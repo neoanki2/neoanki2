@@ -1,41 +1,41 @@
 import Foundation
 
-/// Turns a note into its cards by applying the templates of its note type.
+/// Turns an item into its cards by applying the templates of its item type.
 /// A template that is gated by `generateWhen` is skipped when the condition
-/// isn't met for the note (e.g. no listening card without audio).
+/// isn't met for the item (e.g. no listening card without audio).
 public enum CardGenerator {
     public static func cards(
-        for note: Note,
-        type: NoteType,
+        for item: Item,
+        type: ItemType,
         now: Date = .now
     ) -> [Card] {
         type.templates.compactMap { template in
-            guard shouldGenerate(template, for: note) else { return nil }
+            guard shouldGenerate(template, for: item) else { return nil }
             return Card(
-                noteID: note.id,
+                itemID: item.id,
                 templateID: template.id,
                 skill: template.skill,
                 memory: .new(due: now),
-                deckID: note.deckID
+                deckID: item.deckID
             )
         }
     }
 
-    public static func shouldGenerate(_ template: CardTemplate, for note: Note) -> Bool {
+    public static func shouldGenerate(_ template: Template, for item: Item) -> Bool {
         guard let condition = template.generateWhen else { return true }
-        return evaluate(condition, for: note)
+        return evaluate(condition, for: item)
     }
 
-    private static func evaluate(_ condition: SlotCondition, for note: Note) -> Bool {
+    private static func evaluate(_ condition: SlotCondition, for item: Item) -> Bool {
         switch condition {
         case let .fieldNotEmpty(fieldID):
-            return !note.isFieldEmpty(fieldID)
+            return !item.isFieldEmpty(fieldID)
         case let .fieldEmpty(fieldID):
-            return note.isFieldEmpty(fieldID)
+            return item.isFieldEmpty(fieldID)
         case let .all(conditions):
-            return conditions.allSatisfy { evaluate($0, for: note) }
+            return conditions.allSatisfy { evaluate($0, for: item) }
         case let .any(conditions):
-            return conditions.contains { evaluate($0, for: note) }
+            return conditions.contains { evaluate($0, for: item) }
         }
     }
 }

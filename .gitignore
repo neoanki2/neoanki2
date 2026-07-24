@@ -4,4 +4,8 @@
 xcuserdata/
 DerivedData/
 *.xcodeproj/
+!UITests/NeoAnki2UITests.xcodeproj/
+!UITests/NeoAnki2UITests.xcodeproj/**
 *.xcworkspace/
+!UITests/NeoAnki2UITests.xcodeproj/project.xcworkspace/
+!UITests/NeoAnki2UITests.xcodeproj/project.xcworkspace/**

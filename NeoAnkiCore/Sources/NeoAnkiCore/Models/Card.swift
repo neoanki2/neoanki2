@@ -1,14 +1,14 @@
 import Foundation
 
-/// A single reviewable probe: one note viewed through one template, plus its
-/// own memory state. Content is not copied here — it is resolved from the note
+/// A single reviewable probe: one item viewed through one template, plus its
+/// own memory state. Content is not copied here — it is resolved from the item
 /// and template at study time — so a card stays small and always in sync.
 public struct Card: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
-    public var noteID: UUID
+    public var itemID: UUID
     public var templateID: UUID
     /// Cached from the template so cards can be queried/filtered by skill
-    /// without loading the note type.
+    /// without loading the item type.
     public var skill: Skill
     public var memory: MemoryState
     public var isSuspended: Bool
@@ -16,7 +16,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
 
     public init(
         id: UUID = UUID(),
-        noteID: UUID,
+        itemID: UUID,
         templateID: UUID,
         skill: Skill,
         memory: MemoryState = .new(),
@@ -24,7 +24,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         deckID: UUID? = nil
     ) {
         self.id = id
-        self.noteID = noteID
+        self.itemID = itemID
         self.templateID = templateID
         self.skill = skill
         self.memory = memory

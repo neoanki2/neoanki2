@@ -20,5 +20,13 @@ let package = Package(
             ],
             path: "Sources/NeoAnki2"
         ),
+        .testTarget(
+            name: "NeoAnki2Tests",
+            dependencies: [
+                "NeoAnki2",
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+            ],
+            path: "Tests/NeoAnki2Tests"
+        ),
     ]
 )

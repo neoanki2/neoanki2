@@ -1,0 +1,98 @@
+import Foundation
+
+enum Schema {
+    static let version = 2
+
+    static let createStatements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS item_types (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            definition BLOB NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS items (
+            id TEXT PRIMARY KEY NOT NULL,
+            item_type_id TEXT NOT NULL REFERENCES item_types(id),
+            fields BLOB NOT NULL,
+            tags BLOB NOT NULL,
+            deck_id TEXT,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS cards (
+            id TEXT PRIMARY KEY NOT NULL,
+            item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            template_id TEXT NOT NULL,
+            skill BLOB NOT NULL,
+            memory BLOB NOT NULL,
+            due_at REAL NOT NULL DEFAULT 0,
+            is_suspended INTEGER NOT NULL DEFAULT 0,
+            deck_id TEXT
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS review_logs (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            reviewed_at REAL NOT NULL,
+            log BLOB NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS decks (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT REFERENCES decks(id)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_item_id ON cards(item_id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_due_at ON cards(due_at);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 1.
+    static let migrationV2Statements: [String] = [
+        """
+        ALTER TABLE cards ADD COLUMN due_at REAL NOT NULL DEFAULT 0;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS review_logs (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            reviewed_at REAL NOT NULL,
+            log BLOB NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS decks (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT REFERENCES decks(id)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_due_at ON cards(due_at);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
+        """,
+    ]
+}

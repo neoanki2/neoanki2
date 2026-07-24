@@ -1,9 +1,9 @@
 import Foundation
 
-/// A declarative recipe for producing one card from a note. Pure data (no
+/// A declarative recipe for producing one card from an item. Pure data (no
 /// markup), so a visual builder and a text/DSL form can share one source of
-/// truth. Each note type owns a list of these.
-public struct CardTemplate: Codable, Equatable, Sendable, Identifiable {
+/// truth. Each item type owns a list of these.
+public struct Template: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public var name: String
     /// What the learner sees before answering.
@@ -13,7 +13,7 @@ public struct CardTemplate: Codable, Equatable, Sendable, Identifiable {
     public var interaction: Interaction
     public var skill: Skill
     /// Optional gate: if set and unsatisfied, this template produces no card
-    /// for a given note (e.g. only make a listening card when audio exists).
+    /// for a given item (e.g. only make a listening card when audio exists).
     public var generateWhen: SlotCondition?
 
     public init(
@@ -57,7 +57,7 @@ public struct Slot: Codable, Equatable, Sendable {
 
 /// Where a slot's content comes from.
 public enum SlotSource: Codable, Equatable, Sendable {
-    /// Content of a note field, referenced by `FieldDef.id`.
+    /// Content of an item field, referenced by `FieldDef.id`.
     case field(UUID)
     /// Static template text (labels like "Translate:", "Define:").
     case literal(String)
@@ -104,7 +104,7 @@ public enum Interaction: String, Codable, Sendable {
     case arrange
 }
 
-/// A boolean condition over a note's fields, used to gate card generation.
+/// A boolean condition over an item's fields, used to gate card generation.
 public indirect enum SlotCondition: Codable, Equatable, Sendable {
     case fieldNotEmpty(UUID)
     case fieldEmpty(UUID)

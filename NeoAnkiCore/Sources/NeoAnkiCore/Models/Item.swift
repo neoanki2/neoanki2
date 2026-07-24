@@ -1,24 +1,24 @@
 import Foundation
 
-/// A concrete piece of knowledge: values for the fields of its `NoteType`.
-/// A note holds content once; cards are generated from it per template, so
-/// editing the note updates every card that draws from it.
-public struct Note: Codable, Equatable, Sendable, Identifiable {
+/// A concrete piece of knowledge: values for the fields of its `ItemType`.
+/// An item holds content once; cards are generated from it per template, so
+/// editing the item updates every card that draws from it.
+public struct Item: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
-    public var noteTypeID: UUID
+    public var itemTypeID: UUID
     public var fields: [FieldValue]
     public var tags: [String]
     public var deckID: UUID?
 
     public init(
         id: UUID = UUID(),
-        noteTypeID: UUID,
+        itemTypeID: UUID,
         fields: [FieldValue],
         tags: [String] = [],
         deckID: UUID? = nil
     ) {
         self.id = id
-        self.noteTypeID = noteTypeID
+        self.itemTypeID = itemTypeID
         self.fields = fields
         self.tags = tags
         self.deckID = deckID
@@ -33,7 +33,7 @@ public struct Note: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-/// One field's content on a note. Stored as an array (not a dictionary) so it
+/// One field's content on an item. Stored as an array (not a dictionary) so it
 /// serializes to clean, stable JSON keyed by the field's UUID.
 public struct FieldValue: Codable, Equatable, Sendable {
     public var fieldID: UUID

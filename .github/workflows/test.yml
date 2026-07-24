@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-fast:
+    name: Core unit + flow tests
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run NeoAnkiCore tests
+        run: |
+          cd NeoAnkiCore
+          swift test --parallel
+
+  app-models:
+    name: App ViewModel tests
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run NeoAnki2Tests
+        run: swift test --filter NeoAnki2Tests --parallel
+
+  ui-smoke:
+    name: UI smoke tests
+    runs-on: macos-14
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app bundle and run UI tests
+        run: |
+          chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh
+          ./Scripts/run-ui-tests.sh

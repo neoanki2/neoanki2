@@ -9,9 +9,23 @@ let package = Package(
     ],
     products: [
         .library(name: "NeoAnkiCore", targets: ["NeoAnkiCore"]),
+        .library(name: "NeoAnkiTestSupport", targets: ["NeoAnkiTestSupport"]),
     ],
     targets: [
-        .target(name: "NeoAnkiCore"),
+        .target(
+            name: "NeoAnkiCore",
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+            ]
+        ),
+        .target(
+            name: "NeoAnkiTestSupport",
+            dependencies: ["NeoAnkiCore"]
+        ),
         .testTarget(name: "NeoAnkiCoreTests", dependencies: ["NeoAnkiCore"]),
+        .testTarget(
+            name: "NeoAnkiFlowTests",
+            dependencies: ["NeoAnkiCore", "NeoAnkiTestSupport"]
+        ),
     ]
 )

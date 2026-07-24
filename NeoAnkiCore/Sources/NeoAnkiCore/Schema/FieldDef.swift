@@ -1,6 +1,6 @@
 import Foundation
 
-/// A user-declared slot of content on a note type. Names and types are data,
+/// A user-declared slot of content on an item type. Names and types are data,
 /// so no field ("Front", "Audio", "Meaning", ...) is privileged by the core.
 public struct FieldDef: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID

@@ -2,19 +2,19 @@ import Foundation
 import Testing
 @testable import NeoAnkiCore
 
-private func makeNoteType() -> (NoteType, front: FieldDef, back: FieldDef, audio: FieldDef) {
+private func makeItemType() -> (ItemType, front: FieldDef, back: FieldDef, audio: FieldDef) {
     let front = FieldDef(name: "Front", type: .text)
     let back = FieldDef(name: "Back", type: .text)
     let audio = FieldDef(name: "Audio", type: .audio)
 
-    let recall = CardTemplate(
+    let recall = Template(
         name: "Recall",
         prompt: Side(slots: [Slot(source: .field(front.id))]),
         answer: Side(slots: [Slot(source: .field(back.id))]),
         interaction: .reveal,
         skill: Skill(input: .text, output: .freeResponse, operation: .recall)
     )
-    let listening = CardTemplate(
+    let listening = Template(
         name: "Listening",
         prompt: Side(slots: [
             Slot(source: .field(audio.id), presentation: Presentation(media: .autoplay)),
@@ -25,7 +25,7 @@ private func makeNoteType() -> (NoteType, front: FieldDef, back: FieldDef, audio
         generateWhen: .fieldNotEmpty(audio.id)
     )
 
-    let type = NoteType(
+    let type = ItemType(
         name: "Basic",
         fields: [front, back, audio],
         templates: [recall, listening]
@@ -34,21 +34,21 @@ private func makeNoteType() -> (NoteType, front: FieldDef, back: FieldDef, audio
 }
 
 @Test func gatedTemplateIsSkippedWhenFieldEmpty() {
-    let (type, front, back, _) = makeNoteType()
-    let note = Note(noteTypeID: type.id, fields: [
+    let (type, front, back, _) = makeItemType()
+    let item = Item(itemTypeID: type.id, fields: [
         FieldValue(fieldID: front.id, value: .text("Q")),
         FieldValue(fieldID: back.id, value: .text("A")),
     ])
 
-    let cards = CardGenerator.cards(for: note, type: type)
+    let cards = CardGenerator.cards(for: item, type: type)
 
     #expect(cards.count == 1)
     #expect(cards.first?.skill.operation == .recall)
 }
 
 @Test func gatedTemplateGeneratesWhenFieldPresent() {
-    let (type, front, back, audio) = makeNoteType()
-    let note = Note(noteTypeID: type.id, fields: [
+    let (type, front, back, audio) = makeItemType()
+    let item = Item(itemTypeID: type.id, fields: [
         FieldValue(fieldID: front.id, value: .text("Q")),
         FieldValue(fieldID: back.id, value: .text("A")),
         FieldValue(
@@ -57,15 +57,15 @@ private func makeNoteType() -> (NoteType, front: FieldDef, back: FieldDef, audio
         ),
     ])
 
-    let cards = CardGenerator.cards(for: note, type: type)
+    let cards = CardGenerator.cards(for: item, type: type)
 
     #expect(cards.count == 2)
     #expect(cards.allSatisfy { $0.memory.phase == .new })
 }
 
-@Test func notePreservesMediaThroughCoding() throws {
-    let (type, front, back, audio) = makeNoteType()
-    let note = Note(noteTypeID: type.id, fields: [
+@Test func itemPreservesMediaThroughCoding() throws {
+    let (type, front, back, audio) = makeItemType()
+    let item = Item(itemTypeID: type.id, fields: [
         FieldValue(fieldID: front.id, value: .text("Q")),
         FieldValue(fieldID: back.id, value: .rich([Span("A", styles: [.bold])])),
         FieldValue(
@@ -74,8 +74,8 @@ private func makeNoteType() -> (NoteType, front: FieldDef, back: FieldDef, audio
         ),
     ])
 
-    let data = try JSONEncoder().encode(note)
-    let decoded = try JSONDecoder().decode(Note.self, from: data)
+    let data = try JSONEncoder().encode(item)
+    let decoded = try JSONDecoder().decode(Item.self, from: data)
 
-    #expect(decoded == note)
+    #expect(decoded == item)
 }

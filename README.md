@@ -12,7 +12,7 @@ no SM-2) in favor of a clean, native, and scientifically grounded model.
 - **Native-only.** Card content is data (`ContentValue`), rendered by SwiftUI.
   No HTML, no CSS, no template markup.
 - **Domain-neutral.** The core knows about no subject. Anatomy, music,
-  chemistry, and geography are all just user-declared note types. You can delete
+  chemistry, and geography are all just user-declared item types. You can delete
   any subject without touching a single type.
 - **Learning-science first.** The schema encodes the testing effect, encoding
   specificity, desirable difficulties, dual coding, atomicity, and interleaving.
@@ -24,9 +24,9 @@ no SM-2) in favor of a clean, native, and scientifically grounded model.
 ```
 NeoAnkiCore/Sources/NeoAnkiCore/
   Content/   ContentValue, MediaRef        — the raw knowledge, native values
-  Schema/    NoteType, FieldDef,           — how content is structured,
-             CardTemplate, Skill              presented, and tested
-  Models/    Note, Card, Deck,             — concrete instances and generation
+  Schema/    ItemType, FieldDef,           — how content is structured,
+             Template, Skill                  presented, and tested
+  Models/    Item, Card, Deck,             — concrete instances and generation
              CardGenerator
   SRS/       MemoryState, Scheduler,       — memory and scheduling (FSRS)
              ReviewRating, ReviewLog

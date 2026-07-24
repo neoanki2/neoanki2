@@ -14,17 +14,17 @@ port.
   `.code`, …), not visual markup.
 - **No Anki interop.** No `.apkg`/`.colpkg`, no shared-deck import, no `{{Field}}`
   templates. A clean schema is chosen over a migration path.
-- **Generic and domain-neutral.** The core knows no subject. Fields, note types,
+- **Generic and domain-neutral.** The core knows no subject. Fields, item types,
   and templates are user-declared data.
 
-  | Domain    | Example note type                | Example generated cards                            |
+  | Domain    | Example item type                | Example generated cards                            |
   | --------- | -------------------------------- | -------------------------------------------------- |
   | Anatomy   | Bone (name, region, image)       | image → recall name; name → locate                 |
   | Music     | Interval (name, audio, notation) | audio → name interval; notation → reproduce        |
   | Chemistry | Element (symbol, name, number)   | symbol → name; name → atomic number                |
   | Geography | Country (name, map, capital)     | map → name; name → capital                         |
 
-  **Acceptance test:** deleting a subject (its notes and note type) must require
+  **Acceptance test:** deleting a subject (its items and item type) must require
   no change to any Swift type, enum case, or scheduler. If it does, the design has
   leaked domain knowledge and is wrong.
 - **Grounded in learning science.** Every structural decision maps to a finding
@@ -36,11 +36,11 @@ port.
 
 | Principle | Structural decision |
 | --- | --- |
-| **Testing effect** | Knowledge (`Note`) is separated from its tests (`Card`s); one note spawns many independent retrieval events. |
+| **Testing effect** | Knowledge (`Item`) is separated from its tests (`Card`s); one item spawns many independent retrieval events. |
 | **Encoding specificity** | `Skill = input Modality × output Modality × Operation`; each card trains one explicit route. |
 | **Desirable difficulties (Bjork)** | `Interaction` (`.reveal`, `.type`, `.choose`, `.record`, `.cloze`, `.arrange`) dials the effort a card demands. |
 | **Dual coding** | Media is a first-class `ContentValue` (`.media(MediaRef)`), not an attachment on text. |
-| **Atomicity / minimum information** | Cards are per-template probes; a note fans out into many atomic cards. |
+| **Atomicity / minimum information** | Cards are per-template probes; an item fans out into many atomic cards. |
 | **Interleaving** | Scheduling operates on the flat pool of due cards; `Deck`s are organizational only. |
 | **Modern scheduling (FSRS / DSR)** | `MemoryState` exposes `stability`/`difficulty`; the `Scheduler` protocol is implemented by FSRS. |
 
@@ -56,8 +56,8 @@ Layer 1 — CONTENT (domain-neutral, native)
   ContentValue, Span, ClozeSpan, MediaRef
 
 Layer 2 — SCHEMA / PRESENTATION (user-declared)
-  NoteType → [FieldDef], [CardTemplate]
-  CardTemplate → prompt/answer Side → [Slot(SlotSource + Presentation)]
+  ItemType → [FieldDef], [Template]
+  Template → prompt/answer Side → [Slot(SlotSource + Presentation)]
   Interaction, SlotCondition, Skill
 
 Layer 3 — MEMORY / SCHEDULING (algorithm-agnostic)
@@ -84,9 +84,9 @@ differently on prompt vs. answer.
 ### Layer 2 — Schema / Presentation
 
 ```swift
-public struct NoteType { var name: String; var fields: [FieldDef]; var templates: [CardTemplate] }
+public struct ItemType { var name: String; var fields: [FieldDef]; var templates: [Template] }
 
-public struct CardTemplate {
+public struct Template {
     var prompt: Side                 // what the learner sees first
     var answer: Side                 // what is revealed / checked
     var interaction: Interaction     // how the learner responds
@@ -120,21 +120,21 @@ cards. `ReviewRating` is a 1–4 grade; every review appends a `ReviewLog`.
 
 | Entity | Purpose |
 | --- | --- |
-| `NoteType` | User-declared schema: fields notes hold and templates that make cards. |
+| `ItemType` | User-declared schema: fields items hold and templates that make cards. |
 | `FieldDef` | One named, typed slot (`text`, `richText`, `audio`, `image`, `gif`, `video`, `number`). |
-| `CardTemplate` | Pure-data recipe turning one note into one card. |
-| `Note` | Field values for a note type, plus tags and optional deck. |
+| `Template` | Pure-data recipe turning one item into one card. |
+| `Item` | Field values for an item type, plus tags and optional deck. |
 | `FieldValue` | One field's `ContentValue`, keyed by `FieldDef` UUID. |
-| `Card` | A reviewable probe: one note × one template, plus `MemoryState`. |
+| `Card` | A reviewable probe: one item × one template, plus `MemoryState`. |
 | `Deck` | Hierarchical study grouping; organization only. |
 | `MemoryState` | Per-card memory: `stability`, `difficulty`, `due`, `reps`, `lapses`, `phase`. |
 | `ReviewLog` | Append-only record of one review; drives stats and scheduler optimization. |
 
 ```mermaid
 graph TD
-    NT[NoteType] -->|fields| FD[FieldDef]
-    NT -->|templates| CT[CardTemplate]
-    N[Note] -->|noteTypeID| NT
+    NT[ItemType] -->|fields| FD[FieldDef]
+    NT -->|templates| CT[Template]
+    N[Item] -->|itemTypeID| NT
     N -->|fields| FV[FieldValue]
     N -->|CardGenerator.cards| C[Card]
     CT -.->|one card per template| C
@@ -144,15 +144,15 @@ graph TD
     SCH -.->|updates| MS
 ```
 
-A `Card` stores only `noteID`, `templateID`, cached `skill`, and memory; content
-is resolved from note and template at study time, so cards stay small and in sync
+A `Card` stores only `itemID`, `templateID`, cached `skill`, and memory; content
+is resolved from item and template at study time, so cards stay small and in sync
 with edits.
 
 ---
 
 ## 5. Worked Example
 
-A **Capitals** note type — three fields, three templates:
+A **Capitals** item type — three fields, three templates:
 
 | Field     | Type    | Required |
 | --------- | ------- | -------- |
@@ -165,11 +165,11 @@ A **Capitals** note type — three fields, three templates:
 3. **Locate** — prompt `Map`, reveal `Country`. `.reveal`, `image → spatial, locate`, `generateWhen = .fieldNotEmpty(mapFieldID)`.
 
 ```swift
-let cards = CardGenerator.cards(for: note, type: capitalsType)
+let cards = CardGenerator.cards(for: item, type: capitalsType)
 // with a map  → 3 cards; without a map → 2 (template 3 skipped)
 ```
 
-One note, up to three atomic cards, each training a distinct `Skill`, scheduled
+One item, up to three atomic cards, each training a distinct `Skill`, scheduled
 independently. Adding an `audio` field plus a template yields a listening card
 with no change to any core type.
 
