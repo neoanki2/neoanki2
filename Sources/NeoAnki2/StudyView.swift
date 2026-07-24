@@ -4,6 +4,7 @@ import SwiftUI
 struct StudyView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: StudyModel
+    let scope: StudyScope
     @Binding var endSessionTrigger: Bool
     let onEndSession: () -> Void
 
@@ -25,7 +26,7 @@ struct StudyView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.detailBackground)
         .task {
-            await model.startSession()
+            await model.startSession(scope: scope)
         }
         .onChange(of: endSessionTrigger) { _, triggered in
             guard triggered else { return }
@@ -140,10 +141,10 @@ struct StudyView: View {
 
     private var studyHeader: some View {
         HStack {
-            Text(model.progressLabel)
+            Text(model.headerLabel)
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("Progress, \(model.progressLabel)")
+                .accessibilityLabel("Progress, \(model.headerLabel)")
 
             Spacer()
 

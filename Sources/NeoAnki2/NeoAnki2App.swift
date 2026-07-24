@@ -4,14 +4,15 @@ import SwiftUI
 @main
 struct NeoAnki2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var model: ItemsModel?
+    @State private var itemsModel: ItemsModel?
+    @State private var decksModel: DecksModel?
     @State private var bootstrapError: String?
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if let model {
-                    ContentView(model: model)
+                if let itemsModel, let decksModel {
+                    ContentView(itemsModel: itemsModel, decksModel: decksModel)
                 } else if let bootstrapError {
                     ContentUnavailableView {
                         Label("Could Not Start", systemImage: "exclamationmark.triangle")
@@ -37,7 +38,8 @@ struct NeoAnki2App: App {
         do {
             let store = try ItemStore(databaseURL: AppDatabase.defaultURL)
             try await store.bootstrap()
-            model = ItemsModel(store: store)
+            itemsModel = ItemsModel(store: store)
+            decksModel = DecksModel(store: store)
         } catch {
             bootstrapError = error.localizedDescription
         }

@@ -15,6 +15,37 @@ private func makeStudyModel() async throws -> (StudyModel, ItemStore) {
     return (StudyModel(store: store), store)
 }
 
+@Test @MainActor func studyModelStartsScopedSession() async throws {
+    let (model, store) = try await makeStudyModel()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ],
+            deckID: deck.id
+        )
+    )
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Other")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Card")),
+            ]
+        )
+    )
+
+    await model.startSession(scope: .deck(deck.id, name: "Geography"))
+
+    #expect(model.queue.count == 1)
+    #expect(model.scopeLabel == "Geography")
+}
+
 @Test @MainActor func studyModelStartsSessionWithDueCards() async throws {
     let (model, store) = try await makeStudyModel()
     let itemType = try await store.defaultItemType()

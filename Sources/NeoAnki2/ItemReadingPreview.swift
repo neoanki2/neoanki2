@@ -58,13 +58,17 @@ struct ItemReadingPreview: View {
 
 struct ItemDetailView: View {
     @Bindable var model: ItemsModel
+    @Bindable var decksModel: DecksModel
+    let scope: StudyScope
     let summary: SavedItemSummary
     var onDeleted: () -> Void = {}
 
     @State private var item: Item?
     @State private var itemType: ItemType?
+    @State private var selectedDeckID: UUID?
     @State private var isLoading = true
     @State private var isDeleting = false
+    @State private var isMovingDeck = false
     @State private var showDeleteConfirm = false
     @State private var errorMessage: String?
 
@@ -83,6 +87,24 @@ struct ItemDetailView: View {
                 ScrollView {
                     VStack(spacing: DesignSystem.Spacing.lg) {
                         ItemReadingPreview(item: item, itemType: itemType)
+
+                        if !decksModel.summaries.isEmpty {
+                            Picker("Deck", selection: $selectedDeckID) {
+                                Text("Unassigned").tag(UUID?.none)
+                                ForEach(decksModel.summaries) { deck in
+                                    Text(deck.name).tag(Optional(deck.id))
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityLabel("Deck")
+                            .accessibilityIdentifier("itemDeckPicker")
+                            .onChange(of: selectedDeckID) { oldValue, newValue in
+                                guard oldValue != newValue, !isLoading else { return }
+                                Task { await moveDeck(to: newValue) }
+                            }
+                        }
 
                         Text("\(summary.cardCount) cards · \(summary.itemTypeName)")
                             .font(DesignSystem.Typography.uiCaption)
@@ -142,6 +164,7 @@ struct ItemDetailView: View {
             if let loaded = try await model.store.fetchItem(id: summary.id) {
                 item = loaded.item
                 itemType = loaded.itemType
+                selectedDeckID = loaded.item.deckID
             } else {
                 errorMessage = "This item could not be found."
             }
@@ -153,11 +176,25 @@ struct ItemDetailView: View {
     }
 
     @MainActor
+    private func moveDeck(to deckID: UUID?) async {
+        guard !isMovingDeck else { return }
+        isMovingDeck = true
+        defer { isMovingDeck = false }
+
+        if await model.moveItem(id: summary.id, to: deckID, scope: scope) {
+            item?.deckID = deckID
+            await decksModel.load()
+        } else {
+            selectedDeckID = item?.deckID
+        }
+    }
+
+    @MainActor
     private func deleteItem() async {
         isDeleting = true
         defer { isDeleting = false }
 
-        if await model.deleteItem(id: summary.id) {
+        if await model.deleteItem(id: summary.id, scope: scope) {
             onDeleted()
         }
     }

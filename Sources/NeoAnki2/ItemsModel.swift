@@ -11,6 +11,7 @@ final class ItemsModel {
     private(set) var errorMessage: String?
 
     var addItemTypeID: ItemType.ID?
+    var addItemDeckID: UUID?
 
     let store: ItemStore
 
@@ -23,7 +24,7 @@ final class ItemsModel {
         return itemTypes.first { $0.id == addItemTypeID } ?? itemTypes.first
     }
 
-    func load() async {
+    func load(scope: StudyScope = .allDecks) async {
         isLoading = true
         errorMessage = nil
         do {
@@ -33,20 +34,26 @@ final class ItemsModel {
             } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
                 addItemTypeID = itemTypes.first?.id
             }
-            items = try await store.listItems()
-            dueCount = try await store.dueCount()
+            items = try await store.listItems(scope: scope.filter)
+            dueCount = try await store.dueCount(scope: scope.filter)
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
     }
 
-    func addItem(fieldSpans: [UUID: [Span]], fieldText: [UUID: String] = [:]) async -> Bool {
+    func addItem(
+        fieldSpans: [UUID: [Span]],
+        fieldText: [UUID: String] = [:],
+        deckID: UUID? = nil
+    ) async -> Bool {
         errorMessage = nil
         guard let itemType else {
             errorMessage = "No item type is available."
             return false
         }
+
+        let resolvedDeckID = deckID ?? addItemDeckID
 
         let fields = itemType.fields
             .filter(\.supportsTextInput)
@@ -64,10 +71,10 @@ final class ItemsModel {
             }
 
         do {
-            let item = Item(itemTypeID: itemType.id, fields: fields)
+            let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
             let saved = try await store.createItem(item)
             items.insert(saved, at: 0)
-            dueCount = try await store.dueCount()
+            dueCount = try await store.dueCount(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -78,16 +85,38 @@ final class ItemsModel {
         }
     }
 
-    func deleteItem(id: UUID) async -> Bool {
+    func deleteItem(id: UUID, scope: StudyScope = .allDecks) async -> Bool {
         errorMessage = nil
         do {
             guard try await store.deleteItem(id: id) else { return false }
             items.removeAll { $0.id == id }
-            dueCount = try await store.dueCount()
+            dueCount = try await store.dueCount(scope: scope.filter)
             return true
         } catch {
             errorMessage = UserFacingError.message(from: error)
             return false
         }
+    }
+
+    func moveItem(id: UUID, to deckID: UUID?, scope: StudyScope = .allDecks) async -> Bool {
+        errorMessage = nil
+        do {
+            guard try await store.updateItemDeck(itemID: id, deckID: deckID) else { return false }
+            await load(scope: scope)
+            return true
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
+    private var cachedScope: StudyScope = .allDecks
+
+    private func currentScopeFilter() -> DeckScope {
+        cachedScope.filter
+    }
+
+    func setCachedScope(_ scope: StudyScope) {
+        cachedScope = scope
     }
 }

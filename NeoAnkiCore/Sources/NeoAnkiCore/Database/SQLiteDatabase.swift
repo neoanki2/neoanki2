@@ -11,6 +11,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case deckNotFound(UUID)
     case requiredFieldEmpty(String)
     case invalidItemType(String)
+    case invalidDeck(String)
     case encodingFailed
     case decodingFailed
 
@@ -33,6 +34,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
         case let .requiredFieldEmpty(name):
             return "\(name) is required."
         case let .invalidItemType(message):
+            return message
+        case let .invalidDeck(message):
             return message
         case .encodingFailed:
             return "Could not encode data for storage."
@@ -222,6 +225,245 @@ actor SQLiteDatabase {
 
         let parentID = (row["parent_id"] as? String).flatMap(UUID.init(uuidString:))
         return Deck(id: deckID, name: name, parentID: parentID)
+    }
+
+    func fetchAllDecks() throws -> [Deck] {
+        let rows = try query(
+            """
+            SELECT id, name, parent_id
+            FROM decks
+            ORDER BY name ASC;
+            """
+        )
+        return rows.compactMap { row in
+            guard
+                let idText = row["id"] as? String,
+                let deckID = UUID(uuidString: idText),
+                let name = row["name"] as? String
+            else { return nil }
+            let parentID = (row["parent_id"] as? String).flatMap(UUID.init(uuidString:))
+            return Deck(id: deckID, name: name, parentID: parentID)
+        }
+    }
+
+    func updateDeck(_ deck: Deck) throws {
+        try execute(
+            """
+            UPDATE decks
+            SET name = ?, parent_id = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .text(deck.name),
+                deck.parentID.map { .text($0.uuidString) } ?? .null,
+                .text(deck.id.uuidString),
+            ]
+        )
+    }
+
+    func deleteDeck(id: UUID) throws {
+        try execute(
+            "DELETE FROM decks WHERE id = ?;",
+            bindings: [.text(id.uuidString)]
+        )
+    }
+
+    func reparentChildDecks(from parentID: UUID, to newParentID: UUID?) throws {
+        try execute(
+            """
+            UPDATE decks
+            SET parent_id = ?
+            WHERE parent_id = ?;
+            """,
+            bindings: [
+                newParentID.map { .text($0.uuidString) } ?? .null,
+                .text(parentID.uuidString),
+            ]
+        )
+    }
+
+    func countItems(deckID: UUID) throws -> Int {
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM items WHERE deck_id = ?;",
+            bindings: [.text(deckID.uuidString)]
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func countUnassignedItems() throws -> Int {
+        let rows = try query("SELECT COUNT(*) AS count FROM items WHERE deck_id IS NULL;")
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func countItems(deckIDs: Set<UUID>) throws -> Int {
+        guard !deckIDs.isEmpty else { return 0 }
+        let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM items
+            WHERE deck_id IN (\(placeholders));
+            """,
+            bindings: deckIDs.sorted { $0.uuidString < $1.uuidString }.map { .text($0.uuidString) }
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func moveItems(fromDeckID: UUID, toDeckID: UUID?) throws {
+        try execute(
+            """
+            UPDATE items
+            SET deck_id = ?, updated_at = ?
+            WHERE deck_id = ?;
+            """,
+            bindings: [
+                toDeckID.map { .text($0.uuidString) } ?? .null,
+                .double(Date.now.timeIntervalSince1970),
+                .text(fromDeckID.uuidString),
+            ]
+        )
+    }
+
+    func updateItemDeck(itemID: UUID, deckID: UUID?) throws {
+        try execute(
+            """
+            UPDATE items
+            SET deck_id = ?, updated_at = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                deckID.map { .text($0.uuidString) } ?? .null,
+                .double(Date.now.timeIntervalSince1970),
+                .text(itemID.uuidString),
+            ]
+        )
+    }
+
+    func updateCardsDeck(itemID: UUID, deckID: UUID?) throws {
+        try execute(
+            """
+            UPDATE cards
+            SET deck_id = ?
+            WHERE item_id = ?;
+            """,
+            bindings: [
+                deckID.map { .text($0.uuidString) } ?? .null,
+                .text(itemID.uuidString),
+            ]
+        )
+    }
+
+    func fetchItems(deckID: UUID) throws -> [PersistedItem] {
+        let rows = try query(
+            """
+            SELECT id, item_type_id, fields, tags, deck_id, created_at, updated_at
+            FROM items
+            WHERE deck_id = ?
+            ORDER BY created_at DESC;
+            """,
+            bindings: [.text(deckID.uuidString)]
+        )
+        return try rows.map { try decodePersistedItem(from: $0) }
+    }
+
+    func fetchItems(deckIDs: Set<UUID>) throws -> [PersistedItem] {
+        guard !deckIDs.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
+        let rows = try query(
+            """
+            SELECT id, item_type_id, fields, tags, deck_id, created_at, updated_at
+            FROM items
+            WHERE deck_id IN (\(placeholders))
+            ORDER BY created_at DESC;
+            """,
+            bindings: deckIDs.sorted { $0.uuidString < $1.uuidString }.map { .text($0.uuidString) }
+        )
+        return try rows.map { try decodePersistedItem(from: $0) }
+    }
+
+    func fetchUnassignedItems() throws -> [PersistedItem] {
+        let rows = try query(
+            """
+            SELECT id, item_type_id, fields, tags, deck_id, created_at, updated_at
+            FROM items
+            WHERE deck_id IS NULL
+            ORDER BY created_at DESC;
+            """
+        )
+        return try rows.map { try decodePersistedItem(from: $0) }
+    }
+
+    func fetchDueCards(deckIDs: Set<UUID>, asOf now: Date, limit: Int? = nil) throws -> [Card] {
+        guard !deckIDs.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
+        var sql = """
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            FROM cards
+            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IN (\(placeholders))
+            ORDER BY due_at ASC
+            """
+        var bindings: [Binding] = [.double(now.timeIntervalSince1970)]
+        bindings.append(contentsOf: deckIDs.sorted { $0.uuidString < $1.uuidString }.map { .text($0.uuidString) })
+        if let limit {
+            sql += " LIMIT \(limit);"
+        } else {
+            sql += ";"
+        }
+        let rows = try query(sql, bindings: bindings)
+        return try rows.map { try decodeCard(from: $0) }
+    }
+
+    func fetchUnassignedDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
+        var sql = """
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            FROM cards
+            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IS NULL
+            ORDER BY due_at ASC
+            """
+        if let limit {
+            sql += " LIMIT \(limit);"
+        } else {
+            sql += ";"
+        }
+        let rows = try query(sql, bindings: [.double(now.timeIntervalSince1970)])
+        return try rows.map { try decodeCard(from: $0) }
+    }
+
+    func countDueCards(deckIDs: Set<UUID>, asOf now: Date) throws -> Int {
+        guard !deckIDs.isEmpty else { return 0 }
+        let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
+        var bindings: [Binding] = [.double(now.timeIntervalSince1970)]
+        bindings.append(contentsOf: deckIDs.sorted { $0.uuidString < $1.uuidString }.map { .text($0.uuidString) })
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM cards
+            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IN (\(placeholders));
+            """,
+            bindings: bindings
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func countDueCards(deckID: UUID, asOf now: Date) throws -> Int {
+        try countDueCards(deckIDs: [deckID], asOf: now)
+    }
+
+    func countUnassignedDueCards(asOf now: Date) throws -> Int {
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM cards
+            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IS NULL;
+            """,
+            bindings: [.double(now.timeIntervalSince1970)]
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
     }
 
     func insertItemWithCards(
@@ -599,6 +841,25 @@ actor SQLiteDatabase {
             return Int(version)
         } catch DatabaseError.queryFailed {
             return 0
+        }
+    }
+
+    func updateItemDeckSync(itemID: UUID, deckID: UUID?) throws {
+        try inTransaction {
+            try updateItemDeck(itemID: itemID, deckID: deckID)
+            try updateCardsDeck(itemID: itemID, deckID: deckID)
+        }
+    }
+
+    func deleteDeckMovingContents(id: UUID, reassignTo: UUID?) throws {
+        try inTransaction {
+            try reparentChildDecks(from: id, to: reassignTo)
+            let items = try fetchItems(deckID: id)
+            for entry in items {
+                try updateItemDeck(itemID: entry.item.id, deckID: reassignTo)
+                try updateCardsDeck(itemID: entry.item.id, deckID: reassignTo)
+            }
+            try deleteDeck(id: id)
         }
     }
 

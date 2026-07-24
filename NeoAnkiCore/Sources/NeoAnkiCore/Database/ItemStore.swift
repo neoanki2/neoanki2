@@ -8,6 +8,7 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     public let title: String
     public let subtitle: String
     public let cardCount: Int
+    public let deckID: UUID?
     public let createdAt: Date
 
     public init(
@@ -17,6 +18,7 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
         title: String,
         subtitle: String,
         cardCount: Int,
+        deckID: UUID? = nil,
         createdAt: Date
     ) {
         self.id = id
@@ -25,6 +27,7 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
         self.title = title
         self.subtitle = subtitle
         self.cardCount = cardCount
+        self.deckID = deckID
         self.createdAt = createdAt
     }
 }
@@ -118,11 +121,108 @@ public actor ItemStore {
         return deck
     }
 
+    /// Returns all persisted decks ordered by name.
+    public func listDecks() async throws -> [Deck] {
+        try await database.fetchAllDecks()
+    }
+
+    /// Returns deck metadata with direct item counts and due counts including subdecks.
+    public func deckSummaries(asOf now: Date = .now) async throws -> [DeckSummary] {
+        let decks = try await database.fetchAllDecks()
+        let summaries = decks.map { deck in
+            DeckSummary(
+                id: deck.id,
+                name: deck.name,
+                parentID: deck.parentID,
+                itemCount: 0,
+                dueCount: 0
+            )
+        }
+
+        var itemCounts: [UUID: Int] = [:]
+        var dueCounts: [UUID: Int] = [:]
+
+        for deck in decks {
+            itemCounts[deck.id] = try await database.countItems(deckID: deck.id)
+        }
+
+        for deck in decks {
+            let scope = DeckTree.descendantIDs(of: deck.id, in: summaries)
+            dueCounts[deck.id] = try await database.countDueCards(deckIDs: scope, asOf: now)
+        }
+
+        return decks.map { deck in
+            DeckSummary(
+                id: deck.id,
+                name: deck.name,
+                parentID: deck.parentID,
+                itemCount: itemCounts[deck.id, default: 0],
+                dueCount: dueCounts[deck.id, default: 0]
+            )
+        }
+    }
+
+    /// Renames or reparents a deck. Rejects cycles.
+    @discardableResult
+    public func updateDeck(_ deck: Deck) async throws -> Deck {
+        guard try await database.fetchDeck(id: deck.id) != nil else {
+            throw DatabaseError.deckNotFound(deck.id)
+        }
+
+        if let parentID = deck.parentID {
+            guard try await database.fetchDeck(id: parentID) != nil else {
+                throw DatabaseError.deckNotFound(parentID)
+            }
+        }
+
+        let summaries = try await deckSummaries()
+        if DeckTree.wouldCreateCycle(deckID: deck.id, newParentID: deck.parentID, in: summaries) {
+            throw DatabaseError.invalidDeck("A deck can't be moved inside itself.")
+        }
+
+        try await database.updateDeck(deck)
+        return deck
+    }
+
+    /// Deletes a deck, reparents subdecks, and moves items to the parent deck or unassigned.
+    @discardableResult
+    public func deleteDeck(id: UUID) async throws -> Bool {
+        guard let deck = try await database.fetchDeck(id: id) else { return false }
+
+        let reassignTo = deck.parentID
+
+        try await database.deleteDeckMovingContents(id: id, reassignTo: reassignTo)
+
+        return true
+    }
+
+    /// Moves an item to another deck and syncs generated cards.
+    @discardableResult
+    public func updateItemDeck(itemID: UUID, deckID: UUID?) async throws -> Bool {
+        guard try await database.fetchItem(id: itemID) != nil else { return false }
+
+        if let deckID {
+            guard try await database.fetchDeck(id: deckID) != nil else {
+                throw DatabaseError.deckNotFound(deckID)
+            }
+        }
+
+        try await database.updateItemDeckSync(itemID: itemID, deckID: deckID)
+
+        return true
+    }
+
     /// Saves an item and the cards generated from its item type templates.
     @discardableResult
     public func createItem(_ item: Item, now: Date = .now) async throws -> SavedItemSummary {
         guard let itemType = try await database.fetchItemType(id: item.itemTypeID) else {
             throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+
+        if let deckID = item.deckID {
+            guard try await database.fetchDeck(id: deckID) != nil else {
+                throw DatabaseError.deckNotFound(deckID)
+            }
         }
 
         try validate(item, against: itemType)
@@ -137,61 +237,62 @@ public actor ItemStore {
             title: ItemDisplay.title(for: item, in: itemType),
             subtitle: ItemDisplay.subtitle(for: item, in: itemType),
             cardCount: cards.count,
+            deckID: item.deckID,
             createdAt: now
         )
     }
 
-    public func listItems() async throws -> [SavedItemSummary] {
-        let persisted = try await database.fetchItems()
-        var summaries: [SavedItemSummary] = []
-        summaries.reserveCapacity(persisted.count)
-
-        for entry in persisted {
-            guard let itemType = try await database.fetchItemType(id: entry.item.itemTypeID) else {
-                continue
+    public func listItems(scope: DeckScope = .allDecks) async throws -> [SavedItemSummary] {
+        let persisted: [PersistedItem]
+        switch scope {
+        case .allDecks:
+            persisted = try await database.fetchItems()
+        case .unassigned:
+            persisted = try await database.fetchUnassignedItems()
+        case let .deck(deckID, includeDescendants):
+            if includeDescendants {
+                let summaries = try await deckSummaries()
+                let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
+                persisted = try await database.fetchItems(deckIDs: deckIDs)
+            } else {
+                persisted = try await database.fetchItems(deckID: deckID)
             }
-            let cardCount = try await database.countCards(for: entry.item.id)
-            summaries.append(
-                SavedItemSummary(
-                    id: entry.item.id,
-                    itemTypeID: itemType.id,
-                    itemTypeName: itemType.name,
-                    title: ItemDisplay.title(for: entry.item, in: itemType),
-                    subtitle: ItemDisplay.subtitle(for: entry.item, in: itemType),
-                    cardCount: cardCount,
-                    createdAt: entry.createdAt
-                )
-            )
         }
-        return summaries
+        return try await summaries(for: persisted)
+    }
+
+    /// Returns all items regardless of deck assignment.
+    public func listItems() async throws -> [SavedItemSummary] {
+        try await listItems(scope: .allDecks)
     }
 
     /// Returns cards due for review at `now`, hydrated with item and template data.
-    public func fetchDueCards(asOf now: Date = .now, limit: Int? = nil) async throws -> [DueCard] {
-        let cards = try await database.fetchDueCards(asOf: now, limit: limit)
-        var dueCards: [DueCard] = []
-        dueCards.reserveCapacity(cards.count)
-
-        for card in cards {
-            guard
-                let persisted = try await database.fetchItem(id: card.itemID),
-                let itemType = try await database.fetchItemType(id: persisted.item.itemTypeID),
-                let template = itemType.templates.first(where: { $0.id == card.templateID })
-            else {
-                continue
+    public func fetchDueCards(
+        scope: DeckScope = .allDecks,
+        asOf now: Date = .now,
+        limit: Int? = nil
+    ) async throws -> [DueCard] {
+        let cards: [Card]
+        switch scope {
+        case .allDecks:
+            cards = try await database.fetchDueCards(asOf: now, limit: limit)
+        case .unassigned:
+            cards = try await database.fetchUnassignedDueCards(asOf: now, limit: limit)
+        case let .deck(deckID, includeDescendants):
+            if includeDescendants {
+                let summaries = try await deckSummaries(asOf: now)
+                let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
+                cards = try await database.fetchDueCards(deckIDs: deckIDs, asOf: now, limit: limit)
+            } else {
+                cards = try await database.fetchDueCards(deckIDs: [deckID], asOf: now, limit: limit)
             }
-
-            dueCards.append(
-                DueCard(
-                    card: card,
-                    item: persisted.item,
-                    itemType: itemType,
-                    template: template
-                )
-            )
         }
+        return try await hydrateDueCards(cards)
+    }
 
-        return dueCards
+    /// Returns all due cards regardless of deck assignment.
+    public func fetchDueCards(asOf now: Date = .now, limit: Int? = nil) async throws -> [DueCard] {
+        try await fetchDueCards(scope: .allDecks, asOf: now, limit: limit)
     }
 
     /// Loads a persisted item with its item type for detail views.
@@ -213,8 +314,32 @@ public actor ItemStore {
         return true
     }
 
+    public func dueCount(scope: DeckScope = .allDecks, asOf now: Date = .now) async throws -> Int {
+        switch scope {
+        case .allDecks:
+            return try await database.countDueCards(asOf: now)
+        case .unassigned:
+            return try await database.countUnassignedDueCards(asOf: now)
+        case let .deck(deckID, includeDescendants):
+            if includeDescendants {
+                let summaries = try await deckSummaries(asOf: now)
+                let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
+                return try await database.countDueCards(deckIDs: deckIDs, asOf: now)
+            }
+            return try await database.countDueCards(deckID: deckID, asOf: now)
+        }
+    }
+
     public func dueCount(asOf now: Date = .now) async throws -> Int {
-        try await database.countDueCards(asOf: now)
+        try await dueCount(scope: .allDecks, asOf: now)
+    }
+
+    public func unassignedDueCount(asOf now: Date = .now) async throws -> Int {
+        try await dueCount(scope: .unassigned, asOf: now)
+    }
+
+    public func unassignedItemCount() async throws -> Int {
+        try await database.countUnassignedItems()
     }
 
     /// Applies a review rating, updates card memory, and appends a review log.
@@ -317,6 +442,57 @@ public actor ItemStore {
         }
 
         return values
+    }
+
+    private func summaries(for persisted: [PersistedItem]) async throws -> [SavedItemSummary] {
+        var summaries: [SavedItemSummary] = []
+        summaries.reserveCapacity(persisted.count)
+
+        for entry in persisted {
+            guard let itemType = try await database.fetchItemType(id: entry.item.itemTypeID) else {
+                continue
+            }
+            let cardCount = try await database.countCards(for: entry.item.id)
+            summaries.append(
+                SavedItemSummary(
+                    id: entry.item.id,
+                    itemTypeID: itemType.id,
+                    itemTypeName: itemType.name,
+                    title: ItemDisplay.title(for: entry.item, in: itemType),
+                    subtitle: ItemDisplay.subtitle(for: entry.item, in: itemType),
+                    cardCount: cardCount,
+                    deckID: entry.item.deckID,
+                    createdAt: entry.createdAt
+                )
+            )
+        }
+        return summaries
+    }
+
+    private func hydrateDueCards(_ cards: [Card]) async throws -> [DueCard] {
+        var dueCards: [DueCard] = []
+        dueCards.reserveCapacity(cards.count)
+
+        for card in cards {
+            guard
+                let persisted = try await database.fetchItem(id: card.itemID),
+                let itemType = try await database.fetchItemType(id: persisted.item.itemTypeID),
+                let template = itemType.templates.first(where: { $0.id == card.templateID })
+            else {
+                continue
+            }
+
+            dueCards.append(
+                DueCard(
+                    card: card,
+                    item: persisted.item,
+                    itemType: itemType,
+                    template: template
+                )
+            )
+        }
+
+        return dueCards
     }
 
     private func validate(_ item: Item, against itemType: ItemType) throws {

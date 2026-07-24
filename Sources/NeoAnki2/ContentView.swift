@@ -4,11 +4,13 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Bindable var model: ItemsModel
+    @Bindable var itemsModel: ItemsModel
+    @Bindable var decksModel: DecksModel
     @State private var isAddingItem = false
     @State private var isManagingTemplates = false
     @State private var isStudying = false
     @State private var studyModel: StudyModel?
+    @State private var studyScope: StudyScope = .allDecks
     @State private var templatesModel: TemplatesModel?
     @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
@@ -16,22 +18,20 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            sidebar
-                .navigationSplitViewColumnWidth(
-                    min: DesignSystem.sidebarMin,
-                    ideal: DesignSystem.sidebarIdeal,
-                    max: DesignSystem.sidebarMax
-                )
+            DeckSidebarView(
+                decksModel: decksModel,
+                selection: $decksModel.selectedScope
+            )
+            .navigationSplitViewColumnWidth(
+                min: DesignSystem.sidebarMin,
+                ideal: DesignSystem.sidebarIdeal,
+                max: DesignSystem.sidebarMax
+            )
         } detail: {
             detail
         }
         .tint(DesignSystem.accent(for: colorScheme))
-        .environment(\.font, DesignSystem.Typography.uiBody)
-        .navigationTitle(
-            isStudying ? "Study"
-                : (isManagingTemplates ? "Item Types"
-                    : (isAddingItem ? "Add Item" : "NeoAnki2"))
-        )
+        .navigationTitle(windowTitle)
         .toolbar {
             if isManagingTemplates {
                 ToolbarItem(placement: .cancellationAction) {
@@ -42,33 +42,11 @@ struct ContentView: View {
                     .accessibilityIdentifier("templatesDone")
                 }
             } else if !isStudying && !isAddingItem {
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        startStudy()
-                    } label: {
-                        if model.dueCount > 0 {
-                            Label("Study", systemImage: "play.fill")
-                                .badge(model.dueCount)
-                        } else {
-                            Label("Study", systemImage: "play.fill")
-                        }
-                    }
-                    .disabled(model.dueCount == 0)
-                    .keyboardShortcut("s", modifiers: [.command, .shift])
-                    .accessibilityIdentifier("studyButton")
-                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Item Types", systemImage: "square.grid.2x2") {
                         openTemplates()
                     }
                     .accessibilityIdentifier("templatesToolbar")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Item", systemImage: "plus") {
-                        openAddItem()
-                    }
-                    .keyboardShortcut("n", modifiers: .command)
-                    .accessibilityIdentifier("addItemToolbar")
                 }
             }
         }
@@ -81,11 +59,22 @@ struct ContentView: View {
         .onChange(of: isAddingItem) { _, adding in
             setAddItemFocus(adding)
         }
+        .onChange(of: decksModel.selectedScope) { _, _ in
+            Task { await reloadScope() }
+        }
         .task {
-            await model.load()
+            await decksModel.load()
+            await reloadScope()
         }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
         .focusedSceneValue(\.libraryCommandHandlers, libraryCommandHandlers)
+    }
+
+    private var windowTitle: String {
+        if isStudying { return "Study" }
+        if isManagingTemplates { return "Item Types" }
+        if isAddingItem { return "Add Item" }
+        return "NeoAnki2"
     }
 
     private var libraryCommandHandlers: LibraryCommandHandlers {
@@ -120,7 +109,7 @@ struct ContentView: View {
             requestEndSession: nil,
             showAnswer: nil,
             grade: nil,
-            canStartStudy: model.dueCount > 0 && !isStudying,
+            canStartStudy: itemsModel.dueCount > 0 && !isStudying,
             canEndSession: false,
             canShowAnswer: false,
             canGrade: false
@@ -158,116 +147,101 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private var sidebar: some View {
-        VStack(spacing: 0) {
-            if let errorMessage = model.errorMessage, !model.isLoading {
-                ErrorBanner(message: errorMessage)
-            }
-
-            Group {
-                if model.isLoading {
-                    ProgressView("Loading items…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if model.items.isEmpty {
-                    SidebarEmptyState(
-                        title: "No Items Yet",
-                        message: "Add an item to generate study cards.",
-                        systemImage: "rectangle.stack.badge.plus",
-                        actionTitle: "Add Item",
-                        action: { openAddItem() },
-                        actionIdentifier: "addItemEmptyState"
-                    )
-                } else {
-                    List(model.items, selection: $selectedItemID) { item in
-                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                            Text(item.title)
-                                .font(DesignSystem.Typography.uiTitle)
-                            Text(item.subtitle)
-                                .foregroundStyle(.secondary)
-                            Text("\(item.cardCount) cards · \(item.itemTypeName)")
-                                .font(DesignSystem.Typography.uiCaption)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.vertical, 2)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(
-                            "\(item.title), \(item.subtitle), \(item.cardCount) cards, \(item.itemTypeName)"
-                        )
-                        .accessibilityIdentifier("itemRow-\(item.title)")
-                    }
-                    .listStyle(.plain)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(DesignSystem.sidebarBackground)
-        .navigationTitle("Items")
-    }
-
-    @ViewBuilder
     private var detail: some View {
         if isManagingTemplates, let templatesModel {
             TemplatesView(model: templatesModel) {
-                await model.load()
+                await reloadScope()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if isStudying, let studyModel {
-            StudyView(model: studyModel, endSessionTrigger: $endSessionTrigger) {
+            StudyView(
+                model: studyModel,
+                scope: studyScope,
+                endSessionTrigger: $endSessionTrigger
+            ) {
                 endStudy()
             }
         } else if isAddingItem {
             NavigationStack {
-                AddItemView(model: model) {
+                AddItemView(model: itemsModel, decksModel: decksModel) {
                     closeAddItem()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(DesignSystem.detailBackground)
         } else if let selectedItemID,
-                  let item = model.items.first(where: { $0.id == selectedItemID }) {
+                  let item = itemsModel.items.first(where: { $0.id == selectedItemID }) {
             NavigationStack {
-                ItemDetailView(model: model, summary: item) {
+                ItemDetailView(
+                    model: itemsModel,
+                    decksModel: decksModel,
+                    scope: decksModel.studyScope,
+                    summary: item
+                ) {
                     self.selectedItemID = nil
                 }
             }
         } else {
-            studyPrompt
+            DeckDetailView(
+                itemsModel: itemsModel,
+                decksModel: decksModel,
+                scope: decksModel.studyScope,
+                selectedItemID: $selectedItemID,
+                onAddItem: { openAddItem() },
+                onStudy: { startStudy() }
+            )
         }
-    }
-
-    private var studyPrompt: some View {
-        ContentUnavailableView {
-            Label("Ready to Study", systemImage: "text.book.closed")
-        } description: {
-            if model.dueCount > 0 {
-                Text("You have \(model.dueCount) due cards. Start a session from the toolbar.")
-            } else if model.items.isEmpty {
-                Text("Add your first item to begin.")
-            } else {
-                Text("Select an item from the sidebar, or study when cards are due.")
-            }
-        } actions: {
-            if model.dueCount > 0 {
-                Button("Study") {
-                    startStudy()
-                }
-                .buttonStyle(.borderedProminent)
-                .accessibilityIdentifier("studyDetailPrompt")
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DesignSystem.detailBackground)
     }
 
     private func openAddItem() {
         selectedItemID = nil
+        itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
         isAddingItem = true
     }
 
     private func closeAddItem() {
         isAddingItem = false
         columnVisibility = .all
-        Task { await model.load() }
+        Task { await reloadScope() }
+    }
+
+    private func reloadScope() async {
+        let scope = decksModel.studyScope
+        itemsModel.setCachedScope(scope)
+        itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
+        await itemsModel.load(scope: scope)
+    }
+
+    private func startStudy() {
+        studyScope = decksModel.studyScope
+        studyModel = StudyModel(store: itemsModel.store)
+        isStudying = true
+    }
+
+    private func endStudy() {
+        isStudying = false
+        studyModel = nil
+        Task {
+            await decksModel.load()
+            await reloadScope()
+        }
+    }
+
+    private func closeItemTypes() {
+        Task {
+            await reloadScope()
+            isManagingTemplates = false
+            columnVisibility = .all
+        }
+    }
+
+    private func openTemplates() {
+        if templatesModel == nil {
+            templatesModel = TemplatesModel(store: itemsModel.store)
+        }
+        selectedItemID = nil
+        isManagingTemplates = true
+        setTemplatesFocus(true)
     }
 
     private func setAddItemFocus(_ focused: Bool) {
@@ -281,34 +255,6 @@ struct ContentView: View {
                 update()
             }
         }
-    }
-
-    private func startStudy() {
-        studyModel = StudyModel(store: model.store)
-        isStudying = true
-    }
-
-    private func endStudy() {
-        isStudying = false
-        studyModel = nil
-        Task { await model.load() }
-    }
-
-    private func closeItemTypes() {
-        Task {
-            await model.load()
-            isManagingTemplates = false
-            columnVisibility = .all
-        }
-    }
-
-    private func openTemplates() {
-        if templatesModel == nil {
-            templatesModel = TemplatesModel(store: model.store)
-        }
-        selectedItemID = nil
-        isManagingTemplates = true
-        setTemplatesFocus(true)
     }
 
     private func setTemplatesFocus(_ focused: Bool) {

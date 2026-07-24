@@ -11,6 +11,7 @@ final class StudyModel {
     private(set) var isGrading = false
     private(set) var errorMessage: String?
     private(set) var isFinished = false
+    private(set) var scopeLabel = ""
 
     let store: ItemStore
 
@@ -28,6 +29,12 @@ final class StudyModel {
         return "Card \(min(index + 1, queue.count)) of \(queue.count)"
     }
 
+    var headerLabel: String {
+        guard !scopeLabel.isEmpty else { return progressLabel }
+        guard !progressLabel.isEmpty else { return scopeLabel }
+        return "\(scopeLabel) · \(progressLabel)"
+    }
+
     var cardsReviewed: Int {
         index
     }
@@ -40,15 +47,16 @@ final class StudyModel {
         return "Reviewed \(count) cards"
     }
 
-    func startSession() async {
+    func startSession(scope: StudyScope = .allDecks) async {
         isLoading = true
         errorMessage = nil
         isFinished = false
         isAnswerRevealed = false
         index = 0
+        scopeLabel = scope.label
 
         do {
-            queue = try await store.fetchDueCards()
+            queue = try await store.fetchDueCards(scope: scope.filter)
             isFinished = queue.isEmpty
         } catch {
             errorMessage = userFacingError(from: error)

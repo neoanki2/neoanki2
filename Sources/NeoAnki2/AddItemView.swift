@@ -3,10 +3,12 @@ import SwiftUI
 
 struct AddItemView: View {
     @Bindable var model: ItemsModel
+    @Bindable var decksModel: DecksModel
     var onDismiss: () -> Void = {}
 
     @State private var fieldSpans: [UUID: [Span]] = [:]
     @State private var fieldText: [UUID: String] = [:]
+    @State private var selectedDeckID: UUID?
     @State private var isSaving = false
 
     private var itemType: ItemType? { model.itemType }
@@ -21,6 +23,18 @@ struct AddItemView: View {
                         }
                     }
                     .accessibilityIdentifier("addItemTypePicker")
+                }
+            }
+
+            if !decksModel.summaries.isEmpty || selectedDeckID != nil {
+                Section("Deck") {
+                    Picker("Deck", selection: $selectedDeckID) {
+                        Text("Unassigned").tag(UUID?.none)
+                        ForEach(decksModel.summaries) { deck in
+                            Text(deck.name).tag(Optional(deck.id))
+                        }
+                    }
+                    .accessibilityIdentifier("addItemDeckPicker")
                 }
             }
 
@@ -57,6 +71,7 @@ struct AddItemView: View {
         }
         .frame(minWidth: 420, minHeight: 360)
         .onAppear {
+            selectedDeckID = model.addItemDeckID
             resetFields()
         }
         .onChange(of: model.addItemTypeID) { _, _ in
@@ -150,7 +165,11 @@ struct AddItemView: View {
         isSaving = true
         defer { isSaving = false }
 
-        if await model.addItem(fieldSpans: fieldSpans, fieldText: fieldText) {
+        if await model.addItem(
+            fieldSpans: fieldSpans,
+            fieldText: fieldText,
+            deckID: selectedDeckID
+        ) {
             onDismiss()
         }
     }

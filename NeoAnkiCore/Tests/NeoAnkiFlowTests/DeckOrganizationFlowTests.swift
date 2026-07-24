@@ -24,8 +24,56 @@ import Testing
         let storedDeck = try await ctx.store.deck(id: deck.id)
         #expect(storedDeck.name == "Geography")
 
-        let due = try await ctx.startStudySession()
-        #expect(due.count == 1)
-        #expect(due.first?.card.deckID == deck.id)
+        let globalDue = try await ctx.startStudySession()
+        #expect(globalDue.count == 1)
+        #expect(globalDue.first?.card.deckID == deck.id)
+
+        let scopedDue = try await ctx.store.fetchDueCards(
+            scope: .deck(deck.id, includeDescendants: true),
+            asOf: ctx.clock.now()
+        )
+        #expect(scopedDue.count == 1)
+    }
+}
+
+@Test func deckScopedStudyExcludesOtherDecks() async throws {
+    try await ScenarioRunner.run { ctx in
+        try await ctx.onboard()
+
+        let geography = Deck(name: "Geography")
+        let history = Deck(name: "History")
+        _ = try await ctx.store.createDeck(geography)
+        _ = try await ctx.store.createDeck(history)
+
+        let itemType = try await ctx.store.defaultItemType()
+        _ = try await ctx.store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("France")),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Paris")),
+                ],
+                deckID: geography.id
+            ),
+            now: ctx.clock.now()
+        )
+        _ = try await ctx.store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Rome")),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Italy")),
+                ],
+                deckID: history.id
+            ),
+            now: ctx.clock.now()
+        )
+
+        let geographyDue = try await ctx.store.fetchDueCards(
+            scope: .deck(geography.id, includeDescendants: false),
+            asOf: ctx.clock.now()
+        )
+        #expect(geographyDue.count == 1)
+        #expect(geographyDue.first?.item.fields.first?.value == .text("France"))
     }
 }
