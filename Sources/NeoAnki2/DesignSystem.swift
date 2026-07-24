@@ -16,6 +16,11 @@ enum DesignSystem {
     static var detailBackground: Color { Color(nsColor: .windowBackgroundColor) }
     static var errorBannerBackground: Color { Color(nsColor: .systemRed).opacity(0.12) }
 
+    // MARK: - Card content
+
+    /// Rich-text `.highlight` spans on the study stage — system find-highlight, adapts to Light/Dark/Increased Contrast.
+    static var contentHighlightBackground: Color { Color(nsColor: .findHighlightColor) }
+
     // MARK: - Layout
 
     static let readingColumnMaxWidth: CGFloat = 600

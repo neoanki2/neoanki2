@@ -38,7 +38,7 @@ struct AddItemView: View {
                 Button("Save") {
                     Task { await save() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(isSaving || !canSave)
                 .accessibilityIdentifier("saveAddItem")
             }

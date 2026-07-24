@@ -48,7 +48,7 @@ struct ContentValueView: View {
                 run.backgroundColor = Color(nsColor: .controlBackgroundColor)
             }
             if span.styles.contains(.highlight) {
-                run.backgroundColor = Color.yellow.opacity(0.35)
+                run.backgroundColor = DesignSystem.contentHighlightBackground
             }
 
             result.append(run)
