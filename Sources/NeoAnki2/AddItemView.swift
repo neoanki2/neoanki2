@@ -5,6 +5,7 @@ struct AddItemView: View {
     @Bindable var model: ItemsModel
     var onDismiss: () -> Void = {}
 
+    @State private var fieldSpans: [UUID: [Span]] = [:]
     @State private var fieldText: [UUID: String] = [:]
     @State private var isSaving = false
 
@@ -26,8 +27,7 @@ struct AddItemView: View {
             if let itemType {
                 Section(itemType.name) {
                     ForEach(itemType.fields.filter(\.supportsTextInput)) { field in
-                        TextField(fieldLabel(field), text: binding(for: field.id))
-                            .accessibilityIdentifier("field-\(field.name)")
+                        fieldEditor(for: field)
                     }
                 }
             }
@@ -54,12 +54,29 @@ struct AddItemView: View {
                 .accessibilityIdentifier("saveAddItem")
             }
         }
-        .frame(minWidth: 420, minHeight: 220)
+        .frame(minWidth: 420, minHeight: 320)
         .onAppear {
-            resetFieldText()
+            resetFields()
         }
         .onChange(of: model.addItemTypeID) { _, _ in
-            resetFieldText()
+            resetFields()
+        }
+    }
+
+    @ViewBuilder
+    private func fieldEditor(for field: FieldDef) -> some View {
+        switch field.type {
+        case .text, .richText:
+            RichTextFieldEditor(
+                label: fieldLabel(field),
+                spans: spanBinding(for: field.id),
+                accessibilityIdentifier: "field-\(field.name)"
+            )
+        case .number:
+            TextField(fieldLabel(field), text: textBinding(for: field.id))
+                .accessibilityIdentifier("field-\(field.name)")
+        case .audio, .image, .gif, .video:
+            EmptyView()
         }
     }
 
@@ -76,9 +93,7 @@ struct AddItemView: View {
             .filter(\.supportsTextInput)
             .filter(\.isRequired)
             .allSatisfy { field in
-                !fieldText[field.id, default: ""]
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .isEmpty
+                !fieldPlainText(for: field).isEmpty
             }
     }
 
@@ -86,20 +101,47 @@ struct AddItemView: View {
         field.isRequired ? field.name : "\(field.name) (optional)"
     }
 
-    private func binding(for fieldID: UUID) -> Binding<String> {
+    private func fieldPlainText(for field: FieldDef) -> String {
+        switch field.type {
+        case .text, .richText:
+            return SpanFormatting.plainText(from: fieldSpans[field.id, default: []])
+        case .number:
+            return fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+        case .audio, .image, .gif, .video:
+            return ""
+        }
+    }
+
+    private func spanBinding(for fieldID: UUID) -> Binding<[Span]> {
+        Binding(
+            get: { fieldSpans[fieldID, default: []] },
+            set: { fieldSpans[fieldID] = $0 }
+        )
+    }
+
+    private func textBinding(for fieldID: UUID) -> Binding<String> {
         Binding(
             get: { fieldText[fieldID, default: ""] },
             set: { fieldText[fieldID] = $0 }
         )
     }
 
-    private func resetFieldText() {
+    private func resetFields() {
         guard let itemType else {
+            fieldSpans = [:]
             fieldText = [:]
             return
         }
+
+        fieldSpans = Dictionary(
+            uniqueKeysWithValues: itemType.fields
+                .filter { $0.type == .text || $0.type == .richText }
+                .map { ($0.id, []) }
+        )
         fieldText = Dictionary(
-            uniqueKeysWithValues: itemType.fields.filter(\.supportsTextInput).map { ($0.id, "") }
+            uniqueKeysWithValues: itemType.fields
+                .filter { $0.type == .number }
+                .map { ($0.id, "") }
         )
     }
 
@@ -107,7 +149,7 @@ struct AddItemView: View {
         isSaving = true
         defer { isSaving = false }
 
-        if await model.addItem(fieldText: fieldText) {
+        if await model.addItem(fieldSpans: fieldSpans, fieldText: fieldText) {
             onDismiss()
         }
     }

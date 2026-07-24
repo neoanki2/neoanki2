@@ -10,7 +10,7 @@ struct ContentValueView: View {
             Text(ItemDisplay.plainText(from: value))
                 .multilineTextAlignment(.center)
         case let .rich(spans):
-            Text(attributedString(from: spans))
+            Text(SpanFormatting.swiftUIAttributedString(from: spans))
                 .multilineTextAlignment(.center)
         case .media, .cloze:
             Text("Content not available yet")
@@ -22,38 +22,6 @@ struct ContentValueView: View {
         }
     }
 
-    private func attributedString(from spans: [Span]) -> AttributedString {
-        spans.reduce(into: AttributedString()) { result, span in
-            var run = AttributedString(span.text)
-
-            var font: Font = .body
-            if span.styles.contains(.code) {
-                font = .body.monospaced()
-            }
-            if span.styles.contains(.bold) {
-                font = font.bold()
-            }
-            if span.styles.contains(.italic) {
-                font = font.italic()
-            }
-            run.font = font
-
-            if span.styles.contains(.underline) {
-                run.underlineStyle = .single
-            }
-            if span.styles.contains(.strikethrough) {
-                run.strikethroughStyle = .single
-            }
-            if span.styles.contains(.code) {
-                run.backgroundColor = Color(nsColor: .controlBackgroundColor)
-            }
-            if span.styles.contains(.highlight) {
-                run.backgroundColor = DesignSystem.contentHighlightBackground
-            }
-
-            result.append(run)
-        }
-    }
 }
 
 struct SideContentView: View {

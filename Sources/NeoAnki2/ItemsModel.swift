@@ -41,7 +41,7 @@ final class ItemsModel {
         isLoading = false
     }
 
-    func addItem(fieldText: [UUID: String]) async -> Bool {
+    func addItem(fieldSpans: [UUID: [Span]], fieldText: [UUID: String] = [:]) async -> Bool {
         errorMessage = nil
         guard let itemType else {
             errorMessage = "No item type is available."
@@ -51,10 +51,16 @@ final class ItemsModel {
         let fields = itemType.fields
             .filter(\.supportsTextInput)
             .map { field in
-                FieldValue(
-                    fieldID: field.id,
-                    value: field.contentValue(from: fieldText[field.id, default: ""])
-                )
+                let value: ContentValue = switch field.type {
+                case .text, .richText:
+                    field.contentValue(from: fieldSpans[field.id, default: []])
+                case .number:
+                    field.contentValue(from: fieldText[field.id, default: ""])
+                case .audio, .image, .gif, .video:
+                    .empty
+                }
+
+                return FieldValue(fieldID: field.id, value: value)
             }
 
         do {

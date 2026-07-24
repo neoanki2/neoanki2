@@ -86,6 +86,14 @@ final class NeoAnki2UITests: XCTestCase {
         XCTAssertTrue(emptyState.waitForExistence(timeout: 5))
     }
 
+    private func field(named name: String, in app: XCUIApplication) -> XCUIElement {
+        let textView = app.textViews["field-\(name)"]
+        if textView.waitForExistence(timeout: 1) {
+            return textView
+        }
+        return app.textFields["field-\(name)"]
+    }
+
     func testAddItemFromEmptyState() throws {
         let app = launchApp()
 
@@ -93,11 +101,11 @@ final class NeoAnki2UITests: XCTestCase {
         XCTAssertTrue(addButton.waitForExistence(timeout: 5))
         addButton.click()
 
-        let frontField = app.textFields["field-Front"]
+        let frontField = field(named: "Front", in: app)
         XCTAssertTrue(frontField.waitForExistence(timeout: 5))
         enterText("France", into: frontField, app: app)
 
-        let backField = app.textFields["field-Back"]
+        let backField = field(named: "Back", in: app)
         enterText("Paris", into: backField, app: app)
 
         saveAddItem(in: app)
@@ -115,10 +123,10 @@ final class NeoAnki2UITests: XCTestCase {
             app.buttons["addItemToolbar"].click()
         }
 
-        let frontField = app.textFields["field-Front"]
+        let frontField = field(named: "Front", in: app)
         XCTAssertTrue(frontField.waitForExistence(timeout: 5))
         enterText("Alpha", into: frontField, app: app)
-        enterText("Beta", into: app.textFields["field-Back"], app: app)
+        enterText("Beta", into: field(named: "Back", in: app), app: app)
 
         saveAddItem(in: app)
         waitForItem(named: "Alpha", in: app)
@@ -135,10 +143,10 @@ final class NeoAnki2UITests: XCTestCase {
 
         app.buttons["addItemEmptyState"].click()
 
-        let frontField = app.textFields["field-Front"]
+        let frontField = field(named: "Front", in: app)
         XCTAssertTrue(frontField.waitForExistence(timeout: 5))
         enterText("France", into: frontField, app: app)
-        enterText("Paris", into: app.textFields["field-Back"], app: app)
+        enterText("Paris", into: field(named: "Back", in: app), app: app)
 
         saveAddItem(in: app)
         waitForItem(named: "France", in: app)

@@ -33,9 +33,9 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     let frontID = BuiltInItemTypes.frontFieldID
     let backID = BuiltInItemTypes.backFieldID
 
-    let saved = await model.addItem(fieldText: [
-        frontID: "France",
-        backID: "Paris",
+    let saved = await model.addItem(fieldSpans: [
+        frontID: [Span("France")],
+        backID: [Span("Paris")],
     ])
 
     #expect(saved == true)
@@ -49,8 +49,8 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     let (model, _) = try await makeModel()
     await model.load()
 
-    let saved = await model.addItem(fieldText: [
-        BuiltInItemTypes.frontFieldID: "Only front",
+    let saved = await model.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("Only front")],
     ])
 
     #expect(saved == false)
@@ -62,9 +62,9 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     let (model, _) = try await makeModel()
     await model.load()
 
-    let saved = await model.addItem(fieldText: [
-        BuiltInItemTypes.frontFieldID: "France",
-        BuiltInItemTypes.backFieldID: "Paris",
+    let saved = await model.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("France")],
+        BuiltInItemTypes.backFieldID: [Span("Paris")],
     ])
     #expect(saved == true)
     #expect(model.items.count == 1)

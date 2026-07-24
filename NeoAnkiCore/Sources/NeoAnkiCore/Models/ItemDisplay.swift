@@ -42,17 +42,38 @@ public extension FieldDef {
     }
 
     func contentValue(from text: String) -> ContentValue {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        contentValue(from: text.isEmpty ? [] : [Span(text)])
+    }
+
+    func contentValue(from spans: [Span]) -> ContentValue {
+        let merged = Self.mergeAdjacent(spans)
+        let plain = merged.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+
         switch type {
         case .text:
-            return .text(trimmed)
+            if plain.isEmpty { return .empty }
+            if merged.allSatisfy({ $0.styles.isEmpty }) {
+                return .text(plain)
+            }
+            return .rich(merged)
         case .richText:
-            return trimmed.isEmpty ? .empty : .rich([Span(trimmed)])
+            return plain.isEmpty ? .empty : .rich(merged)
         case .number:
-            guard let number = Double(trimmed) else { return .empty }
+            guard let number = Double(plain) else { return .empty }
             return .number(number)
         case .audio, .image, .gif, .video:
             return .empty
+        }
+    }
+
+    private static func mergeAdjacent(_ spans: [Span]) -> [Span] {
+        spans.reduce(into: [Span]()) { result, span in
+            guard !span.text.isEmpty else { return }
+            if let last = result.last, last.styles == span.styles {
+                result[result.count - 1] = Span(last.text + span.text, styles: last.styles)
+            } else {
+                result.append(span)
+            }
         }
     }
 }
