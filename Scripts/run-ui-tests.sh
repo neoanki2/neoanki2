@@ -33,9 +33,9 @@ if [[ -z "$XCTESTRUN" ]]; then
 fi
 
 APP_PATH="$ROOT/.build/NeoAnki2.app"
-DERIVED_APP=$(find "$HOME/Library/Developer/Xcode/DerivedData/NeoAnki2UITests-"*/Build/Products/Debug -maxdepth 1 -name 'NeoAnki2.app' 2>/dev/null | head -1)
-if [[ -n "$DERIVED_APP" && -d "$DERIVED_APP" ]]; then
-  APP_PATH="$DERIVED_APP"
+if [[ ! -d "$APP_PATH" ]]; then
+  echo "Missing app bundle at $APP_PATH" >&2
+  exit 1
 fi
 
 /usr/libexec/PlistBuddy -c "Delete :TestConfigurations:0:TestTargets:0:UITargetAppPath" "$XCTESTRUN" 2>/dev/null || true

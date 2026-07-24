@@ -10,6 +10,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case templateNotFound(UUID)
     case deckNotFound(UUID)
     case requiredFieldEmpty(String)
+    case invalidItemType(String)
     case encodingFailed
     case decodingFailed
 
@@ -31,6 +32,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "Deck not found: \(id.uuidString)"
         case let .requiredFieldEmpty(name):
             return "\(name) is required."
+        case let .invalidItemType(message):
+            return message
         case .encodingFailed:
             return "Could not encode data for storage."
         case .decodingFailed:
@@ -98,6 +101,10 @@ actor SQLiteDatabase {
                 try backfillCardDueDates()
             }
 
+            if current < 3 {
+                try migrateNotesToItemsSchemaIfNeeded()
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -112,9 +119,7 @@ actor SQLiteDatabase {
                 """
                 INSERT INTO item_types (id, name, definition)
                 VALUES (?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    name = excluded.name,
-                    definition = excluded.definition;
+                ON CONFLICT(id) DO NOTHING;
                 """,
                 bindings: [
                     .text(itemType.id.uuidString),
@@ -156,6 +161,38 @@ actor SQLiteDatabase {
                 .blob(data),
             ]
         )
+    }
+
+    func updateItemType(_ itemType: ItemType) throws {
+        let data = try encode(itemType)
+        try execute(
+            """
+            INSERT INTO item_types (id, name, definition)
+            VALUES (?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                definition = excluded.definition;
+            """,
+            bindings: [
+                .text(itemType.id.uuidString),
+                .text(itemType.name),
+                .blob(data),
+            ]
+        )
+    }
+
+    func fetchAllItemTypes() throws -> [ItemType] {
+        let rows = try query(
+            """
+            SELECT definition
+            FROM item_types
+            ORDER BY name ASC;
+            """
+        )
+        return try rows.compactMap { row in
+            guard let data = row["definition"] as? Data else { return nil }
+            return try decode(ItemType.self, from: data)
+        }
     }
 
     func insertDeck(_ deck: Deck) throws {
@@ -368,7 +405,105 @@ actor SQLiteDatabase {
         return try rows.map { try decodePersistedItem(from: $0) }
     }
 
+    func fetchItems(itemTypeID: UUID) throws -> [PersistedItem] {
+        let rows = try query(
+            """
+            SELECT id, item_type_id, fields, tags, deck_id, created_at, updated_at
+            FROM items
+            WHERE item_type_id = ?
+            ORDER BY created_at DESC;
+            """,
+            bindings: [.text(itemTypeID.uuidString)]
+        )
+        return try rows.map { try decodePersistedItem(from: $0) }
+    }
+
+    func countItems(itemTypeID: UUID) throws -> Int {
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM items WHERE item_type_id = ?;",
+            bindings: [.text(itemTypeID.uuidString)]
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func deleteItemType(id: UUID) throws {
+        try execute(
+            "DELETE FROM item_types WHERE id = ?;",
+            bindings: [.text(id.uuidString)]
+        )
+    }
+
+    func fetchCards(for itemID: UUID) throws -> [Card] {
+        let rows = try query(
+            """
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            FROM cards
+            WHERE item_id = ?;
+            """,
+            bindings: [.text(itemID.uuidString)]
+        )
+        return try rows.map { try decodeCard(from: $0) }
+    }
+
+    func deleteCards(itemID: UUID, templateID: UUID) throws {
+        try execute(
+            """
+            DELETE FROM cards
+            WHERE item_id = ? AND template_id = ?;
+            """,
+            bindings: [
+                .text(itemID.uuidString),
+                .text(templateID.uuidString),
+            ]
+        )
+    }
+
+    func deleteItem(id: UUID) throws {
+        try execute(
+            "DELETE FROM items WHERE id = ?;",
+            bindings: [.text(id.uuidString)]
+        )
+    }
+
+    func updateCardSkill(_ cardID: UUID, skill: Skill) throws {
+        let skillData = try encode(skill)
+        try execute(
+            """
+            UPDATE cards
+            SET skill = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .blob(skillData),
+                .text(cardID.uuidString),
+            ]
+        )
+    }
+
     // MARK: - Private
+
+    /// Renames legacy `note_types` / `notes` tables from early builds to `item_types` / `items`.
+    private func migrateNotesToItemsSchemaIfNeeded() throws {
+        guard try tableExists("note_types"), !(try tableExists("item_types")) else { return }
+
+        try execute("ALTER TABLE note_types RENAME TO item_types;")
+        try execute("ALTER TABLE notes RENAME TO items;")
+        try execute("ALTER TABLE items RENAME COLUMN note_type_id TO item_type_id;")
+        try execute("ALTER TABLE cards RENAME COLUMN note_id TO item_id;")
+        try execute("DROP INDEX IF EXISTS idx_notes_note_type_id;")
+        try execute("CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);")
+        try execute("DROP INDEX IF EXISTS idx_cards_note_id;")
+        try execute("CREATE INDEX IF NOT EXISTS idx_cards_item_id ON cards(item_id);")
+    }
+
+    private func tableExists(_ name: String) throws -> Bool {
+        let rows = try query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1;",
+            bindings: [.text(name)]
+        )
+        return !rows.isEmpty
+    }
 
     private func backfillCardDueDates() throws {
         let rows = try query(

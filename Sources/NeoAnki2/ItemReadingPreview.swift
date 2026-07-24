@@ -46,12 +46,15 @@ struct ItemReadingPreview: View {
 }
 
 struct ItemDetailView: View {
+    @Bindable var model: ItemsModel
     let summary: SavedItemSummary
-    let store: ItemStore
+    var onDeleted: () -> Void = {}
 
     @State private var item: Item?
     @State private var itemType: ItemType?
     @State private var isLoading = true
+    @State private var isDeleting = false
+    @State private var showDeleteConfirm = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -87,6 +90,33 @@ struct ItemDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.detailBackground)
+        .navigationTitle(summary.title)
+        .toolbar {
+            if item != nil, !isLoading {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        showDeleteConfirm = true
+                    }
+                    .disabled(isDeleting)
+                    .accessibilityIdentifier("deleteItem")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete \"\(summary.title)\"?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Item", role: .destructive) {
+                Task { await deleteItem() }
+            }
+            .accessibilityIdentifier("confirmDeleteItem")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This removes the item and its \(summary.cardCount) study cards. This can't be undone."
+            )
+        }
         .task(id: summary.id) {
             await load()
         }
@@ -98,7 +128,7 @@ struct ItemDetailView: View {
         errorMessage = nil
 
         do {
-            if let loaded = try await store.fetchItem(id: summary.id) {
+            if let loaded = try await model.store.fetchItem(id: summary.id) {
                 item = loaded.item
                 itemType = loaded.itemType
             } else {
@@ -109,5 +139,15 @@ struct ItemDetailView: View {
         }
 
         isLoading = false
+    }
+
+    @MainActor
+    private func deleteItem() async {
+        isDeleting = true
+        defer { isDeleting = false }
+
+        if await model.deleteItem(id: summary.id) {
+            onDeleted()
+        }
     }
 }

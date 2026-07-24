@@ -61,7 +61,46 @@ public actor ItemStore {
     /// Persists a user-defined item type.
     @discardableResult
     public func createItemType(_ itemType: ItemType) async throws -> ItemType {
+        try ItemTypeValidation.validate(itemType)
         try await database.insertItemType(itemType)
+        return itemType
+    }
+
+    /// Returns all persisted item types ordered by name.
+    public func listItemTypes() async throws -> [ItemType] {
+        try await database.fetchAllItemTypes()
+    }
+
+    public func countItems(itemTypeID: UUID) async throws -> Int {
+        try await database.countItems(itemTypeID: itemTypeID)
+    }
+
+    /// Deletes an item type when it is not built-in and has no items.
+    @discardableResult
+    public func deleteItemType(id: UUID) async throws -> Bool {
+        guard try await database.fetchItemType(id: id) != nil else { return false }
+        if BuiltInItemTypes.isBuiltIn(id) {
+            throw DatabaseError.invalidItemType("Built-in item types can't be deleted.")
+        }
+        let itemCount = try await database.countItems(itemTypeID: id)
+        if itemCount > 0 {
+            throw DatabaseError.invalidItemType("Remove all items of this type before deleting it.")
+        }
+        try await database.deleteItemType(id: id)
+        return true
+    }
+
+    /// Updates an item type and syncs cards for existing items.
+    @discardableResult
+    public func updateItemType(_ itemType: ItemType, now: Date = .now) async throws -> ItemType {
+        let previous = try await database.fetchItemType(id: itemType.id)
+        try ItemTypeValidation.validate(itemType)
+        try await database.updateItemType(itemType)
+
+        if let previous {
+            try await syncCards(from: previous, to: itemType, now: now)
+        }
+
         return itemType
     }
 
@@ -164,6 +203,14 @@ public actor ItemStore {
             return nil
         }
         return (persisted.item, itemType)
+    }
+
+    /// Deletes an item and its generated cards.
+    @discardableResult
+    public func deleteItem(id: UUID) async throws -> Bool {
+        guard try await database.fetchItem(id: id) != nil else { return false }
+        try await database.deleteItem(id: id)
+        return true
     }
 
     public func dueCount(asOf now: Date = .now) async throws -> Int {
@@ -276,6 +323,55 @@ public actor ItemStore {
         for field in itemType.fields where field.isRequired {
             guard let value = item.value(for: field.id), !value.isEmpty else {
                 throw DatabaseError.requiredFieldEmpty(field.name)
+            }
+        }
+    }
+
+    private func syncCards(from previous: ItemType, to updated: ItemType, now: Date) async throws {
+        let previousTemplateIDs = Set(previous.templates.map(\.id))
+        let updatedTemplateIDs = Set(updated.templates.map(\.id))
+
+        let added = updatedTemplateIDs.subtracting(previousTemplateIDs)
+        let removed = previousTemplateIDs.subtracting(updatedTemplateIDs)
+        let kept = previousTemplateIDs.intersection(updatedTemplateIDs)
+
+        let items = try await database.fetchItems(itemTypeID: updated.id)
+
+        for entry in items {
+            let item = entry.item
+
+            for templateID in removed {
+                try await database.deleteCards(itemID: item.id, templateID: templateID)
+            }
+
+            let existingCards = try await database.fetchCards(for: item.id)
+            let existingTemplateIDs = Set(existingCards.map(\.templateID))
+
+            for template in updated.templates where added.contains(template.id) {
+                guard CardGenerator.shouldGenerate(template, for: item) else { continue }
+                guard !existingTemplateIDs.contains(template.id) else { continue }
+
+                let card = Card(
+                    itemID: item.id,
+                    templateID: template.id,
+                    skill: template.skill,
+                    memory: .new(due: now),
+                    deckID: item.deckID
+                )
+                try await database.insertCards([card])
+            }
+
+            for template in updated.templates where kept.contains(template.id) {
+                guard
+                    let previousTemplate = previous.templates.first(where: { $0.id == template.id }),
+                    previousTemplate.skill != template.skill
+                else {
+                    continue
+                }
+
+                for card in existingCards where card.templateID == template.id {
+                    try await database.updateCardSkill(card.id, skill: template.skill)
+                }
             }
         }
     }

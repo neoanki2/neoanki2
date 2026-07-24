@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 2
+    static let version = 3
 
     static let createStatements: [String] = [
         """

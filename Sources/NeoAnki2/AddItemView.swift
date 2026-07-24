@@ -2,8 +2,8 @@ import NeoAnkiCore
 import SwiftUI
 
 struct AddItemView: View {
-    @Environment(\.dismiss) private var dismiss
     @Bindable var model: ItemsModel
+    var onDismiss: () -> Void = {}
 
     @State private var fieldText: [UUID: String] = [:]
     @State private var isSaving = false
@@ -12,6 +12,17 @@ struct AddItemView: View {
 
     var body: some View {
         Form {
+            if model.itemTypes.count > 1 {
+                Section("Item Type") {
+                    Picker("Type", selection: addItemTypeBinding) {
+                        ForEach(model.itemTypes) { type in
+                            Text(type.name).tag(type.id)
+                        }
+                    }
+                    .accessibilityIdentifier("addItemTypePicker")
+                }
+            }
+
             if let itemType {
                 Section(itemType.name) {
                     ForEach(itemType.fields.filter(\.supportsTextInput)) { field in
@@ -31,7 +42,7 @@ struct AddItemView: View {
         .navigationTitle("Add Item")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
+                Button("Cancel") { onDismiss() }
                     .accessibilityIdentifier("cancelAddItem")
             }
             ToolbarItem(placement: .confirmationAction) {
@@ -45,11 +56,18 @@ struct AddItemView: View {
         }
         .frame(minWidth: 420, minHeight: 220)
         .onAppear {
-            guard fieldText.isEmpty, let itemType else { return }
-            fieldText = Dictionary(
-                uniqueKeysWithValues: itemType.fields.filter(\.supportsTextInput).map { ($0.id, "") }
-            )
+            resetFieldText()
         }
+        .onChange(of: model.addItemTypeID) { _, _ in
+            resetFieldText()
+        }
+    }
+
+    private var addItemTypeBinding: Binding<ItemType.ID> {
+        Binding(
+            get: { model.addItemTypeID ?? model.itemTypes.first!.id },
+            set: { model.addItemTypeID = $0 }
+        )
     }
 
     private var canSave: Bool {
@@ -75,12 +93,22 @@ struct AddItemView: View {
         )
     }
 
+    private func resetFieldText() {
+        guard let itemType else {
+            fieldText = [:]
+            return
+        }
+        fieldText = Dictionary(
+            uniqueKeysWithValues: itemType.fields.filter(\.supportsTextInput).map { ($0.id, "") }
+        )
+    }
+
     private func save() async {
         isSaving = true
         defer { isSaving = false }
 
         if await model.addItem(fieldText: fieldText) {
-            dismiss()
+            onDismiss()
         }
     }
 }

@@ -27,6 +27,7 @@ struct NeoAnki2App: App {
         .defaultSize(width: 960, height: 640)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            LibraryCommands()
             StudyCommands()
         }
     }

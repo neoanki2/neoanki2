@@ -6,8 +6,10 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: ItemsModel
     @State private var isAddingItem = false
+    @State private var isManagingTemplates = false
     @State private var isStudying = false
     @State private var studyModel: StudyModel?
+    @State private var templatesModel: TemplatesModel?
     @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -24,9 +26,21 @@ struct ContentView: View {
             detail
         }
         .tint(DesignSystem.accent(for: colorScheme))
-        .navigationTitle(isStudying ? "Study" : "NeoAnki2")
+        .navigationTitle(
+            isStudying ? "Study"
+                : (isManagingTemplates ? "Item Types"
+                    : (isAddingItem ? "Add Item" : "NeoAnki2"))
+        )
         .toolbar {
-            if !isStudying {
+            if isManagingTemplates {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        closeItemTypes()
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("templatesDone")
+                }
+            } else if !isStudying && !isAddingItem {
                 ToolbarItem(placement: .automatic) {
                     Button {
                         startStudy()
@@ -43,8 +57,14 @@ struct ContentView: View {
                     .accessibilityIdentifier("studyButton")
                 }
                 ToolbarItem(placement: .primaryAction) {
+                    Button("Item Types", systemImage: "square.grid.2x2") {
+                        openTemplates()
+                    }
+                    .accessibilityIdentifier("templatesToolbar")
+                }
+                ToolbarItem(placement: .primaryAction) {
                     Button("Add Item", systemImage: "plus") {
-                        isAddingItem = true
+                        openAddItem()
                     }
                     .keyboardShortcut("n", modifiers: .command)
                     .accessibilityIdentifier("addItemToolbar")
@@ -54,15 +74,24 @@ struct ContentView: View {
         .onChange(of: isStudying) { _, studying in
             setStudyFocus(studying)
         }
-        .sheet(isPresented: $isAddingItem) {
-            NavigationStack {
-                AddItemView(model: model)
-            }
+        .onChange(of: isManagingTemplates) { _, managing in
+            setTemplatesFocus(managing)
+        }
+        .onChange(of: isAddingItem) { _, adding in
+            setAddItemFocus(adding)
         }
         .task {
             await model.load()
         }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
+        .focusedSceneValue(\.libraryCommandHandlers, libraryCommandHandlers)
+    }
+
+    private var libraryCommandHandlers: LibraryCommandHandlers {
+        LibraryCommandHandlers(
+            openTemplates: { openTemplates() },
+            canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem
+        )
     }
 
     private var studyCommandHandlers: StudyCommandHandlers {
@@ -144,7 +173,7 @@ struct ContentView: View {
                         message: "Add an item to generate study cards.",
                         systemImage: "rectangle.stack.badge.plus",
                         actionTitle: "Add Item",
-                        action: { isAddingItem = true },
+                        action: { openAddItem() },
                         actionIdentifier: "addItemEmptyState"
                     )
                 } else {
@@ -165,8 +194,10 @@ struct ContentView: View {
                         )
                         .accessibilityIdentifier("itemRow-\(item.title)")
                     }
+                    .listStyle(.plain)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(DesignSystem.sidebarBackground)
         .navigationTitle("Items")
@@ -174,13 +205,30 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if isStudying, let studyModel {
+        if isManagingTemplates, let templatesModel {
+            TemplatesView(model: templatesModel) {
+                await model.load()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if isStudying, let studyModel {
             StudyView(model: studyModel, endSessionTrigger: $endSessionTrigger) {
                 endStudy()
             }
+        } else if isAddingItem {
+            NavigationStack {
+                AddItemView(model: model) {
+                    closeAddItem()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(DesignSystem.detailBackground)
         } else if let selectedItemID,
                   let item = model.items.first(where: { $0.id == selectedItemID }) {
-            ItemDetailView(summary: item, store: model.store)
+            NavigationStack {
+                ItemDetailView(model: model, summary: item) {
+                    self.selectedItemID = nil
+                }
+            }
         } else {
             studyPrompt
         }
@@ -210,6 +258,30 @@ struct ContentView: View {
         .background(DesignSystem.detailBackground)
     }
 
+    private func openAddItem() {
+        selectedItemID = nil
+        isAddingItem = true
+    }
+
+    private func closeAddItem() {
+        isAddingItem = false
+        columnVisibility = .all
+        Task { await model.load() }
+    }
+
+    private func setAddItemFocus(_ focused: Bool) {
+        let update = {
+            columnVisibility = focused ? .detailOnly : .all
+        }
+        if reduceMotion {
+            update()
+        } else {
+            withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {
+                update()
+            }
+        }
+    }
+
     private func startStudy() {
         studyModel = StudyModel(store: model.store)
         isStudying = true
@@ -219,6 +291,36 @@ struct ContentView: View {
         isStudying = false
         studyModel = nil
         Task { await model.load() }
+    }
+
+    private func closeItemTypes() {
+        Task {
+            await model.load()
+            isManagingTemplates = false
+            columnVisibility = .all
+        }
+    }
+
+    private func openTemplates() {
+        if templatesModel == nil {
+            templatesModel = TemplatesModel(store: model.store)
+        }
+        selectedItemID = nil
+        isManagingTemplates = true
+        setTemplatesFocus(true)
+    }
+
+    private func setTemplatesFocus(_ focused: Bool) {
+        let update = {
+            columnVisibility = focused ? .detailOnly : .all
+        }
+        if reduceMotion {
+            update()
+        } else {
+            withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {
+                update()
+            }
+        }
     }
 
     private func setStudyFocus(_ focused: Bool) {

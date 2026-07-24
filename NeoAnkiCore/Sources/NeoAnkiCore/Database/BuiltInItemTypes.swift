@@ -38,4 +38,8 @@ public enum BuiltInItemTypes {
     }()
 
     public static let all: [ItemType] = [basic]
+
+    public static func isBuiltIn(_ id: UUID) -> Bool {
+        id == basicID
+    }
 }

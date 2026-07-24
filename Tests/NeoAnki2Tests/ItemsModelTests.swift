@@ -57,3 +57,24 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     #expect(model.errorMessage == "Back is required.")
     #expect(model.items.isEmpty)
 }
+
+@Test @MainActor func itemsModelDeletesItemFromList() async throws {
+    let (model, _) = try await makeModel()
+    await model.load()
+
+    let saved = await model.addItem(fieldText: [
+        BuiltInItemTypes.frontFieldID: "France",
+        BuiltInItemTypes.backFieldID: "Paris",
+    ])
+    #expect(saved == true)
+    #expect(model.items.count == 1)
+    #expect(model.dueCount == 1)
+
+    let itemID = try #require(model.items.first?.id)
+    let deleted = await model.deleteItem(id: itemID)
+
+    #expect(deleted == true)
+    #expect(model.items.isEmpty)
+    #expect(model.dueCount == 0)
+    #expect(model.errorMessage == nil)
+}
