@@ -113,7 +113,7 @@ final class NeoAnki2UITests: XCTestCase {
         XCTAssertTrue(gradeGood.waitForExistence(timeout: 5))
         gradeGood.click()
 
-        let studyDone = app.buttons["studyDone"]
+        let studyDone = app.buttons["studySessionDone"]
         XCTAssertTrue(studyDone.waitForExistence(timeout: 5))
         studyDone.click()
 

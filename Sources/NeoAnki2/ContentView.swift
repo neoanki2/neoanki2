@@ -10,9 +10,10 @@ struct ContentView: View {
     @State private var studyModel: StudyModel?
     @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(
                     min: DesignSystem.sidebarMin,
@@ -23,30 +24,35 @@ struct ContentView: View {
             detail
         }
         .tint(DesignSystem.accent(for: colorScheme))
-        .navigationTitle("NeoAnki2")
+        .navigationTitle(isStudying ? "Study" : "NeoAnki2")
         .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    startStudy()
-                } label: {
-                    if model.dueCount > 0 {
-                        Label("Study", systemImage: "play.fill")
-                            .badge(model.dueCount)
-                    } else {
-                        Label("Study", systemImage: "play.fill")
+            if !isStudying {
+                ToolbarItem(placement: .automatic) {
+                    Button {
+                        startStudy()
+                    } label: {
+                        if model.dueCount > 0 {
+                            Label("Study", systemImage: "play.fill")
+                                .badge(model.dueCount)
+                        } else {
+                            Label("Study", systemImage: "play.fill")
+                        }
                     }
+                    .disabled(model.dueCount == 0)
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .accessibilityIdentifier("studyButton")
                 }
-                .disabled(model.dueCount == 0 || isStudying)
-                .keyboardShortcut("s", modifiers: [.command, .shift])
-                .accessibilityIdentifier("studyButton")
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Item", systemImage: "plus") {
-                    isAddingItem = true
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Item", systemImage: "plus") {
+                        isAddingItem = true
+                    }
+                    .keyboardShortcut("n", modifiers: .command)
+                    .accessibilityIdentifier("addItemToolbar")
                 }
-                .keyboardShortcut("n", modifiers: .command)
-                .accessibilityIdentifier("addItemToolbar")
             }
+        }
+        .onChange(of: isStudying) { _, studying in
+            setStudyFocus(studying)
         }
         .sheet(isPresented: $isAddingItem) {
             NavigationStack {
@@ -123,33 +129,43 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebar: some View {
-        Group {
-            if model.isLoading {
-                ProgressView("Loading items…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if model.items.isEmpty {
-                ContentUnavailableView {
-                    Label("No Items Yet", systemImage: "rectangle.stack.badge.plus")
-                } description: {
-                    Text("Add an item to generate study cards.")
-                } actions: {
-                    Button("Add Item") { isAddingItem = true }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("addItemEmptyState")
-                }
-            } else {
-                List(model.items, selection: $selectedItemID) { item in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title)
-                            .font(.headline)
-                        Text(item.subtitle)
-                            .foregroundStyle(.secondary)
-                        Text("\(item.cardCount) cards · \(item.itemTypeName)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+        VStack(spacing: 0) {
+            if let errorMessage = model.errorMessage, !model.isLoading {
+                ErrorBanner(message: errorMessage)
+            }
+
+            Group {
+                if model.isLoading {
+                    ProgressView("Loading items…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if model.items.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Items Yet", systemImage: "rectangle.stack.badge.plus")
+                    } description: {
+                        Text("Add an item to generate study cards.")
+                    } actions: {
+                        Button("Add Item") { isAddingItem = true }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("addItemEmptyState")
                     }
-                    .padding(.vertical, 2)
-                    .accessibilityIdentifier("itemRow-\(item.title)")
+                } else {
+                    List(model.items, selection: $selectedItemID) { item in
+                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                            Text(item.title)
+                                .font(.headline)
+                            Text(item.subtitle)
+                                .foregroundStyle(.secondary)
+                            Text("\(item.cardCount) cards · \(item.itemTypeName)")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 2)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(
+                            "\(item.title), \(item.subtitle), \(item.cardCount) cards, \(item.itemTypeName)"
+                        )
+                        .accessibilityIdentifier("itemRow-\(item.title)")
+                    }
                 }
             }
         }
@@ -165,7 +181,7 @@ struct ContentView: View {
             }
         } else if let selectedItemID,
                   let item = model.items.first(where: { $0.id == selectedItemID }) {
-            itemDetail(item)
+            ItemDetailView(summary: item, store: model.store)
         } else {
             studyPrompt
         }
@@ -195,23 +211,6 @@ struct ContentView: View {
         .background(DesignSystem.detailBackground)
     }
 
-    private func itemDetail(_ item: SavedItemSummary) -> some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-            Text(item.title)
-                .font(.headline)
-            Text(item.subtitle)
-                .font(.body)
-                .foregroundStyle(.secondary)
-            Text("\(item.cardCount) cards · \(item.itemTypeName)")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(DesignSystem.Spacing.xl)
-        .background(DesignSystem.detailBackground)
-    }
-
     private func startStudy() {
         studyModel = StudyModel(store: model.store)
         isStudying = true
@@ -221,5 +220,18 @@ struct ContentView: View {
         isStudying = false
         studyModel = nil
         Task { await model.load() }
+    }
+
+    private func setStudyFocus(_ focused: Bool) {
+        let update = {
+            columnVisibility = focused ? .detailOnly : .all
+        }
+        if reduceMotion {
+            update()
+        } else {
+            withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {
+                update()
+            }
+        }
     }
 }

@@ -68,7 +68,7 @@ struct StudyView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignSystem.Spacing.sm) {
             ProgressView()
             Text("Loading due cards…")
                 .foregroundStyle(.secondary)
@@ -87,7 +87,7 @@ struct StudyView: View {
             Button("Back to Items") {
                 onEndSession()
             }
-            .accessibilityIdentifier("studyDone")
+            .accessibilityIdentifier("studyBackToItems")
         }
     }
 
@@ -101,7 +101,7 @@ struct StudyView: View {
                 onEndSession()
             }
             .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("studyDone")
+            .accessibilityIdentifier("studySessionDone")
         }
     }
 
@@ -122,10 +122,7 @@ struct StudyView: View {
                         revealCardContent(card)
                     }
                 }
-                .frame(maxWidth: DesignSystem.readingColumnMaxWidth)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, DesignSystem.Spacing.xl)
-                .padding(.vertical, DesignSystem.Spacing.lg)
+                .readingColumnLayout()
             }
 
             if let errorMessage = model.errorMessage {
@@ -170,7 +167,7 @@ struct StudyView: View {
             .buttonStyle(.borderless)
             .accessibilityIdentifier("endStudySession")
         }
-        .padding(.horizontal, DesignSystem.Spacing.md + 4)
+        .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.sm)
     }
 
@@ -234,7 +231,7 @@ struct StudyView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(DesignSystem.Spacing.md + 4)
+        .padding(DesignSystem.Spacing.studyHorizontal)
     }
 
     private var gradeButtons: some View {

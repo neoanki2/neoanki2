@@ -97,9 +97,6 @@ final class StudyModel {
     }
 
     private func userFacingError(from error: Error) -> String {
-        if let dbError = error as? DatabaseError, case .requiredFieldEmpty(let field) = dbError {
-            return "\(field) is required."
-        }
-        return "Something went wrong. Try again."
+        UserFacingError.message(from: error)
     }
 }

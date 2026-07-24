@@ -14,6 +14,7 @@ enum DesignSystem {
 
     static var sidebarBackground: Color { Color(nsColor: .controlBackgroundColor) }
     static var detailBackground: Color { Color(nsColor: .windowBackgroundColor) }
+    static var errorBannerBackground: Color { Color(nsColor: .systemRed).opacity(0.12) }
 
     // MARK: - Layout
 
@@ -25,9 +26,11 @@ enum DesignSystem {
     // MARK: - Spacing (8pt grid)
 
     enum Spacing {
+        static let rowTight: CGFloat = 4
         static let xs: CGFloat = 8
         static let sm: CGFloat = 12
         static let md: CGFloat = 16
+        static let studyHorizontal: CGFloat = 20
         static let lg: CGFloat = 24
         static let xl: CGFloat = 32
     }
@@ -46,10 +49,10 @@ struct ErrorBanner: View {
         Label(message, systemImage: "exclamationmark.triangle.fill")
             .font(.caption)
             .foregroundStyle(.primary)
-            .padding(.horizontal, DesignSystem.Spacing.md + 4)
+            .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
             .padding(.vertical, DesignSystem.Spacing.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red.opacity(0.12))
+            .background(DesignSystem.errorBannerBackground)
             .accessibilityLabel("Error, \(message)")
     }
 }
@@ -65,5 +68,23 @@ enum StudyAnimation {
                 action()
             }
         }
+    }
+}
+
+// MARK: - Reading Column Layout
+
+private struct ReadingColumnLayout: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: DesignSystem.readingColumnMaxWidth)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, DesignSystem.Spacing.xl)
+            .padding(.vertical, DesignSystem.Spacing.lg)
+    }
+}
+
+extension View {
+    func readingColumnLayout() -> some View {
+        modifier(ReadingColumnLayout())
     }
 }

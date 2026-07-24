@@ -26,11 +26,13 @@ struct GradeGuideView: View {
                 }
             }
 
-            Text("Keyboard: press 1–4 to grade when the buttons are visible.")
+            Text("Keyboard: Space or Return to reveal; 1–4 to grade; ⌘⇧S to start study.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(DesignSystem.Spacing.md + 4)
+        .padding(DesignSystem.Spacing.studyHorizontal)
         .frame(width: 360)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("How to grade. After you reveal your answer, pick Again, Hard, Good, or Easy. Keyboard shortcuts: Space or Return to reveal, 1 through 4 to grade, Command Shift S to start study.")
     }
 }

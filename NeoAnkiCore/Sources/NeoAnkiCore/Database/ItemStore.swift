@@ -155,6 +155,17 @@ public actor ItemStore {
         return dueCards
     }
 
+    /// Loads a persisted item with its item type for detail views.
+    public func fetchItem(id: UUID) async throws -> (item: Item, itemType: ItemType)? {
+        guard
+            let persisted = try await database.fetchItem(id: id),
+            let itemType = try await database.fetchItemType(id: persisted.item.itemTypeID)
+        else {
+            return nil
+        }
+        return (persisted.item, itemType)
+    }
+
     public func dueCount(asOf now: Date = .now) async throws -> Int {
         try await database.countDueCards(asOf: now)
     }

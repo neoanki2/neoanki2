@@ -24,7 +24,7 @@ final class ItemsModel {
             items = try await store.listItems()
             dueCount = try await store.dueCount()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
     }
@@ -55,7 +55,7 @@ final class ItemsModel {
             errorMessage = "\(field) is required."
             return false
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingError.message(from: error)
             return false
         }
     }
