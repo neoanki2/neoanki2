@@ -139,15 +139,14 @@ struct ContentView: View {
                     ProgressView("Loading items…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if model.items.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Items Yet", systemImage: "rectangle.stack.badge.plus")
-                    } description: {
-                        Text("Add an item to generate study cards.")
-                    } actions: {
-                        Button("Add Item") { isAddingItem = true }
-                            .buttonStyle(.borderedProminent)
-                            .accessibilityIdentifier("addItemEmptyState")
-                    }
+                    SidebarEmptyState(
+                        title: "No Items Yet",
+                        message: "Add an item to generate study cards.",
+                        systemImage: "rectangle.stack.badge.plus",
+                        actionTitle: "Add Item",
+                        action: { isAddingItem = true },
+                        actionIdentifier: "addItemEmptyState"
+                    )
                 } else {
                     List(model.items, selection: $selectedItemID) { item in
                         VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {

@@ -93,3 +93,53 @@ extension View {
         modifier(ReadingColumnLayout())
     }
 }
+
+// MARK: - Sidebar Empty State
+
+struct SidebarEmptyState: View {
+    let title: String
+    let message: String
+    let systemImage: String
+    var actionTitle: String?
+    var action: (() -> Void)?
+    var actionIdentifier: String?
+
+    var body: some View {
+        VStack(spacing: DesignSystem.Spacing.sm) {
+            Spacer(minLength: DesignSystem.Spacing.xl)
+
+            Image(systemName: systemImage)
+                .font(.largeTitle.weight(.light))
+                .foregroundStyle(.tertiary)
+                .symbolRenderingMode(.hierarchical)
+                .accessibilityHidden(true)
+
+            VStack(spacing: DesignSystem.Spacing.rowTight) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(title). \(message)")
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .padding(.top, DesignSystem.Spacing.xs)
+                    .accessibilityIdentifier(actionIdentifier ?? actionTitle)
+            }
+
+            Spacer(minLength: DesignSystem.Spacing.xl)
+        }
+        .padding(.horizontal, DesignSystem.Spacing.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
