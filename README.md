@@ -34,6 +34,8 @@ NeoAnkiCore/Sources/NeoAnkiCore/
 
 ## Documentation
 
-See [`docs/DESIGN.md`](docs/DESIGN.md) for the full design and philosophy: the
-three-layer architecture, the data model, learning-science mapping, a worked
-example, and the rationale for FSRS over SM-2.
+All project docs live in [`docs/`](docs/) — see [`docs/README.md`](docs/README.md) for the index:
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — domain model, learning-science mapping, FSRS rationale
+- [`docs/DESIGN.md`](docs/DESIGN.md) — visual design system (SwiftUI shell)
+- [`docs/PRODUCT.md`](docs/PRODUCT.md) — product context for design and UX work

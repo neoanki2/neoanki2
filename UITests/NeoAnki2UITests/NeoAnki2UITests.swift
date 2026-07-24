@@ -57,9 +57,14 @@ final class NeoAnki2UITests: XCTestCase {
     }
 
     func testAddItemFromToolbar() throws {
-        let app = launchApp(databaseLabel: "persistence")
+        let databaseLabel = UUID().uuidString
+        let app = launchApp(databaseLabel: databaseLabel)
 
-        app.buttons["addItemEmptyState"].click()
+        if app.buttons["addItemEmptyState"].waitForExistence(timeout: 2) {
+            app.buttons["addItemEmptyState"].click()
+        } else {
+            app.buttons["addItemToolbar"].click()
+        }
 
         let frontField = app.textFields["field-Front"]
         XCTAssertTrue(frontField.waitForExistence(timeout: 5))
@@ -75,7 +80,45 @@ final class NeoAnki2UITests: XCTestCase {
         app.terminate()
         runningApp = nil
 
-        let relaunched = launchApp(databaseLabel: "persistence")
+        let relaunched = launchApp(databaseLabel: databaseLabel)
         XCTAssertTrue(relaunched.staticTexts["Alpha"].waitForExistence(timeout: 5))
+    }
+
+    func testStudyBasicItemFlow() throws {
+        let app = launchApp()
+
+        app.buttons["addItemEmptyState"].click()
+
+        let frontField = app.textFields["field-Front"]
+        XCTAssertTrue(frontField.waitForExistence(timeout: 5))
+        frontField.click()
+        frontField.typeText("France")
+
+        app.textFields["field-Back"].click()
+        app.textFields["field-Back"].typeText("Paris")
+
+        app.buttons["saveAddItem"].click()
+        XCTAssertTrue(app.staticTexts["France"].waitForExistence(timeout: 5))
+
+        let studyButton = app.buttons["studyButton"]
+        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(studyButton.isEnabled)
+        studyButton.click()
+
+        let showAnswer = app.buttons["showAnswer"]
+        XCTAssertTrue(showAnswer.waitForExistence(timeout: 5))
+        showAnswer.click()
+
+        let gradeGood = app.buttons["gradeGood"]
+        XCTAssertTrue(gradeGood.waitForExistence(timeout: 5))
+        gradeGood.click()
+
+        let studyDone = app.buttons["studyDone"]
+        XCTAssertTrue(studyDone.waitForExistence(timeout: 5))
+        studyDone.click()
+
+        let studyButtonAfter = app.buttons["studyButton"]
+        XCTAssertTrue(studyButtonAfter.waitForExistence(timeout: 5))
+        XCTAssertFalse(studyButtonAfter.isEnabled)
     }
 }

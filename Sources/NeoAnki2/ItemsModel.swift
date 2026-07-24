@@ -6,10 +6,11 @@ import NeoAnkiCore
 final class ItemsModel {
     private(set) var items: [SavedItemSummary] = []
     private(set) var itemType: ItemType?
+    private(set) var dueCount = 0
     private(set) var isLoading = true
     private(set) var errorMessage: String?
 
-    private let store: ItemStore
+    let store: ItemStore
 
     init(store: ItemStore) {
         self.store = store
@@ -21,6 +22,7 @@ final class ItemsModel {
         do {
             itemType = try await store.defaultItemType()
             items = try await store.listItems()
+            dueCount = try await store.dueCount()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -47,6 +49,7 @@ final class ItemsModel {
             let item = Item(itemTypeID: itemType.id, fields: fields)
             let saved = try await store.createItem(item)
             items.insert(saved, at: 0)
+            dueCount = try await store.dueCount()
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."

@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-24T22:05:00Z",
+  "title": "Design System: NeoAnki2",
+  "extensions": {
+    "colorMeta": {
+      "accent-study": {
+        "role": "primary",
+        "displayName": "Study Indigo",
+        "canonical": "oklch(52% 0.09 250)",
+        "tonalRamp": [
+          "oklch(22% 0.06 250)",
+          "oklch(32% 0.07 250)",
+          "oklch(42% 0.08 250)",
+          "oklch(52% 0.09 250)",
+          "oklch(62% 0.08 250)",
+          "oklch(72% 0.07 250)",
+          "oklch(82% 0.05 250)",
+          "oklch(92% 0.03 250)"
+        ]
+      },
+      "surface-sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar Surface",
+        "canonical": "system.controlBackgroundColor",
+        "tonalRamp": []
+      },
+      "surface-detail": {
+        "role": "neutral",
+        "displayName": "Detail Surface",
+        "canonical": "system.windowBackgroundColor",
+        "tonalRamp": []
+      }
+    },
+    "typographyMeta": {
+      "card-prompt": {
+        "displayName": "Card Prompt",
+        "purpose": "Primary retrieval question in study column; SwiftUI .title"
+      },
+      "card-answer": {
+        "displayName": "Card Answer",
+        "purpose": "Revealed answer; SwiftUI .title2"
+      },
+      "ui-body": {
+        "displayName": "UI Body",
+        "purpose": "Forms, empty states, descriptions; SwiftUI .body"
+      },
+      "ui-caption": {
+        "displayName": "UI Caption",
+        "purpose": "Progress, metadata; SwiftUI .caption or .subheadline"
+      }
+    },
+    "motion": [
+      {
+        "name": "reveal-crossfade",
+        "value": "easeOut 0.2s opacity",
+        "purpose": "Answer reveal in study view; disabled when Reduce Motion is on — use instant cut."
+      },
+      {
+        "name": "grade-submit",
+        "value": "instant",
+        "purpose": "No animation between cards; swap content immediately to preserve study flow."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sidebar-min", "value": "220pt" },
+      { "name": "sidebar-ideal", "value": "260pt" },
+      { "name": "sidebar-max", "value": "340pt" },
+      { "name": "study-column-max", "value": "600pt" },
+      { "name": "window-default-w", "value": "960pt" },
+      { "name": "window-default-h", "value": "640pt" }
+    ],
+    "platformNotes": {
+      "macOS14": "Semantic system colors; standard NavigationSplitView materials.",
+      "macOS26": "Optional Liquid Glass on sidebar and toolbar only; study content stays opaque.",
+      "iOSFuture": "Stack navigation; bottom-fixed grade bar; 44pt touch targets."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Study, Show Answer, Done. SwiftUI .borderedProminent with app tint.",
+      "html": "<button class=\"ds-btn-primary\">Show Answer</button>",
+      "css": ".ds-btn-primary { background: #4A6FA5; color: #fff; padding: 8px 16px; border: none; border-radius: 8px; font: 400 13px/1.4 -apple-system, 'SF Pro', system-ui; cursor: pointer; } .ds-btn-primary:hover { background: #3d5f8f; } .ds-btn-primary:focus-visible { outline: 2px solid #4A6FA5; outline-offset: 2px; }"
+    },
+    {
+      "name": "Grade Button",
+      "kind": "button",
+      "refersTo": "grade-button",
+      "description": "Again/Hard/Good/Easy. SwiftUI .bordered; tooltip on hover.",
+      "html": "<button class=\"ds-btn-grade\">Good</button>",
+      "css": ".ds-btn-grade { background: transparent; color: #1d1d1f; padding: 6px 14px; border: 1px solid rgba(0,0,0,0.15); border-radius: 6px; font: 400 13px/1.4 -apple-system, 'SF Pro', system-ui; cursor: pointer; } .ds-btn-grade:hover { background: rgba(0,0,0,0.04); } .ds-btn-grade:focus-visible { outline: 2px solid #4A6FA5; outline-offset: 2px; }"
+    },
+    {
+      "name": "Study Reading Column",
+      "kind": "custom",
+      "refersTo": "study-column-max",
+      "description": "Centered card stage, max 600pt. Prompt, divider, answer — no shadow box.",
+      "html": "<div class=\"ds-study-column\"><p class=\"ds-prompt\">What is the capital of France?</p><hr class=\"ds-divider\" /><p class=\"ds-answer\">Paris</p></div>",
+      "css": ".ds-study-column { max-width: 600px; margin: 0 auto; text-align: center; padding: 24px 32px; } .ds-prompt { font: 400 28px/1.25 -apple-system, 'SF Pro', system-ui; margin: 0 0 24px; } .ds-divider { border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 24px 0; } .ds-answer { font: 400 22px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.85); margin: 0; }"
+    },
+    {
+      "name": "Sidebar List Row",
+      "kind": "custom",
+      "description": "Item title, subtitle, metadata. SwiftUI List selection row.",
+      "html": "<div class=\"ds-list-row\"><div class=\"ds-row-title\">France</div><div class=\"ds-row-sub\">Paris</div><div class=\"ds-row-meta\">2 cards · Basic</div></div>",
+      "css": ".ds-list-row { padding: 4px 0; } .ds-row-title { font: 600 13px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-row-sub { font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.55); } .ds-row-meta { font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.35); margin-top: 4px; }"
+    },
+    {
+      "name": "Error Banner",
+      "kind": "custom",
+      "description": "Inline study error with icon; never color alone.",
+      "html": "<div class=\"ds-error\"><span class=\"ds-error-icon\">⚠</span> Something went wrong. Try again.</div>",
+      "css": ".ds-error { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: rgba(255, 59, 48, 0.12); font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-error-icon { color: #ff3b30; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Desk",
+    "overview": "NeoAnki2 should feel like a well-lit desk: one open page (the card), a tidy stack of notes to the side (the item list), and almost nothing else competing for attention. Platform-native restraint and content-forward layout. The card is the only hero per screen.",
+    "keyCharacteristics": [
+      "Content-first study column",
+      "Mac-native NavigationSplitView",
+      "Semantic system colors",
+      "Restrained Study Indigo accent",
+      "Tonal depth without shadows",
+      "No gamification visuals"
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Custom accent color appears only on primary forward actions (Study, Show Answer, Done on completion).",
+        "section": "colors"
+      },
+      {
+        "name": "The No Gamification Palette Rule",
+        "body": "Do not introduce streak orange, achievement gold, or chart rainbow colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The Card Type Scale Rule",
+        "body": "Only card prompt uses .title; only card answer uses .title2. UI chrome never borrows card sizes.",
+        "section": "typography"
+      },
+      {
+        "name": "The Dynamic Type Rule",
+        "body": "Use semantic SwiftUI text styles — never hard-coded point sizes in production views.",
+        "section": "typography"
+      },
+      {
+        "name": "The Split-First Rule",
+        "body": "Study never returns to a sheet modal on Mac. Detail pane owns the session.",
+        "section": "layout"
+      },
+      {
+        "name": "The Reading Measure Rule",
+        "body": "Card text lives in a centered column capped at 600pt.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Study Stage Rule",
+        "body": "The study card is not a boxed card with shadow. Divider and typography only.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Platform Shape Rule",
+        "body": "Use system control geometry; custom radii only for future media containers.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do use semantic SwiftUI colors",
+      "Do keep one primary action visible per study phase",
+      "Do expose keyboard paths and document in Grade Help",
+      "Do test Light, Dark, and Increased Contrast",
+      "Do adopt Liquid Glass on sidebar/toolbar for macOS 26 with opaque study content"
+    ],
+    "donts": [
+      "Don't gamify with streaks, XP, or progress rings",
+      "Don't use hard-coded grays",
+      "Don't put shadows, gradients, or glass on card content",
+      "Don't use display serifs or cute illustration styles",
+      "Don't copy Anki density or Quizlet game UI",
+      "Don't show scheduling stats during active review"
+    ]
+  }
+}

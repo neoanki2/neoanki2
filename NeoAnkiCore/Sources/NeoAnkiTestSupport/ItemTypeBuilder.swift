@@ -2,7 +2,7 @@ import Foundation
 import NeoAnkiCore
 
 public enum ItemTypeFixtures {
-    /// Capitals example from DESIGN.md §5.
+    /// Capitals example from docs/ARCHITECTURE.md §5.
     public static func capitals() -> (
         type: ItemType,
         country: FieldDef,
