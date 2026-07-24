@@ -58,6 +58,31 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     #expect(model.items.isEmpty)
 }
 
+@Test @MainActor func itemsModelPersistsRichTextFields() async throws {
+    let (model, store) = try await makeModel()
+    await model.load()
+
+    let frontID = BuiltInItemTypes.frontFieldID
+    let backID = BuiltInItemTypes.backFieldID
+    let richFront = [Span("Q", styles: [.bold]), Span("uestion", styles: [])]
+
+    let saved = await model.addItem(fieldSpans: [
+        frontID: richFront,
+        backID: [Span("Answer", styles: [.italic])],
+    ])
+
+    #expect(saved == true)
+
+    let itemID = try #require(model.items.first?.id)
+    let fetched = try await store.fetchItem(id: itemID)
+    let item = try #require(fetched?.item)
+
+    #expect(item.value(for: frontID) == .rich(richFront))
+    #expect(item.value(for: backID) == .rich([Span("Answer", styles: [.italic])]))
+    #expect(model.items.first?.title == "Question")
+    #expect(model.items.first?.subtitle == "Answer")
+}
+
 @Test @MainActor func itemsModelDeletesItemFromList() async throws {
     let (model, _) = try await makeModel()
     await model.load()

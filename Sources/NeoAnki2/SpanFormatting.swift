@@ -43,6 +43,17 @@ enum SpanFormatting {
         }
     }
 
+    /// Compact span summary exposed on text views during UI testing.
+    static func testingDescription(from spans: [Span]) -> String {
+        mergeAdjacent(spans).map { span in
+            if span.styles.isEmpty {
+                return "plain:\(span.text)"
+            }
+            let styleNames = span.styles.map(\.rawValue).sorted().joined(separator: "+")
+            return "\(styleNames):\(span.text)"
+        }.joined(separator: "|")
+    }
+
     private static func attributes(for span: Span) -> [NSAttributedString.Key: Any] {
         var attributes: [NSAttributedString.Key: Any] = [.font: font(for: span)]
 

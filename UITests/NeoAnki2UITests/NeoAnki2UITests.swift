@@ -94,6 +94,89 @@ final class NeoAnki2UITests: XCTestCase {
         return app.textFields["field-\(name)"]
     }
 
+    private func openAddItem(in app: XCUIApplication) {
+        if app.buttons["addItemEmptyState"].waitForExistence(timeout: 2) {
+            app.buttons["addItemEmptyState"].click()
+        } else {
+            app.buttons["addItemToolbar"].click()
+        }
+
+        XCTAssertTrue(field(named: "Front", in: app).waitForExistence(timeout: 5))
+    }
+
+    private func waitForFormattedField(
+        _ fieldName: String,
+        containing expectedToken: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 5
+    ) {
+        let editorField = field(named: fieldName, in: app)
+        XCTAssertTrue(editorField.waitForExistence(timeout: 2))
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let candidates = [
+                editorField.value as? String,
+                editorField.label,
+            ]
+            if candidates.contains(where: { $0?.contains(expectedToken) == true }) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+
+        let value = editorField.value as? String ?? "<nil>"
+        let label = editorField.label
+        XCTFail("Expected field-\(fieldName) to contain \(expectedToken), got value=\(value) label=\(label)")
+    }
+
+    private func replaceText(_ text: String, in field: XCUIElement, app: XCUIApplication) {
+        field.click()
+        field.typeKey("a", modifierFlags: [.command])
+        field.typeKey(XCUIKeyboardKey.delete, modifierFlags: [])
+        field.typeText(text)
+        field.typeKey("a", modifierFlags: [.command])
+    }
+
+    private func replaceAndSelectText(_ text: String, in field: XCUIElement) {
+        field.click()
+        field.typeKey("a", modifierFlags: [.command])
+        field.typeKey(XCUIKeyboardKey.delete, modifierFlags: [])
+        field.typeText(text)
+        field.typeKey("a", modifierFlags: [.command])
+    }
+
+    private func assertFormattedField(
+        named fieldName: String,
+        buttonID: String,
+        style: String,
+        text: String,
+        in app: XCUIApplication
+    ) {
+        let editorField = field(named: fieldName, in: app)
+        XCTAssertTrue(editorField.waitForExistence(timeout: 5))
+
+        replaceAndSelectText(text, in: editorField)
+
+        let formatButton = app.buttons["field-\(fieldName)-\(buttonID)"]
+        XCTAssertTrue(formatButton.waitForExistence(timeout: 2), "Missing format button \(buttonID) for \(fieldName)")
+        formatButton.click()
+
+        waitForFormattedField(fieldName, containing: "\(style):\(text)", in: app)
+    }
+
+    func testRichTextEditorFormattingButtonsApplyStyles() throws {
+        let app = launchApp()
+        openAddItem(in: app)
+
+        assertFormattedField(named: "Front", buttonID: "formatBold", style: "bold", text: "BoldWord", in: app)
+        assertFormattedField(named: "Front", buttonID: "formatItalic", style: "italic", text: "ItalicWord", in: app)
+        assertFormattedField(named: "Front", buttonID: "formatUnderline", style: "underline", text: "UnderlineWord", in: app)
+        assertFormattedField(named: "Back", buttonID: "formatStrikethrough", style: "strikethrough", text: "StrikeWord", in: app)
+        assertFormattedField(named: "Back", buttonID: "formatHighlight", style: "highlight", text: "HighlightWord", in: app)
+        assertFormattedField(named: "Back", buttonID: "formatCode", style: "code", text: "CodeWord", in: app)
+    }
+
     func testAddItemFromEmptyState() throws {
         let app = launchApp()
 
