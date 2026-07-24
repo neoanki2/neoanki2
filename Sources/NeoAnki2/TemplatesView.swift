@@ -62,7 +62,7 @@ struct TemplatesView: View {
         VStack(spacing: 0) {
             HStack {
                 Text("Types")
-                    .font(.subheadline.weight(.semibold))
+                    .font(DesignSystem.Typography.uiSection)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Add", systemImage: "plus") {
@@ -96,9 +96,9 @@ struct TemplatesView: View {
                     List(model.itemTypes, selection: $model.selectedItemTypeID) { itemType in
                         VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                             Text(itemType.name)
-                                .font(.headline)
+                                .font(DesignSystem.Typography.uiTitle)
                             Text("\(itemType.templates.count) templates · \(itemType.fields.count) fields")
-                                .font(.caption)
+                                .font(DesignSystem.Typography.uiCaption)
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.vertical, 2)
@@ -178,7 +178,7 @@ struct TemplatesView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(itemType.name)
-                    .font(.title3.bold())
+                    .font(DesignSystem.Typography.uiSection)
                     .accessibilityIdentifier("templatesDetailTitle-\(itemType.name)")
                 Spacer()
                 Button("Edit", systemImage: "pencil") {
@@ -215,21 +215,21 @@ struct TemplatesView: View {
     private func fieldsSection(for itemType: ItemType) -> some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             Text("Fields")
-                .font(.headline)
+                .font(DesignSystem.Typography.uiTitle)
 
             VStack(spacing: 0) {
                 ForEach(itemType.fields) { field in
                     HStack {
                         Text(field.name)
-                            .font(.body)
+                            .font(DesignSystem.Typography.uiBody)
                         Spacer()
                         if field.isRequired {
                             Text("Required")
-                                .font(.caption)
+                                .font(DesignSystem.Typography.uiCaption)
                                 .foregroundStyle(.secondary)
                         } else {
                             Text("Optional")
-                                .font(.caption)
+                                .font(DesignSystem.Typography.uiCaption)
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -252,7 +252,7 @@ struct TemplatesView: View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             HStack {
                 Text("Templates")
-                    .font(.headline)
+                    .font(DesignSystem.Typography.uiTitle)
                 Spacer()
                 Button("Add Template", systemImage: "plus") {
                     isAddingTemplate = true
@@ -280,17 +280,17 @@ struct TemplatesView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                                     Text(template.name)
-                                        .font(.body.weight(.medium))
+                                        .font(DesignSystem.Typography.uiBody.weight(.medium))
                                         .foregroundStyle(.primary)
                                     Text(model.templateSummary(template, in: itemType))
                                         .foregroundStyle(.secondary)
                                     Text(interactionLabel(template.interaction))
-                                        .font(.caption)
+                                        .font(DesignSystem.Typography.uiCaption)
                                         .foregroundStyle(.tertiary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.caption)
+                                    .font(DesignSystem.Typography.uiCaption)
                                     .foregroundStyle(.tertiary)
                             }
                             .padding(.vertical, DesignSystem.Spacing.sm)

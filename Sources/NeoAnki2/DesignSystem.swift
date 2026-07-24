@@ -43,6 +43,48 @@ enum DesignSystem {
     // MARK: - Motion
 
     static let revealDuration: Double = 0.2
+
+    // MARK: - Typography
+    //
+    // Semantic styles bumped one step above the baseline in DESIGN.md for better
+    // desk-distance readability while preserving hierarchy and Dynamic Type support.
+
+    enum Typography {
+        static let cardPrompt = Font.largeTitle
+        static let cardAnswer = Font.title
+        static let cardSecondary = Font.title2
+
+        static let uiTitle = Font.title2.weight(.semibold)
+        static let uiSection = Font.title3.weight(.semibold)
+        static let uiBody = Font.body
+        static let uiSecondary = Font.callout
+        static let uiCaption = Font.subheadline
+        static let uiHint = Font.subheadline
+
+        static let emptyIcon = Font.system(.largeTitle, design: .default, weight: .light)
+        static let emptyTitle = Font.body.weight(.semibold)
+        static let emptyMessage = Font.subheadline
+
+        static var richTextPointSize: CGFloat {
+            NSFont.preferredFont(forTextStyle: .body).pointSize
+        }
+
+        static var cardPromptPointSize: CGFloat {
+            NSFont.preferredFont(forTextStyle: .largeTitle).pointSize
+        }
+
+        static var cardAnswerPointSize: CGFloat {
+            NSFont.preferredFont(forTextStyle: .title1).pointSize
+        }
+
+        static var cardSecondaryPointSize: CGFloat {
+            NSFont.preferredFont(forTextStyle: .title2).pointSize
+        }
+
+        static var richTextFont: NSFont {
+            NSFont.systemFont(ofSize: richTextPointSize)
+        }
+    }
 }
 
 // MARK: - Error Banner
@@ -52,7 +94,7 @@ struct ErrorBanner: View {
 
     var body: some View {
         Label(message, systemImage: "exclamationmark.triangle.fill")
-            .font(.caption)
+            .font(DesignSystem.Typography.uiCaption)
             .foregroundStyle(.primary)
             .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
             .padding(.vertical, DesignSystem.Spacing.xs)
@@ -92,6 +134,10 @@ extension View {
     func readingColumnLayout() -> some View {
         modifier(ReadingColumnLayout())
     }
+
+    func neoAnkiFormTypography() -> some View {
+        font(DesignSystem.Typography.uiBody)
+    }
 }
 
 // MARK: - Sidebar Empty State
@@ -109,19 +155,19 @@ struct SidebarEmptyState: View {
             Spacer(minLength: DesignSystem.Spacing.xl)
 
             Image(systemName: systemImage)
-                .font(.largeTitle.weight(.light))
+                .font(DesignSystem.Typography.emptyIcon)
                 .foregroundStyle(.tertiary)
                 .symbolRenderingMode(.hierarchical)
                 .accessibilityHidden(true)
 
             VStack(spacing: DesignSystem.Spacing.rowTight) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(DesignSystem.Typography.emptyTitle)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
                 Text(message)
-                    .font(.caption)
+                    .font(DesignSystem.Typography.emptyMessage)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -132,7 +178,7 @@ struct SidebarEmptyState: View {
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .controlSize(.regular)
                     .padding(.top, DesignSystem.Spacing.xs)
                     .accessibilityIdentifier(actionIdentifier ?? actionTitle)
             }

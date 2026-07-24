@@ -26,6 +26,7 @@ struct ContentView: View {
             detail
         }
         .tint(DesignSystem.accent(for: colorScheme))
+        .environment(\.font, DesignSystem.Typography.uiBody)
         .navigationTitle(
             isStudying ? "Study"
                 : (isManagingTemplates ? "Item Types"
@@ -180,11 +181,11 @@ struct ContentView: View {
                     List(model.items, selection: $selectedItemID) { item in
                         VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                             Text(item.title)
-                                .font(.headline)
+                                .font(DesignSystem.Typography.uiTitle)
                             Text(item.subtitle)
                                 .foregroundStyle(.secondary)
                             Text("\(item.cardCount) cards · \(item.itemTypeName)")
-                                .font(.caption)
+                                .font(DesignSystem.Typography.uiCaption)
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.vertical, 2)

@@ -61,7 +61,7 @@ struct ItemTypeEditorView: View {
 
             Section {
                 Text("New item types start with a default Card template using the first two fields.")
-                    .font(.caption)
+                    .font(DesignSystem.Typography.uiHint)
                     .foregroundStyle(.secondary)
             }
 
@@ -72,6 +72,7 @@ struct ItemTypeEditorView: View {
             }
         }
         .formStyle(.grouped)
+        .neoAnkiFormTypography()
         .navigationTitle(editingItemType == nil ? "Add Item Type" : "Edit Item Type")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

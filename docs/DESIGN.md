@@ -14,27 +14,27 @@ colors:
 typography:
   card-prompt:
     fontFamily: "SF Pro, system-ui"
-    fontSize: "28pt"
+    fontSize: "34pt"
     fontWeight: 400
     lineHeight: 1.25
   card-answer:
     fontFamily: "SF Pro, system-ui"
-    fontSize: "22pt"
+    fontSize: "28pt"
     fontWeight: 400
     lineHeight: 1.3
   ui-title:
     fontFamily: "SF Pro, system-ui"
-    fontSize: "17pt"
+    fontSize: "22pt"
     fontWeight: 600
     lineHeight: 1.2
   ui-body:
     fontFamily: "SF Pro, system-ui"
-    fontSize: "13pt"
+    fontSize: "17pt"
     fontWeight: 400
     lineHeight: 1.45
   ui-caption:
     fontFamily: "SF Pro, system-ui"
-    fontSize: "11pt"
+    fontSize: "15pt"
     fontWeight: 400
     lineHeight: 1.3
 rounded:
@@ -129,17 +129,17 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 ### Hierarchy
 
-- **Card Prompt** (regular, `.title` / ~28pt, 1.25 line-height): Primary retrieval question; center-aligned in study column; multiline supported.
-- **Card Answer** (regular, `.title2` / ~22pt, 1.3 line-height): Revealed content; visually subordinate to prompt but still comfortable to read.
-- **Title** (semibold, `.title2` / `.headline`): Item titles in sidebar and detail preview.
-- **Body** (regular, `.body` / 13–17pt): Form labels, descriptions, empty-state copy. Max ~65 characters per line in study column.
-- **Caption** (regular, `.caption` / `.subheadline`): Progress, card counts, metadata, error banners.
+- **Card Prompt** (regular, `.largeTitle` / ~34pt, 1.25 line-height): Primary retrieval question; center-aligned in study column; multiline supported.
+- **Card Answer** (regular, `.title` / ~28pt, 1.3 line-height): Revealed content; visually subordinate to prompt but still comfortable to read.
+- **Title** (semibold, `.title2` / `.title3`): Item titles in sidebar and detail preview.
+- **Body** (regular, `.body` / ~17pt): Form labels, descriptions, empty-state copy. Max ~65 characters per line in study column.
+- **Caption** (regular, `.subheadline` / ~15pt): Progress, card counts, metadata, error banners.
 
 ### Named Rules
 
-**The Card Type Scale Rule.** Only card prompt uses `.title`; only card answer uses `.title2`. UI chrome never borrows card sizes — prevents “everything shouts.”
+**The Card Type Scale Rule.** Only card prompt uses `.largeTitle`; only card answer uses `.title`. UI chrome never borrows card sizes — prevents “everything shouts.”
 
-**The Dynamic Type Rule.** Use semantic SwiftUI text styles (`.title`, `.headline`, `.body`, `.caption`) — never hard-coded `.font(.system(size:))` in production views.
+**The Dynamic Type Rule.** Use semantic SwiftUI text styles via `DesignSystem.Typography` — never hard-coded `.font(.system(size:))` in production views.
 
 ## Layout
 

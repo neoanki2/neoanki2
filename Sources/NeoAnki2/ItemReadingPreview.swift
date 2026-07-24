@@ -23,11 +23,14 @@ struct ItemReadingPreview: View {
                 VStack(spacing: DesignSystem.Spacing.rowTight) {
                     if index >= 2 {
                         Text(fieldPair.0.name)
-                            .font(.caption)
+                            .font(DesignSystem.Typography.uiHint)
                             .foregroundStyle(.tertiary)
                     }
 
-                    ContentValueView(value: fieldPair.1)
+                    ContentValueView(
+                        value: fieldPair.1,
+                        richTextPointSize: pointSize(for: index)
+                    )
                         .font(font(for: index))
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
@@ -38,9 +41,17 @@ struct ItemReadingPreview: View {
 
     private func font(for index: Int) -> Font {
         switch index {
-        case 0: .title
-        case 1: .title2
-        default: .body
+        case 0: DesignSystem.Typography.cardPrompt
+        case 1: DesignSystem.Typography.cardAnswer
+        default: DesignSystem.Typography.uiBody
+        }
+    }
+
+    private func pointSize(for index: Int) -> CGFloat {
+        switch index {
+        case 0: DesignSystem.Typography.cardPromptPointSize
+        case 1: DesignSystem.Typography.cardAnswerPointSize
+        default: DesignSystem.Typography.richTextPointSize
         }
     }
 }
@@ -74,7 +85,7 @@ struct ItemDetailView: View {
                         ItemReadingPreview(item: item, itemType: itemType)
 
                         Text("\(summary.cardCount) cards · \(summary.itemTypeName)")
-                            .font(.caption)
+                            .font(DesignSystem.Typography.uiCaption)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity)
                     }

@@ -3,14 +3,20 @@ import NeoAnkiCore
 import SwiftUI
 
 enum SpanFormatting {
-    static func attributedString(from spans: [Span]) -> NSAttributedString {
+    static func attributedString(
+        from spans: [Span],
+        pointSize: CGFloat = DesignSystem.Typography.richTextPointSize
+    ) -> NSAttributedString {
         spans.reduce(into: NSMutableAttributedString()) { result, span in
-            result.append(NSAttributedString(string: span.text, attributes: attributes(for: span)))
+            result.append(NSAttributedString(string: span.text, attributes: attributes(for: span, pointSize: pointSize)))
         }
     }
 
-    static func swiftUIAttributedString(from spans: [Span]) -> AttributedString {
-        AttributedString(attributedString(from: spans))
+    static func swiftUIAttributedString(
+        from spans: [Span],
+        pointSize: CGFloat = DesignSystem.Typography.richTextPointSize
+    ) -> AttributedString {
+        AttributedString(attributedString(from: spans, pointSize: pointSize))
     }
 
     static func spans(from attributedString: NSAttributedString) -> [Span] {
@@ -54,8 +60,8 @@ enum SpanFormatting {
         }.joined(separator: "|")
     }
 
-    private static func attributes(for span: Span) -> [NSAttributedString.Key: Any] {
-        var attributes: [NSAttributedString.Key: Any] = [.font: font(for: span)]
+    private static func attributes(for span: Span, pointSize: CGFloat) -> [NSAttributedString.Key: Any] {
+        var attributes: [NSAttributedString.Key: Any] = [.font: font(for: span, pointSize: pointSize)]
 
         if span.styles.contains(.underline) {
             attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
@@ -72,8 +78,8 @@ enum SpanFormatting {
         return attributes
     }
 
-    private static func font(for span: Span) -> NSFont {
-        let size = NSFont.systemFontSize
+    private static func font(for span: Span, pointSize: CGFloat) -> NSFont {
+        let size = pointSize
         if span.styles.contains(.code) {
             var font = NSFont.monospacedSystemFont(
                 ofSize: size,

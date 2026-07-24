@@ -57,7 +57,7 @@ struct TemplateEditorView: View {
 
             Section {
                 Text("Reveal cards show the prompt first, then the answer after you choose Show Answer.")
-                    .font(.caption)
+                    .font(DesignSystem.Typography.uiHint)
                     .foregroundStyle(.secondary)
             }
 
@@ -68,6 +68,7 @@ struct TemplateEditorView: View {
             }
         }
         .formStyle(.grouped)
+        .neoAnkiFormTypography()
         .navigationTitle(editingTemplate == nil ? "Add Template" : "Edit Template")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

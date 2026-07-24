@@ -39,6 +39,7 @@ struct AddItemView: View {
             }
         }
         .formStyle(.grouped)
+        .neoAnkiFormTypography()
         .navigationTitle("Add Item")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -54,7 +55,7 @@ struct AddItemView: View {
                 .accessibilityIdentifier("saveAddItem")
             }
         }
-        .frame(minWidth: 420, minHeight: 320)
+        .frame(minWidth: 420, minHeight: 360)
         .onAppear {
             resetFields()
         }

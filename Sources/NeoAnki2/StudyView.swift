@@ -141,7 +141,7 @@ struct StudyView: View {
     private var studyHeader: some View {
         HStack {
             Text(model.progressLabel)
-                .font(.subheadline)
+                .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Progress, \(model.progressLabel)")
 
@@ -173,15 +173,23 @@ struct StudyView: View {
 
     @ViewBuilder
     private func revealCardContent(_ card: DueCard) -> some View {
-        SideContentView(side: card.template.prompt, item: card.item)
-            .font(.title)
+        SideContentView(
+            side: card.template.prompt,
+            item: card.item,
+            richTextPointSize: DesignSystem.Typography.cardPromptPointSize
+        )
+            .font(DesignSystem.Typography.cardPrompt)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
 
         if model.isAnswerRevealed {
             Divider()
-            SideContentView(side: card.template.answer, item: card.item)
-                .font(.title2)
+            SideContentView(
+                side: card.template.answer,
+                item: card.item,
+                richTextPointSize: DesignSystem.Typography.cardAnswerPointSize
+            )
+                .font(DesignSystem.Typography.cardAnswer)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .transition(.opacity)
@@ -224,6 +232,7 @@ struct StudyView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .keyboardShortcut(.return, modifiers: [])
                 .keyboardShortcut(.space, modifiers: [])
                 .accessibilityIdentifier("showAnswer")
@@ -241,6 +250,7 @@ struct StudyView: View {
                     Task { await model.grade(rating) }
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.large)
                 .help(rating.studyTooltip)
                 .keyboardShortcut(rating.studyKeyboardShortcut, modifiers: [])
                 .disabled(model.isGrading)

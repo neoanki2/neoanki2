@@ -17,7 +17,7 @@ struct RichTextFieldEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
             Text(label)
-                .font(.caption)
+                .font(DesignSystem.Typography.uiHint)
                 .foregroundStyle(.secondary)
 
             formattingToolbar
@@ -27,7 +27,7 @@ struct RichTextFieldEditor: View {
                 accessibilityIdentifier: accessibilityIdentifier,
                 textViewHolder: textViewHolder
             )
-            .frame(minHeight: 72)
+            .frame(minHeight: 88)
             .overlay {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
@@ -65,7 +65,7 @@ struct RichTextFieldEditor: View {
             }
         }
         .buttonStyle(.borderless)
-        .controlSize(.small)
+        .controlSize(.regular)
     }
 
     private func formatButtonID(_ suffix: String) -> String? {
@@ -109,7 +109,7 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
         textView.allowsUndo = true
         textView.drawsBackground = true
         textView.backgroundColor = .textBackgroundColor
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.textContainerInset = NSSize(width: 10, height: 10)
         textView.delegate = context.coordinator
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
         context.coordinator.textView = textView
@@ -187,7 +187,7 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
             let newSpans = SpanFormatting.spans(from: textView.attributedString())
             if SpanFormatting.plainText(from: newSpans).isEmpty {
                 textView.typingAttributes = [
-                    .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                    .font: DesignSystem.Typography.richTextFont,
                 ]
             }
             guard newSpans != spans else {
