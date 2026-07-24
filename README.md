@@ -1,0 +1,39 @@
+# NeoAnki2
+
+A native macOS spaced-repetition app, built ground-up in Swift 6 and SwiftUI,
+with its domain logic in a standalone Swift package, `NeoAnkiCore`.
+
+NeoAnki2 is a rewrite of the Anki idea, not a port. It deliberately drops all
+legacy Anki compatibility (no HTML/CSS cards, no `.apkg`, no shared-deck import,
+no SM-2) in favor of a clean, native, and scientifically grounded model.
+
+## Principles
+
+- **Native-only.** Card content is data (`ContentValue`), rendered by SwiftUI.
+  No HTML, no CSS, no template markup.
+- **Domain-neutral.** The core knows about no subject. Anatomy, music,
+  chemistry, and geography are all just user-declared note types. You can delete
+  any subject without touching a single type.
+- **Learning-science first.** The schema encodes the testing effect, encoding
+  specificity, desirable difficulties, dual coding, atomicity, and interleaving.
+- **Modern scheduling.** FSRS (Difficulty–Stability–Retrievability) is the
+  scheduler, behind a swappable `Scheduler` protocol. No SM-2, no ease hell.
+
+## Layout
+
+```
+NeoAnkiCore/Sources/NeoAnkiCore/
+  Content/   ContentValue, MediaRef        — the raw knowledge, native values
+  Schema/    NoteType, FieldDef,           — how content is structured,
+             CardTemplate, Skill              presented, and tested
+  Models/    Note, Card, Deck,             — concrete instances and generation
+             CardGenerator
+  SRS/       MemoryState, Scheduler,       — memory and scheduling (FSRS)
+             ReviewRating, ReviewLog
+```
+
+## Documentation
+
+See [`docs/DESIGN.md`](docs/DESIGN.md) for the full design and philosophy: the
+three-layer architecture, the data model, learning-science mapping, a worked
+example, and the rationale for FSRS over SM-2.
