@@ -2,14 +2,13 @@ import NeoAnkiCore
 import SwiftUI
 
 struct StudyView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: StudyModel
     @Binding var endSessionTrigger: Bool
     let onEndSession: () -> Void
 
     @State private var showGradeGuide = false
     @State private var showEndSessionConfirm = false
-
-    private let readingColumnMaxWidth: CGFloat = 600
 
     var body: some View {
         Group {
@@ -24,7 +23,7 @@ struct StudyView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(DesignSystem.detailBackground)
         .task {
             await model.startSession()
         }
@@ -114,7 +113,7 @@ struct StudyView: View {
             Divider()
 
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: DesignSystem.Spacing.lg) {
                     if cardHasUnsupportedContent(card) {
                         unsupportedContentView
                     } else if card.template.interaction != .reveal {
@@ -123,14 +122,14 @@ struct StudyView: View {
                         revealCardContent(card)
                     }
                 }
-                .frame(maxWidth: readingColumnMaxWidth)
+                .frame(maxWidth: DesignSystem.readingColumnMaxWidth)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 24)
+                .padding(.horizontal, DesignSystem.Spacing.xl)
+                .padding(.vertical, DesignSystem.Spacing.lg)
             }
 
             if let errorMessage = model.errorMessage {
-                errorBanner(errorMessage)
+                ErrorBanner(message: errorMessage)
             }
 
             Divider()
@@ -168,10 +167,11 @@ struct StudyView: View {
             Button("End Session") {
                 requestEndSession()
             }
+            .buttonStyle(.borderless)
             .accessibilityIdentifier("endStudySession")
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, DesignSystem.Spacing.md + 4)
+        .padding(.vertical, DesignSystem.Spacing.sm)
     }
 
     @ViewBuilder
@@ -222,7 +222,7 @@ struct StudyView: View {
                 gradeButtons
             } else {
                 Button("Show Answer") {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
                         model.revealAnswer()
                     }
                 }
@@ -233,12 +233,12 @@ struct StudyView: View {
                 .accessibilityLabel("Show answer")
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(DesignSystem.Spacing.md + 4)
     }
 
     private var gradeButtons: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: DesignSystem.Spacing.sm) {
             ForEach(ReviewRating.allCases, id: \.self) { rating in
                 Button(rating.studyButtonTitle) {
                     Task { await model.grade(rating) }
@@ -251,17 +251,6 @@ struct StudyView: View {
                 .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
             }
         }
-    }
-
-    private func errorBanner(_ message: String) -> some View {
-        Label(message, systemImage: "exclamationmark.triangle.fill")
-            .font(.caption)
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red.opacity(0.12))
-            .accessibilityLabel("Error, \(message)")
     }
 
     private func requestEndSession() {

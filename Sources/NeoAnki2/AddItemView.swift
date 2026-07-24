@@ -23,8 +23,7 @@ struct AddItemView: View {
 
             if let errorMessage = model.errorMessage {
                 Section {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
+                    ErrorBanner(message: errorMessage)
                 }
             }
         }
@@ -39,6 +38,7 @@ struct AddItemView: View {
                 Button("Save") {
                     Task { await save() }
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(isSaving || !canSave)
                 .accessibilityIdentifier("saveAddItem")
             }

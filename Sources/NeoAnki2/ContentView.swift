@@ -2,6 +2,8 @@ import NeoAnkiCore
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: ItemsModel
     @State private var isAddingItem = false
     @State private var isStudying = false
@@ -12,10 +14,15 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
+                .navigationSplitViewColumnWidth(
+                    min: DesignSystem.sidebarMin,
+                    ideal: DesignSystem.sidebarIdeal,
+                    max: DesignSystem.sidebarMax
+                )
         } detail: {
             detail
         }
+        .tint(DesignSystem.accent(for: colorScheme))
         .navigationTitle("NeoAnki2")
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -58,7 +65,7 @@ struct ContentView: View {
                 startStudy: nil,
                 requestEndSession: { endSessionTrigger = true },
                 showAnswer: {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
                         studyModel.revealAnswer()
                     }
                 },
@@ -146,6 +153,7 @@ struct ContentView: View {
                 }
             }
         }
+        .background(DesignSystem.sidebarBackground)
         .navigationTitle("Items")
     }
 
@@ -183,22 +191,25 @@ struct ContentView: View {
                 .accessibilityIdentifier("studyDetailPrompt")
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DesignSystem.detailBackground)
     }
 
     private func itemDetail(_ item: SavedItemSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             Text(item.title)
-                .font(.title2.bold())
+                .font(.headline)
             Text(item.subtitle)
-                .font(.title3)
+                .font(.body)
                 .foregroundStyle(.secondary)
             Text("\(item.cardCount) cards · \(item.itemTypeName)")
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(32)
+        .padding(DesignSystem.Spacing.xl)
+        .background(DesignSystem.detailBackground)
     }
 
     private func startStudy() {

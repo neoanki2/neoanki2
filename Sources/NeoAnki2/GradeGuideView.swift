@@ -3,7 +3,7 @@ import SwiftUI
 
 struct GradeGuideView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("How to grade")
                 .font(.headline)
 
@@ -15,7 +15,7 @@ struct GradeGuideView: View {
             Divider()
 
             ForEach(ReviewRating.allCases, id: \.self) { rating in
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
                     Text(rating.studyButtonTitle)
                         .font(.body.bold())
                         .frame(width: 52, alignment: .leading)
@@ -30,7 +30,7 @@ struct GradeGuideView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(20)
+        .padding(DesignSystem.Spacing.md + 4)
         .frame(width: 360)
     }
 }
