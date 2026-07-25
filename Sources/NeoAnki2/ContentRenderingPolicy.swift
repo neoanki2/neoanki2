@@ -26,6 +26,19 @@ enum ContentRenderingPolicy {
             )
         }
 
+        // Cloze content is self-concealing: the surrounding sentence must stay
+        // visible while its blanks are masked until the answer is revealed. It
+        // therefore always renders inline (ClozeContentView performs the
+        // per-blank masking based on `isAnswerRevealed`) and never collapses to
+        // a generic placeholder, which would hide the whole prompt.
+        if case .cloze = value {
+            return Decision(
+                rendering: .content,
+                accessibilityLabel: nil,
+                shouldResolveMedia: false
+            )
+        }
+
         guard !isAnswerRevealed, revealMode != .always else {
             return Decision(
                 rendering: .content,

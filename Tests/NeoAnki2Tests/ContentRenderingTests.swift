@@ -54,6 +54,17 @@ import Testing
                     revealMode: revealMode,
                     isAnswerRevealed: isAnswerRevealed
                 )
+
+                if fixture.isSelfConcealing {
+                    // Cloze always renders inline so its blanks can be masked in
+                    // place; it never collapses to a placeholder and never
+                    // exposes the answer through an accessibility label.
+                    #expect(decision.rendering == .content)
+                    #expect(decision.shouldResolveMedia == false)
+                    #expect(decision.accessibilityLabel == nil)
+                    continue
+                }
+
                 let isConcealed = !fixture.isEmpty
                     && !isAnswerRevealed
                     && revealMode != .always
@@ -75,6 +86,36 @@ import Testing
 
     #expect(combinationCount == fixtures.count * RevealMode.allCases.count * 2)
     #expect(combinationCount == 54)
+}
+
+@Test func clozePromptRendersMaskedSentenceInlineAndHidesAnswer() {
+    let sentence = "The capital of France is Paris"
+    let answer = "Paris"
+    let start = sentence.count - answer.count
+    let blanks = [ClozeSpan(group: 1, start: start, length: answer.count)]
+    let value = ContentValue.cloze(sentence, blanks: blanks)
+
+    // Regression guard: a hidden-until-answer cloze must render inline, not as a
+    // generic "hidden until answer" placeholder that swallows the whole prompt.
+    for revealMode in RevealMode.allCases {
+        let prompt = ContentRenderingPolicy.decision(
+            for: value,
+            revealMode: revealMode,
+            isAnswerRevealed: false
+        )
+        #expect(prompt.rendering == .content)
+        #expect(prompt.accessibilityLabel == nil)
+    }
+
+    // The masked prompt keeps the surrounding sentence but conceals the answer.
+    let masked = ClozeValidation.displayText(from: sentence, blanks: blanks, revealed: false)
+    #expect(masked.hasPrefix("The capital of France is "))
+    #expect(masked.contains(answer) == false)
+    #expect(masked.contains("[…]"))
+
+    // Once revealed, the full sentence (including the answer) is shown.
+    let revealed = ClozeValidation.displayText(from: sentence, blanks: blanks, revealed: true)
+    #expect(revealed == sentence)
 }
 
 @Test func concealedTimeBasedMediaCannotResolveOrExposePlayback() {
@@ -101,6 +142,7 @@ private struct RenderingFixture {
     var isMedia = false
     var canRenderBlurredMedia = false
     var isEmpty = false
+    var isSelfConcealing = false
 }
 
 private func renderingFixtures(secret: String) -> [RenderingFixture] {
@@ -112,7 +154,8 @@ private func renderingFixtures(secret: String) -> [RenderingFixture] {
             value: .cloze(
                 secret,
                 blanks: [ClozeSpan(group: 1, start: 0, length: secret.count)]
-            )
+            ),
+            isSelfConcealing: true
         ),
         RenderingFixture(
             value: .media(mediaRef(kind: .audio, altText: secret)),

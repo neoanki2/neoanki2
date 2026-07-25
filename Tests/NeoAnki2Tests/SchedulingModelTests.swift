@@ -19,6 +19,10 @@ import Testing
         Issue.record("Expected a clear optimization failure notice.")
         return
     }
-    #expect(message.contains("At least 100"))
-    #expect(message.contains("0 are available"))
+    // Plain-language guidance names the required and available counts without
+    // leaking raw error/technical wording.
+    #expect(message.contains("100"))
+    #expect(message.contains("0"))
+    #expect(message.contains("Keep studying"))
+    #expect(!message.contains("FSRS"))
 }

@@ -89,3 +89,103 @@ private func mediaImportPayload(path: String) throws -> Data {
         try ImportLimits.validateFieldString(exactlyLimit + "a", fieldName: "Text")
     }
 }
+
+@Test func decodedPayloadRejectsMoreThanTenThousandRows() throws {
+    let atLimit = ImportPayload(
+        itemTypeName: "Capitals",
+        rows: Array(repeating: ImportRow(fieldValues: ["Country": "C"]), count: ImportLimits.maxRows)
+    )
+    try ImportLimits.validateDecodedPayload(atLimit)  // 10,000 is allowed
+
+    let overLimit = ImportPayload(
+        itemTypeName: "Capitals",
+        rows: Array(repeating: ImportRow(fieldValues: ["Country": "C"]), count: ImportLimits.maxRows + 1)
+    )
+    #expect(throws: ImportError.self) {
+        try ImportLimits.validateDecodedPayload(overLimit)
+    }
+    #expect(throws: ImportError.self) {
+        try ImportLimits.validateRowCount(ImportLimits.maxRows + 1)
+    }
+}
+
+@Test func decodedPayloadRejectsRowsWithTooManyFields() throws {
+    var oversized: [String: String] = [:]
+    for index in 0...ImportLimits.maxFieldsPerRow {
+        oversized["Field\(index)"] = "value"
+    }
+    let payload = ImportPayload(
+        itemTypeName: "Capitals",
+        rows: [ImportRow(fieldValues: oversized)]
+    )
+    #expect(throws: ImportError.self) {
+        try ImportLimits.validateDecodedPayload(payload)
+    }
+}
+
+@Test func base64MediaCapRejectsOversizeEncodedBlob() throws {
+    let smallValid = "QQ=="  // "A" base64-encoded
+    try ImportLimits.validateBase64EncodedSize(smallValid, kind: .image, fieldName: "Map")
+
+    let encodedCap = ((MediaValidation.maxBytes(for: .image) + 2) / 3) * 4
+    let oversize = String(repeating: "A", count: encodedCap + 4)
+    #expect(throws: ImportError.self) {
+        try ImportLimits.validateBase64EncodedSize(oversize, kind: .image, fieldName: "Map")
+    }
+}
+
+@Test func importRejectsMoreThanTenThousandRowsBeforePersisting() async throws {
+    var rows: [[String: Any]] = []
+    rows.reserveCapacity(ImportLimits.maxRows + 1)
+    for index in 0...ImportLimits.maxRows {  // 10,001 rows
+        rows.append(["Country": "Country \(index)", "Capital": "Capital \(index)"])
+    }
+    let data = try JSONSerialization.data(withJSONObject: ["itemType": "Capitals", "rows": rows])
+
+    try await ScenarioRunner.run { ctx in
+        try await ctx.onboard()
+        let fixture = ItemTypeFixtures.capitals()
+        _ = try await ctx.store.createItemType(fixture.type)
+
+        await #expect(throws: ImportError.self) {
+            try await ctx.store.importItems(
+                from: data,
+                adapter: JSONImportAdapter(),
+                itemTypeID: fixture.type.id
+            )
+        }
+        #expect(try await ctx.store.listItems().isEmpty)
+    }
+}
+
+@Test func importRejectsOversizePayloadBeforePersisting() async throws {
+    // A base64 media blob large enough to exceed a media cap also exceeds the
+    // 5 MB payload cap, so it is rejected before any decoding or persistence.
+    let oversizeBase64 = String(repeating: "A", count: ImportLimits.maxPayloadBytes + 1_000)
+    let data = try JSONSerialization.data(withJSONObject: [
+        "itemType": "Capitals",
+        "rows": [
+            [
+                "Country": "France",
+                "Capital": "Paris",
+                "Map": ["base64": oversizeBase64, "fileExtension": "png"],
+            ],
+        ],
+    ])
+    #expect(data.count > ImportLimits.maxPayloadBytes)
+
+    try await ScenarioRunner.run { ctx in
+        try await ctx.onboard()
+        let fixture = ItemTypeFixtures.capitals()
+        _ = try await ctx.store.createItemType(fixture.type)
+
+        await #expect(throws: ImportError.self) {
+            try await ctx.store.importItems(
+                from: data,
+                adapter: JSONImportAdapter(),
+                itemTypeID: fixture.type.id
+            )
+        }
+        #expect(try await ctx.store.listItems().isEmpty)
+    }
+}

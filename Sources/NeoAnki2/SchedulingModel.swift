@@ -55,9 +55,9 @@ final class SchedulingModel {
                 )
             }
         } catch let error as FSRSOptimizationError {
-            notice = .failure(error.localizedDescription)
+            notice = .failure(UserFacingError.schedulingMessage(from: error))
         } catch {
-            notice = .failure("Scheduling parameters could not be saved. Try again.")
+            notice = .failure(UserFacingError.schedulingMessage(from: error))
         }
     }
 }

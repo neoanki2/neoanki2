@@ -25,16 +25,32 @@ enum UserFacingError {
         if let dbError = error as? DatabaseError, case .requiredFieldEmpty(let field) = dbError {
             return "Every imported row needs a value for \(field)."
         }
+        if let dbError = error as? DatabaseError {
+            return databaseMessage(dbError)
+        }
         if let clozeError = error as? ClozeValidationError {
-            return clozeError.localizedDescription
+            return clozeMessage(clozeError)
         }
         if let mediaError = error as? MediaError {
-            return mediaError.localizedDescription
+            return mediaMessage(mediaError)
         }
         if error is CocoaError {
             return "NeoAnki2 couldn’t read the selected file. Check that it still exists and try again."
         }
         return "NeoAnki2 couldn’t import this file. Check the file and try again."
+    }
+
+    static func schedulingMessage(from error: Error) -> String {
+        if let error = error as? FSRSOptimizationError {
+            switch error {
+            case let .insufficientData(required, available):
+                return "NeoAnki2 needs at least \(required) review outcomes to tune scheduling; "
+                    + "you have \(available) so far. Keep studying and try again later."
+            case .invalidParameters:
+                return "Scheduling parameters couldn't be tuned from your review history. Try again later."
+            }
+        }
+        return "Scheduling parameters could not be saved. Try again."
     }
 
     private static func databaseMessage(_ error: DatabaseError) -> String {

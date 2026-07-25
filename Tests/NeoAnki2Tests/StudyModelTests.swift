@@ -186,6 +186,27 @@ private func makeInteractionModel(
     #expect(model.arrangedItems != initial)
 }
 
+@Test @MainActor func arrangementMoveWithoutSelectionGuidesUserAndIgnoresBadIndices() async throws {
+    let model = try await makeInteractionModel(.arrange, answer: .text("first second third"))
+    let initial = model.arrangedItems
+
+    // Moving before selecting anything is a no-op that explains what to do.
+    model.moveSelectedArrangementItem(by: 1)
+    #expect(model.selectedArrangementIndex == nil)
+    #expect(model.arrangedItems == initial)
+    #expect(model.interactionMessage == "Select an item before moving it.")
+
+    // Selecting an out-of-range position (e.g. Command-9 with fewer items) is ignored.
+    model.selectArrangementItem(at: 99)
+    #expect(model.selectedArrangementIndex == nil)
+
+    // A selected item cannot be moved past the ends of the list.
+    model.selectArrangementItem(at: 0)
+    model.moveSelectedArrangementItem(by: -1)
+    #expect(model.selectedArrangementIndex == 0)
+    #expect(model.arrangedItems == initial)
+}
+
 @Test @MainActor func studyModelSkipsUnsupportedCard() async throws {
     let (model, store) = try await makeStudyModel()
     let itemType = try await store.defaultItemType()

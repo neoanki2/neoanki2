@@ -63,6 +63,34 @@ import Testing
     }
 }
 
+@Test func optimizerRecoversTowardGeneratingWeightsOnHeldOutData() throws {
+    let logs = syntheticLogs(cardCount: 80, reviewsPerCard: 8)
+    let grouped = Dictionary(grouping: logs, by: \.cardID)
+        .sorted { $0.key.uuidString < $1.key.uuidString }
+    let training = grouped.enumerated()
+        .filter { $0.offset % 4 != 0 }
+        .flatMap(\.element.value)
+    let held = grouped.enumerated()
+        .filter { $0.offset % 4 == 0 }
+        .flatMap(\.element.value)
+
+    let optimizer = FSRSOptimizer(minimumObservations: 300, passes: 7)
+    let baseline = FSRSScheduler.Parameters()
+    let truth = FSRSScheduler.Parameters(weights: syntheticTrueWeights())
+
+    let result = try optimizer.optimize(logs: training, startingAt: baseline)
+
+    let heldBaseline = optimizer.logLoss(logs: held, parameters: baseline)
+    let heldOptimized = optimizer.logLoss(logs: held, parameters: result.parameters)
+    let heldTruth = optimizer.logLoss(logs: held, parameters: truth)
+
+    // The generating weights define the irreducible held-out loss. Fitting must
+    // move the default weights toward that floor, not just wobble.
+    #expect(heldTruth <= heldBaseline)
+    #expect(heldOptimized < heldBaseline)
+    #expect(heldOptimized <= heldTruth * 1.2 + 1e-3)
+}
+
 @Test func equalTimestampReviewsUsePersistedAppendSequenceNotUUID() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki-review-order-\(UUID().uuidString)", isDirectory: true)
@@ -104,7 +132,7 @@ import Testing
     #expect(orderedLoss == shuffledLoss)
 }
 
-private func syntheticLogs(cardCount: Int, reviewsPerCard: Int) -> [ReviewLog] {
+private func syntheticTrueWeights() -> [Double] {
     var trueWeights = FSRSScheduler.Parameters.defaultWeights
     trueWeights[0] = 0.9
     trueWeights[1] = 2.0
@@ -112,6 +140,11 @@ private func syntheticLogs(cardCount: Int, reviewsPerCard: Int) -> [ReviewLog] {
     trueWeights[3] = 20.0
     trueWeights[8] = 2.2
     trueWeights[10] = 1.4
+    return trueWeights
+}
+
+private func syntheticLogs(cardCount: Int, reviewsPerCard: Int) -> [ReviewLog] {
+    let trueWeights = syntheticTrueWeights()
     let scheduler = FSRSScheduler(
         parameters: .init(weights: trueWeights, enableFuzz: false)
     )

@@ -89,3 +89,39 @@ import Testing
             == "There is no item type named “Vocabulary”. Create it first or update the JSON file."
     )
 }
+
+@Test func importMessageMapsClozeAndMediaErrorsToPlainLanguage() {
+    // These previously leaked raw `localizedDescription` text through the import path.
+    #expect(
+        UserFacingError.importMessage(from: ClozeValidationError.overlappingBlanks)
+            == "Blanks can't overlap."
+    )
+    #expect(
+        UserFacingError.importMessage(from: MediaError.fileTooLarge(.image, maxBytes: 10_000_000))
+            == "Choose an image file smaller than 10 MB."
+    )
+    #expect(
+        UserFacingError.importMessage(from: MediaError.unsupportedFormat(.video))
+            == "Choose a supported video file."
+    )
+}
+
+@Test func schedulingMessageExplainsInsufficientDataWithoutTechnicalDetails() {
+    let message = UserFacingError.schedulingMessage(
+        from: FSRSOptimizationError.insufficientData(required: 200, available: 12)
+    )
+    #expect(message.contains("200"))
+    #expect(message.contains("12"))
+    #expect(!message.contains("FSRS"))
+
+    #expect(
+        UserFacingError.schedulingMessage(from: FSRSOptimizationError.invalidParameters)
+            == "Scheduling parameters couldn't be tuned from your review history. Try again later."
+    )
+
+    struct SampleError: Error {}
+    #expect(
+        UserFacingError.schedulingMessage(from: SampleError())
+            == "Scheduling parameters could not be saved. Try again."
+    )
+}

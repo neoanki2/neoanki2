@@ -259,6 +259,49 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(reloaded.fields.map(\.name).contains("Hint"))
 }
 
+@Test func fieldReorderingSwapsNeighboursAndIgnoresOutOfBounds() {
+    let items = ["A", "B", "C"]
+    #expect(FieldReordering.move(items, from: 2, by: -1) == ["A", "C", "B"])
+    #expect(FieldReordering.move(items, from: 0, by: 1) == ["B", "A", "C"])
+    // Out-of-bounds moves are no-ops rather than crashes.
+    #expect(FieldReordering.move(items, from: 0, by: -1) == items)
+    #expect(FieldReordering.move(items, from: 2, by: 1) == items)
+    #expect(FieldReordering.move(items, from: 5, by: -1) == items)
+}
+
+@Test @MainActor func templatesModelPersistsReorderedFields() async throws {
+    let (model, store) = try await makeTemplatesModel()
+    await model.load()
+
+    let created = await model.createItemType(
+        ItemTypeDraft(
+            name: "Ordered",
+            fields: [
+                FieldDraft(name: "One", isRequired: true),
+                FieldDraft(name: "Two", isRequired: true),
+                FieldDraft(name: "Three", isRequired: false),
+            ]
+        )
+    )
+    #expect(created)
+
+    guard let itemType = model.itemTypes.first(where: { $0.name == "Ordered" }) else {
+        Issue.record("Expected Ordered item type.")
+        return
+    }
+    #expect(itemType.fields.map(\.name) == ["One", "Two", "Three"])
+
+    var draft = ItemTypeDraft(itemType: itemType)
+    // Move the last field to the top, mirroring the editor's move-up control.
+    draft.fields = FieldReordering.move(draft.fields, from: 2, by: -1)
+    draft.fields = FieldReordering.move(draft.fields, from: 1, by: -1)
+
+    #expect(await model.updateItemType(draft, editingID: itemType.id))
+
+    let reloaded = try await store.itemType(id: itemType.id)
+    #expect(reloaded.fields.map(\.name) == ["Three", "One", "Two"])
+}
+
 @Test @MainActor func templatesModelDeletesUnusedBasicStarter() async throws {
     let (model, store) = try await makeTemplatesModel()
     await model.load()

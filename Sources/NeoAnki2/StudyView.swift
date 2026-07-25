@@ -394,6 +394,7 @@ struct StudyView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.bordered)
+                .modifier(ArrangementSelectionShortcut(index: index))
                 .accessibilityLabel("Position \(index + 1), \(item)")
                 .accessibilityValue(model.selectedArrangementIndex == index ? "Selected" : "")
                 .accessibilityIdentifier("arrangementItem\(index)")
@@ -541,6 +542,26 @@ struct StudyView: View {
         case .recorded, .playing: "checkmark.circle"
         case .failed: "exclamationmark.triangle"
         case .idle, .requestingPermission: "mic"
+        }
+    }
+}
+
+/// Binds Command-1 … Command-9 to the first nine arrangement items so the whole
+/// arrange interaction (select then move with Command-Arrow) is keyboard-only.
+/// Command avoids clashing with the plain 1–4 grade shortcuts, which are only
+/// active once the answer is revealed.
+private struct ArrangementSelectionShortcut: ViewModifier {
+    let index: Int
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if index < 9 {
+            content.keyboardShortcut(
+                KeyEquivalent(Character("\(index + 1)")),
+                modifiers: [.command]
+            )
+        } else {
+            content
         }
     }
 }

@@ -318,7 +318,15 @@ struct ClozeContentView: View {
     }
 
     private var displayText: String {
-        let revealed = isAnswerRevealed || revealMode == .always
-        return ClozeValidation.displayText(from: text, blanks: blanks, revealed: revealed, group: group)
+        // A cloze prompt always shows the sentence with its blanks masked; the
+        // blanks reveal only once the answer is shown. `revealMode` is
+        // intentionally ignored for concealment so an author-selected
+        // `.always` slot can't leak the answer on the prompt side.
+        ClozeValidation.displayText(
+            from: text,
+            blanks: blanks,
+            revealed: isAnswerRevealed,
+            group: group
+        )
     }
 }

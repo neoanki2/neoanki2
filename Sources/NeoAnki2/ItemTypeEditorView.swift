@@ -1,6 +1,19 @@
 import NeoAnkiCore
 import SwiftUI
 
+enum FieldReordering {
+    /// Swaps the element at `index` with its neighbour `offset` positions away,
+    /// returning the input unchanged when either position is out of bounds.
+    static func move<Element>(_ items: [Element], from index: Int, by offset: Int) -> [Element] {
+        guard items.indices.contains(index) else { return items }
+        let destination = index + offset
+        guard items.indices.contains(destination) else { return items }
+        var result = items
+        result.swapAt(index, destination)
+        return result
+    }
+}
+
 struct ItemTypeEditorView: View {
     @Bindable var model: TemplatesModel
     var onDismiss: () -> Void = {}
@@ -33,13 +46,13 @@ struct ItemTypeEditorView: View {
             }
 
             Section("Fields") {
-                ForEach($draft.fields) { $field in
+                ForEach(Array(draft.fields.enumerated()), id: \.element.id) { index, field in
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                         HStack(spacing: DesignSystem.Spacing.sm) {
-                            TextField("Field name", text: $field.name)
+                            TextField("Field name", text: $draft.fields[index].name)
                                 .accessibilityIdentifier("itemTypeField-\(field.id.uuidString)")
 
-                            Picker("Type", selection: $field.type) {
+                            Picker("Type", selection: $draft.fields[index].type) {
                                 ForEach(FieldTypeLabels.authoringTypes, id: \.self) { type in
                                     Text(FieldTypeLabels.name(for: type)).tag(type)
                                 }
@@ -48,10 +61,34 @@ struct ItemTypeEditorView: View {
                             .frame(width: 130)
                             .accessibilityIdentifier("itemTypeFieldType-\(field.id.uuidString)")
 
-                            Toggle("Required", isOn: $field.isRequired)
+                            Toggle("Required", isOn: $draft.fields[index].isRequired)
                                 .labelsHidden()
                                 .toggleStyle(.checkbox)
                                 .accessibilityLabel("Required")
+
+                            // Per-row move buttons stay keyboard-reachable via Tab
+                            // + Space. They intentionally carry no keyboard
+                            // shortcut: a single shortcut repeated on every row
+                            // would be ambiguous about which field it moves.
+                            Button {
+                                moveField(from: index, by: -1)
+                            } label: {
+                                Image(systemName: "arrow.up")
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(index == 0)
+                            .accessibilityLabel("Move field \(field.name) up")
+                            .accessibilityIdentifier("moveFieldUp-\(field.id.uuidString)")
+
+                            Button {
+                                moveField(from: index, by: 1)
+                            } label: {
+                                Image(systemName: "arrow.down")
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(index == draft.fields.count - 1)
+                            .accessibilityLabel("Move field \(field.name) down")
+                            .accessibilityIdentifier("moveFieldDown-\(field.id.uuidString)")
 
                             if draft.fields.count > 2 {
                                 Button(role: .destructive) {
@@ -114,6 +151,10 @@ struct ItemTypeEditorView: View {
         } message: {
             Text("Your unsaved item type changes will be lost.")
         }
+    }
+
+    private func moveField(from index: Int, by offset: Int) {
+        draft.fields = FieldReordering.move(draft.fields, from: index, by: offset)
     }
 
     private func save() async {

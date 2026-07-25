@@ -124,6 +124,58 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     #expect(sameDay.stability > first.stability)
 }
 
+@Test func forgetStabilityMatchesFSRS5ClosedForm() {
+    let now = Date(timeIntervalSince1970: 6_000_000)
+    let scheduler = FSRSScheduler(parameters: .init(enableFuzz: false))
+    let reviewed = MemoryState(
+        stability: 20,
+        difficulty: 5,
+        due: now,
+        lastReview: now.addingTimeInterval(-30 * 86_400),  // overdue -> lower retrievability
+        reps: 5,
+        lapses: 0,
+        phase: .review
+    )
+
+    let r = scheduler.retrievability(of: reviewed, asOf: now)
+    let lapsed = scheduler.schedule(reviewed, rating: .again, now: now)
+
+    // Independently recompute the FSRS-5 next difficulty for an "again" grade
+    // from the weights, without reading it back from the scheduler.
+    let clamp: (Double) -> Double = { min(10.0, max(1.0, $0)) }
+    let deltaD = -w[6] * (Double(ReviewRating.again.rawValue) - 3.0)
+    let damped = reviewed.difficulty + deltaD * (10.0 - reviewed.difficulty) / 9.0
+    let easyInit = clamp(w[4] - exp(w[5] * 3.0) + 1.0)
+    let expectedDifficulty = clamp(w[7] * easyInit + (1.0 - w[7]) * damped)
+    #expect(abs(lapsed.difficulty - expectedDifficulty) < 1e-12)
+
+    // Independently recompute the FSRS-5 post-lapse stability from the weights.
+    let sf = w[11]
+        * pow(expectedDifficulty, -w[12])
+        * (pow(reviewed.stability + 1.0, w[13]) - 1.0)
+        * exp(w[14] * (1.0 - r))
+    let expected = max(0.1, min(sf, reviewed.stability))
+
+    #expect(abs(lapsed.stability - expected) < 1e-9)
+    #expect(lapsed.stability <= reviewed.stability)  // a lapse never grows stability
+}
+
+@Test func sameDayGoodGrowsStabilityByFSRS5Factor() {
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let scheduler = FSRSScheduler(parameters: .init(enableFuzz: false))
+    let first = scheduler.schedule(.new(due: start), rating: .good, now: start)
+    let sameDay = scheduler.schedule(
+        first,
+        rating: .good,
+        now: start.addingTimeInterval(3_600)
+    )
+    let exponent = w[17] * (Double(ReviewRating.good.rawValue) - 3.0 + w[18])
+    let expected = first.stability * exp(exponent)
+
+    #expect(abs(sameDay.stability - expected) < 1e-12)
+    #expect(sameDay.stability >= first.stability)  // w17,w18 >= 0 -> non-shrinking
+}
+
 @Test func intervalFuzzIsDeterministicAndBounded() {
     let scheduler = FSRSScheduler()
 
