@@ -248,7 +248,7 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(await model.canDeleteSelectedItemType())
     let deleted = await model.deleteSelectedItemType()
     #expect(deleted)
-    #expect(model.itemTypes.isEmpty)
+    #expect(model.itemTypes.map(\.id) == [BuiltInItemTypes.clozeID])
     #expect(model.errorMessage == nil)
-    #expect(try await store.listItemTypes().isEmpty)
+    #expect(try await store.listItemTypes().map(\.id) == [BuiltInItemTypes.clozeID])
 }

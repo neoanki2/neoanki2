@@ -94,11 +94,11 @@ private func makeStore() async throws -> ItemStore {
     try await store.bootstrap()
 
     #expect(try await store.deleteItemType(id: BuiltInItemTypes.basicID))
-    #expect(try await store.listItemTypes().isEmpty)
+    #expect(try await store.listItemTypes().map(\.id) == [BuiltInItemTypes.clozeID])
 
     let reopened = try ItemStore(databaseURL: databaseURL)
     try await reopened.bootstrap()
-    #expect(try await reopened.listItemTypes().isEmpty)
+    #expect(try await reopened.listItemTypes().map(\.id) == [BuiltInItemTypes.clozeID])
 }
 
 @Test func emptyStarterConfigurationIsPersistedAsCompletedFirstRun() async throws {
@@ -573,6 +573,9 @@ private func createEmptyVersionFourDatabase(at url: URL) throws {
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
         definition BLOB NOT NULL
+    );
+    CREATE TABLE cards (
+        id TEXT PRIMARY KEY NOT NULL
     );
     """
     guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {

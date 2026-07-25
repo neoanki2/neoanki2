@@ -197,6 +197,7 @@ private func createV4Database(at url: URL, fields: [FieldValue], hash: String) t
         "CREATE TABLE schema_version (version INTEGER NOT NULL);",
         "INSERT INTO schema_version (version) VALUES (4);",
         "CREATE TABLE item_types (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, definition BLOB NOT NULL);",
+        "CREATE TABLE cards (id TEXT PRIMARY KEY NOT NULL);",
         """
         CREATE TABLE items (
             id TEXT PRIMARY KEY NOT NULL,
