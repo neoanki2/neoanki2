@@ -124,7 +124,7 @@ public struct JSONImportAdapter: ImportAdapter {
         do {
             payload = try decoder.decode(Payload.self, from: data)
         } catch {
-            throw ImportError.invalidFormat(error.localizedDescription)
+            throw ImportError.invalidFormat("The JSON structure is invalid.")
         }
 
         guard !payload.rows.isEmpty else {

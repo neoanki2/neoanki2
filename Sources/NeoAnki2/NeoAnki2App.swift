@@ -49,7 +49,7 @@ struct NeoAnki2App: App {
             decksModel = DecksModel(store: store)
             schedulingModel = SchedulingModel(store: store)
         } catch {
-            bootstrapError = error.localizedDescription
+            bootstrapError = UserFacingError.message(from: error)
         }
     }
 }

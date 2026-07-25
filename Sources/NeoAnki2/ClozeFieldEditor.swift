@@ -19,6 +19,7 @@ struct ClozeFieldEditor: View {
             TextEditor(text: $text)
                 .font(DesignSystem.Typography.uiBody)
                 .frame(minHeight: 100)
+                .accessibilityLabel(label)
                 .accessibilityIdentifier(accessibilityIdentifier)
 
             HStack {
@@ -44,9 +45,7 @@ struct ClozeFieldEditor: View {
             }
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.red)
+                ErrorBanner(message: errorMessage)
             }
         }
     }
@@ -67,6 +66,7 @@ struct ClozeFieldEditor: View {
                 Image(systemName: "minus.circle.fill")
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Remove blank \(snippet) from group \(blank.group)")
         }
     }
 
@@ -101,11 +101,11 @@ struct ClozeFieldEditor: View {
         let blank = ClozeSpan(group: nextGroup(), start: start, length: word.count)
 
         do {
-            var candidate = blanks + [blank]
+            let candidate = blanks + [blank]
             try ClozeValidation.validate(text: text, blanks: candidate)
             blanks = candidate
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingError.message(from: error)
         }
     }
 

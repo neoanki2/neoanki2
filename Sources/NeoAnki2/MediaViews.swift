@@ -12,12 +12,24 @@ struct AudioPlayerView: View {
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.xs) {
             if let player {
-                VideoPlayer(player: player)
-                    .frame(height: 44)
-                    .disabled(behavior == .playOnTap)
+                if behavior == .playOnTap {
+                    Button {
+                        player.play()
+                    } label: {
+                        Label("Play Audio", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel(playButtonAccessibilityLabel)
+                } else {
+                    VideoPlayer(player: player)
+                        .frame(height: 44)
+                        .accessibilityLabel(altText ?? "Audio")
+                }
             } else {
                 ProgressView()
                     .frame(height: 44)
+                    .accessibilityLabel("Loading audio")
             }
 
             if let altText, !altText.isEmpty {
@@ -26,18 +38,17 @@ struct AudioPlayerView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onTapGesture {
-            if behavior == .playOnTap {
-                player?.play()
-            }
-        }
         .onAppear {
             configurePlayer()
         }
         .onDisappear {
             player?.pause()
         }
-        .accessibilityLabel(altText ?? "Audio")
+    }
+
+    private var playButtonAccessibilityLabel: String {
+        guard let altText, !altText.isEmpty else { return "Play audio" }
+        return "Play audio, \(altText)"
     }
 
     private func configurePlayer() {
@@ -76,7 +87,7 @@ struct ImageMediaView: View {
                 placeholder
             }
         }
-        .accessibilityLabel(altText ?? "Image")
+        .accessibilityLabel(accessibilityDescription)
     }
 
     private var shouldHide: Bool {
@@ -84,10 +95,17 @@ struct ImageMediaView: View {
     }
 
     private var placeholder: some View {
-        Text(altText ?? "Image")
+        Text(shouldHide ? "Image hidden until answer" : (altText ?? "Image"))
             .font(DesignSystem.Typography.uiSecondary)
             .foregroundStyle(.secondary)
             .frame(minHeight: 80)
+    }
+
+    private var accessibilityDescription: String {
+        guard isAnswerRevealed || revealMode == .always else {
+            return revealMode == .blurred ? "Blurred image" : "Image hidden until answer"
+        }
+        return altText ?? "Image"
     }
 
     @ViewBuilder
@@ -149,18 +167,28 @@ struct ResolvedMediaView: View {
     let store: MediaStore?
 
     @State private var resolvedURL: URL?
+    @State private var resolutionError: String?
 
     var body: some View {
         Group {
             if let resolvedURL {
                 mediaBody(url: resolvedURL)
+            } else if let resolutionError {
+                ErrorBanner(message: resolutionError)
             } else {
                 ProgressView()
+                    .accessibilityLabel("Loading media")
             }
         }
         .task(id: ref.id) {
             guard let store else { return }
-            resolvedURL = try? await store.resolve(ref)
+            resolvedURL = nil
+            resolutionError = nil
+            do {
+                resolvedURL = try await store.resolve(ref)
+            } catch {
+                resolutionError = UserFacingError.message(from: error)
+            }
         }
     }
 

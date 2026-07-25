@@ -92,6 +92,7 @@ struct TemplateEditorView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { onDismiss() }
+                    .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("cancelTemplateEditor")
             }
             if editingTemplate != nil {
@@ -107,6 +108,7 @@ struct TemplateEditorView: View {
                     Task { await save() }
                 }
                 .buttonStyle(.bordered)
+                .keyboardShortcut(.defaultAction)
                 .disabled(isSaving || !draft.isValid)
                 .accessibilityIdentifier("saveTemplate")
             }

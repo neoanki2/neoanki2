@@ -11,7 +11,10 @@ import Testing
 
 @Test func userFacingErrorMapsGenericDatabaseError() {
     let error = DatabaseError.openFailed("test")
-    #expect(UserFacingError.message(from: error) == "Something went wrong. Try again.")
+    #expect(
+        UserFacingError.message(from: error)
+            == "NeoAnki2 couldn't open your library. Check that its folder is available, then try again."
+    )
 }
 
 @Test func userFacingErrorMapsUnknownError() {
@@ -36,7 +39,37 @@ import Testing
 
 @Test func userFacingErrorMapsInvalidItemType() {
     let error = DatabaseError.invalidItemType("Template is invalid.")
-    #expect(UserFacingError.message(from: error) == "Something went wrong. Try again.")
+    #expect(UserFacingError.message(from: error) == "This item type isn't valid. Check its fields and templates.")
+}
+
+@Test func userFacingErrorMapsMediaErrorsWithoutTechnicalDetails() {
+    #expect(
+        UserFacingError.message(from: MediaError.fileTooLarge(.audio, maxBytes: 20_000_000))
+            == "Choose an audio file smaller than 20 MB."
+    )
+    #expect(
+        UserFacingError.message(from: MediaError.readFailed)
+            == "That media file couldn't be read. Check that it still exists and try again."
+    )
+}
+
+@Test func userFacingErrorMapsClozeErrorsToRecoverySteps() {
+    #expect(
+        UserFacingError.message(from: ClozeValidationError.blankOutOfBounds)
+            == "That blank no longer matches the text. Mark it again."
+    )
+    #expect(
+        UserFacingError.message(from: ClozeValidationError.overlappingBlanks)
+            == "Blanks can't overlap."
+    )
+}
+
+@Test func userFacingErrorDoesNotExposeImportParserDetails() {
+    let message = UserFacingError.message(
+        from: ImportError.invalidFormat("NSCocoaErrorDomain Code=3840")
+    )
+    #expect(message == "This import file couldn't be read. Check its format and try again.")
+    #expect(!message.contains("NSCocoaErrorDomain"))
 }
 
 @Test func userFacingErrorExplainsImportFormatProblem() {

@@ -71,9 +71,7 @@ struct MediaFieldEditor: View {
                 .accessibilityIdentifier("\(accessibilityIdentifier)-altText")
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.red)
+                ErrorBanner(message: errorMessage)
             }
         }
         .accessibilityIdentifier(accessibilityIdentifier)
@@ -137,7 +135,7 @@ struct MediaFieldEditor: View {
             media = ref
             fileName = url.lastPathComponent
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingError.message(from: error)
         }
     }
 }
@@ -147,30 +145,47 @@ struct MediaPreviewView: View {
     let store: MediaStore
 
     @State private var resolvedURL: URL?
+    @State private var resolutionError: String?
 
     var body: some View {
         Group {
-            switch ref.kind {
-            case .audio:
-                Label(ref.altText ?? "Audio clip", systemImage: "waveform")
-                    .font(DesignSystem.Typography.uiSecondary)
-            case .image, .gif:
-                if let resolvedURL, let image = NSImage(contentsOf: resolvedURL) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 160)
-                        .accessibilityLabel(ref.altText ?? "Image")
-                } else {
-                    ProgressView()
-                }
-            case .video:
-                Label(ref.altText ?? "Video clip", systemImage: "film")
-                    .font(DesignSystem.Typography.uiSecondary)
+            if let resolutionError {
+                ErrorBanner(message: resolutionError)
+            } else {
+                mediaContent
             }
         }
         .task(id: ref.id) {
-            resolvedURL = try? await store.resolve(ref)
+            resolvedURL = nil
+            resolutionError = nil
+            do {
+                resolvedURL = try await store.resolve(ref)
+            } catch {
+                resolutionError = UserFacingError.message(from: error)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mediaContent: some View {
+        switch ref.kind {
+        case .audio:
+            Label(ref.altText ?? "Audio clip", systemImage: "waveform")
+                .font(DesignSystem.Typography.uiSecondary)
+        case .image, .gif:
+            if let resolvedURL, let image = NSImage(contentsOf: resolvedURL) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 160)
+                    .accessibilityLabel(ref.altText ?? "Image")
+            } else {
+                ProgressView()
+                    .accessibilityLabel("Loading image preview")
+            }
+        case .video:
+            Label(ref.altText ?? "Video clip", systemImage: "film")
+                .font(DesignSystem.Typography.uiSecondary)
         }
     }
 }

@@ -9,7 +9,6 @@ private struct ImportNotice: Identifiable {
 }
 
 struct ContentView: View {
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
@@ -42,7 +41,7 @@ struct ContentView: View {
         } detail: {
             detail
         }
-        .tint(DesignSystem.accent(for: colorScheme))
+        .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
             if isManagingTemplates {

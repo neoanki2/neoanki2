@@ -1,7 +1,10 @@
+import Foundation
 import NeoAnkiCore
 import SwiftUI
 
 struct ContentValueView: View {
+    @Environment(\.locale) private var locale
+
     let value: ContentValue
     var presentation: Presentation = Presentation()
     var isAnswerRevealed: Bool = true
@@ -10,18 +13,20 @@ struct ContentValueView: View {
 
     var body: some View {
         switch value {
-        case let .text(string, _):
-            Text(string)
+        case let .text(string, language):
+            Text(LanguageMetadata.attributedString(string, language: language))
                 .multilineTextAlignment(.center)
                 .opacity(shouldHideText ? 0 : 1)
+                .accessibilityHidden(shouldHideText)
         case let .number(number):
-            Text(String(number))
+            Text(ContentNumberRendering.string(from: number, locale: locale))
                 .multilineTextAlignment(.center)
         case let .rich(spans):
             Text(SpanFormatting.swiftUIAttributedString(from: spans, pointSize: richTextPointSize))
                 .multilineTextAlignment(.center)
                 .blur(radius: presentation.reveal == .blurred && !isAnswerRevealed ? 8 : 0)
                 .opacity(shouldHideText ? 0 : 1)
+                .accessibilityHidden(shouldHideText)
         case let .media(ref):
             if let mediaStore {
                 ResolvedMediaView(
@@ -59,6 +64,33 @@ struct ContentValueView: View {
         case .gif: .gif
         case .video: .video
         }
+    }
+}
+
+enum LanguageMetadata {
+    static func attributedString(_ text: String, language: String?) -> AttributedString {
+        var attributed = AttributedString(text)
+        attributed.languageIdentifier = accessibilityTag(from: language)
+        return attributed
+    }
+
+    static func accessibilityTag(from language: String?) -> String? {
+        guard let language else { return nil }
+        let tag = language
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "_", with: "-")
+        guard !tag.isEmpty, tag.count <= 35 else { return nil }
+
+        let parts = tag.split(separator: "-", omittingEmptySubsequences: false)
+        guard let primary = parts.first,
+              (2 ... 8).contains(primary.count),
+              primary.allSatisfy(\.isLetter),
+              parts.dropFirst().allSatisfy({
+                  (1 ... 8).contains($0.count) && $0.allSatisfy { $0.isLetter || $0.isNumber }
+              }) else {
+            return nil
+        }
+        return tag
     }
 }
 

@@ -88,6 +88,7 @@ struct ItemTypeEditorView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { onDismiss() }
+                    .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("cancelItemTypeEditor")
             }
             ToolbarItem(placement: .confirmationAction) {
@@ -95,6 +96,7 @@ struct ItemTypeEditorView: View {
                     Task { await save() }
                 }
                 .buttonStyle(.bordered)
+                .keyboardShortcut(.defaultAction)
                 .disabled(isSaving || !draft.isValid)
                 .accessibilityIdentifier("saveItemType")
             }

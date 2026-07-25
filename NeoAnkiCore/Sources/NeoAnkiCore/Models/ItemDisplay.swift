@@ -10,14 +10,17 @@ public enum ItemDisplay {
         plainText(from: item, fieldAt: 1, in: itemType)
     }
 
-    public static func plainText(from value: ContentValue) -> String {
+    public static func plainText(
+        from value: ContentValue,
+        locale: Locale = .autoupdatingCurrent
+    ) -> String {
         switch value {
         case let .text(string, _):
             return string
         case let .rich(spans):
             return spans.map(\.text).joined()
         case let .number(number):
-            return String(number)
+            return ContentNumberRendering.string(from: number, locale: locale)
         case let .media(ref):
             return ref.altText ?? mediaKindLabel(ref.kind)
         case let .cloze(text, blanks):
