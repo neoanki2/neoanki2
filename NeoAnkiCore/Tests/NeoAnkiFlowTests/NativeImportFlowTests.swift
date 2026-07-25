@@ -68,3 +68,44 @@ import Testing
         }
     }
 }
+
+@Test func importRejectsMissingItemType() async throws {
+    try await ScenarioRunner.run { ctx in
+        try await ctx.onboard()
+
+        let json = """
+        {
+          "itemType": "Nonexistent",
+          "rows": [
+            { "Front": "Q", "Back": "A" }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        await #expect(throws: ImportError.itemTypeNotFound("Nonexistent")) {
+            try await ctx.store.importItems(from: json, adapter: JSONImportAdapter())
+        }
+    }
+}
+
+@Test func importCanRunTwiceForDuplicateRows() async throws {
+    try await ScenarioRunner.run { ctx in
+        try await ctx.onboard()
+
+        let json = """
+        {
+          "itemType": "Basic",
+          "rows": [
+            { "Front": "Dup", "Back": "A" }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let first = try await ctx.store.importItems(from: json, adapter: JSONImportAdapter())
+        let second = try await ctx.store.importItems(from: json, adapter: JSONImportAdapter())
+
+        #expect(first == 1)
+        #expect(second == 1)
+        try await ctx.assertItemCount(2)
+    }
+}
