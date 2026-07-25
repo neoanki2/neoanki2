@@ -98,6 +98,14 @@ struct StudyView: View {
         } description: {
             Text(model.queue.isEmpty ? "No more due cards in this session." : model.completionSummary)
         } actions: {
+            if model.canUndoLastGrade {
+                Button("Undo Last Grade") {
+                    Task { await model.undoLastGrade() }
+                }
+                .disabled(model.isGrading)
+                .accessibilityIdentifier("undoLastGrade")
+            }
+
             Button("Done") {
                 onEndSession()
             }
@@ -234,8 +242,7 @@ struct StudyView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .keyboardShortcut(.return, modifiers: [])
-                .keyboardShortcut(.space, modifiers: [])
+                .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("showAnswer")
                 .accessibilityLabel("Show answer")
             }
@@ -253,7 +260,6 @@ struct StudyView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .help(rating.studyTooltip)
-                .keyboardShortcut(rating.studyKeyboardShortcut, modifiers: [])
                 .disabled(model.isGrading)
                 .accessibilityLabel(rating.studyAccessibilityLabel)
                 .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
@@ -271,7 +277,6 @@ struct StudyView: View {
                 Task { await model.undoLastGrade() }
             }
             .buttonStyle(.borderless)
-            .keyboardShortcut("z", modifiers: [.command])
             .accessibilityIdentifier("undoLastGrade")
 
             Spacer()

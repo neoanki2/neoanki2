@@ -6,10 +6,12 @@ struct StudyCommandHandlers {
     var requestEndSession: (() -> Void)?
     var showAnswer: (() -> Void)?
     var grade: ((ReviewRating) -> Void)?
+    var undoLastGrade: (() -> Void)?
     var canStartStudy = false
     var canEndSession = false
     var canShowAnswer = false
     var canGrade = false
+    var canUndoLastGrade = false
 }
 
 private struct StudyCommandHandlersKey: FocusedValueKey {
@@ -45,7 +47,6 @@ struct StudyCommands: Commands {
             Button("Show Answer") {
                 handlers?.showAnswer?()
             }
-            .keyboardShortcut(.return, modifiers: [])
             .keyboardShortcut(.space, modifiers: [])
             .disabled(!(handlers?.canShowAnswer ?? false))
 
@@ -58,6 +59,14 @@ struct StudyCommands: Commands {
                 .keyboardShortcut(rating.studyKeyboardShortcut, modifiers: [])
                 .disabled(!(handlers?.canGrade ?? false))
             }
+
+            Divider()
+
+            Button("Undo Last Grade") {
+                handlers?.undoLastGrade?()
+            }
+            .keyboardShortcut("z", modifiers: [.command])
+            .disabled(!(handlers?.canUndoLastGrade ?? false))
         }
     }
 }

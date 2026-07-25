@@ -91,10 +91,14 @@ struct ContentView: View {
                 grade: { rating in
                     Task { await studyModel.grade(rating) }
                 },
+                undoLastGrade: {
+                    Task { await studyModel.undoLastGrade() }
+                },
                 canStartStudy: false,
                 canEndSession: true,
                 canShowAnswer: studyModelCanShowAnswer(studyModel),
-                canGrade: studyModelCanGrade(studyModel)
+                canGrade: studyModelCanGrade(studyModel),
+                canUndoLastGrade: studyModel.canUndoLastGrade && !studyModel.isGrading
             )
         }
 
@@ -103,10 +107,12 @@ struct ContentView: View {
             requestEndSession: nil,
             showAnswer: nil,
             grade: nil,
+            undoLastGrade: nil,
             canStartStudy: itemsModel.dueCount > 0 && !isStudying,
             canEndSession: false,
             canShowAnswer: false,
-            canGrade: false
+            canGrade: false,
+            canUndoLastGrade: false
         )
     }
 

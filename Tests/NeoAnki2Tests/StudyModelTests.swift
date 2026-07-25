@@ -218,6 +218,140 @@ private func makeStudyModel() async throws -> (StudyModel, ItemStore) {
     #expect(try await store.reviewLogCount(for: model.queue[0].id) == 0)
 }
 
+@Test @MainActor func studyModelRejectsConcurrentGrades() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    for i in 1...2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q\(i)")),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A\(i)")),
+                ]
+            )
+        )
+    }
+
+    await model.startSession()
+    let gradedCardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+
+    async let firstGrade: Void = model.grade(.good)
+    async let secondGrade: Void = model.grade(.easy)
+    _ = await (firstGrade, secondGrade)
+
+    #expect(model.index == 1)
+    #expect(model.currentCard?.id != gradedCardID)
+    #expect(try await store.reviewLogCount(for: gradedCardID) == 1)
+}
+
+@Test @MainActor func studyModelRevealsGradesAndAdvancesClozeCard() async throws {
+    let (model, store) = try await makeStudyModel()
+    let clozeField = FieldDef(name: "Sentence", type: .cloze, isRequired: true)
+    let clozeTemplate = Template(
+        name: "Cloze",
+        prompt: Side(slots: [
+            Slot(
+                source: .field(clozeField.id),
+                presentation: Presentation(reveal: .hiddenUntilAnswer)
+            ),
+        ]),
+        answer: Side(slots: [Slot(source: .field(clozeField.id))]),
+        interaction: .cloze,
+        skill: Skill(input: .text, output: .freeResponse, operation: .recall)
+    )
+    let clozeType = ItemType(
+        name: "Cloze",
+        fields: [clozeField],
+        templates: [clozeTemplate]
+    )
+    _ = try await store.createItemType(clozeType)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: clozeType.id,
+            fields: [
+                FieldValue(
+                    fieldID: clozeField.id,
+                    value: .cloze(
+                        "The capital is Paris.",
+                        blanks: [ClozeSpan(group: 1, start: 15, length: 5)]
+                    )
+                ),
+            ]
+        )
+    )
+
+    await model.startSession()
+    #expect(model.currentCard?.template.interaction == .cloze)
+
+    model.revealAnswer()
+    #expect(model.isAnswerRevealed)
+    await model.grade(.good)
+
+    #expect(model.isFinished)
+    #expect(model.index == 1)
+    #expect(try await store.reviewLogCount(for: model.queue[0].id) == 1)
+}
+
+@Test @MainActor func studyModelUndoAfterLastCardRestoresFinishedSession() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    let cardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+    await model.grade(.good)
+    #expect(model.isFinished)
+    #expect(model.canUndoLastGrade)
+
+    await model.undoLastGrade()
+
+    #expect(model.isFinished == false)
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.isAnswerRevealed)
+    #expect(model.index == 0)
+    #expect(try await store.reviewLogCount(for: cardID) == 0)
+}
+
+@Test @MainActor func studyModelDiscardsDeletedCardAndContinuesSession() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    for i in 1...2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q\(i)")),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A\(i)")),
+                ]
+            )
+        )
+    }
+
+    await model.startSession()
+    let deletedCard = try #require(model.currentCard)
+    #expect(try await store.deleteItem(id: deletedCard.item.id))
+
+    model.revealAnswer()
+    await model.grade(.good)
+
+    #expect(model.errorMessage == nil)
+    #expect(model.isFinished == false)
+    #expect(model.queue.count == 1)
+    #expect(model.currentCard?.id != deletedCard.id)
+    #expect(model.isAnswerRevealed == false)
+}
+
 @Test @MainActor func itemsModelLoadsDueCount() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-app-tests-\(UUID().uuidString)", isDirectory: true)

@@ -81,11 +81,14 @@ final class StudyModel {
     }
 
     func revealAnswer() {
-        guard currentCard?.template.interaction == .reveal else { return }
+        guard let interaction = currentCard?.template.interaction,
+              StudySupport.isSupportedInteraction(interaction)
+        else { return }
         isAnswerRevealed = true
     }
 
     func grade(_ rating: ReviewRating) async {
+        guard !isGrading else { return }
         errorMessage = nil
         guard let card = currentCard else { return }
 
@@ -109,12 +112,15 @@ final class StudyModel {
             if index >= queue.count {
                 isFinished = true
             }
+        } catch DatabaseError.cardNotFound(_) {
+            discardMissingCurrentCard(card.id)
         } catch {
             errorMessage = userFacingError(from: error)
         }
     }
 
     func undoLastGrade() async {
+        guard !isGrading else { return }
         guard let undo = pendingGradeUndo else { return }
 
         isGrading = true
@@ -150,5 +156,12 @@ final class StudyModel {
 
     private func userFacingError(from error: Error) -> String {
         UserFacingError.message(from: error)
+    }
+
+    private func discardMissingCurrentCard(_ cardID: UUID) {
+        guard queue.indices.contains(index), queue[index].id == cardID else { return }
+        queue.remove(at: index)
+        isAnswerRevealed = false
+        isFinished = index >= queue.count
     }
 }
