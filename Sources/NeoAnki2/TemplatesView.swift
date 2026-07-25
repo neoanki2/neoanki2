@@ -11,6 +11,7 @@ struct TemplatesView: View {
     @State private var isAddingItemType = false
     @State private var showDeleteItemTypeConfirm = false
     @State private var canDeleteSelectedItemType = false
+    @State private var definitionToRepair: QuarantinedItemTypeDefinition?
 
     var body: some View {
         HSplitView {
@@ -55,6 +56,25 @@ struct TemplatesView: View {
         } message: {
             Text("This removes the item type and its templates. Items must be deleted first.")
         }
+        .confirmationDialog(
+            "Repair damaged item type?",
+            isPresented: Binding(
+                get: { definitionToRepair != nil },
+                set: { if !$0 { definitionToRepair = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Archive Original and Repair") {
+                guard let definitionToRepair else { return }
+                Task {
+                    _ = await model.repairDefinition(definitionToRepair)
+                    self.definitionToRepair = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { definitionToRepair = nil }
+        } message: {
+            Text("NeoAnki2 will preserve the unreadable definition, then create a minimal editable replacement. Existing items are not deleted.")
+        }
     }
 
     @ViewBuilder
@@ -77,6 +97,20 @@ struct TemplatesView: View {
 
             if let errorMessage = model.errorMessage, !model.isLoading {
                 ErrorBanner(message: errorMessage)
+            }
+
+            ForEach(model.corruptedDefinitions) { corruption in
+                HStack {
+                    Text(corruption.name)
+                        .lineLimit(1)
+                    Spacer()
+                    Button("Repair") {
+                        definitionToRepair = corruption
+                    }
+                    .accessibilityLabel("Repair damaged item type \(corruption.name)")
+                }
+                .padding(.horizontal, DesignSystem.Spacing.md)
+                .padding(.vertical, DesignSystem.Spacing.xs)
             }
 
             Group {

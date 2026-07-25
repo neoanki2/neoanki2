@@ -2,6 +2,103 @@ import AVFoundation
 import Foundation
 
 @MainActor
+protocol RecordingPermissionProviding {
+    func requestPermission() async -> Bool
+}
+
+@MainActor
+protocol AudioRecording: AnyObject {
+    var url: URL { get }
+    func start() -> Bool
+    func stop()
+}
+
+@MainActor
+protocol AudioPlayback: AnyObject {
+    func play() -> Bool
+    func stop()
+}
+
+@MainActor
+protocol StudyAudioFactory {
+    func makeRecorder(url: URL) throws -> any AudioRecording
+    func makePlayer(url: URL, onFinish: @escaping (Bool) -> Void) throws -> any AudioPlayback
+}
+
+@MainActor
+struct SystemRecordingPermission: RecordingPermissionProviding {
+    func requestPermission() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            true
+        case .notDetermined:
+            await AVCaptureDevice.requestAccess(for: .audio)
+        case .denied, .restricted:
+            false
+        @unknown default:
+            false
+        }
+    }
+}
+
+@MainActor
+private final class AVRecorderBox: AudioRecording {
+    let recorder: AVAudioRecorder
+    var url: URL { recorder.url }
+
+    init(url: URL) throws {
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44_100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+        ]
+        recorder = try AVAudioRecorder(url: url, settings: settings)
+    }
+
+    func start() -> Bool {
+        recorder.prepareToRecord() && recorder.record()
+    }
+
+    func stop() {
+        recorder.stop()
+    }
+}
+
+@MainActor
+private final class AVPlayerBox: NSObject, AudioPlayback, AVAudioPlayerDelegate {
+    private let player: AVAudioPlayer
+    private let onFinish: (Bool) -> Void
+
+    init(url: URL, onFinish: @escaping (Bool) -> Void) throws {
+        player = try AVAudioPlayer(contentsOf: url)
+        self.onFinish = onFinish
+        super.init()
+        player.delegate = self
+    }
+
+    func play() -> Bool { player.play() }
+    func stop() { player.stop() }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor [weak self] in
+            self?.onFinish(flag)
+        }
+    }
+}
+
+@MainActor
+struct SystemStudyAudioFactory: StudyAudioFactory {
+    func makeRecorder(url: URL) throws -> any AudioRecording {
+        try AVRecorderBox(url: url)
+    }
+
+    func makePlayer(url: URL, onFinish: @escaping (Bool) -> Void) throws -> any AudioPlayback {
+        try AVPlayerBox(url: url, onFinish: onFinish)
+    }
+}
+
+@MainActor
 @Observable
 final class StudyRecordingController {
     enum State: Equatable {
@@ -14,9 +111,22 @@ final class StudyRecordingController {
     }
 
     private(set) var state: State = .idle
-    private var recorder: AVAudioRecorder?
-    private var player: AVAudioPlayer?
+    private var recorder: (any AudioRecording)?
+    private var player: (any AudioPlayback)?
     private(set) var recordingURL: URL?
+    private let permission: any RecordingPermissionProviding
+    private let audioFactory: any StudyAudioFactory
+    private let temporaryDirectory: URL
+
+    init(
+        permission: any RecordingPermissionProviding = SystemRecordingPermission(),
+        audioFactory: any StudyAudioFactory = SystemStudyAudioFactory(),
+        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+    ) {
+        self.permission = permission
+        self.audioFactory = audioFactory
+        self.temporaryDirectory = temporaryDirectory
+    }
 
     var hasRecording: Bool {
         recordingURL != nil
@@ -26,34 +136,16 @@ final class StudyRecordingController {
         stopPlayback()
         state = .requestingPermission
 
-        let granted: Bool
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            granted = true
-        case .notDetermined:
-            granted = await AVCaptureDevice.requestAccess(for: .audio)
-        case .denied, .restricted:
-            granted = false
-        @unknown default:
-            granted = false
-        }
-
-        guard granted else {
+        guard await permission.requestPermission() else {
             state = .failed("Microphone access is off. Allow it in System Settings → Privacy & Security → Microphone.")
             return
         }
 
         do {
-            let url = FileManager.default.temporaryDirectory
+            let url = temporaryDirectory
                 .appendingPathComponent("neoanki-recording-\(UUID().uuidString).m4a")
-            let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 44_100,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
-            ]
-            let recorder = try AVAudioRecorder(url: url, settings: settings)
-            guard recorder.prepareToRecord(), recorder.record() else {
+            let recorder = try audioFactory.makeRecorder(url: url)
+            guard recorder.start() else {
                 throw RecordingError.couldNotStart
             }
             self.recorder = recorder
@@ -82,8 +174,11 @@ final class StudyRecordingController {
             return
         }
         do {
-            player = try AVAudioPlayer(contentsOf: recordingURL)
-            guard player?.play() == true else { throw RecordingError.couldNotStart }
+            let player = try audioFactory.makePlayer(url: recordingURL) { [weak self] succeeded in
+                self?.playbackFinished(successfully: succeeded)
+            }
+            guard player.play() else { throw RecordingError.couldNotStart }
+            self.player = player
             state = .playing
         } catch {
             state = .failed("The recording couldn't be played. Make a new recording and try again.")
@@ -104,6 +199,14 @@ final class StudyRecordingController {
     private func stopPlayback() {
         player?.stop()
         player = nil
+    }
+
+    func playbackFinished(successfully: Bool) {
+        guard state == .playing else { return }
+        player = nil
+        state = successfully
+            ? .recorded
+            : .failed("The recording couldn't finish playing. Make a new recording and try again.")
     }
 }
 

@@ -85,6 +85,43 @@ import Testing
     #expect(payload.rows[0].fieldValues["Front"] == "Hello, world")
 }
 
+@Test func csvImportAdapterParsesMultilineEscapedQuotesAndCRLF() throws {
+    let csv = "Front,Back\r\n\"Line one\r\nLine \"\"two\"\"\",Answer\r\n"
+        .data(using: .utf8)!
+
+    let payload = try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
+
+    #expect(payload.rows.count == 1)
+    #expect(payload.rows[0].fieldValues["Front"] == "Line one\nLine \"two\"")
+    #expect(payload.rows[0].fieldValues["Back"] == "Answer")
+}
+
+@Test func csvImportAdapterRejectsUnclosedQuotes() async {
+    let csv = "Front,Back\n\"never ends,Answer".data(using: .utf8)!
+
+    await #expect(throws: ImportError.self) {
+        try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
+    }
+}
+
+@Test func csvImportAdapterRejectsOversizedFieldDuringParsing() async {
+    let oversized = String(repeating: "x", count: ImportLimits.maxFieldStringBytes + 1)
+    let csv = "Front,Back\n\(oversized),Answer".data(using: .utf8)!
+
+    await #expect(throws: ImportError.self) {
+        try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
+    }
+}
+
+@Test func csvImportAdapterRejectsTooManyRowsDuringParsing() async {
+    let rows = Array(repeating: "Question,Answer", count: ImportLimits.maxRows + 1)
+    let csv = (["Front,Back"] + rows).joined(separator: "\n").data(using: .utf8)!
+
+    await #expect(throws: ImportError.self) {
+        try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
+    }
+}
+
 @Test func importErrorDescriptionsAreUserFacing() {
     #expect(ImportError.unknownField("Foo").errorDescription?.contains("Foo") == true)
     #expect(ImportError.emptyPayload.errorDescription?.isEmpty == false)

@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 9
+    static let version = 10
 
     static let createStatements: [String] = [
         """
@@ -20,6 +20,14 @@ enum Schema {
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
             definition BLOB NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS quarantined_item_type_definitions (
+            item_type_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            definition BLOB NOT NULL,
+            archived_at REAL NOT NULL
         );
         """,
         """
@@ -122,6 +130,18 @@ enum Schema {
     /// existing non-cloze cards while allowing one persisted card per cloze group.
     static let migrationV9Statements: [String] = [
         "ALTER TABLE cards ADD COLUMN cloze_group INTEGER;",
+    ]
+
+    /// Preserves malformed definitions before an explicit user-requested repair.
+    static let migrationV10Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS quarantined_item_type_definitions (
+            item_type_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            definition BLOB NOT NULL,
+            archived_at REAL NOT NULL
+        );
+        """,
     ]
 
     /// Applied when upgrading from schema version 4. Existing libraries have

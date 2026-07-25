@@ -6,9 +6,11 @@ struct ItemTypeEditorView: View {
     var onDismiss: () -> Void = {}
 
     let editingItemType: ItemType?
+    private let initialDraft: ItemTypeDraft
 
     @State private var draft: ItemTypeDraft
     @State private var isSaving = false
+    @State private var showDiscardConfirmation = false
 
     init(
         model: TemplatesModel,
@@ -18,9 +20,9 @@ struct ItemTypeEditorView: View {
         self.model = model
         self.onDismiss = onDismiss
         self.editingItemType = editingItemType
-        _draft = State(
-            initialValue: editingItemType.map(ItemTypeDraft.init) ?? .new
-        )
+        let draft = editingItemType.map(ItemTypeDraft.init) ?? .new
+        initialDraft = draft
+        _draft = State(initialValue: draft)
     }
 
     var body: some View {
@@ -87,7 +89,7 @@ struct ItemTypeEditorView: View {
         .navigationTitle(editingItemType == nil ? "Add Item Type" : "Edit Item Type")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { onDismiss() }
+                Button("Cancel") { requestDismissal() }
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("cancelItemTypeEditor")
             }
@@ -102,6 +104,16 @@ struct ItemTypeEditorView: View {
             }
         }
         .frame(minWidth: 460, minHeight: 360)
+        .confirmationDialog(
+            "Discard item type changes?",
+            isPresented: $showDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Discard Changes", role: .destructive) { onDismiss() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Your unsaved item type changes will be lost.")
+        }
     }
 
     private func save() async {
@@ -117,6 +129,15 @@ struct ItemTypeEditorView: View {
 
         if saved {
             onDismiss()
+        }
+    }
+
+    private func requestDismissal() {
+        switch EditorDecisionState.dismissalDecision(initial: initialDraft, current: draft) {
+        case .dismiss:
+            onDismiss()
+        case .confirmDiscard:
+            showDiscardConfirmation = true
         }
     }
 }

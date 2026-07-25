@@ -90,6 +90,7 @@ enum DesignSystem {
 struct ErrorBanner: View {
     let message: String
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @AccessibilityFocusState private var isAccessibilityFocused: Bool
 
     var body: some View {
         Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -100,6 +101,12 @@ struct ErrorBanner: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(DesignSystem.errorBannerBackground(contrast: colorSchemeContrast))
             .accessibilityLabel("Error, \(message)")
+            .accessibilityFocused($isAccessibilityFocused)
+            .task(id: message) {
+                if AccessibilityNotifier.shared.post(.errorBanner(message)) != nil {
+                    isAccessibilityFocused = true
+                }
+            }
     }
 }
 

@@ -5,6 +5,21 @@ import Testing
 @testable import NeoAnki2
 
 @MainActor
+private final class ScopedAccessSpy: SecurityScopedResourceAccessing {
+    private(set) var started: [URL] = []
+    private(set) var stopped: [URL] = []
+
+    func startAccessing(_ url: URL) -> Bool {
+        started.append(url)
+        return true
+    }
+
+    func stopAccessing(_ url: URL) {
+        stopped.append(url)
+    }
+}
+
+@MainActor
 private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-import-model-\(UUID().uuidString)", isDirectory: true)
@@ -75,6 +90,30 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(itemsModel.dueCount == 2)
 }
 
+@Test @MainActor func importModelHoldsFileAndDirectoryScopesForRelativeMedia() async throws {
+    let (_, itemsModel, directory) = try await makeImportModel()
+    let spy = ScopedAccessSpy()
+    let model = ImportModel(itemsModel: itemsModel, scopedAccess: spy)
+    let fileURL = directory.appendingPathComponent("relative.json")
+    try """
+    {
+      "itemType": "Basic",
+      "rows": [{ "Front": { "path": "asset.png" }, "Back": "Answer" }]
+    }
+    """.write(to: fileURL, atomically: true, encoding: .utf8)
+
+    #expect(model.selectFile(fileURL))
+    #expect(model.requiresMediaDirectory)
+    #expect(model.canImport == false)
+    #expect(model.selectMediaDirectory(directory))
+    _ = await model.importSelected(scope: .allDecks)
+
+    #expect(spy.started.filter { $0 == fileURL }.count == 2)
+    #expect(spy.started.contains(directory))
+    #expect(spy.stopped.filter { $0 == fileURL }.count == 2)
+    #expect(spy.stopped.contains(directory))
+}
+
 @Test @MainActor func importModelPropagatesBaseDirectoryForMediaPaths() async throws {
     let (model, itemsModel, directory) = try await makeImportModel()
     let image = FieldDef(name: "Image", type: .image, isRequired: true)
@@ -113,6 +152,9 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     """.write(to: fileURL, atomically: true, encoding: .utf8)
 
     #expect(model.selectFile(fileURL))
+    #expect(model.requiresMediaDirectory)
+    #expect(model.canImport == false)
+    #expect(model.selectMediaDirectory(directory))
     #expect(await model.importSelected(scope: .allDecks))
 
     let summary = try #require(itemsModel.items.first(where: { $0.itemTypeID == itemType.id }))

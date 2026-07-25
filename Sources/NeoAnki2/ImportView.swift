@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ImportView: View {
     @Bindable var model: ImportModel
@@ -7,6 +8,7 @@ struct ImportView: View {
     let scope: StudyScope
     let onCancel: () -> Void
     let onImported: (Int) -> Void
+    @State private var choosingMediaDirectory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,6 +26,21 @@ struct ImportView: View {
                         .accessibilityIdentifier("importItemTypePicker")
                     } else {
                         Text("JSON files choose the item type named in the file.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if model.requiresMediaDirectory {
+                        LabeledContent(
+                            "Media Folder",
+                            value: model.selectedMediaDirectoryName.isEmpty
+                                ? "Not selected"
+                                : model.selectedMediaDirectoryName
+                        )
+                        Button("Choose Media Folder…") {
+                            choosingMediaDirectory = true
+                        }
+                        Text("This file uses relative media paths. Choose the containing folder so NeoAnki2 can securely access those files during import.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -91,5 +108,14 @@ struct ImportView: View {
         .frame(minWidth: 460, idealWidth: 500, minHeight: 360)
         .interactiveDismissDisabled(model.isImporting)
         .accessibilityIdentifier("importSheet")
+        .fileImporter(
+            isPresented: $choosingMediaDirectory,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            if case let .success(urls) = result, let directory = urls.first {
+                _ = model.selectMediaDirectory(directory)
+            }
+        }
     }
 }

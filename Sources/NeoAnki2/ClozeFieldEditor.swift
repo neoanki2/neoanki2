@@ -27,6 +27,9 @@ struct ClozeFieldEditor: View {
                 .frame(minHeight: 100)
                 .accessibilityLabel(label)
                 .accessibilityIdentifier(accessibilityIdentifier)
+                .onChange(of: text) { oldText, newText in
+                    rebaseBlanks(from: oldText, to: newText)
+                }
 
             HStack {
                 Picker("Add to", selection: $selectedGroup) {
@@ -149,6 +152,21 @@ struct ClozeFieldEditor: View {
             blanks = candidate
         } catch {
             errorMessage = UserFacingError.message(from: error)
+        }
+    }
+
+    private func rebaseBlanks(from oldText: String, to newText: String) {
+        let result = ClozeSpanRebaser.rebase(spans: blanks, from: oldText, to: newText)
+        guard result.spans != blanks || !result.invalidated.isEmpty else { return }
+        blanks = result.spans
+        if let selectedGroup, !blanks.contains(where: { $0.group == selectedGroup }) {
+            self.selectedGroup = nil
+        }
+        if !result.invalidated.isEmpty {
+            let count = result.invalidated.count
+            errorMessage = count == 1
+                ? "One blank was removed because the edit crossed its boundary. Mark it again if needed."
+                : "\(count) blanks were removed because the edit crossed their boundaries. Mark them again if needed."
         }
     }
 

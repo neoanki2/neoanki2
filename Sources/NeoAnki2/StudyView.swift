@@ -12,6 +12,8 @@ struct StudyView: View {
     @State private var showGradeGuide = false
     @State private var showEndSessionConfirm = false
     @State private var recording = StudyRecordingController()
+    @AccessibilityFocusState private var answerAccessibilityFocused: Bool
+    @AccessibilityFocusState private var recordingErrorAccessibilityFocused: Bool
 
     var body: some View {
         Group {
@@ -50,6 +52,12 @@ struct StudyView: View {
                 Text("You've reviewed \(model.cardsReviewed) cards. The current card won't be saved.")
             } else {
                 Text("The current card won't be saved.")
+            }
+        }
+        .onChange(of: model.isAnswerRevealed) { _, revealed in
+            guard revealed, let cardID = model.currentCard?.id else { return }
+            if AccessibilityNotifier.shared.post(.answerRevealed(cardID: cardID)) != nil {
+                answerAccessibilityFocused = true
             }
         }
     }
@@ -145,6 +153,12 @@ struct StudyView: View {
         .onChange(of: card.id) {
             recording.reset()
         }
+        .onChange(of: recording.state) { _, state in
+            guard case let .failed(message) = state else { return }
+            if AccessibilityNotifier.shared.post(.recordingError(message)) != nil {
+                recordingErrorAccessibilityFocused = true
+            }
+        }
         .onDisappear {
             recording.reset()
         }
@@ -226,6 +240,7 @@ struct StudyView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .transition(.opacity)
+                .accessibilityFocused($answerAccessibilityFocused)
         }
     }
 
@@ -314,6 +329,7 @@ struct StudyView: View {
                 .font(DesignSystem.Typography.uiSecondary)
                 .foregroundStyle(recordingHasError ? .red : .secondary)
                 .multilineTextAlignment(.center)
+                .accessibilityFocused($recordingErrorAccessibilityFocused)
 
             HStack(spacing: DesignSystem.Spacing.sm) {
                 if recording.state == .recording {

@@ -156,6 +156,12 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 10 {
+                for sql in Schema.migrationV10Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -267,18 +273,95 @@ actor SQLiteDatabase {
         }
     }
 
-    func fetchAllItemTypes() throws -> [ItemType] {
+    func fetchItemTypesWithCorruption() throws -> ItemTypeLoadResult {
         let rows = try query(
             """
-            SELECT definition
+            SELECT id, name, definition
             FROM item_types
             ORDER BY name ASC;
             """
         )
-        return try rows.compactMap { row in
-            guard let data = row["definition"] as? Data else { return nil }
-            return try decode(ItemType.self, from: data)
+
+        var itemTypes: [ItemType] = []
+        var corruptions: [QuarantinedItemTypeDefinition] = []
+        for row in rows {
+            let persistedID = row["id"] as? String ?? ""
+            let name = row["name"] as? String ?? "Unnamed item type"
+            guard let data = row["definition"] as? Data else {
+                corruptions.append(.init(persistedID: persistedID, name: name))
+                continue
+            }
+            do {
+                let itemType = try decode(ItemType.self, from: data)
+                try ItemTypeValidation.validate(itemType)
+                itemTypes.append(itemType)
+            } catch {
+                corruptions.append(.init(persistedID: persistedID, name: name))
+            }
         }
+        return ItemTypeLoadResult(itemTypes: itemTypes, corruptions: corruptions)
+    }
+
+    func fetchAllItemTypes() throws -> [ItemType] {
+        try fetchItemTypesWithCorruption().itemTypes
+    }
+
+    func repairItemTypeDefinition(id: UUID, now: Date) throws -> ItemType {
+        let rows = try query(
+            "SELECT name, definition FROM item_types WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first,
+              let name = row["name"] as? String,
+              let definition = row["definition"] as? Data
+        else {
+            throw DatabaseError.itemTypeNotFound(id)
+        }
+
+        let front = FieldDef(name: "Front", type: .text, isRequired: true)
+        let back = FieldDef(name: "Back", type: .text, isRequired: true)
+        let base = try ItemTypeBuilder.makeItemType(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Recovered Item Type" : name,
+            fields: [front, back]
+        )
+        let repaired = ItemType(id: id, name: base.name, fields: base.fields, templates: base.templates)
+        let repairedData = try encode(repaired)
+
+        try inTransaction {
+            try execute(
+                """
+                INSERT INTO quarantined_item_type_definitions
+                    (item_type_id, name, definition, archived_at)
+                VALUES (?, ?, ?, ?);
+                """,
+                bindings: [
+                    .text(id.uuidString),
+                    .text(name),
+                    .blob(definition),
+                    .double(now.timeIntervalSince1970),
+                ]
+            )
+            try execute(
+                "UPDATE item_types SET name = ?, definition = ? WHERE id = ?;",
+                bindings: [.text(repaired.name), .blob(repairedData), .text(id.uuidString)]
+            )
+        }
+        return repaired
+    }
+
+    func quarantinedDefinitionCount(itemTypeID: UUID) throws -> Int {
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM quarantined_item_type_definitions WHERE item_type_id = ?;",
+            bindings: [.text(itemTypeID.uuidString)]
+        )
+        return Int(rows.first?["count"] as? Int64 ?? 0)
+    }
+
+    func replaceItemTypeDefinition(id: UUID, with data: Data) throws {
+        try execute(
+            "UPDATE item_types SET definition = ? WHERE id = ?;",
+            bindings: [.blob(data), .text(id.uuidString)]
+        )
     }
 
     func insertDeck(_ deck: Deck) throws {

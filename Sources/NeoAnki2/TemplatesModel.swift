@@ -299,6 +299,7 @@ struct TemplateDraft: Equatable {
 @Observable
 final class TemplatesModel {
     private(set) var itemTypes: [ItemType] = []
+    private(set) var corruptedDefinitions: [QuarantinedItemTypeDefinition] = []
     private(set) var isLoading = true
     private(set) var errorMessage: String?
 
@@ -319,7 +320,15 @@ final class TemplatesModel {
         isLoading = true
         errorMessage = nil
         do {
-            itemTypes = try await store.listItemTypes()
+            let result = try await store.loadItemTypes()
+            itemTypes = result.itemTypes
+            corruptedDefinitions = result.corruptions
+            if !result.corruptions.isEmpty {
+                let count = result.corruptions.count
+                errorMessage = count == 1
+                    ? "One item type couldn’t be read. Other item types are available; repair the damaged definition when ready."
+                    : "\(count) item types couldn’t be read. Other item types are available; repair damaged definitions when ready."
+            }
             if selectedItemTypeID == nil {
                 selectedItemTypeID = itemTypes.first?.id
             } else if !itemTypes.contains(where: { $0.id == selectedItemTypeID }) {
@@ -329,6 +338,21 @@ final class TemplatesModel {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
+    }
+
+    func repairDefinition(_ corruption: QuarantinedItemTypeDefinition) async -> Bool {
+        guard let id = corruption.repairableID else {
+            errorMessage = "This damaged item type has an invalid identifier and needs manual recovery."
+            return false
+        }
+        do {
+            _ = try await store.repairItemTypeDefinition(id: id)
+            await load()
+            return !corruptedDefinitions.contains(where: { $0.persistedID == corruption.persistedID })
+        } catch {
+            errorMessage = "The damaged definition couldn’t be repaired. Its original data was left unchanged."
+            return false
+        }
     }
 
     func createItemType(_ draft: ItemTypeDraft) async -> Bool {

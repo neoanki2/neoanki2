@@ -3,6 +3,7 @@ import Foundation
 public enum ImportLimits {
     public static let maxPayloadBytes = 5_000_000
     public static let maxRows = 10_000
+    public static let maxFieldsPerRow = 256
     public static let maxFieldStringBytes = 32_768
     public static let maxFieldStringLength = maxFieldStringBytes
 

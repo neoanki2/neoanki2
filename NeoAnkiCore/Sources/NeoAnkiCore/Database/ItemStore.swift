@@ -1,5 +1,28 @@
 import Foundation
 
+public struct QuarantinedItemTypeDefinition: Sendable, Equatable, Identifiable {
+    public let persistedID: String
+    public let name: String
+
+    public var id: String { persistedID }
+    public var repairableID: UUID? { UUID(uuidString: persistedID) }
+
+    public init(persistedID: String, name: String) {
+        self.persistedID = persistedID
+        self.name = name
+    }
+}
+
+public struct ItemTypeLoadResult: Sendable, Equatable {
+    public let itemTypes: [ItemType]
+    public let corruptions: [QuarantinedItemTypeDefinition]
+
+    public init(itemTypes: [ItemType], corruptions: [QuarantinedItemTypeDefinition]) {
+        self.itemTypes = itemTypes
+        self.corruptions = corruptions
+    }
+}
+
 /// An item loaded from persistence with summary fields for list display.
 public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     public let id: UUID
@@ -125,6 +148,18 @@ public actor ItemStore {
     /// Returns all persisted item types ordered by name.
     public func listItemTypes() async throws -> [ItemType] {
         try await database.fetchAllItemTypes()
+    }
+
+    /// Loads each definition independently so one malformed row cannot hide
+    /// unaffected item types.
+    public func loadItemTypes() async throws -> ItemTypeLoadResult {
+        try await database.fetchItemTypesWithCorruption()
+    }
+
+    /// Archives the malformed bytes, then replaces that row with a minimal,
+    /// editable definition. This never silently discards the original data.
+    public func repairItemTypeDefinition(id: UUID, now: Date = .now) async throws -> ItemType {
+        try await database.repairItemTypeDefinition(id: id, now: now)
     }
 
     public func countItems(itemTypeID: UUID) async throws -> Int {
