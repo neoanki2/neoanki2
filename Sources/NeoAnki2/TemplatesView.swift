@@ -53,6 +53,7 @@ struct TemplatesView: View {
             }
             .accessibilityIdentifier("confirmDeleteItemType")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("cancelDeleteItemType")
         } message: {
             Text("This removes the item type and its templates. Items must be deleted first.")
         }
@@ -71,7 +72,9 @@ struct TemplatesView: View {
                     self.definitionToRepair = nil
                 }
             }
+            .accessibilityIdentifier("confirmRepairItemType")
             Button("Cancel", role: .cancel) { definitionToRepair = nil }
+                .accessibilityIdentifier("cancelRepairItemType")
         } message: {
             Text("NeoAnki2 will preserve the unreadable definition, then create a minimal editable replacement. Existing items are not deleted.")
         }
@@ -108,6 +111,7 @@ struct TemplatesView: View {
                         definitionToRepair = corruption
                     }
                     .accessibilityLabel("Repair damaged item type \(corruption.name)")
+                    .accessibilityIdentifier("repairItemType-\(corruption.name)")
                 }
                 .padding(.horizontal, DesignSystem.Spacing.md)
                 .padding(.vertical, DesignSystem.Spacing.xs)

@@ -47,6 +47,7 @@ struct StudyView: View {
             }
             .accessibilityIdentifier("confirmEndStudySession")
             Button("Continue Studying", role: .cancel) {}
+                .accessibilityIdentifier("cancelEndStudySession")
         } message: {
             if model.cardsReviewed > 0 {
                 Text("You've reviewed \(model.cardsReviewed) cards. The current card won't be saved.")
@@ -97,6 +98,7 @@ struct StudyView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Loading due cards")
+        .accessibilityIdentifier("studyLoading")
     }
 
     private var emptyDueView: some View {
@@ -183,6 +185,7 @@ struct StudyView: View {
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Progress, \(model.headerLabel)")
+                .accessibilityIdentifier("studyProgress")
 
             Spacer()
 
@@ -221,6 +224,7 @@ struct StudyView: View {
             mediaStore: mediaStore,
             clozeGroup: card.card.clozeGroup
         )
+            .accessibilityIdentifier("studyPrompt")
             .font(DesignSystem.Typography.cardPrompt)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
@@ -249,6 +253,7 @@ struct StudyView: View {
                 mediaStore: mediaStore,
                 clozeGroup: card.card.clozeGroup
             )
+                .accessibilityIdentifier("studyAnswer")
                 .font(DesignSystem.Typography.cardAnswer)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -496,6 +501,7 @@ struct StudyView: View {
             .buttonStyle(.borderless)
             .help("Dismiss")
             .accessibilityLabel("Dismiss undo")
+            .accessibilityIdentifier("dismissGradeUndo")
         }
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.xs)

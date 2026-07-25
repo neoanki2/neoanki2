@@ -93,6 +93,7 @@ final class StudyModel {
     }
 
     func updateTypedAnswer(_ answer: String) {
+        guard !isAnswerRevealed else { return }
         typedAnswer = answer
         answerEvaluation = nil
         interactionMessage = nil

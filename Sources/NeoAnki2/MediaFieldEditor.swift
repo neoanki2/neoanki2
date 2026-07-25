@@ -49,12 +49,14 @@ struct MediaFieldEditor: View {
                     chooseFile()
                 }
                 .disabled(isImporting || mediaStore == nil)
+                .accessibilityIdentifier("\(accessibilityIdentifier)-chooseFile")
 
                 if media != nil {
                     Button("Remove", role: .destructive) {
                         media = nil
                         fileName = ""
                     }
+                    .accessibilityIdentifier("\(accessibilityIdentifier)-removeFile")
                 }
 
                 Spacer()

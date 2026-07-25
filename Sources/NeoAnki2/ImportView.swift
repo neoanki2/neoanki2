@@ -40,12 +40,14 @@ struct ImportView: View {
                         Button("Choose Media Folder…") {
                             choosingMediaDirectory = true
                         }
+                        .accessibilityIdentifier("chooseImportMediaDirectory")
                         Text("This file uses relative media paths. Choose the containing folder so NeoAnki2 can securely access those files during import.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Import Items")
+                        .accessibilityIdentifier("importSheet")
                 }
 
                 Section {
@@ -90,6 +92,7 @@ struct ImportView: View {
                 }
                 .keyboardShortcut(.cancelAction)
                 .disabled(model.isImporting)
+                .accessibilityIdentifier("cancelImport")
 
                 Button("Import") {
                     Task {
@@ -107,7 +110,6 @@ struct ImportView: View {
         }
         .frame(minWidth: 460, idealWidth: 500, minHeight: 360)
         .interactiveDismissDisabled(model.isImporting)
-        .accessibilityIdentifier("importSheet")
         .fileImporter(
             isPresented: $choosingMediaDirectory,
             allowedContentTypes: [.folder],

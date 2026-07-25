@@ -1,6 +1,17 @@
 import XCTest
 
 final class LibraryUITests: NeoAnkiUITestCase {
+    func testBootstrapFailureShowsSafeErrorState() throws {
+        let app = launchApp(
+            environment: ["NEOANKI_TEST_BOOTSTRAP_FAILURE": "1"],
+            waitForLibrary: false
+        )
+
+        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Could Not Start"].exists)
+        XCTAssertFalse(app.buttons["addItemToolbar"].exists)
+    }
+
     func testAppLaunchesWithEmptyLibrary() throws {
         let app = launchApp()
         assertEmptyLibrary(in: app)
@@ -106,5 +117,140 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         selectScope("deckRow-History", in: app)
         waitForItem(named: "Rome", in: app)
+    }
+
+    func testDeleteItemCancellationPreservesItem() throws {
+        let app = launchApp()
+        addBasicItem(front: "Keep Item", back: "Still Here", in: app)
+        openItemDetail(named: "Keep Item", in: app)
+
+        app.buttons["deleteItem"].click()
+        XCTAssertTrue(app.buttons["cancelDeleteItem"].waitForExistence(timeout: 3))
+        app.buttons["cancelDeleteItem"].click()
+
+        XCTAssertTrue(app.buttons["deleteItem"].waitForExistence(timeout: 3))
+        returnToLibrary(in: app)
+        waitForItem(named: "Keep Item", in: app)
+    }
+
+    func testWhitespaceOnlyRequiredFieldsCannotBeSaved() throws {
+        let app = launchApp()
+        openAddItem(in: app)
+        enterText("   ", into: field(named: "Front", in: app), app: app)
+
+        XCTAssertFalse(app.buttons["saveAddItem"].isEnabled)
+    }
+
+    func testJSONImportThroughSystemFilePicker() throws {
+        let file = try makeImportFixture(
+            name: "items.json",
+            contents: """
+            {
+              "itemType": "Basic",
+              "rows": [
+                { "Front": "Imported Question", "Back": "Imported Answer" }
+              ]
+            }
+            """
+        )
+        let app = launchApp()
+        chooseImportFile(file, in: app)
+
+        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 10))
+        let importButton = app.buttons["confirmImport"]
+        importButton.click()
+        XCTAssertTrue(importButton.waitForNonExistence(timeout: 10))
+        let completion = app.sheets.firstMatch
+        XCTAssertTrue(completion.waitForExistence(timeout: 10))
+        XCTAssertTrue(completion.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS[c] %@", "Import Complete")
+        ).firstMatch.exists)
+        completion.buttons["OK"].click()
+        waitForItem(named: "Imported Question", in: app, timeout: 10)
+    }
+
+    func testCSVImportSelectsItemTypeAndImportsRows() throws {
+        let file = try makeImportFixture(
+            name: "items.csv",
+            contents: """
+            Front,Back,tags
+            CSV Question,CSV Answer,imported
+            """
+        )
+        let app = launchApp()
+        chooseImportFile(file, in: app)
+
+        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.popUpButtons["importItemTypePicker"].waitForExistence(timeout: 3))
+        let importButton = app.buttons["confirmImport"]
+        XCTAssertTrue(importButton.isEnabled)
+        importButton.click()
+        XCTAssertTrue(importButton.waitForNonExistence(timeout: 10))
+        let completion = app.sheets.firstMatch
+        XCTAssertTrue(completion.waitForExistence(timeout: 10))
+        XCTAssertTrue(completion.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS[c] %@", "Import Complete")
+        ).firstMatch.exists)
+        completion.buttons["OK"].click()
+        waitForItem(named: "CSV Question", in: app, timeout: 10)
+    }
+
+    func testImportValidationKeepsSheetOpenAndLibraryUnchanged() throws {
+        let file = try makeImportFixture(
+            name: "invalid.json",
+            contents: """
+            {
+              "itemType": "Basic",
+              "rows": [
+                { "Front": "Question", "Back": "Answer", "Unknown": "Rejected" }
+              ]
+            }
+            """
+        )
+        let app = launchApp()
+        chooseImportFile(file, in: app)
+
+        XCTAssertTrue(app.buttons["confirmImport"].waitForExistence(timeout: 10))
+        app.buttons["confirmImport"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["importError"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].exists)
+        app.buttons["cancelImport"].click()
+        assertEmptyLibrary(in: app)
+    }
+
+    func testSchedulingOptimizationReportsInsufficientHistory() throws {
+        let app = launchApp()
+        app.menuBarItems["Scheduling"].click()
+        let optimize = app.menuItems["Optimize Scheduling…"]
+        XCTAssertTrue(optimize.waitForExistence(timeout: 3))
+        XCTAssertTrue(optimize.isEnabled)
+        optimize.click()
+
+        let alert = app.sheets.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            alert.staticTexts.matching(
+                NSPredicate(format: "value CONTAINS[c] %@", "review")
+            ).firstMatch.exists
+        )
+        alert.buttons["OK"].click()
+    }
+
+    func testSchedulingOptimizationSucceedsWithReviewHistory() throws {
+        let app = launchApp(scenario: "scheduling-history")
+        app.menuBarItems["Scheduling"].click()
+        app.menuItems["Optimize Scheduling…"].click()
+
+        let alert = app.sheets.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 20))
+        XCTAssertTrue(alert.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS[c] %@", "Scheduling Optimized")
+        ).firstMatch.exists)
+        XCTAssertTrue(
+            alert.staticTexts.matching(
+                NSPredicate(format: "value CONTAINS[c] %@", "129 review outcomes")
+            ).firstMatch.exists
+        )
+        alert.buttons["OK"].click()
     }
 }

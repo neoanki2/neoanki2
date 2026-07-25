@@ -164,6 +164,23 @@ private func makeInteractionModel(
     #expect(choiceModel.isAnswerRevealed)
 }
 
+@Test @MainActor func typedAnswersAreEvaluatedAgainstRenderedAnswer() async throws {
+    let correct = try await makeInteractionModel(.type, answer: .text("Paris"))
+    correct.updateTypedAnswer("  PARIS! ")
+    correct.submitTypedAnswer()
+    #expect(correct.isAnswerRevealed)
+    #expect(correct.answerEvaluation == .correct)
+
+    let incorrect = try await makeInteractionModel(.type, answer: .text("Paris"))
+    incorrect.updateTypedAnswer("London")
+    incorrect.submitTypedAnswer()
+    #expect(incorrect.isAnswerRevealed)
+    #expect(incorrect.answerEvaluation == .incorrect)
+    incorrect.updateTypedAnswer("")
+    #expect(incorrect.typedAnswer == "London")
+    #expect(incorrect.answerEvaluation == .incorrect)
+}
+
 @Test @MainActor func missingAnswerRecoversToSelfGradeAndCompletion() async throws {
     let model = try await makeInteractionModel(.type, missingCheckableAnswer: true)
 

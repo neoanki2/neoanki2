@@ -232,7 +232,6 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
             let clampedLocation = min(selectedRange.location, length)
             let clampedLength = min(selectedRange.length, length - clampedLocation)
             textView.setSelectedRange(NSRange(location: clampedLocation, length: clampedLength))
-            syncTestingDescription(on: textView)
         }
 
         @MainActor
@@ -243,26 +242,11 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
                     .font: DesignSystem.Typography.richTextFont,
                 ]
             }
-            guard newSpans != spans else {
-                syncTestingDescription(on: textView)
-                return
-            }
+            guard newSpans != spans else { return }
 
             isUpdatingFromView = true
             defer { isUpdatingFromView = false }
             spans = newSpans
-            syncTestingDescription(on: textView)
-        }
-
-        @MainActor
-        private func syncTestingDescription(on textView: NSTextView) {
-            guard ProcessInfo.processInfo.environment["NEOANKI_TESTING"] == "1" else { return }
-            let description = SpanFormatting.testingDescription(
-                from: SpanFormatting.spans(from: textView.attributedString())
-            )
-            if textView.accessibilityValue() != description {
-                textView.setAccessibilityValue(description)
-            }
         }
     }
 }

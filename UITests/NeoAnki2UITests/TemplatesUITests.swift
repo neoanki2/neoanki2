@@ -181,4 +181,83 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         XCTAssertFalse(app.buttons["templateRow-Cancelled"].waitForExistence(timeout: 2))
         closeTemplates(in: app)
     }
+
+    func testItemTypeValidationDisablesSaveForBlankName() throws {
+        let app = launchApp()
+        openTemplates(in: app)
+        clickAddItemType(in: app)
+
+        XCTAssertFalse(app.buttons["saveItemType"].isEnabled)
+    }
+
+    func testDirtyItemTypeCanKeepEditingThenDiscard() throws {
+        let app = launchApp()
+        openTemplates(in: app)
+        clickAddItemType(in: app)
+        enterText("Unsaved Type", into: app.textFields["itemTypeNameField"], app: app)
+
+        app.buttons["cancelItemTypeEditor"].click()
+        XCTAssertTrue(app.buttons["cancelDiscardItemType"].waitForExistence(timeout: 3))
+        app.buttons["cancelDiscardItemType"].click()
+        XCTAssertTrue(app.textFields["itemTypeNameField"].exists)
+
+        app.buttons["cancelItemTypeEditor"].click()
+        app.buttons["confirmDiscardItemType"].click()
+        XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Unsaved Type"].exists)
+    }
+
+    func testItemTypeFieldsCanBeAddedReorderedAndRemoved() throws {
+        let app = launchApp()
+        openTemplates(in: app)
+        clickAddItemType(in: app)
+        enterText("Structured", into: app.textFields["itemTypeNameField"], app: app)
+
+        app.buttons["addItemTypeField"].click()
+        let moveUp = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
+        )
+        XCTAssertEqual(moveUp.count, 3)
+        moveUp.element(boundBy: 2).click()
+
+        let remove = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "removeItemTypeField-")
+        )
+        XCTAssertEqual(remove.count, 3)
+        remove.element(boundBy: 2).click()
+        XCTAssertEqual(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
+            ).count,
+            2
+        )
+    }
+
+    func testTemplateValidationAndDiscardConfirmation() throws {
+        let app = launchApp()
+        openTemplates(in: app)
+        app.buttons["addTemplateToolbar"].click()
+
+        XCTAssertFalse(app.buttons["saveTemplate"].isEnabled)
+        enterText("Unsaved Template", into: app.textFields["templateNameField"], app: app)
+        app.buttons["cancelTemplateEditor"].click()
+        XCTAssertTrue(app.buttons["cancelDiscardTemplate"].waitForExistence(timeout: 3))
+        app.buttons["cancelDiscardTemplate"].click()
+        XCTAssertTrue(app.textFields["templateNameField"].exists)
+
+        app.buttons["cancelTemplateEditor"].click()
+        app.buttons["confirmDiscardTemplate"].click()
+        XCTAssertFalse(app.buttons["templateRow-Unsaved Template"].exists)
+    }
+
+    func testDeleteTemplateCanBeCancelled() throws {
+        let app = launchApp()
+        openTemplates(in: app)
+        openTemplateEditor(named: "Card", in: app)
+
+        app.buttons["deleteTemplate"].click()
+        XCTAssertTrue(app.buttons["cancelDeleteTemplate"].waitForExistence(timeout: 3))
+        app.buttons["cancelDeleteTemplate"].click()
+
+        XCTAssertTrue(app.textFields["templateNameField"].exists)
+    }
 }

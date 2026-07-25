@@ -152,6 +152,7 @@ struct ItemDetailView: View {
             }
             .accessibilityIdentifier("confirmDeleteItem")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("cancelDeleteItem")
         } message: {
             Text(
                 "This removes the item and its \(summary.cardCount) study cards. This can't be undone."

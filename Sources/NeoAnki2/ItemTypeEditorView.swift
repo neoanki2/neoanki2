@@ -65,6 +65,7 @@ struct ItemTypeEditorView: View {
                                 .labelsHidden()
                                 .toggleStyle(.checkbox)
                                 .accessibilityLabel("Required")
+                                .accessibilityIdentifier("itemTypeFieldRequired-\(field.id.uuidString)")
 
                             // Per-row move buttons stay keyboard-reachable via Tab
                             // + Space. They intentionally carry no keyboard
@@ -98,6 +99,7 @@ struct ItemTypeEditorView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Remove field \(field.name)")
+                                .accessibilityIdentifier("removeItemTypeField-\(field.id.uuidString)")
                             }
                         }
                     }
@@ -147,7 +149,9 @@ struct ItemTypeEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Discard Changes", role: .destructive) { onDismiss() }
+                .accessibilityIdentifier("confirmDiscardItemType")
             Button("Keep Editing", role: .cancel) {}
+                .accessibilityIdentifier("cancelDiscardItemType")
         } message: {
             Text("Your unsaved item type changes will be lost.")
         }

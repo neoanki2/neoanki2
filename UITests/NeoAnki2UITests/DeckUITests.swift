@@ -112,4 +112,62 @@ final class DeckUITests: NeoAnkiUITestCase {
         XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
         XCTAssertFalse(studyButton.isEnabled)
     }
+
+    func testCancelCreatingDeckLeavesSidebarUnchanged() throws {
+        let app = launchApp()
+        app.buttons["newDeckToolbar"].click()
+        XCTAssertTrue(app.buttons["cancelCreateDeck"].waitForExistence(timeout: 3))
+        app.buttons["cancelCreateDeck"].click()
+
+        XCTAssertFalse(app.descendants(matching: .any)["deckRow-Cancelled"].exists)
+        XCTAssertTrue(app.buttons["newDeckToolbar"].waitForExistence(timeout: 3))
+    }
+
+    func testCancelRenameKeepsOriginalDeckName() throws {
+        let app = launchApp()
+        createDeck(named: "Keep Name", in: app)
+
+        let row = app.descendants(matching: .any)["deckRow-Keep Name"]
+        row.rightClick()
+        app.menuItems["Rename"].click()
+        XCTAssertTrue(app.buttons["cancelRenameDeck"].waitForExistence(timeout: 3))
+        app.buttons["cancelRenameDeck"].click()
+
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+    }
+
+    func testCancelDeleteKeepsDeck() throws {
+        let app = launchApp()
+        createDeck(named: "Keep Deck", in: app)
+
+        let row = app.descendants(matching: .any)["deckRow-Keep Deck"]
+        row.rightClick()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        let contextDelete = app.menuItems.matching(
+            NSPredicate(format: "title == 'Delete' AND enabled == true")
+        ).firstMatch
+        XCTAssertTrue(contextDelete.waitForExistence(timeout: 3))
+        contextDelete.click()
+        XCTAssertNotNil(modalContainer(in: app))
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+    }
+
+    func testCreateSubdeckFromContextMenu() throws {
+        let app = launchApp()
+        createDeck(named: "Parent", in: app)
+
+        let parent = app.descendants(matching: .any)["deckRow-Parent"]
+        parent.rightClick()
+        app.menuItems["New Subdeck"].click()
+        guard let container = modalContainer(in: app) else {
+            XCTFail("Subdeck dialog did not appear")
+            return
+        }
+        enterText("Child", into: container.textFields.firstMatch, app: app)
+        app.buttons["confirmCreateDeck"].click()
+
+        XCTAssertTrue(app.staticTexts["Child"].waitForExistence(timeout: 5))
+    }
 }

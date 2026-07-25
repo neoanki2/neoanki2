@@ -8,23 +8,42 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     override func tearDownWithError() throws {
+        if let failure = testRun?.failureCount, failure > 0, let runningApp {
+            let attachment = XCTAttachment(screenshot: runningApp.screenshot())
+            attachment.name = "\(name)-failure"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
         runningApp?.terminate()
         runningApp = nil
         try super.tearDownWithError()
     }
 
     @discardableResult
-    func launchApp(databaseLabel: String = UUID().uuidString) -> XCUIApplication {
+    func launchApp(
+        databaseLabel: String = UUID().uuidString,
+        scenario: String? = nil,
+        environment: [String: String] = [:],
+        waitForLibrary: Bool = true
+    ) -> XCUIApplication {
         runningApp?.terminate()
 
         let app = XCUIApplication()
         app.launchArguments = ["-NeoAnkiTesting"]
         app.launchEnvironment["NEOANKI_TESTING"] = "1"
         app.launchEnvironment["NEOANKI_TEST_DB_DIR"] = NSTemporaryDirectory() + "neoanki2-ui-\(databaseLabel)"
+        if let scenario {
+            app.launchEnvironment["NEOANKI_TEST_SCENARIO"] = scenario
+        }
+        for (key, value) in environment {
+            app.launchEnvironment[key] = value
+        }
         app.launch()
 
         runningApp = app
-        waitForLibraryReady(in: app)
+        if waitForLibrary {
+            waitForLibraryReady(in: app)
+        }
         return app
     }
 
@@ -46,7 +65,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func libraryIsReady(in app: XCUIApplication) -> Bool {
         if app.buttons["deleteItem"].exists { return false }
-        if app.buttons["showAnswer"].exists || app.buttons["studySessionDone"].exists { return false }
+        if app.buttons["primaryStudyAction"].exists || app.buttons["studySessionDone"].exists { return false }
         if app.buttons["saveAddItem"].exists || app.buttons["cancelAddItem"].exists { return false }
         if app.buttons["templatesDone"].exists { return false }
 
@@ -189,8 +208,11 @@ class NeoAnkiUITestCase: XCTestCase {
         }
         if app.buttons["deleteItem"].exists {
             showSidebar(in: app)
+            let unassigned = app.descendants(matching: .any)["scopeRow-Unassigned"]
             let allDecks = app.descendants(matching: .any)["scopeRow-AllDecks"]
-            if allDecks.waitForExistence(timeout: 2) {
+            if unassigned.waitForExistence(timeout: 2), allDecks.waitForExistence(timeout: 2) {
+                unassigned.click()
+                _ = app.buttons["deleteItem"].waitForNonExistence(timeout: 5)
                 allDecks.click()
             } else {
                 app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
@@ -243,6 +265,7 @@ class NeoAnkiUITestCase: XCTestCase {
         let row = app.descendants(matching: .any)[identifier]
         if row.waitForExistence(timeout: 5) {
             row.click()
+            waitForScopeSelection(row, in: app)
             return
         }
         // Fallback: match deck name from identifier deckRow-Name
@@ -252,6 +275,7 @@ class NeoAnkiUITestCase: XCTestCase {
             let match = app.descendants(matching: .any).matching(label).firstMatch
             XCTAssertTrue(match.waitForExistence(timeout: 5))
             match.click()
+            waitForScopeSelection(match, in: app)
             return
         }
         if identifier == "scopeRow-AllDecks" {
@@ -260,6 +284,7 @@ class NeoAnkiUITestCase: XCTestCase {
             ).firstMatch
             XCTAssertTrue(match.waitForExistence(timeout: 5))
             match.click()
+            waitForScopeSelection(match, in: app)
             return
         }
         if identifier == "scopeRow-Unassigned" {
@@ -268,9 +293,24 @@ class NeoAnkiUITestCase: XCTestCase {
             ).firstMatch
             XCTAssertTrue(match.waitForExistence(timeout: 5))
             match.click()
+            waitForScopeSelection(match, in: app)
             return
         }
         XCTFail("Could not find scope row \(identifier)")
+    }
+
+    private func waitForScopeSelection(_ row: XCUIElement, in app: XCUIApplication) {
+        let selected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: row
+        )
+        _ = XCTWaiter.wait(for: [selected], timeout: 5)
+
+        let loading = app.staticTexts["Loading items…"]
+        if loading.exists {
+            XCTAssertTrue(loading.waitForNonExistence(timeout: 10))
+        }
+        waitForLibraryReady(in: app)
     }
 
     func createDeck(named name: String, in app: XCUIApplication) {
@@ -317,13 +357,13 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
         XCTAssertTrue(studyButton.isEnabled)
         studyButton.click()
-        XCTAssertTrue(app.buttons["showAnswer"].waitForExistence(timeout: 5)
+        XCTAssertTrue(app.buttons["primaryStudyAction"].waitForExistence(timeout: 5)
             || app.buttons["studySessionDone"].waitForExistence(timeout: 2))
     }
 
     func revealAndGrade(_ gradeID: String, in app: XCUIApplication) {
-        if app.buttons["showAnswer"].waitForExistence(timeout: 2) {
-            app.buttons["showAnswer"].click()
+        if app.buttons["primaryStudyAction"].waitForExistence(timeout: 2) {
+            app.buttons["primaryStudyAction"].click()
         }
         let gradeButton = app.buttons[gradeID]
         XCTAssertTrue(gradeButton.waitForExistence(timeout: 5))
@@ -345,14 +385,14 @@ class NeoAnkiUITestCase: XCTestCase {
         in app: XCUIApplication,
         timeout: TimeInterval = 5
     ) {
-        let editorField = field(named: fieldName, in: app)
-        XCTAssertTrue(editorField.waitForExistence(timeout: 2))
+        let mirror = app.descendants(matching: .any)["field-\(fieldName)-spans"]
+        XCTAssertTrue(mirror.waitForExistence(timeout: 2))
 
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let candidates = [
-                editorField.value as? String,
-                editorField.label,
+                mirror.value as? String,
+                mirror.label,
             ]
             if candidates.contains(where: { $0?.contains(expectedToken) == true }) {
                 return
@@ -360,8 +400,8 @@ class NeoAnkiUITestCase: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
 
-        let value = editorField.value as? String ?? "<nil>"
-        let label = editorField.label
+        let value = mirror.value as? String ?? "<nil>"
+        let label = mirror.label
         XCTFail("Expected field-\(fieldName) to contain \(expectedToken), got value=\(value) label=\(label)")
     }
 
@@ -390,5 +430,28 @@ class NeoAnkiUITestCase: XCTestCase {
         formatButton.click()
 
         waitForFormattedField(fieldName, containing: "\(style):\(text)", in: app)
+    }
+
+    func makeImportFixture(name: String, contents: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki2-ui-imports-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(name)
+        try contents.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    func chooseImportFile(_ url: URL, in app: XCUIApplication) {
+        app.menuBarItems["File"].click()
+        let importItem = app.menuItems["Import…"]
+        XCTAssertTrue(importItem.waitForExistence(timeout: 3))
+        importItem.click()
+
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        let pathField = app.sheets.textFields.firstMatch
+        XCTAssertTrue(pathField.waitForExistence(timeout: 5))
+        pathField.typeText(url.path)
+        app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+        app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
     }
 }

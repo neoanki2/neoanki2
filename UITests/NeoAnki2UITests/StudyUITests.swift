@@ -17,7 +17,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp()
         addBasicItem(front: "Grade Test", back: "Answer", in: app)
         startStudy(in: app)
-        app.buttons["showAnswer"].click()
+        app.buttons["primaryStudyAction"].click()
 
         for gradeID in ["gradeAgain", "gradeHard", "gradeGood", "gradeEasy"] {
             XCTAssertTrue(app.buttons[gradeID].waitForExistence(timeout: 3), "Missing \(gradeID)")
@@ -116,19 +116,109 @@ final class StudyUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Reverse Q", back: "Reverse A", in: app)
         startStudy(in: app)
 
-        let showAnswer = app.buttons["showAnswer"]
-        if showAnswer.waitForExistence(timeout: 5) {
-            showAnswer.click()
+        let primaryAction = app.buttons["primaryStudyAction"]
+        if primaryAction.waitForExistence(timeout: 5) {
+            primaryAction.click()
             if app.buttons["gradeGood"].waitForExistence(timeout: 2) {
                 app.buttons["gradeGood"].click()
             }
         }
 
-        if app.buttons["showAnswer"].waitForExistence(timeout: 3) {
-            showAnswer.click()
+        if app.buttons["primaryStudyAction"].waitForExistence(timeout: 3) {
+            app.buttons["primaryStudyAction"].click()
             app.buttons["gradeGood"].click()
         }
 
         finishStudySession(in: app)
+    }
+
+    func testTypedAnswerRequiresInputThenAcceptsCorrectAnswer() throws {
+        let app = launchApp(scenario: "study-type")
+        startStudy(in: app)
+
+        let primary = app.buttons["primaryStudyAction"]
+        primary.click()
+        XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
+
+        enterText("Paris", into: app.textFields["typedAnswer"], app: app)
+        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["gradeGood"].exists)
+        app.buttons["gradeGood"].click()
+        finishStudySession(in: app)
+    }
+
+    func testTypedAnswerReportsIncorrectResponse() throws {
+        let app = launchApp(scenario: "study-type")
+        startStudy(in: app)
+
+        enterText("London", into: app.textFields["typedAnswer"], app: app)
+        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
+        let feedback = app.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS[c] %@", "Compare your response")
+        ).firstMatch
+        XCTAssertTrue(feedback.waitForExistence(timeout: 3))
+    }
+
+    func testChoiceRequiresSelectionThenChecksCorrectChoice() throws {
+        let app = launchApp(scenario: "study-choose")
+        startStudy(in: app)
+
+        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
+
+        let paris = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "Paris")
+        ).firstMatch
+        XCTAssertTrue(paris.waitForExistence(timeout: 3))
+        paris.click()
+        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 3))
+    }
+
+    func testArrangeUncheckedOrderIsReportedIncorrect() throws {
+        let app = launchApp(scenario: "study-arrange")
+        startStudy(in: app)
+
+        XCTAssertTrue(app.buttons["arrangementItem0"].waitForExistence(timeout: 3))
+        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 3))
+    }
+
+    func testClozeConcealsThenRevealsBlank() throws {
+        let app = launchApp(scenario: "study-cloze")
+        startStudy(in: app)
+
+        XCTAssertFalse(app.staticTexts["Paris"].exists)
+        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "value CONTAINS[c] %@", "Paris")
+            ).firstMatch.waitForExistence(timeout: 3)
+        )
+    }
+
+    func testRecordRequiresRecordingButAllowsSelfGradeFallback() throws {
+        let app = launchApp(scenario: "study-record")
+        startStudy(in: app)
+
+        XCTAssertTrue(app.buttons["startRecording"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["primaryStudyAction"].isEnabled)
+        app.buttons["revealAndSelfGrade"].click()
+        XCTAssertTrue(app.buttons["gradeGood"].waitForExistence(timeout: 3))
+    }
+
+    func testUndoLastGradeRestoresReviewedCard() throws {
+        let app = launchApp()
+        addBasicItem(front: "Undo Q", back: "Undo A", in: app)
+        startStudy(in: app)
+        revealAndGrade("gradeGood", in: app)
+
+        let undo = app.buttons["undoLastGrade"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        undo.click()
+        XCTAssertTrue(app.buttons["gradeGood"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["studySessionDone"].exists)
     }
 }

@@ -24,6 +24,7 @@ struct NeoAnki2App: App {
                     } description: {
                         Text(bootstrapError)
                     }
+                    .accessibilityIdentifier("bootstrapError")
                 } else {
                     ProgressView("Starting…")
                         .task { await bootstrap() }
@@ -41,9 +42,15 @@ struct NeoAnki2App: App {
 
     @MainActor
     private func bootstrap() async {
+        if AppDatabase.isTesting,
+           ProcessInfo.processInfo.environment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] == "1" {
+            bootstrapError = "NeoAnki2 couldn’t open the test library."
+            return
+        }
         do {
             let store = try ItemStore(databaseURL: AppDatabase.defaultURL)
             try await store.bootstrap()
+            try await UITestScenarioSeeder.seedIfRequested(store: store)
             let mediaStore = await store.media
             itemsModel = ItemsModel(store: store, mediaStore: mediaStore)
             decksModel = DecksModel(store: store)

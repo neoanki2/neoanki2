@@ -39,6 +39,7 @@ struct ClozeFieldEditor: View {
                     }
                 }
                 .frame(maxWidth: 180)
+                .accessibilityIdentifier("\(accessibilityIdentifier)-group")
 
                 Button("Mark Blank") {
                     markSelectionAsBlank()
@@ -50,6 +51,7 @@ struct ClozeFieldEditor: View {
                     Button("Clear Blanks", role: .destructive) {
                         blanks = []
                     }
+                    .accessibilityIdentifier("\(accessibilityIdentifier)-clearBlanks")
                 }
             }
 
@@ -82,9 +84,11 @@ struct ClozeFieldEditor: View {
             }
             .labelsHidden()
             .frame(width: 70)
+            .accessibilityIdentifier("\(accessibilityIdentifier)-blank\(index)-group")
             TextField("Hint", text: hintBinding(for: index))
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 160)
+                .accessibilityIdentifier("\(accessibilityIdentifier)-blank\(index)-hint")
             Button(role: .destructive) {
                 blanks.remove(at: index)
             } label: {
@@ -92,6 +96,7 @@ struct ClozeFieldEditor: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove blank \(snippet) from group \(blank.group)")
+            .accessibilityIdentifier("\(accessibilityIdentifier)-blank\(index)-remove")
         }
     }
 
