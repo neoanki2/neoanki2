@@ -1,4 +1,4 @@
-import XCTest
+@preconcurrency import XCTest
 
 @MainActor
 class NeoAnkiUITestCase: XCTestCase {
