@@ -21,7 +21,7 @@ public struct FieldDef: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-public enum FieldType: String, Codable, Sendable {
+public enum FieldType: String, Codable, Sendable, CaseIterable {
     case text
     case richText
     case audio
@@ -29,4 +29,5 @@ public enum FieldType: String, Codable, Sendable {
     case gif
     case video
     case number
+    case cloze
 }

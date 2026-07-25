@@ -14,9 +14,11 @@ final class ItemsModel {
     var addItemDeckID: UUID?
 
     let store: ItemStore
+    let mediaStore: MediaStore?
 
-    init(store: ItemStore) {
+    init(store: ItemStore, mediaStore: MediaStore?) {
         self.store = store
+        self.mediaStore = mediaStore
     }
 
     var itemType: ItemType? {
@@ -45,6 +47,9 @@ final class ItemsModel {
     func addItem(
         fieldSpans: [UUID: [Span]],
         fieldText: [UUID: String] = [:],
+        fieldMedia: [UUID: MediaRef] = [:],
+        fieldMediaAltText: [UUID: String] = [:],
+        fieldClozeBlanks: [UUID: [ClozeSpan]] = [:],
         deckID: UUID? = nil
     ) async -> Bool {
         errorMessage = nil
@@ -55,22 +60,25 @@ final class ItemsModel {
 
         let resolvedDeckID = deckID ?? addItemDeckID
 
-        let fields = itemType.fields
-            .filter(\.supportsTextInput)
-            .map { field in
-                let value: ContentValue = switch field.type {
-                case .text, .richText:
-                    field.contentValue(from: fieldSpans[field.id, default: []])
-                case .number:
-                    field.contentValue(from: fieldText[field.id, default: ""])
-                case .audio, .image, .gif, .video:
-                    .empty
+        do {
+            var fields: [FieldValue] = []
+            for field in itemType.fields {
+                let value = try contentValue(
+                    for: field,
+                    fieldSpans: fieldSpans,
+                    fieldText: fieldText,
+                    fieldMedia: fieldMedia,
+                    fieldMediaAltText: fieldMediaAltText,
+                    fieldClozeBlanks: fieldClozeBlanks
+                )
+                if value.isEmpty, field.isRequired {
+                    throw DatabaseError.requiredFieldEmpty(field.name)
                 }
-
-                return FieldValue(fieldID: field.id, value: value)
+                if !value.isEmpty {
+                    fields.append(FieldValue(fieldID: field.id, value: value))
+                }
             }
 
-        do {
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
             let saved = try await store.createItem(item)
             items.insert(saved, at: 0)
@@ -82,6 +90,39 @@ final class ItemsModel {
         } catch {
             errorMessage = UserFacingError.message(from: error)
             return false
+        }
+    }
+
+    private func contentValue(
+        for field: FieldDef,
+        fieldSpans: [UUID: [Span]],
+        fieldText: [UUID: String],
+        fieldMedia: [UUID: MediaRef],
+        fieldMediaAltText: [UUID: String],
+        fieldClozeBlanks: [UUID: [ClozeSpan]]
+    ) throws -> ContentValue {
+        switch field.type {
+        case .text, .richText:
+            return field.contentValue(from: fieldSpans[field.id, default: []])
+        case .number:
+            return field.contentValue(from: fieldText[field.id, default: ""])
+        case .audio, .image, .gif, .video:
+            if var ref = fieldMedia[field.id] {
+                let alt = fieldMediaAltText[field.id, default: ""]
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                ref.altText = alt.isEmpty ? nil : alt
+                return field.contentValue(from: ref)
+            }
+            return .empty
+        case .cloze:
+            let text = fieldText[field.id, default: ""]
+            let blanks = fieldClozeBlanks[field.id, default: []]
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty && blanks.isEmpty {
+                return .empty
+            }
+            try ClozeValidation.validate(text: text, blanks: blanks)
+            return field.contentValue(fromClozeText: text, blanks: blanks)
         }
     }
 

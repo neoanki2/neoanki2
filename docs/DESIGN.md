@@ -238,6 +238,14 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 The centered prompt → divider → answer stack is the product’s visual signature. Protect its simplicity: no badges, no side panels, no stats during review.
 
+### Media fields
+
+- **Layout:** Max width `study-column-max` (600pt); centered in the reading column like text cards.
+- **Image / GIF:** Rounded 8pt container; optional alt text shown as caption (`ui-caption`, secondary color).
+- **Audio / video:** Native AVKit controls; no custom chrome beyond system player.
+- **Prompt behavior:** Respect `MediaBehavior` — autoplay only when slot requests it; honor Reduce Motion by skipping autoplay when the system setting is on.
+- **Blur / hidden:** Image prompt slots may use blurred or hidden-until-answer presentation; answer side shows full media.
+
 ## Do's and Don'ts
 
 ### Do:

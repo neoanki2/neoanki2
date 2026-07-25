@@ -3,10 +3,16 @@ import Foundation
 /// One row to import into an existing item type.
 public struct ImportRow: Sendable, Equatable {
     public var fieldValues: [String: String]
+    public var structuredFields: [String: StructuredFieldValue]
     public var tags: [String]
 
-    public init(fieldValues: [String: String], tags: [String] = []) {
+    public init(
+        fieldValues: [String: String] = [:],
+        structuredFields: [String: StructuredFieldValue] = [:],
+        tags: [String] = []
+    ) {
         self.fieldValues = fieldValues
+        self.structuredFields = structuredFields
         self.tags = tags
     }
 }
@@ -42,6 +48,14 @@ public enum ImportError: Error, Sendable, Equatable, LocalizedError {
     }
 }
 
+public struct ImportContext: Sendable {
+    public var baseDirectory: URL?
+
+    public init(baseDirectory: URL? = nil) {
+        self.baseDirectory = baseDirectory
+    }
+}
+
 /// Parses native NeoAnki import data (JSON or CSV) into rows for `ItemStore`.
 public protocol ImportAdapter: Sendable {
     func parse(_ data: Data) throws -> ImportPayload
@@ -56,22 +70,27 @@ public struct JSONImportAdapter: ImportAdapter {
 
         struct Row: Decodable {
             let values: [String: String]
+            let structured: [String: StructuredFieldValue]
             let tags: [String]
 
             init(from decoder: Decoder) throws {
                 let container = try decoder.container(keyedBy: DynamicKey.self)
                 var values: [String: String] = [:]
+                var structured: [String: StructuredFieldValue] = [:]
                 var tags: [String] = []
 
                 for key in container.allKeys {
                     if key.stringValue == "tags" {
                         tags = try container.decodeIfPresent([String].self, forKey: key) ?? []
-                    } else if let string = try container.decodeIfPresent(String.self, forKey: key) {
+                    } else if let string = try? container.decode(String.self, forKey: key) {
                         values[key.stringValue] = string
+                    } else if let structuredValue = try? container.decode(StructuredFieldValue.self, forKey: key) {
+                        structured[key.stringValue] = structuredValue
                     }
                 }
 
                 self.values = values
+                self.structured = structured
                 self.tags = tags
             }
         }
@@ -107,7 +126,7 @@ public struct JSONImportAdapter: ImportAdapter {
         }
 
         let rows = payload.rows.map { row in
-            ImportRow(fieldValues: row.values, tags: row.tags)
+            ImportRow(fieldValues: row.values, structuredFields: row.structured, tags: row.tags)
         }
         return ImportPayload(itemTypeName: payload.itemType, rows: rows)
     }

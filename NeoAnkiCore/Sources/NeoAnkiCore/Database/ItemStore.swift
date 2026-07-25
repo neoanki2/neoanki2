@@ -36,12 +36,26 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
 public actor ItemStore {
     private let database: SQLiteDatabase
     private let scheduler: any Scheduler
+    private let mediaStore: MediaStore?
 
-    public init(databaseURL: URL, scheduler: any Scheduler = FSRSScheduler()) throws {
+    public init(
+        databaseURL: URL,
+        scheduler: any Scheduler = FSRSScheduler(),
+        mediaStore: MediaStore? = nil
+    ) throws {
         let directory = databaseURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         database = try SQLiteDatabase(path: databaseURL)
         self.scheduler = scheduler
+        if let mediaStore {
+            self.mediaStore = mediaStore
+        } else {
+            self.mediaStore = try? MediaStore(rootDirectory: MediaStore.defaultRoot(near: databaseURL))
+        }
+    }
+
+    public var media: MediaStore? {
+        mediaStore
     }
 
     /// Opens the database, runs migrations, and seeds built-in item types.
@@ -399,9 +413,12 @@ public actor ItemStore {
         from data: Data,
         adapter: some ImportAdapter,
         itemTypeID: UUID? = nil,
+        context: ImportContext = ImportContext(),
         now: Date = .now
     ) async throws -> Int {
+        try ImportLimits.validatePayloadSize(data)
         let payload = try adapter.parse(data)
+        try ImportLimits.validateRowCount(payload.rows.count)
         let resolvedType: ItemType
 
         if let itemTypeID {
@@ -418,7 +435,7 @@ public actor ItemStore {
 
         var importedCount = 0
         for row in payload.rows {
-            let fields = try mapImportRow(row, to: resolvedType)
+            let fields = try await mapImportRow(row, to: resolvedType, context: context)
             let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
             _ = try await createItem(item, now: now)
             importedCount += 1
@@ -427,10 +444,25 @@ public actor ItemStore {
         return importedCount
     }
 
-    private func mapImportRow(_ row: ImportRow, to itemType: ItemType) throws -> [FieldValue] {
+    private func mapImportRow(
+        _ row: ImportRow,
+        to itemType: ItemType,
+        context: ImportContext
+    ) async throws -> [FieldValue] {
         var values: [FieldValue] = []
 
         for field in itemType.fields {
+            if let structured = row.structuredFields[field.name] {
+                let value = try await contentValue(from: structured, field: field, context: context)
+                if value.isEmpty, field.isRequired {
+                    throw DatabaseError.requiredFieldEmpty(field.name)
+                }
+                if !value.isEmpty {
+                    values.append(FieldValue(fieldID: field.id, value: value))
+                }
+                continue
+            }
+
             guard let text = row.fieldValues[field.name] else {
                 if field.isRequired {
                     throw DatabaseError.requiredFieldEmpty(field.name)
@@ -438,14 +470,81 @@ public actor ItemStore {
                 continue
             }
 
+            try ImportLimits.validateFieldString(text, fieldName: field.name)
             values.append(FieldValue(fieldID: field.id, value: field.contentValue(from: text)))
         }
 
         for key in row.fieldValues.keys where itemType.field(named: key) == nil {
             throw ImportError.unknownField(key)
         }
+        for key in row.structuredFields.keys where itemType.field(named: key) == nil {
+            throw ImportError.unknownField(key)
+        }
 
         return values
+    }
+
+    private func contentValue(
+        from structured: StructuredFieldValue,
+        field: FieldDef,
+        context: ImportContext
+    ) async throws -> ContentValue {
+        switch structured {
+        case let .text(string):
+            try ImportLimits.validateFieldString(string, fieldName: field.name)
+            return field.contentValue(from: string)
+        case let .cloze(text, blanks):
+            try ImportLimits.validateFieldString(text, fieldName: field.name)
+            try ClozeValidation.validate(text: text, blanks: blanks)
+            return field.contentValue(fromClozeText: text, blanks: blanks)
+        case let .mediaPath(path):
+            guard let kind = field.type.mediaKind else {
+                throw ImportError.invalidFormat("Field \"\(field.name)\" is not a media field.")
+            }
+            guard let mediaStore else {
+                throw ImportError.invalidFormat("Media import requires a media store.")
+            }
+            let resolved = try resolveImportPath(path, baseDirectory: context.baseDirectory)
+            let ref = try await mediaStore.ingest(url: resolved, kind: kind)
+            return .media(ref)
+        case let .mediaBase64(base64, fileExtension):
+            guard let kind = field.type.mediaKind else {
+                throw ImportError.invalidFormat("Field \"\(field.name)\" is not a media field.")
+            }
+            guard let mediaStore else {
+                throw ImportError.invalidFormat("Media import requires a media store.")
+            }
+            guard let data = Data(base64Encoded: base64) else {
+                throw ImportError.invalidFormat("Invalid base64 for field \"\(field.name)\".")
+            }
+            let ref = try await mediaStore.ingest(data: data, kind: kind, fileExtension: fileExtension)
+            return .media(ref)
+        }
+    }
+
+    private func resolveImportPath(_ path: String, baseDirectory: URL?) throws -> URL {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw ImportError.invalidFormat("Media path is empty.")
+        }
+
+        let candidate: URL
+        if trimmed.hasPrefix("/") {
+            candidate = URL(fileURLWithPath: trimmed)
+        } else if let baseDirectory {
+            candidate = baseDirectory.appendingPathComponent(trimmed)
+        } else {
+            throw ImportError.invalidFormat("Relative media paths require an import base directory.")
+        }
+
+        let resolved = candidate.standardizedFileURL
+        if let baseDirectory {
+            let base = baseDirectory.standardizedFileURL
+            guard resolved.path.hasPrefix(base.path) else {
+                throw ImportError.invalidFormat("Media path escapes import directory.")
+            }
+        }
+        return resolved
     }
 
     private func summaries(for persisted: [PersistedItem]) async throws -> [SavedItemSummary] {
@@ -503,6 +602,9 @@ public actor ItemStore {
         for field in itemType.fields where field.isRequired {
             guard let value = item.value(for: field.id), !value.isEmpty else {
                 throw DatabaseError.requiredFieldEmpty(field.name)
+            }
+            if case let .cloze(text, blanks) = value {
+                try ClozeValidation.validate(text: text, blanks: blanks)
             }
         }
     }

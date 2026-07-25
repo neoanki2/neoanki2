@@ -115,29 +115,14 @@ struct ContentView: View {
         return !studyModel.isAnswerRevealed
             && !studyModel.isLoading
             && !studyModel.isFinished
-            && card.template.interaction == .reveal
-            && !cardHasUnsupportedContent(card)
+            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     private func studyModelCanGrade(_ studyModel: StudyModel) -> Bool {
         guard let card = studyModel.currentCard else { return false }
         return studyModel.isAnswerRevealed
             && !studyModel.isGrading
-            && card.template.interaction == .reveal
-            && !cardHasUnsupportedContent(card)
-    }
-
-    private func cardHasUnsupportedContent(_ card: DueCard) -> Bool {
-        let values = SideContent.values(for: card.template.prompt, from: card.item)
-            + SideContent.values(for: card.template.answer, from: card.item)
-        return values.contains { value in
-            switch value {
-            case .media, .cloze:
-                true
-            default:
-                false
-            }
-        }
+            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     @ViewBuilder
@@ -151,6 +136,7 @@ struct ContentView: View {
             StudyView(
                 model: studyModel,
                 scope: studyScope,
+                mediaStore: itemsModel.mediaStore,
                 endSessionTrigger: $endSessionTrigger
             ) {
                 endStudy()

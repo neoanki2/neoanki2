@@ -5,6 +5,7 @@ struct StudyView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: StudyModel
     let scope: StudyScope
+    let mediaStore: MediaStore?
     @Binding var endSessionTrigger: Bool
     let onEndSession: () -> Void
 
@@ -57,16 +58,14 @@ struct StudyView: View {
         return !model.isAnswerRevealed
             && !model.isLoading
             && !model.isFinished
-            && card.template.interaction == .reveal
-            && !cardHasUnsupportedContent(card)
+            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     private var canGrade: Bool {
         guard let card = model.currentCard else { return false }
         return model.isAnswerRevealed
             && !model.isGrading
-            && card.template.interaction == .reveal
-            && !cardHasUnsupportedContent(card)
+            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     private var loadingView: some View {
@@ -116,12 +115,10 @@ struct StudyView: View {
 
             ScrollView {
                 VStack(spacing: DesignSystem.Spacing.lg) {
-                    if cardHasUnsupportedContent(card) {
-                        unsupportedContentView
-                    } else if card.template.interaction != .reveal {
+                    if !StudySupport.isSupportedInteraction(card.template.interaction) {
                         unsupportedInteractionView(card.template.interaction)
                     } else {
-                        revealCardContent(card)
+                        studyCardContent(card)
                     }
                 }
                 .readingColumnLayout()
@@ -179,11 +176,13 @@ struct StudyView: View {
     }
 
     @ViewBuilder
-    private func revealCardContent(_ card: DueCard) -> some View {
+    private func studyCardContent(_ card: DueCard) -> some View {
         SideContentView(
             side: card.template.prompt,
             item: card.item,
-            richTextPointSize: DesignSystem.Typography.cardPromptPointSize
+            isAnswerRevealed: model.isAnswerRevealed,
+            richTextPointSize: DesignSystem.Typography.cardPromptPointSize,
+            mediaStore: mediaStore
         )
             .font(DesignSystem.Typography.cardPrompt)
             .multilineTextAlignment(.center)
@@ -194,22 +193,15 @@ struct StudyView: View {
             SideContentView(
                 side: card.template.answer,
                 item: card.item,
-                richTextPointSize: DesignSystem.Typography.cardAnswerPointSize
+                isAnswerRevealed: true,
+                richTextPointSize: DesignSystem.Typography.cardAnswerPointSize,
+                mediaStore: mediaStore
             )
                 .font(DesignSystem.Typography.cardAnswer)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .transition(.opacity)
         }
-    }
-
-    private var unsupportedContentView: some View {
-        ContentUnavailableView {
-            Label("Content Not Available Yet", systemImage: "photo")
-        } description: {
-            Text("This card includes media or cloze content that NeoAnki2 can't display yet.")
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func unsupportedInteractionView(_ interaction: Interaction) -> some View {
@@ -224,7 +216,7 @@ struct StudyView: View {
     @ViewBuilder
     private func studyFooter(for card: DueCard) -> some View {
         HStack {
-            if cardHasUnsupportedContent(card) || card.template.interaction != .reveal {
+            if !StudySupport.isSupportedInteraction(card.template.interaction) {
                 Button("Skip Card") {
                     model.skipCurrentCard()
                 }
@@ -304,19 +296,6 @@ struct StudyView: View {
             showEndSessionConfirm = true
         } else {
             onEndSession()
-        }
-    }
-
-    private func cardHasUnsupportedContent(_ card: DueCard) -> Bool {
-        let values = SideContent.values(for: card.template.prompt, from: card.item)
-            + SideContent.values(for: card.template.answer, from: card.item)
-        return values.contains { value in
-            switch value {
-            case .media, .cloze:
-                true
-            default:
-                false
-            }
         }
     }
 

@@ -5,6 +5,7 @@ import SwiftUI
 struct ItemReadingPreview: View {
     let item: Item
     let itemType: ItemType
+    var mediaStore: MediaStore?
 
     private var displayFields: [(FieldDef, ContentValue)] {
         itemType.fields.compactMap { field in
@@ -29,7 +30,9 @@ struct ItemReadingPreview: View {
 
                     ContentValueView(
                         value: fieldPair.1,
-                        richTextPointSize: pointSize(for: index)
+                        isAnswerRevealed: true,
+                        richTextPointSize: pointSize(for: index),
+                        mediaStore: mediaStore
                     )
                         .font(font(for: index))
                         .multilineTextAlignment(.center)
@@ -86,7 +89,11 @@ struct ItemDetailView: View {
             } else if let item, let itemType {
                 ScrollView {
                     VStack(spacing: DesignSystem.Spacing.lg) {
-                        ItemReadingPreview(item: item, itemType: itemType)
+                        ItemReadingPreview(
+                            item: item,
+                            itemType: itemType,
+                            mediaStore: model.mediaStore
+                        )
 
                         if !decksModel.summaries.isEmpty {
                             Picker("Deck", selection: $selectedDeckID) {

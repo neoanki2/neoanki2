@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 3
+    static let version = 4
 
     static let createStatements: [String] = [
         """
@@ -65,6 +65,28 @@ enum Schema {
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS media_assets (
+            hash TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL,
+            byte_size INTEGER NOT NULL,
+            file_extension TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 3.
+    static let migrationV4Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS media_assets (
+            hash TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL,
+            byte_size INTEGER NOT NULL,
+            file_extension TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
         """,
     ]
 

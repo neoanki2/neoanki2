@@ -4,17 +4,20 @@ import NeoAnkiCore
 struct FieldDraft: Identifiable, Equatable {
     var id: UUID
     var name: String
+    var type: FieldType
     var isRequired: Bool
 
-    init(id: UUID = UUID(), name: String = "", isRequired: Bool = true) {
+    init(id: UUID = UUID(), name: String = "", type: FieldType = .text, isRequired: Bool = true) {
         self.id = id
         self.name = name
+        self.type = type
         self.isRequired = isRequired
     }
 
     init(field: FieldDef) {
         id = field.id
         name = field.name
+        type = field.type
         isRequired = field.isRequired
     }
 
@@ -60,7 +63,7 @@ struct ItemTypeDraft: Equatable {
             FieldDef(
                 id: draft.id,
                 name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                type: .text,
+                type: draft.type,
                 isRequired: draft.isRequired
             )
         }
@@ -71,17 +74,25 @@ struct TemplateDraft: Equatable {
     var name: String
     var promptFieldID: UUID?
     var answerFieldID: UUID?
+    var promptMediaBehavior: MediaBehavior
 
-    init(name: String = "", promptFieldID: UUID? = nil, answerFieldID: UUID? = nil) {
+    init(
+        name: String = "",
+        promptFieldID: UUID? = nil,
+        answerFieldID: UUID? = nil,
+        promptMediaBehavior: MediaBehavior = .default
+    ) {
         self.name = name
         self.promptFieldID = promptFieldID
         self.answerFieldID = answerFieldID
+        self.promptMediaBehavior = promptMediaBehavior
     }
 
     init(template: Template, in itemType: ItemType) {
         name = template.name
         promptFieldID = ItemTypeValidation.fieldIDs(in: template.prompt).first
         answerFieldID = ItemTypeValidation.fieldIDs(in: template.answer).first
+        promptMediaBehavior = template.prompt.slots.first?.presentation.media ?? .default
     }
 
     var isValid: Bool {
@@ -229,13 +240,18 @@ final class TemplatesModel {
         }
 
         do {
-            let template = try TemplateBuilder.makeRevealTemplate(
+            var template = try TemplateBuilder.makeRevealTemplate(
                 id: editingID ?? UUID(),
                 name: draft.name,
                 promptFieldID: promptFieldID,
                 answerFieldID: answerFieldID,
                 in: itemType
             )
+
+            if let promptField = itemType.field(promptFieldID), promptField.supportsMediaInput,
+               !template.prompt.slots.isEmpty {
+                template.prompt.slots[0].presentation.media = draft.promptMediaBehavior
+            }
 
             if let editingID, let index = itemType.templates.firstIndex(where: { $0.id == editingID }) {
                 itemType.templates[index] = template

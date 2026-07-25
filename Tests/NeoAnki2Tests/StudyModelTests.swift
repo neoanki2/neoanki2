@@ -225,7 +225,8 @@ private func makeStudyModel() async throws -> (StudyModel, ItemStore) {
     let databaseURL = url.appendingPathComponent("test.sqlite")
     let store = try ItemStore(databaseURL: databaseURL)
     try await store.bootstrap()
-    let model = ItemsModel(store: store)
+    let mediaStore = await store.media
+    let model = ItemsModel(store: store, mediaStore: mediaStore)
     let itemType = try await store.defaultItemType()
     let item = Item(
         itemTypeID: itemType.id,

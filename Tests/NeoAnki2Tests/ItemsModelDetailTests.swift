@@ -12,7 +12,8 @@ private func makeItemsModel() async throws -> (ItemsModel, ItemStore) {
     let databaseURL = url.appendingPathComponent("test.sqlite")
     let store = try ItemStore(databaseURL: databaseURL)
     try await store.bootstrap()
-    return (ItemsModel(store: store), store)
+    let mediaStore = await store.media
+    return (ItemsModel(store: store, mediaStore: mediaStore), store)
 }
 
 @Test @MainActor func itemsModelMoveItemUpdatesDeck() async throws {

@@ -32,23 +32,34 @@ struct ItemTypeEditorView: View {
 
             Section("Fields") {
                 ForEach($draft.fields) { $field in
-                    HStack(spacing: DesignSystem.Spacing.sm) {
-                        TextField("Field name", text: $field.name)
-                            .accessibilityIdentifier("itemTypeField-\(field.id.uuidString)")
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                        HStack(spacing: DesignSystem.Spacing.sm) {
+                            TextField("Field name", text: $field.name)
+                                .accessibilityIdentifier("itemTypeField-\(field.id.uuidString)")
 
-                        Toggle("Required", isOn: $field.isRequired)
-                            .labelsHidden()
-                            .toggleStyle(.checkbox)
-                            .accessibilityLabel("Required")
-
-                        if draft.fields.count > 2 {
-                            Button(role: .destructive) {
-                                draft.fields.removeAll { $0.id == field.id }
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
+                            Picker("Type", selection: $field.type) {
+                                ForEach(FieldTypeLabels.authoringTypes, id: \.self) { type in
+                                    Text(FieldTypeLabels.name(for: type)).tag(type)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Remove field \(field.name)")
+                            .labelsHidden()
+                            .frame(width: 130)
+                            .accessibilityIdentifier("itemTypeFieldType-\(field.id.uuidString)")
+
+                            Toggle("Required", isOn: $field.isRequired)
+                                .labelsHidden()
+                                .toggleStyle(.checkbox)
+                                .accessibilityLabel("Required")
+
+                            if draft.fields.count > 2 {
+                                Button(role: .destructive) {
+                                    draft.fields.removeAll { $0.id == field.id }
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Remove field \(field.name)")
+                            }
                         }
                     }
                 }

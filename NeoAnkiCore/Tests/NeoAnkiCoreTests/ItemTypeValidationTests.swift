@@ -135,7 +135,7 @@ private func makeValidItemType() -> ItemType {
 }
 
 @Test func itemTypeBuilderRejectsSingleTextField() async {
-    await #expect(throws: DatabaseError.invalidItemType("Add at least two text fields.")) {
+    await #expect(throws: DatabaseError.invalidItemType("Add at least two text-like fields.")) {
         try ItemTypeBuilder.makeItemType(
             name: "Solo",
             fields: [FieldDef(name: "Only", type: .text, isRequired: true)]

@@ -26,8 +26,17 @@ struct TemplateEditorView: View {
         )
     }
 
-    private var selectableFields: [FieldDef] {
-        itemType.fields.filter(\.supportsTextInput)
+    private var selectablePromptFields: [FieldDef] {
+        itemType.fields
+    }
+
+    private var selectableAnswerFields: [FieldDef] {
+        itemType.fields.filter { $0.isTextLike || $0.type == .number }
+    }
+
+    private var promptField: FieldDef? {
+        guard let id = draft.promptFieldID else { return nil }
+        return itemType.field(id)
     }
 
     var body: some View {
@@ -40,7 +49,7 @@ struct TemplateEditorView: View {
             Section("Fields") {
                 Picker("Prompt", selection: promptBinding) {
                     Text("Choose field").tag(UUID?.none)
-                    ForEach(selectableFields) { field in
+                    ForEach(selectablePromptFields) { field in
                         Text(field.name).tag(Optional(field.id))
                     }
                 }
@@ -48,11 +57,21 @@ struct TemplateEditorView: View {
 
                 Picker("Answer", selection: answerBinding) {
                     Text("Choose field").tag(UUID?.none)
-                    ForEach(selectableFields) { field in
+                    ForEach(selectableAnswerFields) { field in
                         Text(field.name).tag(Optional(field.id))
                     }
                 }
                 .accessibilityIdentifier("templateAnswerField")
+
+                if promptField?.supportsMediaInput == true {
+                    Picker("Media behavior", selection: $draft.promptMediaBehavior) {
+                        Text("Default").tag(MediaBehavior.default)
+                        Text("Autoplay").tag(MediaBehavior.autoplay)
+                        Text("Play on tap").tag(MediaBehavior.playOnTap)
+                        Text("Loop").tag(MediaBehavior.loop)
+                    }
+                    .accessibilityIdentifier("templateMediaBehavior")
+                }
             }
 
             Section {

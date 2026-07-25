@@ -22,6 +22,23 @@ public enum ItemTypeValidation {
                     "Template \"\(template.name)\" references an unknown field."
                 )
             }
+
+            if template.interaction == .cloze {
+                try validateClozeTemplate(template, in: itemType)
+            }
+        }
+    }
+
+    private static func validateClozeTemplate(_ template: Template, in itemType: ItemType) throws {
+        let promptFieldIDs = Set(fieldIDs(in: template.prompt))
+        guard promptFieldIDs.count == 1,
+              let fieldID = promptFieldIDs.first,
+              let field = itemType.field(fieldID),
+              field.type == .cloze
+        else {
+            throw DatabaseError.invalidItemType(
+                "Cloze templates must use a single cloze field on the prompt side."
+            )
         }
     }
 
@@ -130,7 +147,7 @@ public enum TemplateBuilder {
 
     private static func modality(for fieldType: FieldType) -> Modality {
         switch fieldType {
-        case .text, .richText, .number:
+        case .text, .richText, .number, .cloze:
             return .text
         case .audio:
             return .audio
@@ -149,9 +166,9 @@ public enum ItemTypeBuilder {
         let normalizedFields = try normalizeFields(fields)
         var itemType = ItemType(name: trimmedName, fields: normalizedFields, templates: [])
 
-        let textFields = normalizedFields.filter(\.supportsTextInput)
+        let textFields = normalizedFields.filter(\.isTextLike)
         guard textFields.count >= 2 else {
-            throw DatabaseError.invalidItemType("Add at least two text fields.")
+            throw DatabaseError.invalidItemType("Add at least two text-like fields.")
         }
 
         let template = try TemplateBuilder.makeRevealTemplate(
@@ -189,7 +206,7 @@ public enum ItemTypeBuilder {
             FieldDef(
                 id: field.id,
                 name: field.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                type: .text,
+                type: field.type,
                 isRequired: field.isRequired
             )
         }

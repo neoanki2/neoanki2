@@ -18,8 +18,21 @@ public enum ItemDisplay {
             return spans.map(\.text).joined()
         case let .number(number):
             return String(number)
-        case .empty, .media, .cloze:
+        case let .media(ref):
+            return ref.altText ?? mediaKindLabel(ref.kind)
+        case let .cloze(text, blanks):
+            return ClozeValidation.displayText(from: text, blanks: blanks, revealed: false)
+        case .empty:
             return ""
+        }
+    }
+
+    private static func mediaKindLabel(_ kind: MediaKind) -> String {
+        switch kind {
+        case .audio: "Audio"
+        case .image: "Image"
+        case .gif: "GIF"
+        case .video: "Video"
         }
     }
 
@@ -34,10 +47,23 @@ public enum ItemDisplay {
 public extension FieldDef {
     var supportsTextInput: Bool {
         switch type {
-        case .text, .richText, .number:
+        case .text, .richText, .number, .cloze:
             return true
         case .audio, .image, .gif, .video:
             return false
+        }
+    }
+
+    var supportsMediaInput: Bool {
+        type.mediaKind != nil
+    }
+
+    var isTextLike: Bool {
+        switch type {
+        case .text, .richText, .cloze:
+            true
+        default:
+            false
         }
     }
 
@@ -61,9 +87,24 @@ public extension FieldDef {
         case .number:
             guard let number = Double(plain) else { return .empty }
             return .number(number)
+        case .cloze:
+            return plain.isEmpty ? .empty : .cloze(plain, blanks: [])
         case .audio, .image, .gif, .video:
             return .empty
         }
+    }
+
+    func contentValue(from media: MediaRef?) -> ContentValue {
+        guard let media else { return .empty }
+        guard type.mediaKind == media.kind else { return .empty }
+        return .media(media)
+    }
+
+    func contentValue(fromClozeText text: String, blanks: [ClozeSpan]) -> ContentValue {
+        guard type == .cloze else { return .empty }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || blanks.isEmpty { return .empty }
+        return .cloze(text, blanks: blanks)
     }
 
     private static func mergeAdjacent(_ spans: [Span]) -> [Span] {

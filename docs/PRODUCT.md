@@ -73,9 +73,12 @@ claim all three without abandoning its legacy model.
 | macOS first | Current focus; shared core for future iOS/iPad |
 | Item list + add + study session | Implemented (early) |
 | Text/rich/number content display | Implemented |
-| Media / cloze display | Not yet — UI shows placeholder; **open decision:** implement or gate item types |
-| Deck organization UI | Not in shell yet (core supports decks) |
-| Multiple item types / template authoring UI | Not in shell yet |
+| Media display (audio/image/gif/video) | Implemented — sandbox `MediaStore`, study + preview |
+| Cloze display + authoring | Implemented — `FieldType.cloze`, structured blanks (no markup) |
+| Deck organization UI | Implemented |
+| Multiple item types / template authoring UI | Implemented |
+| Native JSON/CSV import (core) | Implemented — text fields; media paths + cloze objects in JSON |
+| Import UI | Not in shell yet |
 | Anki import (`.apkg`, shared decks) | **Non-goal** per [`ARCHITECTURE.md`](ARCHITECTURE.md) — clean schema over migration |
 
 ### Terminology (product-facing)

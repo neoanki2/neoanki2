@@ -8,6 +8,9 @@ struct AddItemView: View {
 
     @State private var fieldSpans: [UUID: [Span]] = [:]
     @State private var fieldText: [UUID: String] = [:]
+    @State private var fieldMedia: [UUID: MediaRef] = [:]
+    @State private var fieldMediaAltText: [UUID: String] = [:]
+    @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var selectedDeckID: UUID?
     @State private var isSaving = false
 
@@ -40,7 +43,7 @@ struct AddItemView: View {
 
             if let itemType {
                 Section(itemType.name) {
-                    ForEach(itemType.fields.filter(\.supportsTextInput)) { field in
+                    ForEach(itemType.fields) { field in
                         fieldEditor(for: field)
                     }
                 }
@@ -92,7 +95,23 @@ struct AddItemView: View {
             TextField(fieldLabel(field), text: textBinding(for: field.id))
                 .accessibilityIdentifier("field-\(field.name)")
         case .audio, .image, .gif, .video:
-            EmptyView()
+            if let kind = field.type.mediaKind {
+                MediaFieldEditor(
+                    label: fieldLabel(field),
+                    kind: kind,
+                    media: mediaBinding(for: field.id),
+                    altText: mediaAltTextBinding(for: field.id),
+                    mediaStore: model.mediaStore,
+                    accessibilityIdentifier: "field-\(field.name)"
+                )
+            }
+        case .cloze:
+            ClozeFieldEditor(
+                label: fieldLabel(field),
+                text: textBinding(for: field.id),
+                blanks: clozeBlanksBinding(for: field.id),
+                accessibilityIdentifier: "field-\(field.name)"
+            )
         }
     }
 
@@ -105,26 +124,24 @@ struct AddItemView: View {
 
     private var canSave: Bool {
         guard let itemType else { return false }
-        return itemType.fields
-            .filter(\.supportsTextInput)
-            .filter(\.isRequired)
-            .allSatisfy { field in
-                !fieldPlainText(for: field).isEmpty
-            }
+        return itemType.fields.allSatisfy { field in
+            guard field.isRequired else { return true }
+            return !fieldPlainContent(for: field).isEmpty
+        }
     }
 
     private func fieldLabel(_ field: FieldDef) -> String {
         field.isRequired ? field.name : "\(field.name) (optional)"
     }
 
-    private func fieldPlainText(for field: FieldDef) -> String {
+    private func fieldPlainContent(for field: FieldDef) -> String {
         switch field.type {
         case .text, .richText:
             return SpanFormatting.plainText(from: fieldSpans[field.id, default: []])
-        case .number:
+        case .number, .cloze:
             return fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
         case .audio, .image, .gif, .video:
-            return ""
+            return fieldMedia[field.id] == nil ? "" : "media"
         }
     }
 
@@ -142,10 +159,34 @@ struct AddItemView: View {
         )
     }
 
+    private func mediaBinding(for fieldID: UUID) -> Binding<MediaRef?> {
+        Binding(
+            get: { fieldMedia[fieldID] },
+            set: { fieldMedia[fieldID] = $0 }
+        )
+    }
+
+    private func mediaAltTextBinding(for fieldID: UUID) -> Binding<String> {
+        Binding(
+            get: { fieldMediaAltText[fieldID, default: ""] },
+            set: { fieldMediaAltText[fieldID] = $0 }
+        )
+    }
+
+    private func clozeBlanksBinding(for fieldID: UUID) -> Binding<[ClozeSpan]> {
+        Binding(
+            get: { fieldClozeBlanks[fieldID, default: []] },
+            set: { fieldClozeBlanks[fieldID] = $0 }
+        )
+    }
+
     private func resetFields() {
         guard let itemType else {
             fieldSpans = [:]
             fieldText = [:]
+            fieldMedia = [:]
+            fieldMediaAltText = [:]
+            fieldClozeBlanks = [:]
             return
         }
 
@@ -156,8 +197,15 @@ struct AddItemView: View {
         )
         fieldText = Dictionary(
             uniqueKeysWithValues: itemType.fields
-                .filter { $0.type == .number }
+                .filter { $0.type == .number || $0.type == .cloze }
                 .map { ($0.id, "") }
+        )
+        fieldMedia = [:]
+        fieldMediaAltText = [:]
+        fieldClozeBlanks = Dictionary(
+            uniqueKeysWithValues: itemType.fields
+                .filter { $0.type == .cloze }
+                .map { ($0.id, []) }
         )
     }
 
@@ -168,6 +216,9 @@ struct AddItemView: View {
         if await model.addItem(
             fieldSpans: fieldSpans,
             fieldText: fieldText,
+            fieldMedia: fieldMedia,
+            fieldMediaAltText: fieldMediaAltText,
+            fieldClozeBlanks: fieldClozeBlanks,
             deckID: selectedDeckID
         ) {
             onDismiss()

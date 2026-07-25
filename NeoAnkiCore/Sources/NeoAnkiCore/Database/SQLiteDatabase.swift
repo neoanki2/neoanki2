@@ -111,6 +111,12 @@ actor SQLiteDatabase {
                 try migrateNotesToItemsSchemaIfNeeded()
             }
 
+            if current < 4 {
+                for sql in Schema.migrationV4Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]

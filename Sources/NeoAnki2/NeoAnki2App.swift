@@ -38,7 +38,8 @@ struct NeoAnki2App: App {
         do {
             let store = try ItemStore(databaseURL: AppDatabase.defaultURL)
             try await store.bootstrap()
-            itemsModel = ItemsModel(store: store)
+            let mediaStore = await store.media
+            itemsModel = ItemsModel(store: store, mediaStore: mediaStore)
             decksModel = DecksModel(store: store)
         } catch {
             bootstrapError = error.localizedDescription

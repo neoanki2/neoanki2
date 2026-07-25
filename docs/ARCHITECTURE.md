@@ -77,9 +77,10 @@ public enum ContentValue: Codable, Equatable, Sendable {
 }
 ```
 
-`MediaRef` is a serializable handle into a content-addressed store (bytes live
-outside the model). Content carries no presentation, so the same value can appear
-differently on prompt vs. answer.
+`MediaRef` is a serializable handle into a content-addressed store (`MediaStore`:
+SHA-256 hash, files under `{AppSupport}/neoanki2/media/`). Legacy URL-based refs
+remain decodable for tests. Content carries no presentation, so the same value can
+appear differently on prompt vs. answer via `Presentation` on each `Slot`.
 
 ### Layer 2 — Schema / Presentation
 
@@ -121,7 +122,7 @@ cards. `ReviewRating` is a 1–4 grade; every review appends a `ReviewLog`.
 | Entity | Purpose |
 | --- | --- |
 | `ItemType` | User-declared schema: fields items hold and templates that make cards. |
-| `FieldDef` | One named, typed slot (`text`, `richText`, `audio`, `image`, `gif`, `video`, `number`). |
+| `FieldDef` | One named, typed slot (`text`, `richText`, `audio`, `image`, `gif`, `video`, `number`, `cloze`). |
 | `Template` | Pure-data recipe turning one item into one card. |
 | `Item` | Field values for an item type, plus tags and optional deck. |
 | `FieldValue` | One field's `ContentValue`, keyed by `FieldDef` UUID. |
@@ -147,6 +148,30 @@ graph TD
 A `Card` stores only `itemID`, `templateID`, cached `skill`, and memory; content
 is resolved from item and template at study time, so cards stay small and in sync
 with edits.
+
+### MediaStore
+
+- **Ingest:** copy bytes into `{AppSupport}/neoanki2/media/{sha256}.{ext}`; dedupe by hash.
+- **Validation:** MIME/extension allow-list, magic-byte check, per-kind size caps (e.g. audio 20 MB, video 100 MB).
+- **Security:** never persist user-supplied absolute `file://` URLs; resolve only inside the sandbox.
+- **Schema v4:** optional `media_assets` table tracks hash, kind, byte size, ref count.
+
+### Import (JSON / CSV)
+
+Bulk import enforces limits before parse: **5 MB** payload, **10 000** rows, **32 KB** per field string.
+
+| Field type | JSON cell shape |
+| --- | --- |
+| Text-like | string |
+| Media | relative path (under import bundle) or base64 object `{ "base64": "…", "altText": "…" }` |
+| Cloze | `{ "text": "…", "blanks": [{ "group": 1, "start": 0, "length": 3, "hint": "…" }] }` |
+
+CSV supports text fields only; cloze and media require JSON.
+
+### Study resolution
+
+`SideContent.resolvedSlots` yields `ResolvedSlot(value:presentation:)` so renderers honor
+`RevealMode` and `MediaBehavior` (autoplay, blur, hidden-until-answer).
 
 ---
 
