@@ -134,6 +134,9 @@ final class StudyRecordingController {
 
     func start() async {
         stopPlayback()
+        recorder?.stop()
+        recorder = nil
+        discardRecording()
         state = .requestingPermission
 
         guard await permission.requestPermission() else {
@@ -141,9 +144,9 @@ final class StudyRecordingController {
             return
         }
 
-        do {
-            let url = temporaryDirectory
+        let url = temporaryDirectory
                 .appendingPathComponent("neoanki-recording-\(UUID().uuidString).m4a")
+        do {
             let recorder = try audioFactory.makeRecorder(url: url)
             guard recorder.start() else {
                 throw RecordingError.couldNotStart
@@ -152,6 +155,8 @@ final class StudyRecordingController {
             recordingURL = url
             state = .recording
         } catch {
+            try? FileManager.default.removeItem(at: url)
+            discardRecording()
             state = .failed("Recording couldn't start. Check your microphone and try again.")
         }
     }
@@ -188,17 +193,21 @@ final class StudyRecordingController {
     func reset() {
         recorder?.stop()
         stopPlayback()
-        if let recordingURL {
-            try? FileManager.default.removeItem(at: recordingURL)
-        }
         recorder = nil
-        recordingURL = nil
+        discardRecording()
         state = .idle
     }
 
     private func stopPlayback() {
         player?.stop()
         player = nil
+    }
+
+    private func discardRecording() {
+        if let recordingURL {
+            try? FileManager.default.removeItem(at: recordingURL)
+        }
+        recordingURL = nil
     }
 
     func playbackFinished(successfully: Bool) {

@@ -160,14 +160,17 @@ with edits.
 - **Ingest:** copy bytes into `{AppSupport}/neoanki2/media/{sha256}.{ext}`; dedupe by hash.
 - **Validation:** MIME/extension allow-list, magic-byte check, per-kind size caps (e.g. audio 20 MB, video 100 MB).
 - **Security:** never persist user-supplied absolute `file://` URLs; resolve only inside the sandbox.
-- **Schema v5:** `media_assets` tracks hash, kind, byte size, extension, creation time,
+- **Schema v7:** `media_assets` tracks hash, kind, byte size, extension, creation time,
   and the number of persisted field references. Item create/edit/delete applies
   reference deltas in the same SQLite transaction as the item write; zero-reference
   assets are removed by sandbox-checked orphan collection.
 
 ### Import (JSON / CSV)
 
-Bulk import enforces limits before parse: **5 MB** payload, **10 000** rows, **32 KB** per field string.
+Bulk import stats the file and enforces the **5 MB payload-byte limit before any
+full read or parse**; its bounded read repeats the cap check. After decoding,
+the **10 000-row**, **256-fields-per-row**, and **32 KB UTF-8 per field string**
+limits are enforced immediately, before any imported item is persisted.
 
 | Field type | JSON cell shape |
 | --- | --- |

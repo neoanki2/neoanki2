@@ -185,6 +185,21 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(hidden == "Alpha […] gamma")
 }
 
+@Test func clozeBlankBuilderRejectsExtremeOffsetsWithoutTrapping() {
+    #expect(ClozeBlankBuilder.blank(
+        text: "safe",
+        selectionStart: Int.max,
+        selectionLength: 1,
+        group: 1
+    ) == nil)
+    #expect(ClozeBlankBuilder.blank(
+        text: "safe",
+        selectionStart: 1,
+        selectionLength: Int.max,
+        group: 1
+    ) == nil)
+}
+
 @Test @MainActor func templatesModelLoadsMultipleItemTypes() async throws {
     let (model, store) = try await makeTemplatesModel()
     let front = FieldDef(name: "Term", type: .text, isRequired: true)

@@ -60,6 +60,19 @@ struct StudyView: View {
                 answerAccessibilityFocused = true
             }
         }
+        .focusedSceneValue(\.studyPrimaryActionHandler, primaryActionHandler)
+    }
+
+    private var primaryActionHandler: StudyPrimaryActionHandler {
+        let recordingIsReady = model.currentCard?.template.interaction != .record || recording.hasRecording
+        return StudyPrimaryActionHandler(
+            action: {
+                StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                    model.performPrimaryAction()
+                }
+            },
+            isEnabled: canShowAnswer && recordingIsReady
+        )
     }
 
     private var canShowAnswer: Bool {
@@ -421,8 +434,7 @@ struct StudyView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .keyboardShortcut(.return, modifiers: [])
-                    .keyboardShortcut(.space, modifiers: [])
+                    .keyboardShortcut(.defaultAction)
                     .disabled(card.template.interaction == .record && !recording.hasRecording)
                     .accessibilityIdentifier("primaryStudyAction")
 

@@ -138,11 +138,6 @@ struct ContentView: View {
             return StudyCommandHandlers(
                 startStudy: nil,
                 requestEndSession: { endSessionTrigger = true },
-                showAnswer: {
-                    StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                        studyModel.revealAnswer()
-                    }
-                },
                 grade: { rating in
                     Task { await studyModel.grade(rating) }
                 },
@@ -151,7 +146,6 @@ struct ContentView: View {
                 },
                 canStartStudy: false,
                 canEndSession: true,
-                canShowAnswer: studyModelCanShowAnswer(studyModel),
                 canGrade: studyModelCanGrade(studyModel),
                 canUndoLastGrade: studyModel.canUndoLastGrade && !studyModel.isGrading
             )
@@ -160,23 +154,13 @@ struct ContentView: View {
         return StudyCommandHandlers(
             startStudy: { startStudy() },
             requestEndSession: nil,
-            showAnswer: nil,
             grade: nil,
             undoLastGrade: nil,
             canStartStudy: itemsModel.dueCount > 0 && !isStudying,
             canEndSession: false,
-            canShowAnswer: false,
             canGrade: false,
             canUndoLastGrade: false
         )
-    }
-
-    private func studyModelCanShowAnswer(_ studyModel: StudyModel) -> Bool {
-        guard let card = studyModel.currentCard else { return false }
-        return !studyModel.isAnswerRevealed
-            && !studyModel.isLoading
-            && !studyModel.isFinished
-            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     private func studyModelCanGrade(_ studyModel: StudyModel) -> Bool {
@@ -249,14 +233,16 @@ struct ContentView: View {
         switch result {
         case let .success(urls):
             guard let url = urls.first else { return }
-            guard let importModel, importModel.selectFile(url) else {
-                importNotice = ImportNotice(
-                    title: "Could Not Import File",
-                    message: importModel?.errorMessage ?? "Choose a JSON or CSV file."
-                )
-                return
+            Task {
+                guard let importModel, await importModel.selectFile(url) else {
+                    importNotice = ImportNotice(
+                        title: "Could Not Import File",
+                        message: importModel?.errorMessage ?? "Choose a JSON or CSV file."
+                    )
+                    return
+                }
+                isShowingImport = true
             }
-            isShowingImport = true
         case let .failure(error):
             if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
                 return

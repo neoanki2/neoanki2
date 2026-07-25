@@ -113,9 +113,15 @@ struct ClozeFieldEditor: View {
     }
 
     private func snippet(for blank: ClozeSpan) -> String {
-        guard blank.start >= 0, blank.start + blank.length <= text.count else { return "?" }
-        let start = text.index(text.startIndex, offsetBy: blank.start)
-        let end = text.index(start, offsetBy: blank.length)
+        let (endOffset, overflowed) = blank.start.addingReportingOverflow(blank.length)
+        guard blank.start >= 0, blank.length > 0, !overflowed, endOffset <= text.count,
+              let start = text.index(
+                  text.startIndex,
+                  offsetBy: blank.start,
+                  limitedBy: text.endIndex
+              ),
+              let end = text.index(start, offsetBy: blank.length, limitedBy: text.endIndex)
+        else { return "?" }
         return String(text[start ..< end])
     }
 
@@ -171,7 +177,9 @@ struct ClozeFieldEditor: View {
     }
 
     private func nextGroup() -> Int {
-        (blanks.map(\.group).max() ?? 0) + 1
+        let maximum = blanks.map(\.group).max() ?? 0
+        let (next, overflowed) = maximum.addingReportingOverflow(1)
+        return overflowed ? 1 : max(1, next)
     }
 }
 

@@ -618,7 +618,7 @@ public actor ItemStore {
     ) async throws -> Int {
         try ImportLimits.validatePayloadSize(data)
         let payload = try adapter.parse(data)
-        try ImportLimits.validateRowCount(payload.rows.count)
+        try ImportLimits.validateDecodedPayload(payload)
         let resolvedType: ItemType
 
         if let itemTypeID {
@@ -873,9 +873,12 @@ public actor ItemStore {
         summaries.reserveCapacity(persisted.count)
 
         for entry in persisted {
-            guard let itemType = try await database.fetchItemType(id: entry.item.itemTypeID) else {
-                continue
-            }
+            // Malformed definitions are reported by loadItemTypes(), where
+            // callers receive the persisted ID and the archive-before-repair
+            // path. Keep unrelated item rows usable in the meantime.
+            guard let itemType = try await database.fetchValidatedItemType(
+                id: entry.item.itemTypeID
+            ) else { continue }
             let cardCount = try await database.countCards(for: entry.item.id)
             summaries.append(
                 SavedItemSummary(
@@ -898,13 +901,16 @@ public actor ItemStore {
         dueCards.reserveCapacity(cards.count)
 
         for card in cards {
-            guard
-                let persisted = try await database.fetchItem(id: card.itemID),
-                let itemType = try await database.fetchItemType(id: persisted.item.itemTypeID),
-                let template = itemType.templates.first(where: { $0.id == card.templateID })
-            else {
+            guard let persisted = try await database.fetchItem(id: card.itemID) else {
                 continue
             }
+            // The linked card remains persisted and becomes available again
+            // after repairItemTypeDefinition archives and repairs its type.
+            guard let itemType = try await database.fetchValidatedItemType(
+                      id: persisted.item.itemTypeID
+                  ),
+                  let template = itemType.templates.first(where: { $0.id == card.templateID })
+            else { continue }
 
             dueCards.append(
                 DueCard(

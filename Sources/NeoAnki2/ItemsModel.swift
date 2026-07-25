@@ -30,7 +30,8 @@ final class ItemsModel {
         isLoading = true
         errorMessage = nil
         do {
-            itemTypes = try await store.listItemTypes()
+            let loadedItemTypes = try await store.loadItemTypes()
+            itemTypes = loadedItemTypes.itemTypes
             if addItemTypeID == nil {
                 addItemTypeID = itemTypes.first?.id
             } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
@@ -38,6 +39,12 @@ final class ItemsModel {
             }
             items = try await store.listItems(scope: scope.filter)
             dueCount = try await store.dueCount(scope: scope.filter)
+            if !loadedItemTypes.corruptions.isEmpty {
+                let count = loadedItemTypes.corruptions.count
+                errorMessage = count == 1
+                    ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
+                    : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
+            }
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }

@@ -19,6 +19,38 @@ public enum ImportLimits {
         }
     }
 
+    /// Validates decoded row shape and textual field payloads before any media
+    /// resolution or persistence work begins.
+    public static func validateDecodedPayload(_ payload: ImportPayload) throws {
+        try validateRowCount(payload.rows.count)
+        for row in payload.rows {
+            let (fieldCount, overflowed) = row.fieldValues.count.addingReportingOverflow(
+                row.structuredFields.count
+            )
+            guard !overflowed, fieldCount <= maxFieldsPerRow else {
+                throw ImportError.invalidFormat(
+                    "Import rows may contain at most \(maxFieldsPerRow) fields."
+                )
+            }
+            for (name, value) in row.fieldValues {
+                try validateFieldString(value, fieldName: name)
+            }
+            for (name, value) in row.structuredFields {
+                switch value {
+                case let .text(text), let .cloze(text, _), let .mediaPath(text):
+                    try validateFieldString(text, fieldName: name)
+                case let .mediaBase64(_, fileExtension, altText):
+                    if let fileExtension {
+                        try validateFieldString(fileExtension, fieldName: "\(name) file extension")
+                    }
+                    if let altText {
+                        try validateFieldString(altText, fieldName: "\(name) alt text")
+                    }
+                }
+            }
+        }
+    }
+
     public static func validateFieldString(_ value: String, fieldName: String) throws {
         guard value.utf8.count <= maxFieldStringBytes else {
             throw ImportError.invalidFormat("Field \"\(fieldName)\" exceeds maximum length.")

@@ -122,6 +122,20 @@ import Testing
     }
 }
 
+@Test func decodedPayloadRejectsTooManyFieldsBeforePersistence() async {
+    let values = Dictionary(
+        uniqueKeysWithValues: (0...ImportLimits.maxFieldsPerRow).map { ("Field \($0)", "value") }
+    )
+    let payload = ImportPayload(
+        itemTypeName: "Basic",
+        rows: [ImportRow(fieldValues: values)]
+    )
+
+    await #expect(throws: ImportError.self) {
+        try ImportLimits.validateDecodedPayload(payload)
+    }
+}
+
 @Test func importErrorDescriptionsAreUserFacing() {
     #expect(ImportError.unknownField("Foo").errorDescription?.contains("Foo") == true)
     #expect(ImportError.emptyPayload.errorDescription?.isEmpty == false)

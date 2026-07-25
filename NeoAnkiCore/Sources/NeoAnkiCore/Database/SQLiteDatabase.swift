@@ -232,6 +232,25 @@ actor SQLiteDatabase {
         return try decode(ItemType.self, from: data)
     }
 
+    /// Returns nil for an independently corrupt definition while preserving
+    /// database/query failures for the caller.
+    func fetchValidatedItemType(id: UUID) throws -> ItemType? {
+        let rows = try query(
+            "SELECT definition FROM item_types WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first, let data = row["definition"] as? Data else { return nil }
+        do {
+            let itemType = try decode(ItemType.self, from: data)
+            try ItemTypeValidation.validate(itemType)
+            return itemType
+        } catch is DecodingError {
+            return nil
+        } catch is DatabaseError {
+            return nil
+        }
+    }
+
     func fetchItemType(named name: String) throws -> ItemType? {
         let rows = try query(
             "SELECT definition FROM item_types WHERE name = ? LIMIT 1;",
@@ -359,6 +378,10 @@ actor SQLiteDatabase {
                 "UPDATE item_types SET name = ?, definition = ? WHERE id = ?;",
                 bindings: [.text(repaired.name), .blob(repairedData), .text(id.uuidString)]
             )
+            for entry in try fetchItems(itemTypeID: id) {
+                let cards = CardGenerator.cards(for: entry.item, type: repaired, now: now)
+                try insertCards(cards)
+            }
         }
         return repaired
     }

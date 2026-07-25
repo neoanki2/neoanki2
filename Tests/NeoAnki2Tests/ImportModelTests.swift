@@ -19,6 +19,23 @@ private final class ScopedAccessSpy: SecurityScopedResourceAccessing {
     }
 }
 
+private final class ProbeFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    func markInvoked() {
+        lock.lock()
+        value = true
+        lock.unlock()
+    }
+
+    var wasInvoked: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 @MainActor
 private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     let directory = FileManager.default.temporaryDirectory
@@ -43,7 +60,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     }
     """.write(to: fileURL, atomically: true, encoding: .utf8)
 
-    #expect(model.selectFile(fileURL))
+    #expect(await model.selectFile(fileURL))
     let imported = await model.importSelected(scope: .allDecks)
 
     #expect(imported)
@@ -58,7 +75,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     let fileURL = directory.appendingPathComponent("items.csv")
     try "Front,Back\nAlpha,Beta\n".write(to: fileURL, atomically: true, encoding: .utf8)
 
-    #expect(model.selectFile(fileURL))
+    #expect(await model.selectFile(fileURL))
     #expect(model.needsItemTypeSelection)
     #expect(model.selectedItemTypeID == BuiltInItemTypes.basicID)
 
@@ -81,7 +98,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     }
     """.write(to: fileURL, atomically: true, encoding: .utf8)
 
-    #expect(model.selectFile(fileURL))
+    #expect(await model.selectFile(fileURL))
     #expect(await model.importSelected(scope: .allDecks))
     #expect(await model.importSelected(scope: .allDecks))
 
@@ -102,7 +119,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     }
     """.write(to: fileURL, atomically: true, encoding: .utf8)
 
-    #expect(model.selectFile(fileURL))
+    #expect(await model.selectFile(fileURL))
     #expect(model.requiresMediaDirectory)
     #expect(model.canImport == false)
     #expect(model.selectMediaDirectory(directory))
@@ -151,7 +168,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     }
     """.write(to: fileURL, atomically: true, encoding: .utf8)
 
-    #expect(model.selectFile(fileURL))
+    #expect(await model.selectFile(fileURL))
     #expect(model.requiresMediaDirectory)
     #expect(model.canImport == false)
     #expect(model.selectMediaDirectory(directory))
@@ -172,7 +189,24 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     let (model, _, directory) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("items.txt")
 
-    #expect(model.selectFile(fileURL) == false)
+    #expect(await model.selectFile(fileURL) == false)
     #expect(model.errorMessage == "Choose a JSON or CSV file.")
     #expect(model.canImport == false)
+}
+
+@Test @MainActor func oversizedSelectionRejectsBeforeRelativeMediaProbe() async throws {
+    let (_, itemsModel, directory) = try await makeImportModel()
+    let fileURL = directory.appendingPathComponent("oversized.json")
+    try Data(repeating: 0x20, count: ImportLimits.maxPayloadBytes + 1).write(to: fileURL)
+    let probe = ProbeFlag()
+    let inspector = SystemImportFileInspector { _ in
+        probe.markInvoked()
+        return true
+    }
+    let model = ImportModel(itemsModel: itemsModel, fileInspector: inspector)
+
+    #expect(await model.selectFile(fileURL) == false)
+    #expect(probe.wasInvoked == false)
+    #expect(model.selectedURL == nil)
+    #expect(model.errorMessage?.contains("larger than 5 MB") == true)
 }

@@ -4,14 +4,27 @@ import SwiftUI
 struct StudyCommandHandlers {
     var startStudy: (() -> Void)?
     var requestEndSession: (() -> Void)?
-    var showAnswer: (() -> Void)?
     var grade: ((ReviewRating) -> Void)?
     var undoLastGrade: (() -> Void)?
     var canStartStudy = false
     var canEndSession = false
-    var canShowAnswer = false
     var canGrade = false
     var canUndoLastGrade = false
+}
+
+struct StudyPrimaryActionHandler {
+    var action: (() -> Void)?
+    var isEnabled = false
+
+    func invoke() {
+        guard isEnabled else { return }
+        action?()
+    }
+}
+
+private struct StudyPrimaryActionHandlerKey: FocusedValueKey {
+    typealias Value = StudyPrimaryActionHandler
+    static var defaultValue: StudyPrimaryActionHandler? { nil }
 }
 
 private struct StudyCommandHandlersKey: FocusedValueKey {
@@ -24,10 +37,16 @@ extension FocusedValues {
         get { self[StudyCommandHandlersKey.self] }
         set { self[StudyCommandHandlersKey.self] = newValue }
     }
+
+    var studyPrimaryActionHandler: StudyPrimaryActionHandler? {
+        get { self[StudyPrimaryActionHandlerKey.self] }
+        set { self[StudyPrimaryActionHandlerKey.self] = newValue }
+    }
 }
 
 struct StudyCommands: Commands {
     @FocusedValue(\.studyCommandHandlers) private var handlers
+    @FocusedValue(\.studyPrimaryActionHandler) private var primaryAction
 
     var body: some Commands {
         CommandMenu("Study") {
@@ -44,11 +63,11 @@ struct StudyCommands: Commands {
 
             Divider()
 
-            Button("Show Answer") {
-                handlers?.showAnswer?()
+            Button("Continue") {
+                primaryAction?.invoke()
             }
             .keyboardShortcut(.space, modifiers: [])
-            .disabled(!(handlers?.canShowAnswer ?? false))
+            .disabled(!(primaryAction?.isEnabled ?? false))
 
             Divider()
 

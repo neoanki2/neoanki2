@@ -64,3 +64,20 @@ import Testing
     #expect(result.spans.isEmpty)
     #expect(result.invalidated == [span])
 }
+
+@Test func clozeRebaserInvalidatesOverflowingPersistedOffsetsWithoutTrapping() {
+    let malformed = [
+        ClozeSpan(group: 1, start: Int.max, length: 1),
+        ClozeSpan(group: 2, start: 1, length: Int.max),
+        ClozeSpan(group: 3, start: Int.max, length: Int.max),
+    ]
+
+    let result = ClozeSpanRebaser.rebase(
+        spans: malformed,
+        from: "safe text",
+        to: "safer text"
+    )
+
+    #expect(result.spans.isEmpty)
+    #expect(result.invalidated == malformed)
+}

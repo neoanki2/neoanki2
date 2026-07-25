@@ -37,8 +37,8 @@ public enum ClozeSpanRebaser {
         rebased.reserveCapacity(spans.count)
 
         for span in spans {
-            let spanEnd = span.start + span.length
-            guard span.start >= 0, span.length > 0, spanEnd <= old.count else {
+            let (spanEnd, spanEndOverflowed) = span.start.addingReportingOverflow(span.length)
+            guard span.start >= 0, span.length > 0, !spanEndOverflowed, spanEnd <= old.count else {
                 invalidated.append(span)
                 continue
             }
@@ -47,26 +47,43 @@ public enum ClozeSpanRebaser {
             if sharedPrefix == oldEditEnd {
                 // Insertion: content inserted strictly inside a blank belongs to it.
                 if sharedPrefix <= span.start {
-                    updated.start += delta
+                    guard let shiftedStart = adding(delta, to: updated.start) else {
+                        invalidated.append(span)
+                        continue
+                    }
+                    updated.start = shiftedStart
                 } else if sharedPrefix < spanEnd {
-                    updated.length += delta
+                    guard let shiftedLength = adding(delta, to: updated.length) else {
+                        invalidated.append(span)
+                        continue
+                    }
+                    updated.length = shiftedLength
                 }
             } else if oldEditEnd <= span.start {
-                updated.start += delta
+                guard let shiftedStart = adding(delta, to: updated.start) else {
+                    invalidated.append(span)
+                    continue
+                }
+                updated.start = shiftedStart
             } else if sharedPrefix >= spanEnd {
                 // Edit is after the span.
             } else if sharedPrefix >= span.start, oldEditEnd <= spanEnd {
                 // Replacement is wholly inside the span, including replacing all
                 // of it. Preserve its group and hint around the replacement.
-                updated.length += delta
+                guard let shiftedLength = adding(delta, to: updated.length) else {
+                    invalidated.append(span)
+                    continue
+                }
+                updated.length = shiftedLength
             } else {
                 // The edit consumed exactly one boundary or surrounded the span.
                 invalidated.append(span)
                 continue
             }
 
-            if updated.length > 0, updated.start >= 0,
-               updated.start + updated.length <= new.count {
+            let (updatedEnd, updatedEndOverflowed) = updated.start.addingReportingOverflow(updated.length)
+            if updated.length > 0, updated.start >= 0, !updatedEndOverflowed,
+               updatedEnd <= new.count {
                 rebased.append(updated)
             } else {
                 invalidated.append(span)
@@ -74,6 +91,11 @@ public enum ClozeSpanRebaser {
         }
 
         return Result(spans: rebased, invalidated: invalidated)
+    }
+
+    private static func adding(_ rhs: Int, to lhs: Int) -> Int? {
+        let (result, overflowed) = lhs.addingReportingOverflow(rhs)
+        return overflowed ? nil : result
     }
 
     private static func commonPrefixCount(_ lhs: [Character], _ rhs: [Character]) -> Int {
