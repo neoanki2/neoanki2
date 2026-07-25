@@ -12,9 +12,9 @@ final class DeckUITests: NeoAnkiUITestCase {
         createDeck(named: "Old Name", in: app)
 
         showSidebar(in: app)
-        let deckRow = app.descendants(matching: .any)["deckRow-Old Name"]
+        let deckRow = app.descendants(matching: .any).identified("deckRow-Old Name")
         deckRow.rightClick()
-        app.menuItems["Rename"].click()
+        app.menuItems.identified("Rename").click()
 
         guard let container = modalContainer(in: app) else {
             XCTFail("Rename dialog did not appear")
@@ -24,10 +24,10 @@ final class DeckUITests: NeoAnkiUITestCase {
         textField.click()
         textField.typeKey("a", modifierFlags: [.command])
         textField.typeText("New Name")
-        if app.buttons["confirmRenameDeck"].exists {
-            app.buttons["confirmRenameDeck"].click()
+        if app.buttons.identified("confirmRenameDeck").exists {
+            app.buttons.identified("confirmRenameDeck").click()
         } else {
-            container.buttons["Save"].click()
+            container.buttons.identified("Save").click()
         }
 
         XCTAssertTrue(app.descendants(matching: .any)["deckRow-New Name"].waitForExistence(timeout: 10))
@@ -38,7 +38,7 @@ final class DeckUITests: NeoAnkiUITestCase {
         createDeck(named: "Temporary", in: app)
 
         showSidebar(in: app)
-        let deckRow = app.descendants(matching: .any)["deckRow-Temporary"]
+        let deckRow = app.descendants(matching: .any).identified("deckRow-Temporary")
         deckRow.rightClick()
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         let contextDelete = app.menuItems.matching(
@@ -50,10 +50,10 @@ final class DeckUITests: NeoAnkiUITestCase {
             app.menuItems["Delete"].firstMatch.click()
         }
 
-        if app.buttons["confirmDeleteDeck"].waitForExistence(timeout: 5) {
-            app.buttons["confirmDeleteDeck"].click()
+        if app.buttons.identified("confirmDeleteDeck").waitForExistence(timeout: 5) {
+            app.buttons.identified("confirmDeleteDeck").click()
         } else if let container = modalContainer(in: app) {
-            container.buttons["Delete Deck"].click()
+            container.buttons.identified("Delete Deck").click()
         } else {
             XCTFail("Delete deck confirmation did not appear")
         }
@@ -69,10 +69,10 @@ final class DeckUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Unassigned Item", back: "A", in: app)
 
         openAddItem(in: app)
-        let deckPicker = app.popUpButtons["addItemDeckPicker"]
+        let deckPicker = app.popUpButtons.identified("addItemDeckPicker")
         if deckPicker.waitForExistence(timeout: 2) {
             deckPicker.click()
-            app.menuItems["Scoped"].click()
+            app.menuItems.identified("Scoped").click()
         }
         enterText("Deck Item", into: field(named: "Front", in: app), app: app)
         enterText("B", into: field(named: "Back", in: app), app: app)
@@ -92,9 +92,9 @@ final class DeckUITests: NeoAnkiUITestCase {
         createDeck(named: "Study Deck", in: app)
 
         openAddItem(in: app)
-        if app.popUpButtons["addItemDeckPicker"].waitForExistence(timeout: 2) {
-            app.popUpButtons["addItemDeckPicker"].click()
-            app.menuItems["Study Deck"].click()
+        if app.popUpButtons.identified("addItemDeckPicker").waitForExistence(timeout: 2) {
+            app.popUpButtons.identified("addItemDeckPicker").click()
+            app.menuItems.identified("Study Deck").click()
         }
         enterText("Scoped Q", into: field(named: "Front", in: app), app: app)
         enterText("Scoped A", into: field(named: "Back", in: app), app: app)
@@ -108,30 +108,30 @@ final class DeckUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons["studyButton"]
+        let studyButton = app.buttons.identified("studyButton")
         XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
         XCTAssertFalse(studyButton.isEnabled)
     }
 
     func testCancelCreatingDeckLeavesSidebarUnchanged() throws {
         let app = launchApp()
-        app.buttons["newDeckToolbar"].click()
-        XCTAssertTrue(app.buttons["cancelCreateDeck"].waitForExistence(timeout: 3))
-        app.buttons["cancelCreateDeck"].click()
+        app.buttons.identified("newDeckToolbar").click()
+        XCTAssertTrue(app.buttons.identified("cancelCreateDeck").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelCreateDeck").click()
 
         XCTAssertFalse(app.descendants(matching: .any)["deckRow-Cancelled"].exists)
-        XCTAssertTrue(app.buttons["newDeckToolbar"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitForExistence(timeout: 3))
     }
 
     func testCancelRenameKeepsOriginalDeckName() throws {
         let app = launchApp()
         createDeck(named: "Keep Name", in: app)
 
-        let row = app.descendants(matching: .any)["deckRow-Keep Name"]
+        let row = app.descendants(matching: .any).identified("deckRow-Keep Name")
         row.rightClick()
-        app.menuItems["Rename"].click()
-        XCTAssertTrue(app.buttons["cancelRenameDeck"].waitForExistence(timeout: 3))
-        app.buttons["cancelRenameDeck"].click()
+        app.menuItems.identified("Rename").click()
+        XCTAssertTrue(app.buttons.identified("cancelRenameDeck").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelRenameDeck").click()
 
         XCTAssertTrue(row.waitForExistence(timeout: 3))
     }
@@ -140,7 +140,7 @@ final class DeckUITests: NeoAnkiUITestCase {
         let app = launchApp()
         createDeck(named: "Keep Deck", in: app)
 
-        let row = app.descendants(matching: .any)["deckRow-Keep Deck"]
+        let row = app.descendants(matching: .any).identified("deckRow-Keep Deck")
         row.rightClick()
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         let contextDelete = app.menuItems.matching(
@@ -158,15 +158,15 @@ final class DeckUITests: NeoAnkiUITestCase {
         let app = launchApp()
         createDeck(named: "Parent", in: app)
 
-        let parent = app.descendants(matching: .any)["deckRow-Parent"]
+        let parent = app.descendants(matching: .any).identified("deckRow-Parent")
         parent.rightClick()
-        app.menuItems["New Subdeck"].click()
+        app.menuItems.identified("New Subdeck").click()
         guard let container = modalContainer(in: app) else {
             XCTFail("Subdeck dialog did not appear")
             return
         }
         enterText("Child", into: container.textFields.firstMatch, app: app)
-        app.buttons["confirmCreateDeck"].click()
+        app.buttons.identified("confirmCreateDeck").click()
 
         XCTAssertTrue(app.staticTexts["Child"].waitForExistence(timeout: 5))
     }

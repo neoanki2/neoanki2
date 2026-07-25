@@ -94,11 +94,11 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func openTemplates(in app: XCUIApplication) {
         app.menuBarItems["Library"].click()
-        app.menuItems["Item Types…"].click()
+        app.menuItems.identified("Item Types…").click()
 
-        let done = app.buttons["templatesDone"]
+        let done = app.buttons.identified("templatesDone")
         if !done.waitForExistence(timeout: 5) {
-            XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 2))
+            XCTAssertTrue(app.buttons.identified("Done").waitForExistence(timeout: 2))
         }
         waitForTemplatesReady(in: app)
     }
@@ -120,31 +120,31 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func clickAddItemType(in app: XCUIApplication) {
-        if app.buttons["addItemTypeToolbar"].waitForExistence(timeout: 3) {
-            app.buttons["addItemTypeToolbar"].click()
+        if app.buttons.identified("addItemTypeToolbar").waitForExistence(timeout: 3) {
+            app.buttons.identified("addItemTypeToolbar").click()
             return
         }
-        if app.buttons["addItemTypeEmptyState"].waitForExistence(timeout: 2) {
-            app.buttons["addItemTypeEmptyState"].click()
+        if app.buttons.identified("addItemTypeEmptyState").waitForExistence(timeout: 2) {
+            app.buttons.identified("addItemTypeEmptyState").click()
             return
         }
         XCTFail("Add item type control not found")
     }
 
     func openTemplateEditor(named name: String, in app: XCUIApplication) {
-        let edit = app.buttons["editTemplate-\(name)"]
+        let edit = app.buttons.identified("editTemplate-\(name)")
         XCTAssertTrue(edit.waitForExistence(timeout: 5))
         edit.click()
-        XCTAssertTrue(app.textFields["templateNameField"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields.identified("templateNameField").waitForExistence(timeout: 10))
     }
 
     func closeTemplates(in app: XCUIApplication) {
-        if app.buttons["templatesDone"].exists {
-            app.buttons["templatesDone"].click()
+        if app.buttons.identified("templatesDone").exists {
+            app.buttons.identified("templatesDone").click()
             return
         }
-        if app.buttons["Done"].exists {
-            app.buttons["Done"].click()
+        if app.buttons.identified("Done").exists {
+            app.buttons.identified("Done").click()
             return
         }
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
@@ -161,7 +161,7 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func saveAddItem(in app: XCUIApplication) {
-        let save = app.buttons["saveAddItem"]
+        let save = app.buttons.identified("saveAddItem")
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         XCTAssertTrue(save.isEnabled)
         save.click()
@@ -169,7 +169,7 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func waitForItem(named title: String, in app: XCUIApplication, timeout: TimeInterval = 10) {
-        let row = app.descendants(matching: .any)["itemRow-\(title)"]
+        let row = app.descendants(matching: .any).identified("itemRow-\(title)")
         if row.waitForExistence(timeout: timeout) {
             return
         }
@@ -181,11 +181,11 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func field(named name: String, in app: XCUIApplication) -> XCUIElement {
         let id = "field-\(name)"
-        let textView = app.textViews[id]
+        let textView = app.textViews.identified(id)
         if textView.waitForExistence(timeout: 2) {
             return textView
         }
-        let textField = app.textFields[id]
+        let textField = app.textFields.identified(id)
         if textField.waitForExistence(timeout: 1) {
             return textField
         }
@@ -193,43 +193,43 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func returnToLibrary(in app: XCUIApplication) {
-        if app.buttons["studySessionDone"].exists {
-            app.buttons["studySessionDone"].click()
+        if app.buttons.identified("studySessionDone").exists {
+            app.buttons.identified("studySessionDone").click()
         }
-        if app.buttons["studyBackToItems"].exists {
-            app.buttons["studyBackToItems"].click()
+        if app.buttons.identified("studyBackToItems").exists {
+            app.buttons.identified("studyBackToItems").click()
         }
-        if app.buttons["cancelAddItem"].exists {
-            app.buttons["cancelAddItem"].click()
+        if app.buttons.identified("cancelAddItem").exists {
+            app.buttons.identified("cancelAddItem").click()
         }
-        if app.buttons["templatesDone"].exists {
-            app.buttons["templatesDone"].click()
+        if app.buttons.identified("templatesDone").exists {
+            app.buttons.identified("templatesDone").click()
         }
-        if app.buttons["cancelTemplateEditor"].exists {
-            app.buttons["cancelTemplateEditor"].click()
+        if app.buttons.identified("cancelTemplateEditor").exists {
+            app.buttons.identified("cancelTemplateEditor").click()
         }
         if app.buttons["deleteItem"].exists {
             showSidebar(in: app)
-            let unassigned = app.descendants(matching: .any)["scopeRow-Unassigned"]
-            let allDecks = app.descendants(matching: .any)["scopeRow-AllDecks"]
+            let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
+            let allDecks = app.descendants(matching: .any).identified("scopeRow-AllDecks")
             if unassigned.waitForExistence(timeout: 2), allDecks.waitForExistence(timeout: 2) {
                 unassigned.click()
-                _ = app.buttons["deleteItem"].waitForNonExistence(timeout: 5)
+                _ = app.buttons.identified("deleteItem").waitForNonExistence(timeout: 5)
                 allDecks.click()
             } else {
                 app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
             }
-            _ = app.buttons["deleteItem"].waitForNonExistence(timeout: 5)
+            _ = app.buttons.identified("deleteItem").waitForNonExistence(timeout: 5)
         }
         waitForLibraryReady(in: app)
     }
 
     func openAddItem(in app: XCUIApplication) {
         returnToLibrary(in: app)
-        if app.buttons["addItemEmptyState"].waitForExistence(timeout: 2) {
-            app.buttons["addItemEmptyState"].click()
+        if app.buttons.identified("addItemEmptyState").waitForExistence(timeout: 2) {
+            app.buttons.identified("addItemEmptyState").click()
         } else {
-            let add = app.buttons["addItemToolbar"]
+            let add = app.buttons.identified("addItemToolbar")
             XCTAssertTrue(add.waitForExistence(timeout: 5))
             add.click()
         }
@@ -249,7 +249,7 @@ class NeoAnkiUITestCase: XCTestCase {
         if app.buttons["newDeckToolbar"].exists { return }
         // Restore split view sidebar when detail-only.
         app.typeKey("0", modifierFlags: [.command])
-        _ = app.buttons["newDeckToolbar"].waitForExistence(timeout: 3)
+        _ = app.buttons.identified("newDeckToolbar").waitForExistence(timeout: 3)
     }
 
     func modalContainer(in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement? {
@@ -264,7 +264,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func selectScope(_ identifier: String, in app: XCUIApplication) {
         showSidebar(in: app)
-        let row = app.descendants(matching: .any)[identifier]
+        let row = app.descendants(matching: .any).identified(identifier)
         if row.waitForExistence(timeout: 5) {
             row.click()
             waitForScopeSelection(row, in: app)
@@ -308,7 +308,7 @@ class NeoAnkiUITestCase: XCTestCase {
         )
         _ = XCTWaiter.wait(for: [selected], timeout: 5)
 
-        let loading = app.staticTexts["Loading items…"]
+        let loading = app.staticTexts.identified("Loading items…")
         if loading.exists {
             XCTAssertTrue(loading.waitForNonExistence(timeout: 10))
         }
@@ -317,7 +317,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func createDeck(named name: String, in app: XCUIApplication) {
         showSidebar(in: app)
-        let newDeck = app.buttons["newDeckToolbar"]
+        let newDeck = app.buttons.identified("newDeckToolbar")
         XCTAssertTrue(newDeck.waitForExistence(timeout: 5))
         newDeck.click()
 
@@ -333,13 +333,14 @@ class NeoAnkiUITestCase: XCTestCase {
             textField.typeText(name)
         }
 
-        if app.buttons["confirmCreateDeck"].waitForExistence(timeout: 2) {
-            app.buttons["confirmCreateDeck"].click()
-        } else if container.buttons["Create"].exists {
-            container.buttons["Create"].click()
+        if app.buttons.identified("confirmCreateDeck").waitForExistence(timeout: 2) {
+            app.buttons.identified("confirmCreateDeck").click()
+        } else if container.buttons.identified("Create").exists {
+            container.buttons.identified("Create").click()
         }
 
-        let deckAppeared = app.descendants(matching: .any)["deckRow-\(name)"].waitForExistence(timeout: 10)
+        let deckAppeared = app.descendants(matching: .any).identified("deckRow-\(name)")
+            .waitForExistence(timeout: 10)
             || app.descendants(matching: .any).matching(
                 NSPredicate(format: "label CONTAINS[c] %@", name)
             ).firstMatch.waitForExistence(timeout: 5)
@@ -348,35 +349,35 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func openItemDetail(named title: String, in app: XCUIApplication) {
         returnToLibrary(in: app)
-        let row = app.descendants(matching: .any)["itemRow-\(title)"]
+        let row = app.descendants(matching: .any).identified("itemRow-\(title)")
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.doubleClick()
-        XCTAssertTrue(app.buttons["deleteItem"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 15))
     }
 
     func startStudy(in app: XCUIApplication) {
-        let studyButton = app.buttons["studyButton"]
+        let studyButton = app.buttons.identified("studyButton")
         XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
         XCTAssertTrue(studyButton.isEnabled)
         studyButton.click()
-        XCTAssertTrue(app.buttons["primaryStudyAction"].waitForExistence(timeout: 5)
-            || app.buttons["studySessionDone"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 5)
+            || app.buttons.identified("studySessionDone").waitForExistence(timeout: 2))
     }
 
     func revealAndGrade(_ gradeID: String, in app: XCUIApplication) {
-        if app.buttons["primaryStudyAction"].waitForExistence(timeout: 2) {
-            app.buttons["primaryStudyAction"].click()
+        if app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 2) {
+            app.buttons.identified("primaryStudyAction").click()
         }
-        let gradeButton = app.buttons[gradeID]
+        let gradeButton = app.buttons.identified(gradeID)
         XCTAssertTrue(gradeButton.waitForExistence(timeout: 5))
         gradeButton.click()
     }
 
     func finishStudySession(in app: XCUIApplication) {
-        if app.buttons["studySessionDone"].waitForExistence(timeout: 5) {
-            app.buttons["studySessionDone"].click()
-        } else if app.buttons["studyBackToItems"].waitForExistence(timeout: 2) {
-            app.buttons["studyBackToItems"].click()
+        if app.buttons.identified("studySessionDone").waitForExistence(timeout: 5) {
+            app.buttons.identified("studySessionDone").click()
+        } else if app.buttons.identified("studyBackToItems").waitForExistence(timeout: 2) {
+            app.buttons.identified("studyBackToItems").click()
         }
         waitForLibraryReady(in: app)
     }
@@ -387,7 +388,7 @@ class NeoAnkiUITestCase: XCTestCase {
         in app: XCUIApplication,
         timeout: TimeInterval = 5
     ) {
-        let mirror = app.descendants(matching: .any)["field-\(fieldName)-spans"]
+        let mirror = app.descendants(matching: .any).identified("field-\(fieldName)-spans")
         XCTAssertTrue(mirror.waitForExistence(timeout: 2))
 
         let deadline = Date().addingTimeInterval(timeout)
@@ -427,7 +428,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
         replaceAndSelectText(text, in: editorField)
 
-        let formatButton = app.buttons["field-\(fieldName)-\(buttonID)"]
+        let formatButton = app.buttons.identified("field-\(fieldName)-\(buttonID)")
         XCTAssertTrue(formatButton.waitForExistence(timeout: 2), "Missing format button \(buttonID) for \(fieldName)")
         formatButton.click()
 
@@ -445,7 +446,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func chooseImportFile(_ url: URL, in app: XCUIApplication) {
         app.menuBarItems["File"].click()
-        let importItem = app.menuItems["Import…"]
+        let importItem = app.menuItems.identified("Import…")
         XCTAssertTrue(importItem.waitForExistence(timeout: 3))
         importItem.click()
 
@@ -455,5 +456,11 @@ class NeoAnkiUITestCase: XCTestCase {
         pathField.typeText(url.path)
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+    }
+}
+
+extension XCUIElementQuery {
+    func identified(_ identifier: String) -> XCUIElement {
+        matching(identifier: identifier).firstMatch
     }
 }
