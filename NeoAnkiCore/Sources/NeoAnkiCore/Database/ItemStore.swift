@@ -32,6 +32,18 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     }
 }
 
+/// The durable result of a review. The log identifier is the only supported
+/// target for a compensating revert.
+public struct ReviewSubmission: Sendable, Equatable {
+    public let memory: MemoryState
+    public let reviewLogID: UUID
+
+    public init(memory: MemoryState, reviewLogID: UUID) {
+        self.memory = memory
+        self.reviewLogID = reviewLogID
+    }
+}
+
 /// Persistence for items and generated cards.
 public actor ItemStore {
     private let database: SQLiteDatabase
@@ -117,11 +129,11 @@ public actor ItemStore {
     public func updateItemType(_ itemType: ItemType, now: Date = .now) async throws -> ItemType {
         let previous = try await database.fetchItemType(id: itemType.id)
         try ItemTypeValidation.validate(itemType)
-        try await database.updateItemType(itemType)
-
-        if let previous {
-            try await syncCards(from: previous, to: itemType, now: now)
-        }
+        try await database.updateItemTypeAndSyncCards(
+            previous: previous,
+            updated: itemType,
+            now: now
+        )
 
         return itemType
     }
@@ -369,10 +381,27 @@ public actor ItemStore {
         now: Date = .now,
         durationMs: Int = 0
     ) async throws -> MemoryState {
+        try await submitReviewWithReceipt(
+            cardID: cardID,
+            rating: rating,
+            now: now,
+            durationMs: durationMs
+        ).memory
+    }
+
+    /// Applies a review and returns the exact append-only log entry that can be
+    /// compensated later.
+    public func submitReviewWithReceipt(
+        cardID: UUID,
+        rating: ReviewRating,
+        now: Date = .now,
+        durationMs: Int = 0
+    ) async throws -> ReviewSubmission {
         guard var card = try await database.fetchCard(id: cardID) else {
             throw DatabaseError.cardNotFound(cardID)
         }
 
+        let memoryBefore = card.memory
         let phaseBefore = card.memory.phase
         let elapsedDays: Double
         if let lastReview = card.memory.lastReview {
@@ -399,17 +428,31 @@ public actor ItemStore {
             durationMs: durationMs
         )
 
-        try await database.persistReview(cardID: card.id, memory: nextMemory, log: log)
+        try await database.persistReview(
+            cardID: card.id,
+            memoryBefore: memoryBefore,
+            memoryAfter: nextMemory,
+            log: log
+        )
 
-        return nextMemory
+        return ReviewSubmission(memory: nextMemory, reviewLogID: log.id)
     }
 
-    public func revertReview(cardID: UUID, restoring memory: MemoryState) async throws {
-        try await database.revertReview(cardID: cardID, restoring: memory)
+    public func revertReview(reviewLogID: UUID, now: Date = .now) async throws {
+        try await database.revertReview(reviewLogID: reviewLogID, revertedAt: now)
     }
 
+    /// Active review count retained for source compatibility with statistics callers.
     public func reviewLogCount(for cardID: UUID) async throws -> Int {
-        try await database.countReviewLogs(for: cardID)
+        try await activeReviewLogCount(for: cardID)
+    }
+
+    public func rawReviewLogCount(for cardID: UUID) async throws -> Int {
+        try await database.countRawReviewLogs(for: cardID)
+    }
+
+    public func activeReviewLogCount(for cardID: UUID) async throws -> Int {
+        try await database.countActiveReviewLogs(for: cardID)
     }
 
     /// Imports rows parsed by a native adapter into an existing item type.
@@ -438,15 +481,21 @@ public actor ItemStore {
             throw ImportError.invalidFormat("Item type name mismatch.")
         }
 
-        var importedCount = 0
+        var entries: [(item: Item, cards: [Card])] = []
+        entries.reserveCapacity(payload.rows.count)
+
         for row in payload.rows {
             let fields = try await mapImportRow(row, to: resolvedType, context: context)
             let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
-            _ = try await createItem(item, now: now)
-            importedCount += 1
+            try validate(item, against: resolvedType)
+            entries.append((
+                item: item,
+                cards: CardGenerator.cards(for: item, type: resolvedType, now: now)
+            ))
         }
 
-        return importedCount
+        try await database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
+        return entries.count
     }
 
     private func mapImportRow(
@@ -649,52 +698,4 @@ public actor ItemStore {
         }
     }
 
-    private func syncCards(from previous: ItemType, to updated: ItemType, now: Date) async throws {
-        let previousTemplateIDs = Set(previous.templates.map(\.id))
-        let updatedTemplateIDs = Set(updated.templates.map(\.id))
-
-        let added = updatedTemplateIDs.subtracting(previousTemplateIDs)
-        let removed = previousTemplateIDs.subtracting(updatedTemplateIDs)
-        let kept = previousTemplateIDs.intersection(updatedTemplateIDs)
-
-        let items = try await database.fetchItems(itemTypeID: updated.id)
-
-        for entry in items {
-            let item = entry.item
-
-            for templateID in removed {
-                try await database.deleteCards(itemID: item.id, templateID: templateID)
-            }
-
-            let existingCards = try await database.fetchCards(for: item.id)
-            let existingTemplateIDs = Set(existingCards.map(\.templateID))
-
-            for template in updated.templates where added.contains(template.id) {
-                guard CardGenerator.shouldGenerate(template, for: item) else { continue }
-                guard !existingTemplateIDs.contains(template.id) else { continue }
-
-                let card = Card(
-                    itemID: item.id,
-                    templateID: template.id,
-                    skill: template.skill,
-                    memory: .new(due: now),
-                    deckID: item.deckID
-                )
-                try await database.insertCards([card])
-            }
-
-            for template in updated.templates where kept.contains(template.id) {
-                guard
-                    let previousTemplate = previous.templates.first(where: { $0.id == template.id }),
-                    previousTemplate.skill != template.skill
-                else {
-                    continue
-                }
-
-                for card in existingCards where card.templateID == template.id {
-                    try await database.updateCardSkill(card.id, skill: template.skill)
-                }
-            }
-        }
-    }
 }

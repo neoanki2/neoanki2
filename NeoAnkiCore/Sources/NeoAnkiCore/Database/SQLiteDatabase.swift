@@ -15,6 +15,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case invalidDeck(String)
     case encodingFailed
     case decodingFailed
+    case unsupportedSchemaVersion(Int)
+    case schemaVersionReadFailed
 
     public var errorDescription: String? {
         switch self {
@@ -29,7 +31,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
         case let .cardNotFound(id):
             return "Card not found: \(id.uuidString)"
         case let .reviewLogNotFound(id):
-            return "No review log found for card: \(id.uuidString)"
+            return "Review log not found: \(id.uuidString)"
         case let .templateNotFound(id):
             return "Template not found: \(id.uuidString)"
         case let .deckNotFound(id):
@@ -44,6 +46,10 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "Could not encode data for storage."
         case .decodingFailed:
             return "Could not decode stored data."
+        case let .unsupportedSchemaVersion(version):
+            return "Database schema version \(version) is newer than this app supports."
+        case .schemaVersionReadFailed:
+            return "Could not read the database schema version."
         }
     }
 }
@@ -84,6 +90,10 @@ actor SQLiteDatabase {
     func migrate() throws {
         let current = try schemaVersion()
 
+        guard current <= Schema.version else {
+            throw DatabaseError.unsupportedSchemaVersion(current)
+        }
+
         if current == 0 {
             try inTransaction {
                 for sql in Schema.createStatements {
@@ -119,6 +129,12 @@ actor SQLiteDatabase {
 
             if current < 5 {
                 for sql in Schema.migrationV5Statements {
+                    try execute(sql)
+                }
+            }
+
+            if current < 6 {
+                for sql in Schema.migrationV6Statements {
                     try execute(sql)
                 }
             }
@@ -219,6 +235,19 @@ actor SQLiteDatabase {
                 .blob(data),
             ]
         )
+    }
+
+    func updateItemTypeAndSyncCards(
+        previous: ItemType?,
+        updated: ItemType,
+        now: Date
+    ) throws {
+        try inTransaction {
+            try updateItemType(updated)
+            if let previous {
+                try syncCards(from: previous, to: updated, now: now)
+            }
+        }
     }
 
     func fetchAllItemTypes() throws -> [ItemType] {
@@ -515,6 +544,19 @@ actor SQLiteDatabase {
         }
     }
 
+    func insertItemsWithCards(
+        _ entries: [(item: Item, cards: [Card])],
+        createdAt: Date,
+        updatedAt: Date
+    ) throws {
+        try inTransaction {
+            for entry in entries {
+                try insertItem(entry.item, createdAt: createdAt, updatedAt: updatedAt)
+                try insertCards(entry.cards)
+            }
+        }
+    }
+
     func insertItem(_ item: Item, createdAt: Date, updatedAt: Date) throws {
         let fields = try encode(item.fields)
         let tags = try encode(item.tags)
@@ -618,54 +660,109 @@ actor SQLiteDatabase {
         )
     }
 
-    func insertReviewLog(_ log: ReviewLog) throws {
+    func insertReviewLog(_ log: ReviewLog, memoryBefore: MemoryState) throws {
         let data = try encode(log)
+        let memoryData = try encode(memoryBefore)
         try execute(
             """
-            INSERT INTO review_logs (id, card_id, reviewed_at, log)
-            VALUES (?, ?, ?, ?);
+            INSERT INTO review_logs (id, card_id, reviewed_at, log, memory_before)
+            VALUES (?, ?, ?, ?, ?);
             """,
             bindings: [
                 .text(log.id.uuidString),
                 .text(log.cardID.uuidString),
                 .double(log.reviewedAt.timeIntervalSince1970),
                 .blob(data),
+                .blob(memoryData),
             ]
         )
     }
 
-    func persistReview(cardID: UUID, memory: MemoryState, log: ReviewLog) throws {
+    func persistReview(
+        cardID: UUID,
+        memoryBefore: MemoryState,
+        memoryAfter: MemoryState,
+        log: ReviewLog
+    ) throws {
         try inTransaction {
-            try updateCardMemory(cardID, memory: memory)
-            try insertReviewLog(log)
+            try updateCardMemory(cardID, memory: memoryAfter)
+            try insertReviewLog(log, memoryBefore: memoryBefore)
         }
     }
 
-    func revertReview(cardID: UUID, restoring memory: MemoryState) throws {
+    func revertReview(reviewLogID: UUID, revertedAt: Date) throws {
         try inTransaction {
             let rows = try query(
                 """
-                SELECT id FROM review_logs
-                WHERE card_id = ?
-                ORDER BY reviewed_at DESC
+                SELECT review_logs.card_id, review_logs.memory_before
+                FROM review_logs
+                LEFT JOIN review_reverts
+                    ON review_reverts.review_log_id = review_logs.id
+                WHERE review_logs.id = ?
+                  AND review_reverts.id IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM review_logs AS newer
+                      LEFT JOIN review_reverts AS newer_revert
+                          ON newer_revert.review_log_id = newer.id
+                      WHERE newer.card_id = review_logs.card_id
+                        AND newer.rowid > review_logs.rowid
+                        AND newer_revert.id IS NULL
+                  )
                 LIMIT 1;
                 """,
-                bindings: [.text(cardID.uuidString)]
+                bindings: [.text(reviewLogID.uuidString)]
             )
-            guard let row = rows.first, let logID = row["id"] as? String else {
-                throw DatabaseError.reviewLogNotFound(cardID)
+            guard
+                let row = rows.first,
+                let cardIDText = row["card_id"] as? String,
+                let cardID = UUID(uuidString: cardIDText)
+            else {
+                throw DatabaseError.reviewLogNotFound(reviewLogID)
             }
+            guard let memoryData = row["memory_before"] as? Data else {
+                throw DatabaseError.queryFailed(
+                    "This legacy review does not contain restorable memory."
+                )
+            }
+            let memory = try decode(MemoryState.self, from: memoryData)
+            guard try fetchCard(id: cardID) != nil else {
+                throw DatabaseError.cardNotFound(cardID)
+            }
+
             try execute(
-                "DELETE FROM review_logs WHERE id = ?;",
-                bindings: [.text(logID)]
+                """
+                INSERT INTO review_reverts (id, review_log_id, reverted_at)
+                VALUES (?, ?, ?);
+                """,
+                bindings: [
+                    .text(UUID().uuidString),
+                    .text(reviewLogID.uuidString),
+                    .double(revertedAt.timeIntervalSince1970),
+                ]
             )
             try updateCardMemory(cardID, memory: memory)
         }
     }
 
-    func countReviewLogs(for cardID: UUID) throws -> Int {
+    func countRawReviewLogs(for cardID: UUID) throws -> Int {
         let rows = try query(
             "SELECT COUNT(*) AS count FROM review_logs WHERE card_id = ?;",
+            bindings: [.text(cardID.uuidString)]
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func countActiveReviewLogs(for cardID: UUID) throws -> Int {
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM review_logs
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_logs.card_id = ? AND review_reverts.id IS NULL;
+            """,
             bindings: [.text(cardID.uuidString)]
         )
         guard let count = rows.first?["count"] as? Int64 else { return 0 }
@@ -784,6 +881,54 @@ actor SQLiteDatabase {
 
     // MARK: - Private
 
+    private func syncCards(from previous: ItemType, to updated: ItemType, now: Date) throws {
+        let previousTemplateIDs = Set(previous.templates.map(\.id))
+        let updatedTemplateIDs = Set(updated.templates.map(\.id))
+        let added = updatedTemplateIDs.subtracting(previousTemplateIDs)
+        let removed = previousTemplateIDs.subtracting(updatedTemplateIDs)
+        let kept = previousTemplateIDs.intersection(updatedTemplateIDs)
+        let items = try fetchItems(itemTypeID: updated.id)
+
+        for entry in items {
+            let item = entry.item
+
+            for templateID in removed {
+                try deleteCards(itemID: item.id, templateID: templateID)
+            }
+
+            let existingCards = try fetchCards(for: item.id)
+            let existingTemplateIDs = Set(existingCards.map(\.templateID))
+
+            for template in updated.templates where added.contains(template.id) {
+                guard CardGenerator.shouldGenerate(template, for: item) else { continue }
+                guard !existingTemplateIDs.contains(template.id) else { continue }
+
+                try insertCards([
+                    Card(
+                        itemID: item.id,
+                        templateID: template.id,
+                        skill: template.skill,
+                        memory: .new(due: now),
+                        deckID: item.deckID
+                    ),
+                ])
+            }
+
+            for template in updated.templates where kept.contains(template.id) {
+                guard
+                    let previousTemplate = previous.templates.first(where: { $0.id == template.id }),
+                    previousTemplate.skill != template.skill
+                else {
+                    continue
+                }
+
+                for card in existingCards where card.templateID == template.id {
+                    try updateCardSkill(card.id, skill: template.skill)
+                }
+            }
+        }
+    }
+
     /// Renames legacy `note_types` / `notes` tables from early builds to `item_types` / `items`.
     private func migrateNotesToItemsSchemaIfNeeded() throws {
         guard try tableExists("note_types"), !(try tableExists("item_types")) else { return }
@@ -895,11 +1040,14 @@ actor SQLiteDatabase {
 
     private func schemaVersion() throws -> Int {
         do {
+            guard try tableExists("schema_version") else { return 0 }
             let rows = try query("SELECT version FROM schema_version LIMIT 1;")
-            guard let version = rows.first?["version"] as? Int64 else { return 0 }
+            guard let version = rows.first?["version"] as? Int64 else {
+                throw DatabaseError.schemaVersionReadFailed
+            }
             return Int(version)
-        } catch DatabaseError.queryFailed {
-            return 0
+        } catch {
+            throw DatabaseError.schemaVersionReadFailed
         }
     }
 

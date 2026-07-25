@@ -312,7 +312,8 @@ private func makeInteractionModel(
     #expect(model.canUndoLastGrade == false)
     #expect(model.isAnswerRevealed)
     #expect(model.progressLabel == "Card 1 of 2")
-    #expect(try await store.reviewLogCount(for: model.queue[0].id) == 0)
+    #expect(try await store.rawReviewLogCount(for: model.queue[0].id) == 1)
+    #expect(try await store.activeReviewLogCount(for: model.queue[0].id) == 0)
 }
 
 @Test @MainActor func studyModelRejectsConcurrentGrades() async throws {

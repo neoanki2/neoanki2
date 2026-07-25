@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 5
+    static let version = 6
 
     static let createStatements: [String] = [
         """
@@ -48,9 +48,17 @@ enum Schema {
         """
         CREATE TABLE IF NOT EXISTS review_logs (
             id TEXT PRIMARY KEY NOT NULL,
-            card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            card_id TEXT NOT NULL,
             reviewed_at REAL NOT NULL,
-            log BLOB NOT NULL
+            log BLOB NOT NULL,
+            memory_before BLOB NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS review_reverts (
+            id TEXT PRIMARY KEY NOT NULL,
+            review_log_id TEXT NOT NULL UNIQUE REFERENCES review_logs(id),
+            reverted_at REAL NOT NULL
         );
         """,
         """
@@ -71,6 +79,9 @@ enum Schema {
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_review_reverts_log_id ON review_reverts(review_log_id);
         """,
         """
         CREATE TABLE IF NOT EXISTS media_assets (
@@ -96,6 +107,46 @@ enum Schema {
         INSERT INTO app_metadata (key, value)
         VALUES ('starter_item_types_seeded', '1')
         ON CONFLICT(key) DO NOTHING;
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 5.
+    ///
+    /// Rebuilding `review_logs` deliberately removes its cascading card foreign
+    /// key. Review history must survive item/card deletion, while compensating
+    /// reversals are recorded separately instead of mutating or deleting logs.
+    static let migrationV6Statements: [String] = [
+        """
+        CREATE TABLE review_logs_v5 (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL,
+            reviewed_at REAL NOT NULL,
+            log BLOB NOT NULL,
+            memory_before BLOB
+        );
+        """,
+        """
+        INSERT INTO review_logs_v5 (id, card_id, reviewed_at, log)
+        SELECT id, card_id, reviewed_at, log FROM review_logs;
+        """,
+        """
+        DROP TABLE review_logs;
+        """,
+        """
+        ALTER TABLE review_logs_v5 RENAME TO review_logs;
+        """,
+        """
+        CREATE INDEX idx_review_logs_card_id ON review_logs(card_id);
+        """,
+        """
+        CREATE TABLE review_reverts (
+            id TEXT PRIMARY KEY NOT NULL,
+            review_log_id TEXT NOT NULL UNIQUE REFERENCES review_logs(id),
+            reverted_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX idx_review_reverts_log_id ON review_reverts(review_log_id);
         """,
     ]
 

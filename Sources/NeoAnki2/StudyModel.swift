@@ -2,8 +2,7 @@ import Foundation
 import NeoAnkiCore
 
 struct PendingGradeUndo: Equatable, Sendable {
-    let cardID: UUID
-    let previousMemory: MemoryState
+    let reviewLogID: UUID
     let previousIndex: Int
     let rating: ReviewRating
 }
@@ -192,14 +191,15 @@ final class StudyModel {
         isGrading = true
         defer { isGrading = false }
 
-        let previousMemory = card.card.memory
         let previousIndex = index
 
         do {
-            _ = try await store.submitReview(cardID: card.id, rating: rating)
-            pendingGradeUndo = PendingGradeUndo(
+            let submission = try await store.submitReviewWithReceipt(
                 cardID: card.id,
-                previousMemory: previousMemory,
+                rating: rating
+            )
+            pendingGradeUndo = PendingGradeUndo(
+                reviewLogID: submission.reviewLogID,
                 previousIndex: previousIndex,
                 rating: rating
             )
@@ -226,7 +226,7 @@ final class StudyModel {
         defer { isGrading = false }
 
         do {
-            try await store.revertReview(cardID: undo.cardID, restoring: undo.previousMemory)
+            try await store.revertReview(reviewLogID: undo.reviewLogID)
             index = undo.previousIndex
             isFinished = false
             isAnswerRevealed = true
