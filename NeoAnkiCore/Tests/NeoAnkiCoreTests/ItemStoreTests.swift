@@ -164,6 +164,29 @@ private func makeStore() async throws -> ItemStore {
     }
 }
 
+@Test func fetchItemReturnsItemAndType() async throws {
+    let store = try await makeStore()
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+        ]
+    )
+    _ = try await store.createItem(item)
+
+    let fetched = try await store.fetchItem(id: item.id)
+    #expect(fetched?.item.id == item.id)
+    #expect(fetched?.itemType.id == itemType.id)
+    #expect(fetched?.item.value(for: BuiltInItemTypes.frontFieldID) == .text("Question"))
+}
+
+@Test func fetchItemReturnsNilForMissingID() async throws {
+    let store = try await makeStore()
+    #expect(try await store.fetchItem(id: UUID()) == nil)
+}
+
 @Test func migratesLegacyNoteSchema() async throws {
     let databaseURL = tempDatabaseURL()
     try createLegacyNoteDatabase(at: databaseURL)
