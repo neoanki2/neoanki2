@@ -69,6 +69,76 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(reloaded.templates.first?.name == "Front to Back")
 }
 
+@Test @MainActor func newTemplateDraftKeepsAdvancedSettingsCollapsedWithoutChangingExistingIntent() async throws {
+    let (model, _) = try await makeTemplatesModel()
+    await model.load()
+    let itemType = try #require(model.selectedItemType)
+    let template = try #require(itemType.templates.first)
+
+    let newDraft = TemplateDraft()
+    #expect(newDraft.hasAdvancedSettings == false)
+
+    let existingDraft = TemplateDraft(template: template, in: itemType)
+    #expect(existingDraft.usesAutomaticSkill == false)
+    #expect(existingDraft.hasAdvancedSettings)
+}
+
+@Test func existingTemplateDraftPreservesManualSkillWhenFieldsChange() throws {
+    let cue = FieldDef(name: "Cue", type: .text)
+    let response = FieldDef(name: "Response", type: .text)
+    let image = FieldDef(name: "Image", type: .image)
+    let originalSkill = Skill(input: .text, output: .text, operation: .recognize)
+    let template = Template(
+        name: "Manual",
+        prompt: Side(slots: [Slot(source: .field(cue.id))]),
+        answer: Side(slots: [Slot(source: .field(response.id))]),
+        interaction: .reveal,
+        skill: originalSkill
+    )
+    let itemType = ItemType(
+        name: "Mixed",
+        fields: [cue, response, image],
+        templates: [template]
+    )
+
+    var draft = TemplateDraft(template: template, in: itemType)
+    draft.promptSlots[0].fieldID = image.id
+    let updated = try draft.template(id: template.id, in: itemType)
+
+    #expect(draft.usesAutomaticSkill == false)
+    #expect(updated.skill == originalSkill)
+}
+
+@Test func templateDraftAdvancedSettingsCoverEveryDisclosureTrigger() {
+    let fieldID = UUID()
+    let baseline = TemplateDraft(
+        name: "Baseline",
+        promptFieldID: fieldID,
+        answerFieldID: fieldID
+    )
+    #expect(baseline.hasAdvancedSettings == false)
+
+    var manualSkill = baseline
+    manualSkill.usesAutomaticSkill = false
+    #expect(manualSkill.hasAdvancedSettings)
+
+    var conditional = baseline
+    conditional.generateWhen = .fieldNotEmpty(fieldID)
+    #expect(conditional.hasAdvancedSettings)
+
+    var literal = baseline
+    literal.promptSlots[0] = SlotDraft(sourceKind: .literal, literal: "Context")
+    #expect(literal.hasAdvancedSettings)
+
+    var concealed = baseline
+    concealed.promptSlots[0].reveal = .blurred
+    #expect(concealed.hasAdvancedSettings)
+
+    var mediaBehavior = baseline
+    mediaBehavior.promptSlots[0].media = .playOnTap
+    #expect(mediaBehavior.hasAdvancedSettings)
+}
+
 @Test @MainActor func templatesModelSurfacesValidationErrors() async throws {
     let (model, _) = try await makeTemplatesModel()
     await model.load()

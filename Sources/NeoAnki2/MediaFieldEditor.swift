@@ -3,6 +3,16 @@ import NeoAnkiCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum MediaFieldPolicy {
+    static func requiresDescription(kind: MediaKind, hasMedia: Bool) -> Bool {
+        hasMedia && [.image, .gif].contains(kind)
+    }
+
+    static func descriptionLabel(for kind: MediaKind) -> String {
+        [.image, .gif].contains(kind) ? "Image description (required)" : "Description (optional)"
+    }
+}
+
 struct MediaFieldEditor: View {
     let label: String
     let kind: MediaKind
@@ -54,6 +64,7 @@ struct MediaFieldEditor: View {
                 if media != nil {
                     Button("Remove", role: .destructive) {
                         media = nil
+                        altText = ""
                         fileName = ""
                     }
                     .accessibilityIdentifier("\(accessibilityIdentifier)-removeFile")
@@ -69,8 +80,18 @@ struct MediaFieldEditor: View {
                 }
             }
 
-            TextField("Alt text (optional)", text: $altText)
+            TextField(descriptionLabel, text: $altText)
                 .accessibilityIdentifier("\(accessibilityIdentifier)-altText")
+
+            if requiresDescription, altText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Label(
+                    "Add a short description so the image is understandable with VoiceOver.",
+                    systemImage: "accessibility"
+                )
+                .font(DesignSystem.Typography.uiHint)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("\(accessibilityIdentifier)-descriptionRequired")
+            }
 
             if let errorMessage {
                 ErrorBanner(message: errorMessage)
@@ -86,6 +107,14 @@ struct MediaFieldEditor: View {
         case .gif: "photo.stack"
         case .video: "film"
         }
+    }
+
+    private var requiresDescription: Bool {
+        MediaFieldPolicy.requiresDescription(kind: kind, hasMedia: media != nil)
+    }
+
+    private var descriptionLabel: String {
+        MediaFieldPolicy.descriptionLabel(for: kind)
     }
 
     private func chooseFile() {
@@ -148,6 +177,8 @@ struct MediaPreviewView: View {
 
     @State private var resolvedURL: URL?
     @State private var resolutionError: String?
+    @State private var loadedImage: NSImage?
+    @State private var imageLoadFailed = false
 
     var body: some View {
         Group {
@@ -160,11 +191,27 @@ struct MediaPreviewView: View {
         .task(id: ref.id) {
             resolvedURL = nil
             resolutionError = nil
+            loadedImage = nil
+            imageLoadFailed = false
             do {
-                resolvedURL = try await store.resolve(ref)
+                let url = try await store.resolve(ref)
+                guard !Task.isCancelled else { return }
+                resolvedURL = url
             } catch {
+                guard !Task.isCancelled else { return }
                 resolutionError = UserFacingError.message(from: error)
             }
+        }
+        .task(id: resolvedURL) {
+            guard let resolvedURL, [.image, .gif].contains(ref.kind) else { return }
+            let image = await MediaImageLoader.shared.image(
+                for: resolvedURL,
+                kind: ref.kind,
+                maxPixelSize: 640
+            )
+            guard !Task.isCancelled else { return }
+            loadedImage = image
+            imageLoadFailed = image == nil
         }
     }
 
@@ -175,12 +222,16 @@ struct MediaPreviewView: View {
             Label(ref.altText ?? "Audio clip", systemImage: "waveform")
                 .font(DesignSystem.Typography.uiSecondary)
         case .image, .gif:
-            if let resolvedURL, let image = NSImage(contentsOf: resolvedURL) {
+            if let image = loadedImage {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 160)
                     .accessibilityLabel(ref.altText ?? "Image")
+            } else if imageLoadFailed {
+                Label("Image preview unavailable", systemImage: "photo.badge.exclamationmark")
+                    .font(DesignSystem.Typography.uiSecondary)
+                    .foregroundStyle(.secondary)
             } else {
                 ProgressView()
                     .accessibilityLabel("Loading image preview")

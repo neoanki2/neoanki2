@@ -70,6 +70,71 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons["deleteItem"].exists)
     }
 
+    func testEditItemFromDetailUpdatesLibraryAndPreview() throws {
+        let app = launchApp()
+        addBasicItem(front: "France", back: "Paris", in: app)
+        openItemDetail(named: "France", in: app)
+
+        app.buttons["editItem"].click()
+        enterText("Japan", into: field(named: "Front", in: app), app: app)
+        enterText("Tokyo", into: field(named: "Back", in: app), app: app)
+        let save = app.buttons["saveEditItem"]
+        XCTAssertTrue(save.isEnabled)
+        save.click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", "Japan", "Japan")
+        ).firstMatch.waitForExistence(timeout: 5))
+        returnToLibrary(in: app)
+        waitForItem(named: "Japan", in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-France"].exists)
+    }
+
+    func testDirtyItemEditCanKeepEditingThenDiscard() throws {
+        let app = launchApp()
+        addBasicItem(front: "Original", back: "Answer", in: app)
+        openItemDetail(named: "Original", in: app)
+
+        app.buttons["editItem"].click()
+        enterText("Changed", into: field(named: "Front", in: app), app: app)
+        app.buttons["cancelEditItem"].click()
+        XCTAssertTrue(app.buttons["cancelDiscardItem"].waitForExistence(timeout: 3))
+        app.buttons["cancelDiscardItem"].click()
+        XCTAssertTrue(app.buttons["saveEditItem"].exists)
+
+        app.buttons["cancelEditItem"].click()
+        app.buttons["confirmDiscardItem"].click()
+        XCTAssertTrue(app.buttons["deleteItem"].waitForExistence(timeout: 5))
+        returnToLibrary(in: app)
+        waitForItem(named: "Original", in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Changed"].exists)
+    }
+
+    func testImageEditRequiresDescriptionBeforeSaving() throws {
+        let app = launchApp(scenario: "image-missing-description")
+        waitForItem(named: "Image", in: app)
+        openItemDetail(named: "Image", in: app)
+
+        app.buttons["editItem"].click()
+        let save = app.buttons["saveEditItem"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["field-Image-descriptionRequired"]
+                .waitForExistence(timeout: 3)
+        )
+
+        enterText(
+            "Map showing France",
+            into: app.textFields["field-Image-altText"],
+            app: app
+        )
+        XCTAssertTrue(save.isEnabled)
+        save.click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+    }
+
     func testDeleteItemFromDetail() throws {
         let app = launchApp()
         addBasicItem(front: "Remove", back: "Me", in: app)

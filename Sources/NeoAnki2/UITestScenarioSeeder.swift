@@ -23,6 +23,8 @@ enum UITestScenarioSeeder {
             try await seedCloze(store: store)
         case "scheduling-history":
             try await seedSchedulingHistory(store: store)
+        case "image-missing-description":
+            try await seedImageMissingDescription(store: store)
         default:
             break
         }
@@ -106,5 +108,40 @@ enum UITestScenarioSeeder {
                 durationMs: 1_000
             )
         }
+    }
+
+    private static func seedImageMissingDescription(store: ItemStore) async throws {
+        let image = FieldDef(name: "Image", type: .image, isRequired: true)
+        let caption = FieldDef(name: "Caption", type: .text, isRequired: true)
+        let template = Template(
+            name: "Recognize",
+            prompt: Side(slots: [Slot(source: .field(image.id))]),
+            answer: Side(slots: [Slot(source: .field(caption.id))]),
+            interaction: .reveal,
+            skill: Skill(input: .image, output: .text, operation: .recognize)
+        )
+        let itemType = ItemType(
+            name: "UI Image",
+            fields: [image, caption],
+            templates: [template]
+        )
+        _ = try await store.createItemType(itemType)
+        guard let mediaStore = await store.media,
+              let bytes = Data(base64Encoded:
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+              )
+        else {
+            return
+        }
+        let ref = try await mediaStore.ingest(data: bytes, kind: .image, fileExtension: "png")
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: image.id, value: .media(ref)),
+                    FieldValue(fieldID: caption.id, value: .text("A diagram")),
+                ]
+            )
+        )
     }
 }

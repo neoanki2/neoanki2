@@ -1,6 +1,11 @@
 import Foundation
 import NeoAnkiCore
 
+private enum ItemEditingError: Error {
+    case missingItem
+    case missingMediaDescription(String)
+}
+
 @MainActor
 @Observable
 final class ItemsModel {
@@ -68,23 +73,14 @@ final class ItemsModel {
         let resolvedDeckID = deckID ?? addItemDeckID
 
         do {
-            var fields: [FieldValue] = []
-            for field in itemType.fields {
-                let value = try contentValue(
-                    for: field,
-                    fieldSpans: fieldSpans,
-                    fieldText: fieldText,
-                    fieldMedia: fieldMedia,
-                    fieldMediaAltText: fieldMediaAltText,
-                    fieldClozeBlanks: fieldClozeBlanks
-                )
-                if value.isEmpty, field.isRequired {
-                    throw DatabaseError.requiredFieldEmpty(field.name)
-                }
-                if !value.isEmpty {
-                    fields.append(FieldValue(fieldID: field.id, value: value))
-                }
-            }
+            let fields = try makeFields(
+                for: itemType,
+                fieldSpans: fieldSpans,
+                fieldText: fieldText,
+                fieldMedia: fieldMedia,
+                fieldMediaAltText: fieldMediaAltText,
+                fieldClozeBlanks: fieldClozeBlanks
+            )
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
             let saved = try await store.createItem(item)
@@ -94,10 +90,94 @@ final class ItemsModel {
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
             return false
+        } catch ItemEditingError.missingMediaDescription(let field) {
+            errorMessage = "Add a description for \(field) so it works with VoiceOver."
+            return false
         } catch {
             errorMessage = UserFacingError.message(from: error)
             return false
         }
+    }
+
+    func updateItem(
+        id: UUID,
+        fieldSpans: [UUID: [Span]],
+        fieldText: [UUID: String] = [:],
+        fieldMedia: [UUID: MediaRef] = [:],
+        fieldMediaAltText: [UUID: String] = [:],
+        fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
+    ) async -> Bool {
+        errorMessage = nil
+
+        do {
+            guard let stored = try await store.fetchItem(id: id) else {
+                throw ItemEditingError.missingItem
+            }
+
+            var fields = try makeFields(
+                for: stored.itemType,
+                fieldSpans: fieldSpans,
+                fieldText: fieldText,
+                fieldMedia: fieldMedia,
+                fieldMediaAltText: fieldMediaAltText,
+                fieldClozeBlanks: fieldClozeBlanks
+            )
+            preserveTextLanguages(in: &fields, from: stored.item)
+
+            let item = Item(
+                id: stored.item.id,
+                itemTypeID: stored.item.itemTypeID,
+                fields: fields,
+                tags: stored.item.tags,
+                deckID: stored.item.deckID
+            )
+            let saved = try await store.updateItem(item)
+            if let index = items.firstIndex(where: { $0.id == saved.id }) {
+                items[index] = saved
+            }
+            dueCount = try await store.dueCount(scope: currentScopeFilter())
+            return true
+        } catch DatabaseError.requiredFieldEmpty(let field) {
+            errorMessage = "\(field) is required."
+            return false
+        } catch ItemEditingError.missingItem {
+            errorMessage = "This item no longer exists."
+            return false
+        } catch ItemEditingError.missingMediaDescription(let field) {
+            errorMessage = "Add a description for \(field) so it works with VoiceOver."
+            return false
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
+    private func makeFields(
+        for itemType: ItemType,
+        fieldSpans: [UUID: [Span]],
+        fieldText: [UUID: String],
+        fieldMedia: [UUID: MediaRef],
+        fieldMediaAltText: [UUID: String],
+        fieldClozeBlanks: [UUID: [ClozeSpan]]
+    ) throws -> [FieldValue] {
+        var fields: [FieldValue] = []
+        for field in itemType.fields {
+            let value = try contentValue(
+                for: field,
+                fieldSpans: fieldSpans,
+                fieldText: fieldText,
+                fieldMedia: fieldMedia,
+                fieldMediaAltText: fieldMediaAltText,
+                fieldClozeBlanks: fieldClozeBlanks
+            )
+            if value.isEmpty, field.isRequired {
+                throw DatabaseError.requiredFieldEmpty(field.name)
+            }
+            if !value.isEmpty {
+                fields.append(FieldValue(fieldID: field.id, value: value))
+            }
+        }
+        return fields
     }
 
     private func contentValue(
@@ -117,6 +197,9 @@ final class ItemsModel {
             if var ref = fieldMedia[field.id] {
                 let alt = fieldMediaAltText[field.id, default: ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines)
+                if [.image, .gif].contains(field.type), alt.isEmpty {
+                    throw ItemEditingError.missingMediaDescription(field.name)
+                }
                 ref.altText = alt.isEmpty ? nil : alt
                 return field.contentValue(from: ref)
             }
@@ -130,6 +213,16 @@ final class ItemsModel {
             }
             try ClozeValidation.validate(text: text, blanks: blanks)
             return field.contentValue(fromClozeText: text, blanks: blanks)
+        }
+    }
+
+    private func preserveTextLanguages(in fields: inout [FieldValue], from original: Item) {
+        for index in fields.indices {
+            guard case let .text(text, _) = fields[index].value,
+                  case let .text(_, language)? = original.value(for: fields[index].fieldID) else {
+                continue
+            }
+            fields[index].value = .text(text, lang: language)
         }
     }
 

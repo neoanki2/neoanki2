@@ -72,6 +72,7 @@ struct ItemDetailView: View {
     @State private var isLoading = true
     @State private var isDeleting = false
     @State private var isMovingDeck = false
+    @State private var isEditing = false
     @State private var showDeleteConfirm = false
     @State private var errorMessage: String?
 
@@ -133,12 +134,33 @@ struct ItemDetailView: View {
         .navigationTitle(summary.title)
         .toolbar {
             if item != nil, !isLoading {
+                ToolbarItem {
+                    Button("Edit", systemImage: "pencil") {
+                        isEditing = true
+                    }
+                    .accessibilityIdentifier("editItem")
+                }
                 ToolbarItem(placement: .destructiveAction) {
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         showDeleteConfirm = true
                     }
                     .disabled(isDeleting)
                     .accessibilityIdentifier("deleteItem")
+                }
+            }
+        }
+        .sheet(isPresented: $isEditing) {
+            if let item, let itemType {
+                NavigationStack {
+                    AddItemView(
+                        model: model,
+                        decksModel: decksModel,
+                        editingItem: item,
+                        editingItemType: itemType
+                    ) {
+                        isEditing = false
+                        Task { await load() }
+                    }
                 }
             }
         }

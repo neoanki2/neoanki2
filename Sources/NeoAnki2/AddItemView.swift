@@ -4,6 +4,8 @@ import SwiftUI
 struct AddItemView: View {
     @Bindable var model: ItemsModel
     @Bindable var decksModel: DecksModel
+    let editingItem: Item?
+    let editingItemType: ItemType?
     var onDismiss: () -> Void = {}
 
     @State private var fieldSpans: [UUID: [Span]] = [:]
@@ -13,13 +15,31 @@ struct AddItemView: View {
     @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var selectedDeckID: UUID?
     @State private var isSaving = false
+    @State private var didInitialize = false
+    @State private var initialSnapshot: ItemEditorSnapshot?
+    @State private var showDiscardConfirmation = false
     @FocusState private var focusedFieldID: UUID?
 
-    private var itemType: ItemType? { model.itemType }
+    init(
+        model: ItemsModel,
+        decksModel: DecksModel,
+        editingItem: Item? = nil,
+        editingItemType: ItemType? = nil,
+        onDismiss: @escaping () -> Void = {}
+    ) {
+        self.model = model
+        self.decksModel = decksModel
+        self.editingItem = editingItem
+        self.editingItemType = editingItemType
+        self.onDismiss = onDismiss
+    }
+
+    private var itemType: ItemType? { editingItemType ?? model.itemType }
+    private var isEditing: Bool { editingItem != nil }
 
     var body: some View {
         Form {
-            if model.itemTypes.count > 1 {
+            if !isEditing, model.itemTypes.count > 1 {
                 Section("Item Type") {
                     Picker("Type", selection: addItemTypeBinding) {
                         ForEach(model.itemTypes) { type in
@@ -30,7 +50,7 @@ struct AddItemView: View {
                 }
             }
 
-            if !decksModel.summaries.isEmpty || selectedDeckID != nil {
+            if !isEditing, !decksModel.summaries.isEmpty || selectedDeckID != nil {
                 Section("Deck") {
                     Picker("Deck", selection: $selectedDeckID) {
                         Text("Unassigned").tag(UUID?.none)
@@ -58,30 +78,43 @@ struct AddItemView: View {
         }
         .formStyle(.grouped)
         .neoAnkiFormTypography()
-        .navigationTitle("Add Item")
+        .navigationTitle(isEditing ? "Edit Item" : "Add Item")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { onDismiss() }
+                Button("Cancel") { requestDismissal() }
                     .keyboardShortcut(.cancelAction)
-                    .accessibilityIdentifier("cancelAddItem")
+                    .accessibilityIdentifier(isEditing ? "cancelEditItem" : "cancelAddItem")
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     Task { await save() }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(isSaving || !canSave)
-                .accessibilityIdentifier("saveAddItem")
+                .accessibilityIdentifier(isEditing ? "saveEditItem" : "saveAddItem")
             }
         }
         .frame(minWidth: 420, minHeight: 360)
         .onAppear {
-            selectedDeckID = model.addItemDeckID
-            resetFields()
+            initializeIfNeeded()
         }
         .onChange(of: model.addItemTypeID) { _, _ in
+            guard !isEditing else { return }
             resetFields()
+            initialSnapshot = currentSnapshot
+        }
+        .confirmationDialog(
+            "Discard item changes?",
+            isPresented: $showDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Discard Changes", role: .destructive) { onDismiss() }
+                .accessibilityIdentifier("confirmDiscardItem")
+            Button("Keep Editing", role: .cancel) {}
+                .accessibilityIdentifier("cancelDiscardItem")
+        } message: {
+            Text("Your unsaved changes will be lost.")
         }
     }
 
@@ -129,26 +162,11 @@ struct AddItemView: View {
     }
 
     private var canSave: Bool {
-        guard let itemType else { return false }
-        return itemType.fields.allSatisfy { field in
-            guard field.isRequired else { return true }
-            return !fieldPlainContent(for: field).isEmpty
-        }
+        ItemEditorState.canSave(currentSnapshot, itemType: itemType)
     }
 
     private func fieldLabel(_ field: FieldDef) -> String {
         field.isRequired ? field.name : "\(field.name) (optional)"
-    }
-
-    private func fieldPlainContent(for field: FieldDef) -> String {
-        switch field.type {
-        case .text, .richText:
-            return SpanFormatting.plainText(from: fieldSpans[field.id, default: []])
-        case .number, .cloze:
-            return fieldText[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
-        case .audio, .image, .gif, .video:
-            return fieldMedia[field.id] == nil ? "" : "media"
-        }
     }
 
     private func spanBinding(for fieldID: UUID) -> Binding<[Span]> {
@@ -200,33 +218,52 @@ struct AddItemView: View {
     }
 
     private func resetFields() {
-        guard let itemType else {
-            fieldSpans = [:]
-            fieldText = [:]
-            fieldMedia = [:]
-            fieldMediaAltText = [:]
-            fieldClozeBlanks = [:]
-            return
-        }
-
-        fieldSpans = Dictionary(
-            uniqueKeysWithValues: itemType.fields
-                .filter { $0.type == .text || $0.type == .richText }
-                .map { ($0.id, []) }
-        )
-        fieldText = Dictionary(
-            uniqueKeysWithValues: itemType.fields
-                .filter { $0.type == .number || $0.type == .cloze }
-                .map { ($0.id, "") }
-        )
-        fieldMedia = [:]
-        fieldMediaAltText = [:]
-        fieldClozeBlanks = Dictionary(
-            uniqueKeysWithValues: itemType.fields
-                .filter { $0.type == .cloze }
-                .map { ($0.id, []) }
-        )
+        apply(ItemEditorState.empty(for: itemType))
         focusFirstField()
+    }
+
+    private func initializeIfNeeded() {
+        guard !didInitialize else { return }
+        didInitialize = true
+        selectedDeckID = editingItem?.deckID ?? model.addItemDeckID
+        if let editingItem {
+            loadFields(from: editingItem)
+        } else {
+            resetFields()
+        }
+        initialSnapshot = currentSnapshot
+    }
+
+    private func loadFields(from item: Item) {
+        guard let itemType else { return }
+        apply(ItemEditorState.hydrated(from: item, itemType: itemType))
+        focusFirstField()
+    }
+
+    private func apply(_ snapshot: ItemEditorSnapshot) {
+        fieldSpans = snapshot.fieldSpans
+        fieldText = snapshot.fieldText
+        fieldMedia = snapshot.fieldMedia
+        fieldMediaAltText = snapshot.fieldMediaAltText
+        fieldClozeBlanks = snapshot.fieldClozeBlanks
+    }
+
+    private var currentSnapshot: ItemEditorSnapshot {
+        ItemEditorSnapshot(
+            fieldSpans: fieldSpans,
+            fieldText: fieldText,
+            fieldMedia: fieldMedia,
+            fieldMediaAltText: fieldMediaAltText,
+            fieldClozeBlanks: fieldClozeBlanks
+        )
+    }
+
+    private func requestDismissal() {
+        if isEditing, initialSnapshot != currentSnapshot {
+            showDiscardConfirmation = true
+        } else {
+            onDismiss()
+        }
     }
 
     private func focusFirstField() {
@@ -244,14 +281,27 @@ struct AddItemView: View {
         isSaving = true
         defer { isSaving = false }
 
-        if await model.addItem(
-            fieldSpans: fieldSpans,
-            fieldText: fieldText,
-            fieldMedia: fieldMedia,
-            fieldMediaAltText: fieldMediaAltText,
-            fieldClozeBlanks: fieldClozeBlanks,
-            deckID: selectedDeckID
-        ) {
+        let didSave: Bool
+        if let editingItem {
+            didSave = await model.updateItem(
+                id: editingItem.id,
+                fieldSpans: fieldSpans,
+                fieldText: fieldText,
+                fieldMedia: fieldMedia,
+                fieldMediaAltText: fieldMediaAltText,
+                fieldClozeBlanks: fieldClozeBlanks
+            )
+        } else {
+            didSave = await model.addItem(
+                fieldSpans: fieldSpans,
+                fieldText: fieldText,
+                fieldMedia: fieldMedia,
+                fieldMediaAltText: fieldMediaAltText,
+                fieldClozeBlanks: fieldClozeBlanks,
+                deckID: selectedDeckID
+            )
+        }
+        if didSave {
             onDismiss()
         }
     }
