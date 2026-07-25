@@ -53,7 +53,7 @@ private func makeItemType() -> (ItemType, front: FieldDef, back: FieldDef, audio
         FieldValue(fieldID: back.id, value: .text("A")),
         FieldValue(
             fieldID: audio.id,
-            value: .media(MediaRef(kind: .audio, url: URL(string: "file:///clip.m4a")!))
+            value: .media(MediaRef(kind: .audio, assetHash: String(repeating: "a", count: 64), fileExtension: "m4a"))
         ),
     ])
 
@@ -70,7 +70,7 @@ private func makeItemType() -> (ItemType, front: FieldDef, back: FieldDef, audio
         FieldValue(fieldID: back.id, value: .rich([Span("A", styles: [.bold])])),
         FieldValue(
             fieldID: audio.id,
-            value: .media(MediaRef(kind: .audio, url: URL(string: "file:///clip.m4a")!))
+            value: .media(MediaRef(kind: .audio, assetHash: String(repeating: "a", count: 64), fileExtension: "m4a"))
         ),
     ])
 

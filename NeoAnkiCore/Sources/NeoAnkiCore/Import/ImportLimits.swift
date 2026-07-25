@@ -3,7 +3,8 @@ import Foundation
 public enum ImportLimits {
     public static let maxPayloadBytes = 5_000_000
     public static let maxRows = 10_000
-    public static let maxFieldStringLength = 32_768
+    public static let maxFieldStringBytes = 32_768
+    public static let maxFieldStringLength = maxFieldStringBytes
 
     public static func validatePayloadSize(_ data: Data) throws {
         guard data.count <= maxPayloadBytes else {
@@ -18,8 +19,19 @@ public enum ImportLimits {
     }
 
     public static func validateFieldString(_ value: String, fieldName: String) throws {
-        guard value.count <= maxFieldStringLength else {
+        guard value.utf8.count <= maxFieldStringBytes else {
             throw ImportError.invalidFormat("Field \"\(fieldName)\" exceeds maximum length.")
+        }
+    }
+
+    public static func validateBase64EncodedSize(
+        _ value: String,
+        kind: MediaKind,
+        fieldName: String
+    ) throws {
+        let maxEncodedBytes = ((MediaValidation.maxBytes(for: kind) + 2) / 3) * 4
+        guard value.utf8.count <= maxEncodedBytes else {
+            throw ImportError.invalidFormat("Media in field \"\(fieldName)\" exceeds its size limit.")
         }
     }
 }

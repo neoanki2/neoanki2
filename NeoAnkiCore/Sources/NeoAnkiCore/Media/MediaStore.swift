@@ -7,10 +7,16 @@ public actor MediaStore {
 
     public init(rootDirectory: URL) throws {
         self.rootDirectory = rootDirectory
+        let mediaDirectory = rootDirectory.appendingPathComponent("media", isDirectory: true)
         try FileManager.default.createDirectory(
-            at: rootDirectory.appendingPathComponent("media", isDirectory: true),
+            at: mediaDirectory,
             withIntermediateDirectories: true
         )
+        let resolvedRoot = rootDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        let resolvedMedia = mediaDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        guard Self.isContained(resolvedMedia, in: resolvedRoot) else {
+            throw MediaError.sandboxViolation
+        }
     }
 
     public static func defaultRoot(near databaseURL: URL) -> URL {
@@ -28,11 +34,16 @@ public actor MediaStore {
             throw MediaError.invalidPath
         }
 
-        let data = try Data(contentsOf: resolved)
-        let ext = resolved.pathExtension.lowercased().isEmpty
+        let maxBytes = MediaValidation.maxBytes(for: kind)
+        let data = try readFile(at: resolved, kind: kind, maxBytes: maxBytes)
+        let claimedExtension = resolved.pathExtension.lowercased().isEmpty
             ? MediaValidation.defaultExtension(for: kind)
             : resolved.pathExtension.lowercased()
-        try MediaValidation.validate(data: data, kind: kind, fileExtension: ext)
+        let ext = try MediaValidation.validatedExtension(
+            data: data,
+            kind: kind,
+            fileExtension: claimedExtension
+        )
 
         let hash = Self.sha256Hex(data)
         let destination = mediaDirectory.appendingPathComponent("\(hash).\(ext)")
@@ -51,8 +62,11 @@ public actor MediaStore {
 
     /// Ingests raw data (e.g. import base64) into the sandbox.
     public func ingest(data: Data, kind: MediaKind, fileExtension: String, altText: String? = nil) throws -> MediaRef {
-        let ext = fileExtension.lowercased()
-        try MediaValidation.validate(data: data, kind: kind, fileExtension: ext)
+        let ext = try MediaValidation.validatedExtension(
+            data: data,
+            kind: kind,
+            fileExtension: fileExtension
+        )
 
         let hash = Self.sha256Hex(data)
         let destination = mediaDirectory.appendingPathComponent("\(hash).\(ext)")
@@ -71,13 +85,17 @@ public actor MediaStore {
 
     /// Resolves a ref to a file URL inside the sandbox. Rejects paths outside mediaDirectory.
     public func resolve(_ ref: MediaRef) throws -> URL {
-        if let legacy = ref.legacyURL {
-            return try resolveLegacyURL(legacy)
+        guard ref.isValidStoredReference else {
+            throw MediaError.sandboxViolation
         }
 
         let fileName = "\(ref.assetHash).\(ref.fileExtension)"
-        let url = mediaDirectory.appendingPathComponent(fileName).standardizedFileURL
-        guard url.path.hasPrefix(mediaDirectory.standardizedFileURL.path) else {
+        let base = mediaDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        let url = mediaDirectory
+            .appendingPathComponent(fileName)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard Self.isContained(url, in: base) else {
             throw MediaError.sandboxViolation
         }
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -86,12 +104,52 @@ public actor MediaStore {
         return url
     }
 
-    private func resolveLegacyURL(_ url: URL) throws -> URL {
-        let resolved = url.standardizedFileURL
-        guard resolved.isFileURL, FileManager.default.fileExists(atPath: resolved.path) else {
+    private func readFile(at url: URL, kind: MediaKind, maxBytes: Int) throws -> Data {
+        let attributes: [FileAttributeKey: Any]
+        do {
+            attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        } catch {
             throw MediaError.readFailed
         }
-        return resolved
+
+        guard attributes[.type] as? FileAttributeType == .typeRegular else {
+            throw MediaError.invalidPath
+        }
+        if let size = attributes[.size] as? NSNumber, size.uint64Value > UInt64(maxBytes) {
+            throw MediaError.fileTooLarge(kind, maxBytes: maxBytes)
+        }
+
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forReadingFrom: url)
+        } catch {
+            throw MediaError.readFailed
+        }
+        defer {
+            try? handle.close()
+        }
+
+        var data = Data()
+        data.reserveCapacity(min((attributes[.size] as? NSNumber)?.intValue ?? 0, maxBytes))
+        do {
+            while data.count <= maxBytes {
+                let remaining = maxBytes - data.count + 1
+                guard let chunk = try handle.read(upToCount: min(64 * 1024, remaining)), !chunk.isEmpty else {
+                    return data
+                }
+                data.append(chunk)
+            }
+        } catch {
+            throw MediaError.readFailed
+        }
+        throw MediaError.fileTooLarge(kind, maxBytes: maxBytes)
+    }
+
+    private static func isContained(_ candidate: URL, in directory: URL) -> Bool {
+        let baseComponents = directory.pathComponents
+        let candidateComponents = candidate.pathComponents
+        return candidateComponents.count > baseComponents.count
+            && candidateComponents.prefix(baseComponents.count).elementsEqual(baseComponents)
     }
 
     private static func sha256Hex(_ data: Data) -> String {

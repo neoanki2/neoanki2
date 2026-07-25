@@ -519,8 +519,12 @@ public actor ItemStore {
             guard let mediaStore else {
                 throw ImportError.invalidFormat("Media import requires a media store.")
             }
+            try ImportLimits.validateBase64EncodedSize(base64, kind: kind, fieldName: field.name)
             guard let data = Data(base64Encoded: base64) else {
                 throw ImportError.invalidFormat("Invalid base64 for field \"\(field.name)\".")
+            }
+            guard data.count <= MediaValidation.maxBytes(for: kind) else {
+                throw ImportError.invalidFormat("Media in field \"\(field.name)\" exceeds its size limit.")
             }
             let ref = try await mediaStore.ingest(data: data, kind: kind, fileExtension: fileExtension)
             return .media(ref)
@@ -532,22 +536,36 @@ public actor ItemStore {
         guard !trimmed.isEmpty else {
             throw ImportError.invalidFormat("Media path is empty.")
         }
-
-        let candidate: URL
-        if trimmed.hasPrefix("/") {
-            candidate = URL(fileURLWithPath: trimmed)
-        } else if let baseDirectory {
-            candidate = baseDirectory.appendingPathComponent(trimmed)
-        } else {
-            throw ImportError.invalidFormat("Relative media paths require an import base directory.")
+        guard !NSString(string: trimmed).isAbsolutePath else {
+            throw ImportError.invalidFormat("Absolute media paths are not allowed.")
+        }
+        guard let baseDirectory else {
+            throw ImportError.invalidFormat("Media paths require an import base directory.")
+        }
+        guard baseDirectory.isFileURL else {
+            throw ImportError.invalidFormat("Import base directory is invalid.")
         }
 
-        let resolved = candidate.standardizedFileURL
-        if let baseDirectory {
-            let base = baseDirectory.standardizedFileURL
-            guard resolved.path.hasPrefix(base.path) else {
-                throw ImportError.invalidFormat("Media path escapes import directory.")
-            }
+        let base = baseDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        var isDirectory: ObjCBool = false
+        guard
+            FileManager.default.fileExists(atPath: base.path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        else {
+            throw ImportError.invalidFormat("Import base directory is invalid.")
+        }
+
+        let resolved = baseDirectory
+            .appendingPathComponent(trimmed)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let baseComponents = base.pathComponents
+        let resolvedComponents = resolved.pathComponents
+        guard
+            resolvedComponents.count > baseComponents.count,
+            resolvedComponents.prefix(baseComponents.count).elementsEqual(baseComponents)
+        else {
+            throw ImportError.invalidFormat("Media path escapes import directory.")
         }
         return resolved
     }
@@ -604,12 +622,29 @@ public actor ItemStore {
     }
 
     private func validate(_ item: Item, against itemType: ItemType) throws {
-        for field in itemType.fields where field.isRequired {
-            guard let value = item.value(for: field.id), !value.isEmpty else {
-                throw DatabaseError.requiredFieldEmpty(field.name)
-            }
-            if case let .cloze(text, blanks) = value {
+        for fieldValue in item.fields {
+            switch fieldValue.value {
+            case let .cloze(text, blanks):
                 try ClozeValidation.validate(text: text, blanks: blanks)
+            case let .media(ref):
+                guard ref.isValidStoredReference else {
+                    throw MediaError.sandboxViolation
+                }
+            default:
+                break
+            }
+        }
+
+        for field in itemType.fields {
+            let value = item.value(for: field.id)
+            if field.isRequired {
+                guard let value, !value.isEmpty else {
+                    throw DatabaseError.requiredFieldEmpty(field.name)
+                }
+            }
+
+            if case let .media(ref)? = value, field.type.mediaKind != ref.kind {
+                throw MediaError.unsupportedFormat(ref.kind)
             }
         }
     }

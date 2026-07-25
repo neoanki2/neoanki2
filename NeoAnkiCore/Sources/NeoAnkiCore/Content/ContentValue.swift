@@ -77,4 +77,24 @@ public struct ClozeSpan: Codable, Equatable, Sendable {
         self.length = length
         self.hint = hint
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case group, start, length, hint
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        group = try container.decode(Int.self, forKey: .group)
+        start = try container.decode(Int.self, forKey: .start)
+        length = try container.decode(Int.self, forKey: .length)
+        hint = try container.decodeIfPresent(String.self, forKey: .hint)
+
+        guard start >= 0, length >= 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: start < 0 ? .start : .length,
+                in: container,
+                debugDescription: "Cloze span offsets cannot be negative."
+            )
+        }
+    }
 }

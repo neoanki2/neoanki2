@@ -55,7 +55,13 @@ public struct ScenarioContext: Sendable {
             builder.fields.append(
                 FieldValue(
                     fieldID: mapField.id,
-                    value: .media(MediaRef(kind: .image, url: URL(string: "file:///map.png")!))
+                    value: .media(
+                        MediaRef(
+                            kind: .image,
+                            assetHash: String(repeating: "a", count: 64),
+                            fileExtension: "png"
+                        )
+                    )
                 )
             )
         }
