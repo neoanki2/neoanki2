@@ -15,7 +15,10 @@ port.
 - **No Anki interop.** No `.apkg`/`.colpkg`, no shared-deck import, no `{{Field}}`
   templates. A clean schema is chosen over a migration path.
 - **Generic and domain-neutral.** The core knows no subject. Fields, item types,
-  and templates are user-declared data.
+  and templates are user-declared data. The app offers a neutral `Basic` schema
+  as a first-run convenience, not as protected domain logic: starter seeding is
+  recorded once per library, `Basic` is user-deletable, and it is never
+  recreated after deletion. Core clients may configure an empty starter set.
 
   | Domain    | Example item type                | Example generated cards                            |
   | --------- | -------------------------------- | -------------------------------------------------- |
@@ -26,7 +29,9 @@ port.
 
   **Acceptance test:** deleting a subject (its items and item type) must require
   no change to any Swift type, enum case, or scheduler. If it does, the design has
-  leaked domain knowledge and is wrong.
+  leaked domain knowledge and is wrong. The flow suite exercises this with a
+  novel spatial/sequence arrange-and-reproduce schema through creation, card
+  generation, study, and deletion.
 - **Grounded in learning science.** Every structural decision maps to a finding
   in §2.
 

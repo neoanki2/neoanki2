@@ -117,6 +117,12 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 5 {
+                for sql in Schema.migrationV5Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -124,19 +130,41 @@ actor SQLiteDatabase {
         }
     }
 
-    func seedBuiltInItemTypesIfNeeded() throws {
-        for itemType in BuiltInItemTypes.all {
-            let data = try encode(itemType)
+    /// Seeds the configured first-run starters exactly once. The marker and
+    /// inserts share a transaction so an interrupted launch can safely retry.
+    func seedStarterItemTypesIfNeeded(_ itemTypes: [ItemType]) throws {
+        try inTransaction {
+            let marker = try query(
+                "SELECT value FROM app_metadata WHERE key = ? LIMIT 1;",
+                bindings: [.text("starter_item_types_seeded")]
+            )
+            guard marker.isEmpty else { return }
+
+            for itemType in itemTypes {
+                let data = try encode(itemType)
+                try execute(
+                    """
+                    INSERT INTO item_types (id, name, definition)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(id) DO NOTHING;
+                    """,
+                    bindings: [
+                        .text(itemType.id.uuidString),
+                        .text(itemType.name),
+                        .blob(data),
+                    ]
+                )
+            }
+
             try execute(
                 """
-                INSERT INTO item_types (id, name, definition)
-                VALUES (?, ?, ?)
-                ON CONFLICT(id) DO NOTHING;
+                INSERT INTO app_metadata (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value;
                 """,
                 bindings: [
-                    .text(itemType.id.uuidString),
-                    .text(itemType.name),
-                    .blob(data),
+                    .text("starter_item_types_seeded"),
+                    .text("1"),
                 ]
             )
         }

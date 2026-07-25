@@ -46,13 +46,18 @@ music, and chemistry are user-declared schemas, not baked-in types. FSRS sits
 behind a swappable `Scheduler` protocol. A neighboring product cannot truthfully
 claim all three without abandoning its legacy model.
 
+On first run the app offers a neutral `Basic` starter so adding an item requires
+no setup. It is ordinary user-owned schema data: it can be deleted, its one-time
+seed is persisted, and later launches do not recreate it. `NeoAnkiCore` clients
+can choose an empty starter set.
+
 ## Operating Context
 
 - **Environment:** macOS desktop, single-user, local SQLite store
   (`AppDatabase.defaultURL`).
 - **Core workflows today:**
   1. Browse items in the main window
-  2. Add an item via form (fields from default item type)
+  2. Add an item via form (fields from a selected item type)
   3. Study due cards in a session (reveal → Again/Hard/Good/Easy)
 - **Architecture split:** `NeoAnkiCore` (domain, scheduling, persistence);
   `NeoAnki2` (SwiftUI shell). See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the three-layer model.

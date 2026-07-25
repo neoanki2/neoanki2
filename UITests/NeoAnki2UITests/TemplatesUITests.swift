@@ -89,13 +89,14 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testTemplatesBlockDeletingBuiltInBasic() throws {
+    func testTemplatesDeleteBasicStarter() throws {
         let app = launchApp()
         openTemplates(in: app)
 
         app.descendants(matching: .any)["itemTypeRow-Basic"].click()
-        let deleteButton = app.buttons["deleteItemType"]
-        XCTAssertFalse(deleteButton.exists)
+        app.buttons["deleteItemType"].click()
+        app.buttons["confirmDeleteItemType"].click()
+        XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Basic"].waitForExistence(timeout: 2))
         closeTemplates(in: app)
     }
 

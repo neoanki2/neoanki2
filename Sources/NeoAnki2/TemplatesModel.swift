@@ -223,7 +223,6 @@ final class TemplatesModel {
 
     func canDeleteSelectedItemType() async -> Bool {
         guard let itemType = selectedItemType else { return false }
-        if BuiltInItemTypes.isBuiltIn(itemType.id) { return false }
         return await itemCount(for: itemType.id) == 0
     }
 

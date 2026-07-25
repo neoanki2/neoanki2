@@ -1,7 +1,8 @@
 import Foundation
 
-/// Built-in item types shipped with the app. Stable UUIDs keep seeds and forms
-/// consistent across launches and devices.
+/// Neutral starter item types offered on first run. They are ordinary,
+/// user-deletable item types after the one-time seed; stable UUIDs only make
+/// first-run setup deterministic.
 public enum BuiltInItemTypes {
     public static let basicID = UUID(uuidString: "A2000001-0000-4000-8000-000000000001")!
     public static let frontFieldID = UUID(uuidString: "A2000001-0001-4000-8000-000000000001")!

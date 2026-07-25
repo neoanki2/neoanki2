@@ -88,12 +88,38 @@ private func makeStore() async throws -> ItemStore {
     #expect(try await store.listItemTypes().map(\.name).contains("Temporary") == false)
 }
 
-@Test func deleteItemTypeRejectsBuiltInType() async throws {
-    let store = try await makeStore()
+@Test func deletingBasicStarterDoesNotReseedAfterReopen() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
 
-    await #expect(throws: DatabaseError.invalidItemType("Built-in item types can't be deleted.")) {
-        try await store.deleteItemType(id: BuiltInItemTypes.basicID)
-    }
+    #expect(try await store.deleteItemType(id: BuiltInItemTypes.basicID))
+    #expect(try await store.listItemTypes().isEmpty)
+
+    let reopened = try ItemStore(databaseURL: databaseURL)
+    try await reopened.bootstrap()
+    #expect(try await reopened.listItemTypes().isEmpty)
+}
+
+@Test func emptyStarterConfigurationIsPersistedAsCompletedFirstRun() async throws {
+    let databaseURL = tempDatabaseURL()
+    let unseeded = try ItemStore(databaseURL: databaseURL, starterItemTypes: [])
+    try await unseeded.bootstrap()
+    #expect(try await unseeded.listItemTypes().isEmpty)
+
+    let reopenedWithDefaultStarter = try ItemStore(databaseURL: databaseURL)
+    try await reopenedWithDefaultStarter.bootstrap()
+    #expect(try await reopenedWithDefaultStarter.listItemTypes().isEmpty)
+}
+
+@Test func migrationMarksExistingLibrarySeededWithoutResurrectingBasic() async throws {
+    let databaseURL = tempDatabaseURL()
+    try createEmptyVersionFourDatabase(at: databaseURL)
+
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+
+    #expect(try await store.listItemTypes().isEmpty)
 }
 
 @Test func deleteItemTypeRejectsTypeWithItems() async throws {
@@ -298,6 +324,27 @@ private func createLegacyNoteDatabase(at url: URL) throws {
         memoryData,
         1_700_000_000.0
     )
+}
+
+private func createEmptyVersionFourDatabase(at url: URL) throws {
+    var db: OpaquePointer?
+    guard sqlite3_open(url.path(percentEncoded: false), &db) == SQLITE_OK, let db else {
+        throw DatabaseError.openFailed("Could not create version four test database.")
+    }
+    defer { sqlite3_close(db) }
+
+    let sql = """
+    CREATE TABLE schema_version (version INTEGER NOT NULL);
+    INSERT INTO schema_version (version) VALUES (4);
+    CREATE TABLE item_types (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        definition BLOB NOT NULL
+    );
+    """
+    guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+        throw DatabaseError.executeFailed(String(cString: sqlite3_errmsg(db)))
+    }
 }
 
 private func bindAndRun(

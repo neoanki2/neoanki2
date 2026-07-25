@@ -142,12 +142,14 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(reloaded.fields.map(\.name).contains("Hint"))
 }
 
-@Test @MainActor func templatesModelBlocksDeletingBuiltInType() async throws {
-    let (model, _) = try await makeTemplatesModel()
+@Test @MainActor func templatesModelDeletesUnusedBasicStarter() async throws {
+    let (model, store) = try await makeTemplatesModel()
     await model.load()
 
-    #expect(await model.canDeleteSelectedItemType() == false)
+    #expect(await model.canDeleteSelectedItemType())
     let deleted = await model.deleteSelectedItemType()
-    #expect(deleted == false)
-    #expect(model.errorMessage == "Built-in item types can't be deleted.")
+    #expect(deleted)
+    #expect(model.itemTypes.isEmpty)
+    #expect(model.errorMessage == nil)
+    #expect(try await store.listItemTypes().isEmpty)
 }

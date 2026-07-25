@@ -37,16 +37,19 @@ public actor ItemStore {
     private let database: SQLiteDatabase
     private let scheduler: any Scheduler
     private let mediaStore: MediaStore?
+    private let starterItemTypes: [ItemType]
 
     public init(
         databaseURL: URL,
         scheduler: any Scheduler = FSRSScheduler(),
-        mediaStore: MediaStore? = nil
+        mediaStore: MediaStore? = nil,
+        starterItemTypes: [ItemType] = BuiltInItemTypes.all
     ) throws {
         let directory = databaseURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         database = try SQLiteDatabase(path: databaseURL)
         self.scheduler = scheduler
+        self.starterItemTypes = starterItemTypes
         if let mediaStore {
             self.mediaStore = mediaStore
         } else {
@@ -58,10 +61,14 @@ public actor ItemStore {
         mediaStore
     }
 
-    /// Opens the database, runs migrations, and seeds built-in item types.
+    /// Opens the database, runs migrations, and applies the configured
+    /// first-run starter set once for this library.
     public func bootstrap() async throws {
+        for itemType in starterItemTypes {
+            try ItemTypeValidation.validate(itemType)
+        }
         try await database.migrate()
-        try await database.seedBuiltInItemTypesIfNeeded()
+        try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
     }
 
     public func defaultItemType() async throws -> ItemType {
@@ -92,13 +99,11 @@ public actor ItemStore {
         try await database.countItems(itemTypeID: itemTypeID)
     }
 
-    /// Deletes an item type when it is not built-in and has no items.
+    /// Deletes an item type when it has no items. First-run starters are regular
+    /// user-owned types after seeding and can be removed.
     @discardableResult
     public func deleteItemType(id: UUID) async throws -> Bool {
         guard try await database.fetchItemType(id: id) != nil else { return false }
-        if BuiltInItemTypes.isBuiltIn(id) {
-            throw DatabaseError.invalidItemType("Built-in item types can't be deleted.")
-        }
         let itemCount = try await database.countItems(itemTypeID: id)
         if itemCount > 0 {
             throw DatabaseError.invalidItemType("Remove all items of this type before deleting it.")

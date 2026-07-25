@@ -1,12 +1,18 @@
 import Foundation
 
 enum Schema {
-    static let version = 4
+    static let version = 5
 
     static let createStatements: [String] = [
         """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
         );
         """,
         """
@@ -74,6 +80,22 @@ enum Schema {
             file_extension TEXT NOT NULL,
             created_at REAL NOT NULL
         );
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 4. Existing libraries have
+    /// already passed first-run seeding, so the marker prevents resurrection.
+    static let migrationV5Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        """,
+        """
+        INSERT INTO app_metadata (key, value)
+        VALUES ('starter_item_types_seeded', '1')
+        ON CONFLICT(key) DO NOTHING;
         """,
     ]
 
