@@ -78,13 +78,21 @@ public enum ClozeValidation {
         return accepted
     }
 
-    public static func displayText(from text: String, blanks: [ClozeSpan], revealed: Bool) -> String {
+    public static func displayText(
+        from text: String,
+        blanks: [ClozeSpan],
+        revealed: Bool,
+        group: Int? = nil
+    ) -> String {
         guard !text.isEmpty else { return "" }
         if revealed || blanks.isEmpty {
             return text
         }
 
-        let sorted = sanitize(text: text, blanks: blanks).sorted { $0.start > $1.start }
+        let hiddenBlanks = group.map { selectedGroup in
+            blanks.filter { $0.group == selectedGroup }
+        } ?? blanks
+        let sorted = sanitize(text: text, blanks: hiddenBlanks).sorted { $0.start > $1.start }
         var result = text
         for blank in sorted {
             guard

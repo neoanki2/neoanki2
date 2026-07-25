@@ -13,6 +13,9 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
     public var memory: MemoryState
     public var isSuspended: Bool
     public var deckID: UUID?
+    /// For cloze interactions, identifies the one blank group this card tests.
+    /// Nil for non-cloze cards.
+    public var clozeGroup: Int?
 
     public init(
         id: UUID = UUID(),
@@ -21,7 +24,8 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         skill: Skill,
         memory: MemoryState = .new(),
         isSuspended: Bool = false,
-        deckID: UUID? = nil
+        deckID: UUID? = nil,
+        clozeGroup: Int? = nil
     ) {
         self.id = id
         self.itemID = itemID
@@ -30,6 +34,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         self.memory = memory
         self.isSuspended = isSuspended
         self.deckID = deckID
+        self.clozeGroup = clozeGroup
     }
 
     public func isDue(asOf now: Date = .now) -> Bool {

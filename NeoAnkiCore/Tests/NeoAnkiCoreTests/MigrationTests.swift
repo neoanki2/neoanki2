@@ -13,6 +13,42 @@ import Testing
     #expect(try tableExists("media_assets", at: url))
     #expect(try tableExists("review_reverts", at: url))
     #expect(try columnExists("memory_before", in: "review_logs", at: url))
+    #expect(try columnExists("cloze_group", in: "cards", at: url))
+}
+
+@Test func versionEightMigrationAddsClozeGroupsWithoutChangingExistingCards() async throws {
+    let url = migrationDatabaseURL()
+    let cardID = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (8);
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY NOT NULL,
+            item_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            skill BLOB NOT NULL,
+            memory BLOB NOT NULL,
+            due_at REAL NOT NULL DEFAULT 0,
+            is_suspended INTEGER NOT NULL DEFAULT 0,
+            deck_id TEXT
+        );
+        INSERT INTO cards (
+            id, item_id, template_id, skill, memory, due_at, is_suspended, deck_id
+        ) VALUES (
+            '\(cardID.uuidString)', '\(UUID().uuidString)', '\(UUID().uuidString)',
+            X'7b7d', X'7b7d', 0, 0, NULL
+        );
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try columnExists("cloze_group", in: "cards", at: url))
+    #expect(try integer("SELECT COUNT(*) FROM cards;", at: url) == 1)
 }
 
 @Test func versionOneMigrationBackfillsDueDateAndReachesCurrentSchema() async throws {
@@ -49,6 +85,9 @@ import Testing
         """
         CREATE TABLE schema_version (version INTEGER NOT NULL);
         INSERT INTO schema_version VALUES (4);
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY NOT NULL
+        );
         CREATE TABLE review_logs (
             id TEXT PRIMARY KEY NOT NULL,
             card_id TEXT NOT NULL,

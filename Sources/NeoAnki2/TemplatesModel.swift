@@ -70,35 +70,216 @@ struct ItemTypeDraft: Equatable {
     }
 }
 
+struct SlotDraft: Identifiable, Equatable {
+    enum SourceKind: String, CaseIterable {
+        case field
+        case literal
+    }
+
+    var id = UUID()
+    var sourceKind: SourceKind = .field
+    var fieldID: UUID?
+    var literal = ""
+    var reveal: RevealMode = .always
+    var media: MediaBehavior = .default
+
+    init(
+        id: UUID = UUID(),
+        sourceKind: SourceKind = .field,
+        fieldID: UUID? = nil,
+        literal: String = "",
+        reveal: RevealMode = .always,
+        media: MediaBehavior = .default
+    ) {
+        self.id = id
+        self.sourceKind = sourceKind
+        self.fieldID = fieldID
+        self.literal = literal
+        self.reveal = reveal
+        self.media = media
+    }
+
+    init(slot: Slot) {
+        switch slot.source {
+        case let .field(fieldID):
+            sourceKind = .field
+            self.fieldID = fieldID
+        case let .literal(literal):
+            sourceKind = .literal
+            self.literal = literal
+        }
+        reveal = slot.presentation.reveal
+        media = slot.presentation.media
+    }
+
+    var isValid: Bool {
+        switch sourceKind {
+        case .field:
+            return fieldID != nil
+        case .literal:
+            return !literal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    func slot() throws -> Slot {
+        let source: SlotSource
+        switch sourceKind {
+        case .field:
+            guard let fieldID else {
+                throw DatabaseError.invalidItemType("Choose a field for every field slot.")
+            }
+            source = .field(fieldID)
+        case .literal:
+            let value = literal.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else {
+                throw DatabaseError.invalidItemType("Literal slots can't be empty.")
+            }
+            source = .literal(value)
+        }
+        return Slot(source: source, presentation: Presentation(reveal: reveal, media: media))
+    }
+}
+
+indirect enum ConditionDraft: Equatable {
+    case fieldNotEmpty(UUID?)
+    case fieldEmpty(UUID?)
+    case all([ConditionDraft])
+    case any([ConditionDraft])
+
+    init(condition: SlotCondition) {
+        switch condition {
+        case let .fieldNotEmpty(id):
+            self = .fieldNotEmpty(id)
+        case let .fieldEmpty(id):
+            self = .fieldEmpty(id)
+        case let .all(conditions):
+            self = .all(conditions.map(ConditionDraft.init))
+        case let .any(conditions):
+            self = .any(conditions.map(ConditionDraft.init))
+        }
+    }
+
+    var isValid: Bool {
+        switch self {
+        case let .fieldNotEmpty(id), let .fieldEmpty(id):
+            return id != nil
+        case let .all(children), let .any(children):
+            return !children.isEmpty && children.allSatisfy(\.isValid)
+        }
+    }
+
+    func condition() throws -> SlotCondition {
+        switch self {
+        case let .fieldNotEmpty(id):
+            guard let id else { throw DatabaseError.invalidItemType("Choose a field for the generation rule.") }
+            return .fieldNotEmpty(id)
+        case let .fieldEmpty(id):
+            guard let id else { throw DatabaseError.invalidItemType("Choose a field for the generation rule.") }
+            return .fieldEmpty(id)
+        case let .all(children):
+            guard !children.isEmpty else {
+                throw DatabaseError.invalidItemType("An “all” rule needs at least one condition.")
+            }
+            return .all(try children.map { try $0.condition() })
+        case let .any(children):
+            guard !children.isEmpty else {
+                throw DatabaseError.invalidItemType("An “any” rule needs at least one condition.")
+            }
+            return .any(try children.map { try $0.condition() })
+        }
+    }
+}
+
 struct TemplateDraft: Equatable {
     var name: String
-    var promptFieldID: UUID?
-    var answerFieldID: UUID?
-    var promptMediaBehavior: MediaBehavior
+    var interaction: Interaction
+    var skill: Skill
+    var usesAutomaticSkill: Bool
+    var generateWhen: ConditionDraft?
+    var promptSlots: [SlotDraft]
+    var answerSlots: [SlotDraft]
 
     init(
         name: String = "",
-        promptFieldID: UUID? = nil,
-        answerFieldID: UUID? = nil,
-        promptMediaBehavior: MediaBehavior = .default
+        interaction: Interaction = .reveal,
+        skill: Skill = Skill(input: .text, output: .text, operation: .recognize),
+        usesAutomaticSkill: Bool = true,
+        generateWhen: ConditionDraft? = nil,
+        promptSlots: [SlotDraft] = [SlotDraft()],
+        answerSlots: [SlotDraft] = [SlotDraft()]
     ) {
         self.name = name
-        self.promptFieldID = promptFieldID
-        self.answerFieldID = answerFieldID
-        self.promptMediaBehavior = promptMediaBehavior
+        self.interaction = interaction
+        self.skill = skill
+        self.usesAutomaticSkill = usesAutomaticSkill
+        self.generateWhen = generateWhen
+        self.promptSlots = promptSlots
+        self.answerSlots = answerSlots
+    }
+
+    init(
+        name: String,
+        promptFieldID: UUID?,
+        answerFieldID: UUID?,
+        promptMediaBehavior: MediaBehavior = .default
+    ) {
+        self.init(
+            name: name,
+            promptSlots: [SlotDraft(fieldID: promptFieldID, media: promptMediaBehavior)],
+            answerSlots: [SlotDraft(fieldID: answerFieldID)]
+        )
     }
 
     init(template: Template, in itemType: ItemType) {
         name = template.name
-        promptFieldID = ItemTypeValidation.fieldIDs(in: template.prompt).first
-        answerFieldID = ItemTypeValidation.fieldIDs(in: template.answer).first
-        promptMediaBehavior = template.prompt.slots.first?.presentation.media ?? .default
+        interaction = template.interaction
+        skill = template.skill
+        usesAutomaticSkill = false
+        generateWhen = template.generateWhen.map(ConditionDraft.init)
+        promptSlots = template.prompt.slots.map(SlotDraft.init)
+        answerSlots = template.answer.slots.map(SlotDraft.init)
     }
 
     var isValid: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let promptFieldID, let answerFieldID else { return false }
-        return promptFieldID != answerFieldID
+        return !trimmed.isEmpty
+            && !promptSlots.isEmpty
+            && !answerSlots.isEmpty
+            && promptSlots.allSatisfy(\.isValid)
+            && answerSlots.allSatisfy(\.isValid)
+            && (generateWhen?.isValid ?? true)
+    }
+
+    func template(id: UUID, in itemType: ItemType) throws -> Template {
+        let prompt = Side(slots: try promptSlots.map { try $0.slot() })
+        let answer = Side(slots: try answerSlots.map { try $0.slot() })
+        let resolvedSkill: Skill
+        if usesAutomaticSkill,
+           let promptID = ItemTypeValidation.fieldIDs(in: prompt).first,
+           let answerID = ItemTypeValidation.fieldIDs(in: answer).first,
+           let promptField = itemType.field(promptID),
+           let answerField = itemType.field(answerID) {
+            resolvedSkill = TemplateBuilder.deriveSkill(
+                promptField: promptField,
+                answerField: answerField,
+                in: itemType
+            )
+        } else {
+            resolvedSkill = skill
+        }
+        let template = Template(
+            id: id,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            prompt: prompt,
+            answer: answer,
+            interaction: interaction,
+            skill: resolvedSkill,
+            generateWhen: try generateWhen?.condition()
+        )
+        var candidate = itemType
+        candidate.templates = [template]
+        try ItemTypeValidation.validate(candidate)
+        return template
     }
 }
 
@@ -233,24 +414,13 @@ final class TemplatesModel {
             return false
         }
 
-        guard draft.isValid, let promptFieldID = draft.promptFieldID, let answerFieldID = draft.answerFieldID else {
-            errorMessage = "Enter a name and choose different prompt and answer fields."
+        guard draft.isValid else {
+            errorMessage = "Enter a name and complete every prompt, answer, and generation rule."
             return false
         }
 
         do {
-            var template = try TemplateBuilder.makeRevealTemplate(
-                id: editingID ?? UUID(),
-                name: draft.name,
-                promptFieldID: promptFieldID,
-                answerFieldID: answerFieldID,
-                in: itemType
-            )
-
-            if let promptField = itemType.field(promptFieldID), promptField.supportsMediaInput,
-               !template.prompt.slots.isEmpty {
-                template.prompt.slots[0].presentation.media = draft.promptMediaBehavior
-            }
+            let template = try draft.template(id: editingID ?? UUID(), in: itemType)
 
             if let editingID, let index = itemType.templates.firstIndex(where: { $0.id == editingID }) {
                 itemType.templates[index] = template

@@ -150,6 +150,12 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 9 {
+                for sql in Schema.migrationV9Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -477,7 +483,7 @@ actor SQLiteDatabase {
         guard !deckIDs.isEmpty else { return [] }
         let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
         var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE is_suspended = 0 AND due_at <= ? AND deck_id IN (\(placeholders))
             ORDER BY due_at ASC
@@ -495,7 +501,7 @@ actor SQLiteDatabase {
 
     func fetchUnassignedDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
         var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE is_suspended = 0 AND due_at <= ? AND deck_id IS NULL
             ORDER BY due_at ASC
@@ -656,8 +662,10 @@ actor SQLiteDatabase {
             let memory = try encode(card.memory)
             try execute(
                 """
-                INSERT INTO cards (id, item_id, template_id, skill, memory, due_at, is_suspended, deck_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                INSERT INTO cards (
+                    id, item_id, template_id, skill, memory, due_at, is_suspended, deck_id, cloze_group
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 bindings: [
                     .text(card.id.uuidString),
@@ -668,6 +676,7 @@ actor SQLiteDatabase {
                     .double(card.memory.due.timeIntervalSince1970),
                     .int(card.isSuspended ? 1 : 0),
                     card.deckID.map { .text($0.uuidString) } ?? .null,
+                    card.clozeGroup.map { .int(Int64($0)) } ?? .null,
                 ]
             )
         }
@@ -676,7 +685,7 @@ actor SQLiteDatabase {
     func fetchCard(id: UUID) throws -> Card? {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE id = ?
             LIMIT 1;
@@ -689,7 +698,7 @@ actor SQLiteDatabase {
 
     func fetchDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
         var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE is_suspended = 0 AND due_at <= ?
             ORDER BY due_at ASC
@@ -969,7 +978,7 @@ actor SQLiteDatabase {
     func fetchCards(for itemID: UUID) throws -> [Card] {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE item_id = ?;
             """,
@@ -988,6 +997,13 @@ actor SQLiteDatabase {
                 .text(itemID.uuidString),
                 .text(templateID.uuidString),
             ]
+        )
+    }
+
+    func deleteCard(id: UUID) throws {
+        try execute(
+            "DELETE FROM cards WHERE id = ?;",
+            bindings: [.text(id.uuidString)]
         )
     }
 
@@ -1089,32 +1105,26 @@ actor SQLiteDatabase {
             }
 
             let existingCards = try fetchCards(for: item.id)
-            let existingTemplateIDs = Set(existingCards.map(\.templateID))
 
-            for template in updated.templates where added.contains(template.id) {
-                guard CardGenerator.shouldGenerate(template, for: item) else { continue }
-                guard !existingTemplateIDs.contains(template.id) else { continue }
+            for template in updated.templates where added.contains(template.id) || kept.contains(template.id) {
+                var singleTemplateType = updated
+                singleTemplateType.templates = [template]
+                let desiredCards = CardGenerator.cards(for: item, type: singleTemplateType, now: now)
+                let desiredGroups = Set(desiredCards.map(\.clozeGroup))
+                let currentCards = existingCards.filter { $0.templateID == template.id }
 
-                try insertCards([
-                    Card(
-                        itemID: item.id,
-                        templateID: template.id,
-                        skill: template.skill,
-                        memory: .new(due: now),
-                        deckID: item.deckID
-                    ),
-                ])
-            }
-
-            for template in updated.templates where kept.contains(template.id) {
-                guard
-                    let previousTemplate = previous.templates.first(where: { $0.id == template.id }),
-                    previousTemplate.skill != template.skill
-                else {
-                    continue
+                for card in currentCards where !desiredGroups.contains(card.clozeGroup) {
+                    try deleteCard(id: card.id)
                 }
 
-                for card in existingCards where card.templateID == template.id {
+                let currentGroups = Set(currentCards.map(\.clozeGroup))
+                let missingCards = desiredCards.filter { !currentGroups.contains($0.clozeGroup) }
+                if !missingCards.isEmpty {
+                    try insertCards(missingCards)
+                }
+
+                for card in currentCards
+                    where desiredGroups.contains(card.clozeGroup) && card.skill != template.skill {
                     try updateCardSkill(card.id, skill: template.skill)
                 }
             }
@@ -1369,6 +1379,7 @@ actor SQLiteDatabase {
         let skill = try decode(Skill.self, from: skillData)
         let memory = try decode(MemoryState.self, from: memoryData)
         let deckID = (row["deck_id"] as? String).flatMap(UUID.init(uuidString:))
+        let clozeGroup = (row["cloze_group"] as? Int64).map(Int.init)
 
         return Card(
             id: id,
@@ -1377,7 +1388,8 @@ actor SQLiteDatabase {
             skill: skill,
             memory: memory,
             isSuspended: suspendedValue != 0,
-            deckID: deckID
+            deckID: deckID,
+            clozeGroup: clozeGroup
         )
     }
 

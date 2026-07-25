@@ -191,7 +191,8 @@ struct StudyView: View {
             item: card.item,
             isAnswerRevealed: model.isAnswerRevealed,
             richTextPointSize: DesignSystem.Typography.cardPromptPointSize,
-            mediaStore: mediaStore
+            mediaStore: mediaStore,
+            clozeGroup: card.card.clozeGroup
         )
             .font(DesignSystem.Typography.cardPrompt)
             .multilineTextAlignment(.center)
@@ -218,7 +219,8 @@ struct StudyView: View {
                 item: card.item,
                 isAnswerRevealed: true,
                 richTextPointSize: DesignSystem.Typography.cardAnswerPointSize,
-                mediaStore: mediaStore
+                mediaStore: mediaStore,
+                clozeGroup: card.card.clozeGroup
             )
                 .font(DesignSystem.Typography.cardAnswer)
                 .multilineTextAlignment(.center)

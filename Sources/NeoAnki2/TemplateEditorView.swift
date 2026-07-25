@@ -26,58 +26,71 @@ struct TemplateEditorView: View {
         )
     }
 
-    private var selectablePromptFields: [FieldDef] {
-        itemType.fields
-    }
-
-    private var selectableAnswerFields: [FieldDef] {
-        itemType.fields.filter { $0.isTextLike || $0.type == .number }
-    }
-
-    private var promptField: FieldDef? {
-        guard let id = draft.promptFieldID else { return nil }
-        return itemType.field(id)
-    }
-
     var body: some View {
         Form {
             Section("Template") {
                 TextField("Name", text: $draft.name)
                     .accessibilityIdentifier("templateNameField")
-            }
 
-            Section("Fields") {
-                Picker("Prompt", selection: promptBinding) {
-                    Text("Choose field").tag(UUID?.none)
-                    ForEach(selectablePromptFields) { field in
-                        Text(field.name).tag(Optional(field.id))
+                Picker("Interaction", selection: $draft.interaction) {
+                    ForEach(Interaction.allCases, id: \.self) { interaction in
+                        Text(interaction.label).tag(interaction)
                     }
                 }
-                .accessibilityIdentifier("templatePromptField")
-
-                Picker("Answer", selection: answerBinding) {
-                    Text("Choose field").tag(UUID?.none)
-                    ForEach(selectableAnswerFields) { field in
-                        Text(field.name).tag(Optional(field.id))
-                    }
-                }
-                .accessibilityIdentifier("templateAnswerField")
-
-                if promptField?.supportsMediaInput == true {
-                    Picker("Media behavior", selection: $draft.promptMediaBehavior) {
-                        Text("Default").tag(MediaBehavior.default)
-                        Text("Autoplay").tag(MediaBehavior.autoplay)
-                        Text("Play on tap").tag(MediaBehavior.playOnTap)
-                        Text("Loop").tag(MediaBehavior.loop)
-                    }
-                    .accessibilityIdentifier("templateMediaBehavior")
+                .onChange(of: draft.interaction) { _, interaction in
+                    applyInteractionDefaults(interaction)
                 }
             }
 
-            Section {
-                Text("Reveal cards show the prompt first, then the answer after you choose Show Answer.")
-                    .font(DesignSystem.Typography.uiHint)
-                    .foregroundStyle(.secondary)
+            Section("Practice skill") {
+                Toggle("Derive from the first prompt and answer fields", isOn: $draft.usesAutomaticSkill)
+                if !draft.usesAutomaticSkill {
+                    Picker("Input", selection: $draft.skill.input) {
+                        ForEach(Modality.allCases, id: \.self) { modality in
+                            Text(modality.label).tag(modality)
+                        }
+                    }
+                    Picker("Output", selection: $draft.skill.output) {
+                        ForEach(Modality.allCases, id: \.self) { modality in
+                            Text(modality.label).tag(modality)
+                        }
+                    }
+                    Picker("Operation", selection: $draft.skill.operation) {
+                        ForEach(NeoAnkiCore.Operation.allCases, id: \.self) { operation in
+                            Text(operation.label).tag(operation)
+                        }
+                    }
+                }
+            }
+
+            Section("Prompt") {
+                SlotListEditor(
+                    slots: $draft.promptSlots,
+                    fields: itemType.fields,
+                    sideName: "Prompt",
+                    clozeFieldsDefaultToHidden: draft.interaction == .cloze
+                )
+                    .accessibilityIdentifier("templatePromptSlots")
+            }
+
+            Section("Answer") {
+                SlotListEditor(slots: $draft.answerSlots, fields: itemType.fields, sideName: "Answer")
+                    .accessibilityIdentifier("templateAnswerSlots")
+            }
+
+            Section("Card generation") {
+                Toggle(
+                    "Only generate this card when…",
+                    isOn: Binding(
+                        get: { draft.generateWhen != nil },
+                        set: { enabled in
+                            draft.generateWhen = enabled ? .fieldNotEmpty(itemType.fields.first?.id) : nil
+                        }
+                    )
+                )
+                if draft.generateWhen != nil {
+                    ConditionEditor(condition: generateWhenBinding, fields: itemType.fields)
+                }
             }
 
             if let errorMessage = model.errorMessage {
@@ -113,21 +126,23 @@ struct TemplateEditorView: View {
                 .accessibilityIdentifier("saveTemplate")
             }
         }
-        .frame(minWidth: 420, minHeight: 280)
+        .frame(minWidth: 640, minHeight: 560)
     }
 
-    private var promptBinding: Binding<UUID?> {
+    private var generateWhenBinding: Binding<ConditionDraft> {
         Binding(
-            get: { draft.promptFieldID },
-            set: { draft.promptFieldID = $0 }
+            get: { draft.generateWhen ?? .fieldNotEmpty(itemType.fields.first?.id) },
+            set: { draft.generateWhen = $0 }
         )
     }
 
-    private var answerBinding: Binding<UUID?> {
-        Binding(
-            get: { draft.answerFieldID },
-            set: { draft.answerFieldID = $0 }
-        )
+    private func applyInteractionDefaults(_ interaction: Interaction) {
+        guard interaction == .cloze else { return }
+        for index in draft.promptSlots.indices
+            where draft.promptSlots[index].reveal == .always
+                && draft.promptSlots[index].fieldID.flatMap(itemType.field)?.type == .cloze {
+            draft.promptSlots[index].reveal = .hiddenUntilAnswer
+        }
     }
 
     private func save() async {
@@ -143,6 +158,283 @@ struct TemplateEditorView: View {
         guard let editingTemplate else { return }
         if await model.deleteTemplate(id: editingTemplate.id) {
             onDismiss()
+        }
+    }
+}
+
+private struct SlotListEditor: View {
+    @Binding var slots: [SlotDraft]
+    let fields: [FieldDef]
+    let sideName: String
+    var clozeFieldsDefaultToHidden = false
+
+    var body: some View {
+        ForEach($slots) { $slot in
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                HStack {
+                    Picker("Source", selection: $slot.sourceKind) {
+                        Text("Field").tag(SlotDraft.SourceKind.field)
+                        Text("Literal text").tag(SlotDraft.SourceKind.literal)
+                    }
+                    Spacer()
+                    Button("Move Up", systemImage: "arrow.up") {
+                        move(slot.id, by: -1)
+                    }
+                    .labelStyle(.iconOnly)
+                    .disabled(slots.first?.id == slot.id)
+                    .help("Move slot up")
+                    Button("Move Down", systemImage: "arrow.down") {
+                        move(slot.id, by: 1)
+                    }
+                    .labelStyle(.iconOnly)
+                    .disabled(slots.last?.id == slot.id)
+                    .help("Move slot down")
+                    Button("Remove", systemImage: "minus.circle", role: .destructive) {
+                        slots.removeAll { $0.id == slot.id }
+                    }
+                    .labelStyle(.iconOnly)
+                    .disabled(slots.count == 1)
+                    .help("Remove slot")
+                }
+
+                if slot.sourceKind == .field {
+                    Picker("Field", selection: $slot.fieldID) {
+                        Text("Choose field").tag(UUID?.none)
+                        ForEach(fields) { field in
+                            Text(field.name).tag(Optional(field.id))
+                        }
+                    }
+                    .onChange(of: slot.fieldID) { _, fieldID in
+                        guard clozeFieldsDefaultToHidden,
+                              fieldID.flatMap({ id in fields.first { $0.id == id } })?.type == .cloze,
+                              slot.reveal == .always
+                        else { return }
+                        slot.reveal = .hiddenUntilAnswer
+                    }
+                } else {
+                    TextField("Literal text", text: $slot.literal)
+                }
+
+                HStack {
+                    Picker("Reveal", selection: $slot.reveal) {
+                        ForEach(RevealMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    Picker("Media", selection: $slot.media) {
+                        ForEach(MediaBehavior.allCases, id: \.self) { behavior in
+                            Text(behavior.label).tag(behavior)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, DesignSystem.Spacing.xs)
+        }
+
+        Button("Add \(sideName) Slot", systemImage: "plus") {
+            slots.append(SlotDraft())
+        }
+    }
+
+    private func move(_ id: UUID, by offset: Int) {
+        guard let source = slots.firstIndex(where: { $0.id == id }) else { return }
+        let destination = source + offset
+        guard slots.indices.contains(destination) else { return }
+        slots.swapAt(source, destination)
+    }
+}
+
+private struct ConditionEditor: View {
+    private enum Kind: String, CaseIterable {
+        case fieldNotEmpty
+        case fieldEmpty
+        case all
+        case any
+    }
+
+    @Binding var condition: ConditionDraft
+    let fields: [FieldDef]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+            Picker("Rule", selection: kindBinding) {
+                Text("Field is not empty").tag(Kind.fieldNotEmpty)
+                Text("Field is empty").tag(Kind.fieldEmpty)
+                Text("All rules match").tag(Kind.all)
+                Text("Any rule matches").tag(Kind.any)
+            }
+
+            switch condition {
+            case .fieldNotEmpty, .fieldEmpty:
+                Picker("Field", selection: fieldBinding) {
+                    Text("Choose field").tag(UUID?.none)
+                    ForEach(fields) { field in
+                        Text(field.name).tag(Optional(field.id))
+                    }
+                }
+            case let .all(children), let .any(children):
+                ForEach(children.indices, id: \.self) { index in
+                    HStack(alignment: .top) {
+                        ConditionEditor(condition: childBinding(index), fields: fields)
+                        Button("Remove Rule", systemImage: "minus.circle", role: .destructive) {
+                            removeChild(at: index)
+                        }
+                        .labelStyle(.iconOnly)
+                        .help("Remove rule")
+                    }
+                    .padding(.leading, DesignSystem.Spacing.md)
+                }
+                Button("Add Rule", systemImage: "plus") {
+                    addChild()
+                }
+            }
+        }
+    }
+
+    private var kindBinding: Binding<Kind> {
+        Binding(
+            get: {
+                switch condition {
+                case .fieldNotEmpty: .fieldNotEmpty
+                case .fieldEmpty: .fieldEmpty
+                case .all: .all
+                case .any: .any
+                }
+            },
+            set: { kind in
+                let firstID = fields.first?.id
+                switch kind {
+                case .fieldNotEmpty: condition = .fieldNotEmpty(firstID)
+                case .fieldEmpty: condition = .fieldEmpty(firstID)
+                case .all: condition = .all([.fieldNotEmpty(firstID)])
+                case .any: condition = .any([.fieldNotEmpty(firstID)])
+                }
+            }
+        )
+    }
+
+    private var fieldBinding: Binding<UUID?> {
+        Binding(
+            get: {
+                switch condition {
+                case let .fieldNotEmpty(id), let .fieldEmpty(id): id
+                case .all, .any: nil
+                }
+            },
+            set: { id in
+                switch condition {
+                case .fieldNotEmpty: condition = .fieldNotEmpty(id)
+                case .fieldEmpty: condition = .fieldEmpty(id)
+                case .all, .any: break
+                }
+            }
+        )
+    }
+
+    private func childBinding(_ index: Int) -> Binding<ConditionDraft> {
+        Binding(
+            get: {
+                switch condition {
+                case let .all(children), let .any(children): children[index]
+                default: .fieldNotEmpty(fields.first?.id)
+                }
+            },
+            set: { child in
+                switch condition {
+                case .all(var children):
+                    children[index] = child
+                    condition = .all(children)
+                case .any(var children):
+                    children[index] = child
+                    condition = .any(children)
+                default:
+                    break
+                }
+            }
+        )
+    }
+
+    private func addChild() {
+        let child = ConditionDraft.fieldNotEmpty(fields.first?.id)
+        switch condition {
+        case .all(var children):
+            children.append(child)
+            condition = .all(children)
+        case .any(var children):
+            children.append(child)
+            condition = .any(children)
+        default:
+            break
+        }
+    }
+
+    private func removeChild(at index: Int) {
+        switch condition {
+        case .all(var children):
+            guard children.indices.contains(index) else { return }
+            children.remove(at: index)
+            condition = .all(children)
+        case .any(var children):
+            guard children.indices.contains(index) else { return }
+            children.remove(at: index)
+            condition = .any(children)
+        default:
+            break
+        }
+    }
+}
+
+private extension Interaction {
+    var label: String {
+        switch self {
+        case .reveal: "Reveal"
+        case .type: "Type answer"
+        case .choose: "Choose"
+        case .record: "Record"
+        case .cloze: "Cloze"
+        case .arrange: "Arrange"
+        }
+    }
+}
+
+private extension Modality {
+    var label: String {
+        switch self {
+        case .text: "Text"
+        case .audio: "Audio"
+        case .image: "Image"
+        case .video: "Video"
+        case .diagram: "Diagram"
+        case .none: "None"
+        case .freeResponse: "Free response"
+        case .selection: "Selection"
+        case .spatial: "Spatial"
+        case .sequence: "Sequence"
+        }
+    }
+}
+
+private extension NeoAnkiCore.Operation {
+    var label: String { rawValue.capitalized }
+}
+
+private extension RevealMode {
+    var label: String {
+        switch self {
+        case .always: "Always visible"
+        case .hiddenUntilAnswer: "Hidden until answer"
+        case .blurred: "Blurred until answer"
+        }
+    }
+}
+
+private extension MediaBehavior {
+    var label: String {
+        switch self {
+        case .default: "Default"
+        case .autoplay: "Autoplay"
+        case .playOnTap: "Play on tap"
+        case .loop: "Loop"
         }
     }
 }

@@ -30,14 +30,10 @@ public enum ItemTypeValidation {
     }
 
     private static func validateClozeTemplate(_ template: Template, in itemType: ItemType) throws {
-        let promptFieldIDs = Set(fieldIDs(in: template.prompt))
-        guard promptFieldIDs.count == 1,
-              let fieldID = promptFieldIDs.first,
-              let field = itemType.field(fieldID),
-              field.type == .cloze
-        else {
+        let clozeFields = Set(fieldIDs(in: template.prompt)).compactMap(itemType.field).filter { $0.type == .cloze }
+        guard clozeFields.count == 1 else {
             throw DatabaseError.invalidItemType(
-                "Cloze templates must use a single cloze field on the prompt side."
+                "Cloze templates must use exactly one cloze field on the prompt side."
             )
         }
     }

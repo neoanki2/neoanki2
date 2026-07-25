@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 8
+    static let version = 9
 
     static let createStatements: [String] = [
         """
@@ -42,7 +42,8 @@ enum Schema {
             memory BLOB NOT NULL,
             due_at REAL NOT NULL DEFAULT 0,
             is_suspended INTEGER NOT NULL DEFAULT 0,
-            deck_id TEXT
+            deck_id TEXT,
+            cloze_group INTEGER
         );
         """,
         """
@@ -115,6 +116,12 @@ enum Schema {
             log_loss REAL NOT NULL
         );
         """,
+    ]
+
+    /// Applied when upgrading from schema version 8. A nullable group preserves
+    /// existing non-cloze cards while allowing one persisted card per cloze group.
+    static let migrationV9Statements: [String] = [
+        "ALTER TABLE cards ADD COLUMN cloze_group INTEGER;",
     ]
 
     /// Applied when upgrading from schema version 4. Existing libraries have

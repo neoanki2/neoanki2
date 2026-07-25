@@ -56,6 +56,72 @@ import Testing
     #expect(shown.contains("Paris"))
 }
 
+@Test func clozeDisplayTextRevealsOtherGroupsButNeverLeaksCurrentAnswer() {
+    let text = "Mercury Venus Earth"
+    let blanks = [
+        ClozeSpan(group: 1, start: 0, length: 7),
+        ClozeSpan(group: 2, start: 8, length: 5),
+        ClozeSpan(group: 1, start: 14, length: 5),
+    ]
+
+    let groupOnePrompt = ClozeValidation.displayText(
+        from: text,
+        blanks: blanks,
+        revealed: false,
+        group: 1
+    )
+    let groupTwoPrompt = ClozeValidation.displayText(
+        from: text,
+        blanks: blanks,
+        revealed: false,
+        group: 2
+    )
+
+    #expect(!groupOnePrompt.contains("Mercury"))
+    #expect(!groupOnePrompt.contains("Earth"))
+    #expect(groupOnePrompt.contains("Venus"))
+    #expect(groupTwoPrompt.contains("Mercury"))
+    #expect(!groupTwoPrompt.contains("Venus"))
+    #expect(groupTwoPrompt.contains("Earth"))
+}
+
+@Test func builtInClozeTemplateDefaultsToAnswerHiding() throws {
+    try ItemTypeValidation.validate(BuiltInItemTypes.cloze)
+    let promptSlot = try #require(BuiltInItemTypes.cloze.templates.first?.prompt.slots.first)
+    #expect(promptSlot.source == .field(BuiltInItemTypes.clozeTextFieldID))
+    #expect(promptSlot.presentation.reveal == .hiddenUntilAnswer)
+    #expect(BuiltInItemTypes.cloze.templates.first?.interaction == .cloze)
+}
+
+@Test func clozeGroupsPersistAndHydrateAsSeparateCards() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-cloze-cards-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let store = try ItemStore(databaseURL: root.appendingPathComponent("test.sqlite"))
+    try await store.bootstrap()
+    let item = Item(itemTypeID: BuiltInItemTypes.clozeID, fields: [
+        FieldValue(
+            fieldID: BuiltInItemTypes.clozeTextFieldID,
+            value: .cloze(
+                "red green blue",
+                blanks: [
+                    ClozeSpan(group: 4, start: 0, length: 3),
+                    ClozeSpan(group: 9, start: 4, length: 5),
+                    ClozeSpan(group: 4, start: 10, length: 4),
+                ]
+            )
+        ),
+        FieldValue(fieldID: BuiltInItemTypes.clozeContextFieldID, value: .empty),
+    ])
+
+    let saved = try await store.createItem(item)
+    let due = try await store.fetchDueCards()
+
+    #expect(saved.cardCount == 2)
+    #expect(due.map(\.card.clozeGroup).sorted { ($0 ?? 0) < ($1 ?? 0) } == [4, 9])
+    #expect(due.allSatisfy { $0.template.id == BuiltInItemTypes.clozeTemplateID })
+}
+
 @Test func fieldDefMapsMediaAndClozeContentValues() {
     let audioField = FieldDef(name: "Clip", type: .audio)
     let ref = MediaRef(kind: .audio, assetHash: "abc", fileExtension: "m4a")

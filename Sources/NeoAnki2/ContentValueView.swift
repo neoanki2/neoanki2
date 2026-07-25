@@ -10,6 +10,7 @@ struct ContentValueView: View {
     var isAnswerRevealed: Bool = true
     var richTextPointSize: CGFloat = DesignSystem.Typography.richTextPointSize
     var mediaStore: MediaStore?
+    var clozeGroup: Int?
 
     var body: some View {
         switch value {
@@ -46,7 +47,8 @@ struct ContentValueView: View {
                 text: text,
                 blanks: blanks,
                 revealMode: presentation.reveal,
-                isAnswerRevealed: isAnswerRevealed
+                isAnswerRevealed: isAnswerRevealed,
+                group: clozeGroup
             )
         case .empty:
             EmptyView()
@@ -100,6 +102,7 @@ struct SideContentView: View {
     var isAnswerRevealed: Bool = true
     var richTextPointSize: CGFloat = DesignSystem.Typography.richTextPointSize
     var mediaStore: MediaStore?
+    var clozeGroup: Int?
 
     var body: some View {
         let slots = SideContent.resolvedSlots(for: side, from: item)
@@ -110,7 +113,8 @@ struct SideContentView: View {
                     presentation: slot.presentation,
                     isAnswerRevealed: isAnswerRevealed,
                     richTextPointSize: richTextPointSize,
-                    mediaStore: mediaStore
+                    mediaStore: mediaStore,
+                    clozeGroup: clozeGroup
                 )
             }
         }

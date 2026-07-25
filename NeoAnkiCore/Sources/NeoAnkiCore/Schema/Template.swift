@@ -75,13 +75,13 @@ public struct Presentation: Codable, Equatable, Sendable {
     }
 }
 
-public enum RevealMode: String, Codable, Sendable {
+public enum RevealMode: String, Codable, CaseIterable, Sendable {
     case always
     case hiddenUntilAnswer
     case blurred
 }
 
-public enum MediaBehavior: String, Codable, Sendable {
+public enum MediaBehavior: String, Codable, CaseIterable, Sendable {
     case `default`
     case autoplay
     case playOnTap
@@ -89,7 +89,7 @@ public enum MediaBehavior: String, Codable, Sendable {
 }
 
 /// How the learner responds — this is where desirable difficulty is encoded.
-public enum Interaction: String, Codable, Sendable {
+public enum Interaction: String, Codable, CaseIterable, Sendable {
     /// Flip to reveal the answer, then self-grade.
     case reveal
     /// Type the answer; can be auto-checked against the answer side.
