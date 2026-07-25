@@ -8,18 +8,6 @@ class NeoAnkiUITestCase: XCTestCase {
         continueAfterFailure = false
     }
 
-    override func tearDownWithError() throws {
-        if let failure = testRun?.failureCount, failure > 0, let runningApp {
-            let attachment = XCTAttachment(screenshot: runningApp.screenshot())
-            attachment.name = "\(name)-failure"
-            attachment.lifetime = .keepAlways
-            add(attachment)
-        }
-        runningApp?.terminate()
-        runningApp = nil
-        try super.tearDownWithError()
-    }
-
     @discardableResult
     func launchApp(
         databaseLabel: String = UUID().uuidString,
@@ -42,6 +30,19 @@ class NeoAnkiUITestCase: XCTestCase {
         app.launch()
 
         runningApp = app
+        addTeardownBlock { @MainActor [weak self, weak app] in
+            guard let self else { return }
+            if let failure = self.testRun?.failureCount, failure > 0, let app {
+                let attachment = XCTAttachment(screenshot: app.screenshot())
+                attachment.name = "\(self.name)-failure"
+                attachment.lifetime = .keepAlways
+                self.add(attachment)
+            }
+            app?.terminate()
+            if self.runningApp === app {
+                self.runningApp = nil
+            }
+        }
         if waitForLibrary {
             waitForLibraryReady(in: app)
         }
