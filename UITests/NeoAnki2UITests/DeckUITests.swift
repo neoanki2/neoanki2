@@ -104,6 +104,7 @@ final class DeckUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Other Q", back: "Other A", in: app)
 
         selectScope("deckRow-Study Deck", in: app)
+        app.typeKey("0", modifierFlags: [.command])
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
