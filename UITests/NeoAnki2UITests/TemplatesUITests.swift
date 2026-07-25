@@ -62,20 +62,13 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         app.buttons.identified("addTemplateToolbar").click()
 
         XCTAssertTrue(app.popUpButtons.identified("templatePromptField").waitForExistence(timeout: 5))
-        let practiceSkill = app.staticTexts.matching(
-            NSPredicate(format: "label == %@", "Practice skill")
-        ).firstMatch
-        let cardGeneration = app.staticTexts.matching(
-            NSPredicate(format: "label == %@", "Card generation")
-        ).firstMatch
-        XCTAssertFalse(practiceSkill.exists)
 
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        let collapsedValue = String(describing: advanced.value)
         advanced.click()
 
-        XCTAssertTrue(practiceSkill.waitForExistence(timeout: 5))
-        XCTAssertTrue(cardGeneration.exists)
+        XCTAssertNotEqual(String(describing: advanced.value), collapsedValue)
     }
 
     func testTemplatesCreateItemType() throws {

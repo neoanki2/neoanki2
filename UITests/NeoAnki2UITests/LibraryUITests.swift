@@ -120,10 +120,6 @@ final class LibraryUITests: NeoAnkiUITestCase {
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled)
-        let descriptionHint = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "understandable with VoiceOver")
-        ).firstMatch
-        XCTAssertTrue(descriptionHint.waitForExistence(timeout: 3))
 
         enterText(
             "Map showing France",

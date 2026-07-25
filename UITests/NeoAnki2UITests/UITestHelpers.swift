@@ -365,8 +365,16 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func revealAndGrade(_ gradeID: String, in app: XCUIApplication) {
-        if app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 2) {
-            app.buttons.identified("primaryStudyAction").click()
+        let primaryAction = app.buttons.identified("primaryStudyAction")
+        if primaryAction.waitForExistence(timeout: 2) {
+            if !primaryAction.isHittable {
+                let scrollView = app.scrollViews.firstMatch
+                if scrollView.exists {
+                    scrollView.scroll(byDeltaX: 0, deltaY: -300)
+                }
+            }
+            XCTAssertTrue(primaryAction.isHittable)
+            primaryAction.click()
         }
         let gradeButton = app.buttons.identified(gradeID)
         XCTAssertTrue(gradeButton.waitForExistence(timeout: 5))
