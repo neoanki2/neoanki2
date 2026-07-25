@@ -63,6 +63,47 @@ import Testing
     }
 }
 
+@Test func equalTimestampReviewsUsePersistedAppendSequenceNotUUID() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-review-order-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let database = try SQLiteDatabase(path: root.appendingPathComponent("test.sqlite"))
+    try await database.migrate()
+    let cardID = UUID()
+    let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+    let first = ReviewLog(
+        id: UUID(uuidString: "FFFFFFFF-FFFF-4FFF-8FFF-FFFFFFFFFFFF")!,
+        cardID: cardID,
+        reviewedAt: timestamp,
+        rating: .good,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        phaseBefore: .new,
+        durationMs: 1
+    )
+    let second = ReviewLog(
+        id: UUID(uuidString: "00000000-0000-4000-8000-000000000001")!,
+        cardID: cardID,
+        reviewedAt: timestamp,
+        rating: .again,
+        elapsedDays: 1,
+        scheduledDays: 1,
+        phaseBefore: .review,
+        durationMs: 1
+    )
+    try await database.insertReviewLog(first, memoryBefore: .new(due: timestamp))
+    try await database.insertReviewLog(second, memoryBefore: .new(due: timestamp))
+
+    let fetched = try await database.fetchActiveReviewLogs()
+    #expect(fetched.map(\.id) == [first.id, second.id])
+    #expect(fetched.map(\.sequence) == [1, 2])
+
+    let optimizer = FSRSOptimizer(minimumObservations: 1)
+    let orderedLoss = optimizer.logLoss(logs: fetched)
+    let shuffledLoss = optimizer.logLoss(logs: Array(fetched.reversed()))
+    #expect(orderedLoss == shuffledLoss)
+}
+
 private func syntheticLogs(cardCount: Int, reviewsPerCard: Int) -> [ReviewLog] {
     var trueWeights = FSRSScheduler.Parameters.defaultWeights
     trueWeights[0] = 0.9

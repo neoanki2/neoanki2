@@ -418,19 +418,20 @@ public actor ItemStore {
 
         try validate(item, against: itemType)
         let mediaDescriptors = try await newMediaDescriptors(in: item, comparedTo: previous.item)
+        let desiredCards = CardGenerator.cards(for: item, type: itemType, now: now)
         try await database.updateItemWithMedia(
             item,
+            desiredCards: desiredCards,
             updatedAt: now,
             mediaDescriptors: mediaDescriptors
         )
-        let cardCount = try await database.countCards(for: item.id)
         return SavedItemSummary(
             id: item.id,
             itemTypeID: itemType.id,
             itemTypeName: itemType.name,
             title: ItemDisplay.title(for: item, in: itemType),
             subtitle: ItemDisplay.subtitle(for: item, in: itemType),
-            cardCount: cardCount,
+            cardCount: desiredCards.count,
             deckID: item.deckID,
             createdAt: previous.createdAt
         )
@@ -452,8 +453,9 @@ public actor ItemStore {
 
     /// Deletes only zero-reference assets, retaining metadata when deletion is unsafe.
     @discardableResult
-    public func collectMediaGarbage() async throws -> Int {
+    public func collectMediaGarbage(asOf now: Date = .now) async throws -> Int {
         guard let mediaStore else { return 0 }
+        try await database.removeExpiredMediaReservations(asOf: now)
         let orphans = try await database.fetchOrphanedMediaAssets()
         var collected = 0
         for asset in orphans {
@@ -633,24 +635,32 @@ public actor ItemStore {
 
         var entries: [(item: Item, cards: [Card])] = []
         entries.reserveCapacity(payload.rows.count)
+        let importScope = UUID()
 
-        for row in payload.rows {
-            let fields = try await mapImportRow(
-                row,
-                to: resolvedType,
-                context: context,
-                supportsStructuredFields: adapter.supportsStructuredFields
-            )
-            let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
-            try validate(item, against: resolvedType)
-            entries.append((
-                item: item,
-                cards: CardGenerator.cards(for: item, type: resolvedType, now: now)
-            ))
+        do {
+            for row in payload.rows {
+                let fields = try await mapImportRow(
+                    row,
+                    to: resolvedType,
+                    context: context,
+                    supportsStructuredFields: adapter.supportsStructuredFields,
+                    mediaReservationScope: importScope
+                )
+                let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
+                try validate(item, against: resolvedType)
+                entries.append((
+                    item: item,
+                    cards: CardGenerator.cards(for: item, type: resolvedType, now: now)
+                ))
+            }
+
+            try await database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
+            try await mediaStore?.releaseReservations(scopeID: importScope)
+            return entries.count
+        } catch {
+            try? await mediaStore?.rollbackReservations(scopeID: importScope)
+            throw error
         }
-
-        try await database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
-        return entries.count
     }
 
     private func newMediaDescriptors(
@@ -698,13 +708,19 @@ public actor ItemStore {
         _ row: ImportRow,
         to itemType: ItemType,
         context: ImportContext,
-        supportsStructuredFields: Bool
+        supportsStructuredFields: Bool,
+        mediaReservationScope: UUID
     ) async throws -> [FieldValue] {
         var values: [FieldValue] = []
 
         for field in itemType.fields {
             if let structured = row.structuredFields[field.name] {
-                let value = try await contentValue(from: structured, field: field, context: context)
+                let value = try await contentValue(
+                    from: structured,
+                    field: field,
+                    context: context,
+                    mediaReservationScope: mediaReservationScope
+                )
                 if value.isEmpty, field.isRequired {
                     throw DatabaseError.requiredFieldEmpty(field.name)
                 }
@@ -743,7 +759,8 @@ public actor ItemStore {
     private func contentValue(
         from structured: StructuredFieldValue,
         field: FieldDef,
-        context: ImportContext
+        context: ImportContext,
+        mediaReservationScope: UUID
     ) async throws -> ContentValue {
         switch structured {
         case let .text(string):
@@ -761,7 +778,11 @@ public actor ItemStore {
                 throw ImportError.invalidFormat("Media import requires a media store.")
             }
             let resolved = try resolveImportPath(path, baseDirectory: context.baseDirectory)
-            let ref = try await mediaStore.ingest(url: resolved, kind: kind)
+            let ref = try await mediaStore.ingest(
+                url: resolved,
+                kind: kind,
+                reservationScope: mediaReservationScope
+            )
             return .media(ref)
         case let .mediaBase64(base64, declaredExtension, altText):
             guard let kind = field.type.mediaKind else {
@@ -801,7 +822,8 @@ public actor ItemStore {
                 data: data,
                 kind: kind,
                 fileExtension: inferredExtension,
-                altText: altText
+                altText: altText,
+                reservationScope: mediaReservationScope
             )
             return .media(ref)
         }

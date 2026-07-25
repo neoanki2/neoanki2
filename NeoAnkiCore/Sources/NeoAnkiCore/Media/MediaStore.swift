@@ -3,6 +3,7 @@ import Foundation
 
 /// Content-addressed media storage scoped to a sandbox directory.
 public actor MediaStore {
+    static let reservationLifetime: TimeInterval = 24 * 60 * 60
     public let rootDirectory: URL
     private var metadataDatabase: SQLiteDatabase?
 
@@ -46,7 +47,13 @@ public actor MediaStore {
             fileExtension: claimedExtension
         )
 
-        return try await store(data, kind: kind, fileExtension: ext, altText: altText)
+        return try await store(
+            data,
+            kind: kind,
+            fileExtension: ext,
+            altText: altText,
+            reservationScope: nil
+        )
     }
 
     /// Ingests raw data (e.g. import base64) into the sandbox.
@@ -62,7 +69,63 @@ public actor MediaStore {
             fileExtension: fileExtension
         )
 
-        return try await store(data, kind: kind, fileExtension: ext, altText: altText)
+        return try await store(
+            data,
+            kind: kind,
+            fileExtension: ext,
+            altText: altText,
+            reservationScope: nil
+        )
+    }
+
+    func ingest(
+        url: URL,
+        kind: MediaKind,
+        reservationScope: UUID
+    ) async throws -> MediaRef {
+        let resolved = url.standardizedFileURL
+        guard resolved.isFileURL else { throw MediaError.invalidPath }
+        let data = try readFile(
+            at: resolved,
+            kind: kind,
+            maxBytes: MediaValidation.maxBytes(for: kind)
+        )
+        let claimedExtension = resolved.pathExtension.lowercased().isEmpty
+            ? MediaValidation.defaultExtension(for: kind)
+            : resolved.pathExtension.lowercased()
+        let ext = try MediaValidation.validatedExtension(
+            data: data,
+            kind: kind,
+            fileExtension: claimedExtension
+        )
+        return try await store(
+            data,
+            kind: kind,
+            fileExtension: ext,
+            altText: nil,
+            reservationScope: reservationScope
+        )
+    }
+
+    func ingest(
+        data: Data,
+        kind: MediaKind,
+        fileExtension: String,
+        altText: String? = nil,
+        reservationScope: UUID
+    ) async throws -> MediaRef {
+        let ext = try MediaValidation.validatedExtension(
+            data: data,
+            kind: kind,
+            fileExtension: fileExtension
+        )
+        return try await store(
+            data,
+            kind: kind,
+            fileExtension: ext,
+            altText: altText,
+            reservationScope: reservationScope
+        )
     }
 
     /// Ingests raw data after deriving its format from validated bytes.
@@ -72,14 +135,21 @@ public actor MediaStore {
         altText: String? = nil
     ) async throws -> MediaRef {
         let ext = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
-        return try await store(data, kind: kind, fileExtension: ext, altText: altText)
+        return try await store(
+            data,
+            kind: kind,
+            fileExtension: ext,
+            altText: altText,
+            reservationScope: nil
+        )
     }
 
     private func store(
         _ data: Data,
         kind: MediaKind,
         fileExtension: String,
-        altText: String?
+        altText: String?,
+        reservationScope: UUID?
     ) async throws -> MediaRef {
         let hash = Self.sha256Hex(data)
         var storedExtension = fileExtension
@@ -91,30 +161,54 @@ public actor MediaStore {
             }
             storedExtension = existing.fileExtension
         }
+        let descriptor = MediaAssetDescriptor(
+            hash: hash,
+            kind: kind,
+            byteSize: data.count,
+            fileExtension: storedExtension
+        )
+        let reservationID = UUID()
+        let createdAsset: Bool
+        if let metadataDatabase {
+            let now = Date.now
+            createdAsset = try await metadataDatabase.reserveMediaAsset(
+                descriptor,
+                reservationID: reservationID,
+                scopeID: reservationScope,
+                createdAt: now,
+                expiresAt: now.addingTimeInterval(Self.reservationLifetime)
+            )
+        } else {
+            createdAsset = false
+        }
         let destination = try assetURL(hash: hash, fileExtension: storedExtension, kind: kind)
 
-        if !FileManager.default.fileExists(atPath: destination.path) {
-            try data.write(to: destination, options: .atomic)
-        } else {
-            _ = try containedExistingURL(destination)
+        do {
+            if !FileManager.default.fileExists(atPath: destination.path) {
+                try data.write(to: destination, options: .atomic)
+            } else {
+                _ = try containedExistingURL(destination)
+            }
+        } catch {
+            if let metadataDatabase,
+               let asset = try? await metadataDatabase.cancelMediaReservation(
+                   id: reservationID,
+                   deleteNewAsset: createdAsset
+               )
+            {
+                try? removeAssetFile(asset)
+            }
+            throw error
         }
 
-        let ref = MediaRef(
+        var ref = MediaRef(
             kind: kind,
             assetHash: hash,
             fileExtension: storedExtension,
             altText: altText?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         )
-        if let metadataDatabase {
-            try await metadataDatabase.registerMediaAsset(
-                MediaAssetDescriptor(
-                    hash: hash,
-                    kind: kind,
-                    byteSize: data.count,
-                    fileExtension: storedExtension
-                ),
-                createdAt: .now
-            )
+        if metadataDatabase != nil {
+            ref.reservationID = reservationID
         }
         return ref
     }
@@ -154,6 +248,22 @@ public actor MediaStore {
     /// Missing files are already collected and therefore count as success.
     func removeOrphan(_ asset: MediaAsset) throws {
         guard asset.refCount == 0 else { return }
+        try removeAssetFile(asset)
+    }
+
+    func rollbackReservations(scopeID: UUID) async throws {
+        guard let metadataDatabase else { return }
+        let assets = try await metadataDatabase.rollbackMediaReservations(scopeID: scopeID)
+        for asset in assets {
+            try removeAssetFile(asset)
+        }
+    }
+
+    func releaseReservations(scopeID: UUID) async throws {
+        try await metadataDatabase?.releaseMediaReservations(scopeID: scopeID)
+    }
+
+    private func removeAssetFile(_ asset: MediaAsset) throws {
         let url = try assetURL(
             hash: asset.hash,
             fileExtension: asset.fileExtension,

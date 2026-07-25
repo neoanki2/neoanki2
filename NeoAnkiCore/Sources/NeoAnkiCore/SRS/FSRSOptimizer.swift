@@ -146,23 +146,29 @@ public struct FSRSOptimizer: Sendable {
     }
 
     private static func usableHistories(from logs: [ReviewLog]) -> [[ReviewLog]] {
-        let valid = logs.filter {
-            $0.reviewedAt.timeIntervalSinceReferenceDate.isFinite
-                && $0.elapsedDays.isFinite
-                && $0.elapsedDays >= 0
-                && $0.scheduledDays.isFinite
-                && $0.scheduledDays >= 0
-                && $0.durationMs >= 0
+        let valid = logs.enumerated().filter {
+            $0.element.reviewedAt.timeIntervalSinceReferenceDate.isFinite
+                && $0.element.elapsedDays.isFinite
+                && $0.element.elapsedDays >= 0
+                && $0.element.scheduledDays.isFinite
+                && $0.element.scheduledDays >= 0
+                && $0.element.durationMs >= 0
         }
-        return Dictionary(grouping: valid, by: \.cardID)
+        return Dictionary(grouping: valid, by: \.element.cardID)
             .values
             .map {
                 $0.sorted {
-                    if $0.reviewedAt == $1.reviewedAt {
-                        return $0.id.uuidString < $1.id.uuidString
+                    if $0.element.reviewedAt == $1.element.reviewedAt {
+                        switch ($0.element.sequence, $1.element.sequence) {
+                        case let (lhs?, rhs?) where lhs != rhs:
+                            return lhs < rhs
+                        default:
+                            return $0.offset < $1.offset
+                        }
                     }
-                    return $0.reviewedAt < $1.reviewedAt
+                    return $0.element.reviewedAt < $1.element.reviewedAt
                 }
+                .map(\.element)
             }
             .filter { $0.count >= 2 }
             .sorted { lhs, rhs in

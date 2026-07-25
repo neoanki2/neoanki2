@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SQLite3
 import Testing
@@ -162,6 +163,102 @@ private func item(
         try await context.media.removeOrphan(hostile)
     }
     #expect(FileManager.default.fileExists(atPath: sentinel.path))
+}
+
+@Test func freshIngestReservationSurvivesGCUntilItemCommit() async throws {
+    let context = try await makeMediaStore()
+    let ref = try await context.media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
+
+    #expect(try await context.store.collectMediaGarbage() == 0)
+    _ = try await context.media.resolve(ref)
+
+    let saved = item(
+        type: context.type,
+        mediaFields: [(context.firstImage, ref)]
+    )
+    _ = try await context.store.createItem(saved)
+    #expect(try await context.store.deleteItem(id: saved.id))
+    #expect(try await context.store.mediaAsset(hash: ref.assetHash) == nil)
+    await #expect(throws: MediaError.readFailed) {
+        _ = try await context.media.resolve(ref)
+    }
+}
+
+@Test func staleIngestReservationIsCleanedAndCollected() async throws {
+    let context = try await makeMediaStore()
+    let ref = try await context.media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
+    let afterExpiry = Date.now.addingTimeInterval(MediaStore.reservationLifetime + 1)
+
+    #expect(try await context.store.collectMediaGarbage(asOf: afterExpiry) == 1)
+    #expect(try await context.store.mediaAsset(hash: ref.assetHash) == nil)
+    await #expect(throws: MediaError.readFailed) {
+        _ = try await context.media.resolve(ref)
+    }
+}
+
+@Test func failedLaterImportRowRemovesOnlyAssetsCreatedByImport() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-import-rollback-\(UUID().uuidString)", isDirectory: true)
+    let store = try ItemStore(databaseURL: root.appendingPathComponent("test.sqlite"))
+    try await store.bootstrap()
+    let media = try #require(await store.media)
+    let image = FieldDef(name: "Image", type: .image, isRequired: true)
+    let caption = FieldDef(name: "Caption", type: .text, isRequired: true)
+    let template = Template(
+        name: "Card",
+        prompt: Side(slots: [Slot(source: .field(image.id))]),
+        answer: Side(slots: [Slot(source: .field(caption.id))]),
+        interaction: .reveal,
+        skill: Skill(input: .image, output: .text, operation: .recognize)
+    )
+    let type = ItemType(name: "Rollback Media", fields: [image, caption], templates: [template])
+    _ = try await store.createItemType(type)
+
+    let existingRef = try await media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
+    let existingItem = Item(
+        itemTypeID: type.id,
+        fields: [
+            FieldValue(fieldID: image.id, value: .media(existingRef)),
+            FieldValue(fieldID: caption.id, value: .text("Existing")),
+        ]
+    )
+    _ = try await store.createItem(existingItem)
+    var newBytes = pngBytes
+    newBytes.append(0x7F)
+    let newHash = SHA256.hash(data: newBytes).map { String(format: "%02x", $0) }.joined()
+    let json = """
+    {
+      "itemType": "Rollback Media",
+      "rows": [
+        {
+          "Image": {
+            "base64": "\(pngBytes.base64EncodedString())",
+            "fileExtension": "png"
+          },
+          "Caption": "Deduplicated"
+        },
+        {
+          "Image": {
+            "base64": "\(newBytes.base64EncodedString())",
+            "fileExtension": "png"
+          }
+        }
+      ]
+    }
+    """.data(using: .utf8)!
+
+    await #expect(throws: DatabaseError.requiredFieldEmpty("Caption")) {
+        try await store.importItems(from: json, adapter: JSONImportAdapter())
+    }
+
+    #expect(try await store.listItems().map(\.id) == [existingItem.id])
+    #expect(try await store.mediaAsset(hash: existingRef.assetHash)?.refCount == 1)
+    _ = try await media.resolve(existingRef)
+    #expect(try await store.mediaAsset(hash: newHash) == nil)
+    let rolledBack = MediaRef(kind: .image, assetHash: newHash, fileExtension: "png")
+    await #expect(throws: MediaError.readFailed) {
+        _ = try await media.resolve(rolledBack)
+    }
 }
 
 @Test func migrationV5BackfillsDuplicateReferences() async throws {

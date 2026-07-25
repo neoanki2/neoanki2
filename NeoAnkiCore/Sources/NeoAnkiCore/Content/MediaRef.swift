@@ -12,6 +12,9 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
     public var durationMs: Int?
     /// Accessibility / fallback description.
     public var altText: String?
+    /// Ephemeral GC handoff. It is deliberately excluded from Codable and is
+    /// consumed atomically when an item commit adopts this reference.
+    var reservationID: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -27,6 +30,7 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
         self.fileExtension = fileExtension
         self.durationMs = durationMs
         self.altText = altText
+        reservationID = nil
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -49,6 +53,7 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
         fileExtension = try container.decode(String.self, forKey: .fileExtension)
         durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs)
         altText = try container.decodeIfPresent(String.self, forKey: .altText)
+        reservationID = nil
         guard isValidStoredReference else {
             throw DecodingError.dataCorruptedError(
                 forKey: .assetHash,
@@ -83,6 +88,15 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
             && assetHash.allSatisfy { "0123456789abcdef".contains($0) }
             && fileExtension == fileExtension.lowercased()
             && MediaValidation.allowedExtensions(for: kind).contains(fileExtension)
+    }
+
+    public static func == (lhs: MediaRef, rhs: MediaRef) -> Bool {
+        lhs.id == rhs.id
+            && lhs.kind == rhs.kind
+            && lhs.assetHash == rhs.assetHash
+            && lhs.fileExtension == rhs.fileExtension
+            && lhs.durationMs == rhs.durationMs
+            && lhs.altText == rhs.altText
     }
 }
 

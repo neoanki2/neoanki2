@@ -13,7 +13,57 @@ import Testing
     #expect(try tableExists("media_assets", at: url))
     #expect(try tableExists("review_reverts", at: url))
     #expect(try columnExists("memory_before", in: "review_logs", at: url))
+    #expect(try columnExists("sequence", in: "review_logs", at: url))
     #expect(try columnExists("cloze_group", in: "cards", at: url))
+    #expect(try tableExists("media_reservations", at: url))
+}
+
+@Test func versionNineMigrationBackfillsStableReviewAppendOrder() async throws {
+    let url = migrationDatabaseURL()
+    let firstID = UUID(uuidString: "FFFFFFFF-FFFF-4FFF-8FFF-FFFFFFFFFFFF")!
+    let secondID = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (9);
+        CREATE TABLE review_logs (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL,
+            reviewed_at REAL NOT NULL,
+            log BLOB NOT NULL,
+            memory_before BLOB
+        );
+        INSERT INTO review_logs VALUES (
+            '\(firstID.uuidString)', '\(UUID().uuidString)', 100, X'7b7d', NULL
+        );
+        INSERT INTO review_logs VALUES (
+            '\(secondID.uuidString)', '\(UUID().uuidString)', 100, X'7b7d', NULL
+        );
+        CREATE TABLE media_assets (
+            hash TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL,
+            byte_size INTEGER NOT NULL,
+            file_extension TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            ref_count INTEGER NOT NULL DEFAULT 0
+        );
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer(
+        "SELECT sequence FROM review_logs WHERE id = '\(firstID.uuidString)';",
+        at: url
+    ) == 1)
+    #expect(try integer(
+        "SELECT sequence FROM review_logs WHERE id = '\(secondID.uuidString)';",
+        at: url
+    ) == 2)
+    #expect(try tableExists("media_reservations", at: url))
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
 }
 
 @Test func versionEightMigrationAddsClozeGroupsWithoutChangingExistingCards() async throws {

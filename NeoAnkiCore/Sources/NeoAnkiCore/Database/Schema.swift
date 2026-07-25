@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 10
+    static let version = 12
 
     static let createStatements: [String] = [
         """
@@ -60,7 +60,8 @@ enum Schema {
             card_id TEXT NOT NULL,
             reviewed_at REAL NOT NULL,
             log BLOB NOT NULL,
-            memory_before BLOB NOT NULL
+            memory_before BLOB NOT NULL,
+            sequence INTEGER NOT NULL UNIQUE
         );
         """,
         """
@@ -69,6 +70,22 @@ enum Schema {
             review_log_id TEXT NOT NULL UNIQUE REFERENCES review_logs(id),
             reverted_at REAL NOT NULL
         );
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS review_logs_sequence_insert_required
+        BEFORE INSERT ON review_logs
+        WHEN NEW.sequence IS NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'review log sequence is required');
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS review_logs_sequence_update_required
+        BEFORE UPDATE OF sequence ON review_logs
+        WHEN NEW.sequence IS NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'review log sequence is required');
+        END;
         """,
         """
         CREATE TABLE IF NOT EXISTS decks (
@@ -101,6 +118,23 @@ enum Schema {
             created_at REAL NOT NULL,
             ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0)
         );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS media_reservations (
+            id TEXT PRIMARY KEY NOT NULL,
+            hash TEXT NOT NULL REFERENCES media_assets(hash) ON DELETE CASCADE,
+            scope_id TEXT,
+            expires_at REAL NOT NULL,
+            created_asset INTEGER NOT NULL DEFAULT 0
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_reservations_hash
+        ON media_reservations(hash);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_reservations_expiry
+        ON media_reservations(expires_at);
         """,
         """
         CREATE TABLE IF NOT EXISTS scheduler_params (
@@ -141,6 +175,54 @@ enum Schema {
             definition BLOB NOT NULL,
             archived_at REAL NOT NULL
         );
+        """,
+    ]
+
+    /// Review append order is independent of wall-clock precision and UUID text.
+    static let migrationV11Statements: [String] = [
+        "ALTER TABLE review_logs ADD COLUMN sequence INTEGER;",
+        "UPDATE review_logs SET sequence = rowid WHERE sequence IS NULL;",
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_review_logs_sequence
+        ON review_logs(sequence);
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS review_logs_sequence_insert_required
+        BEFORE INSERT ON review_logs
+        WHEN NEW.sequence IS NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'review log sequence is required');
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS review_logs_sequence_update_required
+        BEFORE UPDATE OF sequence ON review_logs
+        WHEN NEW.sequence IS NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'review log sequence is required');
+        END;
+        """,
+    ]
+
+    /// Durable reservations prevent GC from racing an editor/import between
+    /// ingesting bytes and committing the item that references them.
+    static let migrationV12Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS media_reservations (
+            id TEXT PRIMARY KEY NOT NULL,
+            hash TEXT NOT NULL REFERENCES media_assets(hash) ON DELETE CASCADE,
+            scope_id TEXT,
+            expires_at REAL NOT NULL,
+            created_asset INTEGER NOT NULL DEFAULT 0
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_reservations_hash
+        ON media_reservations(hash);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_reservations_expiry
+        ON media_reservations(expires_at);
         """,
     ]
 
