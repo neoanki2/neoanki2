@@ -170,11 +170,20 @@ private struct SlotListEditor: View {
 
     var body: some View {
         ForEach($slots) { $slot in
+            let mediaKind = slot.fieldID
+                .flatMap { id in fields.first { $0.id == id } }?
+                .type.mediaKind
+            let mediaBehaviors = slot.sourceKind == .field
+                ? MediaBehavior.supported(for: mediaKind)
+                : [.default]
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 HStack {
                     Picker("Source", selection: $slot.sourceKind) {
                         Text("Field").tag(SlotDraft.SourceKind.field)
                         Text("Literal text").tag(SlotDraft.SourceKind.literal)
+                    }
+                    .onChange(of: slot.sourceKind) { _, _ in
+                        slot.media = .default
                     }
                     Spacer()
                     Button("Move Up", systemImage: "arrow.up") {
@@ -205,11 +214,15 @@ private struct SlotListEditor: View {
                         }
                     }
                     .onChange(of: slot.fieldID) { _, fieldID in
-                        guard clozeFieldsDefaultToHidden,
-                              fieldID.flatMap({ id in fields.first { $0.id == id } })?.type == .cloze,
-                              slot.reveal == .always
-                        else { return }
-                        slot.reveal = .hiddenUntilAnswer
+                        let field = fieldID.flatMap { id in fields.first { $0.id == id } }
+                        if !slot.media.isSupported(for: field?.type.mediaKind) {
+                            slot.media = .default
+                        }
+                        if clozeFieldsDefaultToHidden,
+                           field?.type == .cloze,
+                           slot.reveal == .always {
+                            slot.reveal = .hiddenUntilAnswer
+                        }
                     }
                 } else {
                     TextField("Literal text", text: $slot.literal)
@@ -221,9 +234,11 @@ private struct SlotListEditor: View {
                             Text(mode.label).tag(mode)
                         }
                     }
-                    Picker("Media", selection: $slot.media) {
-                        ForEach(MediaBehavior.allCases, id: \.self) { behavior in
-                            Text(behavior.label).tag(behavior)
+                    if mediaBehaviors.count > 1 {
+                        Picker("Media", selection: $slot.media) {
+                            ForEach(mediaBehaviors, id: \.self) { behavior in
+                                Text(behavior.label).tag(behavior)
+                            }
                         }
                     }
                 }

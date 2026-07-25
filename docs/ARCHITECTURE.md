@@ -84,8 +84,9 @@ public enum ContentValue: Codable, Equatable, Sendable {
 
 `MediaRef` is a serializable handle into a content-addressed store (`MediaStore`:
 SHA-256 hash, files under `{AppSupport}/neoanki2/media/`). Legacy URL-based refs
-remain decodable for tests. Content carries no presentation, so the same value can
-appear differently on prompt vs. answer via `Presentation` on each `Slot`.
+are rejected during decoding; only validated hash references resolve. Content
+carries no presentation, so the same value can appear differently on prompt vs.
+answer via `Presentation` on each `Slot`.
 
 ### Layer 2 — Schema / Presentation
 
@@ -171,7 +172,7 @@ Bulk import enforces limits before parse: **5 MB** payload, **10 000** rows, **3
 | Field type | JSON cell shape |
 | --- | --- |
 | Text-like | string |
-| Media | relative path (under import bundle) or base64 object `{ "base64": "…", "altText": "…" }` |
+| Media | relative path (under import bundle) or base64 object `{ "base64": "…", "altText": "…" }`; kind comes from the field and extension is inferred from validated bytes |
 | Cloze | `{ "text": "…", "blanks": [{ "group": 1, "start": 0, "length": 3, "hint": "…" }] }` |
 
 CSV supports text fields only; cloze and media require JSON.
@@ -179,7 +180,13 @@ CSV supports text fields only; cloze and media require JSON.
 ### Study resolution
 
 `SideContent.resolvedSlots` yields `ResolvedSlot(value:presentation:)` so renderers honor
-`RevealMode` and `MediaBehavior` (autoplay, blur, hidden-until-answer).
+`RevealMode` and meaningful `MediaBehavior` values (default controls, autoplay,
+play-on-tap, and looping). Reduce Motion suppresses automatic audio, video, and
+GIF playback; static images cannot be authored with playback-only behavior.
+
+The macOS shell exposes item-type/template authoring and study as first-class
+detail-pane modes. File import is selected from the File menu and configured in
+a native import sheet.
 
 ---
 

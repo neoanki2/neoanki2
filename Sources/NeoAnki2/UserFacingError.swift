@@ -78,6 +78,8 @@ enum UserFacingError {
             "Choose \(article(for: kind)) \(kind.rawValue) file smaller than \(maxBytes / 1_000_000) MB."
         case let .unsupportedFormat(kind):
             "Choose a supported \(kind.rawValue) file."
+        case .ambiguousFormat:
+            "That file matches more than one media format. Choose a standard audio, image, GIF, or video file."
         case .invalidPath:
             "That file location isn't valid. Choose the file again."
         case .readFailed:

@@ -86,7 +86,7 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
 @Test func templateDraftBuildsEveryInteractionAndModelFeature() throws {
     let cue = FieldDef(name: "Cue", type: .text)
     let response = FieldDef(name: "Response", type: .richText)
-    let picture = FieldDef(name: "Picture", type: .image, isRequired: false)
+    let picture = FieldDef(name: "Animation", type: .gif, isRequired: false)
     let cloze = FieldDef(name: "Sentence", type: .cloze)
     let base = try TemplateBuilder.makeRevealTemplate(
         name: "Base",
@@ -101,7 +101,7 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     )
 
     for interaction in Interaction.allCases {
-        let promptField = interaction == .cloze ? cloze.id : cue.id
+        let promptField = interaction == .cloze ? cloze.id : picture.id
         let draft = TemplateDraft(
             name: "\(interaction.rawValue) practice",
             interaction: interaction,
@@ -116,11 +116,11 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
                 SlotDraft(
                     fieldID: promptField,
                     reveal: interaction == .cloze ? .hiddenUntilAnswer : .blurred,
-                    media: .autoplay
+                    media: interaction == .cloze ? .default : .autoplay
                 ),
             ],
             answerSlots: [
-                SlotDraft(fieldID: response.id, reveal: .always, media: .playOnTap),
+                SlotDraft(fieldID: picture.id, reveal: .always, media: .playOnTap),
                 SlotDraft(sourceKind: .literal, literal: "Complete"),
             ]
         )
@@ -131,7 +131,10 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
         #expect(template.prompt.slots.count == 2)
         #expect(template.answer.slots.count == 2)
         #expect(template.prompt.slots[0].source == .literal("Study:"))
-        #expect(template.prompt.slots[1].presentation.media == .autoplay)
+        #expect(
+            template.prompt.slots[1].presentation.media
+                == (interaction == .cloze ? .default : .autoplay)
+        )
         #expect(template.generateWhen == .all([
             .fieldNotEmpty(cue.id),
             .any([.fieldEmpty(picture.id), .fieldNotEmpty(response.id)]),

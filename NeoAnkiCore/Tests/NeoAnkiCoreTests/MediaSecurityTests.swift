@@ -127,3 +127,26 @@ private let pngHeader = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         try MediaValidation.validate(data: m4a, kind: .video, fileExtension: "mp4")
     }
 }
+
+@Test func mediaValidationInfersCanonicalFormatsAndRejectsAmbiguity() throws {
+    let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0])
+    let mp4 = Data([0x00, 0x00, 0x00, 0x18] + Array("ftypisom".utf8))
+    let ambiguousISO = Data(
+        [0x00, 0x00, 0x00, 0x18]
+            + Array("ftypisom".utf8)
+            + [0x00, 0x00, 0x00, 0x00]
+            + Array("M4A ".utf8)
+    )
+
+    #expect(
+        try MediaValidation.detectedFormat(data: jpeg)
+            == MediaValidation.DetectedFormat(kind: .image, fileExtension: "jpg")
+    )
+    #expect(
+        try MediaValidation.detectedFormat(data: mp4)
+            == MediaValidation.DetectedFormat(kind: .video, fileExtension: "mp4")
+    )
+    #expect(throws: MediaError.ambiguousFormat) {
+        try MediaValidation.detectedFormat(data: ambiguousISO)
+    }
+}

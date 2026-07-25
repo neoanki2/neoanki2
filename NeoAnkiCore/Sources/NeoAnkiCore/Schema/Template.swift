@@ -86,6 +86,19 @@ public enum MediaBehavior: String, Codable, CaseIterable, Sendable {
     case autoplay
     case playOnTap
     case loop
+
+    public static func supported(for kind: MediaKind?) -> [MediaBehavior] {
+        switch kind {
+        case .audio, .gif, .video:
+            return allCases
+        case .image, nil:
+            return [.default]
+        }
+    }
+
+    public func isSupported(for kind: MediaKind?) -> Bool {
+        Self.supported(for: kind).contains(self)
+    }
 }
 
 /// How the learner responds — this is where desirable difficulty is encoded.

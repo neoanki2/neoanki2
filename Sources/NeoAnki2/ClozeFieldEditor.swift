@@ -243,6 +243,19 @@ private struct ClozeTextEditor: NSViewRepresentable {
             updateSelection(in: textView)
         }
 
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            switch ClozeFocusNavigation.direction(for: commandSelector) {
+            case .forward:
+                textView.window?.selectNextKeyView(textView)
+                return true
+            case .backward:
+                textView.window?.selectPreviousKeyView(textView)
+                return true
+            case nil:
+                return false
+            }
+        }
+
         private func updateSelection(in textView: NSTextView) {
             let string = textView.string
             let selected = textView.selectedRange()
@@ -256,6 +269,12 @@ private struct ClozeTextEditor: NSViewRepresentable {
             parent.selectionStart = string.distance(from: string.startIndex, to: range.lowerBound)
             parent.selectionLength = string.distance(from: range.lowerBound, to: range.upperBound)
         }
+    }
+}
+
+enum ClozeFocusNavigation {
+    static func direction(for selector: Selector) -> RichTextFocusNavigation.Direction? {
+        RichTextFocusNavigation.direction(for: selector)
     }
 }
 

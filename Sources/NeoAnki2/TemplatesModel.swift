@@ -238,6 +238,18 @@ struct TemplateDraft: Equatable {
         generateWhen = template.generateWhen.map(ConditionDraft.init)
         promptSlots = template.prompt.slots.map(SlotDraft.init)
         answerSlots = template.answer.slots.map(SlotDraft.init)
+        for index in promptSlots.indices
+            where !promptSlots[index].media.isSupported(
+                for: promptSlots[index].fieldID.flatMap(itemType.field)?.type.mediaKind
+            ) {
+            promptSlots[index].media = .default
+        }
+        for index in answerSlots.indices
+            where !answerSlots[index].media.isSupported(
+                for: answerSlots[index].fieldID.flatMap(itemType.field)?.type.mediaKind
+            ) {
+            answerSlots[index].media = .default
+        }
     }
 
     var isValid: Bool {

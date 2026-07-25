@@ -3,6 +3,7 @@ import Foundation
 public enum MediaError: Error, Sendable, Equatable, LocalizedError {
     case fileTooLarge(MediaKind, maxBytes: Int)
     case unsupportedFormat(MediaKind)
+    case ambiguousFormat
     case invalidPath
     case readFailed
     case sandboxViolation
@@ -13,6 +14,8 @@ public enum MediaError: Error, Sendable, Equatable, LocalizedError {
             return "\(kind.rawValue) files must be \(maxBytes / 1_000_000) MB or smaller."
         case let .unsupportedFormat(kind):
             return "This file is not a supported \(kind.rawValue) format."
+        case .ambiguousFormat:
+            return "The media bytes match more than one supported format."
         case .invalidPath:
             return "The media file path is invalid."
         case .readFailed:
@@ -24,6 +27,16 @@ public enum MediaError: Error, Sendable, Equatable, LocalizedError {
 }
 
 public enum MediaValidation {
+    public struct DetectedFormat: Sendable, Hashable {
+        public let kind: MediaKind
+        public let fileExtension: String
+
+        public init(kind: MediaKind, fileExtension: String) {
+            self.kind = kind
+            self.fileExtension = fileExtension
+        }
+    }
+
     public static func maxBytes(for kind: MediaKind) -> Int {
         switch kind {
         case .audio: 20_000_000
@@ -75,6 +88,50 @@ public enum MediaValidation {
     ) throws -> String {
         try validate(data: data, kind: kind, fileExtension: fileExtension)
         return canonicalExtension(fileExtension.lowercased())
+    }
+
+    /// Identifies a supported media format from its bytes alone. Aliases such
+    /// as jpg/jpeg are collapsed before ambiguity is checked.
+    public static func detectedFormat(data: Data) throws -> DetectedFormat {
+        var matches = Set<DetectedFormat>()
+        for kind in [MediaKind.audio, .image, .gif, .video] {
+            for fileExtension in allowedExtensions(for: kind)
+                where matchesMagicBytes(data, kind: kind, fileExtension: fileExtension) {
+                matches.insert(
+                    DetectedFormat(
+                        kind: kind,
+                        fileExtension: canonicalExtension(fileExtension)
+                    )
+                )
+            }
+        }
+
+        guard !matches.isEmpty else {
+            throw MediaError.unsupportedFormat(.image)
+        }
+        guard matches.count == 1, let match = matches.first else {
+            throw MediaError.ambiguousFormat
+        }
+        guard data.count <= maxBytes(for: match.kind) else {
+            throw MediaError.fileTooLarge(match.kind, maxBytes: maxBytes(for: match.kind))
+        }
+        return match
+    }
+
+    public static func inferredExtension(data: Data, expectedKind: MediaKind) throws -> String {
+        let detected: DetectedFormat
+        do {
+            detected = try detectedFormat(data: data)
+        } catch MediaError.unsupportedFormat {
+            throw MediaError.unsupportedFormat(expectedKind)
+        }
+        guard detected.kind == expectedKind else {
+            throw MediaError.unsupportedFormat(expectedKind)
+        }
+        guard data.count <= maxBytes(for: expectedKind) else {
+            throw MediaError.fileTooLarge(expectedKind, maxBytes: maxBytes(for: expectedKind))
+        }
+        return detected.fileExtension
     }
 
     private static func canonicalExtension(_ fileExtension: String) -> String {

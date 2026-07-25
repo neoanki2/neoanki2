@@ -728,7 +728,7 @@ public actor ItemStore {
             let resolved = try resolveImportPath(path, baseDirectory: context.baseDirectory)
             let ref = try await mediaStore.ingest(url: resolved, kind: kind)
             return .media(ref)
-        case let .mediaBase64(base64, fileExtension):
+        case let .mediaBase64(base64, declaredExtension, altText):
             guard let kind = field.type.mediaKind else {
                 throw ImportError.invalidFormat("Field \"\(field.name)\" is not a media field.")
             }
@@ -742,7 +742,32 @@ public actor ItemStore {
             guard data.count <= MediaValidation.maxBytes(for: kind) else {
                 throw ImportError.invalidFormat("Media in field \"\(field.name)\" exceeds its size limit.")
             }
-            let ref = try await mediaStore.ingest(data: data, kind: kind, fileExtension: fileExtension)
+            if let altText {
+                try ImportLimits.validateFieldString(altText, fieldName: "\(field.name) alt text")
+            }
+            let inferredExtension: String
+            do {
+                inferredExtension = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
+            } catch {
+                let detail = (error as? LocalizedError)?.errorDescription ?? "The bytes are invalid."
+                throw ImportError.invalidFormat("Media in field \"\(field.name)\" is invalid. \(detail)")
+            }
+            if let declaredExtension {
+                let normalized = declaredExtension.lowercased() == "jpeg"
+                    ? "jpg"
+                    : declaredExtension.lowercased()
+                guard normalized == inferredExtension else {
+                    throw ImportError.invalidFormat(
+                        "Media in field \"\(field.name)\" does not match its fileExtension."
+                    )
+                }
+            }
+            let ref = try await mediaStore.ingest(
+                data: data,
+                kind: kind,
+                fileExtension: inferredExtension,
+                altText: altText
+            )
             return .media(ref)
         }
     }

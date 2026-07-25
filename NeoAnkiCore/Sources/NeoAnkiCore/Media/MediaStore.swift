@@ -65,6 +65,16 @@ public actor MediaStore {
         return try await store(data, kind: kind, fileExtension: ext, altText: altText)
     }
 
+    /// Ingests raw data after deriving its format from validated bytes.
+    public func ingest(
+        data: Data,
+        kind: MediaKind,
+        altText: String? = nil
+    ) async throws -> MediaRef {
+        let ext = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
+        return try await store(data, kind: kind, fileExtension: ext, altText: altText)
+    }
+
     private func store(
         _ data: Data,
         kind: MediaKind,

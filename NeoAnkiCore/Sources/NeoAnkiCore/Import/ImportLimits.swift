@@ -41,10 +41,10 @@ public enum StructuredFieldValue: Decodable, Sendable, Equatable {
     case text(String)
     case cloze(text: String, blanks: [ClozeSpan])
     case mediaPath(String)
-    case mediaBase64(String, fileExtension: String)
+    case mediaBase64(String, fileExtension: String?, altText: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case text, blanks, path, base64, fileExtension
+        case text, blanks, path, base64, fileExtension, altText
     }
 
     public init(from decoder: Decoder) throws {
@@ -60,8 +60,11 @@ public enum StructuredFieldValue: Decodable, Sendable, Equatable {
             return
         }
         if let base64 = try container.decodeIfPresent(String.self, forKey: .base64) {
-            let ext = try container.decodeIfPresent(String.self, forKey: .fileExtension) ?? "bin"
-            self = .mediaBase64(base64, fileExtension: ext)
+            self = .mediaBase64(
+                base64,
+                fileExtension: try container.decodeIfPresent(String.self, forKey: .fileExtension),
+                altText: try container.decodeIfPresent(String.self, forKey: .altText)
+            )
             return
         }
 

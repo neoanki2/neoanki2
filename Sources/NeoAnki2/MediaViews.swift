@@ -1,13 +1,48 @@
 import AVKit
+import AppKit
 import NeoAnkiCore
 import SwiftUI
+
+enum MediaPlaybackPolicy {
+    static func shouldAutoplay(
+        kind: MediaKind,
+        behavior: MediaBehavior,
+        reduceMotion: Bool
+    ) -> Bool {
+        !reduceMotion
+            && behavior == .autoplay
+            && [.audio, .gif, .video].contains(kind)
+    }
+
+    static func shouldLoop(kind: MediaKind, behavior: MediaBehavior) -> Bool {
+        behavior == .loop && [.audio, .gif, .video].contains(kind)
+    }
+
+    static func gifAnimates(
+        behavior: MediaBehavior,
+        reduceMotion: Bool,
+        playOnTapActive: Bool
+    ) -> Bool {
+        guard !reduceMotion else { return false }
+        switch behavior {
+        case .autoplay, .loop:
+            return true
+        case .playOnTap:
+            return playOnTapActive
+        case .default:
+            return false
+        }
+    }
+}
 
 struct AudioPlayerView: View {
     let url: URL
     let behavior: MediaBehavior
     let altText: String?
+    let reduceMotion: Bool
 
     @State private var player: AVPlayer?
+    @State private var loopObserver: NSObjectProtocol?
 
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.xs) {
@@ -43,6 +78,10 @@ struct AudioPlayerView: View {
         }
         .onDisappear {
             player?.pause()
+            if let loopObserver {
+                NotificationCenter.default.removeObserver(loopObserver)
+                self.loopObserver = nil
+            }
         }
     }
 
@@ -53,8 +92,8 @@ struct AudioPlayerView: View {
 
     private func configurePlayer() {
         let avPlayer = AVPlayer(url: url)
-        if behavior == .loop {
-            NotificationCenter.default.addObserver(
+        if MediaPlaybackPolicy.shouldLoop(kind: .audio, behavior: behavior) {
+            loopObserver = NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: avPlayer.currentItem,
                 queue: .main
@@ -64,7 +103,11 @@ struct AudioPlayerView: View {
             }
         }
         player = avPlayer
-        if behavior == .autoplay {
+        if MediaPlaybackPolicy.shouldAutoplay(
+            kind: .audio,
+            behavior: behavior,
+            reduceMotion: reduceMotion
+        ) {
             avPlayer.play()
         }
     }
@@ -72,17 +115,25 @@ struct AudioPlayerView: View {
 
 struct ImageMediaView: View {
     let url: URL
+    let kind: MediaKind
     let behavior: MediaBehavior
     let revealMode: RevealMode
     let isAnswerRevealed: Bool
     let altText: String?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var playOnTapActive = false
 
     var body: some View {
         Group {
             if shouldHide {
                 placeholder
             } else if let image = NSImage(contentsOf: url) {
-                imageView(image)
+                if kind == .gif {
+                    gifView(image)
+                } else {
+                    imageView(image)
+                }
             } else {
                 placeholder
             }
@@ -121,14 +172,60 @@ struct ImageMediaView: View {
             view
         }
     }
+
+    @ViewBuilder
+    private func gifView(_ image: NSImage) -> some View {
+        let animated = AnimatedGIFView(
+            image: image,
+            animates: MediaPlaybackPolicy.gifAnimates(
+                behavior: behavior,
+                reduceMotion: reduceMotion,
+                playOnTapActive: playOnTapActive
+            )
+        )
+        .frame(maxWidth: DesignSystem.readingColumnMaxWidth, maxHeight: 320)
+
+        if behavior == .playOnTap {
+            Button {
+                playOnTapActive.toggle()
+            } label: {
+                animated
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(playOnTapActive ? "Pause animation" : "Play animation")
+        } else {
+            animated
+        }
+    }
+}
+
+private struct AnimatedGIFView: NSViewRepresentable {
+    let image: NSImage
+    let animates: Bool
+
+    func makeNSView(context: Context) -> NSImageView {
+        let imageView = NSImageView()
+        imageView.imageScaling = .scaleProportionallyUpOrDown
+        imageView.imageAlignment = .alignCenter
+        imageView.image = image
+        imageView.animates = animates
+        return imageView
+    }
+
+    func updateNSView(_ imageView: NSImageView, context: Context) {
+        imageView.image = image
+        imageView.animates = animates
+    }
 }
 
 struct VideoPlayerView: View {
     let url: URL
     let behavior: MediaBehavior
     let altText: String?
+    let reduceMotion: Bool
 
     @State private var player: AVPlayer?
+    @State private var loopObserver: NSObjectProtocol?
 
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.xs) {
@@ -147,14 +244,34 @@ struct VideoPlayerView: View {
             }
         }
         .onAppear { configurePlayer() }
-        .onDisappear { player?.pause() }
+        .onDisappear {
+            player?.pause()
+            if let loopObserver {
+                NotificationCenter.default.removeObserver(loopObserver)
+                self.loopObserver = nil
+            }
+        }
         .accessibilityLabel(altText ?? "Video")
     }
 
     private func configurePlayer() {
         let avPlayer = AVPlayer(url: url)
+        if MediaPlaybackPolicy.shouldLoop(kind: .video, behavior: behavior) {
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: avPlayer.currentItem,
+                queue: .main
+            ) { _ in
+                avPlayer.seek(to: .zero)
+                avPlayer.play()
+            }
+        }
         player = avPlayer
-        if behavior == .autoplay {
+        if MediaPlaybackPolicy.shouldAutoplay(
+            kind: .video,
+            behavior: behavior,
+            reduceMotion: reduceMotion
+        ) {
             avPlayer.play()
         }
     }
@@ -166,6 +283,7 @@ struct ResolvedMediaView: View {
     let isAnswerRevealed: Bool
     let store: MediaStore?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var resolvedURL: URL?
     @State private var resolutionError: String?
 
@@ -196,17 +314,28 @@ struct ResolvedMediaView: View {
     private func mediaBody(url: URL) -> some View {
         switch ref.kind {
         case .audio:
-            AudioPlayerView(url: url, behavior: presentation.media, altText: ref.altText)
+            AudioPlayerView(
+                url: url,
+                behavior: presentation.media,
+                altText: ref.altText,
+                reduceMotion: reduceMotion
+            )
         case .image, .gif:
             ImageMediaView(
                 url: url,
+                kind: ref.kind,
                 behavior: presentation.media,
                 revealMode: presentation.reveal,
                 isAnswerRevealed: isAnswerRevealed,
                 altText: ref.altText
             )
         case .video:
-            VideoPlayerView(url: url, behavior: presentation.media, altText: ref.altText)
+            VideoPlayerView(
+                url: url,
+                behavior: presentation.media,
+                altText: ref.altText,
+                reduceMotion: reduceMotion
+            )
         }
     }
 }
