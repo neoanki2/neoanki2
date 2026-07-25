@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 class NeoAnkiUITestCase: XCTestCase {
     var runningApp: XCUIApplication?
 
