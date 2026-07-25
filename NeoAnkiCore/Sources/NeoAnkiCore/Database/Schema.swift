@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 6
+    static let version = 7
 
     static let createStatements: [String] = [
         """
@@ -89,7 +89,8 @@ enum Schema {
             kind TEXT NOT NULL,
             byte_size INTEGER NOT NULL,
             file_extension TEXT NOT NULL,
-            created_at REAL NOT NULL
+            created_at REAL NOT NULL,
+            ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0)
         );
         """,
     ]
@@ -160,6 +161,15 @@ enum Schema {
             file_extension TEXT NOT NULL,
             created_at REAL NOT NULL
         );
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 6. Reference counts are
+    /// backfilled from persisted item fields by SQLiteDatabase.
+    static let migrationV7Statements: [String] = [
+        """
+        ALTER TABLE media_assets
+        ADD COLUMN ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0);
         """,
     ]
 

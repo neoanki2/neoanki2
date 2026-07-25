@@ -80,6 +80,7 @@ public actor ItemStore {
             try ItemTypeValidation.validate(itemType)
         }
         try await database.migrate()
+        await mediaStore?.attachMetadataDatabase(database)
         try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
     }
 
@@ -258,8 +259,15 @@ public actor ItemStore {
 
         try validate(item, against: itemType)
         let cards = CardGenerator.cards(for: item, type: itemType, now: now)
+        let mediaDescriptors = try await newMediaDescriptors(in: item, comparedTo: nil)
 
-        try await database.insertItemWithCards(item, cards: cards, createdAt: now, updatedAt: now)
+        try await database.insertItemWithCards(
+            item,
+            cards: cards,
+            createdAt: now,
+            updatedAt: now,
+            mediaDescriptors: mediaDescriptors
+        )
 
         return SavedItemSummary(
             id: item.id,
@@ -337,12 +345,69 @@ public actor ItemStore {
         return (persisted.item, itemType)
     }
 
+    /// Updates item content and applies media reference deltas atomically.
+    @discardableResult
+    public func updateItem(_ item: Item, now: Date = .now) async throws -> SavedItemSummary {
+        guard let previous = try await database.fetchItem(id: item.id) else {
+            throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
+        }
+        guard previous.item.itemTypeID == item.itemTypeID,
+              let itemType = try await database.fetchItemType(id: item.itemTypeID)
+        else {
+            throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+        if let deckID = item.deckID {
+            guard try await database.fetchDeck(id: deckID) != nil else {
+                throw DatabaseError.deckNotFound(deckID)
+            }
+        }
+
+        try validate(item, against: itemType)
+        let mediaDescriptors = try await newMediaDescriptors(in: item, comparedTo: previous.item)
+        try await database.updateItemWithMedia(
+            item,
+            updatedAt: now,
+            mediaDescriptors: mediaDescriptors
+        )
+        let cardCount = try await database.countCards(for: item.id)
+        return SavedItemSummary(
+            id: item.id,
+            itemTypeID: itemType.id,
+            itemTypeName: itemType.name,
+            title: ItemDisplay.title(for: item, in: itemType),
+            subtitle: ItemDisplay.subtitle(for: item, in: itemType),
+            cardCount: cardCount,
+            deckID: item.deckID,
+            createdAt: previous.createdAt
+        )
+    }
+
     /// Deletes an item and its generated cards.
     @discardableResult
-    public func deleteItem(id: UUID) async throws -> Bool {
-        guard try await database.fetchItem(id: id) != nil else { return false }
-        try await database.deleteItem(id: id)
-        return true
+    public func deleteItem(id: UUID, now: Date = .now) async throws -> Bool {
+        let deleted = try await database.deleteItemWithMedia(id: id, deletedAt: now)
+        if deleted {
+            _ = try? await collectMediaGarbage()
+        }
+        return deleted
+    }
+
+    public func mediaAsset(hash: String) async throws -> MediaAsset? {
+        try await database.fetchMediaAsset(hash: hash)
+    }
+
+    /// Deletes only zero-reference assets, retaining metadata when deletion is unsafe.
+    @discardableResult
+    public func collectMediaGarbage() async throws -> Int {
+        guard let mediaStore else { return 0 }
+        let orphans = try await database.fetchOrphanedMediaAssets()
+        var collected = 0
+        for asset in orphans {
+            try await mediaStore.removeOrphan(asset)
+            try await database.deleteMediaAssetIfOrphaned(hash: asset.hash)
+            collected += 1
+        }
+        return collected
     }
 
     public func dueCount(scope: DeckScope = .allDecks, asOf now: Date = .now) async throws -> Int {
@@ -496,6 +561,47 @@ public actor ItemStore {
 
         try await database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
         return entries.count
+    }
+
+    private func newMediaDescriptors(
+        in item: Item,
+        comparedTo previous: Item?
+    ) async throws -> [String: MediaAssetDescriptor] {
+        var previousCounts: [String: Int] = [:]
+        if let previous {
+            for ref in mediaReferences(in: previous) {
+                previousCounts[mediaIdentity(ref), default: 0] += 1
+            }
+        }
+
+        var descriptors: [String: MediaAssetDescriptor] = [:]
+        for ref in mediaReferences(in: item) {
+            let identity = mediaIdentity(ref)
+            if previousCounts[identity, default: 0] > 0 {
+                previousCounts[identity, default: 0] -= 1
+                continue
+            }
+            guard let mediaStore else {
+                throw DatabaseError.invalidMediaAsset("Media storage is unavailable.")
+            }
+            let descriptor = try await mediaStore.descriptor(for: ref)
+            if let existing = descriptors[descriptor.hash], existing != descriptor {
+                throw DatabaseError.invalidMediaAsset("Conflicting media metadata uses the same hash.")
+            }
+            descriptors[descriptor.hash] = descriptor
+        }
+        return descriptors
+    }
+
+    private func mediaReferences(in item: Item) -> [MediaRef] {
+        item.fields.compactMap { field in
+            guard case let .media(ref) = field.value, ref.legacyURL == nil else { return nil }
+            return ref
+        }
+    }
+
+    private func mediaIdentity(_ ref: MediaRef) -> String {
+        "\(ref.assetHash)|\(ref.kind.rawValue)|\(ref.fileExtension)"
     }
 
     private func mapImportRow(

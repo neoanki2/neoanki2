@@ -13,6 +13,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case requiredFieldEmpty(String)
     case invalidItemType(String)
     case invalidDeck(String)
+    case invalidMediaAsset(String)
     case encodingFailed
     case decodingFailed
     case unsupportedSchemaVersion(Int)
@@ -41,6 +42,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
         case let .invalidItemType(message):
             return message
         case let .invalidDeck(message):
+            return message
+        case let .invalidMediaAsset(message):
             return message
         case .encodingFailed:
             return "Could not encode data for storage."
@@ -137,6 +140,13 @@ actor SQLiteDatabase {
                 for sql in Schema.migrationV6Statements {
                     try execute(sql)
                 }
+            }
+
+            if current < 7 {
+                for sql in Schema.migrationV7Statements {
+                    try execute(sql)
+                }
+                try backfillMediaReferenceCounts()
             }
 
             try execute(
@@ -536,9 +546,16 @@ actor SQLiteDatabase {
         _ item: Item,
         cards: [Card],
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        mediaDescriptors: [String: MediaAssetDescriptor] = [:]
     ) throws {
         try inTransaction {
+            try applyMediaReferenceDeltas(
+                from: [:],
+                to: mediaReferenceCounts(in: item),
+                descriptors: mediaDescriptors,
+                now: createdAt
+            )
             try insertItem(item, createdAt: createdAt, updatedAt: updatedAt)
             try insertCards(cards)
         }
@@ -551,9 +568,64 @@ actor SQLiteDatabase {
     ) throws {
         try inTransaction {
             for entry in entries {
+                try applyMediaReferenceDeltas(
+                    from: [:],
+                    to: mediaReferenceCounts(in: entry.item),
+                    descriptors: [:],
+                    now: createdAt
+                )
                 try insertItem(entry.item, createdAt: createdAt, updatedAt: updatedAt)
                 try insertCards(entry.cards)
             }
+        }
+    }
+
+    func updateItemWithMedia(
+        _ item: Item,
+        updatedAt: Date,
+        mediaDescriptors: [String: MediaAssetDescriptor]
+    ) throws {
+        try inTransaction {
+            guard let previous = try fetchItem(id: item.id) else {
+                throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
+            }
+            try applyMediaReferenceDeltas(
+                from: mediaReferenceCounts(in: previous.item),
+                to: mediaReferenceCounts(in: item),
+                descriptors: mediaDescriptors,
+                now: updatedAt
+            )
+            let fields = try encode(item.fields)
+            let tags = try encode(item.tags)
+            try execute(
+                """
+                UPDATE items
+                SET item_type_id = ?, fields = ?, tags = ?, deck_id = ?, updated_at = ?
+                WHERE id = ?;
+                """,
+                bindings: [
+                    .text(item.itemTypeID.uuidString),
+                    .blob(fields),
+                    .blob(tags),
+                    item.deckID.map { .text($0.uuidString) } ?? .null,
+                    .double(updatedAt.timeIntervalSince1970),
+                    .text(item.id.uuidString),
+                ]
+            )
+        }
+    }
+
+    func deleteItemWithMedia(id: UUID, deletedAt: Date) throws -> Bool {
+        try inTransaction {
+            guard let persisted = try fetchItem(id: id) else { return false }
+            try applyMediaReferenceDeltas(
+                from: mediaReferenceCounts(in: persisted.item),
+                to: [:],
+                descriptors: [:],
+                now: deletedAt
+            )
+            try deleteItem(id: id)
+            return true
         }
     }
 
@@ -864,6 +936,64 @@ actor SQLiteDatabase {
         )
     }
 
+    func fetchMediaAsset(hash: String) throws -> MediaAsset? {
+        let rows = try query(
+            """
+            SELECT hash, kind, byte_size, file_extension, created_at, ref_count
+            FROM media_assets
+            WHERE hash = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(hash)]
+        )
+        guard let row = rows.first else { return nil }
+        return try decodeMediaAsset(from: row)
+    }
+
+    func registerMediaAsset(_ descriptor: MediaAssetDescriptor, createdAt: Date) throws {
+        guard isValidMediaHash(descriptor.hash),
+              descriptor.byteSize >= 0,
+              MediaValidation.allowedExtensions(for: descriptor.kind)
+                  .contains(descriptor.fileExtension)
+        else {
+            throw DatabaseError.invalidMediaAsset("Media metadata is invalid.")
+        }
+        try execute(
+            """
+            INSERT INTO media_assets
+                (hash, kind, byte_size, file_extension, created_at, ref_count)
+            VALUES (?, ?, ?, ?, ?, 0)
+            ON CONFLICT(hash) DO NOTHING;
+            """,
+            bindings: [
+                .text(descriptor.hash),
+                .text(descriptor.kind.rawValue),
+                .int(Int64(descriptor.byteSize)),
+                .text(descriptor.fileExtension),
+                .double(createdAt.timeIntervalSince1970),
+            ]
+        )
+    }
+
+    func fetchOrphanedMediaAssets() throws -> [MediaAsset] {
+        let rows = try query(
+            """
+            SELECT hash, kind, byte_size, file_extension, created_at, ref_count
+            FROM media_assets
+            WHERE ref_count = 0
+            ORDER BY created_at ASC;
+            """
+        )
+        return try rows.map { try decodeMediaAsset(from: $0) }
+    }
+
+    func deleteMediaAssetIfOrphaned(hash: String) throws {
+        try execute(
+            "DELETE FROM media_assets WHERE hash = ? AND ref_count = 0;",
+            bindings: [.text(hash)]
+        )
+    }
+
     func updateCardSkill(_ cardID: UUID, skill: Skill) throws {
         let skillData = try encode(skill)
         try execute(
@@ -929,6 +1059,102 @@ actor SQLiteDatabase {
         }
     }
 
+    private func mediaReferenceCounts(in item: Item) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for field in item.fields {
+            guard case let .media(ref) = field.value,
+                  ref.legacyURL == nil,
+                  isValidMediaHash(ref.assetHash),
+                  MediaValidation.allowedExtensions(for: ref.kind)
+                      .contains(ref.fileExtension.lowercased())
+            else {
+                continue
+            }
+            counts[ref.assetHash, default: 0] += 1
+        }
+        return counts
+    }
+
+    private func applyMediaReferenceDeltas(
+        from previous: [String: Int],
+        to updated: [String: Int],
+        descriptors: [String: MediaAssetDescriptor],
+        now: Date
+    ) throws {
+        for hash in Set(previous.keys).union(updated.keys).sorted() {
+            let delta = updated[hash, default: 0] - previous[hash, default: 0]
+            guard delta != 0 else { continue }
+
+            if delta > 0 {
+                if try fetchMediaAsset(hash: hash) == nil {
+                    guard let descriptor = descriptors[hash],
+                          descriptor.hash == hash,
+                          isValidMediaHash(descriptor.hash),
+                          MediaValidation.allowedExtensions(for: descriptor.kind)
+                              .contains(descriptor.fileExtension)
+                    else {
+                        throw DatabaseError.invalidMediaAsset("Media metadata is missing or invalid.")
+                    }
+                    try execute(
+                        """
+                        INSERT INTO media_assets
+                            (hash, kind, byte_size, file_extension, created_at, ref_count)
+                        VALUES (?, ?, ?, ?, ?, ?);
+                        """,
+                        bindings: [
+                            .text(hash),
+                            .text(descriptor.kind.rawValue),
+                            .int(Int64(descriptor.byteSize)),
+                            .text(descriptor.fileExtension),
+                            .double(now.timeIntervalSince1970),
+                            .int(Int64(delta)),
+                        ]
+                    )
+                } else {
+                    try execute(
+                        "UPDATE media_assets SET ref_count = ref_count + ? WHERE hash = ?;",
+                        bindings: [.int(Int64(delta)), .text(hash)]
+                    )
+                }
+            } else {
+                guard let current = try fetchMediaAsset(hash: hash),
+                      current.refCount >= -delta
+                else {
+                    throw DatabaseError.invalidMediaAsset("Media reference count would become negative.")
+                }
+                try execute(
+                    "UPDATE media_assets SET ref_count = ref_count + ? WHERE hash = ?;",
+                    bindings: [.int(Int64(delta)), .text(hash)]
+                )
+            }
+        }
+    }
+
+    private func decodeMediaAsset(from row: [String: Any?]) throws -> MediaAsset {
+        guard let hash = row["hash"] as? String,
+              let kindText = row["kind"] as? String,
+              let kind = MediaKind(rawValue: kindText),
+              let byteSize = row["byte_size"] as? Int64,
+              let fileExtension = row["file_extension"] as? String,
+              let createdAt = row["created_at"] as? Double,
+              let refCount = row["ref_count"] as? Int64
+        else {
+            throw DatabaseError.decodingFailed
+        }
+        return MediaAsset(
+            hash: hash,
+            kind: kind,
+            byteSize: Int(byteSize),
+            fileExtension: fileExtension,
+            createdAt: Date(timeIntervalSince1970: createdAt),
+            refCount: Int(refCount)
+        )
+    }
+
+    private func isValidMediaHash(_ hash: String) -> Bool {
+        hash.count == 64 && hash.allSatisfy { $0.isHexDigit && !$0.isUppercase }
+    }
+
     /// Renames legacy `note_types` / `notes` tables from early builds to `item_types` / `items`.
     private func migrateNotesToItemsSchemaIfNeeded() throws {
         guard try tableExists("note_types"), !(try tableExists("item_types")) else { return }
@@ -941,6 +1167,35 @@ actor SQLiteDatabase {
         try execute("CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);")
         try execute("DROP INDEX IF EXISTS idx_cards_note_id;")
         try execute("CREATE INDEX IF NOT EXISTS idx_cards_item_id ON cards(item_id);")
+    }
+
+    private func backfillMediaReferenceCounts() throws {
+        try execute("UPDATE media_assets SET ref_count = 0;")
+        for persisted in try fetchItems() {
+            var descriptors: [String: MediaAssetDescriptor] = [:]
+            for field in persisted.item.fields {
+                guard case let .media(ref) = field.value,
+                      ref.legacyURL == nil,
+                      isValidMediaHash(ref.assetHash),
+                      MediaValidation.allowedExtensions(for: ref.kind)
+                          .contains(ref.fileExtension.lowercased())
+                else {
+                    continue
+                }
+                descriptors[ref.assetHash] = MediaAssetDescriptor(
+                    hash: ref.assetHash,
+                    kind: ref.kind,
+                    byteSize: 0,
+                    fileExtension: ref.fileExtension.lowercased()
+                )
+            }
+            try applyMediaReferenceDeltas(
+                from: [:],
+                to: mediaReferenceCounts(in: persisted.item),
+                descriptors: descriptors,
+                now: persisted.createdAt
+            )
+        }
     }
 
     private func tableExists(_ name: String) throws -> Bool {
@@ -1070,11 +1325,12 @@ actor SQLiteDatabase {
         }
     }
 
-    private func inTransaction(_ body: () throws -> Void) throws {
+    private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {
         try execute("BEGIN IMMEDIATE TRANSACTION;")
         do {
-            try body()
+            let result = try body()
             try execute("COMMIT;")
+            return result
         } catch {
             try? execute("ROLLBACK;")
             throw error

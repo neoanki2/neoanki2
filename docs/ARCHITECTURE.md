@@ -159,7 +159,10 @@ with edits.
 - **Ingest:** copy bytes into `{AppSupport}/neoanki2/media/{sha256}.{ext}`; dedupe by hash.
 - **Validation:** MIME/extension allow-list, magic-byte check, per-kind size caps (e.g. audio 20 MB, video 100 MB).
 - **Security:** never persist user-supplied absolute `file://` URLs; resolve only inside the sandbox.
-- **Schema v4:** optional `media_assets` table tracks hash, kind, byte size, ref count.
+- **Schema v5:** `media_assets` tracks hash, kind, byte size, extension, creation time,
+  and the number of persisted field references. Item create/edit/delete applies
+  reference deltas in the same SQLite transaction as the item write; zero-reference
+  assets are removed by sandbox-checked orphan collection.
 
 ### Import (JSON / CSV)
 
