@@ -38,3 +38,21 @@ import Testing
     let error = DatabaseError.invalidItemType("Template is invalid.")
     #expect(UserFacingError.message(from: error) == "Something went wrong. Try again.")
 }
+
+@Test func userFacingErrorExplainsImportFormatProblem() {
+    let error = ImportError.invalidFormat(
+        "CSV cannot import the structured field \"Image\". Use JSON for cloze and media fields."
+    )
+    #expect(
+        UserFacingError.importMessage(from: error)
+            == "This file couldn’t be imported. CSV cannot import the structured field \"Image\". Use JSON for cloze and media fields."
+    )
+}
+
+@Test func userFacingErrorExplainsMissingImportItemType() {
+    let error = ImportError.itemTypeNotFound("Vocabulary")
+    #expect(
+        UserFacingError.importMessage(from: error)
+            == "There is no item type named “Vocabulary”. Create it first or update the JSON file."
+    )
+}

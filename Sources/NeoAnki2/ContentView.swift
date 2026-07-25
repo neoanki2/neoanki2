@@ -1,5 +1,12 @@
 import NeoAnkiCore
 import SwiftUI
+import UniformTypeIdentifiers
+
+private struct ImportNotice: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
 
 struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -16,6 +23,10 @@ struct ContentView: View {
     @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var importModel: ImportModel?
+    @State private var isChoosingImportFile = false
+    @State private var isShowingImport = false
+    @State private var importNotice: ImportNotice?
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -61,6 +72,30 @@ struct ContentView: View {
             await decksModel.load()
             await reloadScope()
         }
+        .fileImporter(
+            isPresented: $isChoosingImportFile,
+            allowedContentTypes: [.json, .commaSeparatedText],
+            allowsMultipleSelection: false,
+            onCompletion: handleImportFile
+        )
+        .sheet(isPresented: $isShowingImport) {
+            if let importModel {
+                ImportView(
+                    model: importModel,
+                    itemTypes: itemsModel.itemTypes,
+                    scope: decksModel.studyScope,
+                    onCancel: { isShowingImport = false },
+                    onImported: finishImport
+                )
+            }
+        }
+        .alert(item: $importNotice) { notice in
+            Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
         .focusedSceneValue(\.libraryCommandHandlers, libraryCommandHandlers)
         .alert(
@@ -87,7 +122,14 @@ struct ContentView: View {
 
     private var libraryCommandHandlers: LibraryCommandHandlers {
         LibraryCommandHandlers(
+            openImport: { openImport() },
             openTemplates: { openTemplates() },
+            canImport: !itemsModel.isLoading
+                && !itemsModel.itemTypes.isEmpty
+                && !isStudying
+                && !isManagingTemplates
+                && !isAddingItem
+                && !isShowingImport,
             canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem
         )
     }
@@ -197,6 +239,46 @@ struct ContentView: View {
         selectedItemID = nil
         itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
         isAddingItem = true
+    }
+
+    private func openImport() {
+        importModel = ImportModel(itemsModel: itemsModel)
+        isChoosingImportFile = true
+    }
+
+    private func handleImportFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case let .success(urls):
+            guard let url = urls.first else { return }
+            guard let importModel, importModel.selectFile(url) else {
+                importNotice = ImportNotice(
+                    title: "Could Not Import File",
+                    message: importModel?.errorMessage ?? "Choose a JSON or CSV file."
+                )
+                return
+            }
+            isShowingImport = true
+        case let .failure(error):
+            if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
+                return
+            }
+            importNotice = ImportNotice(
+                title: "Could Not Open File",
+                message: "NeoAnki2 couldn’t open the selected file. Try choosing it again."
+            )
+        }
+    }
+
+    private func finishImport(_ count: Int) {
+        isShowingImport = false
+        let noun = count == 1 ? "item" : "items"
+        importNotice = ImportNotice(
+            title: "Import Complete",
+            message: "\(count) \(noun) imported. Importing the same file again will create duplicates."
+        )
+        Task {
+            await decksModel.load()
+        }
     }
 
     private func closeAddItem() {

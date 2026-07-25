@@ -58,7 +58,13 @@ public struct ImportContext: Sendable {
 
 /// Parses native NeoAnki import data (JSON or CSV) into rows for `ItemStore`.
 public protocol ImportAdapter: Sendable {
+    /// Whether the source format can represent cloze and media objects.
+    var supportsStructuredFields: Bool { get }
     func parse(_ data: Data) throws -> ImportPayload
+}
+
+public extension ImportAdapter {
+    var supportsStructuredFields: Bool { true }
 }
 
 /// Native JSON import format:
@@ -135,6 +141,7 @@ public struct JSONImportAdapter: ImportAdapter {
 /// CSV with a header row. Optional `tags` column contains comma-separated tags.
 public struct CSVImportAdapter: ImportAdapter {
     public var itemTypeName: String
+    public var supportsStructuredFields: Bool { false }
 
     public init(itemTypeName: String) {
         self.itemTypeName = itemTypeName

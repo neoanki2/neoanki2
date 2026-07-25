@@ -44,6 +44,17 @@ public struct ReviewSubmission: Sendable, Equatable {
     }
 }
 
+private extension FieldType {
+    var requiresStructuredImportValue: Bool {
+        switch self {
+        case .audio, .image, .gif, .video, .cloze:
+            true
+        case .text, .richText, .number:
+            false
+        }
+    }
+}
+
 /// Persistence for items and generated cards.
 public actor ItemStore {
     private let database: SQLiteDatabase
@@ -589,7 +600,12 @@ public actor ItemStore {
         entries.reserveCapacity(payload.rows.count)
 
         for row in payload.rows {
-            let fields = try await mapImportRow(row, to: resolvedType, context: context)
+            let fields = try await mapImportRow(
+                row,
+                to: resolvedType,
+                context: context,
+                supportsStructuredFields: adapter.supportsStructuredFields
+            )
             let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
             try validate(item, against: resolvedType)
             entries.append((
@@ -646,7 +662,8 @@ public actor ItemStore {
     private func mapImportRow(
         _ row: ImportRow,
         to itemType: ItemType,
-        context: ImportContext
+        context: ImportContext,
+        supportsStructuredFields: Bool
     ) async throws -> [FieldValue] {
         var values: [FieldValue] = []
 
@@ -669,6 +686,11 @@ public actor ItemStore {
                 continue
             }
 
+            if !supportsStructuredFields, field.type.requiresStructuredImportValue {
+                throw ImportError.invalidFormat(
+                    "CSV cannot import the structured field \"\(field.name)\". Use JSON for cloze and media fields."
+                )
+            }
             try ImportLimits.validateFieldString(text, fieldName: field.name)
             values.append(FieldValue(fieldID: field.id, value: field.contentValue(from: text)))
         }
