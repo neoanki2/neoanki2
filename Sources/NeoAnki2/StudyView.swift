@@ -11,6 +11,7 @@ struct StudyView: View {
 
     @State private var showGradeGuide = false
     @State private var showEndSessionConfirm = false
+    @State private var recording = StudyRecordingController()
 
     var body: some View {
         Group {
@@ -54,18 +55,16 @@ struct StudyView: View {
     }
 
     private var canShowAnswer: Bool {
-        guard let card = model.currentCard else { return false }
+        guard model.currentCard != nil else { return false }
         return !model.isAnswerRevealed
             && !model.isLoading
             && !model.isFinished
-            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     private var canGrade: Bool {
-        guard let card = model.currentCard else { return false }
+        guard model.currentCard != nil else { return false }
         return model.isAnswerRevealed
             && !model.isGrading
-            && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
     private var loadingView: some View {
@@ -123,11 +122,7 @@ struct StudyView: View {
 
             ScrollView {
                 VStack(spacing: DesignSystem.Spacing.lg) {
-                    if !StudySupport.isSupportedInteraction(card.template.interaction) {
-                        unsupportedInteractionView(card.template.interaction)
-                    } else {
-                        studyCardContent(card)
-                    }
+                    studyCardContent(card)
                 }
                 .readingColumnLayout()
             }
@@ -146,6 +141,12 @@ struct StudyView: View {
         }
         .onExitCommand {
             requestEndSession()
+        }
+        .onChange(of: card.id) {
+            recording.reset()
+        }
+        .onDisappear {
+            recording.reset()
         }
     }
 
@@ -196,8 +197,22 @@ struct StudyView: View {
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
 
+        if !model.isAnswerRevealed {
+            interactionResponse(for: card)
+        }
+
+        if let message = model.interactionMessage {
+            Text(message)
+                .font(DesignSystem.Typography.uiSecondary)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("studyInteractionMessage")
+        }
+
         if model.isAnswerRevealed {
             Divider()
+            evaluationFeedback
             SideContentView(
                 side: card.template.answer,
                 item: card.item,
@@ -212,39 +227,199 @@ struct StudyView: View {
         }
     }
 
-    private func unsupportedInteractionView(_ interaction: Interaction) -> some View {
-        ContentUnavailableView {
-            Label("Not Available Yet", systemImage: "hammer")
-        } description: {
-            Text("\(interactionLabel(interaction)) cards aren't supported in the app yet.")
+    @ViewBuilder
+    private func interactionResponse(for card: DueCard) -> some View {
+        switch card.template.interaction {
+        case .reveal, .cloze:
+            EmptyView()
+        case .type:
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                Text("Your answer")
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+                TextField(
+                    "Type your answer",
+                    text: Binding(
+                        get: { model.typedAnswer },
+                        set: { model.updateTypedAnswer($0) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { model.submitTypedAnswer() }
+                .accessibilityIdentifier("typedAnswer")
+                Text("Press Return to check. You’ll still choose your own grade.")
+                    .font(DesignSystem.Typography.uiHint)
+                    .foregroundStyle(.tertiary)
+            }
+        case .choose:
+            VStack(spacing: DesignSystem.Spacing.xs) {
+                ForEach(Array(model.choiceOptions.enumerated()), id: \.offset) { index, option in
+                    Button {
+                        model.selectChoice(option)
+                    } label: {
+                        HStack {
+                            Text("\(index + 1).")
+                                .foregroundStyle(.secondary)
+                            Text(option)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if model.selectedChoice == option {
+                                Image(systemName: "checkmark")
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [])
+                    .help("Choose option \(index + 1) (\(index + 1))")
+                    .accessibilityLabel("Option \(index + 1), \(option)")
+                    .accessibilityValue(model.selectedChoice == option ? "Selected" : "")
+                    .accessibilityIdentifier("choiceOption\(index)")
+                }
+            }
+            .frame(maxWidth: .infinity)
+        case .record:
+            recordingResponse
+        case .arrange:
+            arrangementResponse
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var evaluationFeedback: some View {
+        switch model.answerEvaluation {
+        case .correct:
+            Label("Your response matches.", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .accessibilityIdentifier("answerCorrect")
+        case .incorrect:
+            Label("Compare your response with the answer.", systemImage: "arrow.left.arrow.right")
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("answerIncorrect")
+        case .unavailable:
+            Label("Automatic checking wasn’t available.", systemImage: "person.crop.circle.badge.questionmark")
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("answerCheckUnavailable")
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private var recordingResponse: some View {
+        VStack(spacing: DesignSystem.Spacing.sm) {
+            Label(recordingStatusText, systemImage: recordingStatusIcon)
+                .font(DesignSystem.Typography.uiSecondary)
+                .foregroundStyle(recordingHasError ? .red : .secondary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                if recording.state == .recording {
+                    Button("Stop Recording") {
+                        recording.stop()
+                    }
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .accessibilityIdentifier("stopRecording")
+                } else {
+                    Button(recording.hasRecording ? "Record Again" : "Start Recording") {
+                        Task { await recording.start() }
+                    }
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .disabled(recording.state == .requestingPermission)
+                    .accessibilityIdentifier("startRecording")
+                }
+
+                if recording.hasRecording, recording.state != .recording {
+                    Button(recording.state == .playing ? "Stop Playback" : "Play My Recording") {
+                        recording.togglePlayback()
+                    }
+                    .keyboardShortcut("p", modifiers: [.command])
+                    .accessibilityIdentifier("playRecording")
+                }
+            }
+        }
+    }
+
+    private var arrangementResponse: some View {
+        VStack(spacing: DesignSystem.Spacing.sm) {
+            Text("Select an item, then move it into the right order.")
+                .font(DesignSystem.Typography.uiHint)
+                .foregroundStyle(.secondary)
+
+            ForEach(Array(model.arrangedItems.enumerated()), id: \.offset) { index, item in
+                Button {
+                    model.selectArrangementItem(at: index)
+                } label: {
+                    HStack {
+                        Text("\(index + 1).")
+                            .foregroundStyle(.secondary)
+                        Text(item)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if model.selectedArrangementIndex == index {
+                            Image(systemName: "selection.pin.in.out")
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Position \(index + 1), \(item)")
+                .accessibilityValue(model.selectedArrangementIndex == index ? "Selected" : "")
+                .accessibilityIdentifier("arrangementItem\(index)")
+            }
+
+            HStack {
+                Button("Move Up", systemImage: "arrow.up") {
+                    model.moveSelectedArrangementItem(by: -1)
+                }
+                .keyboardShortcut(.upArrow, modifiers: [.command])
+                .disabled(model.selectedArrangementIndex == nil || model.selectedArrangementIndex == 0)
+                .accessibilityIdentifier("moveArrangementUp")
+
+                Button("Move Down", systemImage: "arrow.down") {
+                    model.moveSelectedArrangementItem(by: 1)
+                }
+                .keyboardShortcut(.downArrow, modifiers: [.command])
+                .disabled(
+                    model.selectedArrangementIndex == nil
+                        || model.selectedArrangementIndex == model.arrangedItems.indices.last
+                )
+                .accessibilityIdentifier("moveArrangementDown")
+            }
+        }
     }
 
     @ViewBuilder
     private func studyFooter(for card: DueCard) -> some View {
         HStack {
-            if !StudySupport.isSupportedInteraction(card.template.interaction) {
-                Button("Skip Card") {
-                    model.skipCurrentCard()
-                }
-                .keyboardShortcut(.rightArrow, modifiers: [])
-                .help("Skip this card (Right Arrow)")
-                .accessibilityLabel("Skip card")
-                .accessibilityIdentifier("skipCard")
-            } else if model.isAnswerRevealed {
+            if model.isAnswerRevealed {
                 gradeButtons
             } else {
-                Button("Show Answer") {
-                    StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                        model.revealAnswer()
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Button(primaryActionTitle(for: card.template.interaction)) {
+                        StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                            model.performPrimaryAction()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.return, modifiers: [])
+                    .keyboardShortcut(.space, modifiers: [])
+                    .disabled(card.template.interaction == .record && !recording.hasRecording)
+                    .accessibilityIdentifier("primaryStudyAction")
+
+                    if card.template.interaction != .reveal, card.template.interaction != .cloze {
+                        Button("Reveal & Self-Grade") {
+                            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                                model.revealAnswer()
+                            }
+                        }
+                        .controlSize(.large)
+                        .keyboardShortcut(.rightArrow, modifiers: [])
+                        .help("Reveal without checking (Right Arrow)")
+                        .accessibilityIdentifier("revealAndSelfGrade")
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .accessibilityIdentifier("showAnswer")
-                .accessibilityLabel("Show answer")
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -304,14 +479,38 @@ struct StudyView: View {
         }
     }
 
-    private func interactionLabel(_ interaction: Interaction) -> String {
+    private func primaryActionTitle(for interaction: Interaction) -> String {
         switch interaction {
-        case .reveal: "Reveal"
-        case .type: "Type-the-answer"
-        case .choose: "Multiple choice"
-        case .record: "Record"
-        case .cloze: "Cloze"
-        case .arrange: "Arrange"
+        case .reveal, .cloze: "Show Answer"
+        case .type: "Check Answer"
+        case .choose: "Check Choice"
+        case .record: "Compare Recording"
+        case .arrange: "Check Order"
+        }
+    }
+
+    private var recordingHasError: Bool {
+        if case .failed = recording.state { return true }
+        return false
+    }
+
+    private var recordingStatusText: String {
+        switch recording.state {
+        case .idle: "Record yourself, then compare with the reference answer."
+        case .requestingPermission: "Waiting for microphone permission…"
+        case .recording: "Recording… press Command-R to stop."
+        case .recorded: "Recording ready. Play it back before comparing."
+        case .playing: "Playing your recording…"
+        case let .failed(message): message
+        }
+    }
+
+    private var recordingStatusIcon: String {
+        switch recording.state {
+        case .recording: "waveform"
+        case .recorded, .playing: "checkmark.circle"
+        case .failed: "exclamationmark.triangle"
+        case .idle, .requestingPermission: "mic"
         }
     }
 }
