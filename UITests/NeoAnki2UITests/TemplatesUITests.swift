@@ -65,10 +65,13 @@ final class TemplatesUITests: NeoAnkiUITestCase {
 
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5))
-        let collapsedValue = String(describing: advanced.value)
         advanced.click()
+        app.scrollViews.lastElement.scroll(byDeltaX: 0, deltaY: -500)
 
-        XCTAssertNotEqual(String(describing: advanced.value), collapsedValue)
+        XCTAssertTrue(
+            app.descendants(matching: .any).identified("templateAutomaticSkill")
+                .waitForExistence(timeout: 5)
+        )
     }
 
     func testTemplatesCreateItemType() throws {
