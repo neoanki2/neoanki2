@@ -288,8 +288,18 @@ struct ResolvedMediaView: View {
     @State private var resolutionError: String?
 
     var body: some View {
+        let decision = ContentRenderingPolicy.decision(
+            for: .media(ref),
+            revealMode: presentation.reveal,
+            isAnswerRevealed: isAnswerRevealed
+        )
+
         Group {
-            if let resolvedURL {
+            if decision.rendering == .placeholder {
+                ConcealedContentPlaceholder(
+                    accessibilityLabel: decision.accessibilityLabel ?? "Media concealed until answer"
+                )
+            } else if let resolvedURL {
                 mediaBody(url: resolvedURL)
             } else if let resolutionError {
                 ErrorBanner(message: resolutionError)
@@ -298,7 +308,12 @@ struct ResolvedMediaView: View {
                     .accessibilityLabel("Loading media")
             }
         }
-        .task(id: ref.id) {
+        .task(id: ResolutionTaskID(refID: ref.id, shouldResolve: decision.shouldResolveMedia)) {
+            guard decision.shouldResolveMedia else {
+                resolvedURL = nil
+                resolutionError = nil
+                return
+            }
             guard let store else { return }
             resolvedURL = nil
             resolutionError = nil
@@ -337,5 +352,10 @@ struct ResolvedMediaView: View {
                 reduceMotion: reduceMotion
             )
         }
+    }
+
+    private struct ResolutionTaskID: Equatable {
+        let refID: UUID
+        let shouldResolve: Bool
     }
 }

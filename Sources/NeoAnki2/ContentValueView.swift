@@ -13,50 +13,57 @@ struct ContentValueView: View {
     var clozeGroup: Int?
 
     var body: some View {
-        switch value {
-        case let .text(string, language):
-            Text(LanguageMetadata.attributedString(string, language: language))
-                .multilineTextAlignment(.center)
-                .opacity(shouldHideText ? 0 : 1)
-                .accessibilityHidden(shouldHideText)
-        case let .number(number):
-            Text(ContentNumberRendering.string(from: number, locale: locale))
-                .multilineTextAlignment(.center)
-        case let .rich(spans):
-            Text(SpanFormatting.swiftUIAttributedString(from: spans, pointSize: richTextPointSize))
-                .multilineTextAlignment(.center)
-                .blur(radius: presentation.reveal == .blurred && !isAnswerRevealed ? 8 : 0)
-                .opacity(shouldHideText ? 0 : 1)
-                .accessibilityHidden(shouldHideText)
-        case let .media(ref):
-            if let mediaStore {
-                ResolvedMediaView(
-                    ref: ref,
-                    presentation: presentation,
-                    isAnswerRevealed: isAnswerRevealed,
-                    store: mediaStore
-                )
-            } else {
-                Text(ref.altText ?? FieldTypeLabels.name(for: fieldType(for: ref.kind)))
-                    .font(DesignSystem.Typography.uiSecondary)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-        case let .cloze(text, blanks):
-            ClozeContentView(
-                text: text,
-                blanks: blanks,
-                revealMode: presentation.reveal,
-                isAnswerRevealed: isAnswerRevealed,
-                group: clozeGroup
-            )
-        case .empty:
-            EmptyView()
-        }
-    }
+        let decision = ContentRenderingPolicy.decision(
+            for: value,
+            revealMode: presentation.reveal,
+            isAnswerRevealed: isAnswerRevealed
+        )
 
-    private var shouldHideText: Bool {
-        presentation.reveal == .hiddenUntilAnswer && !isAnswerRevealed
+        if decision.rendering == .placeholder {
+            ConcealedContentPlaceholder(
+                accessibilityLabel: decision.accessibilityLabel ?? "Content concealed until answer"
+            )
+        } else {
+            switch value {
+            case let .text(string, language):
+                Text(LanguageMetadata.attributedString(string, language: language))
+                    .multilineTextAlignment(.center)
+            case let .number(number):
+                Text(ContentNumberRendering.string(from: number, locale: locale))
+                    .multilineTextAlignment(.center)
+            case let .rich(spans):
+                Text(SpanFormatting.swiftUIAttributedString(from: spans, pointSize: richTextPointSize))
+                    .multilineTextAlignment(.center)
+            case let .media(ref):
+                if let mediaStore {
+                    ResolvedMediaView(
+                        ref: ref,
+                        presentation: presentation,
+                        isAnswerRevealed: isAnswerRevealed,
+                        store: mediaStore
+                    )
+                } else if decision.rendering == .blurredMedia {
+                    ConcealedContentPlaceholder(
+                        accessibilityLabel: decision.accessibilityLabel ?? "Media concealed until answer"
+                    )
+                } else {
+                    Text(ref.altText ?? FieldTypeLabels.name(for: fieldType(for: ref.kind)))
+                        .font(DesignSystem.Typography.uiSecondary)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            case let .cloze(text, blanks):
+                ClozeContentView(
+                    text: text,
+                    blanks: blanks,
+                    revealMode: presentation.reveal,
+                    isAnswerRevealed: isAnswerRevealed,
+                    group: clozeGroup
+                )
+            case .empty:
+                EmptyView()
+            }
+        }
     }
 
     private func fieldType(for kind: MediaKind) -> FieldType {
@@ -66,6 +73,19 @@ struct ContentValueView: View {
         case .gif: .gif
         case .video: .video
         }
+    }
+}
+
+struct ConcealedContentPlaceholder: View {
+    let accessibilityLabel: String
+
+    var body: some View {
+        Label(accessibilityLabel, systemImage: "eye.slash")
+            .font(DesignSystem.Typography.uiSecondary)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel)
     }
 }
 
