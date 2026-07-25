@@ -64,6 +64,7 @@ struct TemplatesView: View {
                 Text("Types")
                     .font(DesignSystem.Typography.uiSection)
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("templatesItemTypesHeader")
                 Spacer()
                 Button("Add", systemImage: "plus") {
                     isAddingItemType = true
@@ -73,7 +74,6 @@ struct TemplatesView: View {
             .padding(.horizontal, DesignSystem.Spacing.md)
             .padding(.top, DesignSystem.Spacing.sm)
             .padding(.bottom, DesignSystem.Spacing.xs)
-            .accessibilityIdentifier("templatesItemTypesHeader")
 
             if let errorMessage = model.errorMessage, !model.isLoading {
                 ErrorBanner(message: errorMessage)
@@ -274,33 +274,43 @@ struct TemplatesView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(itemType.templates) { template in
-                        Button {
-                            editingTemplate = template
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                                    Text(template.name)
-                                        .font(DesignSystem.Typography.uiBody.weight(.medium))
-                                        .foregroundStyle(.primary)
-                                    Text(model.templateSummary(template, in: itemType))
-                                        .foregroundStyle(.secondary)
-                                    Text(interactionLabel(template.interaction))
+                        HStack {
+                            Button {
+                                editingTemplate = template
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                                        Text(template.name)
+                                            .font(DesignSystem.Typography.uiBody.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        Text(model.templateSummary(template, in: itemType))
+                                            .foregroundStyle(.secondary)
+                                        Text(interactionLabel(template.interaction))
+                                            .font(DesignSystem.Typography.uiCaption)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
                                         .font(DesignSystem.Typography.uiCaption)
                                         .foregroundStyle(.tertiary)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(DesignSystem.Typography.uiCaption)
-                                    .foregroundStyle(.tertiary)
+                                .padding(.vertical, DesignSystem.Spacing.sm)
                             }
-                            .padding(.vertical, DesignSystem.Spacing.sm)
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(
+                                "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction))"
+                            )
+                            .accessibilityIdentifier("templateRow-\(template.name)")
+
+                            Button("Edit", systemImage: "pencil") {
+                                editingTemplate = template
+                            }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Edit \(template.name)")
+                            .accessibilityIdentifier("editTemplate-\(template.name)")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(
-                            "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction))"
-                        )
-                        .accessibilityIdentifier("templateRow-\(template.name)")
 
                         if template.id != itemType.templates.last?.id {
                             Divider()

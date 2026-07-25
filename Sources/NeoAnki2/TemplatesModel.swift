@@ -257,6 +257,38 @@ final class TemplatesModel {
         }
     }
 
+    func deleteTemplate(id: UUID) async -> Bool {
+        errorMessage = nil
+        guard var itemType = selectedItemType else {
+            errorMessage = "No item type is selected."
+            return false
+        }
+
+        guard itemType.templates.count > 1 else {
+            errorMessage = "An item type must have at least one template."
+            return false
+        }
+
+        guard itemType.templates.contains(where: { $0.id == id }) else {
+            return false
+        }
+
+        do {
+            itemType.templates.removeAll { $0.id == id }
+            let updated = try await store.updateItemType(itemType)
+            if let index = itemTypes.firstIndex(where: { $0.id == updated.id }) {
+                itemTypes[index] = updated
+            }
+            return true
+        } catch let error as DatabaseError {
+            errorMessage = itemTypeErrorMessage(from: error)
+            return false
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
     func fieldName(for fieldID: UUID, in itemType: ItemType) -> String {
         itemType.field(fieldID)?.name ?? "Unknown"
     }
