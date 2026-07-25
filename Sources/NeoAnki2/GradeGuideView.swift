@@ -26,13 +26,14 @@ struct GradeGuideView: View {
                 }
             }
 
-            Text("Keyboard: Space or Return to reveal; 1–4 to grade; ⌘⇧S to start study.")
+            Text("Keyboard: Space or Return to reveal; 1–4 to grade; ⌘Z to undo the last grade; Escape to end session; → to skip unsupported cards; ⌘⇧S to start study.")
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.tertiary)
         }
         .padding(DesignSystem.Spacing.studyHorizontal)
         .frame(width: 360)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("How to grade. After you reveal your answer, pick Again, Hard, Good, or Easy. Keyboard shortcuts: Space or Return to reveal, 1 through 4 to grade, Command Shift S to start study.")
+        .accessibilityLabel("How to grade. After you reveal your answer, pick Again, Hard, Good, or Easy. Keyboard shortcuts: Space or Return to reveal, 1 through 4 to grade, Command Z to undo the last grade, Escape to end session, Right Arrow to skip unsupported cards, Command Shift S to start study.")
+        .accessibilityIdentifier("gradeGuidePanel")
     }
 }

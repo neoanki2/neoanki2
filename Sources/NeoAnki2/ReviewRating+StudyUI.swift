@@ -11,6 +11,19 @@ extension ReviewRating {
         }
     }
 
+    var studyButtonTitleWithShortcut: String {
+        "\(studyButtonTitle) (\(studyShortcutLabel))"
+    }
+
+    var studyShortcutLabel: String {
+        switch self {
+        case .again: "1"
+        case .hard: "2"
+        case .good: "3"
+        case .easy: "4"
+        }
+    }
+
     var studyTooltip: String {
         switch self {
         case .again: "Didn't remember — show this card again soon"

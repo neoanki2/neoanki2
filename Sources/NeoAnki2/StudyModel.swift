@@ -1,6 +1,13 @@
 import Foundation
 import NeoAnkiCore
 
+struct PendingGradeUndo: Equatable, Sendable {
+    let cardID: UUID
+    let previousMemory: MemoryState
+    let previousIndex: Int
+    let rating: ReviewRating
+}
+
 @MainActor
 @Observable
 final class StudyModel {
@@ -12,6 +19,7 @@ final class StudyModel {
     private(set) var errorMessage: String?
     private(set) var isFinished = false
     private(set) var scopeLabel = ""
+    private(set) var pendingGradeUndo: PendingGradeUndo?
 
     let store: ItemStore
 
@@ -47,6 +55,10 @@ final class StudyModel {
         return "Reviewed \(count) cards"
     }
 
+    var canUndoLastGrade: Bool {
+        pendingGradeUndo != nil
+    }
+
     func startSession(scope: StudyScope = .allDecks) async {
         isLoading = true
         errorMessage = nil
@@ -54,6 +66,7 @@ final class StudyModel {
         isAnswerRevealed = false
         index = 0
         scopeLabel = scope.label
+        pendingGradeUndo = nil
 
         do {
             queue = try await store.fetchDueCards(scope: scope.filter)
@@ -79,8 +92,17 @@ final class StudyModel {
         isGrading = true
         defer { isGrading = false }
 
+        let previousMemory = card.card.memory
+        let previousIndex = index
+
         do {
             _ = try await store.submitReview(cardID: card.id, rating: rating)
+            pendingGradeUndo = PendingGradeUndo(
+                cardID: card.id,
+                previousMemory: previousMemory,
+                previousIndex: previousIndex,
+                rating: rating
+            )
             index += 1
             isAnswerRevealed = false
 
@@ -92,8 +114,30 @@ final class StudyModel {
         }
     }
 
+    func undoLastGrade() async {
+        guard let undo = pendingGradeUndo else { return }
+
+        isGrading = true
+        defer { isGrading = false }
+
+        do {
+            try await store.revertReview(cardID: undo.cardID, restoring: undo.previousMemory)
+            index = undo.previousIndex
+            isFinished = false
+            isAnswerRevealed = true
+            pendingGradeUndo = nil
+        } catch {
+            errorMessage = userFacingError(from: error)
+        }
+    }
+
+    func dismissGradeUndo() {
+        pendingGradeUndo = nil
+    }
+
     func skipCurrentCard() {
         errorMessage = nil
+        pendingGradeUndo = nil
         guard currentCard != nil else { return }
 
         index += 1

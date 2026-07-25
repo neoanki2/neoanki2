@@ -7,6 +7,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case queryFailed(String)
     case itemTypeNotFound(UUID)
     case cardNotFound(UUID)
+    case reviewLogNotFound(UUID)
     case templateNotFound(UUID)
     case deckNotFound(UUID)
     case requiredFieldEmpty(String)
@@ -27,6 +28,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "Item type not found: \(id.uuidString)"
         case let .cardNotFound(id):
             return "Card not found: \(id.uuidString)"
+        case let .reviewLogNotFound(id):
+            return "No review log found for card: \(id.uuidString)"
         case let .templateNotFound(id):
             return "Template not found: \(id.uuidString)"
         case let .deckNotFound(id):
@@ -601,6 +604,28 @@ actor SQLiteDatabase {
         try inTransaction {
             try updateCardMemory(cardID, memory: memory)
             try insertReviewLog(log)
+        }
+    }
+
+    func revertReview(cardID: UUID, restoring memory: MemoryState) throws {
+        try inTransaction {
+            let rows = try query(
+                """
+                SELECT id FROM review_logs
+                WHERE card_id = ?
+                ORDER BY reviewed_at DESC
+                LIMIT 1;
+                """,
+                bindings: [.text(cardID.uuidString)]
+            )
+            guard let row = rows.first, let logID = row["id"] as? String else {
+                throw DatabaseError.reviewLogNotFound(cardID)
+            }
+            try execute(
+                "DELETE FROM review_logs WHERE id = ?;",
+                bindings: [.text(logID)]
+            )
+            try updateCardMemory(cardID, memory: memory)
         }
     }
 

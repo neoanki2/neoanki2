@@ -41,6 +41,7 @@ struct StudyView: View {
             Button("End Session", role: .destructive) {
                 onEndSession()
             }
+            .accessibilityIdentifier("confirmEndStudySession")
             Button("Continue Studying", role: .cancel) {}
         } message: {
             if model.cardsReviewed > 0 {
@@ -81,7 +82,7 @@ struct StudyView: View {
 
     private var emptyDueView: some View {
         ContentUnavailableView {
-            Label("You're Caught Up", systemImage: "checkmark.circle")
+            Label("You're Caught Up", systemImage: "calendar.badge.clock")
         } description: {
             Text("No cards are due right now. Add items to create new study cards.")
         } actions: {
@@ -130,6 +131,10 @@ struct StudyView: View {
                 ErrorBanner(message: errorMessage)
             }
 
+            if let undo = model.pendingGradeUndo {
+                gradeUndoBanner(for: undo)
+            }
+
             Divider()
 
             studyFooter(for: card)
@@ -166,6 +171,7 @@ struct StudyView: View {
                 requestEndSession()
             }
             .buttonStyle(.borderless)
+            .help("End session (Escape)")
             .accessibilityIdentifier("endStudySession")
         }
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
@@ -223,6 +229,8 @@ struct StudyView: View {
                     model.skipCurrentCard()
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [])
+                .help("Skip this card (Right Arrow)")
+                .accessibilityLabel("Skip card")
                 .accessibilityIdentifier("skipCard")
             } else if model.isAnswerRevealed {
                 gradeButtons
@@ -247,7 +255,7 @@ struct StudyView: View {
     private var gradeButtons: some View {
         HStack(spacing: DesignSystem.Spacing.sm) {
             ForEach(ReviewRating.allCases, id: \.self) { rating in
-                Button(rating.studyButtonTitle) {
+                Button(rating.studyButtonTitleWithShortcut) {
                     Task { await model.grade(rating) }
                 }
                 .buttonStyle(.bordered)
@@ -259,6 +267,36 @@ struct StudyView: View {
                 .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
             }
         }
+    }
+
+    private func gradeUndoBanner(for undo: PendingGradeUndo) -> some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            Text("Graded as \(undo.rating.studyButtonTitle).")
+                .font(DesignSystem.Typography.uiSecondary)
+                .foregroundStyle(.secondary)
+
+            Button("Undo") {
+                Task { await model.undoLastGrade() }
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("z", modifiers: [.command])
+            .accessibilityIdentifier("undoLastGrade")
+
+            Spacer()
+
+            Button {
+                model.dismissGradeUndo()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(DesignSystem.Typography.uiCaption)
+            }
+            .buttonStyle(.borderless)
+            .help("Dismiss")
+            .accessibilityLabel("Dismiss undo")
+        }
+        .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
+        .padding(.vertical, DesignSystem.Spacing.xs)
+        .background(DesignSystem.sidebarBackground)
     }
 
     private func requestEndSession() {

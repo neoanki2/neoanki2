@@ -48,7 +48,7 @@ struct ItemTypeEditorView: View {
                                 Image(systemName: "minus.circle.fill")
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Remove field")
+                            .accessibilityLabel("Remove field \(field.name)")
                         }
                     }
                 }

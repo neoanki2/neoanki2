@@ -385,6 +385,10 @@ public actor ItemStore {
         return nextMemory
     }
 
+    public func revertReview(cardID: UUID, restoring memory: MemoryState) async throws {
+        try await database.revertReview(cardID: cardID, restoring: memory)
+    }
+
     public func reviewLogCount(for cardID: UUID) async throws -> Int {
         try await database.countReviewLogs(for: cardID)
     }
