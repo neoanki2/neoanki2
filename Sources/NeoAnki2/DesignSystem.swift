@@ -149,6 +149,7 @@ struct SidebarEmptyState: View {
     var actionTitle: String?
     var action: (() -> Void)?
     var actionIdentifier: String?
+    var contentIdentifier: String?
 
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.sm) {
@@ -187,5 +188,18 @@ struct SidebarEmptyState: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(OptionalAccessibilityIdentifier(identifier: contentIdentifier))
+    }
+}
+
+private struct OptionalAccessibilityIdentifier: ViewModifier {
+    let identifier: String?
+
+    func body(content: Content) -> some View {
+        if let identifier, !identifier.isEmpty {
+            content.accessibilityIdentifier(identifier)
+        } else {
+            content
+        }
     }
 }

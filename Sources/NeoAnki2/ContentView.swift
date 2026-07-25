@@ -41,13 +41,6 @@ struct ContentView: View {
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("templatesDone")
                 }
-            } else if !isStudying && !isAddingItem {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Item Types", systemImage: "square.grid.2x2") {
-                        openTemplates()
-                    }
-                    .accessibilityIdentifier("templatesToolbar")
-                }
             }
         }
         .onChange(of: isStudying) { _, studying in
@@ -60,6 +53,7 @@ struct ContentView: View {
             setAddItemFocus(adding)
         }
         .onChange(of: decksModel.selectedScope) { _, _ in
+            selectedItemID = nil
             Task { await reloadScope() }
         }
         .task {

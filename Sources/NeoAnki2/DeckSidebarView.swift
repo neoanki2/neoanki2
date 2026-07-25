@@ -86,7 +86,9 @@ struct DeckSidebarView: View {
                     }
                 }
             }
+            .accessibilityIdentifier("confirmCreateDeck")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("cancelCreateDeck")
         } message: {
             if newDeckParentID != nil {
                 Text("Create a subdeck inside the selected deck.")
@@ -104,9 +106,11 @@ struct DeckSidebarView: View {
                     }
                 }
             }
+            .accessibilityIdentifier("confirmRenameDeck")
             Button("Cancel", role: .cancel) {
                 deckToRename = nil
             }
+            .accessibilityIdentifier("cancelRenameDeck")
         }
         .confirmationDialog(
             deckToDelete.map { "Delete \"\($0.name)\"?" } ?? "Delete deck?",
@@ -120,9 +124,11 @@ struct DeckSidebarView: View {
                     deckToDelete = nil
                 }
             }
+            .accessibilityIdentifier("confirmDeleteDeck")
             Button("Cancel", role: .cancel) {
                 deckToDelete = nil
             }
+            .accessibilityIdentifier("cancelDeleteDeck")
         } message: {
             Text("Items move to the parent deck, or become unassigned if this is a top-level deck.")
         }
@@ -185,10 +191,19 @@ struct DeckSidebarView: View {
         .tag(tag)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(subtitle)")
+        .accessibilityIdentifier(scopeAccessibilityIdentifier(for: tag))
     }
 
     private func dueCaption(_ count: Int) -> String {
         count > 0 ? "\(count) due" : "No cards due"
+    }
+
+    private func scopeAccessibilityIdentifier(for tag: SidebarSelection) -> String {
+        switch tag {
+        case .allDecks: "scopeRow-AllDecks"
+        case .unassigned: "scopeRow-Unassigned"
+        case .deck: "scopeRow-Deck"
+        }
     }
 }
 
@@ -245,6 +260,7 @@ private struct DeckSidebarNode: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(summary.name), \(rowSubtitle(for: summary))")
+        .accessibilityIdentifier("deckRow-\(summary.name)")
     }
 
     private func rowSubtitle(for summary: DeckSummary) -> String {

@@ -75,6 +75,14 @@ struct TemplateEditorView: View {
                 Button("Cancel") { onDismiss() }
                     .accessibilityIdentifier("cancelTemplateEditor")
             }
+            if editingTemplate != nil {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("Delete", role: .destructive) {
+                        Task { await deleteTemplate() }
+                    }
+                    .accessibilityIdentifier("deleteTemplate")
+                }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     Task { await save() }
@@ -106,6 +114,13 @@ struct TemplateEditorView: View {
         defer { isSaving = false }
 
         if await model.saveTemplate(draft, editingID: editingTemplate?.id) {
+            onDismiss()
+        }
+    }
+
+    private func deleteTemplate() async {
+        guard let editingTemplate else { return }
+        if await model.deleteTemplate(id: editingTemplate.id) {
             onDismiss()
         }
     }

@@ -82,7 +82,8 @@ struct DeckDetailView: View {
                 systemImage: "rectangle.stack.badge.plus",
                 actionTitle: "Add Item",
                 action: onAddItem,
-                actionIdentifier: "addItemEmptyState"
+                actionIdentifier: "addItemEmptyState",
+                contentIdentifier: "emptyLibraryState"
             )
         case .unassigned:
             SidebarEmptyState(
