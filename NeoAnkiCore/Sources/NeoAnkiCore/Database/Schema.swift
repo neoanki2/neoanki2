@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 7
+    static let version = 8
 
     static let createStatements: [String] = [
         """
@@ -91,6 +91,28 @@ enum Schema {
             file_extension TEXT NOT NULL,
             created_at REAL NOT NULL,
             ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0)
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_params (
+            profile_id TEXT PRIMARY KEY NOT NULL,
+            parameters BLOB NOT NULL,
+            optimized_at REAL NOT NULL,
+            sample_count INTEGER NOT NULL,
+            log_loss REAL NOT NULL
+        );
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 7.
+    static let migrationV8Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_params (
+            profile_id TEXT PRIMARY KEY NOT NULL,
+            parameters BLOB NOT NULL,
+            optimized_at REAL NOT NULL,
+            sample_count INTEGER NOT NULL,
+            log_loss REAL NOT NULL
         );
         """,
     ]

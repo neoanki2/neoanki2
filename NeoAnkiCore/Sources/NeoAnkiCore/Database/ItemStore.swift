@@ -47,20 +47,24 @@ public struct ReviewSubmission: Sendable, Equatable {
 /// Persistence for items and generated cards.
 public actor ItemStore {
     private let database: SQLiteDatabase
-    private let scheduler: any Scheduler
+    private let schedulerOverride: (any Scheduler)?
+    private let profileID: String
+    private var fsrsParameters = FSRSScheduler.Parameters()
     private let mediaStore: MediaStore?
     private let starterItemTypes: [ItemType]
 
     public init(
         databaseURL: URL,
-        scheduler: any Scheduler = FSRSScheduler(),
+        scheduler: (any Scheduler)? = nil,
+        profileID: String = "default",
         mediaStore: MediaStore? = nil,
         starterItemTypes: [ItemType] = BuiltInItemTypes.all
     ) throws {
         let directory = databaseURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         database = try SQLiteDatabase(path: databaseURL)
-        self.scheduler = scheduler
+        schedulerOverride = scheduler
+        self.profileID = profileID.isEmpty ? "default" : profileID
         self.starterItemTypes = starterItemTypes
         if let mediaStore {
             self.mediaStore = mediaStore
@@ -82,6 +86,10 @@ public actor ItemStore {
         try await database.migrate()
         await mediaStore?.attachMetadataDatabase(database)
         try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
+        if schedulerOverride == nil,
+           let saved = try await database.fetchSchedulerParameters(profileID: profileID) {
+            fsrsParameters = saved
+        }
     }
 
     public func defaultItemType() async throws -> ItemType {
@@ -480,6 +488,8 @@ public actor ItemStore {
             0
         )
 
+        let scheduler: any Scheduler = schedulerOverride
+            ?? FSRSScheduler(parameters: fsrsParameters)
         let nextMemory = scheduler.schedule(card.memory, rating: rating, now: now)
         card.memory = nextMemory
 
@@ -518,6 +528,35 @@ public actor ItemStore {
 
     public func activeReviewLogCount(for cardID: UUID) async throws -> Int {
         try await database.countActiveReviewLogs(for: cardID)
+    }
+
+    public func schedulingParameters() -> FSRSScheduler.Parameters {
+        fsrsParameters
+    }
+
+    /// Fits and persists scheduler weights for this store's profile.
+    ///
+    /// Only active, decodable review logs participate. The minimum-data gate
+    /// is based on repeated-review outcomes rather than raw log rows.
+    @discardableResult
+    public func optimizeScheduling(
+        minimumObservations: Int = 100,
+        now: Date = .now
+    ) async throws -> FSRSOptimizationResult {
+        let logs = try await database.fetchActiveReviewLogs()
+        let optimizer = FSRSOptimizer(minimumObservations: minimumObservations)
+        let result = try optimizer.optimize(logs: logs, startingAt: fsrsParameters)
+        guard result.improved else { return result }
+
+        try await database.saveSchedulerParameters(
+            result.parameters,
+            profileID: profileID,
+            optimizedAt: now,
+            sampleCount: result.observationCount,
+            logLoss: result.optimizedLoss
+        )
+        fsrsParameters = result.parameters
+        return result
     }
 
     /// Imports rows parsed by a native adapter into an existing item type.

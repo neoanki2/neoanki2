@@ -311,6 +311,141 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(items.first?.subtitle == "Legacy back")
 }
 
+@Test func persistedProfileParametersLoadAndDriveScheduling() async throws {
+    let databaseURL = tempDatabaseURL()
+    var weights = FSRSScheduler.Parameters.defaultWeights
+    weights[0] = 2.5
+    let expected = FSRSScheduler.Parameters(weights: weights, enableFuzz: false)
+
+    let database = try SQLiteDatabase(path: databaseURL)
+    try await database.migrate()
+    try await database.saveSchedulerParameters(
+        expected,
+        profileID: "learner-a",
+        optimizedAt: Date(timeIntervalSince1970: 100),
+        sampleCount: 120,
+        logLoss: 0.4
+    )
+
+    let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-a")
+    try await store.bootstrap()
+    #expect(await store.schedulingParameters() == expected)
+
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    )
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(item, now: now)
+    let card = try #require(await store.fetchDueCards(asOf: now).first)
+    let memory = try await store.submitReview(cardID: card.id, rating: .again, now: now)
+
+    #expect(memory.stability == 2.5)
+}
+
+@Test func revertMarksReviewInactiveWithoutDeletingHistory() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    )
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(item, now: now)
+    let card = try #require(await store.fetchDueCards(asOf: now).first)
+    let original = card.card.memory
+
+    _ = try await store.submitReview(cardID: card.id, rating: .good, now: now)
+    try await store.revertReview(cardID: card.id, restoring: original)
+
+    #expect(try await store.reviewLogCount(for: card.id) == 0)
+    #expect(try reviewLogRowCount(at: databaseURL, cardID: card.id) == 1)
+}
+
+@Test func optimizationPersistsThroughStoreAPIAndReopen() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    )
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(item, now: start)
+    let card = try #require(await store.fetchDueCards(asOf: start).first)
+    let database = try SQLiteDatabase(path: databaseURL)
+
+    for index in 0..<130 {
+        let rating: ReviewRating = index == 0 || index % 5 != 0 ? .good : .again
+        try await database.insertReviewLog(
+            ReviewLog(
+                cardID: card.id,
+                reviewedAt: start.addingTimeInterval(Double(index * 12) * 86_400),
+                rating: rating,
+                elapsedDays: index == 0 ? 0 : 12,
+                scheduledDays: index == 0 ? 0 : 12,
+                phaseBefore: index == 0 ? .new : .review,
+                durationMs: 1_000
+            )
+        )
+    }
+
+    let result = try await store.optimizeScheduling(minimumObservations: 100)
+    #expect(result.improved)
+    #expect(result.optimizedLoss < result.previousLoss)
+
+    let reopened = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
+    try await reopened.bootstrap()
+    #expect(await reopened.schedulingParameters() == result.parameters)
+}
+
+private func reviewLogRowCount(at url: URL, cardID: UUID) throws -> Int {
+    var db: OpaquePointer?
+    guard sqlite3_open_v2(url.path(percentEncoded: false), &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+          let db else {
+        throw DatabaseError.openFailed("Could not inspect test database.")
+    }
+    defer { sqlite3_close(db) }
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(
+        db,
+        "SELECT COUNT(*) FROM review_logs WHERE card_id = ?;",
+        -1,
+        &statement,
+        nil
+    ) == SQLITE_OK,
+          let statement else {
+        throw DatabaseError.queryFailed("Could not inspect test database.")
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_bind_text(
+        statement,
+        1,
+        cardID.uuidString,
+        -1,
+        unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    ) == SQLITE_OK else {
+        throw DatabaseError.queryFailed("Could not bind test card ID.")
+    }
+    guard sqlite3_step(statement) == SQLITE_ROW else {
+        throw DatabaseError.queryFailed("Could not inspect test database.")
+    }
+    return Int(sqlite3_column_int64(statement, 0))
+}
+
 private func createLegacyNoteDatabase(at url: URL) throws {
     var db: OpaquePointer?
     guard sqlite3_open(url.path(percentEncoded: false), &db) == SQLITE_OK, let db else {

@@ -149,6 +149,12 @@ actor SQLiteDatabase {
                 try backfillMediaReferenceCounts()
             }
 
+            if current < 8 {
+                for sql in Schema.migrationV8Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -746,6 +752,67 @@ actor SQLiteDatabase {
                 .double(log.reviewedAt.timeIntervalSince1970),
                 .blob(data),
                 .blob(memoryData),
+            ]
+        )
+    }
+
+    func fetchActiveReviewLogs() throws -> [ReviewLog] {
+        let rows = try query(
+            """
+            SELECT review_logs.log
+            FROM review_logs
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_reverts.id IS NULL
+            ORDER BY review_logs.reviewed_at ASC, review_logs.id ASC;
+            """
+        )
+        return rows.compactMap { row in
+            guard let data = row["log"] as? Data else { return nil }
+            return try? decoder.decode(ReviewLog.self, from: data)
+        }
+    }
+
+    func fetchSchedulerParameters(profileID: String) throws -> FSRSScheduler.Parameters? {
+        let rows = try query(
+            """
+            SELECT parameters
+            FROM scheduler_params
+            WHERE profile_id = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(profileID)]
+        )
+        guard let data = rows.first?["parameters"] as? Data else { return nil }
+        return try? decoder.decode(FSRSScheduler.Parameters.self, from: data)
+    }
+
+    func saveSchedulerParameters(
+        _ parameters: FSRSScheduler.Parameters,
+        profileID: String,
+        optimizedAt: Date,
+        sampleCount: Int,
+        logLoss: Double
+    ) throws {
+        let data = try encode(parameters)
+        try execute(
+            """
+            INSERT INTO scheduler_params (
+                profile_id, parameters, optimized_at, sample_count, log_loss
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(profile_id) DO UPDATE SET
+                parameters = excluded.parameters,
+                optimized_at = excluded.optimized_at,
+                sample_count = excluded.sample_count,
+                log_loss = excluded.log_loss;
+            """,
+            bindings: [
+                .text(profileID),
+                .blob(data),
+                .double(optimizedAt.timeIntervalSince1970),
+                .int(Int64(sampleCount)),
+                .double(logLoss),
             ]
         )
     }

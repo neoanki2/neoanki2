@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
+    @Bindable var schedulingModel: SchedulingModel
     @State private var isAddingItem = false
     @State private var isManagingTemplates = false
     @State private var isStudying = false
@@ -62,6 +63,19 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
         .focusedSceneValue(\.libraryCommandHandlers, libraryCommandHandlers)
+        .alert(
+            schedulingModel.notice?.title ?? "Scheduling",
+            isPresented: Binding(
+                get: { schedulingModel.notice != nil },
+                set: { if !$0 { schedulingModel.notice = nil } }
+            )
+        ) {
+            Button("OK") {
+                schedulingModel.notice = nil
+            }
+        } message: {
+            Text(schedulingModel.notice?.message ?? "")
+        }
     }
 
     private var windowTitle: String {
