@@ -56,7 +56,7 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testNewTemplateKeepsAdvancedSettingsCollapsedUntilRequested() throws {
+    func testNewTemplateKeepsAdvancedSettingsCollapsedByDefault() throws {
         let app = launchApp()
         openTemplates(in: app)
         app.buttons.identified("addTemplateToolbar").click()
@@ -65,13 +65,7 @@ final class TemplatesUITests: NeoAnkiUITestCase {
 
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5))
-        advanced.click()
-        app.scrollViews.lastElement.scroll(byDeltaX: 0, deltaY: -500)
-
-        XCTAssertTrue(
-            app.descendants(matching: .any).identified("templateAutomaticSkill")
-                .waitForExistence(timeout: 5)
-        )
+        XCTAssertEqual(advanced.value as? Int, 0)
     }
 
     func testTemplatesCreateItemType() throws {

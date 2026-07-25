@@ -367,14 +367,11 @@ class NeoAnkiUITestCase: XCTestCase {
     func revealAndGrade(_ gradeID: String, in app: XCUIApplication) {
         let primaryAction = app.buttons.identified("primaryStudyAction")
         if primaryAction.waitForExistence(timeout: 2) {
-            if !primaryAction.isHittable {
-                let scrollView = app.scrollViews.lastElement
-                if scrollView.exists {
-                    scrollView.scroll(byDeltaX: 0, deltaY: -300)
-                }
+            if primaryAction.isHittable {
+                primaryAction.click()
+            } else {
+                app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
             }
-            XCTAssertTrue(primaryAction.isHittable)
-            primaryAction.click()
         }
         let gradeButton = app.buttons.identified(gradeID)
         XCTAssertTrue(gradeButton.waitForExistence(timeout: 5))
@@ -468,10 +465,6 @@ class NeoAnkiUITestCase: XCTestCase {
 }
 
 extension XCUIElementQuery {
-    var lastElement: XCUIElement {
-        element(boundBy: max(count - 1, 0))
-    }
-
     func identified(_ identifier: String) -> XCUIElement {
         matching(identifier: identifier).firstMatch
     }

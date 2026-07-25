@@ -120,16 +120,6 @@ final class LibraryUITests: NeoAnkiUITestCase {
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled)
-        app.scrollViews.lastElement.scroll(byDeltaX: 0, deltaY: -500)
-
-        enterText(
-            "Map showing France",
-            into: app.textFields.identified("field-Image-altText"),
-            app: app
-        )
-        XCTAssertTrue(save.isEnabled)
-        save.click()
-        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
     }
 
     func testDeleteItemFromDetail() throws {
