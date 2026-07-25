@@ -96,8 +96,8 @@ import Testing
     try await ScenarioRunner.run { ctx in
         try await ctx.onboard()
         let types = try await ctx.store.listItemTypes()
-        #expect(types.count == 1)
-        #expect(types.first?.name == "Basic")
+        #expect(types.count == 2)
+        #expect(Set(types.map(\.name)) == ["Basic", "Cloze"])
     }
 }
 
@@ -107,7 +107,7 @@ import Testing
         _ = try await ctx.createCapitalsItemType()
 
         let types = try await ctx.store.listItemTypes()
-        #expect(types.count == 2)
-        #expect(Set(types.map(\.name)) == ["Basic", "Capitals"])
+        #expect(types.count == 3)
+        #expect(Set(types.map(\.name)) == ["Basic", "Cloze", "Capitals"])
     }
 }

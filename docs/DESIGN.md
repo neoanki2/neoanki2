@@ -2,8 +2,7 @@
 name: NeoAnki2
 description: A calm, native Mac study surface where card content is the hero and the app chrome disappears.
 colors:
-  accent-study: "#4A6FA5"
-  accent-study-dark: "#7BA4D9"
+  accent-study: "{system.controlAccentColor}"
   surface-sidebar: "{system.controlBackgroundColor}"
   surface-detail: "{system.windowBackgroundColor}"
   text-primary: "{system.labelColor}"
@@ -93,11 +92,11 @@ NeoAnki2 expresses brand through **precision and calm** — correct split-view s
 
 ## Colors
 
-The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` system names so Light/Dark Mode and Increased Contrast adapt automatically. Hex values below are **fallback anchors** for the single custom accent only.
+The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` system names so Light/Dark Mode, the user's chosen accent, and Increased Contrast adapt automatically.
 
 ### Primary
 
-- **Study Indigo** (`#4A6FA5` light / `#7BA4D9` dark): The app tint and primary action fill (Study, Show Answer). Chosen for calm focus — cooler than “success green,” less alarming than “error red,” distinct from Anki teal. Apply via `.tint()` at app root; never as a full-bleed background.
+- **System Accent** (`controlAccentColor`): The app tint and primary action fill (Study, Show Answer). It follows the user's macOS accent and includes system-provided Light, Dark, and Increased Contrast variants. Apply via `.tint()` at app root; never as a full-bleed background.
 
 ### Neutral
 
@@ -115,7 +114,7 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 ### Named Rules
 
-**The One Accent Rule.** Custom accent color appears only on primary forward actions (Study, Show Answer, Done on completion). Grade buttons, list rows, and chrome stay neutral bordered styles.
+**The One Accent Rule.** The system accent appears only on primary forward actions (Study, Show Answer, Done on completion). Grade buttons, list rows, and chrome stay neutral bordered styles.
 
 **The No Gamification Palette Rule.** Do not introduce streak orange, achievement gold, or chart rainbow colors. Progress is text (“Card 3 of 12”), not rings or bars.
 

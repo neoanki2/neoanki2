@@ -11,6 +11,7 @@ struct RichTextFieldEditor: View {
     let label: String
     @Binding var spans: [Span]
     var accessibilityIdentifier: String?
+    var isFocused: Binding<Bool>?
 
     @State private var textViewHolder = TextViewHolder()
 
@@ -23,9 +24,11 @@ struct RichTextFieldEditor: View {
             formattingToolbar
 
             RichTextEditorRepresentable(
+                label: label,
                 spans: $spans,
                 accessibilityIdentifier: accessibilityIdentifier,
-                textViewHolder: textViewHolder
+                textViewHolder: textViewHolder,
+                isFocused: isFocused
             )
             .frame(minHeight: 88)
             .overlay {
@@ -89,12 +92,18 @@ private struct FormatButton: View {
 }
 
 private struct RichTextEditorRepresentable: NSViewRepresentable {
+    let label: String
     @Binding var spans: [Span]
     var accessibilityIdentifier: String?
     var textViewHolder: TextViewHolder
+    var isFocused: Binding<Bool>?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(spans: $spans, textViewHolder: textViewHolder)
+        Coordinator(
+            spans: $spans,
+            textViewHolder: textViewHolder,
+            isFocused: isFocused
+        )
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -112,6 +121,7 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 10, height: 10)
         textView.delegate = context.coordinator
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
+        textView.setAccessibilityLabel(label)
         context.coordinator.textView = textView
         textViewHolder.textView = textView
 
@@ -119,6 +129,11 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
             SpanFormatting.attributedString(from: spans),
             preservingSelection: false
         )
+        if isFocused?.wrappedValue == true {
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+            }
+        }
 
         return scrollView
     }
@@ -127,7 +142,16 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         context.coordinator.textView = textView
+        context.coordinator.isFocused = isFocused
         textViewHolder.textView = textView
+        textView.setAccessibilityIdentifier(accessibilityIdentifier)
+        textView.setAccessibilityLabel(label)
+
+        if isFocused?.wrappedValue == true, textView.window?.firstResponder !== textView {
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+            }
+        }
 
         guard !context.coordinator.isUpdatingFromView else { return }
 
@@ -146,10 +170,16 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
         var isUpdatingFromView = false
         var isProgrammaticUpdate = false
         let textViewHolder: TextViewHolder
+        var isFocused: Binding<Bool>?
 
-        init(spans: Binding<[Span]>, textViewHolder: TextViewHolder) {
+        init(
+            spans: Binding<[Span]>,
+            textViewHolder: TextViewHolder,
+            isFocused: Binding<Bool>?
+        ) {
             _spans = spans
             self.textViewHolder = textViewHolder
+            self.isFocused = isFocused
         }
 
         func textDidChange(_ notification: Notification) {
@@ -167,6 +197,29 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
             }
         }
 
+        func textDidBeginEditing(_ notification: Notification) {
+            isFocused?.wrappedValue = true
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            isFocused?.wrappedValue = false
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            switch RichTextFocusNavigation.direction(for: commandSelector) {
+            case .forward:
+                isFocused?.wrappedValue = false
+                textView.window?.selectNextKeyView(textView)
+                return true
+            case .backward:
+                isFocused?.wrappedValue = false
+                textView.window?.selectPreviousKeyView(textView)
+                return true
+            case nil:
+                return false
+            }
+        }
+
         @MainActor
         func setAttributedString(_ attributedString: NSAttributedString, preservingSelection: Bool) {
             guard let textView else { return }
@@ -179,7 +232,7 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
             let clampedLocation = min(selectedRange.location, length)
             let clampedLength = min(selectedRange.length, length - clampedLocation)
             textView.setSelectedRange(NSRange(location: clampedLocation, length: clampedLength))
-            syncTestingAccessibilityValue(on: textView)
+            syncTestingDescription(on: textView)
         }
 
         @MainActor
@@ -191,27 +244,43 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
                 ]
             }
             guard newSpans != spans else {
-                syncTestingAccessibilityValue(on: textView)
+                syncTestingDescription(on: textView)
                 return
             }
 
             isUpdatingFromView = true
             defer { isUpdatingFromView = false }
             spans = newSpans
-            syncTestingAccessibilityValue(on: textView)
+            syncTestingDescription(on: textView)
         }
 
         @MainActor
-        private func syncTestingAccessibilityValue(on textView: NSTextView) {
+        private func syncTestingDescription(on textView: NSTextView) {
             guard ProcessInfo.processInfo.environment["NEOANKI_TESTING"] == "1" else { return }
             let description = SpanFormatting.testingDescription(
                 from: SpanFormatting.spans(from: textView.attributedString())
             )
-            if textView.accessibilityLabel() as? String != description {
-                textView.setAccessibilityLabel(description)
+            if textView.accessibilityValue() != description {
                 textView.setAccessibilityValue(description)
             }
         }
+    }
+}
+
+enum RichTextFocusNavigation {
+    enum Direction: Equatable {
+        case forward
+        case backward
+    }
+
+    static func direction(for selector: Selector) -> Direction? {
+        if selector == #selector(NSResponder.insertTab(_:)) {
+            return .forward
+        }
+        if selector == #selector(NSResponder.insertBacktab(_:)) {
+            return .backward
+        }
+        return nil
     }
 }
 

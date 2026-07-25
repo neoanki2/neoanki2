@@ -1,3 +1,5 @@
+import CryptoKit
+import Darwin
 import Foundation
 import SQLite3
 
@@ -13,8 +15,11 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case requiredFieldEmpty(String)
     case invalidItemType(String)
     case invalidDeck(String)
+    case invalidMediaAsset(String)
     case encodingFailed
     case decodingFailed
+    case unsupportedSchemaVersion(Int)
+    case schemaVersionReadFailed
 
     public var errorDescription: String? {
         switch self {
@@ -29,7 +34,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
         case let .cardNotFound(id):
             return "Card not found: \(id.uuidString)"
         case let .reviewLogNotFound(id):
-            return "No review log found for card: \(id.uuidString)"
+            return "Review log not found: \(id.uuidString)"
         case let .templateNotFound(id):
             return "Template not found: \(id.uuidString)"
         case let .deckNotFound(id):
@@ -40,10 +45,16 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return message
         case let .invalidDeck(message):
             return message
+        case let .invalidMediaAsset(message):
+            return message
         case .encodingFailed:
             return "Could not encode data for storage."
         case .decodingFailed:
             return "Could not decode stored data."
+        case let .unsupportedSchemaVersion(version):
+            return "Database schema version \(version) is newer than this app supports."
+        case .schemaVersionReadFailed:
+            return "Could not read the database schema version."
         }
     }
 }
@@ -57,10 +68,12 @@ struct PersistedItem {
 /// Low-level SQLite connection. An actor so callers serialize access.
 actor SQLiteDatabase {
     private nonisolated(unsafe) var handle: OpaquePointer?
+    private let databaseURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     init(path: URL) throws {
+        databaseURL = path.standardizedFileURL
         var db: OpaquePointer?
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         let code = sqlite3_open_v2(path.path(percentEncoded: false), &db, flags, nil)
@@ -83,6 +96,10 @@ actor SQLiteDatabase {
 
     func migrate() throws {
         let current = try schemaVersion()
+
+        guard current <= Schema.version else {
+            throw DatabaseError.unsupportedSchemaVersion(current)
+        }
 
         if current == 0 {
             try inTransaction {
@@ -117,6 +134,48 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 5 {
+                for sql in Schema.migrationV5Statements {
+                    try execute(sql)
+                }
+            }
+
+            if current < 6 {
+                try migrateReviewHistorySchemaIfNeeded()
+            }
+
+            if current < 7 {
+                try migrateMediaReferenceSchemaIfNeeded()
+            }
+
+            if current < 8 {
+                for sql in Schema.migrationV8Statements {
+                    try execute(sql)
+                }
+            }
+
+            if current < 9 {
+                for sql in Schema.migrationV9Statements {
+                    try execute(sql)
+                }
+            }
+
+            if current < 10 {
+                for sql in Schema.migrationV10Statements {
+                    try execute(sql)
+                }
+            }
+
+            if current < 11 {
+                try migrateReviewSequenceSchemaIfNeeded()
+            }
+
+            if current < 12 {
+                for sql in Schema.migrationV12Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -124,19 +183,41 @@ actor SQLiteDatabase {
         }
     }
 
-    func seedBuiltInItemTypesIfNeeded() throws {
-        for itemType in BuiltInItemTypes.all {
-            let data = try encode(itemType)
+    /// Seeds the configured first-run starters exactly once. The marker and
+    /// inserts share a transaction so an interrupted launch can safely retry.
+    func seedStarterItemTypesIfNeeded(_ itemTypes: [ItemType]) throws {
+        try inTransaction {
+            let marker = try query(
+                "SELECT value FROM app_metadata WHERE key = ? LIMIT 1;",
+                bindings: [.text("starter_item_types_seeded")]
+            )
+            guard marker.isEmpty else { return }
+
+            for itemType in itemTypes {
+                let data = try encode(itemType)
+                try execute(
+                    """
+                    INSERT INTO item_types (id, name, definition)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(id) DO NOTHING;
+                    """,
+                    bindings: [
+                        .text(itemType.id.uuidString),
+                        .text(itemType.name),
+                        .blob(data),
+                    ]
+                )
+            }
+
             try execute(
                 """
-                INSERT INTO item_types (id, name, definition)
-                VALUES (?, ?, ?)
-                ON CONFLICT(id) DO NOTHING;
+                INSERT INTO app_metadata (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value;
                 """,
                 bindings: [
-                    .text(itemType.id.uuidString),
-                    .text(itemType.name),
-                    .blob(data),
+                    .text("starter_item_types_seeded"),
+                    .text("1"),
                 ]
             )
         }
@@ -149,6 +230,25 @@ actor SQLiteDatabase {
         )
         guard let row = rows.first, let data = row["definition"] as? Data else { return nil }
         return try decode(ItemType.self, from: data)
+    }
+
+    /// Returns nil for an independently corrupt definition while preserving
+    /// database/query failures for the caller.
+    func fetchValidatedItemType(id: UUID) throws -> ItemType? {
+        let rows = try query(
+            "SELECT definition FROM item_types WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first, let data = row["definition"] as? Data else { return nil }
+        do {
+            let itemType = try decode(ItemType.self, from: data)
+            try ItemTypeValidation.validate(itemType)
+            return itemType
+        } catch is DecodingError {
+            return nil
+        } catch is DatabaseError {
+            return nil
+        }
     }
 
     func fetchItemType(named name: String) throws -> ItemType? {
@@ -193,18 +293,112 @@ actor SQLiteDatabase {
         )
     }
 
-    func fetchAllItemTypes() throws -> [ItemType] {
+    func updateItemTypeAndSyncCards(
+        previous: ItemType?,
+        updated: ItemType,
+        now: Date
+    ) throws {
+        try inTransaction {
+            try updateItemType(updated)
+            if let previous {
+                try syncCards(from: previous, to: updated, now: now)
+            }
+        }
+    }
+
+    func fetchItemTypesWithCorruption() throws -> ItemTypeLoadResult {
         let rows = try query(
             """
-            SELECT definition
+            SELECT id, name, definition
             FROM item_types
             ORDER BY name ASC;
             """
         )
-        return try rows.compactMap { row in
-            guard let data = row["definition"] as? Data else { return nil }
-            return try decode(ItemType.self, from: data)
+
+        var itemTypes: [ItemType] = []
+        var corruptions: [QuarantinedItemTypeDefinition] = []
+        for row in rows {
+            let persistedID = row["id"] as? String ?? ""
+            let name = row["name"] as? String ?? "Unnamed item type"
+            guard let data = row["definition"] as? Data else {
+                corruptions.append(.init(persistedID: persistedID, name: name))
+                continue
+            }
+            do {
+                let itemType = try decode(ItemType.self, from: data)
+                try ItemTypeValidation.validate(itemType)
+                itemTypes.append(itemType)
+            } catch {
+                corruptions.append(.init(persistedID: persistedID, name: name))
+            }
         }
+        return ItemTypeLoadResult(itemTypes: itemTypes, corruptions: corruptions)
+    }
+
+    func fetchAllItemTypes() throws -> [ItemType] {
+        try fetchItemTypesWithCorruption().itemTypes
+    }
+
+    func repairItemTypeDefinition(id: UUID, now: Date) throws -> ItemType {
+        let rows = try query(
+            "SELECT name, definition FROM item_types WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first,
+              let name = row["name"] as? String,
+              let definition = row["definition"] as? Data
+        else {
+            throw DatabaseError.itemTypeNotFound(id)
+        }
+
+        let front = FieldDef(name: "Front", type: .text, isRequired: true)
+        let back = FieldDef(name: "Back", type: .text, isRequired: true)
+        let base = try ItemTypeBuilder.makeItemType(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Recovered Item Type" : name,
+            fields: [front, back]
+        )
+        let repaired = ItemType(id: id, name: base.name, fields: base.fields, templates: base.templates)
+        let repairedData = try encode(repaired)
+
+        try inTransaction {
+            try execute(
+                """
+                INSERT INTO quarantined_item_type_definitions
+                    (item_type_id, name, definition, archived_at)
+                VALUES (?, ?, ?, ?);
+                """,
+                bindings: [
+                    .text(id.uuidString),
+                    .text(name),
+                    .blob(definition),
+                    .double(now.timeIntervalSince1970),
+                ]
+            )
+            try execute(
+                "UPDATE item_types SET name = ?, definition = ? WHERE id = ?;",
+                bindings: [.text(repaired.name), .blob(repairedData), .text(id.uuidString)]
+            )
+            for entry in try fetchItems(itemTypeID: id) {
+                let cards = CardGenerator.cards(for: entry.item, type: repaired, now: now)
+                try insertCards(cards)
+            }
+        }
+        return repaired
+    }
+
+    func quarantinedDefinitionCount(itemTypeID: UUID) throws -> Int {
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM quarantined_item_type_definitions WHERE item_type_id = ?;",
+            bindings: [.text(itemTypeID.uuidString)]
+        )
+        return Int(rows.first?["count"] as? Int64 ?? 0)
+    }
+
+    func replaceItemTypeDefinition(id: UUID, with data: Data) throws {
+        try execute(
+            "UPDATE item_types SET definition = ? WHERE id = ?;",
+            bindings: [.blob(data), .text(id.uuidString)]
+        )
     }
 
     func insertDeck(_ deck: Deck) throws {
@@ -409,7 +603,7 @@ actor SQLiteDatabase {
         guard !deckIDs.isEmpty else { return [] }
         let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
         var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE is_suspended = 0 AND due_at <= ? AND deck_id IN (\(placeholders))
             ORDER BY due_at ASC
@@ -427,7 +621,7 @@ actor SQLiteDatabase {
 
     func fetchUnassignedDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
         var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE is_suspended = 0 AND due_at <= ? AND deck_id IS NULL
             ORDER BY due_at ASC
@@ -479,11 +673,91 @@ actor SQLiteDatabase {
         _ item: Item,
         cards: [Card],
         createdAt: Date,
+        updatedAt: Date,
+        mediaDescriptors: [String: MediaAssetDescriptor] = [:]
+    ) throws {
+        try inTransaction {
+            try applyMediaReferenceDeltas(
+                from: [:],
+                to: mediaReferenceCounts(in: item),
+                descriptors: mediaDescriptors,
+                now: createdAt
+            )
+            try insertItem(item, createdAt: createdAt, updatedAt: updatedAt)
+            try insertCards(cards)
+            try consumeMediaReservations(ids: mediaReservationIDs(in: item))
+        }
+    }
+
+    func insertItemsWithCards(
+        _ entries: [(item: Item, cards: [Card])],
+        createdAt: Date,
         updatedAt: Date
     ) throws {
         try inTransaction {
-            try insertItem(item, createdAt: createdAt, updatedAt: updatedAt)
-            try insertCards(cards)
+            for entry in entries {
+                try applyMediaReferenceDeltas(
+                    from: [:],
+                    to: mediaReferenceCounts(in: entry.item),
+                    descriptors: [:],
+                    now: createdAt
+                )
+                try insertItem(entry.item, createdAt: createdAt, updatedAt: updatedAt)
+                try insertCards(entry.cards)
+                try consumeMediaReservations(ids: mediaReservationIDs(in: entry.item))
+            }
+        }
+    }
+
+    func updateItemWithMedia(
+        _ item: Item,
+        desiredCards: [Card],
+        updatedAt: Date,
+        mediaDescriptors: [String: MediaAssetDescriptor]
+    ) throws {
+        try inTransaction {
+            guard let previous = try fetchItem(id: item.id) else {
+                throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
+            }
+            try applyMediaReferenceDeltas(
+                from: mediaReferenceCounts(in: previous.item),
+                to: mediaReferenceCounts(in: item),
+                descriptors: mediaDescriptors,
+                now: updatedAt
+            )
+            let fields = try encode(item.fields)
+            let tags = try encode(item.tags)
+            try execute(
+                """
+                UPDATE items
+                SET item_type_id = ?, fields = ?, tags = ?, deck_id = ?, updated_at = ?
+                WHERE id = ?;
+                """,
+                bindings: [
+                    .text(item.itemTypeID.uuidString),
+                    .blob(fields),
+                    .blob(tags),
+                    item.deckID.map { .text($0.uuidString) } ?? .null,
+                    .double(updatedAt.timeIntervalSince1970),
+                    .text(item.id.uuidString),
+                ]
+            )
+            try reconcileCards(for: item.id, desired: desiredCards)
+            try consumeMediaReservations(ids: mediaReservationIDs(in: item))
+        }
+    }
+
+    func deleteItemWithMedia(id: UUID, deletedAt: Date) throws -> Bool {
+        try inTransaction {
+            guard let persisted = try fetchItem(id: id) else { return false }
+            try applyMediaReferenceDeltas(
+                from: mediaReferenceCounts(in: persisted.item),
+                to: [:],
+                descriptors: [:],
+                now: deletedAt
+            )
+            try deleteItem(id: id)
+            return true
         }
     }
 
@@ -513,8 +787,10 @@ actor SQLiteDatabase {
             let memory = try encode(card.memory)
             try execute(
                 """
-                INSERT INTO cards (id, item_id, template_id, skill, memory, due_at, is_suspended, deck_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                INSERT INTO cards (
+                    id, item_id, template_id, skill, memory, due_at, is_suspended, deck_id, cloze_group
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 bindings: [
                     .text(card.id.uuidString),
@@ -525,6 +801,7 @@ actor SQLiteDatabase {
                     .double(card.memory.due.timeIntervalSince1970),
                     .int(card.isSuspended ? 1 : 0),
                     card.deckID.map { .text($0.uuidString) } ?? .null,
+                    card.clozeGroup.map { .int(Int64($0)) } ?? .null,
                 ]
             )
         }
@@ -533,7 +810,7 @@ actor SQLiteDatabase {
     func fetchCard(id: UUID) throws -> Card? {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE id = ?
             LIMIT 1;
@@ -546,7 +823,7 @@ actor SQLiteDatabase {
 
     func fetchDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
         var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE is_suspended = 0 AND due_at <= ?
             ORDER BY due_at ASC
@@ -590,54 +867,176 @@ actor SQLiteDatabase {
         )
     }
 
-    func insertReviewLog(_ log: ReviewLog) throws {
-        let data = try encode(log)
+    func insertReviewLog(_ log: ReviewLog, memoryBefore: MemoryState) throws {
+        let nextSequence = try nextReviewSequence()
+        let sequencedLog = log.withSequence(nextSequence)
+        let data = try encode(sequencedLog)
+        let memoryData = try encode(memoryBefore)
         try execute(
             """
-            INSERT INTO review_logs (id, card_id, reviewed_at, log)
-            VALUES (?, ?, ?, ?);
+            INSERT INTO review_logs (id, card_id, reviewed_at, log, memory_before, sequence)
+            VALUES (?, ?, ?, ?, ?, ?);
             """,
             bindings: [
                 .text(log.id.uuidString),
                 .text(log.cardID.uuidString),
                 .double(log.reviewedAt.timeIntervalSince1970),
                 .blob(data),
+                .blob(memoryData),
+                .int(nextSequence),
             ]
         )
     }
 
-    func persistReview(cardID: UUID, memory: MemoryState, log: ReviewLog) throws {
-        try inTransaction {
-            try updateCardMemory(cardID, memory: memory)
-            try insertReviewLog(log)
+    func fetchActiveReviewLogs() throws -> [ReviewLog] {
+        let rows = try query(
+            """
+            SELECT review_logs.log, review_logs.sequence
+            FROM review_logs
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_reverts.id IS NULL
+            ORDER BY review_logs.reviewed_at ASC, review_logs.sequence ASC;
+            """
+        )
+        return rows.compactMap { row in
+            guard let data = row["log"] as? Data,
+                  let sequence = row["sequence"] as? Int64,
+                  let log = try? decoder.decode(ReviewLog.self, from: data)
+            else { return nil }
+            return log.withSequence(sequence)
         }
     }
 
-    func revertReview(cardID: UUID, restoring memory: MemoryState) throws {
+    func fetchSchedulerParameters(profileID: String) throws -> FSRSScheduler.Parameters? {
+        let rows = try query(
+            """
+            SELECT parameters
+            FROM scheduler_params
+            WHERE profile_id = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(profileID)]
+        )
+        guard let data = rows.first?["parameters"] as? Data else { return nil }
+        return try? decoder.decode(FSRSScheduler.Parameters.self, from: data)
+    }
+
+    func saveSchedulerParameters(
+        _ parameters: FSRSScheduler.Parameters,
+        profileID: String,
+        optimizedAt: Date,
+        sampleCount: Int,
+        logLoss: Double
+    ) throws {
+        let data = try encode(parameters)
+        try execute(
+            """
+            INSERT INTO scheduler_params (
+                profile_id, parameters, optimized_at, sample_count, log_loss
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(profile_id) DO UPDATE SET
+                parameters = excluded.parameters,
+                optimized_at = excluded.optimized_at,
+                sample_count = excluded.sample_count,
+                log_loss = excluded.log_loss;
+            """,
+            bindings: [
+                .text(profileID),
+                .blob(data),
+                .double(optimizedAt.timeIntervalSince1970),
+                .int(Int64(sampleCount)),
+                .double(logLoss),
+            ]
+        )
+    }
+
+    func persistReview(
+        cardID: UUID,
+        memoryBefore: MemoryState,
+        memoryAfter: MemoryState,
+        log: ReviewLog
+    ) throws {
+        try inTransaction {
+            try updateCardMemory(cardID, memory: memoryAfter)
+            try insertReviewLog(log, memoryBefore: memoryBefore)
+        }
+    }
+
+    func revertReview(reviewLogID: UUID, revertedAt: Date) throws {
         try inTransaction {
             let rows = try query(
                 """
-                SELECT id FROM review_logs
-                WHERE card_id = ?
-                ORDER BY reviewed_at DESC
+                SELECT review_logs.card_id, review_logs.memory_before
+                FROM review_logs
+                LEFT JOIN review_reverts
+                    ON review_reverts.review_log_id = review_logs.id
+                WHERE review_logs.id = ?
+                  AND review_reverts.id IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM review_logs AS newer
+                      LEFT JOIN review_reverts AS newer_revert
+                          ON newer_revert.review_log_id = newer.id
+                      WHERE newer.card_id = review_logs.card_id
+                        AND newer.rowid > review_logs.rowid
+                        AND newer_revert.id IS NULL
+                  )
                 LIMIT 1;
                 """,
-                bindings: [.text(cardID.uuidString)]
+                bindings: [.text(reviewLogID.uuidString)]
             )
-            guard let row = rows.first, let logID = row["id"] as? String else {
-                throw DatabaseError.reviewLogNotFound(cardID)
+            guard
+                let row = rows.first,
+                let cardIDText = row["card_id"] as? String,
+                let cardID = UUID(uuidString: cardIDText)
+            else {
+                throw DatabaseError.reviewLogNotFound(reviewLogID)
             }
+            guard let memoryData = row["memory_before"] as? Data else {
+                throw DatabaseError.queryFailed(
+                    "This legacy review does not contain restorable memory."
+                )
+            }
+            let memory = try decode(MemoryState.self, from: memoryData)
+            guard try fetchCard(id: cardID) != nil else {
+                throw DatabaseError.cardNotFound(cardID)
+            }
+
             try execute(
-                "DELETE FROM review_logs WHERE id = ?;",
-                bindings: [.text(logID)]
+                """
+                INSERT INTO review_reverts (id, review_log_id, reverted_at)
+                VALUES (?, ?, ?);
+                """,
+                bindings: [
+                    .text(UUID().uuidString),
+                    .text(reviewLogID.uuidString),
+                    .double(revertedAt.timeIntervalSince1970),
+                ]
             )
             try updateCardMemory(cardID, memory: memory)
         }
     }
 
-    func countReviewLogs(for cardID: UUID) throws -> Int {
+    func countRawReviewLogs(for cardID: UUID) throws -> Int {
         let rows = try query(
             "SELECT COUNT(*) AS count FROM review_logs WHERE card_id = ?;",
+            bindings: [.text(cardID.uuidString)]
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    func countActiveReviewLogs(for cardID: UUID) throws -> Int {
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM review_logs
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_logs.card_id = ? AND review_reverts.id IS NULL;
+            """,
             bindings: [.text(cardID.uuidString)]
         )
         guard let count = rows.first?["count"] as? Int64 else { return 0 }
@@ -710,7 +1109,7 @@ actor SQLiteDatabase {
     func fetchCards(for itemID: UUID) throws -> [Card] {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
             FROM cards
             WHERE item_id = ?;
             """,
@@ -732,10 +1131,182 @@ actor SQLiteDatabase {
         )
     }
 
+    func deleteCard(id: UUID) throws {
+        try execute(
+            "DELETE FROM cards WHERE id = ?;",
+            bindings: [.text(id.uuidString)]
+        )
+    }
+
     func deleteItem(id: UUID) throws {
         try execute(
             "DELETE FROM items WHERE id = ?;",
             bindings: [.text(id.uuidString)]
+        )
+    }
+
+    func fetchMediaAsset(hash: String) throws -> MediaAsset? {
+        let rows = try query(
+            """
+            SELECT hash, kind, byte_size, file_extension, created_at, ref_count
+            FROM media_assets
+            WHERE hash = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(hash)]
+        )
+        guard let row = rows.first else { return nil }
+        return try decodeMediaAsset(from: row)
+    }
+
+    func registerMediaAsset(_ descriptor: MediaAssetDescriptor, createdAt: Date) throws {
+        guard isValidMediaHash(descriptor.hash),
+              descriptor.byteSize >= 0,
+              MediaValidation.allowedExtensions(for: descriptor.kind)
+                  .contains(descriptor.fileExtension)
+        else {
+            throw DatabaseError.invalidMediaAsset("Media metadata is invalid.")
+        }
+        try execute(
+            """
+            INSERT INTO media_assets
+                (hash, kind, byte_size, file_extension, created_at, ref_count)
+            VALUES (?, ?, ?, ?, ?, 0)
+            ON CONFLICT(hash) DO NOTHING;
+            """,
+            bindings: [
+                .text(descriptor.hash),
+                .text(descriptor.kind.rawValue),
+                .int(Int64(descriptor.byteSize)),
+                .text(descriptor.fileExtension),
+                .double(createdAt.timeIntervalSince1970),
+            ]
+        )
+    }
+
+    /// Registers metadata and a GC reservation in one transaction. The caller
+    /// may safely suspend after this returns without exposing a zero-ref asset.
+    func reserveMediaAsset(
+        _ descriptor: MediaAssetDescriptor,
+        reservationID: UUID,
+        scopeID: UUID?,
+        createdAt: Date,
+        expiresAt: Date
+    ) throws -> Bool {
+        try inTransaction {
+            let existing = try fetchMediaAsset(hash: descriptor.hash)
+            if let existing {
+                guard existing.kind == descriptor.kind,
+                      existing.byteSize == descriptor.byteSize,
+                      existing.fileExtension == descriptor.fileExtension
+                else {
+                    throw DatabaseError.invalidMediaAsset("Conflicting media metadata uses the same hash.")
+                }
+            } else {
+                try registerMediaAsset(descriptor, createdAt: createdAt)
+            }
+            try execute(
+                """
+                INSERT INTO media_reservations (id, hash, scope_id, expires_at, created_asset)
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                bindings: [
+                    .text(reservationID.uuidString),
+                    .text(descriptor.hash),
+                    scopeID.map { .text($0.uuidString) } ?? .null,
+                    .double(expiresAt.timeIntervalSince1970),
+                    .int(existing == nil ? 1 : 0),
+                ]
+            )
+            return existing == nil
+        }
+    }
+
+    func cancelMediaReservation(id: UUID, deleteNewAsset: Bool) throws -> MediaAsset? {
+        try inTransaction {
+            let rows = try query(
+                "SELECT hash FROM media_reservations WHERE id = ? LIMIT 1;",
+                bindings: [.text(id.uuidString)]
+            )
+            guard let hash = rows.first?["hash"] as? String else { return nil }
+            try execute(
+                "DELETE FROM media_reservations WHERE id = ?;",
+                bindings: [.text(id.uuidString)]
+            )
+            guard deleteNewAsset,
+                  try mediaReservationCount(hash: hash) == 0,
+                  let asset = try fetchMediaAsset(hash: hash),
+                  asset.refCount == 0
+            else { return nil }
+            try deleteMediaAssetIfOrphaned(hash: hash)
+            return asset
+        }
+    }
+
+    func rollbackMediaReservations(scopeID: UUID) throws -> [MediaAsset] {
+        try inTransaction {
+            let rows = try query(
+                """
+                SELECT hash, MAX(created_asset) AS created_asset
+                FROM media_reservations
+                WHERE scope_id = ?
+                GROUP BY hash;
+                """,
+                bindings: [.text(scopeID.uuidString)]
+            )
+            try execute(
+                "DELETE FROM media_reservations WHERE scope_id = ?;",
+                bindings: [.text(scopeID.uuidString)]
+            )
+            var removable: [MediaAsset] = []
+            for row in rows {
+                guard let hash = row["hash"] as? String,
+                      row["created_asset"] as? Int64 == 1,
+                      try mediaReservationCount(hash: hash) == 0,
+                      let asset = try fetchMediaAsset(hash: hash),
+                      asset.refCount == 0
+                else { continue }
+                try deleteMediaAssetIfOrphaned(hash: hash)
+                removable.append(asset)
+            }
+            return removable
+        }
+    }
+
+    func removeExpiredMediaReservations(asOf now: Date) throws {
+        try execute(
+            "DELETE FROM media_reservations WHERE expires_at <= ?;",
+            bindings: [.double(now.timeIntervalSince1970)]
+        )
+    }
+
+    func releaseMediaReservations(scopeID: UUID) throws {
+        try execute(
+            "DELETE FROM media_reservations WHERE scope_id = ?;",
+            bindings: [.text(scopeID.uuidString)]
+        )
+    }
+
+    func fetchOrphanedMediaAssets() throws -> [MediaAsset] {
+        let rows = try query(
+            """
+            SELECT hash, kind, byte_size, file_extension, created_at, ref_count
+            FROM media_assets
+            WHERE ref_count = 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM media_reservations
+                  WHERE media_reservations.hash = media_assets.hash
+              )
+            ORDER BY created_at ASC;
+            """
+        )
+        return try rows.map { try decodeMediaAsset(from: $0) }
+    }
+
+    func deleteMediaAssetIfOrphaned(hash: String) throws {
+        try execute(
+            "DELETE FROM media_assets WHERE hash = ? AND ref_count = 0;",
+            bindings: [.text(hash)]
         )
     }
 
@@ -756,6 +1327,220 @@ actor SQLiteDatabase {
 
     // MARK: - Private
 
+    private struct CardIdentity: Hashable {
+        let templateID: UUID
+        let clozeGroup: Int?
+    }
+
+    private func reconcileCards(for itemID: UUID, desired: [Card]) throws {
+        var existingByIdentity: [CardIdentity: Card] = [:]
+        for card in try fetchCards(for: itemID) {
+            let identity = CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+            if existingByIdentity[identity] == nil {
+                existingByIdentity[identity] = card
+            } else {
+                try deleteCard(id: card.id)
+            }
+        }
+
+        let desiredIdentities = Set(desired.map {
+            CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup)
+        })
+        for (identity, card) in existingByIdentity where !desiredIdentities.contains(identity) {
+            try deleteCard(id: card.id)
+        }
+
+        for card in desired {
+            let identity = CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+            if let existing = existingByIdentity[identity] {
+                let skillData = try encode(card.skill)
+                try execute(
+                    """
+                    UPDATE cards
+                    SET skill = ?, deck_id = ?
+                    WHERE id = ?;
+                    """,
+                    bindings: [
+                        .blob(skillData),
+                        card.deckID.map { .text($0.uuidString) } ?? .null,
+                        .text(existing.id.uuidString),
+                    ]
+                )
+            } else {
+                try insertCards([card])
+            }
+        }
+    }
+
+    private func nextReviewSequence() throws -> Int64 {
+        let rows = try query("SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM review_logs;")
+        guard let next = rows.first?["next"] as? Int64 else {
+            throw DatabaseError.queryFailed("Could not allocate review append order.")
+        }
+        return next
+    }
+
+    private func syncCards(from previous: ItemType, to updated: ItemType, now: Date) throws {
+        let previousTemplateIDs = Set(previous.templates.map(\.id))
+        let updatedTemplateIDs = Set(updated.templates.map(\.id))
+        let added = updatedTemplateIDs.subtracting(previousTemplateIDs)
+        let removed = previousTemplateIDs.subtracting(updatedTemplateIDs)
+        let kept = previousTemplateIDs.intersection(updatedTemplateIDs)
+        let items = try fetchItems(itemTypeID: updated.id)
+
+        for entry in items {
+            let item = entry.item
+
+            for templateID in removed {
+                try deleteCards(itemID: item.id, templateID: templateID)
+            }
+
+            let existingCards = try fetchCards(for: item.id)
+
+            for template in updated.templates where added.contains(template.id) || kept.contains(template.id) {
+                var singleTemplateType = updated
+                singleTemplateType.templates = [template]
+                let desiredCards = CardGenerator.cards(for: item, type: singleTemplateType, now: now)
+                let desiredGroups = Set(desiredCards.map(\.clozeGroup))
+                let currentCards = existingCards.filter { $0.templateID == template.id }
+
+                for card in currentCards where !desiredGroups.contains(card.clozeGroup) {
+                    try deleteCard(id: card.id)
+                }
+
+                let currentGroups = Set(currentCards.map(\.clozeGroup))
+                let missingCards = desiredCards.filter { !currentGroups.contains($0.clozeGroup) }
+                if !missingCards.isEmpty {
+                    try insertCards(missingCards)
+                }
+
+                for card in currentCards
+                    where desiredGroups.contains(card.clozeGroup) && card.skill != template.skill {
+                    try updateCardSkill(card.id, skill: template.skill)
+                }
+            }
+        }
+    }
+
+    private func mediaReferenceCounts(in item: Item) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for field in item.fields {
+            guard case let .media(ref) = field.value,
+                  isValidMediaHash(ref.assetHash),
+                  MediaValidation.allowedExtensions(for: ref.kind)
+                      .contains(ref.fileExtension.lowercased())
+            else {
+                continue
+            }
+            counts[ref.assetHash, default: 0] += 1
+        }
+        return counts
+    }
+
+    private func mediaReservationIDs(in item: Item) -> Set<UUID> {
+        Set(item.fields.compactMap { field in
+            guard case let .media(ref) = field.value else { return nil }
+            return ref.reservationID
+        })
+    }
+
+    private func applyMediaReferenceDeltas(
+        from previous: [String: Int],
+        to updated: [String: Int],
+        descriptors: [String: MediaAssetDescriptor],
+        now: Date
+    ) throws {
+        for hash in Set(previous.keys).union(updated.keys).sorted() {
+            let delta = updated[hash, default: 0] - previous[hash, default: 0]
+            guard delta != 0 else { continue }
+
+            if delta > 0 {
+                if try fetchMediaAsset(hash: hash) == nil {
+                    guard let descriptor = descriptors[hash],
+                          descriptor.hash == hash,
+                          isValidMediaHash(descriptor.hash),
+                          MediaValidation.allowedExtensions(for: descriptor.kind)
+                              .contains(descriptor.fileExtension)
+                    else {
+                        throw DatabaseError.invalidMediaAsset("Media metadata is missing or invalid.")
+                    }
+                    try execute(
+                        """
+                        INSERT INTO media_assets
+                            (hash, kind, byte_size, file_extension, created_at, ref_count)
+                        VALUES (?, ?, ?, ?, ?, ?);
+                        """,
+                        bindings: [
+                            .text(hash),
+                            .text(descriptor.kind.rawValue),
+                            .int(Int64(descriptor.byteSize)),
+                            .text(descriptor.fileExtension),
+                            .double(now.timeIntervalSince1970),
+                            .int(Int64(delta)),
+                        ]
+                    )
+                } else {
+                    try execute(
+                        "UPDATE media_assets SET ref_count = ref_count + ? WHERE hash = ?;",
+                        bindings: [.int(Int64(delta)), .text(hash)]
+                    )
+                }
+            } else {
+                guard let current = try fetchMediaAsset(hash: hash),
+                      current.refCount >= -delta
+                else {
+                    throw DatabaseError.invalidMediaAsset("Media reference count would become negative.")
+                }
+                try execute(
+                    "UPDATE media_assets SET ref_count = ref_count + ? WHERE hash = ?;",
+                    bindings: [.int(Int64(delta)), .text(hash)]
+                )
+            }
+        }
+    }
+
+    private func mediaReservationCount(hash: String) throws -> Int {
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM media_reservations WHERE hash = ?;",
+            bindings: [.text(hash)]
+        )
+        return Int(rows.first?["count"] as? Int64 ?? 0)
+    }
+
+    private func consumeMediaReservations(ids: Set<UUID>) throws {
+        for id in ids {
+            try execute(
+                "DELETE FROM media_reservations WHERE id = ?;",
+                bindings: [.text(id.uuidString)]
+            )
+        }
+    }
+
+    private func decodeMediaAsset(from row: [String: Any?]) throws -> MediaAsset {
+        guard let hash = row["hash"] as? String,
+              let kindText = row["kind"] as? String,
+              let kind = MediaKind(rawValue: kindText),
+              let byteSize = row["byte_size"] as? Int64,
+              let fileExtension = row["file_extension"] as? String,
+              let createdAt = row["created_at"] as? Double,
+              let refCount = row["ref_count"] as? Int64
+        else {
+            throw DatabaseError.decodingFailed
+        }
+        return MediaAsset(
+            hash: hash,
+            kind: kind,
+            byteSize: Int(byteSize),
+            fileExtension: fileExtension,
+            createdAt: Date(timeIntervalSince1970: createdAt),
+            refCount: Int(refCount)
+        )
+    }
+
+    private func isValidMediaHash(_ hash: String) -> Bool {
+        hash.count == 64 && hash.allSatisfy { $0.isHexDigit && !$0.isUppercase }
+    }
+
     /// Renames legacy `note_types` / `notes` tables from early builds to `item_types` / `items`.
     private func migrateNotesToItemsSchemaIfNeeded() throws {
         guard try tableExists("note_types"), !(try tableExists("item_types")) else { return }
@@ -768,6 +1553,121 @@ actor SQLiteDatabase {
         try execute("CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);")
         try execute("DROP INDEX IF EXISTS idx_cards_note_id;")
         try execute("CREATE INDEX IF NOT EXISTS idx_cards_item_id ON cards(item_id);")
+    }
+
+    private func backfillMediaReferenceCounts() throws {
+        try execute("UPDATE media_assets SET ref_count = 0;")
+        guard try tableExists("items") else { return }
+        for persisted in try fetchItems() {
+            var descriptors: [String: MediaAssetDescriptor] = [:]
+            for field in persisted.item.fields {
+                guard case let .media(ref) = field.value,
+                      isValidMediaHash(ref.assetHash),
+                      MediaValidation.allowedExtensions(for: ref.kind)
+                          .contains(ref.fileExtension.lowercased())
+                else {
+                    continue
+                }
+                descriptors[ref.assetHash] = MediaAssetDescriptor(
+                    hash: ref.assetHash,
+                    kind: ref.kind,
+                    byteSize: 0,
+                    fileExtension: ref.fileExtension.lowercased()
+                )
+            }
+            try applyMediaReferenceDeltas(
+                from: [:],
+                to: mediaReferenceCounts(in: persisted.item),
+                descriptors: descriptors,
+                now: persisted.createdAt
+            )
+        }
+    }
+
+    private func migrateReviewHistorySchemaIfNeeded() throws {
+        guard try tableExists("review_logs") else {
+            try execute(
+                """
+                CREATE TABLE review_logs (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    card_id TEXT NOT NULL,
+                    reviewed_at REAL NOT NULL,
+                    log BLOB NOT NULL,
+                    memory_before BLOB NOT NULL
+                );
+                """
+            )
+            try execute("CREATE INDEX idx_review_logs_card_id ON review_logs(card_id);")
+            try execute(
+                """
+                CREATE TABLE review_reverts (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    review_log_id TEXT NOT NULL UNIQUE REFERENCES review_logs(id),
+                    reverted_at REAL NOT NULL
+                );
+                """
+            )
+            try execute("CREATE INDEX idx_review_reverts_log_id ON review_reverts(review_log_id);")
+            return
+        }
+
+        for sql in Schema.migrationV6Statements {
+            try execute(sql)
+        }
+    }
+
+    private func migrateReviewSequenceSchemaIfNeeded() throws {
+        guard try tableExists("review_logs") else {
+            try execute(
+                """
+                CREATE TABLE review_logs (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    card_id TEXT NOT NULL,
+                    reviewed_at REAL NOT NULL,
+                    log BLOB NOT NULL,
+                    memory_before BLOB NOT NULL,
+                    sequence INTEGER NOT NULL UNIQUE
+                );
+                """
+            )
+            try execute("CREATE INDEX idx_review_logs_card_id ON review_logs(card_id);")
+            return
+        }
+        let columns = try query("PRAGMA table_info(review_logs);")
+        if !columns.contains(where: { $0["name"] as? String == "sequence" }) {
+            for sql in Schema.migrationV11Statements {
+                try execute(sql)
+            }
+        }
+    }
+
+    private func migrateMediaReferenceSchemaIfNeeded() throws {
+        guard try tableExists("media_assets") else {
+            try execute(
+                """
+                CREATE TABLE media_assets (
+                    hash TEXT PRIMARY KEY NOT NULL,
+                    kind TEXT NOT NULL,
+                    byte_size INTEGER NOT NULL,
+                    file_extension TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0)
+                );
+                """
+            )
+            try migrateLegacyMediaReferences()
+            try backfillMediaReferenceCounts()
+            return
+        }
+
+        let columns = try query("PRAGMA table_info(media_assets);")
+        if !columns.contains(where: { $0["name"] as? String == "ref_count" }) {
+            for sql in Schema.migrationV7Statements {
+                try execute(sql)
+            }
+        }
+        try migrateLegacyMediaReferences()
+        try backfillMediaReferenceCounts()
     }
 
     private func tableExists(_ name: String) throws -> Bool {
@@ -804,6 +1704,175 @@ actor SQLiteDatabase {
         }
     }
 
+    /// Legacy URL decoding exists only inside the upgrade transaction. Runtime
+    /// decoding continues to reject URL-backed MediaRef values.
+    private func migrateLegacyMediaReferences() throws {
+        guard try tableExists("items") else { return }
+        let rows = try query("SELECT id, fields FROM items;")
+        for row in rows {
+            guard let id = row["id"] as? String,
+                  let data = row["fields"] as? Data,
+                  let object = try? JSONSerialization.jsonObject(with: data)
+            else { continue }
+            let (converted, changed) = try convertLegacyMediaObject(object)
+            guard changed else { continue }
+            let encoded = try JSONSerialization.data(
+                withJSONObject: converted,
+                options: [.sortedKeys]
+            )
+            try execute(
+                "UPDATE items SET fields = ? WHERE id = ?;",
+                bindings: [.blob(encoded), .text(id)]
+            )
+        }
+    }
+
+    private func convertLegacyMediaObject(_ object: Any) throws -> (Any, Bool) {
+        if var dictionary = object as? [String: Any] {
+            if let urlText = dictionary["url"] as? String,
+               let kindText = dictionary["kind"] as? String,
+               let kind = MediaKind(rawValue: kindText)
+            {
+                return (try convertedLegacyMedia(dictionary, urlText: urlText, kind: kind), true)
+            }
+            var changed = false
+            for (key, value) in dictionary {
+                let (converted, childChanged) = try convertLegacyMediaObject(value)
+                dictionary[key] = converted
+                changed = changed || childChanged
+            }
+            return (dictionary, changed)
+        }
+        if let array = object as? [Any] {
+            var changed = false
+            let converted = try array.map { value -> Any in
+                let (newValue, childChanged) = try convertLegacyMediaObject(value)
+                changed = changed || childChanged
+                return newValue
+            }
+            return (converted, changed)
+        }
+        return (object, false)
+    }
+
+    private func convertedLegacyMedia(
+        _ legacy: [String: Any],
+        urlText: String,
+        kind: MediaKind
+    ) throws -> [String: Any] {
+        let idText = (legacy["id"] as? String).flatMap(UUID.init(uuidString:))?.uuidString
+            ?? UUID().uuidString
+        var replacement: [String: Any] = [
+            "id": idText,
+            "kind": kind.rawValue,
+        ]
+        if let duration = legacy["durationMs"] as? NSNumber {
+            replacement["durationMs"] = duration
+        }
+
+        if let converted = try securelyConvertLegacyFile(urlText: urlText, kind: kind) {
+            replacement["assetHash"] = converted.hash
+            replacement["fileExtension"] = converted.fileExtension
+            if let altText = legacy["altText"] as? String {
+                replacement["altText"] = altText
+            }
+        } else {
+            let missingSeed = Data("missing-legacy-media:\(idText)".utf8)
+            replacement["assetHash"] = Self.sha256Hex(missingSeed)
+            replacement["fileExtension"] = MediaValidation.defaultExtension(for: kind)
+            replacement["altText"] =
+                "Media unavailable after a secure upgrade. Re-import this file to restore it."
+        }
+        return replacement
+    }
+
+    private func securelyConvertLegacyFile(
+        urlText: String,
+        kind: MediaKind
+    ) throws -> MediaAssetDescriptor? {
+        guard let sourceURL = URL(string: urlText), sourceURL.isFileURL else { return nil }
+        let trustedDirectory = databaseURL.deletingLastPathComponent()
+            .appendingPathComponent("media", isDirectory: true)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let source = sourceURL.standardizedFileURL.resolvingSymlinksInPath()
+        guard source.deletingLastPathComponent() == trustedDirectory else {
+            return nil
+        }
+        let data = try readLegacyMedia(
+            named: source.lastPathComponent,
+            in: trustedDirectory,
+            kind: kind,
+            maximumBytes: MediaValidation.maxBytes(for: kind)
+        )
+        let claimedExtension = source.pathExtension.lowercased().isEmpty
+            ? MediaValidation.defaultExtension(for: kind)
+            : source.pathExtension.lowercased()
+        guard let fileExtension = try? MediaValidation.validatedExtension(
+            data: data,
+            kind: kind,
+            fileExtension: claimedExtension
+        ) else {
+            return nil
+        }
+
+        let hash = Self.sha256Hex(data)
+        let destination = trustedDirectory.appendingPathComponent("\(hash).\(fileExtension)")
+        guard destination.deletingLastPathComponent() == trustedDirectory else { return nil }
+        if !FileManager.default.fileExists(atPath: destination.path) {
+            try data.write(to: destination, options: .atomic)
+        }
+        let descriptor = MediaAssetDescriptor(
+            hash: hash,
+            kind: kind,
+            byteSize: data.count,
+            fileExtension: fileExtension
+        )
+        try registerMediaAsset(descriptor, createdAt: .now)
+        return descriptor
+    }
+
+    private func readLegacyMedia(
+        named filename: String,
+        in directory: URL,
+        kind: MediaKind,
+        maximumBytes: Int
+    ) throws -> Data {
+        let directoryFD = directory.path.withCString {
+            Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        }
+        guard directoryFD >= 0 else { throw MediaError.readFailed }
+        defer { Darwin.close(directoryFD) }
+        let fileFD = filename.withCString {
+            Darwin.openat(directoryFD, $0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        }
+        guard fileFD >= 0 else { throw MediaError.readFailed }
+        var status = stat()
+        guard fstat(fileFD, &status) == 0,
+              (status.st_mode & S_IFMT) == S_IFREG,
+              status.st_size >= 0,
+              status.st_size <= maximumBytes
+        else {
+            Darwin.close(fileFD)
+            throw MediaError.invalidPath
+        }
+        let handle = FileHandle(fileDescriptor: fileFD, closeOnDealloc: true)
+        defer { try? handle.close() }
+        var data = Data()
+        while data.count <= maximumBytes {
+            let remaining = maximumBytes - data.count + 1
+            guard let chunk = try handle.read(upToCount: min(64 * 1024, remaining)),
+                  !chunk.isEmpty
+            else { return data }
+            data.append(chunk)
+        }
+        throw MediaError.fileTooLarge(kind, maxBytes: maximumBytes)
+    }
+
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
     private func decodeCard(from row: [String: Any?]) throws -> Card {
         guard
             let idText = row["id"] as? String,
@@ -822,6 +1891,7 @@ actor SQLiteDatabase {
         let skill = try decode(Skill.self, from: skillData)
         let memory = try decode(MemoryState.self, from: memoryData)
         let deckID = (row["deck_id"] as? String).flatMap(UUID.init(uuidString:))
+        let clozeGroup = (row["cloze_group"] as? Int64).map(Int.init)
 
         return Card(
             id: id,
@@ -830,7 +1900,8 @@ actor SQLiteDatabase {
             skill: skill,
             memory: memory,
             isSuspended: suspendedValue != 0,
-            deckID: deckID
+            deckID: deckID,
+            clozeGroup: clozeGroup
         )
     }
 
@@ -867,11 +1938,14 @@ actor SQLiteDatabase {
 
     private func schemaVersion() throws -> Int {
         do {
+            guard try tableExists("schema_version") else { return 0 }
             let rows = try query("SELECT version FROM schema_version LIMIT 1;")
-            guard let version = rows.first?["version"] as? Int64 else { return 0 }
+            guard let version = rows.first?["version"] as? Int64 else {
+                throw DatabaseError.schemaVersionReadFailed
+            }
             return Int(version)
-        } catch DatabaseError.queryFailed {
-            return 0
+        } catch {
+            throw DatabaseError.schemaVersionReadFailed
         }
     }
 
@@ -894,11 +1968,12 @@ actor SQLiteDatabase {
         }
     }
 
-    private func inTransaction(_ body: () throws -> Void) throws {
+    private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {
         try execute("BEGIN IMMEDIATE TRANSACTION;")
         do {
-            try body()
+            let result = try body()
             try execute("COMMIT;")
+            return result
         } catch {
             try? execute("ROLLBACK;")
             throw error

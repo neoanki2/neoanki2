@@ -1,20 +1,18 @@
 import SwiftUI
 
 enum DesignSystem {
-    // MARK: - Accent (Study Indigo — only custom hex in the app)
+    // MARK: - Accent
 
-    static let accentLight = Color(red: 0.29, green: 0.44, blue: 0.65) // #4A6FA5
-    static let accentDark = Color(red: 0.48, green: 0.64, blue: 0.85) // #7BA4D9
-
-    static func accent(for colorScheme: ColorScheme) -> Color {
-        colorScheme == .dark ? accentDark : accentLight
-    }
+    /// The user's macOS accent, including its Light, Dark, and Increased Contrast variants.
+    static var accent: Color { Color(nsColor: .controlAccentColor) }
 
     // MARK: - Surfaces
 
     static var sidebarBackground: Color { Color(nsColor: .controlBackgroundColor) }
     static var detailBackground: Color { Color(nsColor: .windowBackgroundColor) }
-    static var errorBannerBackground: Color { Color(nsColor: .systemRed).opacity(0.12) }
+    static func errorBannerBackground(contrast: ColorSchemeContrast) -> Color {
+        Color(nsColor: .systemRed).opacity(contrast == .increased ? 0.22 : 0.12)
+    }
 
     // MARK: - Card content
 
@@ -91,6 +89,8 @@ enum DesignSystem {
 
 struct ErrorBanner: View {
     let message: String
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @AccessibilityFocusState private var isAccessibilityFocused: Bool
 
     var body: some View {
         Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -99,8 +99,14 @@ struct ErrorBanner: View {
             .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
             .padding(.vertical, DesignSystem.Spacing.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DesignSystem.errorBannerBackground)
+            .background(DesignSystem.errorBannerBackground(contrast: colorSchemeContrast))
             .accessibilityLabel("Error, \(message)")
+            .accessibilityFocused($isAccessibilityFocused)
+            .task(id: message) {
+                if AccessibilityNotifier.shared.post(.errorBanner(message)) != nil {
+                    isAccessibilityFocused = true
+                }
+            }
     }
 }
 

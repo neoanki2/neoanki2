@@ -46,14 +46,20 @@ music, and chemistry are user-declared schemas, not baked-in types. FSRS sits
 behind a swappable `Scheduler` protocol. A neighboring product cannot truthfully
 claim all three without abandoning its legacy model.
 
+On first run the app offers a neutral `Basic` starter so adding an item requires
+no setup. It is ordinary user-owned schema data: it can be deleted, its one-time
+seed is persisted, and later launches do not recreate it. `NeoAnkiCore` clients
+can choose an empty starter set.
+
 ## Operating Context
 
 - **Environment:** macOS desktop, single-user, local SQLite store
   (`AppDatabase.defaultURL`).
 - **Core workflows today:**
   1. Browse items in the main window
-  2. Add an item via form (fields from default item type)
-  3. Study due cards in a session (reveal → Again/Hard/Good/Easy)
+  2. Add an item via form (fields from a selected item type)
+  3. Study due cards in the main detail pane (reveal → Again/Hard/Good/Easy)
+  4. Manage item types/templates and import JSON or CSV from the native shell
 - **Architecture split:** `NeoAnkiCore` (domain, scheduling, persistence);
   `NeoAnki2` (SwiftUI shell). See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the three-layer model.
 - **Dev verification:** `./Scripts/test-fast.sh` for unit/flow tests; UI tests
@@ -78,7 +84,7 @@ claim all three without abandoning its legacy model.
 | Deck organization UI | Implemented |
 | Multiple item types / template authoring UI | Implemented |
 | Native JSON/CSV import (core) | Implemented — text fields; media paths + cloze objects in JSON |
-| Import UI | Not in shell yet |
+| Import UI | Implemented — File menu/import sheet with JSON and CSV file selection |
 | Anki import (`.apkg`, shared decks) | **Non-goal** per [`ARCHITECTURE.md`](ARCHITECTURE.md) — clean schema over migration |
 
 ### Terminology (product-facing)
@@ -93,8 +99,6 @@ claim all three without abandoning its legacy model.
 
 ### Open decisions
 
-- When to expose template/item-type authoring in the UI
-- Whether study stays in a sheet or becomes a first-class window/pane
 - iOS/iPad interaction model (touch targets, navigation) — deferred until Mac shell is coherent
 
 ## Brand Commitments
@@ -133,4 +137,4 @@ shared-deck catalogs, or Anki compatibility promises.
 - Dynamic Type and Increased Contrast supported via semantic system styles
 - Keyboard-only path through add-item and study flows
 - Plain-language error messages; never color alone for state
-- Reduce Motion honored for any custom transitions
+- Reduce Motion honored for custom transitions and media autoplay

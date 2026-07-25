@@ -6,13 +6,18 @@ struct NeoAnki2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var itemsModel: ItemsModel?
     @State private var decksModel: DecksModel?
+    @State private var schedulingModel: SchedulingModel?
     @State private var bootstrapError: String?
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if let itemsModel, let decksModel {
-                    ContentView(itemsModel: itemsModel, decksModel: decksModel)
+                if let itemsModel, let decksModel, let schedulingModel {
+                    ContentView(
+                        itemsModel: itemsModel,
+                        decksModel: decksModel,
+                        schedulingModel: schedulingModel
+                    )
                 } else if let bootstrapError {
                     ContentUnavailableView {
                         Label("Could Not Start", systemImage: "exclamationmark.triangle")
@@ -30,6 +35,7 @@ struct NeoAnki2App: App {
             CommandGroup(replacing: .newItem) {}
             LibraryCommands()
             StudyCommands()
+            SchedulingCommands(model: schedulingModel)
         }
     }
 
@@ -41,8 +47,9 @@ struct NeoAnki2App: App {
             let mediaStore = await store.media
             itemsModel = ItemsModel(store: store, mediaStore: mediaStore)
             decksModel = DecksModel(store: store)
+            schedulingModel = SchedulingModel(store: store)
         } catch {
-            bootstrapError = error.localizedDescription
+            bootstrapError = UserFacingError.message(from: error)
         }
     }
 }

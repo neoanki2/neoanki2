@@ -9,15 +9,24 @@ public enum CardGenerator {
         type: ItemType,
         now: Date = .now
     ) -> [Card] {
-        type.templates.compactMap { template in
-            guard shouldGenerate(template, for: item) else { return nil }
-            return Card(
-                itemID: item.id,
-                templateID: template.id,
-                skill: template.skill,
-                memory: .new(due: now),
-                deckID: item.deckID
-            )
+        type.templates.flatMap { template -> [Card] in
+            guard shouldGenerate(template, for: item) else { return [] }
+            let groups: [Int?]
+            if template.interaction == .cloze {
+                groups = clozeGroups(for: template, item: item).map(Optional.some)
+            } else {
+                groups = [nil]
+            }
+            return groups.map { group in
+                Card(
+                    itemID: item.id,
+                    templateID: template.id,
+                    skill: template.skill,
+                    memory: .new(due: now),
+                    deckID: item.deckID,
+                    clozeGroup: group
+                )
+            }
         }
     }
 
@@ -37,5 +46,15 @@ public enum CardGenerator {
         case let .any(conditions):
             return conditions.contains { evaluate($0, for: item) }
         }
+    }
+
+    public static func clozeGroups(for template: Template, item: Item) -> [Int] {
+        guard template.interaction == .cloze else { return [] }
+        for fieldID in ItemTypeValidation.fieldIDs(in: template.prompt) {
+            if case let .cloze(_, blanks)? = item.value(for: fieldID) {
+                return Set(blanks.map(\.group)).sorted()
+            }
+        }
+        return []
     }
 }

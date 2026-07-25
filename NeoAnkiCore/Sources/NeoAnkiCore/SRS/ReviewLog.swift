@@ -15,6 +15,9 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
     public let phaseBefore: Phase
     /// How long the learner spent on the card, in milliseconds.
     public let durationMs: Int
+    /// Durable append order assigned by persistence. In-memory/test logs may
+    /// omit it, in which case their input order is preserved for timestamp ties.
+    public let sequence: Int64?
 
     public init(
         id: UUID = UUID(),
@@ -24,7 +27,8 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
         elapsedDays: Double,
         scheduledDays: Double,
         phaseBefore: Phase,
-        durationMs: Int
+        durationMs: Int,
+        sequence: Int64? = nil
     ) {
         self.id = id
         self.cardID = cardID
@@ -34,5 +38,20 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
         self.scheduledDays = scheduledDays
         self.phaseBefore = phaseBefore
         self.durationMs = durationMs
+        self.sequence = sequence
+    }
+
+    func withSequence(_ sequence: Int64) -> ReviewLog {
+        ReviewLog(
+            id: id,
+            cardID: cardID,
+            reviewedAt: reviewedAt,
+            rating: rating,
+            elapsedDays: elapsedDays,
+            scheduledDays: scheduledDays,
+            phaseBefore: phaseBefore,
+            durationMs: durationMs,
+            sequence: sequence
+        )
     }
 }

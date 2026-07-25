@@ -12,6 +12,16 @@ import Foundation
 /// purely from stability, floored at one day.
 public struct FSRSScheduler: Scheduler {
     public struct Parameters: Codable, Equatable, Sendable {
+        public struct WeightBound: Equatable, Sendable {
+            public let lower: Double
+            public let upper: Double
+
+            public init(_ lower: Double, _ upper: Double) {
+                self.lower = lower
+                self.upper = upper
+            }
+        }
+
         /// The 19 FSRS-5 weights.
         public var weights: [Double]
         /// Target probability of recall when a card comes due (0 < r < 1).
@@ -22,12 +32,19 @@ public struct FSRSScheduler: Scheduler {
         public init(
             weights: [Double] = Parameters.defaultWeights,
             requestRetention: Double = 0.9,
-            maximumInterval: Int = 36_500
+            maximumInterval: Int = 36_500,
+            enableFuzz: Bool = true
         ) {
-            self.weights = weights
-            self.requestRetention = requestRetention
-            self.maximumInterval = maximumInterval
+            self.weights = Parameters.sanitizedWeights(weights)
+            self.requestRetention = requestRetention.isFinite
+                ? min(0.99, max(0.7, requestRetention))
+                : 0.9
+            self.maximumInterval = min(36_500, max(1, maximumInterval))
+            self.enableFuzz = enableFuzz
         }
+
+        /// Whether review intervals receive deterministic FSRS-style fuzz.
+        public var enableFuzz: Bool
 
         /// FSRS-5 default weights, used until per-user optimization runs.
         public static let defaultWeights: [Double] = [
@@ -35,6 +52,39 @@ public struct FSRSScheduler: Scheduler {
             1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315,
             2.9898, 0.51655, 0.6621,
         ]
+
+        /// Conservative FSRS-5 domains. They keep exponentials and powers
+        /// finite while still covering the ranges used by upstream trainers.
+        public static let weightBounds: [WeightBound] = [
+            .init(0.1, 10), .init(0.1, 10), .init(0.1, 10), .init(0.1, 30),
+            .init(1, 10), .init(0.001, 4), .init(0.001, 4), .init(0, 0.75),
+            .init(0, 4.5), .init(0, 0.8), .init(0.001, 3.5), .init(0.001, 5),
+            .init(0.001, 0.25), .init(0.001, 0.9), .init(0, 4), .init(0, 1),
+            .init(1, 6), .init(0, 2), .init(0, 2),
+        ]
+
+        public static func sanitizedWeights(_ weights: [Double]) -> [Double] {
+            guard weights.count == weightBounds.count else { return defaultWeights }
+            return zip(weights, weightBounds).enumerated().map { index, pair in
+                let (value, bound) = pair
+                guard value.isFinite else { return defaultWeights[index] }
+                return min(bound.upper, max(bound.lower, value))
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case weights, requestRetention, maximumInterval, enableFuzz
+        }
+
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                weights: try values.decode([Double].self, forKey: .weights),
+                requestRetention: try values.decode(Double.self, forKey: .requestRetention),
+                maximumInterval: try values.decode(Int.self, forKey: .maximumInterval),
+                enableFuzz: try values.decodeIfPresent(Bool.self, forKey: .enableFuzz) ?? true
+            )
+        }
     }
 
     private let params: Parameters
@@ -67,18 +117,26 @@ public struct FSRSScheduler: Scheduler {
             let elapsedDays = elapsed(from: state.lastReview, to: now)
             let r = retrievability(elapsedDays: elapsedDays, stability: state.stability)
             difficulty = nextDifficulty(state.difficulty, rating: rating)
-            stability = rating == .again
-                ? forgetStability(difficulty: difficulty, stability: state.stability, retrievability: r)
-                : recallStability(
+            if elapsedDays < 1 {
+                stability = sameDayStability(stability: state.stability, rating: rating)
+            } else if rating == .again {
+                stability = forgetStability(
+                    difficulty: difficulty,
+                    stability: state.stability,
+                    retrievability: r
+                )
+            } else {
+                stability = recallStability(
                     difficulty: difficulty,
                     stability: state.stability,
                     retrievability: r,
                     rating: rating
                 )
+            }
         }
 
         next.difficulty = difficulty
-        next.stability = max(minimumStability, stability)
+        next.stability = stability.isFinite ? max(minimumStability, stability) : minimumStability
         next.lastReview = now
         next.reps += 1
 
@@ -89,7 +147,12 @@ public struct FSRSScheduler: Scheduler {
             next.phase = .review
         }
 
-        let interval = intervalDays(for: next.stability)
+        let interval = scheduledIntervalDays(
+            for: next.stability,
+            state: state,
+            rating: rating,
+            now: now
+        )
         next.due = now.addingTimeInterval(Double(interval) * 86_400.0)
         return next
     }
@@ -108,15 +171,20 @@ public struct FSRSScheduler: Scheduler {
 
     /// The interval, in days, this state would receive at the target retention.
     public func intervalDays(for stability: Double) -> Int {
+        guard stability.isFinite, stability > 0 else { return 1 }
         let ideal = (stability / factor) * (pow(params.requestRetention, 1.0 / decay) - 1.0)
+        guard ideal.isFinite else { return 1 }
         return min(params.maximumInterval, max(1, Int(ideal.rounded())))
     }
 
-    // MARK: - FSRS-5 core
-
-    private func retrievability(elapsedDays: Double, stability: Double) -> Double {
-        pow(1.0 + factor * elapsedDays / stability, decay)
+    /// FSRS forgetting curve probability for an elapsed interval.
+    public func retrievability(elapsedDays: Double, stability: Double) -> Double {
+        guard elapsedDays.isFinite, stability.isFinite, stability > 0 else { return 0 }
+        let value = pow(1.0 + factor * max(0, elapsedDays) / stability, decay)
+        return value.isFinite ? min(1, max(0, value)) : 0
     }
+
+    // MARK: - FSRS-5 core
 
     private func initialStability(_ rating: ReviewRating) -> Double {
         max(minimumStability, params.weights[rating.rawValue - 1])
@@ -167,6 +235,60 @@ public struct FSRSScheduler: Scheduler {
             * exp(w[14] * (1.0 - r))
         // Post-lapse stability should not exceed the pre-lapse value.
         return min(sf, stability)
+    }
+
+    /// FSRS-5 short-term memory update for reviews less than one day apart.
+    /// w17 controls the update strength and w18 shifts its grade response.
+    private func sameDayStability(stability: Double, rating: ReviewRating) -> Double {
+        let exponent = params.weights[17]
+            * (Double(rating.rawValue) - 3.0 + params.weights[18])
+        let value = stability * exp(exponent)
+        return value.isFinite ? value : stability
+    }
+
+    private func scheduledIntervalDays(
+        for stability: Double,
+        state: MemoryState,
+        rating: ReviewRating,
+        now: Date
+    ) -> Int {
+        let interval = intervalDays(for: stability)
+        guard params.enableFuzz, interval >= 3, interval < params.maximumInterval else {
+            return interval
+        }
+        return fuzz(interval: interval, unit: deterministicUnit(state: state, rating: rating, now: now))
+    }
+
+    /// Exposed for parity tests and queue previews that need reproducible fuzz.
+    public func fuzz(interval: Int, unit: Double) -> Int {
+        guard interval >= 3 else { return max(1, interval) }
+        let delta: Int
+        switch interval {
+        case ..<7:
+            delta = max(1, Int((Double(interval) * 0.15).rounded()))
+        case ..<30:
+            delta = max(2, Int((Double(interval) * 0.10).rounded()))
+        default:
+            delta = max(4, Int((Double(interval) * 0.05).rounded()))
+        }
+        let lower = max(1, interval - delta)
+        let upper = min(params.maximumInterval, interval + delta)
+        let clampedUnit = unit.isFinite ? min(0.999_999_999, max(0, unit)) : 0.5
+        return lower + Int((Double(upper - lower + 1) * clampedUnit).rounded(.down))
+    }
+
+    private func deterministicUnit(state: MemoryState, rating: ReviewRating, now: Date) -> Double {
+        var seed = state.stability.bitPattern
+        seed ^= state.difficulty.bitPattern &* 0x9E37_79B9_7F4A_7C15
+        seed ^= now.timeIntervalSinceReferenceDate.bitPattern
+        seed ^= UInt64(state.reps) &* 0xBF58_476D_1CE4_E5B9
+        seed ^= UInt64(rating.rawValue) &* 0x94D0_49BB_1331_11EB
+        seed ^= seed >> 30
+        seed &*= 0xBF58_476D_1CE4_E5B9
+        seed ^= seed >> 27
+        seed &*= 0x94D0_49BB_1331_11EB
+        seed ^= seed >> 31
+        return Double(seed >> 11) / Double(UInt64(1) << 53)
     }
 
     private func clampDifficulty(_ value: Double) -> Double {

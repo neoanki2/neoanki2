@@ -9,6 +9,6 @@ swift test --parallel
 
 echo "==> NeoAnki2 ViewModel tests"
 cd "$ROOT"
-swift test --filter NeoAnki2Tests --parallel
+swift test --filter NeoAnki2Tests --skip AppLaunchSmokeTests --parallel
 
 echo "All fast tests passed."

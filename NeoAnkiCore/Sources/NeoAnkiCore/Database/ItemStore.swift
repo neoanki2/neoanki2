@@ -1,5 +1,28 @@
 import Foundation
 
+public struct QuarantinedItemTypeDefinition: Sendable, Equatable, Identifiable {
+    public let persistedID: String
+    public let name: String
+
+    public var id: String { persistedID }
+    public var repairableID: UUID? { UUID(uuidString: persistedID) }
+
+    public init(persistedID: String, name: String) {
+        self.persistedID = persistedID
+        self.name = name
+    }
+}
+
+public struct ItemTypeLoadResult: Sendable, Equatable {
+    public let itemTypes: [ItemType]
+    public let corruptions: [QuarantinedItemTypeDefinition]
+
+    public init(itemTypes: [ItemType], corruptions: [QuarantinedItemTypeDefinition]) {
+        self.itemTypes = itemTypes
+        self.corruptions = corruptions
+    }
+}
+
 /// An item loaded from persistence with summary fields for list display.
 public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     public let id: UUID
@@ -32,21 +55,51 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     }
 }
 
+/// The durable result of a review. The log identifier is the only supported
+/// target for a compensating revert.
+public struct ReviewSubmission: Sendable, Equatable {
+    public let memory: MemoryState
+    public let reviewLogID: UUID
+
+    public init(memory: MemoryState, reviewLogID: UUID) {
+        self.memory = memory
+        self.reviewLogID = reviewLogID
+    }
+}
+
+private extension FieldType {
+    var requiresStructuredImportValue: Bool {
+        switch self {
+        case .audio, .image, .gif, .video, .cloze:
+            true
+        case .text, .richText, .number:
+            false
+        }
+    }
+}
+
 /// Persistence for items and generated cards.
 public actor ItemStore {
     private let database: SQLiteDatabase
-    private let scheduler: any Scheduler
+    private let schedulerOverride: (any Scheduler)?
+    private let profileID: String
+    private var fsrsParameters = FSRSScheduler.Parameters()
     private let mediaStore: MediaStore?
+    private let starterItemTypes: [ItemType]
 
     public init(
         databaseURL: URL,
-        scheduler: any Scheduler = FSRSScheduler(),
-        mediaStore: MediaStore? = nil
+        scheduler: (any Scheduler)? = nil,
+        profileID: String = "default",
+        mediaStore: MediaStore? = nil,
+        starterItemTypes: [ItemType] = BuiltInItemTypes.all
     ) throws {
         let directory = databaseURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         database = try SQLiteDatabase(path: databaseURL)
-        self.scheduler = scheduler
+        schedulerOverride = scheduler
+        self.profileID = profileID.isEmpty ? "default" : profileID
+        self.starterItemTypes = starterItemTypes
         if let mediaStore {
             self.mediaStore = mediaStore
         } else {
@@ -58,10 +111,19 @@ public actor ItemStore {
         mediaStore
     }
 
-    /// Opens the database, runs migrations, and seeds built-in item types.
+    /// Opens the database, runs migrations, and applies the configured
+    /// first-run starter set once for this library.
     public func bootstrap() async throws {
+        for itemType in starterItemTypes {
+            try ItemTypeValidation.validate(itemType)
+        }
         try await database.migrate()
-        try await database.seedBuiltInItemTypesIfNeeded()
+        await mediaStore?.attachMetadataDatabase(database)
+        try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
+        if schedulerOverride == nil,
+           let saved = try await database.fetchSchedulerParameters(profileID: profileID) {
+            fsrsParameters = saved
+        }
     }
 
     public func defaultItemType() async throws -> ItemType {
@@ -88,17 +150,27 @@ public actor ItemStore {
         try await database.fetchAllItemTypes()
     }
 
+    /// Loads each definition independently so one malformed row cannot hide
+    /// unaffected item types.
+    public func loadItemTypes() async throws -> ItemTypeLoadResult {
+        try await database.fetchItemTypesWithCorruption()
+    }
+
+    /// Archives the malformed bytes, then replaces that row with a minimal,
+    /// editable definition. This never silently discards the original data.
+    public func repairItemTypeDefinition(id: UUID, now: Date = .now) async throws -> ItemType {
+        try await database.repairItemTypeDefinition(id: id, now: now)
+    }
+
     public func countItems(itemTypeID: UUID) async throws -> Int {
         try await database.countItems(itemTypeID: itemTypeID)
     }
 
-    /// Deletes an item type when it is not built-in and has no items.
+    /// Deletes an item type when it has no items. First-run starters are regular
+    /// user-owned types after seeding and can be removed.
     @discardableResult
     public func deleteItemType(id: UUID) async throws -> Bool {
         guard try await database.fetchItemType(id: id) != nil else { return false }
-        if BuiltInItemTypes.isBuiltIn(id) {
-            throw DatabaseError.invalidItemType("Built-in item types can't be deleted.")
-        }
         let itemCount = try await database.countItems(itemTypeID: id)
         if itemCount > 0 {
             throw DatabaseError.invalidItemType("Remove all items of this type before deleting it.")
@@ -112,11 +184,11 @@ public actor ItemStore {
     public func updateItemType(_ itemType: ItemType, now: Date = .now) async throws -> ItemType {
         let previous = try await database.fetchItemType(id: itemType.id)
         try ItemTypeValidation.validate(itemType)
-        try await database.updateItemType(itemType)
-
-        if let previous {
-            try await syncCards(from: previous, to: itemType, now: now)
-        }
+        try await database.updateItemTypeAndSyncCards(
+            previous: previous,
+            updated: itemType,
+            now: now
+        )
 
         return itemType
     }
@@ -241,8 +313,15 @@ public actor ItemStore {
 
         try validate(item, against: itemType)
         let cards = CardGenerator.cards(for: item, type: itemType, now: now)
+        let mediaDescriptors = try await newMediaDescriptors(in: item, comparedTo: nil)
 
-        try await database.insertItemWithCards(item, cards: cards, createdAt: now, updatedAt: now)
+        try await database.insertItemWithCards(
+            item,
+            cards: cards,
+            createdAt: now,
+            updatedAt: now,
+            mediaDescriptors: mediaDescriptors
+        )
 
         return SavedItemSummary(
             id: item.id,
@@ -320,12 +399,71 @@ public actor ItemStore {
         return (persisted.item, itemType)
     }
 
+    /// Updates item content and applies media reference deltas atomically.
+    @discardableResult
+    public func updateItem(_ item: Item, now: Date = .now) async throws -> SavedItemSummary {
+        guard let previous = try await database.fetchItem(id: item.id) else {
+            throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
+        }
+        guard previous.item.itemTypeID == item.itemTypeID,
+              let itemType = try await database.fetchItemType(id: item.itemTypeID)
+        else {
+            throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+        if let deckID = item.deckID {
+            guard try await database.fetchDeck(id: deckID) != nil else {
+                throw DatabaseError.deckNotFound(deckID)
+            }
+        }
+
+        try validate(item, against: itemType)
+        let mediaDescriptors = try await newMediaDescriptors(in: item, comparedTo: previous.item)
+        let desiredCards = CardGenerator.cards(for: item, type: itemType, now: now)
+        try await database.updateItemWithMedia(
+            item,
+            desiredCards: desiredCards,
+            updatedAt: now,
+            mediaDescriptors: mediaDescriptors
+        )
+        return SavedItemSummary(
+            id: item.id,
+            itemTypeID: itemType.id,
+            itemTypeName: itemType.name,
+            title: ItemDisplay.title(for: item, in: itemType),
+            subtitle: ItemDisplay.subtitle(for: item, in: itemType),
+            cardCount: desiredCards.count,
+            deckID: item.deckID,
+            createdAt: previous.createdAt
+        )
+    }
+
     /// Deletes an item and its generated cards.
     @discardableResult
-    public func deleteItem(id: UUID) async throws -> Bool {
-        guard try await database.fetchItem(id: id) != nil else { return false }
-        try await database.deleteItem(id: id)
-        return true
+    public func deleteItem(id: UUID, now: Date = .now) async throws -> Bool {
+        let deleted = try await database.deleteItemWithMedia(id: id, deletedAt: now)
+        if deleted {
+            _ = try? await collectMediaGarbage()
+        }
+        return deleted
+    }
+
+    public func mediaAsset(hash: String) async throws -> MediaAsset? {
+        try await database.fetchMediaAsset(hash: hash)
+    }
+
+    /// Deletes only zero-reference assets, retaining metadata when deletion is unsafe.
+    @discardableResult
+    public func collectMediaGarbage(asOf now: Date = .now) async throws -> Int {
+        guard let mediaStore else { return 0 }
+        try await database.removeExpiredMediaReservations(asOf: now)
+        let orphans = try await database.fetchOrphanedMediaAssets()
+        var collected = 0
+        for asset in orphans {
+            try await mediaStore.removeOrphan(asset)
+            try await database.deleteMediaAssetIfOrphaned(hash: asset.hash)
+            collected += 1
+        }
+        return collected
     }
 
     public func dueCount(scope: DeckScope = .allDecks, asOf now: Date = .now) async throws -> Int {
@@ -364,10 +502,27 @@ public actor ItemStore {
         now: Date = .now,
         durationMs: Int = 0
     ) async throws -> MemoryState {
+        try await submitReviewWithReceipt(
+            cardID: cardID,
+            rating: rating,
+            now: now,
+            durationMs: durationMs
+        ).memory
+    }
+
+    /// Applies a review and returns the exact append-only log entry that can be
+    /// compensated later.
+    public func submitReviewWithReceipt(
+        cardID: UUID,
+        rating: ReviewRating,
+        now: Date = .now,
+        durationMs: Int = 0
+    ) async throws -> ReviewSubmission {
         guard var card = try await database.fetchCard(id: cardID) else {
             throw DatabaseError.cardNotFound(cardID)
         }
 
+        let memoryBefore = card.memory
         let phaseBefore = card.memory.phase
         let elapsedDays: Double
         if let lastReview = card.memory.lastReview {
@@ -381,6 +536,8 @@ public actor ItemStore {
             0
         )
 
+        let scheduler: any Scheduler = schedulerOverride
+            ?? FSRSScheduler(parameters: fsrsParameters)
         let nextMemory = scheduler.schedule(card.memory, rating: rating, now: now)
         card.memory = nextMemory
 
@@ -394,17 +551,60 @@ public actor ItemStore {
             durationMs: durationMs
         )
 
-        try await database.persistReview(cardID: card.id, memory: nextMemory, log: log)
+        try await database.persistReview(
+            cardID: card.id,
+            memoryBefore: memoryBefore,
+            memoryAfter: nextMemory,
+            log: log
+        )
 
-        return nextMemory
+        return ReviewSubmission(memory: nextMemory, reviewLogID: log.id)
     }
 
-    public func revertReview(cardID: UUID, restoring memory: MemoryState) async throws {
-        try await database.revertReview(cardID: cardID, restoring: memory)
+    public func revertReview(reviewLogID: UUID, now: Date = .now) async throws {
+        try await database.revertReview(reviewLogID: reviewLogID, revertedAt: now)
     }
 
+    /// Active review count retained for source compatibility with statistics callers.
     public func reviewLogCount(for cardID: UUID) async throws -> Int {
-        try await database.countReviewLogs(for: cardID)
+        try await activeReviewLogCount(for: cardID)
+    }
+
+    public func rawReviewLogCount(for cardID: UUID) async throws -> Int {
+        try await database.countRawReviewLogs(for: cardID)
+    }
+
+    public func activeReviewLogCount(for cardID: UUID) async throws -> Int {
+        try await database.countActiveReviewLogs(for: cardID)
+    }
+
+    public func schedulingParameters() -> FSRSScheduler.Parameters {
+        fsrsParameters
+    }
+
+    /// Fits and persists scheduler weights for this store's profile.
+    ///
+    /// Only active, decodable review logs participate. The minimum-data gate
+    /// is based on repeated-review outcomes rather than raw log rows.
+    @discardableResult
+    public func optimizeScheduling(
+        minimumObservations: Int = 100,
+        now: Date = .now
+    ) async throws -> FSRSOptimizationResult {
+        let logs = try await database.fetchActiveReviewLogs()
+        let optimizer = FSRSOptimizer(minimumObservations: minimumObservations)
+        let result = try optimizer.optimize(logs: logs, startingAt: fsrsParameters)
+        guard result.improved else { return result }
+
+        try await database.saveSchedulerParameters(
+            result.parameters,
+            profileID: profileID,
+            optimizedAt: now,
+            sampleCount: result.observationCount,
+            logLoss: result.optimizedLoss
+        )
+        fsrsParameters = result.parameters
+        return result
     }
 
     /// Imports rows parsed by a native adapter into an existing item type.
@@ -418,7 +618,7 @@ public actor ItemStore {
     ) async throws -> Int {
         try ImportLimits.validatePayloadSize(data)
         let payload = try adapter.parse(data)
-        try ImportLimits.validateRowCount(payload.rows.count)
+        try ImportLimits.validateDecodedPayload(payload)
         let resolvedType: ItemType
 
         if let itemTypeID {
@@ -433,27 +633,94 @@ public actor ItemStore {
             throw ImportError.invalidFormat("Item type name mismatch.")
         }
 
-        var importedCount = 0
-        for row in payload.rows {
-            let fields = try await mapImportRow(row, to: resolvedType, context: context)
-            let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
-            _ = try await createItem(item, now: now)
-            importedCount += 1
+        var entries: [(item: Item, cards: [Card])] = []
+        entries.reserveCapacity(payload.rows.count)
+        let importScope = UUID()
+
+        do {
+            for row in payload.rows {
+                let fields = try await mapImportRow(
+                    row,
+                    to: resolvedType,
+                    context: context,
+                    supportsStructuredFields: adapter.supportsStructuredFields,
+                    mediaReservationScope: importScope
+                )
+                let item = Item(itemTypeID: resolvedType.id, fields: fields, tags: row.tags)
+                try validate(item, against: resolvedType)
+                entries.append((
+                    item: item,
+                    cards: CardGenerator.cards(for: item, type: resolvedType, now: now)
+                ))
+            }
+
+            try await database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
+            try await mediaStore?.releaseReservations(scopeID: importScope)
+            return entries.count
+        } catch {
+            try? await mediaStore?.rollbackReservations(scopeID: importScope)
+            throw error
+        }
+    }
+
+    private func newMediaDescriptors(
+        in item: Item,
+        comparedTo previous: Item?
+    ) async throws -> [String: MediaAssetDescriptor] {
+        var previousCounts: [String: Int] = [:]
+        if let previous {
+            for ref in mediaReferences(in: previous) {
+                previousCounts[mediaIdentity(ref), default: 0] += 1
+            }
         }
 
-        return importedCount
+        var descriptors: [String: MediaAssetDescriptor] = [:]
+        for ref in mediaReferences(in: item) {
+            let identity = mediaIdentity(ref)
+            if previousCounts[identity, default: 0] > 0 {
+                previousCounts[identity, default: 0] -= 1
+                continue
+            }
+            guard let mediaStore else {
+                throw DatabaseError.invalidMediaAsset("Media storage is unavailable.")
+            }
+            let descriptor = try await mediaStore.descriptor(for: ref)
+            if let existing = descriptors[descriptor.hash], existing != descriptor {
+                throw DatabaseError.invalidMediaAsset("Conflicting media metadata uses the same hash.")
+            }
+            descriptors[descriptor.hash] = descriptor
+        }
+        return descriptors
+    }
+
+    private func mediaReferences(in item: Item) -> [MediaRef] {
+        item.fields.compactMap { field in
+            guard case let .media(ref) = field.value else { return nil }
+            return ref
+        }
+    }
+
+    private func mediaIdentity(_ ref: MediaRef) -> String {
+        "\(ref.assetHash)|\(ref.kind.rawValue)|\(ref.fileExtension)"
     }
 
     private func mapImportRow(
         _ row: ImportRow,
         to itemType: ItemType,
-        context: ImportContext
+        context: ImportContext,
+        supportsStructuredFields: Bool,
+        mediaReservationScope: UUID
     ) async throws -> [FieldValue] {
         var values: [FieldValue] = []
 
         for field in itemType.fields {
             if let structured = row.structuredFields[field.name] {
-                let value = try await contentValue(from: structured, field: field, context: context)
+                let value = try await contentValue(
+                    from: structured,
+                    field: field,
+                    context: context,
+                    mediaReservationScope: mediaReservationScope
+                )
                 if value.isEmpty, field.isRequired {
                     throw DatabaseError.requiredFieldEmpty(field.name)
                 }
@@ -470,6 +737,11 @@ public actor ItemStore {
                 continue
             }
 
+            if !supportsStructuredFields, field.type.requiresStructuredImportValue {
+                throw ImportError.invalidFormat(
+                    "CSV cannot import the structured field \"\(field.name)\". Use JSON for cloze and media fields."
+                )
+            }
             try ImportLimits.validateFieldString(text, fieldName: field.name)
             values.append(FieldValue(fieldID: field.id, value: field.contentValue(from: text)))
         }
@@ -487,7 +759,8 @@ public actor ItemStore {
     private func contentValue(
         from structured: StructuredFieldValue,
         field: FieldDef,
-        context: ImportContext
+        context: ImportContext,
+        mediaReservationScope: UUID
     ) async throws -> ContentValue {
         switch structured {
         case let .text(string):
@@ -505,19 +778,53 @@ public actor ItemStore {
                 throw ImportError.invalidFormat("Media import requires a media store.")
             }
             let resolved = try resolveImportPath(path, baseDirectory: context.baseDirectory)
-            let ref = try await mediaStore.ingest(url: resolved, kind: kind)
+            let ref = try await mediaStore.ingest(
+                url: resolved,
+                kind: kind,
+                reservationScope: mediaReservationScope
+            )
             return .media(ref)
-        case let .mediaBase64(base64, fileExtension):
+        case let .mediaBase64(base64, declaredExtension, altText):
             guard let kind = field.type.mediaKind else {
                 throw ImportError.invalidFormat("Field \"\(field.name)\" is not a media field.")
             }
             guard let mediaStore else {
                 throw ImportError.invalidFormat("Media import requires a media store.")
             }
+            try ImportLimits.validateBase64EncodedSize(base64, kind: kind, fieldName: field.name)
             guard let data = Data(base64Encoded: base64) else {
                 throw ImportError.invalidFormat("Invalid base64 for field \"\(field.name)\".")
             }
-            let ref = try await mediaStore.ingest(data: data, kind: kind, fileExtension: fileExtension)
+            guard data.count <= MediaValidation.maxBytes(for: kind) else {
+                throw ImportError.invalidFormat("Media in field \"\(field.name)\" exceeds its size limit.")
+            }
+            if let altText {
+                try ImportLimits.validateFieldString(altText, fieldName: "\(field.name) alt text")
+            }
+            let inferredExtension: String
+            do {
+                inferredExtension = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
+            } catch {
+                let detail = (error as? LocalizedError)?.errorDescription ?? "The bytes are invalid."
+                throw ImportError.invalidFormat("Media in field \"\(field.name)\" is invalid. \(detail)")
+            }
+            if let declaredExtension {
+                let normalized = declaredExtension.lowercased() == "jpeg"
+                    ? "jpg"
+                    : declaredExtension.lowercased()
+                guard normalized == inferredExtension else {
+                    throw ImportError.invalidFormat(
+                        "Media in field \"\(field.name)\" does not match its fileExtension."
+                    )
+                }
+            }
+            let ref = try await mediaStore.ingest(
+                data: data,
+                kind: kind,
+                fileExtension: inferredExtension,
+                altText: altText,
+                reservationScope: mediaReservationScope
+            )
             return .media(ref)
         }
     }
@@ -527,22 +834,36 @@ public actor ItemStore {
         guard !trimmed.isEmpty else {
             throw ImportError.invalidFormat("Media path is empty.")
         }
-
-        let candidate: URL
-        if trimmed.hasPrefix("/") {
-            candidate = URL(fileURLWithPath: trimmed)
-        } else if let baseDirectory {
-            candidate = baseDirectory.appendingPathComponent(trimmed)
-        } else {
-            throw ImportError.invalidFormat("Relative media paths require an import base directory.")
+        guard !NSString(string: trimmed).isAbsolutePath else {
+            throw ImportError.invalidFormat("Absolute media paths are not allowed.")
+        }
+        guard let baseDirectory else {
+            throw ImportError.invalidFormat("Media paths require an import base directory.")
+        }
+        guard baseDirectory.isFileURL else {
+            throw ImportError.invalidFormat("Import base directory is invalid.")
         }
 
-        let resolved = candidate.standardizedFileURL
-        if let baseDirectory {
-            let base = baseDirectory.standardizedFileURL
-            guard resolved.path.hasPrefix(base.path) else {
-                throw ImportError.invalidFormat("Media path escapes import directory.")
-            }
+        let base = baseDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        var isDirectory: ObjCBool = false
+        guard
+            FileManager.default.fileExists(atPath: base.path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        else {
+            throw ImportError.invalidFormat("Import base directory is invalid.")
+        }
+
+        let resolved = baseDirectory
+            .appendingPathComponent(trimmed)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let baseComponents = base.pathComponents
+        let resolvedComponents = resolved.pathComponents
+        guard
+            resolvedComponents.count > baseComponents.count,
+            resolvedComponents.prefix(baseComponents.count).elementsEqual(baseComponents)
+        else {
+            throw ImportError.invalidFormat("Media path escapes import directory.")
         }
         return resolved
     }
@@ -552,9 +873,12 @@ public actor ItemStore {
         summaries.reserveCapacity(persisted.count)
 
         for entry in persisted {
-            guard let itemType = try await database.fetchItemType(id: entry.item.itemTypeID) else {
-                continue
-            }
+            // Malformed definitions are reported by loadItemTypes(), where
+            // callers receive the persisted ID and the archive-before-repair
+            // path. Keep unrelated item rows usable in the meantime.
+            guard let itemType = try await database.fetchValidatedItemType(
+                id: entry.item.itemTypeID
+            ) else { continue }
             let cardCount = try await database.countCards(for: entry.item.id)
             summaries.append(
                 SavedItemSummary(
@@ -577,13 +901,16 @@ public actor ItemStore {
         dueCards.reserveCapacity(cards.count)
 
         for card in cards {
-            guard
-                let persisted = try await database.fetchItem(id: card.itemID),
-                let itemType = try await database.fetchItemType(id: persisted.item.itemTypeID),
-                let template = itemType.templates.first(where: { $0.id == card.templateID })
-            else {
+            guard let persisted = try await database.fetchItem(id: card.itemID) else {
                 continue
             }
+            // The linked card remains persisted and becomes available again
+            // after repairItemTypeDefinition archives and repairs its type.
+            guard let itemType = try await database.fetchValidatedItemType(
+                      id: persisted.item.itemTypeID
+                  ),
+                  let template = itemType.templates.first(where: { $0.id == card.templateID })
+            else { continue }
 
             dueCards.append(
                 DueCard(
@@ -599,62 +926,31 @@ public actor ItemStore {
     }
 
     private func validate(_ item: Item, against itemType: ItemType) throws {
-        for field in itemType.fields where field.isRequired {
-            guard let value = item.value(for: field.id), !value.isEmpty else {
-                throw DatabaseError.requiredFieldEmpty(field.name)
-            }
-            if case let .cloze(text, blanks) = value {
+        for fieldValue in item.fields {
+            switch fieldValue.value {
+            case let .cloze(text, blanks):
                 try ClozeValidation.validate(text: text, blanks: blanks)
+            case let .media(ref):
+                guard ref.isValidStoredReference else {
+                    throw MediaError.sandboxViolation
+                }
+            default:
+                break
+            }
+        }
+
+        for field in itemType.fields {
+            let value = item.value(for: field.id)
+            if field.isRequired {
+                guard let value, !value.isEmpty else {
+                    throw DatabaseError.requiredFieldEmpty(field.name)
+                }
+            }
+
+            if case let .media(ref)? = value, field.type.mediaKind != ref.kind {
+                throw MediaError.unsupportedFormat(ref.kind)
             }
         }
     }
 
-    private func syncCards(from previous: ItemType, to updated: ItemType, now: Date) async throws {
-        let previousTemplateIDs = Set(previous.templates.map(\.id))
-        let updatedTemplateIDs = Set(updated.templates.map(\.id))
-
-        let added = updatedTemplateIDs.subtracting(previousTemplateIDs)
-        let removed = previousTemplateIDs.subtracting(updatedTemplateIDs)
-        let kept = previousTemplateIDs.intersection(updatedTemplateIDs)
-
-        let items = try await database.fetchItems(itemTypeID: updated.id)
-
-        for entry in items {
-            let item = entry.item
-
-            for templateID in removed {
-                try await database.deleteCards(itemID: item.id, templateID: templateID)
-            }
-
-            let existingCards = try await database.fetchCards(for: item.id)
-            let existingTemplateIDs = Set(existingCards.map(\.templateID))
-
-            for template in updated.templates where added.contains(template.id) {
-                guard CardGenerator.shouldGenerate(template, for: item) else { continue }
-                guard !existingTemplateIDs.contains(template.id) else { continue }
-
-                let card = Card(
-                    itemID: item.id,
-                    templateID: template.id,
-                    skill: template.skill,
-                    memory: .new(due: now),
-                    deckID: item.deckID
-                )
-                try await database.insertCards([card])
-            }
-
-            for template in updated.templates where kept.contains(template.id) {
-                guard
-                    let previousTemplate = previous.templates.first(where: { $0.id == template.id }),
-                    previousTemplate.skill != template.skill
-                else {
-                    continue
-                }
-
-                for card in existingCards where card.templateID == template.id {
-                    try await database.updateCardSkill(card.id, skill: template.skill)
-                }
-            }
-        }
-    }
 }

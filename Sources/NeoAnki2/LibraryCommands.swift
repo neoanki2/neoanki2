@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct LibraryCommandHandlers {
+    var openImport: (() -> Void)?
     var openTemplates: (() -> Void)?
+    var canImport = false
     var canOpenTemplates = false
 }
 
@@ -21,6 +23,13 @@ struct LibraryCommands: Commands {
     @FocusedValue(\.libraryCommandHandlers) private var handlers
 
     var body: some Commands {
+        CommandGroup(after: .importExport) {
+            Button("Import…") {
+                handlers?.openImport?()
+            }
+            .disabled(!(handlers?.canImport ?? false))
+        }
+
         CommandMenu("Library") {
             Button("Item Types…") {
                 handlers?.openTemplates?()

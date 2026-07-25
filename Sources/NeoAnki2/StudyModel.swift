@@ -2,8 +2,7 @@ import Foundation
 import NeoAnkiCore
 
 struct PendingGradeUndo: Equatable, Sendable {
-    let cardID: UUID
-    let previousMemory: MemoryState
+    let reviewLogID: UUID
     let previousIndex: Int
     let rating: ReviewRating
 }
@@ -20,6 +19,13 @@ final class StudyModel {
     private(set) var isFinished = false
     private(set) var scopeLabel = ""
     private(set) var pendingGradeUndo: PendingGradeUndo?
+    private(set) var typedAnswer = ""
+    private(set) var answerEvaluation: AnswerEvaluation?
+    private(set) var choiceOptions: [String] = []
+    private(set) var selectedChoice: String?
+    private(set) var arrangedItems: [String] = []
+    private(set) var selectedArrangementIndex: Int?
+    private(set) var interactionMessage: String?
 
     let store: ItemStore
 
@@ -71,6 +77,7 @@ final class StudyModel {
         do {
             queue = try await store.fetchDueCards(scope: scope.filter)
             isFinished = queue.isEmpty
+            prepareCurrentInteraction()
         } catch {
             errorMessage = userFacingError(from: error)
             queue = []
@@ -81,25 +88,118 @@ final class StudyModel {
     }
 
     func revealAnswer() {
-        guard currentCard?.template.interaction == .reveal else { return }
+        guard currentCard != nil else { return }
         isAnswerRevealed = true
     }
 
+    func updateTypedAnswer(_ answer: String) {
+        typedAnswer = answer
+        answerEvaluation = nil
+        interactionMessage = nil
+    }
+
+    func submitTypedAnswer() {
+        guard let card = currentCard, card.template.interaction == .type else { return }
+        let evaluation = StudySupport.evaluate(typedAnswer, for: card)
+        if evaluation == .unavailable {
+            recoverFromMissingAnswer()
+            return
+        }
+        guard !typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            interactionMessage = "Enter an answer, or reveal it to self-grade."
+            return
+        }
+        answerEvaluation = evaluation
+        isAnswerRevealed = true
+    }
+
+    func selectChoice(_ option: String) {
+        guard choiceOptions.contains(option), !isAnswerRevealed else { return }
+        selectedChoice = option
+        interactionMessage = nil
+    }
+
+    func submitChoice() {
+        guard let card = currentCard, card.template.interaction == .choose else { return }
+        guard !choiceOptions.isEmpty else {
+            recoverFromMissingAnswer()
+            return
+        }
+        guard let selectedChoice else {
+            interactionMessage = "Choose an option, or reveal the answer to self-grade."
+            return
+        }
+        answerEvaluation = StudySupport.evaluate(selectedChoice, for: card)
+        isAnswerRevealed = true
+    }
+
+    func selectArrangementItem(at index: Int) {
+        guard arrangedItems.indices.contains(index), !isAnswerRevealed else { return }
+        selectedArrangementIndex = index
+        interactionMessage = nil
+    }
+
+    func moveSelectedArrangementItem(by offset: Int) {
+        guard let selectedArrangementIndex else {
+            interactionMessage = "Select an item before moving it."
+            return
+        }
+        let destination = selectedArrangementIndex + offset
+        guard arrangedItems.indices.contains(destination), !isAnswerRevealed else { return }
+        arrangedItems.swapAt(selectedArrangementIndex, destination)
+        self.selectedArrangementIndex = destination
+        answerEvaluation = nil
+    }
+
+    func submitArrangement() {
+        guard let card = currentCard, card.template.interaction == .arrange else { return }
+        guard !arrangedItems.isEmpty else {
+            recoverFromMissingAnswer()
+            return
+        }
+        answerEvaluation = StudySupport.isCorrectArrangement(arrangedItems, for: card)
+        isAnswerRevealed = true
+    }
+
+    func completeRecording() {
+        guard currentCard?.template.interaction == .record else { return }
+        interactionMessage = "Play your recording and the reference, then grade your recall."
+        isAnswerRevealed = true
+    }
+
+    func performPrimaryAction() {
+        guard let interaction = currentCard?.template.interaction else { return }
+        switch interaction {
+        case .reveal, .cloze:
+            revealAnswer()
+        case .type:
+            submitTypedAnswer()
+        case .choose:
+            submitChoice()
+        case .record:
+            completeRecording()
+        case .arrange:
+            submitArrangement()
+        }
+    }
+
     func grade(_ rating: ReviewRating) async {
+        guard !isGrading else { return }
         errorMessage = nil
         guard let card = currentCard else { return }
 
         isGrading = true
         defer { isGrading = false }
 
-        let previousMemory = card.card.memory
         let previousIndex = index
 
         do {
-            _ = try await store.submitReview(cardID: card.id, rating: rating)
-            pendingGradeUndo = PendingGradeUndo(
+            let submission = try await store.submitReviewWithReceipt(
                 cardID: card.id,
-                previousMemory: previousMemory,
+                rating: rating
+            )
+            pendingGradeUndo = PendingGradeUndo(
+                reviewLogID: submission.reviewLogID,
                 previousIndex: previousIndex,
                 rating: rating
             )
@@ -108,22 +208,29 @@ final class StudyModel {
 
             if index >= queue.count {
                 isFinished = true
+            } else {
+                prepareCurrentInteraction()
             }
+        } catch DatabaseError.cardNotFound(_) {
+            discardMissingCurrentCard(card.id)
         } catch {
             errorMessage = userFacingError(from: error)
         }
     }
 
     func undoLastGrade() async {
+        guard !isGrading else { return }
         guard let undo = pendingGradeUndo else { return }
 
         isGrading = true
         defer { isGrading = false }
 
         do {
-            try await store.revertReview(cardID: undo.cardID, restoring: undo.previousMemory)
+            try await store.revertReview(reviewLogID: undo.reviewLogID)
             index = undo.previousIndex
             isFinished = false
+            isAnswerRevealed = true
+            prepareCurrentInteraction()
             isAnswerRevealed = true
             pendingGradeUndo = nil
         } catch {
@@ -145,10 +252,49 @@ final class StudyModel {
 
         if index >= queue.count {
             isFinished = true
+        } else {
+            prepareCurrentInteraction()
         }
+    }
+
+    private func prepareCurrentInteraction() {
+        typedAnswer = ""
+        answerEvaluation = nil
+        selectedChoice = nil
+        selectedArrangementIndex = nil
+        interactionMessage = nil
+        guard let card = currentCard else {
+            choiceOptions = []
+            arrangedItems = []
+            return
+        }
+        choiceOptions = card.template.interaction == .choose
+            ? StudySupport.choiceOptions(for: card)
+            : []
+        arrangedItems = card.template.interaction == .arrange
+            ? StudySupport.arrangement(for: card)?.initial ?? []
+            : []
+        if card.template.interaction == .choose, choiceOptions.isEmpty {
+            interactionMessage = "This card has no usable answer options. Reveal it to self-grade."
+        } else if card.template.interaction == .arrange, arrangedItems.isEmpty {
+            interactionMessage = "This card has nothing to arrange. Reveal it to self-grade."
+        }
+    }
+
+    private func recoverFromMissingAnswer() {
+        answerEvaluation = .unavailable
+        interactionMessage = "No checkable answer is available. Review the card and self-grade."
+        isAnswerRevealed = true
     }
 
     private func userFacingError(from error: Error) -> String {
         UserFacingError.message(from: error)
+    }
+
+    private func discardMissingCurrentCard(_ cardID: UUID) {
+        guard queue.indices.contains(index), queue[index].id == cardID else { return }
+        queue.remove(at: index)
+        isAnswerRevealed = false
+        isFinished = index >= queue.count
     }
 }

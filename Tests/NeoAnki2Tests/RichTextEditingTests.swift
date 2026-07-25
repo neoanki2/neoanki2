@@ -26,6 +26,36 @@ private func spans(in textView: NSTextView) -> [Span] {
     #expect(spans(in: textView) == [Span("Hello", styles: [.bold])])
 }
 
+@Test func richTextTabCommandsNavigateFormFocus() {
+    #expect(
+        RichTextFocusNavigation.direction(for: #selector(NSResponder.insertTab(_:)))
+            == .forward
+    )
+    #expect(
+        RichTextFocusNavigation.direction(for: #selector(NSResponder.insertBacktab(_:)))
+            == .backward
+    )
+    #expect(
+        RichTextFocusNavigation.direction(for: #selector(NSResponder.insertNewline(_:)))
+            == nil
+    )
+}
+
+@Test func clozeTabCommandsNavigateFormFocus() {
+    #expect(
+        ClozeFocusNavigation.direction(for: #selector(NSResponder.insertTab(_:)))
+            == .forward
+    )
+    #expect(
+        ClozeFocusNavigation.direction(for: #selector(NSResponder.insertBacktab(_:)))
+            == .backward
+    )
+    #expect(
+        ClozeFocusNavigation.direction(for: #selector(NSResponder.insertNewline(_:)))
+            == nil
+    )
+}
+
 @Test @MainActor func toggleBoldRemovesFromSelectedText() {
     let textView = makeTextView(text: "Hello", selection: NSRange(location: 0, length: 5))
     textView.textStorage?.setAttributedString(

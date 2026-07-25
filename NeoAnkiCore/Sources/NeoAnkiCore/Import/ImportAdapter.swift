@@ -58,7 +58,13 @@ public struct ImportContext: Sendable {
 
 /// Parses native NeoAnki import data (JSON or CSV) into rows for `ItemStore`.
 public protocol ImportAdapter: Sendable {
+    /// Whether the source format can represent cloze and media objects.
+    var supportsStructuredFields: Bool { get }
     func parse(_ data: Data) throws -> ImportPayload
+}
+
+public extension ImportAdapter {
+    var supportsStructuredFields: Bool { true }
 }
 
 /// Native JSON import format:
@@ -118,7 +124,7 @@ public struct JSONImportAdapter: ImportAdapter {
         do {
             payload = try decoder.decode(Payload.self, from: data)
         } catch {
-            throw ImportError.invalidFormat(error.localizedDescription)
+            throw ImportError.invalidFormat("The JSON structure is invalid.")
         }
 
         guard !payload.rows.isEmpty else {
@@ -135,36 +141,38 @@ public struct JSONImportAdapter: ImportAdapter {
 /// CSV with a header row. Optional `tags` column contains comma-separated tags.
 public struct CSVImportAdapter: ImportAdapter {
     public var itemTypeName: String
+    public var supportsStructuredFields: Bool { false }
 
     public init(itemTypeName: String) {
         self.itemTypeName = itemTypeName
     }
 
     public func parse(_ data: Data) throws -> ImportPayload {
+        try ImportLimits.validatePayloadSize(data)
         guard let text = String(data: data, encoding: .utf8) else {
             throw ImportError.invalidFormat("Expected UTF-8 text.")
         }
 
-        let lines = text
-            .split(whereSeparator: \.isNewline)
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        guard lines.count >= 2 else {
+        let records = try parseRecords(text)
+        guard records.count >= 2 else {
             throw ImportError.emptyPayload
         }
 
-        let headers = parseCSVLine(lines[0])
-        guard !headers.isEmpty else {
+        let headers = records[0].map { $0.trimmingCharacters(in: .whitespaces) }
+        guard !headers.isEmpty, headers.allSatisfy({ !$0.isEmpty }) else {
             throw ImportError.invalidFormat("Missing CSV header.")
+        }
+        guard Set(headers).count == headers.count else {
+            throw ImportError.invalidFormat("CSV header names must be unique.")
         }
 
         var rows: [ImportRow] = []
-        rows.reserveCapacity(lines.count - 1)
+        rows.reserveCapacity(records.count - 1)
 
-        for line in lines.dropFirst() {
-            let values = parseCSVLine(line)
-            guard !values.isEmpty else { continue }
+        for values in records.dropFirst() {
+            guard values.count == headers.count else {
+                throw ImportError.invalidFormat("Every CSV row must have \(headers.count) fields.")
+            }
 
             var fieldValues: [String: String] = [:]
             var tags: [String] = []
@@ -191,26 +199,110 @@ public struct CSVImportAdapter: ImportAdapter {
         return ImportPayload(itemTypeName: itemTypeName, rows: rows)
     }
 
-    private func parseCSVLine(_ line: String) -> [String] {
-        var values: [String] = []
-        var current = ""
-        var inQuotes = false
-        var index = line.startIndex
+    private enum CSVState {
+        case fieldStart
+        case unquoted
+        case quoted
+        case afterQuote
+    }
 
-        while index < line.endIndex {
-            let character = line[index]
-            if character == "\"" {
-                inQuotes.toggle()
-            } else if character == "," && !inQuotes {
-                values.append(current.trimmingCharacters(in: .whitespaces))
-                current = ""
-            } else {
-                current.append(character)
+    private func parseRecords(_ text: String) throws -> [[String]] {
+        var records: [[String]] = []
+        var record: [String] = []
+        var field = ""
+        var fieldBytes = 0
+        var state = CSVState.fieldStart
+        var index = text.startIndex
+
+        func appendField() throws {
+            guard record.count < ImportLimits.maxFieldsPerRow else {
+                throw ImportError.invalidFormat(
+                    "CSV rows may contain at most \(ImportLimits.maxFieldsPerRow) fields."
+                )
             }
-            index = line.index(after: index)
+            record.append(field)
+            field = ""
+            fieldBytes = 0
         }
 
-        values.append(current.trimmingCharacters(in: .whitespaces))
-        return values
+        func appendRecord() throws {
+            try appendField()
+            if !record.allSatisfy(\.isEmpty) {
+                guard records.count < ImportLimits.maxRows + 1 else {
+                    throw ImportError.invalidFormat("Import exceeds \(ImportLimits.maxRows) row limit.")
+                }
+                records.append(record)
+            }
+            record = []
+        }
+
+        func append(_ character: Character) throws {
+            fieldBytes += String(character).utf8.count
+            guard fieldBytes <= ImportLimits.maxFieldStringBytes else {
+                throw ImportError.invalidFormat("A CSV field exceeds maximum length.")
+            }
+            field.append(character)
+        }
+
+        while index < text.endIndex {
+            let character = text[index]
+
+            switch state {
+            case .fieldStart:
+                if character == "\"" {
+                    state = .quoted
+                } else if character == "," {
+                    try appendField()
+                } else if character.isNewline {
+                    try appendRecord()
+                } else {
+                    try append(character)
+                    state = .unquoted
+                }
+            case .unquoted:
+                if character == "," {
+                    try appendField()
+                    state = .fieldStart
+                } else if character.isNewline {
+                    try appendRecord()
+                    state = .fieldStart
+                } else if character == "\"" {
+                    throw ImportError.invalidFormat("Quotes must enclose an entire CSV field.")
+                } else {
+                    try append(character)
+                }
+            case .quoted:
+                if character == "\"" {
+                    state = .afterQuote
+                } else if character.isNewline {
+                    try append("\n")
+                } else {
+                    try append(character)
+                }
+            case .afterQuote:
+                if character == "\"" {
+                    try append("\"")
+                    state = .quoted
+                } else if character == "," {
+                    try appendField()
+                    state = .fieldStart
+                } else if character.isNewline {
+                    try appendRecord()
+                    state = .fieldStart
+                } else {
+                    throw ImportError.invalidFormat("Unexpected text after a closing CSV quote.")
+                }
+            }
+
+            index = text.index(after: index)
+        }
+
+        guard state != .quoted else {
+            throw ImportError.invalidFormat("A quoted CSV field is not closed.")
+        }
+        if state != .fieldStart || !field.isEmpty || !record.isEmpty {
+            try appendRecord()
+        }
+        return records
     }
 }

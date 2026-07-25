@@ -15,7 +15,10 @@ port.
 - **No Anki interop.** No `.apkg`/`.colpkg`, no shared-deck import, no `{{Field}}`
   templates. A clean schema is chosen over a migration path.
 - **Generic and domain-neutral.** The core knows no subject. Fields, item types,
-  and templates are user-declared data.
+  and templates are user-declared data. The app offers a neutral `Basic` schema
+  as a first-run convenience, not as protected domain logic: starter seeding is
+  recorded once per library, `Basic` is user-deletable, and it is never
+  recreated after deletion. Core clients may configure an empty starter set.
 
   | Domain    | Example item type                | Example generated cards                            |
   | --------- | -------------------------------- | -------------------------------------------------- |
@@ -26,7 +29,9 @@ port.
 
   **Acceptance test:** deleting a subject (its items and item type) must require
   no change to any Swift type, enum case, or scheduler. If it does, the design has
-  leaked domain knowledge and is wrong.
+  leaked domain knowledge and is wrong. The flow suite exercises this with a
+  novel spatial/sequence arrange-and-reproduce schema through creation, card
+  generation, study, and deletion.
 - **Grounded in learning science.** Every structural decision maps to a finding
   in §2.
 
@@ -79,8 +84,9 @@ public enum ContentValue: Codable, Equatable, Sendable {
 
 `MediaRef` is a serializable handle into a content-addressed store (`MediaStore`:
 SHA-256 hash, files under `{AppSupport}/neoanki2/media/`). Legacy URL-based refs
-remain decodable for tests. Content carries no presentation, so the same value can
-appear differently on prompt vs. answer via `Presentation` on each `Slot`.
+are rejected during decoding; only validated hash references resolve. Content
+carries no presentation, so the same value can appear differently on prompt vs.
+answer via `Presentation` on each `Slot`.
 
 ### Layer 2 — Schema / Presentation
 
@@ -154,16 +160,22 @@ with edits.
 - **Ingest:** copy bytes into `{AppSupport}/neoanki2/media/{sha256}.{ext}`; dedupe by hash.
 - **Validation:** MIME/extension allow-list, magic-byte check, per-kind size caps (e.g. audio 20 MB, video 100 MB).
 - **Security:** never persist user-supplied absolute `file://` URLs; resolve only inside the sandbox.
-- **Schema v4:** optional `media_assets` table tracks hash, kind, byte size, ref count.
+- **Schema v7:** `media_assets` tracks hash, kind, byte size, extension, creation time,
+  and the number of persisted field references. Item create/edit/delete applies
+  reference deltas in the same SQLite transaction as the item write; zero-reference
+  assets are removed by sandbox-checked orphan collection.
 
 ### Import (JSON / CSV)
 
-Bulk import enforces limits before parse: **5 MB** payload, **10 000** rows, **32 KB** per field string.
+Bulk import stats the file and enforces the **5 MB payload-byte limit before any
+full read or parse**; its bounded read repeats the cap check. After decoding,
+the **10 000-row**, **256-fields-per-row**, and **32 KB UTF-8 per field string**
+limits are enforced immediately, before any imported item is persisted.
 
 | Field type | JSON cell shape |
 | --- | --- |
 | Text-like | string |
-| Media | relative path (under import bundle) or base64 object `{ "base64": "…", "altText": "…" }` |
+| Media | relative path (under import bundle) or base64 object `{ "base64": "…", "altText": "…" }`; kind comes from the field and extension is inferred from validated bytes |
 | Cloze | `{ "text": "…", "blanks": [{ "group": 1, "start": 0, "length": 3, "hint": "…" }] }` |
 
 CSV supports text fields only; cloze and media require JSON.
@@ -171,7 +183,13 @@ CSV supports text fields only; cloze and media require JSON.
 ### Study resolution
 
 `SideContent.resolvedSlots` yields `ResolvedSlot(value:presentation:)` so renderers honor
-`RevealMode` and `MediaBehavior` (autoplay, blur, hidden-until-answer).
+`RevealMode` and meaningful `MediaBehavior` values (default controls, autoplay,
+play-on-tap, and looping). Reduce Motion suppresses automatic audio, video, and
+GIF playback; static images cannot be authored with playback-only behavior.
+
+The macOS shell exposes item-type/template authoring and study as first-class
+detail-pane modes. File import is selected from the File menu and configured in
+a native import sheet.
 
 ---
 

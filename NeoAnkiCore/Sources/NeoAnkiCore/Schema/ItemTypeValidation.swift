@@ -22,6 +22,7 @@ public enum ItemTypeValidation {
                     "Template \"\(template.name)\" references an unknown field."
                 )
             }
+            try validateMediaBehaviors(template, in: itemType)
 
             if template.interaction == .cloze {
                 try validateClozeTemplate(template, in: itemType)
@@ -29,15 +30,28 @@ public enum ItemTypeValidation {
         }
     }
 
+    private static func validateMediaBehaviors(_ template: Template, in itemType: ItemType) throws {
+        for slot in template.prompt.slots + template.answer.slots {
+            let kind: MediaKind?
+            switch slot.source {
+            case let .field(id):
+                kind = itemType.field(id)?.type.mediaKind
+            case .literal:
+                kind = nil
+            }
+            guard slot.presentation.media.isSupported(for: kind) else {
+                throw DatabaseError.invalidItemType(
+                    "Template \"\(template.name)\" uses \(slot.presentation.media.rawValue) on content that cannot play media."
+                )
+            }
+        }
+    }
+
     private static func validateClozeTemplate(_ template: Template, in itemType: ItemType) throws {
-        let promptFieldIDs = Set(fieldIDs(in: template.prompt))
-        guard promptFieldIDs.count == 1,
-              let fieldID = promptFieldIDs.first,
-              let field = itemType.field(fieldID),
-              field.type == .cloze
-        else {
+        let clozeFields = Set(fieldIDs(in: template.prompt)).compactMap(itemType.field).filter { $0.type == .cloze }
+        guard clozeFields.count == 1 else {
             throw DatabaseError.invalidItemType(
-                "Cloze templates must use a single cloze field on the prompt side."
+                "Cloze templates must use exactly one cloze field on the prompt side."
             )
         }
     }

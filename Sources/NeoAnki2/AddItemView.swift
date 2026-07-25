@@ -13,6 +13,7 @@ struct AddItemView: View {
     @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var selectedDeckID: UUID?
     @State private var isSaving = false
+    @FocusState private var focusedFieldID: UUID?
 
     private var itemType: ItemType? { model.itemType }
 
@@ -61,6 +62,7 @@ struct AddItemView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { onDismiss() }
+                    .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("cancelAddItem")
             }
             ToolbarItem(placement: .confirmationAction) {
@@ -68,6 +70,7 @@ struct AddItemView: View {
                     Task { await save() }
                 }
                 .buttonStyle(.bordered)
+                .keyboardShortcut(.defaultAction)
                 .disabled(isSaving || !canSave)
                 .accessibilityIdentifier("saveAddItem")
             }
@@ -89,10 +92,12 @@ struct AddItemView: View {
             RichTextFieldEditor(
                 label: fieldLabel(field),
                 spans: spanBinding(for: field.id),
-                accessibilityIdentifier: "field-\(field.name)"
+                accessibilityIdentifier: "field-\(field.name)",
+                isFocused: richTextFocusBinding(for: field.id)
             )
         case .number:
             TextField(fieldLabel(field), text: textBinding(for: field.id))
+                .focused($focusedFieldID, equals: field.id)
                 .accessibilityIdentifier("field-\(field.name)")
         case .audio, .image, .gif, .video:
             if let kind = field.type.mediaKind {
@@ -112,6 +117,7 @@ struct AddItemView: View {
                 blanks: clozeBlanksBinding(for: field.id),
                 accessibilityIdentifier: "field-\(field.name)"
             )
+            .focused($focusedFieldID, equals: field.id)
         }
     }
 
@@ -149,6 +155,19 @@ struct AddItemView: View {
         Binding(
             get: { fieldSpans[fieldID, default: []] },
             set: { fieldSpans[fieldID] = $0 }
+        )
+    }
+
+    private func richTextFocusBinding(for fieldID: UUID) -> Binding<Bool> {
+        Binding(
+            get: { focusedFieldID == fieldID },
+            set: { isFocused in
+                if isFocused {
+                    focusedFieldID = fieldID
+                } else if focusedFieldID == fieldID {
+                    focusedFieldID = nil
+                }
+            }
         )
     }
 
@@ -207,6 +226,18 @@ struct AddItemView: View {
                 .filter { $0.type == .cloze }
                 .map { ($0.id, []) }
         )
+        focusFirstField()
+    }
+
+    private func focusFirstField() {
+        guard let firstFieldID = itemType?.fields.first(where: \.supportsTextInput)?.id else {
+            focusedFieldID = nil
+            return
+        }
+        Task { @MainActor in
+            await Task.yield()
+            focusedFieldID = firstFieldID
+        }
     }
 
     private func save() async {

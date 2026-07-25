@@ -12,8 +12,9 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
     public var durationMs: Int?
     /// Accessibility / fallback description.
     public var altText: String?
-    /// Legacy test fixtures may still carry a direct file URL.
-    public var legacyURL: URL?
+    /// Ephemeral GC handoff. It is deliberately excluded from Codable and is
+    /// consumed atomically when an item commit adopts this reference.
+    var reservationID: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -21,8 +22,7 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
         assetHash: String,
         fileExtension: String,
         durationMs: Int? = nil,
-        altText: String? = nil,
-        legacyURL: URL? = nil
+        altText: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -30,24 +30,7 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
         self.fileExtension = fileExtension
         self.durationMs = durationMs
         self.altText = altText
-        self.legacyURL = legacyURL
-    }
-
-    /// Convenience for tests and migration from URL-based refs.
-    public init(
-        id: UUID = UUID(),
-        kind: MediaKind,
-        url: URL,
-        durationMs: Int? = nil,
-        altText: String? = nil
-    ) {
-        self.id = id
-        self.kind = kind
-        self.assetHash = ""
-        self.fileExtension = url.pathExtension.lowercased()
-        self.durationMs = durationMs
-        self.altText = altText
-        self.legacyURL = url
+        reservationID = nil
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -56,39 +39,64 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        if container.contains(.url) {
+            throw DecodingError.dataCorruptedError(
+                forKey: .url,
+                in: container,
+                debugDescription: "Direct file URLs are not supported media references."
+            )
+        }
+
         id = try container.decode(UUID.self, forKey: .id)
         kind = try container.decode(MediaKind.self, forKey: .kind)
+        assetHash = try container.decode(String.self, forKey: .assetHash)
+        fileExtension = try container.decode(String.self, forKey: .fileExtension)
         durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs)
         altText = try container.decodeIfPresent(String.self, forKey: .altText)
-
-        if let hash = try container.decodeIfPresent(String.self, forKey: .assetHash), !hash.isEmpty {
-            assetHash = hash
-            fileExtension = try container.decode(String.self, forKey: .fileExtension)
-            legacyURL = nil
-        } else if let url = try container.decodeIfPresent(URL.self, forKey: .url) {
-            assetHash = ""
-            fileExtension = url.pathExtension.lowercased()
-            legacyURL = url
-        } else {
-            assetHash = try container.decode(String.self, forKey: .assetHash)
-            fileExtension = try container.decode(String.self, forKey: .fileExtension)
-            legacyURL = nil
+        reservationID = nil
+        guard isValidStoredReference else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .assetHash,
+                in: container,
+                debugDescription: "Media references must use a SHA-256 hash and allowed extension."
+            )
         }
     }
 
     public func encode(to encoder: Encoder) throws {
+        guard isValidStoredReference else {
+            throw EncodingError.invalidValue(
+                self,
+                EncodingError.Context(
+                    codingPath: encoder.codingPath,
+                    debugDescription: "Media references must use a SHA-256 hash and allowed extension."
+                )
+            )
+        }
+
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(kind, forKey: .kind)
+        try container.encode(assetHash, forKey: .assetHash)
+        try container.encode(fileExtension, forKey: .fileExtension)
         try container.encodeIfPresent(durationMs, forKey: .durationMs)
         try container.encodeIfPresent(altText, forKey: .altText)
+    }
 
-        if let legacyURL, assetHash.isEmpty {
-            try container.encode(legacyURL, forKey: .url)
-        } else {
-            try container.encode(assetHash, forKey: .assetHash)
-            try container.encode(fileExtension, forKey: .fileExtension)
-        }
+    var isValidStoredReference: Bool {
+        assetHash.count == 64
+            && assetHash.allSatisfy { "0123456789abcdef".contains($0) }
+            && fileExtension == fileExtension.lowercased()
+            && MediaValidation.allowedExtensions(for: kind).contains(fileExtension)
+    }
+
+    public static func == (lhs: MediaRef, rhs: MediaRef) -> Bool {
+        lhs.id == rhs.id
+            && lhs.kind == rhs.kind
+            && lhs.assetHash == rhs.assetHash
+            && lhs.fileExtension == rhs.fileExtension
+            && lhs.durationMs == rhs.durationMs
+            && lhs.altText == rhs.altText
     }
 }
 

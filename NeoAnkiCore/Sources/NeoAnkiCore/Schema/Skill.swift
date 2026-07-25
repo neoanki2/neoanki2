@@ -18,7 +18,7 @@ public struct Skill: Codable, Hashable, Sendable {
 }
 
 /// How information is presented (as a cue) or produced (as a response).
-public enum Modality: String, Codable, Sendable {
+public enum Modality: String, Codable, CaseIterable, Sendable {
     case text
     case audio
     case image
@@ -37,7 +37,7 @@ public enum Modality: String, Codable, Sendable {
 }
 
 /// The cognitive act being practiced. Neutral across subjects.
-public enum Operation: String, Codable, Sendable {
+public enum Operation: String, Codable, CaseIterable, Sendable {
     case recognize
     case recall
     case discriminate

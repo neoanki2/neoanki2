@@ -53,7 +53,7 @@ private func makeItemType() -> (ItemType, front: FieldDef, back: FieldDef, audio
         FieldValue(fieldID: back.id, value: .text("A")),
         FieldValue(
             fieldID: audio.id,
-            value: .media(MediaRef(kind: .audio, url: URL(string: "file:///clip.m4a")!))
+            value: .media(MediaRef(kind: .audio, assetHash: String(repeating: "a", count: 64), fileExtension: "m4a"))
         ),
     ])
 
@@ -70,7 +70,7 @@ private func makeItemType() -> (ItemType, front: FieldDef, back: FieldDef, audio
         FieldValue(fieldID: back.id, value: .rich([Span("A", styles: [.bold])])),
         FieldValue(
             fieldID: audio.id,
-            value: .media(MediaRef(kind: .audio, url: URL(string: "file:///clip.m4a")!))
+            value: .media(MediaRef(kind: .audio, assetHash: String(repeating: "a", count: 64), fileExtension: "m4a"))
         ),
     ])
 
@@ -78,4 +78,68 @@ private func makeItemType() -> (ItemType, front: FieldDef, back: FieldDef, audio
     let decoded = try JSONDecoder().decode(Item.self, from: data)
 
     #expect(decoded == item)
+}
+
+@Test func nestedGenerationConditionsEvaluateAllAndAnyBranches() {
+    let (type, front, back, audio) = makeItemType()
+    var nestedType = type
+    nestedType.templates = [
+        Template(
+            name: "Nested",
+            prompt: Side(slots: [Slot(source: .literal("Prompt")), Slot(source: .field(front.id))]),
+            answer: Side(slots: [Slot(source: .field(back.id))]),
+            interaction: .choose,
+            skill: Skill(input: .text, output: .selection, operation: .discriminate),
+            generateWhen: .all([
+                .fieldNotEmpty(front.id),
+                .any([.fieldEmpty(audio.id), .fieldNotEmpty(back.id)]),
+            ])
+        ),
+    ]
+    let matching = Item(itemTypeID: type.id, fields: [
+        FieldValue(fieldID: front.id, value: .text("Q")),
+        FieldValue(fieldID: back.id, value: .text("A")),
+    ])
+    let failing = Item(itemTypeID: type.id, fields: [
+        FieldValue(fieldID: front.id, value: .empty),
+        FieldValue(fieldID: back.id, value: .text("A")),
+    ])
+
+    #expect(CardGenerator.cards(for: matching, type: nestedType).count == 1)
+    #expect(CardGenerator.cards(for: failing, type: nestedType).isEmpty)
+}
+
+@Test func clozeTemplateGeneratesOneCardPerDistinctGroup() {
+    let field = FieldDef(name: "Text", type: .cloze)
+    let template = Template(
+        name: "Cloze",
+        prompt: Side(slots: [
+            Slot(
+                source: .field(field.id),
+                presentation: Presentation(reveal: .hiddenUntilAnswer)
+            ),
+        ]),
+        answer: Side(slots: [Slot(source: .field(field.id))]),
+        interaction: .cloze,
+        skill: Skill(input: .text, output: .freeResponse, operation: .recall)
+    )
+    let type = ItemType(name: "Cloze", fields: [field], templates: [template])
+    let item = Item(itemTypeID: type.id, fields: [
+        FieldValue(
+            fieldID: field.id,
+            value: .cloze(
+                "Mercury Venus Earth",
+                blanks: [
+                    ClozeSpan(group: 2, start: 0, length: 7),
+                    ClozeSpan(group: 1, start: 8, length: 5),
+                    ClozeSpan(group: 1, start: 14, length: 5),
+                ]
+            )
+        ),
+    ])
+
+    let cards = CardGenerator.cards(for: item, type: type)
+
+    #expect(cards.map(\.clozeGroup) == [1, 2])
+    #expect(Set(cards.map(\.templateID)) == [template.id])
 }

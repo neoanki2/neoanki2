@@ -41,8 +41,8 @@ public enum ClozeValidation {
                 throw ClozeValidationError.emptyBlank
             }
             let start = blank.start
-            let end = start + blank.length
-            guard start >= 0, end <= count else {
+            let (end, overflowed) = start.addingReportingOverflow(blank.length)
+            guard start >= 0, !overflowed, end <= count else {
                 throw ClozeValidationError.blankOutOfBounds
             }
 
@@ -54,20 +54,67 @@ public enum ClozeValidation {
         }
     }
 
-    public static func displayText(from text: String, blanks: [ClozeSpan], revealed: Bool) -> String {
+    /// Drops malformed spans so values from damaged or older persistence can
+    /// still be displayed without allowing invalid offsets into String.
+    public static func sanitize(text: String, blanks: [ClozeSpan]) -> [ClozeSpan] {
+        let count = text.count
+        var accepted: [ClozeSpan] = []
+        var ranges: [Range<Int>] = []
+
+        for blank in blanks.sorted(by: spanOrder) {
+            let (end, overflowed) = blank.start.addingReportingOverflow(blank.length)
+            guard blank.start >= 0, blank.length > 0, !overflowed, end <= count else {
+                continue
+            }
+
+            let range = blank.start ..< end
+            guard !ranges.contains(where: { $0.overlaps(range) }) else {
+                continue
+            }
+            accepted.append(blank)
+            ranges.append(range)
+        }
+
+        return accepted
+    }
+
+    public static func displayText(
+        from text: String,
+        blanks: [ClozeSpan],
+        revealed: Bool,
+        group: Int? = nil
+    ) -> String {
         guard !text.isEmpty else { return "" }
         if revealed || blanks.isEmpty {
             return text
         }
 
-        let sorted = blanks.sorted { $0.start > $1.start }
+        let hiddenBlanks = group.map { selectedGroup in
+            blanks.filter { $0.group == selectedGroup }
+        } ?? blanks
+        let sorted = sanitize(text: text, blanks: hiddenBlanks).sorted { $0.start > $1.start }
         var result = text
         for blank in sorted {
-            let start = result.index(result.startIndex, offsetBy: blank.start)
-            let end = result.index(start, offsetBy: blank.length)
+            guard
+                let start = result.index(
+                    result.startIndex,
+                    offsetBy: blank.start,
+                    limitedBy: result.endIndex
+                ),
+                let end = result.index(start, offsetBy: blank.length, limitedBy: result.endIndex)
+            else {
+                continue
+            }
             let replacement = blank.hint.map { "[\($0)]" } ?? "[…]"
             result.replaceSubrange(start ..< end, with: replacement)
         }
         return result
+    }
+
+    private static func spanOrder(_ lhs: ClozeSpan, _ rhs: ClozeSpan) -> Bool {
+        if lhs.start != rhs.start {
+            return lhs.start < rhs.start
+        }
+        return lhs.length < rhs.length
     }
 }

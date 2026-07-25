@@ -3,7 +3,9 @@ import Foundation
 public enum ImportLimits {
     public static let maxPayloadBytes = 5_000_000
     public static let maxRows = 10_000
-    public static let maxFieldStringLength = 32_768
+    public static let maxFieldsPerRow = 256
+    public static let maxFieldStringBytes = 32_768
+    public static let maxFieldStringLength = maxFieldStringBytes
 
     public static func validatePayloadSize(_ data: Data) throws {
         guard data.count <= maxPayloadBytes else {
@@ -17,9 +19,52 @@ public enum ImportLimits {
         }
     }
 
+    /// Validates decoded row shape and textual field payloads before any media
+    /// resolution or persistence work begins.
+    public static func validateDecodedPayload(_ payload: ImportPayload) throws {
+        try validateRowCount(payload.rows.count)
+        for row in payload.rows {
+            let (fieldCount, overflowed) = row.fieldValues.count.addingReportingOverflow(
+                row.structuredFields.count
+            )
+            guard !overflowed, fieldCount <= maxFieldsPerRow else {
+                throw ImportError.invalidFormat(
+                    "Import rows may contain at most \(maxFieldsPerRow) fields."
+                )
+            }
+            for (name, value) in row.fieldValues {
+                try validateFieldString(value, fieldName: name)
+            }
+            for (name, value) in row.structuredFields {
+                switch value {
+                case let .text(text), let .cloze(text, _), let .mediaPath(text):
+                    try validateFieldString(text, fieldName: name)
+                case let .mediaBase64(_, fileExtension, altText):
+                    if let fileExtension {
+                        try validateFieldString(fileExtension, fieldName: "\(name) file extension")
+                    }
+                    if let altText {
+                        try validateFieldString(altText, fieldName: "\(name) alt text")
+                    }
+                }
+            }
+        }
+    }
+
     public static func validateFieldString(_ value: String, fieldName: String) throws {
-        guard value.count <= maxFieldStringLength else {
+        guard value.utf8.count <= maxFieldStringBytes else {
             throw ImportError.invalidFormat("Field \"\(fieldName)\" exceeds maximum length.")
+        }
+    }
+
+    public static func validateBase64EncodedSize(
+        _ value: String,
+        kind: MediaKind,
+        fieldName: String
+    ) throws {
+        let maxEncodedBytes = ((MediaValidation.maxBytes(for: kind) + 2) / 3) * 4
+        guard value.utf8.count <= maxEncodedBytes else {
+            throw ImportError.invalidFormat("Media in field \"\(fieldName)\" exceeds its size limit.")
         }
     }
 }
@@ -29,10 +74,10 @@ public enum StructuredFieldValue: Decodable, Sendable, Equatable {
     case text(String)
     case cloze(text: String, blanks: [ClozeSpan])
     case mediaPath(String)
-    case mediaBase64(String, fileExtension: String)
+    case mediaBase64(String, fileExtension: String?, altText: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case text, blanks, path, base64, fileExtension
+        case text, blanks, path, base64, fileExtension, altText
     }
 
     public init(from decoder: Decoder) throws {
@@ -48,8 +93,11 @@ public enum StructuredFieldValue: Decodable, Sendable, Equatable {
             return
         }
         if let base64 = try container.decodeIfPresent(String.self, forKey: .base64) {
-            let ext = try container.decodeIfPresent(String.self, forKey: .fileExtension) ?? "bin"
-            self = .mediaBase64(base64, fileExtension: ext)
+            self = .mediaBase64(
+                base64,
+                fileExtension: try container.decodeIfPresent(String.self, forKey: .fileExtension),
+                altText: try container.decodeIfPresent(String.self, forKey: .altText)
+            )
             return
         }
 

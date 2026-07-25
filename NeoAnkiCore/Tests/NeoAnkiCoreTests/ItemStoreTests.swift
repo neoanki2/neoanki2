@@ -88,12 +88,38 @@ private func makeStore() async throws -> ItemStore {
     #expect(try await store.listItemTypes().map(\.name).contains("Temporary") == false)
 }
 
-@Test func deleteItemTypeRejectsBuiltInType() async throws {
-    let store = try await makeStore()
+@Test func deletingBasicStarterDoesNotReseedAfterReopen() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
 
-    await #expect(throws: DatabaseError.invalidItemType("Built-in item types can't be deleted.")) {
-        try await store.deleteItemType(id: BuiltInItemTypes.basicID)
-    }
+    #expect(try await store.deleteItemType(id: BuiltInItemTypes.basicID))
+    #expect(try await store.listItemTypes().map(\.id) == [BuiltInItemTypes.clozeID])
+
+    let reopened = try ItemStore(databaseURL: databaseURL)
+    try await reopened.bootstrap()
+    #expect(try await reopened.listItemTypes().map(\.id) == [BuiltInItemTypes.clozeID])
+}
+
+@Test func emptyStarterConfigurationIsPersistedAsCompletedFirstRun() async throws {
+    let databaseURL = tempDatabaseURL()
+    let unseeded = try ItemStore(databaseURL: databaseURL, starterItemTypes: [])
+    try await unseeded.bootstrap()
+    #expect(try await unseeded.listItemTypes().isEmpty)
+
+    let reopenedWithDefaultStarter = try ItemStore(databaseURL: databaseURL)
+    try await reopenedWithDefaultStarter.bootstrap()
+    #expect(try await reopenedWithDefaultStarter.listItemTypes().isEmpty)
+}
+
+@Test func migrationMarksExistingLibrarySeededWithoutResurrectingBasic() async throws {
+    let databaseURL = tempDatabaseURL()
+    try createEmptyVersionFourDatabase(at: databaseURL)
+
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+
+    #expect(try await store.listItemTypes().isEmpty)
 }
 
 @Test func deleteItemTypeRejectsTypeWithItems() async throws {
@@ -164,6 +190,79 @@ private func makeStore() async throws -> ItemStore {
     }
 }
 
+@Test func itemTypeAndCardSyncRollBackTogether() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    var itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+        ]
+    )
+    _ = try await store.createItem(item)
+    let reverse = try TemplateBuilder.makeRevealTemplate(
+        name: "Reverse",
+        promptFieldID: BuiltInItemTypes.backFieldID,
+        answerFieldID: BuiltInItemTypes.frontFieldID,
+        in: itemType
+    )
+    itemType.templates.append(reverse)
+    try executeTestSQL(
+        """
+        CREATE TRIGGER force_card_insert_failure
+        BEFORE INSERT ON cards
+        BEGIN
+            SELECT RAISE(ABORT, 'forced card sync failure');
+        END;
+        """,
+        at: databaseURL
+    )
+
+    await #expect(throws: DatabaseError.self) {
+        try await store.updateItemType(itemType)
+    }
+
+    let persistedType = try await store.defaultItemType()
+    #expect(persistedType.templates.count == 1)
+    #expect(try await store.listItems().first?.cardCount == 1)
+}
+
+@Test func batchImportRollsBackEveryRowOnDatabaseFailure() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    try executeTestSQL(
+        """
+        CREATE TRIGGER force_second_item_failure
+        BEFORE INSERT ON items
+        WHEN (SELECT COUNT(*) FROM items) >= 1
+        BEGIN
+            SELECT RAISE(ABORT, 'forced second item failure');
+        END;
+        """,
+        at: databaseURL
+    )
+    let json = """
+    {
+      "itemType": "Basic",
+      "rows": [
+        { "Front": "One", "Back": "1" },
+        { "Front": "Two", "Back": "2" }
+      ]
+    }
+    """.data(using: .utf8)!
+
+    await #expect(throws: DatabaseError.self) {
+        try await store.importItems(from: json, adapter: JSONImportAdapter())
+    }
+
+    #expect(try await store.listItems().isEmpty)
+    #expect(try await store.dueCount() == 0)
+}
+
 @Test func fetchItemReturnsItemAndType() async throws {
     let store = try await makeStore()
     let itemType = try await store.defaultItemType()
@@ -182,6 +281,18 @@ private func makeStore() async throws -> ItemStore {
     #expect(fetched?.item.value(for: BuiltInItemTypes.frontFieldID) == .text("Question"))
 }
 
+private func executeTestSQL(_ sql: String, at url: URL) throws {
+    var db: OpaquePointer?
+    guard sqlite3_open(url.path(percentEncoded: false), &db) == SQLITE_OK, let db else {
+        throw DatabaseError.openFailed("Could not open test database.")
+    }
+    defer { sqlite3_close(db) }
+
+    guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+        throw DatabaseError.executeFailed(String(cString: sqlite3_errmsg(db)))
+    }
+}
+
 @Test func fetchItemReturnsNilForMissingID() async throws {
     let store = try await makeStore()
     #expect(try await store.fetchItem(id: UUID()) == nil)
@@ -198,6 +309,145 @@ private func makeStore() async throws -> ItemStore {
     #expect(items.count == 1)
     #expect(items.first?.title == "Legacy front")
     #expect(items.first?.subtitle == "Legacy back")
+}
+
+@Test func persistedProfileParametersLoadAndDriveScheduling() async throws {
+    let databaseURL = tempDatabaseURL()
+    var weights = FSRSScheduler.Parameters.defaultWeights
+    weights[0] = 2.5
+    let expected = FSRSScheduler.Parameters(weights: weights, enableFuzz: false)
+
+    let database = try SQLiteDatabase(path: databaseURL)
+    try await database.migrate()
+    try await database.saveSchedulerParameters(
+        expected,
+        profileID: "learner-a",
+        optimizedAt: Date(timeIntervalSince1970: 100),
+        sampleCount: 120,
+        logLoss: 0.4
+    )
+
+    let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-a")
+    try await store.bootstrap()
+    #expect(await store.schedulingParameters() == expected)
+
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    )
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(item, now: now)
+    let card = try #require(await store.fetchDueCards(asOf: now).first)
+    let memory = try await store.submitReview(cardID: card.id, rating: .again, now: now)
+
+    #expect(memory.stability == 2.5)
+}
+
+@Test func revertMarksReviewInactiveWithoutDeletingHistory() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    )
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(item, now: now)
+    let card = try #require(await store.fetchDueCards(asOf: now).first)
+
+    let submission = try await store.submitReviewWithReceipt(
+        cardID: card.id,
+        rating: .good,
+        now: now
+    )
+    try await store.revertReview(reviewLogID: submission.reviewLogID, now: now)
+
+    #expect(try await store.reviewLogCount(for: card.id) == 0)
+    #expect(try reviewLogRowCount(at: databaseURL, cardID: card.id) == 1)
+}
+
+@Test func optimizationPersistsThroughStoreAPIAndReopen() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    )
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(item, now: start)
+    let card = try #require(await store.fetchDueCards(asOf: start).first)
+    let database = try SQLiteDatabase(path: databaseURL)
+
+    for index in 0..<130 {
+        let rating: ReviewRating = index == 0 || index % 5 != 0 ? .good : .again
+        try await database.insertReviewLog(
+            ReviewLog(
+                cardID: card.id,
+                reviewedAt: start.addingTimeInterval(Double(index * 12) * 86_400),
+                rating: rating,
+                elapsedDays: index == 0 ? 0 : 12,
+                scheduledDays: index == 0 ? 0 : 12,
+                phaseBefore: index == 0 ? .new : .review,
+                durationMs: 1_000
+            ),
+            memoryBefore: .new(due: start)
+        )
+    }
+
+    let result = try await store.optimizeScheduling(minimumObservations: 100)
+    #expect(result.improved)
+    #expect(result.optimizedLoss < result.previousLoss)
+
+    let reopened = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
+    try await reopened.bootstrap()
+    #expect(await reopened.schedulingParameters() == result.parameters)
+}
+
+private func reviewLogRowCount(at url: URL, cardID: UUID) throws -> Int {
+    var db: OpaquePointer?
+    guard sqlite3_open_v2(url.path(percentEncoded: false), &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+          let db else {
+        throw DatabaseError.openFailed("Could not inspect test database.")
+    }
+    defer { sqlite3_close(db) }
+    var statement: OpaquePointer?
+    guard sqlite3_prepare_v2(
+        db,
+        "SELECT COUNT(*) FROM review_logs WHERE card_id = ?;",
+        -1,
+        &statement,
+        nil
+    ) == SQLITE_OK,
+          let statement else {
+        throw DatabaseError.queryFailed("Could not inspect test database.")
+    }
+    defer { sqlite3_finalize(statement) }
+    guard sqlite3_bind_text(
+        statement,
+        1,
+        cardID.uuidString,
+        -1,
+        unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    ) == SQLITE_OK else {
+        throw DatabaseError.queryFailed("Could not bind test card ID.")
+    }
+    guard sqlite3_step(statement) == SQLITE_ROW else {
+        throw DatabaseError.queryFailed("Could not inspect test database.")
+    }
+    return Int(sqlite3_column_int64(statement, 0))
 }
 
 private func createLegacyNoteDatabase(at url: URL) throws {
@@ -241,6 +491,15 @@ private func createLegacyNoteDatabase(at url: URL) throws {
             deck_id TEXT,
             due_at REAL NOT NULL DEFAULT 0
         );
+        """,
+        """
+        CREATE TABLE review_logs (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            reviewed_at REAL NOT NULL,
+            log BLOB NOT NULL
+        );
+        CREATE INDEX idx_review_logs_card_id ON review_logs(card_id);
         """,
     ]
 
@@ -298,6 +557,30 @@ private func createLegacyNoteDatabase(at url: URL) throws {
         memoryData,
         1_700_000_000.0
     )
+}
+
+private func createEmptyVersionFourDatabase(at url: URL) throws {
+    var db: OpaquePointer?
+    guard sqlite3_open(url.path(percentEncoded: false), &db) == SQLITE_OK, let db else {
+        throw DatabaseError.openFailed("Could not create version four test database.")
+    }
+    defer { sqlite3_close(db) }
+
+    let sql = """
+    CREATE TABLE schema_version (version INTEGER NOT NULL);
+    INSERT INTO schema_version (version) VALUES (4);
+    CREATE TABLE item_types (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        definition BLOB NOT NULL
+    );
+    CREATE TABLE cards (
+        id TEXT PRIMARY KEY NOT NULL
+    );
+    """
+    guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+        throw DatabaseError.executeFailed(String(cString: sqlite3_errmsg(db)))
+    }
 }
 
 private func bindAndRun(
