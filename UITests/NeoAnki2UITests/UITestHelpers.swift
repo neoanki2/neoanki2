@@ -375,7 +375,20 @@ class NeoAnkiUITestCase: XCTestCase {
         }
         let gradeButton = app.buttons.identified(gradeID)
         XCTAssertTrue(gradeButton.waitForExistence(timeout: 5))
-        gradeButton.click()
+        if gradeButton.isHittable {
+            gradeButton.click()
+        } else {
+            let shortcut = [
+                "gradeAgain": "1",
+                "gradeHard": "2",
+                "gradeGood": "3",
+                "gradeEasy": "4",
+            ][gradeID]
+            XCTAssertNotNil(shortcut)
+            if let shortcut {
+                app.typeKey(shortcut, modifierFlags: [])
+            }
+        }
     }
 
     func finishStudySession(in app: XCUIApplication) {
