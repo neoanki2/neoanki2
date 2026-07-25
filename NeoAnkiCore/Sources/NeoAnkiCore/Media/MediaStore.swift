@@ -127,7 +127,6 @@ public actor MediaStore {
     }
 
     func descriptor(for ref: MediaRef) throws -> MediaAssetDescriptor {
-        guard ref.legacyURL == nil else { throw MediaError.invalidPath }
         let url = try resolve(ref)
         let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
         guard values.isRegularFile == true, let byteSize = values.fileSize else {

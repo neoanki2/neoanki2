@@ -52,16 +52,18 @@ public struct ScenarioContext: Sendable {
             .field(capitalField, text: capital)
 
         if includeMap {
+            guard let mediaStore = await store.media else {
+                throw ScenarioError.unexpectedState("Expected media storage for map fixture.")
+            }
+            let mapRef = try await mediaStore.ingest(
+                data: Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+                kind: .image,
+                fileExtension: "png"
+            )
             builder.fields.append(
                 FieldValue(
                     fieldID: mapField.id,
-                    value: .media(
-                        MediaRef(
-                            kind: .image,
-                            assetHash: String(repeating: "a", count: 64),
-                            fileExtension: "png"
-                        )
-                    )
+                    value: .media(mapRef)
                 )
             )
         }

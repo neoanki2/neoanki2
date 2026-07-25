@@ -362,10 +362,13 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     _ = try await store.createItem(item, now: now)
     let card = try #require(await store.fetchDueCards(asOf: now).first)
-    let original = card.card.memory
 
-    _ = try await store.submitReview(cardID: card.id, rating: .good, now: now)
-    try await store.revertReview(cardID: card.id, restoring: original)
+    let submission = try await store.submitReviewWithReceipt(
+        cardID: card.id,
+        rating: .good,
+        now: now
+    )
+    try await store.revertReview(reviewLogID: submission.reviewLogID, now: now)
 
     #expect(try await store.reviewLogCount(for: card.id) == 0)
     #expect(try reviewLogRowCount(at: databaseURL, cardID: card.id) == 1)
@@ -399,7 +402,8 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
                 scheduledDays: index == 0 ? 0 : 12,
                 phaseBefore: index == 0 ? .new : .review,
                 durationMs: 1_000
-            )
+            ),
+            memoryBefore: .new(due: start)
         )
     }
 

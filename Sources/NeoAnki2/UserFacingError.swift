@@ -13,7 +13,7 @@ enum UserFacingError {
             return clozeMessage(error)
         }
         if let error = error as? ImportError {
-            return importMessage(error)
+            return safeImportMessage(error)
         }
         return "Something went wrong. Try again."
     }
@@ -120,5 +120,12 @@ enum UserFacingError {
         case let .itemTypeNotFound(name):
             "There is no item type named “\(name)”. Create it first or update the JSON file."
         }
+    }
+
+    private static func safeImportMessage(_ error: ImportError) -> String {
+        if case .invalidFormat = error {
+            return "This import file couldn't be read. Check its format and try again."
+        }
+        return importMessage(error)
     }
 }

@@ -650,7 +650,7 @@ public actor ItemStore {
 
     private func mediaReferences(in item: Item) -> [MediaRef] {
         item.fields.compactMap { field in
-            guard case let .media(ref) = field.value, ref.legacyURL == nil else { return nil }
+            guard case let .media(ref) = field.value else { return nil }
             return ref
         }
     }

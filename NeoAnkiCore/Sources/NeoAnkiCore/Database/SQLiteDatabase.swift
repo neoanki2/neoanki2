@@ -137,16 +137,11 @@ actor SQLiteDatabase {
             }
 
             if current < 6 {
-                for sql in Schema.migrationV6Statements {
-                    try execute(sql)
-                }
+                try migrateReviewHistorySchemaIfNeeded()
             }
 
             if current < 7 {
-                for sql in Schema.migrationV7Statements {
-                    try execute(sql)
-                }
-                try backfillMediaReferenceCounts()
+                try migrateMediaReferenceSchemaIfNeeded()
             }
 
             if current < 8 {
@@ -1130,7 +1125,6 @@ actor SQLiteDatabase {
         var counts: [String: Int] = [:]
         for field in item.fields {
             guard case let .media(ref) = field.value,
-                  ref.legacyURL == nil,
                   isValidMediaHash(ref.assetHash),
                   MediaValidation.allowedExtensions(for: ref.kind)
                       .contains(ref.fileExtension.lowercased())
@@ -1238,11 +1232,11 @@ actor SQLiteDatabase {
 
     private func backfillMediaReferenceCounts() throws {
         try execute("UPDATE media_assets SET ref_count = 0;")
+        guard try tableExists("items") else { return }
         for persisted in try fetchItems() {
             var descriptors: [String: MediaAssetDescriptor] = [:]
             for field in persisted.item.fields {
                 guard case let .media(ref) = field.value,
-                      ref.legacyURL == nil,
                       isValidMediaHash(ref.assetHash),
                       MediaValidation.allowedExtensions(for: ref.kind)
                           .contains(ref.fileExtension.lowercased())
@@ -1263,6 +1257,64 @@ actor SQLiteDatabase {
                 now: persisted.createdAt
             )
         }
+    }
+
+    private func migrateReviewHistorySchemaIfNeeded() throws {
+        guard try tableExists("review_logs") else {
+            try execute(
+                """
+                CREATE TABLE review_logs (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    card_id TEXT NOT NULL,
+                    reviewed_at REAL NOT NULL,
+                    log BLOB NOT NULL,
+                    memory_before BLOB NOT NULL
+                );
+                """
+            )
+            try execute("CREATE INDEX idx_review_logs_card_id ON review_logs(card_id);")
+            try execute(
+                """
+                CREATE TABLE review_reverts (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    review_log_id TEXT NOT NULL UNIQUE REFERENCES review_logs(id),
+                    reverted_at REAL NOT NULL
+                );
+                """
+            )
+            try execute("CREATE INDEX idx_review_reverts_log_id ON review_reverts(review_log_id);")
+            return
+        }
+
+        for sql in Schema.migrationV6Statements {
+            try execute(sql)
+        }
+    }
+
+    private func migrateMediaReferenceSchemaIfNeeded() throws {
+        guard try tableExists("media_assets") else {
+            try execute(
+                """
+                CREATE TABLE media_assets (
+                    hash TEXT PRIMARY KEY NOT NULL,
+                    kind TEXT NOT NULL,
+                    byte_size INTEGER NOT NULL,
+                    file_extension TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0)
+                );
+                """
+            )
+            return
+        }
+
+        let columns = try query("PRAGMA table_info(media_assets);")
+        if !columns.contains(where: { $0["name"] as? String == "ref_count" }) {
+            for sql in Schema.migrationV7Statements {
+                try execute(sql)
+            }
+        }
+        try backfillMediaReferenceCounts()
     }
 
     private func tableExists(_ name: String) throws -> Bool {
