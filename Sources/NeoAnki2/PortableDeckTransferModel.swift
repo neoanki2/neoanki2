@@ -142,6 +142,11 @@ final class PortableDeckTransferModel {
         conflictingSource = nil
     }
 
+    var testingForceBusy: Bool {
+        AppDatabase.isTesting
+            && ProcessInfo.processInfo.environment["NEOANKI_TEST_PORTABLE_BUSY"] == "1"
+    }
+
     @discardableResult
     func exportDeck(id: UUID, to destination: URL) async -> Bool {
         guard !isBusy else { return false }

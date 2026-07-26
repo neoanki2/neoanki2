@@ -92,7 +92,8 @@ struct DeckDetailView: View {
                 systemImage: "tray",
                 actionTitle: nil,
                 action: nil,
-                actionIdentifier: nil
+                actionIdentifier: nil,
+                contentIdentifier: "emptyUnassignedState"
             )
         case .deck:
             SidebarEmptyState(

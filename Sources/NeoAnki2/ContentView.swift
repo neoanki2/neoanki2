@@ -60,10 +60,11 @@ struct ContentView: View {
         .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
-            if portableDeckTransfer.isBusy {
+            if portableDeckTransfer.isBusy || portableDeckTransfer.testingForceBusy {
                 ToolbarItem(placement: .status) {
                     ProgressView("Transferring deck…")
                         .controlSize(.small)
+                        .accessibilityIdentifier("portableDeckTransferBusy")
                 }
             }
             if isManagingTemplates {
@@ -92,6 +93,7 @@ struct ContentView: View {
         .task {
             await decksModel.load()
             await reloadScope()
+            await openTestingTransfersIfRequested()
         }
         .fileImporter(
             isPresented: $isChoosingImportFile,
@@ -141,12 +143,15 @@ struct ContentView: View {
             Button("Use Matching Local Type") {
                 resolvePortableDeckConflict(using: .useMatchingSchema)
             }
+            .accessibilityIdentifier("portableDeckConflictUseLocal")
             Button("Import as New Type") {
                 resolvePortableDeckConflict(using: .importAsDistinctRevision)
             }
+            .accessibilityIdentifier("portableDeckConflictImportNew")
             Button("Cancel", role: .cancel) {
                 portableDeckTransfer.cancelConflict()
             }
+            .accessibilityIdentifier("portableDeckConflictCancel")
         } message: {
             Text(
                 "This deck carries a different revision of an item type already in your library. "
@@ -197,6 +202,7 @@ struct ContentView: View {
 
     private var canTransferPortableDeck: Bool {
         !portableDeckTransfer.isBusy
+            && !portableDeckTransfer.testingForceBusy
             && !itemsModel.isLoading
             && !decksModel.isLoading
             && !isStudying
@@ -301,6 +307,52 @@ struct ContentView: View {
         isChoosingImportFile = true
     }
 
+    private func openTestingTransfersIfRequested() async {
+        guard AppDatabase.isTesting else { return }
+        let environment = ProcessInfo.processInfo.environment
+
+        if let importPath = environment["NEOANKI_TEST_IMPORT_PATH"], !importPath.isEmpty {
+            let source = URL(fileURLWithPath: importPath)
+            guard let accessible = copyTestingTransferFile(source) else { return }
+            importModel = ImportModel(itemsModel: itemsModel)
+            guard let importModel, await importModel.selectFile(accessible) else { return }
+            isShowingImport = true
+            return
+        }
+
+        if let portablePath = environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"], !portablePath.isEmpty {
+            let source = URL(fileURLWithPath: portablePath)
+            guard let accessible = copyTestingTransferFile(source) else { return }
+            if let imported = await portableDeckTransfer.importDeck(from: accessible) {
+                await refreshAfterPortableDeckImport(imported)
+            }
+        }
+    }
+
+    private func copyTestingTransferFile(_ source: URL) -> URL? {
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki-test-transfer-\(UUID().uuidString)")
+            .appendingPathComponent(source.lastPathComponent)
+        do {
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                try FileManager.default.copyItem(at: source, to: destination)
+            } else {
+                try FileManager.default.copyItem(at: source, to: destination)
+            }
+            return destination
+        } catch {
+            return nil
+        }
+    }
+
     private func handleImportFile(_ result: Result<[URL], Error>) {
         switch result {
         case let .success(urls):
@@ -335,6 +387,7 @@ struct ContentView: View {
         )
         Task {
             await decksModel.load()
+            await reloadScope()
         }
     }
 

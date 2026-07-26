@@ -205,19 +205,10 @@ final class LibraryUITests: NeoAnkiUITestCase {
             }
             """
         )
-        let app = launchApp()
-        chooseImportFile(file, in: app)
-
-        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 10))
-        let importButton = app.buttons.identified("confirmImport")
-        importButton.click()
-        XCTAssertTrue(importButton.waitForNonExistence(timeout: 10))
-        let completion = app.sheets.firstMatch
-        XCTAssertTrue(completion.waitForExistence(timeout: 10))
-        XCTAssertTrue(completion.staticTexts.matching(
-            NSPredicate(format: "value CONTAINS[c] %@", "Import Complete")
-        ).firstMatch.exists)
-        completion.buttons.identified("OK").click()
+        let app = launchAppForImport(file: file)
+        app.buttons.identified("confirmImport").click()
+        _ = app.buttons.identified("confirmImport").waitForNonExistence(timeout: 30)
+        dismissImportComplete(in: app)
         waitForItem(named: "Imported Question", in: app, timeout: 10)
     }
 
@@ -229,21 +220,13 @@ final class LibraryUITests: NeoAnkiUITestCase {
             CSV Question,CSV Answer,imported
             """
         )
-        let app = launchApp()
-        chooseImportFile(file, in: app)
-
-        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 10))
+        let app = launchAppForImport(file: file)
         XCTAssertTrue(app.popUpButtons.identified("importItemTypePicker").waitForExistence(timeout: 3))
         let importButton = app.buttons.identified("confirmImport")
         XCTAssertTrue(importButton.isEnabled)
         importButton.click()
-        XCTAssertTrue(importButton.waitForNonExistence(timeout: 10))
-        let completion = app.sheets.firstMatch
-        XCTAssertTrue(completion.waitForExistence(timeout: 10))
-        XCTAssertTrue(completion.staticTexts.matching(
-            NSPredicate(format: "value CONTAINS[c] %@", "Import Complete")
-        ).firstMatch.exists)
-        completion.buttons.identified("OK").click()
+        _ = importButton.waitForNonExistence(timeout: 30)
+        dismissImportComplete(in: app)
         waitForItem(named: "CSV Question", in: app, timeout: 10)
     }
 
@@ -259,8 +242,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
             }
             """
         )
-        let app = launchApp()
-        chooseImportFile(file, in: app)
+        let app = launchAppForImport(file: file)
 
         XCTAssertTrue(app.buttons.identified("confirmImport").waitForExistence(timeout: 10))
         app.buttons.identified("confirmImport").click()
