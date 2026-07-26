@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neoanki.app/schemas/authored-item-v1.json",
+  "title": "NeoAnki authored item record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "deck", "type", "fields"],
+  "properties": {
+    "kind": {"const": "item"},
+    "deck": {"$ref": "#/$defs/id"},
+    "type": {"$ref": "#/$defs/id"},
+    "fields": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/id"},
+      "additionalProperties": {"$ref": "#/$defs/value"}
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"},
+    "value": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/text"},
+        {"$ref": "#/$defs/rich"},
+        {"$ref": "#/$defs/number"},
+        {"$ref": "#/$defs/cloze"},
+        {"$ref": "#/$defs/mediaValue"}
+      ]
+    },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {"type": "string"},
+        "lang": {"type": "string"}
+      }
+    },
+    "rich": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rich"],
+      "properties": {
+        "rich": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {"$ref": "#/$defs/span"}
+        }
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {"type": "string"},
+        "styles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["bold", "italic", "underline", "strikethrough", "highlight", "code"]
+          }
+        }
+      }
+    },
+    "number": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number"],
+      "properties": {"number": {"type": "number"}}
+    },
+    "cloze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloze"],
+      "properties": {"cloze": {"type": "string", "minLength": 1}}
+    },
+    "mediaValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["media"],
+      "properties": {"media": {"$ref": "#/$defs/media"}}
+    },
+    "media": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^media/(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "alt": {"type": "string"},
+        "durationMs": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

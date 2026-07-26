@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neoanki.app/schemas/authored-deck-v1.json",
+  "title": "NeoAnki authored deck record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "id", "name"],
+  "properties": {
+    "kind": {"const": "deck"},
+    "id": {"$ref": "#/$defs/id"},
+    "name": {"type": "string", "minLength": 1},
+    "parent": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"}
+  }
+}

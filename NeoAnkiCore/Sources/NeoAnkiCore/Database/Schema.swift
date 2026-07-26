@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 12
+    static let version = 13
 
     static let createStatements: [String] = [
         """
@@ -145,6 +145,23 @@ enum Schema {
             log_loss REAL NOT NULL
         );
         """,
+        """
+        CREATE TABLE IF NOT EXISTS portable_item_type_mappings (
+            origin_library_id TEXT NOT NULL,
+            origin_type_id TEXT NOT NULL,
+            schema_digest TEXT NOT NULL CHECK(length(schema_digest) = 64),
+            local_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+            PRIMARY KEY (origin_library_id, origin_type_id, schema_digest)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_digest
+        ON portable_item_type_mappings(schema_digest);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_local_type
+        ON portable_item_type_mappings(local_type_id);
+        """,
     ]
 
     /// Applied when upgrading from schema version 7.
@@ -223,6 +240,35 @@ enum Schema {
         """
         CREATE INDEX IF NOT EXISTS idx_media_reservations_expiry
         ON media_reservations(expires_at);
+        """,
+    ]
+
+    /// Gives each library a durable identity and remembers item-type decisions
+    /// made while importing portable decks. The library UUID value itself is
+    /// initialized by SQLiteDatabase inside the migration transaction.
+    static let migrationV13Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS portable_item_type_mappings (
+            origin_library_id TEXT NOT NULL,
+            origin_type_id TEXT NOT NULL,
+            schema_digest TEXT NOT NULL CHECK(length(schema_digest) = 64),
+            local_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+            PRIMARY KEY (origin_library_id, origin_type_id, schema_digest)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_digest
+        ON portable_item_type_mappings(schema_digest);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_local_type
+        ON portable_item_type_mappings(local_type_id);
         """,
     ]
 

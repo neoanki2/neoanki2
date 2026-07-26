@@ -1,3 +1,4 @@
+import AppKit
 import NeoAnkiCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -26,6 +27,21 @@ struct ContentView: View {
     @State private var isChoosingImportFile = false
     @State private var isShowingImport = false
     @State private var importNotice: ImportNotice?
+    @State private var portableDeckTransfer: PortableDeckTransferModel
+    @State private var isChoosingPortableDeck = false
+
+    init(
+        itemsModel: ItemsModel,
+        decksModel: DecksModel,
+        schedulingModel: SchedulingModel
+    ) {
+        self.itemsModel = itemsModel
+        self.decksModel = decksModel
+        self.schedulingModel = schedulingModel
+        _portableDeckTransfer = State(
+            initialValue: PortableDeckTransferModel(store: itemsModel.store)
+        )
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -44,6 +60,12 @@ struct ContentView: View {
         .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
+            if portableDeckTransfer.isBusy {
+                ToolbarItem(placement: .status) {
+                    ProgressView("Transferring deck…")
+                        .controlSize(.small)
+                }
+            }
             if isManagingTemplates {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
@@ -77,6 +99,12 @@ struct ContentView: View {
             allowsMultipleSelection: false,
             onCompletion: handleImportFile
         )
+        .fileImporter(
+            isPresented: $isChoosingPortableDeck,
+            allowedContentTypes: [.neoDeck, .neoAnkiSource],
+            allowsMultipleSelection: false,
+            onCompletion: handlePortableDeckFile
+        )
         .sheet(isPresented: $isShowingImport) {
             if let importModel {
                 ImportView(
@@ -93,6 +121,36 @@ struct ContentView: View {
                 title: Text(notice.title),
                 message: Text(notice.message),
                 dismissButton: .default(Text("OK"))
+            )
+        }
+        .alert(item: $portableDeckTransfer.notice) { notice in
+            Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .confirmationDialog(
+            "Item Type Conflict",
+            isPresented: Binding(
+                get: { portableDeckTransfer.conflictingSource != nil },
+                set: { if !$0 { portableDeckTransfer.cancelConflict() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Use Matching Local Type") {
+                resolvePortableDeckConflict(using: .useMatchingSchema)
+            }
+            Button("Import as New Type") {
+                resolvePortableDeckConflict(using: .importAsDistinctRevision)
+            }
+            Button("Cancel", role: .cancel) {
+                portableDeckTransfer.cancelConflict()
+            }
+        } message: {
+            Text(
+                "This deck carries a different revision of an item type already in your library. "
+                    + "You can reuse an identical local schema, keep both revisions, or cancel."
             )
         }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
@@ -122,6 +180,8 @@ struct ContentView: View {
     private var libraryCommandHandlers: LibraryCommandHandlers {
         LibraryCommandHandlers(
             openImport: { openImport() },
+            openPortableDeckImport: { isChoosingPortableDeck = true },
+            openPortableDeckExport: { openPortableDeckExport() },
             openTemplates: { openTemplates() },
             canImport: !itemsModel.isLoading
                 && !itemsModel.itemTypes.isEmpty
@@ -129,8 +189,20 @@ struct ContentView: View {
                 && !isManagingTemplates
                 && !isAddingItem
                 && !isShowingImport,
+            canImportPortableDeck: canTransferPortableDeck,
+            canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
             canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem
         )
+    }
+
+    private var canTransferPortableDeck: Bool {
+        !portableDeckTransfer.isBusy
+            && !itemsModel.isLoading
+            && !decksModel.isLoading
+            && !isStudying
+            && !isManagingTemplates
+            && !isAddingItem
+            && !isShowingImport
     }
 
     private var studyCommandHandlers: StudyCommandHandlers {
@@ -264,6 +336,73 @@ struct ContentView: View {
         Task {
             await decksModel.load()
         }
+    }
+
+    private func handlePortableDeckFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case let .success(urls):
+            guard let source = urls.first else { return }
+            Task {
+                guard let imported = await portableDeckTransfer.importDeck(from: source) else {
+                    return
+                }
+                await refreshAfterPortableDeckImport(imported)
+            }
+        case let .failure(error):
+            if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
+                return
+            }
+            portableDeckTransfer.notice = PortableDeckTransferNotice(
+                title: "Could Not Open Deck",
+                message: "NeoAnki2 couldn’t open the selected deck. Try choosing it again."
+            )
+        }
+    }
+
+    private func refreshAfterPortableDeckImport(_ result: PortableDeckImportResult) async {
+        await decksModel.load()
+        if let rootID = result.deckIDs.first,
+           decksModel.summaries.contains(where: { $0.id == rootID }) {
+            decksModel.selectedScope = .deck(rootID)
+        }
+        await reloadScope()
+        await templatesModel?.load()
+    }
+
+    private func resolvePortableDeckConflict(
+        using resolution: PortableDeckTypeConflictResolution
+    ) {
+        Task {
+            guard let imported = await portableDeckTransfer.resolveConflict(using: resolution) else {
+                return
+            }
+            await refreshAfterPortableDeckImport(imported)
+        }
+    }
+
+    private func openPortableDeckExport() {
+        guard let deckID = decksModel.selectedDeckID else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.neoDeck]
+        panel.allowsOtherFileTypes = false
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        let deckName = decksModel.deckName(for: deckID) ?? "Deck"
+        panel.nameFieldStringValue = "\(safeExportFileName(deckName)).\(PortableDeck.fileExtension)"
+        guard panel.runModal() == .OK, var destination = panel.url else { return }
+        if destination.pathExtension.lowercased() != PortableDeck.fileExtension {
+            destination.appendPathExtension(PortableDeck.fileExtension)
+        }
+        Task {
+            await portableDeckTransfer.exportDeck(id: deckID, to: destination)
+        }
+    }
+
+    private func safeExportFileName(_ name: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/:")
+        let components = name.components(separatedBy: invalid)
+        let safe = components.joined(separator: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+        return safe.isEmpty ? "Deck" : safe
     }
 
     private func closeAddItem() {

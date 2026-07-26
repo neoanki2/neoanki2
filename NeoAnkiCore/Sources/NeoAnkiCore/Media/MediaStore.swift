@@ -128,6 +128,110 @@ public actor MediaStore {
         )
     }
 
+    /// Adopts a portable-deck staging file without materializing it as `Data`.
+    /// The file is re-hashed immediately before adoption to close the gap
+    /// between package validation and destination publication.
+    func ingestVerifiedPortableFile(
+        url: URL,
+        expected: MediaAssetDescriptor,
+        kind: MediaKind,
+        reservationScope: UUID
+    ) async throws -> MediaRef {
+        guard kind == expected.kind,
+              expected.byteSize >= 0,
+              expected.byteSize <= MediaValidation.maxBytes(for: kind),
+              expected.hash.count == 64,
+              expected.hash.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+        else { throw MediaError.unsupportedFormat(kind) }
+
+        let verified = try verifyFile(
+            at: url.standardizedFileURL,
+            kind: kind,
+            fileExtension: expected.fileExtension,
+            maximumBytes: expected.byteSize
+        )
+        guard verified.byteSize == expected.byteSize, verified.hash == expected.hash else {
+            throw MediaError.readFailed
+        }
+
+        var storedExtension = expected.fileExtension
+        if let metadataDatabase,
+           let existing = try await metadataDatabase.fetchMediaAsset(hash: expected.hash)
+        {
+            guard existing.kind == kind,
+                  existing.byteSize == expected.byteSize,
+                  MediaValidation.allowedExtensions(for: kind).contains(existing.fileExtension)
+            else { throw MediaError.unsupportedFormat(kind) }
+            storedExtension = existing.fileExtension
+        }
+        let descriptor = MediaAssetDescriptor(
+            hash: expected.hash,
+            kind: kind,
+            byteSize: expected.byteSize,
+            fileExtension: storedExtension
+        )
+        let reservationID = UUID()
+        let createdAsset: Bool
+        if let metadataDatabase {
+            let now = Date.now
+            createdAsset = try await metadataDatabase.reserveMediaAsset(
+                descriptor,
+                reservationID: reservationID,
+                scopeID: reservationScope,
+                createdAt: now,
+                expiresAt: now.addingTimeInterval(Self.reservationLifetime)
+            )
+        } else {
+            createdAsset = false
+        }
+
+        let destination = try assetURL(
+            hash: expected.hash,
+            fileExtension: storedExtension,
+            kind: kind
+        )
+        do {
+            if !FileManager.default.fileExists(atPath: destination.path) {
+                let temporary = mediaDirectory.appendingPathComponent(
+                    ".\(UUID().uuidString).portable-media",
+                    isDirectory: false
+                )
+                defer { try? FileManager.default.removeItem(at: temporary) }
+                try copyFileInChunks(from: url, to: temporary, expectedBytes: expected.byteSize)
+                try FileManager.default.moveItem(at: temporary, to: destination)
+            } else {
+                let existingURL = try containedExistingURL(destination)
+                let existing = try verifyFile(
+                    at: existingURL,
+                    kind: kind,
+                    fileExtension: storedExtension,
+                    maximumBytes: expected.byteSize
+                )
+                guard existing.hash == expected.hash else {
+                    throw MediaError.readFailed
+                }
+            }
+        } catch {
+            if let metadataDatabase,
+               let asset = try? await metadataDatabase.cancelMediaReservation(
+                   id: reservationID,
+                   deleteNewAsset: createdAsset
+               )
+            {
+                try? removeAssetFile(asset)
+            }
+            throw error
+        }
+
+        var ref = MediaRef(
+            kind: kind,
+            assetHash: expected.hash,
+            fileExtension: storedExtension
+        )
+        if metadataDatabase != nil { ref.reservationID = reservationID }
+        return ref
+    }
+
     /// Ingests raw data after deriving its format from validated bytes.
     public func ingest(
         data: Data,
@@ -313,6 +417,60 @@ public actor MediaStore {
             throw MediaError.readFailed
         }
         throw MediaError.fileTooLarge(kind, maxBytes: maxBytes)
+    }
+
+    private func verifyFile(
+        at url: URL,
+        kind: MediaKind,
+        fileExtension: String,
+        maximumBytes: Int
+    ) throws -> (hash: String, byteSize: Int) {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard url.isFileURL, values.isRegularFile == true,
+              let size = values.fileSize, size == maximumBytes
+        else { throw MediaError.invalidPath }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        var prefix = Data()
+        var count = 0
+        while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            count += chunk.count
+            guard count <= maximumBytes else {
+                throw MediaError.fileTooLarge(kind, maxBytes: maximumBytes)
+            }
+            if prefix.count < 64 {
+                prefix.append(chunk.prefix(64 - prefix.count))
+            }
+            hasher.update(data: chunk)
+        }
+        _ = try MediaValidation.validatedExtension(
+            data: prefix,
+            kind: kind,
+            fileExtension: fileExtension
+        )
+        return (
+            hasher.finalize().map { String(format: "%02x", $0) }.joined(),
+            count
+        )
+    }
+
+    private func copyFileInChunks(from source: URL, to destination: URL, expectedBytes: Int) throws {
+        FileManager.default.createFile(atPath: destination.path, contents: nil)
+        let input = try FileHandle(forReadingFrom: source)
+        let output = try FileHandle(forWritingTo: destination)
+        defer {
+            try? input.close()
+            try? output.close()
+        }
+        var count = 0
+        while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            count += chunk.count
+            guard count <= expectedBytes else { throw MediaError.readFailed }
+            try output.write(contentsOf: chunk)
+        }
+        guard count == expectedBytes else { throw MediaError.readFailed }
+        try output.synchronize()
     }
 
     private static func isContained(_ candidate: URL, in directory: URL) -> Bool {

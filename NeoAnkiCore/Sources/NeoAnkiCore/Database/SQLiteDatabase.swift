@@ -59,7 +59,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     }
 }
 
-struct PersistedItem {
+struct PersistedItem: Sendable {
     var item: Item
     var createdAt: Date
     var updatedAt: Date
@@ -110,11 +110,15 @@ actor SQLiteDatabase {
                     "INSERT INTO schema_version (version) VALUES (?);",
                     bindings: [.int(Int64(Schema.version))]
                 )
+                _ = try getOrCreateLibraryID()
             }
             return
         }
 
-        guard current < Schema.version else { return }
+        guard current < Schema.version else {
+            _ = try getOrCreateLibraryID()
+            return
+        }
 
         try inTransaction {
             if current < 2 {
@@ -176,9 +180,214 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 13 {
+                for sql in Schema.migrationV13Statements {
+                    try execute(sql)
+                }
+                _ = try getOrCreateLibraryID()
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
+            )
+        }
+    }
+
+    /// Returns this library's durable identity, creating it once when absent.
+    /// The value is stored as metadata so moves and subsequent launches retain it.
+    func getOrCreateLibraryID() throws -> UUID {
+        let key = "library_id"
+        let rows = try query(
+            "SELECT value FROM app_metadata WHERE key = ? LIMIT 1;",
+            bindings: [.text(key)]
+        )
+        if let value = rows.first?["value"] as? String {
+            guard let id = UUID(uuidString: value) else {
+                throw DatabaseError.decodingFailed
+            }
+            return id
+        }
+
+        let id = UUID()
+        try execute(
+            """
+            INSERT INTO app_metadata (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO NOTHING;
+            """,
+            bindings: [.text(key), .text(id.uuidString)]
+        )
+        guard let persisted = try query(
+            "SELECT value FROM app_metadata WHERE key = ? LIMIT 1;",
+            bindings: [.text(key)]
+        ).first?["value"] as? String,
+              let persistedID = UUID(uuidString: persisted)
+        else {
+            throw DatabaseError.decodingFailed
+        }
+        return persistedID
+    }
+
+    func libraryID() throws -> UUID {
+        try getOrCreateLibraryID()
+    }
+
+    func portableDeckLibrarySnapshot() throws -> PortableDeckLibrarySnapshot {
+        try execute("BEGIN DEFERRED TRANSACTION;")
+        do {
+            let snapshot = PortableDeckLibrarySnapshot(
+                libraryID: try getOrCreateLibraryID(),
+                decks: try fetchAllDecks(),
+                items: try fetchItems(),
+                itemTypes: try fetchAllItemTypes(),
+                mappings: try allPortableItemTypeMappings()
+            )
+            try execute("COMMIT;")
+            return snapshot
+        } catch {
+            try? execute("ROLLBACK;")
+            throw error
+        }
+    }
+
+    func lookupPortableItemTypeMapping(
+        originLibraryID: UUID,
+        originTypeID: UUID,
+        schemaDigest: String
+    ) throws -> UUID? {
+        guard Self.isValidSHA256Digest(schemaDigest) else {
+            throw DatabaseError.queryFailed("Portable item-type schema digest is invalid.")
+        }
+        let rows = try query(
+            """
+            SELECT local_type_id
+            FROM portable_item_type_mappings
+            WHERE origin_library_id = ?
+              AND origin_type_id = ?
+              AND schema_digest = ?
+            LIMIT 1;
+            """,
+            bindings: [
+                .text(originLibraryID.uuidString),
+                .text(originTypeID.uuidString),
+                .text(schemaDigest),
+            ]
+        )
+        guard let value = rows.first?["local_type_id"] as? String else { return nil }
+        guard let id = UUID(uuidString: value) else {
+            throw DatabaseError.decodingFailed
+        }
+        return id
+    }
+
+    /// Finds an already mapped local type with the same canonical schema,
+    /// regardless of origin, so imports can deduplicate equivalent definitions.
+    func lookupPortableItemTypeMapping(schemaDigest: String) throws -> UUID? {
+        guard Self.isValidSHA256Digest(schemaDigest) else {
+            throw DatabaseError.queryFailed("Portable item-type schema digest is invalid.")
+        }
+        let rows = try query(
+            """
+            SELECT local_type_id
+            FROM portable_item_type_mappings
+            WHERE schema_digest = ?
+            ORDER BY rowid ASC
+            LIMIT 1;
+            """,
+            bindings: [.text(schemaDigest)]
+        )
+        guard let value = rows.first?["local_type_id"] as? String else { return nil }
+        guard let id = UUID(uuidString: value) else {
+            throw DatabaseError.decodingFailed
+        }
+        return id
+    }
+
+    func persistPortableItemTypeMapping(
+        originLibraryID: UUID,
+        originTypeID: UUID,
+        schemaDigest: String,
+        localTypeID: UUID
+    ) throws {
+        guard Self.isValidSHA256Digest(schemaDigest) else {
+            throw DatabaseError.executeFailed("Portable item-type schema digest is invalid.")
+        }
+        try execute(
+            """
+            INSERT INTO portable_item_type_mappings (
+                origin_library_id, origin_type_id, schema_digest, local_type_id
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(origin_library_id, origin_type_id, schema_digest)
+            DO UPDATE SET local_type_id = excluded.local_type_id;
+            """,
+            bindings: [
+                .text(originLibraryID.uuidString),
+                .text(originTypeID.uuidString),
+                .text(schemaDigest),
+                .text(localTypeID.uuidString),
+            ]
+        )
+    }
+
+    func portableItemTypeMappings(originLibraryID: UUID, originTypeID: UUID) throws
+        -> [(digest: String, localTypeID: UUID)]
+    {
+        try query(
+            """
+            SELECT schema_digest, local_type_id FROM portable_item_type_mappings
+            WHERE origin_library_id = ? AND origin_type_id = ? ORDER BY rowid;
+            """,
+            bindings: [.text(originLibraryID.uuidString), .text(originTypeID.uuidString)]
+        ).compactMap { row in
+            guard let digest = row["schema_digest"] as? String,
+                  let local = (row["local_type_id"] as? String).flatMap(UUID.init(uuidString:))
+            else { return nil }
+            return (digest, local)
+        }
+    }
+
+    func portableItemTypeOrigin(localTypeID: UUID) throws
+        -> (libraryID: UUID, typeID: UUID, digest: String)?
+    {
+        let rows = try query(
+            """
+            SELECT origin_library_id, origin_type_id, schema_digest
+            FROM portable_item_type_mappings WHERE local_type_id = ?
+            ORDER BY rowid LIMIT 1;
+            """,
+            bindings: [.text(localTypeID.uuidString)]
+        )
+        guard let row = rows.first,
+              let library = (row["origin_library_id"] as? String).flatMap(UUID.init(uuidString:)),
+              let type = (row["origin_type_id"] as? String).flatMap(UUID.init(uuidString:)),
+              let digest = row["schema_digest"] as? String
+        else { return nil }
+        return (library, type, digest)
+    }
+
+    func allPortableItemTypeMappings() throws -> [PortableDeckTypeMapping] {
+        try query(
+            """
+            SELECT origin_library_id, origin_type_id, schema_digest, local_type_id
+            FROM portable_item_type_mappings ORDER BY rowid;
+            """
+        ).compactMap { row in
+            guard let originLibrary = (row["origin_library_id"] as? String)
+                    .flatMap(UUID.init(uuidString:)),
+                  let originType = (row["origin_type_id"] as? String)
+                    .flatMap(UUID.init(uuidString:)),
+                  let digest = row["schema_digest"] as? String,
+                  Self.isValidSHA256Digest(digest),
+                  let local = (row["local_type_id"] as? String)
+                    .flatMap(UUID.init(uuidString:))
+            else { return nil }
+            return PortableDeckTypeMapping(
+                originLibraryID: originLibrary,
+                originTypeID: originType,
+                digest: digest,
+                localTypeID: local
             )
         }
     }
@@ -704,6 +913,96 @@ actor SQLiteDatabase {
                 )
                 try insertItem(entry.item, createdAt: createdAt, updatedAt: updatedAt)
                 try insertCards(entry.cards)
+                try consumeMediaReservations(ids: mediaReservationIDs(in: entry.item))
+            }
+        }
+    }
+
+    /// Commits a validated portable-deck plan as one database transaction.
+    /// Cards are deliberately generated here rather than accepted from the
+    /// package, so imported scheduling state always starts fresh.
+    func importPortableDeck(_ plan: PortableDeckImportPlan, now: Date) throws {
+        try inTransaction {
+            for itemType in plan.itemTypes {
+                try insertItemType(itemType)
+            }
+            for mapping in plan.mappings {
+                try persistPortableItemTypeMapping(
+                    originLibraryID: mapping.originLibraryID,
+                    originTypeID: mapping.originTypeID,
+                    schemaDigest: mapping.digest,
+                    localTypeID: mapping.localTypeID
+                )
+            }
+            for deck in plan.decks {
+                try insertDeck(deck)
+            }
+            var itemTypesByID = Dictionary(uniqueKeysWithValues: plan.itemTypes.map { ($0.id, $0) })
+            for itemTypeID in Set(plan.items.map(\.item.itemTypeID))
+                where itemTypesByID[itemTypeID] == nil
+            {
+                guard let itemType = try fetchItemType(id: itemTypeID) else {
+                    throw DatabaseError.itemTypeNotFound(itemTypeID)
+                }
+                itemTypesByID[itemTypeID] = itemType
+            }
+            let itemStatement = try prepareStatement(
+                """
+                INSERT INTO items (id, item_type_id, fields, tags, deck_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """
+            )
+            let cardStatement = try prepareStatement(
+                """
+                INSERT INTO cards (
+                    id, item_id, template_id, skill, memory, due_at,
+                    is_suspended, deck_id, cloze_group
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """
+            )
+            defer {
+                sqlite3_finalize(itemStatement)
+                sqlite3_finalize(cardStatement)
+            }
+            for entry in plan.items {
+                guard let itemType = itemTypesByID[entry.item.itemTypeID] else {
+                    throw DatabaseError.itemTypeNotFound(entry.item.itemTypeID)
+                }
+                try applyMediaReferenceDeltas(
+                    from: [:],
+                    to: mediaReferenceCounts(in: entry.item),
+                    descriptors: [:],
+                    now: now
+                )
+                try executePrepared(
+                    itemStatement,
+                    bindings: [
+                        .text(entry.item.id.uuidString),
+                        .text(entry.item.itemTypeID.uuidString),
+                        .blob(try encode(entry.item.fields)),
+                        .blob(try encode(entry.item.tags)),
+                        entry.item.deckID.map { .text($0.uuidString) } ?? .null,
+                        .double(entry.createdAt.timeIntervalSince1970),
+                        .double(entry.updatedAt.timeIntervalSince1970),
+                    ]
+                )
+                for card in CardGenerator.cards(for: entry.item, type: itemType, now: now) {
+                    try executePrepared(
+                        cardStatement,
+                        bindings: [
+                            .text(card.id.uuidString),
+                            .text(card.itemID.uuidString),
+                            .text(card.templateID.uuidString),
+                            .blob(try encode(card.skill)),
+                            .blob(try encode(card.memory)),
+                            .double(card.memory.due.timeIntervalSince1970),
+                            .int(card.isSuspended ? 1 : 0),
+                            card.deckID.map { .text($0.uuidString) } ?? .null,
+                            card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                        ]
+                    )
+                }
                 try consumeMediaReservations(ids: mediaReservationIDs(in: entry.item))
             }
         }
@@ -1873,6 +2172,13 @@ actor SQLiteDatabase {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    private static func isValidSHA256Digest(_ value: String) -> Bool {
+        value.count == 64 && value.allSatisfy { character in
+            ("0"..."9").contains(String(character))
+                || ("a"..."f").contains(String(character))
+        }
+    }
+
     private func decodeCard(from row: [String: Any?]) throws -> Card {
         guard
             let idText = row["id"] as? String,
@@ -1997,6 +2303,34 @@ actor SQLiteDatabase {
 
         let code = sqlite3_step(statement)
         guard code == SQLITE_DONE || code == SQLITE_ROW else {
+            throw DatabaseError.executeFailed(errorMessage(from: handle))
+        }
+    }
+
+    private func prepareStatement(_ sql: String) throws -> OpaquePointer {
+        guard let handle else {
+            throw DatabaseError.executeFailed("Database is closed.")
+        }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement
+        else {
+            throw DatabaseError.executeFailed(errorMessage(from: handle))
+        }
+        return statement
+    }
+
+    private func executePrepared(
+        _ statement: OpaquePointer,
+        bindings: [Binding]
+    ) throws {
+        guard let handle else {
+            throw DatabaseError.executeFailed("Database is closed.")
+        }
+        sqlite3_reset(statement)
+        sqlite3_clear_bindings(statement)
+        try bind(bindings, to: statement)
+        guard sqlite3_step(statement) == SQLITE_DONE else {
             throw DatabaseError.executeFailed(errorMessage(from: handle))
         }
     }

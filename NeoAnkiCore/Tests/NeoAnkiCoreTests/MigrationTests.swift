@@ -16,6 +16,46 @@ import Testing
     #expect(try columnExists("sequence", in: "review_logs", at: url))
     #expect(try columnExists("cloze_group", in: "cards", at: url))
     #expect(try tableExists("media_reservations", at: url))
+    #expect(try tableExists("portable_item_type_mappings", at: url))
+    let firstLibraryID = try await database.getOrCreateLibraryID()
+    let secondLibraryID = try await database.getOrCreateLibraryID()
+    #expect(firstLibraryID == secondLibraryID)
+}
+
+@Test func versionTwelveMigrationPreservesLibraryIdentityAndAddsPortableMappings() async throws {
+    let url = migrationDatabaseURL()
+    let libraryID = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (12);
+        CREATE TABLE app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        INSERT INTO app_metadata VALUES ('library_id', '\(libraryID.uuidString)');
+        CREATE TABLE item_types (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            definition BLOB NOT NULL
+        );
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == 13)
+    #expect(try tableExists("portable_item_type_mappings", at: url))
+    #expect(try await database.getOrCreateLibraryID() == libraryID)
+    #expect(try integer(
+        """
+        SELECT COUNT(*) FROM sqlite_master
+        WHERE type = 'index' AND name = 'idx_portable_item_type_mappings_digest';
+        """,
+        at: url
+    ) == 1)
 }
 
 @Test func versionNineMigrationBackfillsStableReviewAppendOrder() async throws {

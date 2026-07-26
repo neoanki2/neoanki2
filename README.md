@@ -37,5 +37,7 @@ NeoAnkiCore/Sources/NeoAnkiCore/
 All project docs live in [`docs/`](docs/) — see [`docs/README.md`](docs/README.md) for the index:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — domain model, learning-science mapping, FSRS rationale
+- [`docs/AUTHORED_DECK_FORMAT.md`](docs/AUTHORED_DECK_FORMAT.md) — import-only JSONL deck source format
 - [`docs/DESIGN.md`](docs/DESIGN.md) — visual design system (SwiftUI shell)
+- [`docs/LLM_DECK_AUTHORING.md`](docs/LLM_DECK_AUTHORING.md) — coding-agent deck authoring workflow
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product context for design and UX work

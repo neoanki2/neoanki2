@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "NeoAnkiCore", targets: ["NeoAnkiCore"]),
         .library(name: "NeoAnkiTestSupport", targets: ["NeoAnkiTestSupport"]),
+        .executable(name: "neoanki-deck", targets: ["NeoAnkiDeckCLI"]),
     ],
     targets: [
         .target(
@@ -20,6 +21,10 @@ let package = Package(
         ),
         .target(
             name: "NeoAnkiTestSupport",
+            dependencies: ["NeoAnkiCore"]
+        ),
+        .executableTarget(
+            name: "NeoAnkiDeckCLI",
             dependencies: ["NeoAnkiCore"]
         ),
         .testTarget(name: "NeoAnkiCoreTests", dependencies: ["NeoAnkiCore"]),
