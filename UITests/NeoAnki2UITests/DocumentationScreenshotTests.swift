@@ -173,30 +173,17 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             .identified("templateEditorForm")
         XCTAssertTrue(advancedForm.waitForExistence(timeout: 3))
         advancedForm.swipeUp()
-        XCTAssertTrue(
-            advancedApp.descendants(matching: .any)
-                .identified("templateAutomaticSkill")
-                .waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(advancedApp.popUpButtons.identified("templateSkillInput").waitForExistence(timeout: 3))
-        let generateCondition = advancedApp.descendants(matching: .any)
-            .identified("templateGenerateCondition")
-        if !generateCondition.waitForExistence(timeout: 1) {
-            advancedForm.swipeUp()
-        }
-        XCTAssertTrue(generateCondition.waitForExistence(timeout: 3))
-        generateCondition.click()
-        generateCondition
-            .scroll(byDeltaX: 0, deltaY: 350)
+        let answerReveal = advancedApp.popUpButtons.identified("answerSlotReveal")
+        XCTAssertTrue(answerReveal.waitForExistence(timeout: 5))
+        answerReveal.scroll(byDeltaX: 0, deltaY: 240)
         captureDocumentationScreenshot(
             named: "template-advanced",
             of: advancedApp,
-            scenario: "advanced template editor with explicit skill mapping and generation rule",
+            scenario: "advanced template editor with answer reveal controls and advanced settings entry point",
             expectedVisibleIdentifiers: [
-                "templateSkillInput",
-                "templateSkillOutput",
-                "templateSkillOperation",
-                "templateGenerateCondition",
+                "answerSlotSource",
+                "answerSlotReveal",
+                "templateAdvancedSettings",
             ]
         )
     }
