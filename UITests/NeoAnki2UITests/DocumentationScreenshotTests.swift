@@ -162,10 +162,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             expectedVisibleIdentifiers: ["templateNameField", "templatePromptField", "templateAnswerField"]
         )
 
-        let advancedApp = launchApp(
-            databaseLabel: "docs-template-advanced",
-            environment: ["NEOANKI_TEST_EXPAND_TEMPLATE_ADVANCED": "1"]
-        )
+        let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
         advancedApp.buttons.identified("addTemplateToolbar").click()
         XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitForExistence(timeout: 5))
@@ -177,7 +174,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedSettings = advancedApp.descendants(matching: .any)
             .identified("templateAdvancedSettings")
         XCTAssertTrue(advancedSettings.waitForExistence(timeout: 5))
-        advancedSettings.scroll(byDeltaX: 0, deltaY: 450)
+        advancedSettings.click()
         XCTAssertTrue(
             advancedApp.descendants(matching: .any)
                 .identified("templateAutomaticSkill")
