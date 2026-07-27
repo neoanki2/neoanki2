@@ -85,9 +85,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
         openTemplates(in: advancedApp)
         advancedApp.buttons.identified("addTemplateToolbar").click()
-        XCTAssertTrue(
-            advancedApp.descendants(matching: .any)["templateAutomaticSkill"].waitForExistence(timeout: 5)
-        )
+        XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitForExistence(timeout: 5))
         captureDocumentationScreenshot(named: "template-advanced", of: advancedApp)
     }
 
