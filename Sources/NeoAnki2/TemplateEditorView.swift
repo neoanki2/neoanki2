@@ -28,7 +28,9 @@ struct TemplateEditorView: View {
         let draft = editingTemplate.map { TemplateDraft(template: $0, in: itemType) } ?? TemplateDraft()
         initialDraft = draft
         _draft = State(initialValue: draft)
-        _showAdvanced = State(initialValue: draft.hasAdvancedSettings)
+        let expandsAdvancedForScreenshot = AppDatabase.isTesting
+            && ProcessInfo.processInfo.environment["NEOANKI_TEST_EXPAND_TEMPLATE_ADVANCED"] == "1"
+        _showAdvanced = State(initialValue: draft.hasAdvancedSettings || expandsAdvancedForScreenshot)
     }
 
     var body: some View {
