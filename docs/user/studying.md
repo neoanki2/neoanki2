@@ -1,5 +1,6 @@
 ---
 title: Studying
+description: Complete due-card sessions using reveal, type, choose, arrange, cloze, and record interactions.
 nav_order: 3
 parent: User Guide
 ---
@@ -8,7 +9,18 @@ parent: User Guide
 
 NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The Study button shows the number due and is disabled when that count is zero; future cards are not included.
 
-![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)
+[![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)]({{ site.baseurl }}/assets/screenshots/study-prompt.png)
+
+<nav class="local-toc" aria-label="On this page" markdown="1">
+**On this page**
+
+- [Session states](#session-states)
+- [Card interactions](#card-interactions)
+- [Feedback and grading](#feedback-and-grading)
+- [Keyboard and Study menu](#keyboard-and-study-menu)
+- [Undo and ending a session](#undo-and-ending-a-session)
+- [Motion and accessibility](#motion-and-accessibility)
+</nav>
 
 ## Session states
 
@@ -22,7 +34,7 @@ A session moves through a small set of states:
 
 The header shows the scope and progress, such as “Biology · Card 2 of 8.” The queue is assembled when the session starts. When no cards are due, NeoAnki2 shows **You’re Caught Up** instead of a prompt.
 
-![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)
+[![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)]({{ site.baseurl }}/assets/screenshots/study-answer.png)
 
 ## Card interactions
 
@@ -38,7 +50,7 @@ Enter a response in **Your answer**, then press Return or choose **Check Answer*
 
 An empty response is not checked. Enter an answer or choose **Reveal & Self-Grade**. If the answer side has no checkable text, automatic checking is unavailable and the answer is revealed for self-grading.
 
-![Typing and checking an answer]({{ site.baseurl }}/assets/screenshots/study-type.png)
+[![Typing and checking an answer]({{ site.baseurl }}/assets/screenshots/study-type.png)]({{ site.baseurl }}/assets/screenshots/study-type.png)
 
 ### Choose
 
@@ -74,16 +86,24 @@ After reveal, NeoAnki2 may show:
 
 These messages do not choose a rating. Grade based on the quality of your recall:
 
-- **Again (1):** you did not remember; ask NeoAnki2 to schedule it sooner.
+- **Again (1):** you did not remember; ask NeoAnki2 for its shortest interval.
+  Intervals are floored at one day, so this is not an immediate same-session
+  repeat.
 - **Hard (2):** you remembered with difficulty.
 - **Good (3):** you remembered correctly.
 - **Easy (4):** recall was too easy; allow a longer wait.
 
 Open **Grade Help** from the question-mark button for the same guidance.
 
-![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
+[![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
-NeoAnki2 uses FSRS-5. Each saved rating updates the card’s estimated difficulty and stability, and the next due date is calculated for the configured retention target. Again marks a lapse on an already-reviewed card; Hard reduces growth; Easy can increase it. Actual intervals depend on the card’s history, elapsed time, scheduler parameters, and small deterministic interval variation. The labels are directional guidance, not promises of a particular date or interval, and this version schedules at a minimum granularity of one day rather than guaranteeing an immediate same-session repeat.
+NeoAnki2 uses FSRS-5. Each saved rating updates the card’s estimated difficulty
+and stability, and the next due date is calculated for the built-in 90%
+retention target. The current app does not expose a retention setting. Again
+marks a lapse on an already-reviewed card; Hard reduces growth; Easy can
+increase it. Actual intervals depend on the card’s history, elapsed time,
+scheduler parameters, and small deterministic interval variation. The labels
+are directional guidance, not promises of a particular date or interval.
 
 ## Keyboard and Study menu
 
@@ -102,7 +122,7 @@ Interaction-specific shortcuts are described above. Shortcuts are enabled only w
 
 After a grade is saved, an undo banner identifies the rating. Choose **Undo** or press Command-Z to revert that latest review and return to the same card with its answer revealed. You can dismiss the banner; completing another grade replaces the previous undo opportunity. **Undo Last Grade** also appears on the completion screen when the final grade can still be reverted.
 
-![The completed-session summary]({{ site.baseurl }}/assets/screenshots/study-complete.png)
+[![The completed-session summary]({{ site.baseurl }}/assets/screenshots/study-complete.png)]({{ site.baseurl }}/assets/screenshots/study-complete.png)
 
 Choose **End Session** or press Escape to leave early. If you have already reviewed at least one card and more cards remain, NeoAnki2 asks for confirmation and reports the number reviewed. Saved grades remain saved; the current, ungraded card is not saved. Choose **Continue Studying** to cancel. Before any grade, or after the session is complete, leaving does not require that confirmation.
 

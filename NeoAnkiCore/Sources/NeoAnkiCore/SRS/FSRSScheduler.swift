@@ -12,6 +12,11 @@ import Foundation
 /// purely from stability, floored at one day.
 public struct FSRSScheduler: Scheduler {
     public struct Parameters: Codable, Equatable, Sendable {
+        public static let modelVersion = 5
+        public static let defaultRequestRetention = 0.9
+        public static let defaultMaximumInterval = 36_500
+        public static let minimumInterval = 1
+
         public struct WeightBound: Equatable, Sendable {
             public let lower: Double
             public let upper: Double
@@ -31,15 +36,18 @@ public struct FSRSScheduler: Scheduler {
 
         public init(
             weights: [Double] = Parameters.defaultWeights,
-            requestRetention: Double = 0.9,
-            maximumInterval: Int = 36_500,
+            requestRetention: Double = Parameters.defaultRequestRetention,
+            maximumInterval: Int = Parameters.defaultMaximumInterval,
             enableFuzz: Bool = true
         ) {
             self.weights = Parameters.sanitizedWeights(weights)
             self.requestRetention = requestRetention.isFinite
                 ? min(0.99, max(0.7, requestRetention))
-                : 0.9
-            self.maximumInterval = min(36_500, max(1, maximumInterval))
+                : Parameters.defaultRequestRetention
+            self.maximumInterval = min(
+                Parameters.defaultMaximumInterval,
+                max(Parameters.minimumInterval, maximumInterval)
+            )
             self.enableFuzz = enableFuzz
         }
 
@@ -171,10 +179,13 @@ public struct FSRSScheduler: Scheduler {
 
     /// The interval, in days, this state would receive at the target retention.
     public func intervalDays(for stability: Double) -> Int {
-        guard stability.isFinite, stability > 0 else { return 1 }
+        guard stability.isFinite, stability > 0 else { return Parameters.minimumInterval }
         let ideal = (stability / factor) * (pow(params.requestRetention, 1.0 / decay) - 1.0)
-        guard ideal.isFinite else { return 1 }
-        return min(params.maximumInterval, max(1, Int(ideal.rounded())))
+        guard ideal.isFinite else { return Parameters.minimumInterval }
+        return min(
+            params.maximumInterval,
+            max(Parameters.minimumInterval, Int(ideal.rounded()))
+        )
     }
 
     /// FSRS forgetting curve probability for an elapsed interval.

@@ -28,9 +28,7 @@ struct TemplateEditorView: View {
         let draft = editingTemplate.map { TemplateDraft(template: $0, in: itemType) } ?? TemplateDraft()
         initialDraft = draft
         _draft = State(initialValue: draft)
-        let expandsAdvancedForScreenshot = AppDatabase.isTesting
-            && ProcessInfo.processInfo.environment["NEOANKI_TEST_EXPAND_TEMPLATE_ADVANCED"] == "1"
-        _showAdvanced = State(initialValue: draft.hasAdvancedSettings || expandsAdvancedForScreenshot)
+        _showAdvanced = State(initialValue: draft.hasAdvancedSettings)
     }
 
     var body: some View {
@@ -135,6 +133,7 @@ struct TemplateEditorView: View {
                 }
             }
         }
+        .accessibilityIdentifier("templateEditorForm")
         .formStyle(.grouped)
         .neoAnkiFormTypography()
         .navigationTitle(editingTemplate == nil ? "Add Template" : "Edit Template")

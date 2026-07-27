@@ -1,10 +1,21 @@
 #!/usr/bin/env swift
 
+import CryptoKit
 import Foundation
 
 struct Manifest: Decodable {
     let schemaVersion: Int
+    let inventory: Inventory
     let features: [Feature]
+}
+
+struct Inventory: Decodable {
+    let sourceRoots: [String]
+    let fullyMappedSourceRoots: [String]
+    let sourceMarkers: [String]
+    let testRoots: [String]
+    let testMarkers: [String]
+    let excludedFiles: [String]
 }
 
 struct Feature: Decodable {
@@ -16,11 +27,67 @@ struct Feature: Decodable {
     let screenshot: String?
 }
 
+struct ClaimsRegistry: Decodable {
+    struct Evidence: Decodable {
+        let article: String
+        let source: String
+    }
+
+    struct ArticleAssertion: Decodable {
+        let article: String
+        let contains: [String]
+    }
+
+    struct HistoryClaim: Decodable {
+        let article: String
+        let source: String
+        let reviewLogRetention: String
+    }
+
+    let schemaVersion: Int
+    let media: Evidence
+    let itemImport: Evidence
+    let portableDeck: Evidence
+    let authoredDeck: Evidence
+    let scheduling: Evidence
+    let scheduler: Evidence
+    let appData: Evidence
+    let history: HistoryClaim
+    let compatibility: Evidence
+    let articleAssertions: [ArticleAssertion]
+
+    var evidence: [Evidence] {
+        [
+            media, itemImport, portableDeck, authoredDeck, scheduling,
+            scheduler, appData,
+            Evidence(article: history.article, source: history.source),
+            compatibility,
+        ]
+    }
+}
+
+struct ScreenshotManifest: Decodable {
+    struct Entry: Decodable {
+        let filename: String
+        let width: Int
+        let height: Int
+        let sha256: String
+        let scenario: String
+        let expectedVisibleIdentifiers: [String]
+    }
+
+    let schemaVersion: Int
+    let sourceSHA: String
+    let capturedAt: String
+    let screenshots: [Entry]
+}
+
 let fileManager = FileManager.default
 let scriptURL = URL(fileURLWithPath: #filePath).standardizedFileURL
 let root = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
 let docs = root.appendingPathComponent("docs", isDirectory: true)
 let manifestURL = docs.appendingPathComponent("features.json")
+let claimsURL = docs.appendingPathComponent("claims.json")
 let generatedURL = docs.appendingPathComponent("features.md")
 let arguments = Set(CommandLine.arguments.dropFirst())
 let writeGenerated = arguments.contains("--write")
@@ -35,6 +102,13 @@ func fail(_ message: String) {
     failures.append(message)
 }
 
+func exitWithFailuresIfNeeded() -> Never {
+    for failure in failures {
+        fputs("error: \(failure)\n", stderr)
+    }
+    exit(1)
+}
+
 guard
     let data = try? Data(contentsOf: manifestURL),
     let manifest = try? JSONDecoder().decode(Manifest.self, from: data)
@@ -43,8 +117,74 @@ else {
     exit(1)
 }
 
+guard
+    let claimsData = try? Data(contentsOf: claimsURL),
+    let claims = try? JSONDecoder().decode(ClaimsRegistry.self, from: claimsData)
+else {
+    fputs("Unable to decode docs/claims.json\n", stderr)
+    exit(1)
+}
+
 if manifest.schemaVersion != 1 {
     fail("Unsupported feature manifest schema version \(manifest.schemaVersion)")
+}
+if claims.schemaVersion != 1 {
+    fail("Unsupported claims registry schema version \(claims.schemaVersion)")
+}
+for claim in claims.evidence {
+    if !exists(claim.article, under: docs) {
+        fail("Claim references missing article docs/\(claim.article)")
+    }
+    if !exists(claim.source) {
+        fail("Claim references missing production source \(claim.source)")
+    }
+}
+let historyBehaviorTest = root.appendingPathComponent(
+    "NeoAnkiCore/Tests/NeoAnkiFlowTests/RevertReviewFlowTests.swift"
+)
+if claims.history.reviewLogRetention != "survives-item-and-card-deletion"
+    || (try? String(contentsOf: historyBehaviorTest, encoding: .utf8))?
+        .contains("deletingCardDoesNotDeleteReviewHistory") != true {
+    fail("Review-log retention claim is not backed by its production behavior test")
+}
+for assertion in claims.articleAssertions {
+    let articleURL = docs.appendingPathComponent(assertion.article)
+    guard let article = try? String(contentsOf: articleURL, encoding: .utf8) else {
+        fail("Claim assertion references unreadable article docs/\(assertion.article)")
+        continue
+    }
+    for expectedText in assertion.contains where !article.contains(expectedText) {
+        fail(
+            "High-risk prose in docs/\(assertion.article) is missing registry text: \(expectedText)"
+        )
+    }
+}
+
+let authoredItemSchemaURL = docs.appendingPathComponent("schemas/authored-item.schema.json")
+if let schemaData = try? Data(contentsOf: authoredItemSchemaURL),
+   let schema = try? JSONSerialization.jsonObject(with: schemaData) as? [String: Any],
+   let definitions = schema["$defs"] as? [String: Any],
+   let media = definitions["media"] as? [String: Any],
+   let properties = media["properties"] as? [String: Any],
+   let path = properties["path"] as? [String: Any],
+   let pattern = path["pattern"] as? String,
+   let expression = try? NSRegularExpression(pattern: pattern) {
+    func schemaAccepts(_ value: String) -> Bool {
+        let range = NSRange(value.startIndex..., in: value)
+        return expression.firstMatch(in: value, range: range)?.range == range
+    }
+    for valid in ["media/image.png", "media/subdirectory/audio.m4a"]
+        where !schemaAccepts(valid) {
+        fail("Authored media schema rejects valid confined path: \(valid)")
+    }
+    for invalid in [
+        "media/./bad.png", "media/../bad.png", "media//bad.png",
+        "media/sub/../bad.png", "/media/bad.png", "bad.png",
+    ] where schemaAccepts(invalid) {
+        fail("Authored media schema accepts unsafe path: \(invalid)")
+    }
+} else {
+    fail("Could not validate authored media path schema")
 }
 
 var identifiers = Set<String>()
@@ -66,6 +206,145 @@ for feature in manifest.features {
     }
 }
 
+if requireScreenshots {
+    let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/manifest.json")
+    guard
+        let screenshotData = try? Data(contentsOf: screenshotManifestURL),
+        let screenshotManifest = try? JSONDecoder().decode(
+            ScreenshotManifest.self,
+            from: screenshotData
+        )
+    else {
+        fail("Missing or invalid docs/assets/screenshots/manifest.json")
+        exitWithFailuresIfNeeded()
+    }
+    if screenshotManifest.schemaVersion != 1 {
+        fail("Unsupported screenshot manifest schema version \(screenshotManifest.schemaVersion)")
+    }
+    if screenshotManifest.sourceSHA.range(
+        of: #"^[0-9a-f]{40}$"#,
+        options: .regularExpression
+    ) == nil {
+        fail("Screenshot manifest sourceSHA must be a 40-character lowercase Git SHA")
+    }
+    if ISO8601DateFormatter().date(from: screenshotManifest.capturedAt) == nil {
+        fail("Screenshot manifest capturedAt must be an ISO-8601 timestamp")
+    }
+    let ancestryCheck = Process()
+    ancestryCheck.currentDirectoryURL = root
+    ancestryCheck.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    ancestryCheck.arguments = [
+        "merge-base", "--is-ancestor", screenshotManifest.sourceSHA, "HEAD",
+    ]
+    do {
+        try ancestryCheck.run()
+        ancestryCheck.waitUntilExit()
+        if ancestryCheck.terminationStatus != 0 {
+            fail("Screenshot manifest sourceSHA is not an ancestor of the validated revision")
+        }
+    } catch {
+        fail("Could not verify screenshot manifest source revision")
+    }
+    let expectedFilenames = Set(
+        manifest.features.compactMap(\.screenshot).map {
+            URL(fileURLWithPath: $0).lastPathComponent
+        }
+    )
+    let entriesByName = Dictionary(
+        screenshotManifest.screenshots.map { ($0.filename, $0) },
+        uniquingKeysWith: { first, _ in first }
+    )
+    if entriesByName.count != screenshotManifest.screenshots.count {
+        fail("Screenshot manifest contains duplicate filenames")
+    }
+    if Set(entriesByName.keys) != expectedFilenames {
+        fail("Screenshot manifest entries do not match feature screenshot coverage")
+    }
+    for entry in screenshotManifest.screenshots {
+        let screenshotURL = docs
+            .appendingPathComponent("assets/screenshots")
+            .appendingPathComponent(entry.filename)
+        guard let png = try? Data(contentsOf: screenshotURL), png.count >= 24,
+              Array(png.prefix(8)) == [137, 80, 78, 71, 13, 10, 26, 10] else {
+            fail("Screenshot \(entry.filename) is missing or is not a PNG")
+            continue
+        }
+        func pngInteger(at offset: Int) -> Int {
+            png[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+        }
+        if entry.width != pngInteger(at: 16) || entry.height != pngInteger(at: 20)
+            || entry.width <= 0 || entry.height <= 0 {
+            fail("Screenshot \(entry.filename) dimensions do not match its manifest")
+        }
+        let digest = SHA256.hash(data: png)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        if entry.sha256 != digest {
+            fail("Screenshot \(entry.filename) SHA-256 does not match its manifest")
+        }
+        if entry.scenario.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || entry.expectedVisibleIdentifiers.isEmpty {
+            fail("Screenshot \(entry.filename) is missing scenario evidence")
+        }
+    }
+}
+
+let mappedSources = Set(manifest.features.flatMap(\.sources))
+let mappedTests = Set(manifest.features.flatMap(\.tests))
+let excludedInventoryFiles = Set(manifest.inventory.excludedFiles)
+
+func inventoryFiles(under relativeRoot: String) -> [URL] {
+    let directory = root.appendingPathComponent(relativeRoot, isDirectory: true)
+    guard let enumerator = fileManager.enumerator(
+        at: directory,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    ) else {
+        fail("Feature inventory root does not exist: \(relativeRoot)")
+        return []
+    }
+    return (enumerator.allObjects as? [URL] ?? []).filter { $0.pathExtension == "swift" }
+}
+
+for sourceRoot in manifest.inventory.sourceRoots {
+    for file in inventoryFiles(under: sourceRoot) {
+        let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
+        guard !excludedInventoryFiles.contains(relativePath),
+              let text = try? String(contentsOf: file, encoding: .utf8),
+              manifest.inventory.sourceMarkers.contains(where: text.contains)
+        else {
+            continue
+        }
+        if !mappedSources.contains(relativePath) {
+            fail("User-facing source is missing from docs/features.json: \(relativePath)")
+        }
+    }
+}
+
+for sourceRoot in manifest.inventory.fullyMappedSourceRoots {
+    for file in inventoryFiles(under: sourceRoot) {
+        let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
+        if !excludedInventoryFiles.contains(relativePath), !mappedSources.contains(relativePath) {
+            fail("Required core/CLI source is missing from docs/features.json: \(relativePath)")
+        }
+    }
+}
+
+for testRoot in manifest.inventory.testRoots {
+    for file in inventoryFiles(under: testRoot) {
+        let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
+        guard !excludedInventoryFiles.contains(relativePath),
+              let text = try? String(contentsOf: file, encoding: .utf8),
+              manifest.inventory.testMarkers.contains(where: text.contains)
+        else {
+            continue
+        }
+        if !mappedTests.contains(relativePath) {
+            fail("User-facing test is missing from docs/features.json: \(relativePath)")
+        }
+    }
+}
+
 func featureIndex(_ features: [Feature]) -> String {
     var output = """
     ---
@@ -77,17 +356,28 @@ func featureIndex(_ features: [Feature]) -> String {
 
     # Feature index
 
-    This page is generated from [`features.json`](../features.json). It makes
-    documentation ownership explicit: each user-facing feature points to its guide,
-    implementation evidence, and behavioral tests.
+    Looking for an action rather than engineering evidence? Start with the
+    [task index](../user/tasks/).
+
+    This contributor-facing page is generated from [`features.json`](../features.json).
+    Within its declared app-source and UI-test inventory boundary, each detected
+    user-facing file must map to a guide, implementation evidence, and behavioral
+    tests. The screenshot capture harness is explicitly excluded because it verifies
+    documentation evidence rather than product behavior.
+
+        Evidence links establish implementation and test ownership; they are not a
+        conformance claim. In particular, the accessibility guide identifies which
+        VoiceOver, text-size, contrast, and end-to-end checks still require manual testing.
+
+    {% assign source_revision = site.data.build.commit_sha | default: site.documentation.revision %}
 
     | Feature | Guide | Implementation | Tests | Screenshot |
     | --- | --- | --- | --- | --- |
     """
     for feature in features.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) {
         let article = feature.article.replacingOccurrences(of: ".md", with: "/")
-        let sourceLinks = feature.sources.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/main/\($0))" }.joined(separator: "<br>")
-        let testLinks = feature.tests.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/main/\($0))" }.joined(separator: "<br>")
+        let sourceLinks = feature.sources.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/{{ source_revision }}/\($0))" }.joined(separator: "<br>")
+        let testLinks = feature.tests.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/{{ source_revision }}/\($0))" }.joined(separator: "<br>")
         let screenshot = feature.screenshot.map { "[View](../\($0))" } ?? "—"
         output += "\n| \(feature.name) | [Guide](../\(article)) | \(sourceLinks) | \(testLinks) | \(screenshot) |"
     }
@@ -123,6 +413,9 @@ for file in markdownFiles {
         guard let targetRange = Range(match.range(at: 2), in: text) else { continue }
         let isImage = match.range(at: 1).length == 1
         var target = String(text[targetRange])
+        if target.hasPrefix("#") {
+            continue
+        }
         target = target.split(separator: "#", maxSplits: 1).first.map(String.init) ?? target
         target = target.removingPercentEncoding ?? target
         if target.isEmpty || target.hasPrefix("http://") || target.hasPrefix("https://")
@@ -178,12 +471,27 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
         if process.terminationStatus == 0 {
             let changedData = pipe.fileHandleForReading.readDataToEndOfFile()
             let changed = Set(String(decoding: changedData, as: UTF8.self).split(separator: "\n").map(String.init))
-            if !changed.contains("docs/features.json") {
-                for feature in manifest.features where !changed.isDisjoint(with: Set(feature.sources)) {
-                    let articlePath = "docs/\(feature.article)"
-                    if !changed.contains(articlePath) {
-                        fail("Feature '\(feature.id)' changed without updating \(articlePath) or docs/features.json")
+            for feature in manifest.features where !changed.isDisjoint(with: Set(feature.sources)) {
+                let articlePath = "docs/\(feature.article)"
+                if !changed.contains(articlePath) {
+                    fail("Feature '\(feature.id)' changed without reviewing and updating \(articlePath)")
+                }
+                if let screenshot = feature.screenshot {
+                    let screenshotPath = "docs/\(screenshot)"
+                    if !changed.contains(screenshotPath)
+                        || !changed.contains("docs/assets/screenshots/manifest.json") {
+                        fail(
+                            "Feature '\(feature.id)' changed without refreshing \(screenshotPath) and its screenshot manifest"
+                        )
                     }
+                }
+            }
+            for claim in claims.evidence where changed.contains(claim.source) {
+                let articlePath = "docs/\(claim.article)"
+                if !changed.contains("docs/claims.json") || !changed.contains(articlePath) {
+                    fail(
+                        "High-risk claims source \(claim.source) changed; update docs/claims.json and \(articlePath)"
+                    )
                 }
             }
         } else {

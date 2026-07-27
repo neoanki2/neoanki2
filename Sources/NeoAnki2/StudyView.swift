@@ -131,6 +131,7 @@ struct StudyView: View {
             Button("Done") {
                 onEndSession()
             }
+            .keyboardShortcut(.defaultAction)
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("studySessionDone")
         }

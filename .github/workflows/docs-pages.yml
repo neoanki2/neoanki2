@@ -7,15 +7,24 @@ on:
       - Sources/NeoAnki2/**
       - NeoAnkiCore/Sources/NeoAnkiCore/**
       - NeoAnkiCore/Sources/NeoAnkiDeckCLI/**
+      - Package.swift
       - Tests/NeoAnki2Tests/**
       - UITests/NeoAnki2UITests/**
       - Scripts/validate-docs.swift
+      - Scripts/validate-built-docs.py
       - .github/workflows/docs-pages.yml
   push:
     branches: [main]
     paths:
       - docs/**
+      - Sources/NeoAnki2/**
+      - NeoAnkiCore/Sources/NeoAnkiCore/**
+      - NeoAnkiCore/Sources/NeoAnkiDeckCLI/**
+      - Package.swift
+      - Tests/NeoAnki2Tests/**
+      - UITests/NeoAnki2UITests/**
       - Scripts/validate-docs.swift
+      - Scripts/validate-built-docs.py
       - .github/workflows/docs-pages.yml
   workflow_dispatch:
 
@@ -40,20 +49,44 @@ jobs:
       - name: Check changed features have documentation updates
         if: github.event_name == 'pull_request'
         run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "origin/${{ github.base_ref }}"
+      - name: Check direct main changes have documentation updates
+        if: github.event_name == 'push'
+        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "${{ github.event.before }}"
 
   build:
     name: Build documentation site
-    if: github.event_name != 'pull_request'
     needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pages: write
-      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Add build metadata
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import datetime
+          import json
+          import os
+          from pathlib import Path
+
+          data_directory = Path("docs/_data")
+          data_directory.mkdir(exist_ok=True)
+          metadata = {
+              "commit_sha": os.environ["COMMIT_SHA"],
+              "published_at": datetime.datetime.now(
+                  datetime.timezone.utc
+              ).isoformat(timespec="seconds").replace("+00:00", "Z"),
+          }
+          (data_directory / "build.json").write_text(
+              json.dumps(metadata, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
       - name: Configure Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
       - name: Build with Jekyll
@@ -61,7 +94,12 @@ jobs:
         with:
           source: ./docs
           destination: ./_site
+      - name: Validate rendered documentation
+        run: >-
+          python3 Scripts/validate-built-docs.py _site
+          --base-url https://neoanki2.github.io/neoanki2
       - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
 
   deploy:

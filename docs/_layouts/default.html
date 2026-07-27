@@ -4,45 +4,122 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    {% assign page_title = page.title | default: site.title %}
+    {% assign page_description = page.description | default: site.description %}
+    {% assign canonical_url = page.url | absolute_url %}
     <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
-    <meta name="description" content="{{ page.description | default: site.description | escape }}">
+    <meta name="description" content="{{ page_description | escape }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta property="og:site_name" content="{{ site.title | escape }}">
+    <meta property="og:title" content="{{ page_title | escape }}">
+    <meta property="og:description" content="{{ page_description | escape }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:type" content="{% if page.url == '/' %}website{% else %}article{% endif %}">
+    {% if page.image %}<meta property="og:image" content="{{ page.image | absolute_url }}">{% endif %}
     <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
+    <script src="{{ '/assets/js/search.js' | relative_url }}" defer></script>
   </head>
-  <body>
+  <body class="{% if page.url == '/features/' %}page-features{% endif %}">
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="site-header">
-      <a class="brand" href="{{ '/' | relative_url }}">NeoAnki2</a>
-      <nav aria-label="Primary">
-        <a href="{{ '/user/' | relative_url }}">User guide</a>
-        <a href="{{ '/features/' | relative_url }}">Feature index</a>
-        <a href="{{ '/reference/' | relative_url }}">Reference</a>
-        <a href="https://github.com/neoanki2/neoanki2">GitHub</a>
+      <div class="header-bar">
+        <a class="brand" href="{{ '/' | relative_url }}">{{ site.title }}</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        {% for item in site.data.navigation.primary %}
+          {% assign item_active = false %}
+          {% if page.url == item.url %}{% assign item_active = true %}{% endif %}
+          {% for child in item.children %}
+            {% if page.url == child.url %}{% assign item_active = true %}{% endif %}
+          {% endfor %}
+          <a{% if item_active %} class="active"{% endif %} href="{% if item.external %}{{ item.url }}{% else %}{{ item.url | relative_url }}{% endif %}"{% if page.url == item.url %} aria-current="page"{% elsif item_active %} aria-current="location"{% endif %}{% if item.external %} rel="noopener noreferrer"{% endif %}>{{ item.short_title | default: item.title }}{% if item.external %}<span class="external-mark" aria-hidden="true">↗</span>{% endif %}</a>
+        {% endfor %}
       </nav>
+      <form class="site-search" role="search" action="{{ '/search.json' | relative_url }}" data-guide-url="{{ '/user/getting-started/' | relative_url }}" data-features-url="{{ '/features/' | relative_url }}">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
     </header>
     <div class="page-shell">
-      <aside class="sidebar" aria-label="Documentation">
-        <strong>User guide</strong>
-        <a href="{{ '/user/getting-started/' | relative_url }}">Getting started</a>
-        <a href="{{ '/user/library-and-decks/' | relative_url }}">Library and decks</a>
-        <a href="{{ '/user/authoring-items/' | relative_url }}">Authoring items</a>
-        <a href="{{ '/user/content-and-media/' | relative_url }}">Content and media</a>
-        <a href="{{ '/user/studying/' | relative_url }}">Studying</a>
-        <a href="{{ '/user/item-types-and-templates/' | relative_url }}">Item types and templates</a>
-        <a href="{{ '/user/import-export/' | relative_url }}">Import and export</a>
-        <a href="{{ '/user/scheduling/' | relative_url }}">Scheduling</a>
-        <a href="{{ '/user/shortcuts-accessibility/' | relative_url }}">Shortcuts and accessibility</a>
-        <a href="{{ '/user/troubleshooting/' | relative_url }}">Troubleshooting</a>
-        <a href="{{ '/user/cli/' | relative_url }}">Deck authoring CLI</a>
-        <strong>Contributors</strong>
-        <a href="{{ '/user/maintaining-documentation/' | relative_url }}">Maintaining documentation</a>
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        {% for section in site.data.navigation.primary %}
+          {% if section.children %}
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="{{ section.url | relative_url }}"{% if page.url == section.url %} aria-current="page"{% endif %}>{{ section.title }}</a>
+              <ul>
+                {% for item in section.children %}
+                  <li><a href="{{ item.url | relative_url }}"{% if page.url == item.url %} aria-current="page"{% endif %}>{{ item.title }}</a></li>
+                {% endfor %}
+              </ul>
+            </section>
+          {% endif %}
+        {% endfor %}
       </aside>
-      <main id="content">
-        {% if page.parent %}<p class="eyebrow">{{ page.parent }}</p>{% endif %}
+      <main id="content" tabindex="-1">
+        {% assign breadcrumb_parent_title = nil %}
+        {% assign breadcrumb_parent_url = nil %}
+        {% assign previous_item = nil %}
+        {% assign next_item = nil %}
+        {% for section in site.data.navigation.primary %}
+          {% for item in section.children %}
+            {% if page.url == item.url %}
+              {% assign breadcrumb_parent_title = section.title %}
+              {% assign breadcrumb_parent_url = section.url %}
+              {% unless forloop.first %}
+                {% assign previous_index = forloop.index0 | minus: 1 %}
+                {% assign previous_item = section.children[previous_index] %}
+              {% endunless %}
+              {% unless forloop.last %}
+                {% assign next_index = forloop.index0 | plus: 1 %}
+                {% assign next_item = section.children[next_index] %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+        {% unless page.url == '/' %}
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="{{ '/' | relative_url }}">Home</a></li>
+              {% if breadcrumb_parent_title %}
+                <li><a href="{{ breadcrumb_parent_url | relative_url }}">{{ breadcrumb_parent_title }}</a></li>
+              {% endif %}
+              <li><span aria-current="page">{{ page_title }}</span></li>
+            </ol>
+          </nav>
+        {% endunless %}
         {{ content }}
+        {% if previous_item or next_item %}
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            {% if previous_item %}
+              <a class="article-previous" href="{{ previous_item.url | relative_url }}"><span>Previous</span>{{ previous_item.title }}</a>
+            {% endif %}
+            {% if next_item %}
+              <a class="article-next" href="{{ next_item.url | relative_url }}"><span>Next</span>{{ next_item.title }}</a>
+            {% endif %}
+          </nav>
+        {% endif %}
       </main>
     </div>
-    <footer>
-      NeoAnki2 is open source. Documentation is versioned with the product.
+    {% assign documentation_revision = site.data.build.commit_sha | default: site.documentation.revision %}
+    {% assign documentation_published_at = site.data.build.published_at | default: site.documentation.published_at %}
+    <footer class="site-footer">
+      <p>{{ site.documentation.status }} for {{ site.title }}.</p>
+      <p>
+        <a href="{{ site.source_url }}/tree/{{ documentation_revision }}/docs">Source revision {{ documentation_revision | slice: 0, 12 }}</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="{{ documentation_published_at | date_to_xmlschema }}">{{ documentation_published_at | date: "%B %-d, %Y at %H:%M UTC" }}</time>
+      </p>
     </footer>
   </body>
 </html>

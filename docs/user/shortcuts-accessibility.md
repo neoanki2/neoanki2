@@ -1,5 +1,6 @@
 ---
 title: Shortcuts and accessibility
+description: Use NeoAnki2 by keyboard and distinguish automated accessibility coverage from unverified behavior.
 nav_order: 9
 parent: User Guide
 ---
@@ -10,6 +11,33 @@ NeoAnki2 uses standard macOS menus, controls, focus behavior, and semantic
 system colors. Menu items are disabled when their action is unsafe—for example,
 imports are disabled during study and portable export requires a selected
 deck.
+
+## Accessibility evidence and limits
+
+Current automated tests verify specific behavior, not general accessibility
+conformance:
+
+- routing logic produces announcements and answer/error focus targets, and
+  suppresses only consecutive duplicate announcements;
+- concealed content policies cover every content/reveal combination without
+  putting hidden answer text in accessibility labels;
+- Reduce Motion suppresses time-based audio/video autoplay and GIF animation;
+- image and GIF item validation requires a description; and
+- UI tests exercise selected keyboard paths: Space to reveal, `3` to grade
+  Good, Command-Z to undo, Right Arrow to self-grade, and Command-Down Arrow
+  during arrange.
+
+The test suite does **not** run a live VoiceOver session, verify spoken output
+or focus movement end to end, audit every screen at every text size, measure
+contrast, or establish WCAG conformance. Full keyboard traversal, Voice
+Control, Switch Control, Zoom, and localization with assistive technology are
+also unverified as complete user journeys.
+
+The sections below document behavior implemented in current source. Treat
+anything outside the tested list above as implemented but not independently
+verified with its assistive technology. If you depend on one of those paths,
+test the current development build and [report a minimal, privacy-redacted
+issue](../support/#report-an-issue-safely).
 
 ## Menus
 
@@ -32,7 +60,8 @@ the library instead.
 
 - **Start Study** — **Command-Shift-S**
 - **End Session**
-- **Continue** — **Space**
+- **Continue** — **Space** from the Study menu; **Return** also activates the
+  in-view default action.
 - **Grade: Again** — **1**
 - **Grade: Hard** — **2**
 - **Grade: Good** — **3**
@@ -139,3 +168,9 @@ description is not announced before the answer.
 - A disabled command generally means the app is loading, transferring, showing
   another workflow, or lacks the required selection—not that the shortcut is
   broken.
+
+---
+
+**Next:** [Troubleshoot app behavior](../troubleshooting/)
+
+**Related:** [First study session](../first-study-session/) · [Build and support](../support/)

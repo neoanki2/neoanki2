@@ -1,5 +1,6 @@
 ---
 title: Deck authoring CLI
+description: Build and run neoanki-deck to validate editable authored deck bundles before import.
 nav_order: 11
 parent: User Guide
 ---
@@ -81,4 +82,4 @@ workflow. Do not use it to convert personal decks, validate content, back up a
 library, or prepare a production import.
 
 For the authored source layout and all supported records, see the
-[Authored Deck Format](../../AUTHORED_DECK_FORMAT.html).
+[Authored Deck Format]({{ site.baseurl }}/AUTHORED_DECK_FORMAT/).

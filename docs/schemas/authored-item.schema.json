@@ -93,7 +93,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "pattern": "^media/(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+          "pattern": "^media/(?!\\.{1,2}/)(?!.*?/\\.{1,2}(?:/|$))(?:[^/]+/)*[^/]+$"
         },
         "alt": {"type": "string"},
         "durationMs": {"type": "integer", "minimum": 0}

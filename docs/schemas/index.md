@@ -1,5 +1,6 @@
 ---
 title: Authored deck JSON Schemas
+description: Download the JSON Schemas for .neoanki manifests, item types, decks, and items.
 parent: Reference
 ---
 

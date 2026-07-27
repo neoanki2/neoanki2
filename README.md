@@ -7,6 +7,16 @@ NeoAnki2 is a rewrite of the Anki idea, not a port. It deliberately drops all
 legacy Anki compatibility (no HTML/CSS cards, no `.apkg`, no shared-deck import,
 no SM-2) in favor of a clean, native, and scientifically grounded model.
 
+NeoAnki2 does not currently publish releases, installers, or a signed download.
+On macOS 14+ with a Swift 6 Xcode toolchain, clone the repository and run:
+
+```bash
+./Scripts/run-app.sh
+```
+
+See [Getting started](https://neoanki2.github.io/neoanki2/user/getting-started/)
+for prerequisite checks, expected output, updates, and removal.
+
 ## Principles
 
 - **Native-only.** Card content is data (`ContentValue`), rendered by SwiftUI.

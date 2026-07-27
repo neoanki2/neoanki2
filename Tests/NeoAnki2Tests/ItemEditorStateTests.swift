@@ -99,3 +99,20 @@ import Testing
     #expect(MediaFieldPolicy.descriptionLabel(for: .audio) == "Description (optional)")
     #expect(MediaFieldPolicy.descriptionLabel(for: .video) == "Description (optional)")
 }
+
+@Test func mediaPickerOffersOnlyFormatsAcceptedByCoreValidation() throws {
+    for kind in [MediaKind.audio, .image, .gif, .video] {
+        let acceptedExtensions = MediaValidation.allowedExtensions(for: kind)
+        let offeredExtensions = MediaFieldPolicy.allowedFilenameExtensions(for: kind)
+        #expect(
+            MediaFieldPolicy.allowedContentTypes(for: kind).count == offeredExtensions.count,
+            "Every offered extension must resolve to a system content type"
+        )
+        for fileExtension in offeredExtensions {
+            #expect(
+                acceptedExtensions.contains(fileExtension),
+                "Picker offers \(fileExtension) for \(kind.rawValue), but core rejects it"
+            )
+        }
+    }
+}

@@ -42,12 +42,15 @@ public struct FSRSOptimizationResult: Equatable, Sendable {
 /// bounded coordinate search against binary recall log loss, with a small
 /// regularizer that prevents sparse histories from driving weights to bounds.
 public struct FSRSOptimizer: Sendable {
+    public static let defaultMinimumObservations = 100
+    public static let minimumReviewsPerCardForOutcome = 2
+
     public let minimumObservations: Int
     public let passes: Int
     public let regularization: Double
 
     public init(
-        minimumObservations: Int = 100,
+        minimumObservations: Int = Self.defaultMinimumObservations,
         passes: Int = 5,
         regularization: Double = 0.002
     ) {
@@ -170,7 +173,7 @@ public struct FSRSOptimizer: Sendable {
                 }
                 .map(\.element)
             }
-            .filter { $0.count >= 2 }
+            .filter { $0.count >= Self.minimumReviewsPerCardForOutcome }
             .sorted { lhs, rhs in
                 (lhs.first?.cardID.uuidString ?? "") < (rhs.first?.cardID.uuidString ?? "")
             }

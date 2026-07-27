@@ -5,10 +5,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT_DIR="${1:-$ROOT/.build/documentation-screenshots}"
 
 mkdir -p "$OUTPUT_DIR"
+rm -f "$OUTPUT_DIR"/*.png "$OUTPUT_DIR/manifest.json" "$OUTPUT_DIR/.capture-context.json"
 export DOC_SCREENSHOT_DIR="$OUTPUT_DIR"
+DOC_SCREENSHOT_SOURCE_SHA="$(git -C "$ROOT" rev-parse HEAD)"
+DOC_SCREENSHOT_CAPTURED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+printf '{"sourceSHA":"%s","capturedAt":"%s"}\n' \
+  "$DOC_SCREENSHOT_SOURCE_SHA" "$DOC_SCREENSHOT_CAPTURED_AT" \
+  > "$OUTPUT_DIR/.capture-context.json"
 export NEOANKI_UI_ONLY_TESTING="NeoAnki2UITests/DocumentationScreenshotTests"
 
 "$ROOT/Scripts/run-ui-tests.sh"
+rm -f "$OUTPUT_DIR/.capture-context.json"
 
 EXPECTED=(
   library-empty.png library-populated.png decks-nested.png item-add.png
@@ -25,4 +32,62 @@ for screenshot in "${EXPECTED[@]}"; do
   fi
 done
 
-echo "Captured ${#EXPECTED[@]} documentation screenshots in $OUTPUT_DIR"
+python3 - "$OUTPUT_DIR" "$DOC_SCREENSHOT_SOURCE_SHA" "${EXPECTED[@]}" <<'PY'
+import datetime
+import json
+import pathlib
+import re
+import struct
+import sys
+
+directory = pathlib.Path(sys.argv[1])
+expected_sha = sys.argv[2]
+expected_files = set(sys.argv[3:])
+manifest_path = directory / "manifest.json"
+
+try:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as error:
+    raise SystemExit(f"Invalid or missing screenshot manifest: {error}")
+
+if manifest.get("schemaVersion") != 1:
+    raise SystemExit("Screenshot manifest must use schemaVersion 1")
+source_sha = manifest.get("sourceSHA")
+if source_sha != expected_sha or re.fullmatch(r"[0-9a-f]{40}", source_sha or "") is None:
+    raise SystemExit("Screenshot manifest sourceSHA is missing or does not match the captured commit")
+captured_at = manifest.get("capturedAt")
+try:
+    datetime.datetime.strptime(captured_at, "%Y-%m-%dT%H:%M:%SZ")
+except (TypeError, ValueError):
+    raise SystemExit("Screenshot manifest capturedAt must be a UTC RFC3339 timestamp")
+
+entries = manifest.get("screenshots")
+if not isinstance(entries, list):
+    raise SystemExit("Screenshot manifest screenshots must be an array")
+by_filename = {entry.get("filename"): entry for entry in entries if isinstance(entry, dict)}
+if set(by_filename) != expected_files or len(entries) != len(expected_files):
+    raise SystemExit("Screenshot manifest entries do not exactly match the expected screenshots")
+
+for filename in sorted(expected_files):
+    entry = by_filename[filename]
+    path = directory / filename
+    with path.open("rb") as image:
+        header = image.read(24)
+    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"{filename} is not a valid PNG")
+    width, height = struct.unpack(">II", header[16:24])
+    if entry.get("width") != width or entry.get("height") != height or width <= 0 or height <= 0:
+        raise SystemExit(f"Manifest dimensions do not match {filename}")
+    if not isinstance(entry.get("scenario"), str) or not entry["scenario"].strip():
+        raise SystemExit(f"Manifest scenario is missing for {filename}")
+    identifiers = entry.get("expectedVisibleIdentifiers")
+    if (
+        not isinstance(identifiers, list)
+        or not identifiers
+        or any(not isinstance(value, str) or not value.strip() for value in identifiers)
+    ):
+        raise SystemExit(f"Expected visible identifiers are missing for {filename}")
+PY
+
+echo "Captured and validated ${#EXPECTED[@]} documentation screenshots in $OUTPUT_DIR"
+echo "Manifest: $OUTPUT_DIR/manifest.json"

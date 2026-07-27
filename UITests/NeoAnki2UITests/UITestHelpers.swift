@@ -1,3 +1,4 @@
+import CryptoKit
 @preconcurrency import XCTest
 
 @MainActor
@@ -52,6 +53,8 @@ class NeoAnkiUITestCase: XCTestCase {
     func captureDocumentationScreenshot(
         named name: String,
         of app: XCUIApplication,
+        scenario: String,
+        expectedVisibleIdentifiers: [String],
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
@@ -59,17 +62,70 @@ class NeoAnkiUITestCase: XCTestCase {
             XCTFail("DOC_SCREENSHOT_DIR must be set for documentation screenshot tests", file: file, line: line)
             return
         }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        guard !scenario.isEmpty, !expectedVisibleIdentifiers.isEmpty else {
+            XCTFail("Screenshot scenario and expected identifiers must not be empty", file: file, line: line)
+            return
+        }
+
         let outputDirectory = URL(fileURLWithPath: outputPath, isDirectory: true)
+        let captureContext: DocumentationScreenshotCaptureContext
+        do {
+            captureContext = try JSONDecoder().decode(
+                DocumentationScreenshotCaptureContext.self,
+                from: Data(contentsOf: outputDirectory.appendingPathComponent(".capture-context.json"))
+            )
+        } catch {
+            XCTFail("Could not read documentation screenshot capture context: \(error)", file: file, line: line)
+            return
+        }
+
+        app.activate()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        let appWindow = app.windows.firstMatch
+        guard appWindow.waitForExistence(timeout: 5) else {
+            XCTFail("No app window available for documentation screenshot '\(name)'", file: file, line: line)
+            return
+        }
+        for identifier in expectedVisibleIdentifiers {
+            let element = appWindow.descendants(matching: .any).identified(identifier)
+            guard element.waitForExistence(timeout: 3),
+                  !element.frame.isEmpty,
+                  element.frame.intersects(appWindow.frame) else {
+                XCTFail(
+                    "Expected '\(identifier)' to be visible in documentation screenshot '\(name)'",
+                    file: file,
+                    line: line
+                )
+                return
+            }
+        }
+
         do {
             try FileManager.default.createDirectory(
                 at: outputDirectory,
                 withIntermediateDirectories: true
             )
-            let screenshot = app.screenshot()
-            try screenshot.pngRepresentation.write(
+            let screenshot = appWindow.screenshot()
+            let pngData = screenshot.pngRepresentation
+            let dimensions = try pngDimensions(pngData)
+            try pngData.write(
                 to: outputDirectory.appendingPathComponent("\(name).png"),
                 options: .atomic
+            )
+            try updateDocumentationScreenshotManifest(
+                in: outputDirectory,
+                entry: DocumentationScreenshotManifest.Entry(
+                    filename: "\(name).png",
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    sha256: SHA256.hash(data: pngData)
+                        .map { String(format: "%02x", $0) }
+                        .joined(),
+                    scenario: scenario,
+                    expectedVisibleIdentifiers: expectedVisibleIdentifiers
+                ),
+                sourceSHA: captureContext.sourceSHA,
+                capturedAt: captureContext.capturedAt
             )
             let attachment = XCTAttachment(screenshot: screenshot)
             attachment.name = name
@@ -78,6 +134,77 @@ class NeoAnkiUITestCase: XCTestCase {
         } catch {
             XCTFail("Could not write documentation screenshot '\(name)': \(error)", file: file, line: line)
         }
+    }
+
+    private struct DocumentationScreenshotManifest: Codable {
+        struct Entry: Codable {
+            let filename: String
+            let width: Int
+            let height: Int
+            let sha256: String
+            let scenario: String
+            let expectedVisibleIdentifiers: [String]
+        }
+
+        let schemaVersion: Int
+        let sourceSHA: String
+        let capturedAt: String
+        var screenshots: [Entry]
+    }
+
+    private struct DocumentationScreenshotCaptureContext: Codable {
+        let sourceSHA: String
+        let capturedAt: String
+    }
+
+    private func pngDimensions(_ data: Data) throws -> (width: Int, height: Int) {
+        guard data.count >= 24,
+              Array(data.prefix(8)) == [137, 80, 78, 71, 13, 10, 26, 10] else {
+            throw NSError(
+                domain: "DocumentationScreenshot",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Screenshot is not a valid PNG"]
+            )
+        }
+        func integer(at offset: Int) -> Int {
+            data[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+        }
+        return (integer(at: 16), integer(at: 20))
+    }
+
+    private func updateDocumentationScreenshotManifest(
+        in directory: URL,
+        entry: DocumentationScreenshotManifest.Entry,
+        sourceSHA: String,
+        capturedAt: String
+    ) throws {
+        let manifestURL = directory.appendingPathComponent("manifest.json")
+        var manifest = DocumentationScreenshotManifest(
+            schemaVersion: 1,
+            sourceSHA: sourceSHA,
+            capturedAt: capturedAt,
+            screenshots: []
+        )
+        if FileManager.default.fileExists(atPath: manifestURL.path) {
+            manifest = try JSONDecoder().decode(
+                DocumentationScreenshotManifest.self,
+                from: Data(contentsOf: manifestURL)
+            )
+            guard manifest.sourceSHA == sourceSHA, manifest.capturedAt == capturedAt else {
+                throw NSError(
+                    domain: "DocumentationScreenshot",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Manifest capture metadata changed during the run"]
+                )
+            }
+        }
+        manifest.screenshots.removeAll { $0.filename == entry.filename }
+        manifest.screenshots.append(entry)
+        manifest.screenshots.sort { $0.filename < $1.filename }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(manifest).write(to: manifestURL, options: .atomic)
     }
 
     func waitForLibraryReady(in app: XCUIApplication, timeout: TimeInterval = 15) {

@@ -1,0 +1,20 @@
+---
+layout: null
+search: false
+---
+[
+  {% assign emitted_search_result = false %}
+  {% for item in site.pages %}
+    {% if item.title %}
+    {% unless item.search == false %}
+    {% if emitted_search_result %},{% endif %}
+    {
+      "title": {{ item.title | jsonify }},
+      "url": {{ item.url | relative_url | jsonify }},
+      "content": {{ item.content | markdownify | strip_html | normalize_whitespace | jsonify }}
+    }
+    {% assign emitted_search_result = true %}
+    {% endunless %}
+    {% endif %}
+  {% endfor %}
+]

@@ -1,5 +1,6 @@
 ---
 title: Library and decks
+description: Create, nest, rename, select, and safely remove decks while understanding All Decks and Unassigned.
 nav_order: 2
 parent: User Guide
 ---
@@ -9,7 +10,7 @@ parent: User Guide
 The sidebar controls which items and due cards appear in the detail area.
 Decks organize items without changing their item type or generated cards.
 
-![A populated library and its item list]({{ site.baseurl }}/assets/screenshots/library-populated.png)
+[![A populated library and its item list]({{ site.baseurl }}/assets/screenshots/library-populated.png)]({{ site.baseurl }}/assets/screenshots/library-populated.png)
 
 ## Choose a scope
 
@@ -46,7 +47,7 @@ scope. Choosing **Cancel** leaves the tree unchanged.
 Parents with children appear as disclosure groups. Expand or collapse them to
 navigate the hierarchy.
 
-![Nested decks in the sidebar]({{ site.baseurl }}/assets/screenshots/decks-nested.png)
+[![Nested decks in the sidebar]({{ site.baseurl }}/assets/screenshots/decks-nested.png)]({{ site.baseurl }}/assets/screenshots/decks-nested.png)
 
 Selecting a parent includes content in every level below it. Selecting a child
 limits the list and study session to that child's subtree.
@@ -107,5 +108,5 @@ Each row shows:
 - the number of generated cards and the item type name
 
 For media fields, the description is used when available; otherwise the media
-kind is shown. Cloze text is shown with its blanks concealed. Double-click a
-row for the complete field preview and item actions.
+kind is shown. Cloze text is shown with its blanks concealed. Select a row for
+the complete field preview and item actions.

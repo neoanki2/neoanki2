@@ -34,6 +34,9 @@ jobs:
           defaults write -g AppleLanguages -array en
           defaults write -g AppleLocale -string en_US
           defaults write com.apple.universalaccess reduceMotion -bool true
+          defaults write com.apple.dock autohide -bool true
+          defaults write com.apple.dock autohide-delay -float 1000
+          killall Dock || true
       - name: Capture documentation screenshots
         run: |
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh Scripts/capture-doc-screenshots.sh
@@ -42,6 +45,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: neoanki2-documentation-screenshots
-          path: ${{ runner.temp }}/neoanki2-doc-screenshots/*.png
+          path: ${{ runner.temp }}/neoanki2-doc-screenshots/
           if-no-files-found: error
           retention-days: 14

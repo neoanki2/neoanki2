@@ -1,5 +1,6 @@
 ---
 title: Import and export
+description: Choose JSON, CSV, portable decks, or authored decks and recover safely from validation and conflict errors.
 nav_order: 7
 parent: User Guide
 ---
@@ -15,13 +16,25 @@ NeoAnki2 has three native ways to bring in content:
 Anki `.apkg` and `.colpkg` packages, shared-deck imports, HTML/CSS cards, and
 Anki template markup are not supported.
 
+<nav class="local-toc" aria-label="On this page" markdown="1">
+**On this page**
+
+- [Import JSON or CSV](#import-json-or-csv)
+- [Export a portable deck](#export-a-portable-deck)
+- [Import `.neodeck` or `.neoanki`](#import-neodeck-or-neoanki)
+- [Choose the right format](#choosing-the-right-format)
+</nav>
+
 ## Import JSON or CSV
 
 Choose **File → Import…**, select one `.json` or `.csv` file, review the import
-sheet, and choose **Import**. Import is unavailable while studying, editing an
-item, managing item types, or another transfer is active.
+sheet, and choose **Import**. Import is unavailable while studying, adding an
+item, managing item types, showing another import sheet, or while a deck
+transfer is active. It is also disabled while the library is loading or no item
+types exist. An item edit sheet does not disable the menu. Deck import/export
+waits for item and deck loading but can supply its own item types.
 
-![JSON import sheet showing the selected file and duplicate warning]({{ site.baseurl }}/assets/screenshots/import-sheet.png)
+[![JSON import sheet showing the selected file and duplicate warning]({{ site.baseurl }}/assets/screenshots/import-sheet.png)]({{ site.baseurl }}/assets/screenshots/import-sheet.png)
 
 ### JSON
 
@@ -67,6 +80,27 @@ JSON may also contain base64 media with optional `fileExtension` and `altText`,
 but a media folder is simpler for authored files. Media kind, signature, size,
 and path confinement are validated before any row is saved.
 
+Structured values use these complete shapes:
+
+```json
+{
+  "Cloze": {
+    "text": "Paris is in France.",
+    "blanks": [{ "group": 1, "start": 12, "length": 6, "hint": "country" }]
+  },
+  "Image": {
+    "base64": "<base64 bytes>",
+    "fileExtension": "png",
+    "altText": "Map highlighting France"
+  }
+}
+```
+
+The importer currently accepts Image/GIF media without `altText`, unlike the
+item editor. Treat that as an accessibility limitation: include a meaningful
+description in authored/imported content whenever the image carries
+information.
+
 ### CSV
 
 CSV requires a header row and at least one data row. Choose the destination
@@ -95,7 +129,10 @@ rows, invalid media, and empty payloads stop the import.
 The operation is all-or-nothing: a failed import leaves the existing library
 unchanged. Every successful row is always added as a new item. NeoAnki2 does
 not search for matching content, so importing the same file twice creates
-duplicates and new due cards.
+duplicates and new due cards. JSON and CSV rows are placed in **Unassigned**.
+There is currently no bulk move, search, or duplicate-cleanup action; organize
+or remove imported items one at a time, and test large imports with a small
+sample first.
 
 ## Export a portable deck
 
@@ -139,7 +176,7 @@ schema, no content is imported until you choose:
   item type.
 - **Cancel** — make no changes.
 
-![Item type conflict choices during portable deck import]({{ site.baseurl }}/assets/screenshots/portable-conflict.png)
+[![Item type conflict choices during portable deck import]({{ site.baseurl }}/assets/screenshots/portable-conflict.png)]({{ site.baseurl }}/assets/screenshots/portable-conflict.png)
 
 Portable imports are atomic. An unsupported version, malformed package,
 conflict left unresolved, media error, size limit, disk error, or cancellation

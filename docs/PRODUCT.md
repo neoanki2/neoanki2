@@ -1,5 +1,6 @@
 ---
 title: Product
+description: Review NeoAnki2 product goals, user workflows, requirements, and deliberate scope boundaries.
 parent: Reference
 ---
 
@@ -120,8 +121,8 @@ can choose an empty starter set.
 | Architecture & philosophy | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Visual design system | [`DESIGN.md`](DESIGN.md) |
 | Product context | [`PRODUCT.md`](PRODUCT.md) |
-| Documentation index | [`README.md`](README.md) |
-| Project overview | [`../README.md`](../README.md) |
+| Documentation index | [Documentation home]({{ site.baseurl }}/) |
+| Project overview | [Repository README](https://github.com/neoanki2/neoanki2#readme) |
 | Runnable macOS app | `Sources/NeoAnki2/` |
 | Domain package | `NeoAnkiCore/` |
 

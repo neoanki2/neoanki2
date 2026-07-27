@@ -92,6 +92,12 @@ public struct JSONImportAdapter: ImportAdapter {
                         values[key.stringValue] = string
                     } else if let structuredValue = try? container.decode(StructuredFieldValue.self, forKey: key) {
                         structured[key.stringValue] = structuredValue
+                    } else {
+                        throw DecodingError.dataCorruptedError(
+                            forKey: key,
+                            in: container,
+                            debugDescription: "Field values must be strings or supported structured values."
+                        )
                     }
                 }
 

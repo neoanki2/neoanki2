@@ -1,5 +1,6 @@
 ---
 title: Authoring items
+description: Create, edit, move, and delete structured study items without losing track of their generated cards.
 nav_order: 3
 parent: User Guide
 ---
@@ -18,7 +19,7 @@ fields you fill in and the templates that generate study cards.
 5. Complete the required fields.
 6. Choose **Save** or press Return when Save is enabled.
 
-![The Add Item form]({{ site.baseurl }}/assets/screenshots/item-add.png)
+[![The Add Item form]({{ site.baseurl }}/assets/screenshots/item-add.png)]({{ site.baseurl }}/assets/screenshots/item-add.png)
 
 The first text-capable field receives keyboard focus. Tab and Shift-Tab move
 between controls. Switching item type while adding resets the field values for
@@ -53,7 +54,7 @@ text, then toggle **Bold**, **Italic**, **Underline**, **Strikethrough**,
 formatting is used and preserves semantic rich spans when styles are applied;
 a Rich Text field always stores rich spans.
 
-![Rich-text formatting while authoring]({{ site.baseurl }}/assets/screenshots/item-rich-text.png)
+[![Rich-text formatting while authoring]({{ site.baseurl }}/assets/screenshots/item-rich-text.png)]({{ site.baseurl }}/assets/screenshots/item-rich-text.png)
 
 Formatting is native data, not HTML or CSS. See [Content and
 media](../content-and-media/) for number, cloze, and media procedures.
@@ -74,9 +75,9 @@ Saving closes the form and refreshes the current library scope.
 
 ## Open item detail
 
-Double-click an item row to open its detail view.
+Select an item row to open its detail view.
 
-![An item's detail view]({{ site.baseurl }}/assets/screenshots/item-detail.png)
+[![An item's detail view]({{ site.baseurl }}/assets/screenshots/item-detail.png)]({{ site.baseurl }}/assets/screenshots/item-detail.png)
 
 The preview displays non-empty fields in item-type order. The first two fields
 receive prompt-and-answer emphasis; later fields include their field names.
@@ -92,10 +93,13 @@ part of the edit sheet.
 3. Change field content.
 4. Choose **Save**.
 
-Editing preserves the item's type, tags, deck assignment, and generated-card
-identity while rebuilding field values from the form. The item type picker and
-deck picker are therefore absent. After saving, the detail preview and library
-row update.
+Editing preserves the item's type, tags, and deck assignment while rebuilding
+field values from the form. Generated cards are reconciled: cards whose
+generation conditions or cloze groups still exist preserve their identity and
+history, while cards that no longer generate are deleted. Recreating removed
+content later creates a new, never-reviewed card. The item type picker and deck
+picker are therefore absent. After saving, the detail preview and library row
+update.
 
 ## Delete an item
 
@@ -104,9 +108,11 @@ row update.
 3. Confirm with **Delete Item**.
 
 The confirmation states how many generated study cards will also be removed.
-Deleting an item removes the item, its cards, and associated review records;
-it cannot be undone. Media no longer referenced by any item is eligible for
-cleanup. Choose **Cancel** to keep the item.
+Deleting an item removes the item and its generated cards; it cannot be undone.
+Append-only review logs are retained for history integrity, but no longer belong
+to an active card. Outcomes that were not undone can still contribute to later
+scheduling optimization. Media no longer referenced by any item is eligible
+for cleanup. Choose **Cancel** to keep the item.
 
 Deleting a deck is different: it moves contained items and does not delete
 them.

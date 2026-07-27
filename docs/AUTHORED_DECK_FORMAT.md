@@ -1,5 +1,6 @@
 ---
 title: Authored deck format
+description: Implement or inspect editable .neoanki bundles, records, validation rules, and safety limits.
 parent: Reference
 ---
 
@@ -171,19 +172,21 @@ means empty. Required fields MUST have a non-empty value. `tags` is optional.
 Values are selected by the declared field type:
 
 ```json
+{% raw %}
 {"text":"plain text"}
 {"text":"hola","lang":"es"}
 {"rich":[{"text":"important","styles":["bold","highlight"]}]}
 {"number":42.5}
 {"cloze":"Paris is in {{c1::France::country}}."}
 {"media":{"path":"media/paris.webp","alt":"Map of Paris","durationMs":1200}}
+{% endraw %}
 ```
 
 Rich styles are `bold`, `italic`, `underline`, `strikethrough`, `highlight`,
 and `code`; styles cannot repeat within a span.
 
-Cloze markers have the form `{{cN::answer}}` or
-`{{cN::answer::hint}}`, where `N` is a positive integer and `answer` is
+Cloze markers have the form {% raw %}`{{cN::answer}}` or
+`{{cN::answer::hint}}`{% endraw %}, where `N` is a positive integer and `answer` is
 non-empty. Import removes the marker syntax and computes Unicode
 extended-grapheme-cluster offsets. Markers cannot nest; answers and hints
 cannot contain `::` or `}}`.

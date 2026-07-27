@@ -1,0 +1,78 @@
+primary:
+  - title: Home
+    url: /
+  - title: Start
+    url: /user/
+    children:
+      - title: Getting started
+        url: /user/getting-started/
+      - title: First study session
+        url: /user/first-study-session/
+  - title: Tasks
+    url: /user/tasks/
+    children:
+      - title: Library and decks
+        url: /user/library-and-decks/
+      - title: Authoring items
+        url: /user/authoring-items/
+      - title: Content and media
+        url: /user/content-and-media/
+      - title: Studying
+        url: /user/studying/
+      - title: Import and export
+        url: /user/import-export/
+      - title: Scheduling
+        url: /user/scheduling/
+  - title: Understand
+    url: /user/concepts/
+    children:
+      - title: Concepts and glossary
+        url: /user/concepts/
+      - title: Shortcuts and accessibility
+        url: /user/shortcuts-accessibility/
+  - title: Troubleshoot
+    url: /user/troubleshooting/
+    children:
+      - title: Troubleshooting
+        url: /user/troubleshooting/
+      - title: Build, launch, and support
+        url: /user/support/
+  - title: Advanced authoring
+    url: /user/item-types-and-templates/
+    children:
+      - title: Item types and templates
+        url: /user/item-types-and-templates/
+      - title: Deck authoring CLI
+        url: /user/cli/
+  - title: Feature index
+    short_title: Features
+    url: /features/
+  - title: Reference
+    url: /reference/
+    children:
+      - title: Product model
+        url: /PRODUCT/
+      - title: Architecture
+        url: /ARCHITECTURE/
+      - title: Design system
+        url: /DESIGN/
+      - title: Authored deck format
+        url: /AUTHORED_DECK_FORMAT/
+      - title: Portable deck format
+        url: /PORTABLE_DECK_FORMAT/
+      - title: LLM deck authoring
+        url: /LLM_DECK_AUTHORING/
+      - title: JSON Schemas
+        url: /schemas/
+      - title: Example deck
+        url: /examples/
+  - title: Contribute
+    url: /user/maintaining-documentation/
+    children:
+      - title: Maintaining documentation
+        url: /user/maintaining-documentation/
+      - title: Documentation quality audit
+        url: /audits/state-of-art-2026-07-27/
+  - title: GitHub
+    url: https://github.com/neoanki2/neoanki2
+    external: true
