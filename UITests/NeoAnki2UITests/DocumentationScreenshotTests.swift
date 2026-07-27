@@ -175,15 +175,25 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             .identified("templateAdvancedSettings")
         XCTAssertTrue(advancedSettings.waitForExistence(timeout: 5))
         advancedSettings.click()
+        let advancedForm = advancedApp.scrollViews.firstMatch
+        XCTAssertTrue(advancedForm.waitForExistence(timeout: 3))
+        advancedForm.swipeUp()
         XCTAssertTrue(
             advancedApp.descendants(matching: .any)
                 .identified("templateAutomaticSkill")
                 .waitForExistence(timeout: 5)
         )
         advancedApp.descendants(matching: .any).identified("templateAutomaticSkill").click()
+        advancedForm.swipeUp()
         XCTAssertTrue(advancedApp.popUpButtons.identified("templateSkillInput").waitForExistence(timeout: 3))
-        advancedApp.descendants(matching: .any).identified("templateGenerateCondition").click()
-        advancedApp.descendants(matching: .any).identified("templateGenerateCondition")
+        let generateCondition = advancedApp.descendants(matching: .any)
+            .identified("templateGenerateCondition")
+        if !generateCondition.waitForExistence(timeout: 1) {
+            advancedForm.swipeUp()
+        }
+        XCTAssertTrue(generateCondition.waitForExistence(timeout: 3))
+        generateCondition.click()
+        generateCondition
             .scroll(byDeltaX: 0, deltaY: 350)
         captureDocumentationScreenshot(
             named: "template-advanced",
