@@ -79,13 +79,16 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         XCTAssertTrue(app.textFields.identified("templateNameField").waitForExistence(timeout: 5))
         captureDocumentationScreenshot(named: "template-editor", of: app)
 
-        let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
-        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
-        let disclosure = app.disclosureTriangles.firstMatch
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 3))
-        disclosure.click()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        captureDocumentationScreenshot(named: "template-advanced", of: app)
+        let advancedApp = launchApp(
+            databaseLabel: "docs-template-advanced",
+            environment: ["NEOANKI_TEST_EXPAND_TEMPLATE_ADVANCED": "1"]
+        )
+        openTemplates(in: advancedApp)
+        advancedApp.buttons.identified("addTemplateToolbar").click()
+        XCTAssertTrue(
+            advancedApp.descendants(matching: .any)["templateAutomaticSkill"].waitForExistence(timeout: 5)
+        )
+        captureDocumentationScreenshot(named: "template-advanced", of: advancedApp)
     }
 
     func testImportAndConflictScreenshots() throws {
