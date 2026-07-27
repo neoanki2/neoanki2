@@ -4,10 +4,12 @@ struct LibraryCommandHandlers {
     var openImport: (() -> Void)?
     var openPortableDeckImport: (() -> Void)?
     var openPortableDeckExport: (() -> Void)?
+    var openDeckBuilder: (() -> Void)?
     var openTemplates: (() -> Void)?
     var canImport = false
     var canImportPortableDeck = false
     var canExportPortableDeck = false
+    var canOpenDeckBuilder = false
     var canOpenTemplates = false
 }
 
@@ -44,6 +46,14 @@ struct LibraryCommands: Commands {
                 handlers?.openPortableDeckExport?()
             }
             .disabled(!(handlers?.canExportPortableDeck ?? false))
+
+            Divider()
+
+            Button("Build Deck…") {
+                handlers?.openDeckBuilder?()
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+            .disabled(!(handlers?.canOpenDeckBuilder ?? false))
         }
 
         CommandMenu("Library") {

@@ -1,4 +1,6 @@
 import NeoAnkiCore
+import NeoAnkiDeckBuilderKit
+import PoemDeckBuilder
 import SwiftUI
 
 @main
@@ -16,7 +18,8 @@ struct NeoAnki2App: App {
                     ContentView(
                         itemsModel: itemsModel,
                         decksModel: decksModel,
-                        schedulingModel: schedulingModel
+                        schedulingModel: schedulingModel,
+                        deckBuilderRegistry: .production
                     )
                 } else if let bootstrapError {
                     ContentUnavailableView {
@@ -58,5 +61,13 @@ struct NeoAnki2App: App {
         } catch {
             bootstrapError = UserFacingError.message(from: error)
         }
+    }
+}
+
+private extension DeckBuilderRegistry {
+    static var production: DeckBuilderRegistry {
+        DeckBuilderRegistry([
+            PoemDeckBuilderFeature.makeFeature(),
+        ])
     }
 }

@@ -7,8 +7,9 @@ parent: User Guide
 
 # Import and export
 
-NeoAnki2 has three native ways to bring in content:
+NeoAnki2 has four native ways to bring in content:
 
+- A bundled deck builder turns guided input into an authored deck.
 - JSON and CSV add rows to an item type already in your library.
 - `.neoanki` is an editable, import-only authored deck bundle.
 - `.neodeck` is a portable, content-only deck file that NeoAnki2 can import and export.
@@ -19,11 +20,27 @@ Anki template markup are not supported.
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
 
+- [Build a poem deck](#build-a-poem-deck)
 - [Import JSON or CSV](#import-json-or-csv)
 - [Export a portable deck](#export-a-portable-deck)
 - [Import `.neodeck` or `.neoanki`](#import-neodeck-or-neoanki)
 - [Choose the right format](#choosing-the-right-format)
 </nav>
+
+## Build a poem deck
+
+Choose **File → Build Deck…** to open the deck-builder catalog, then select
+**Poem Deck**. Enter the author, title, and poem text, then choose **Add to
+Library**. Other bundled builders can appear alongside it in future releases.
+
+NeoAnki2 creates an author deck with a poem subdeck. Every nonblank line after
+the first becomes one Basic card answer. Its prompt contains the preceding one
+or two lines, matching a moving recitation window. For example, a 12-line poem
+creates 11 cards.
+
+The builder first writes a temporary `.neoanki` bundle, validates the complete
+bundle with the same rules as an imported authored deck, imports it atomically,
+and removes the temporary files. It does not write directly to the library.
 
 ## Import JSON or CSV
 

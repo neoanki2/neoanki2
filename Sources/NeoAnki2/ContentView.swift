@@ -1,5 +1,6 @@
 import AppKit
 import NeoAnkiCore
+import NeoAnkiDeckBuilderKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -29,11 +30,14 @@ struct ContentView: View {
     @State private var importNotice: ImportNotice?
     @State private var portableDeckTransfer: PortableDeckTransferModel
     @State private var isChoosingPortableDeck = false
+    @State private var isShowingDeckBuilder = false
+    private let deckBuilderRegistry: DeckBuilderRegistry
 
     init(
         itemsModel: ItemsModel,
         decksModel: DecksModel,
-        schedulingModel: SchedulingModel
+        schedulingModel: SchedulingModel,
+        deckBuilderRegistry: DeckBuilderRegistry
     ) {
         self.itemsModel = itemsModel
         self.decksModel = decksModel
@@ -41,6 +45,7 @@ struct ContentView: View {
         _portableDeckTransfer = State(
             initialValue: PortableDeckTransferModel(store: itemsModel.store)
         )
+        self.deckBuilderRegistry = deckBuilderRegistry
     }
 
     var body: some View {
@@ -118,6 +123,14 @@ struct ContentView: View {
                 )
             }
         }
+        .sheet(isPresented: $isShowingDeckBuilder) {
+            DeckBuilderSheet(
+                registry: deckBuilderRegistry,
+                isImporting: portableDeckTransfer.isBusy,
+                onGenerated: importGeneratedDeck,
+                onCancel: { isShowingDeckBuilder = false }
+            )
+        }
         .alert(item: $importNotice) { notice in
             Alert(
                 title: Text(notice.title),
@@ -187,15 +200,18 @@ struct ContentView: View {
             openImport: { openImport() },
             openPortableDeckImport: { isChoosingPortableDeck = true },
             openPortableDeckExport: { openPortableDeckExport() },
+            openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
             canImport: !itemsModel.isLoading
                 && !itemsModel.itemTypes.isEmpty
                 && !isStudying
                 && !isManagingTemplates
                 && !isAddingItem
-                && !isShowingImport,
+                && !isShowingImport
+                && !isShowingDeckBuilder,
             canImportPortableDeck: canTransferPortableDeck,
             canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
+            canOpenDeckBuilder: canTransferPortableDeck && !deckBuilderRegistry.features.isEmpty,
             canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem
         )
     }
@@ -209,6 +225,7 @@ struct ContentView: View {
             && !isManagingTemplates
             && !isAddingItem
             && !isShowingImport
+            && !isShowingDeckBuilder
     }
 
     private var studyCommandHandlers: StudyCommandHandlers {
@@ -409,6 +426,17 @@ struct ContentView: View {
                 title: "Could Not Open Deck",
                 message: "NeoAnki2 couldn’t open the selected deck. Try choosing it again."
             )
+        }
+    }
+
+    private func importGeneratedDeck(_ generated: GeneratedDeckBundle) {
+        Task {
+            defer { generated.cleanup() }
+            guard let imported = await portableDeckTransfer.importDeck(from: generated.bundleURL) else {
+                return
+            }
+            await refreshAfterPortableDeckImport(imported)
+            isShowingDeckBuilder = false
         }
     }
 

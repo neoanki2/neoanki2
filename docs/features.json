@@ -7,10 +7,12 @@
       "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck",
       "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck",
       "NeoAnkiCore/Sources/NeoAnkiCore/Media",
-      "NeoAnkiCore/Sources/NeoAnkiDeckCLI"
+      "NeoAnkiCore/Sources/NeoAnkiDeckCLI",
+      "Sources/NeoAnkiDeckBuilderKit",
+      "Sources/PoemDeckBuilder"
     ],
     "sourceMarkers": ["CommandMenu(", "CommandGroup(", ": Commands {", ": View {", ".keyboardShortcut(", ".accessibilityIdentifier("],
-    "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests"],
+    "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests", "Tests/PoemDeckBuilderTests"],
     "testMarkers": ["func test", "@Test"],
     "excludedFiles": [
       "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift",
@@ -218,6 +220,13 @@
       "article": "user/import-export.md",
       "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift"],
       "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
+    },
+    {
+      "id": "deck-builders",
+      "name": "Build poem decks from guided input",
+      "article": "user/import-export.md",
+      "sources": ["Sources/NeoAnki2/DeckBuilderSheet.swift", "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift", "Sources/PoemDeckBuilder/PoemDeckBuilderView.swift", "Sources/PoemDeckBuilder/PoemDeckGenerator.swift"],
+      "tests": ["Tests/NeoAnki2Tests/DeckBuilderIntegrationTests.swift", "Tests/PoemDeckBuilderTests/PoemDeckBuilderTests.swift"]
     },
     {
       "id": "scheduling-optimize",
