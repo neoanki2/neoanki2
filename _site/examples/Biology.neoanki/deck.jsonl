@@ -1,0 +1,5 @@
+{"kind":"neoanki","version":1,"root":"biology","parts":["items/cells.jsonl"]}
+{"kind":"type","id":"Basic","name":"Biology Basic","fields":[{"id":"prompt","name":"Prompt","type":"text","required":true},{"id":"answer","name":"Answer","type":"richText","required":true},{"id":"context","name":"Context","type":"cloze"}],"templates":[{"name":"Recall","prompt":[{"field":"prompt"}],"answer":[{"field":"answer"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}
+{"kind":"type","id":"Cloze","name":"Biology Cloze","fields":[{"id":"statement","name":"Statement","type":"cloze","required":true}],"templates":[{"name":"Fill the blank","prompt":[{"field":"statement"}],"answer":[{"field":"statement"}],"interaction":"cloze","skill":{"input":"text","output":"freeResponse","operation":"recall"}}]}
+{"kind":"deck","id":"biology","name":"Biology"}
+{"kind":"deck","id":"cells","name":"Cells","parent":"biology"}
