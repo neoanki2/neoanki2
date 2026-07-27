@@ -52,6 +52,24 @@ Do not edit the database, rename managed media, replace individual files while
 the app is running, or open a `.neodeck` as the library database. A `.neodeck`
 omits learner progress and is not a complete backup.
 
+To restore a complete backup safely:
+
+1. Quit NeoAnki2 and confirm no Terminal-attached instance remains.
+2. In `~/Library/Application Support/`, rename the current `neoanki2` folder to
+   a dated name such as `neoanki2-damaged-2026-07-27`. Preserve it until the
+   restore is verified.
+3. Copy the backed-up **whole** `neoanki2` folder into Application Support.
+   Do not merge individual database or media files.
+4. Confirm your macOS account can read and write the restored folder.
+5. Launch the same or a newer compatible NeoAnki2 source revision. Check
+   **All Decks**, open an item containing media, and confirm due counts appear.
+6. If verification fails, quit immediately, preserve the failed restored copy,
+   and put the renamed original folder back before seeking support.
+
+Do not use a build older than the one that last opened the backup. Cloud-syncing
+the live folder while NeoAnki2 is running has not been validated as a backup
+method.
+
 ## Startup problems
 
 During launch, **Starting…** is normal briefly. **Could Not Start** means the

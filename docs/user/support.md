@@ -29,6 +29,11 @@ Command Line Tools** to select it, then repeat the checks. Do not change the
 selected developer directory unless you know which installed Xcode should own
 the build.
 
+After a new Xcode installation, open Xcode once and allow it to install required
+components. Accept the displayed license before returning to Terminal. If
+Terminal still reports initialization or license errors, finish those prompts
+in Xcode rather than running undocumented privileged workarounds.
+
 ## Swift reports a version older than 6
 
 The package declares Swift tools 6.0 and macOS 14. An older compiler cannot

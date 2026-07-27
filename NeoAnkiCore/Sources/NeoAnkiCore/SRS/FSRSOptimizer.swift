@@ -43,6 +43,7 @@ public struct FSRSOptimizationResult: Equatable, Sendable {
 /// regularizer that prevents sparse histories from driving weights to bounds.
 public struct FSRSOptimizer: Sendable {
     public static let defaultMinimumObservations = 100
+    public static let minimumReviewsPerCardForOutcome = 2
 
     public let minimumObservations: Int
     public let passes: Int
@@ -172,7 +173,7 @@ public struct FSRSOptimizer: Sendable {
                 }
                 .map(\.element)
             }
-            .filter { $0.count >= 2 }
+            .filter { $0.count >= Self.minimumReviewsPerCardForOutcome }
             .sorted { lhs, rhs in
                 (lhs.first?.cardID.uuidString ?? "") < (rhs.first?.cardID.uuidString ?? "")
             }

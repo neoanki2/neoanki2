@@ -12,7 +12,7 @@ struct Inventory: Decodable {
     let sourceRoots: [String]
     let sourceMarkers: [String]
     let testRoots: [String]
-    let testMarker: String
+    let testMarkers: [String]
     let excludedFiles: [String]
 }
 
@@ -31,6 +31,11 @@ struct ClaimsRegistry: Decodable {
         let source: String
     }
 
+    struct ArticleAssertion: Decodable {
+        let article: String
+        let contains: [String]
+    }
+
     let schemaVersion: Int
     let media: Evidence
     let itemImport: Evidence
@@ -41,6 +46,7 @@ struct ClaimsRegistry: Decodable {
     let appData: Evidence
     let history: Evidence
     let compatibility: Evidence
+    let articleAssertions: [ArticleAssertion]
 
     var evidence: [Evidence] {
         [
@@ -48,6 +54,21 @@ struct ClaimsRegistry: Decodable {
             scheduler, appData, history, compatibility,
         ]
     }
+}
+
+struct ScreenshotManifest: Decodable {
+    struct Entry: Decodable {
+        let filename: String
+        let width: Int
+        let height: Int
+        let scenario: String
+        let expectedVisibleIdentifiers: [String]
+    }
+
+    let schemaVersion: Int
+    let sourceSHA: String
+    let capturedAt: String
+    let screenshots: [Entry]
 }
 
 let fileManager = FileManager.default
@@ -68,6 +89,13 @@ func exists(_ relativePath: String, under base: URL = root) -> Bool {
 
 func fail(_ message: String) {
     failures.append(message)
+}
+
+func exitWithFailuresIfNeeded() -> Never {
+    for failure in failures {
+        fputs("error: \(failure)\n", stderr)
+    }
+    exit(1)
 }
 
 guard
@@ -100,6 +128,45 @@ for claim in claims.evidence {
         fail("Claim references missing production source \(claim.source)")
     }
 }
+for assertion in claims.articleAssertions {
+    let articleURL = docs.appendingPathComponent(assertion.article)
+    guard let article = try? String(contentsOf: articleURL, encoding: .utf8) else {
+        fail("Claim assertion references unreadable article docs/\(assertion.article)")
+        continue
+    }
+    for expectedText in assertion.contains where !article.contains(expectedText) {
+        fail(
+            "High-risk prose in docs/\(assertion.article) is missing registry text: \(expectedText)"
+        )
+    }
+}
+
+let authoredItemSchemaURL = docs.appendingPathComponent("schemas/authored-item.schema.json")
+if let schemaData = try? Data(contentsOf: authoredItemSchemaURL),
+   let schema = try? JSONSerialization.jsonObject(with: schemaData) as? [String: Any],
+   let definitions = schema["$defs"] as? [String: Any],
+   let media = definitions["media"] as? [String: Any],
+   let properties = media["properties"] as? [String: Any],
+   let path = properties["path"] as? [String: Any],
+   let pattern = path["pattern"] as? String,
+   let expression = try? NSRegularExpression(pattern: pattern) {
+    func schemaAccepts(_ value: String) -> Bool {
+        let range = NSRange(value.startIndex..., in: value)
+        return expression.firstMatch(in: value, range: range)?.range == range
+    }
+    for valid in ["media/image.png", "media/subdirectory/audio.m4a"]
+        where !schemaAccepts(valid) {
+        fail("Authored media schema rejects valid confined path: \(valid)")
+    }
+    for invalid in [
+        "media/./bad.png", "media/../bad.png", "media//bad.png",
+        "media/sub/../bad.png", "/media/bad.png", "bad.png",
+    ] where schemaAccepts(invalid) {
+        fail("Authored media schema accepts unsafe path: \(invalid)")
+    }
+} else {
+    fail("Could not validate authored media path schema")
+}
 
 var identifiers = Set<String>()
 for feature in manifest.features {
@@ -117,6 +184,56 @@ for feature in manifest.features {
     }
     if let screenshot = feature.screenshot, requireScreenshots, !exists(screenshot, under: docs) {
         fail("Feature '\(feature.id)' references missing screenshot docs/\(screenshot)")
+    }
+}
+
+if requireScreenshots {
+    let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/manifest.json")
+    guard
+        let screenshotData = try? Data(contentsOf: screenshotManifestURL),
+        let screenshotManifest = try? JSONDecoder().decode(
+            ScreenshotManifest.self,
+            from: screenshotData
+        )
+    else {
+        fail("Missing or invalid docs/assets/screenshots/manifest.json")
+        exitWithFailuresIfNeeded()
+    }
+    if screenshotManifest.schemaVersion != 1 {
+        fail("Unsupported screenshot manifest schema version \(screenshotManifest.schemaVersion)")
+    }
+    if screenshotManifest.sourceSHA.range(
+        of: #"^[0-9a-f]{40}$"#,
+        options: .regularExpression
+    ) == nil {
+        fail("Screenshot manifest sourceSHA must be a 40-character lowercase Git SHA")
+    }
+    if ISO8601DateFormatter().date(from: screenshotManifest.capturedAt) == nil {
+        fail("Screenshot manifest capturedAt must be an ISO-8601 timestamp")
+    }
+    let expectedFilenames = Set(
+        manifest.features.compactMap(\.screenshot).map {
+            URL(fileURLWithPath: $0).lastPathComponent
+        }
+    )
+    let entriesByName = Dictionary(
+        screenshotManifest.screenshots.map { ($0.filename, $0) },
+        uniquingKeysWith: { first, _ in first }
+    )
+    if entriesByName.count != screenshotManifest.screenshots.count {
+        fail("Screenshot manifest contains duplicate filenames")
+    }
+    if Set(entriesByName.keys) != expectedFilenames {
+        fail("Screenshot manifest entries do not match feature screenshot coverage")
+    }
+    for entry in screenshotManifest.screenshots {
+        if entry.width <= 0 || entry.height <= 0 {
+            fail("Screenshot \(entry.filename) has invalid dimensions in manifest")
+        }
+        if entry.scenario.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || entry.expectedVisibleIdentifiers.isEmpty {
+            fail("Screenshot \(entry.filename) is missing scenario evidence")
+        }
     }
 }
 
@@ -157,7 +274,7 @@ for testRoot in manifest.inventory.testRoots {
         let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
         guard !excludedInventoryFiles.contains(relativePath),
               let text = try? String(contentsOf: file, encoding: .utf8),
-              text.contains(manifest.inventory.testMarker)
+              manifest.inventory.testMarkers.contains(where: text.contains)
         else {
             continue
         }
@@ -293,6 +410,15 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
                 let articlePath = "docs/\(feature.article)"
                 if !changed.contains(articlePath) {
                     fail("Feature '\(feature.id)' changed without reviewing and updating \(articlePath)")
+                }
+                if let screenshot = feature.screenshot {
+                    let screenshotPath = "docs/\(screenshot)"
+                    if !changed.contains(screenshotPath)
+                        || !changed.contains("docs/assets/screenshots/manifest.json") {
+                        fail(
+                            "Feature '\(feature.id)' changed without refreshing \(screenshotPath) and its screenshot manifest"
+                        )
+                    }
                 }
             }
             for claim in claims.evidence where changed.contains(claim.source) {

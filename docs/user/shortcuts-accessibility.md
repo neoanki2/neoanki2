@@ -60,7 +60,8 @@ the library instead.
 
 - **Start Study** — **Command-Shift-S**
 - **End Session**
-- **Continue** — **Space**
+- **Continue** — **Space** from the Study menu; **Return** also activates the
+  in-view default action.
 - **Grade: Again** — **1**
 - **Grade: Hard** — **2**
 - **Grade: Good** — **3**

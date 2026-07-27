@@ -86,7 +86,9 @@ After reveal, NeoAnki2 may show:
 
 These messages do not choose a rating. Grade based on the quality of your recall:
 
-- **Again (1):** you did not remember; ask NeoAnki2 to schedule it sooner.
+- **Again (1):** you did not remember; ask NeoAnki2 for its shortest interval.
+  Intervals are floored at one day, so this is not an immediate same-session
+  repeat.
 - **Hard (2):** you remembered with difficulty.
 - **Good (3):** you remembered correctly.
 - **Easy (4):** recall was too easy; allow a longer wait.
@@ -95,7 +97,13 @@ Open **Grade Help** from the question-mark button for the same guidance.
 
 [![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
-NeoAnki2 uses FSRS-5. Each saved rating updates the card’s estimated difficulty and stability, and the next due date is calculated for the configured retention target. Again marks a lapse on an already-reviewed card; Hard reduces growth; Easy can increase it. Actual intervals depend on the card’s history, elapsed time, scheduler parameters, and small deterministic interval variation. The labels are directional guidance, not promises of a particular date or interval, and this version schedules at a minimum granularity of one day rather than guaranteeing an immediate same-session repeat.
+NeoAnki2 uses FSRS-5. Each saved rating updates the card’s estimated difficulty
+and stability, and the next due date is calculated for the built-in 90%
+retention target. The current app does not expose a retention setting. Again
+marks a lapse on an already-reviewed card; Hard reduces growth; Easy can
+increase it. Actual intervals depend on the card’s history, elapsed time,
+scheduler parameters, and small deterministic interval variation. The labels
+are directional guidance, not promises of a particular date or interval.
 
 ## Keyboard and Study menu
 

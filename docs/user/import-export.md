@@ -30,7 +30,9 @@ Anki template markup are not supported.
 Choose **File → Import…**, select one `.json` or `.csv` file, review the import
 sheet, and choose **Import**. Import is unavailable while studying, adding an
 item, managing item types, showing another import sheet, or while a deck
-transfer is active. An item edit sheet does not disable the menu.
+transfer is active. It is also disabled while the library is loading or no item
+types exist. An item edit sheet does not disable the menu. Deck import/export
+waits for item and deck loading but can supply its own item types.
 
 [![JSON import sheet showing the selected file and duplicate warning]({{ site.baseurl }}/assets/screenshots/import-sheet.png)]({{ site.baseurl }}/assets/screenshots/import-sheet.png)
 
@@ -78,6 +80,27 @@ JSON may also contain base64 media with optional `fileExtension` and `altText`,
 but a media folder is simpler for authored files. Media kind, signature, size,
 and path confinement are validated before any row is saved.
 
+Structured values use these complete shapes:
+
+```json
+{
+  "Cloze": {
+    "text": "Paris is in France.",
+    "blanks": [{ "group": 1, "start": 12, "length": 6, "hint": "country" }]
+  },
+  "Image": {
+    "base64": "<base64 bytes>",
+    "fileExtension": "png",
+    "altText": "Map highlighting France"
+  }
+}
+```
+
+The importer currently accepts Image/GIF media without `altText`, unlike the
+item editor. Treat that as an accessibility limitation: include a meaningful
+description in authored/imported content whenever the image carries
+information.
+
 ### CSV
 
 CSV requires a header row and at least one data row. Choose the destination
@@ -106,7 +129,10 @@ rows, invalid media, and empty payloads stop the import.
 The operation is all-or-nothing: a failed import leaves the existing library
 unchanged. Every successful row is always added as a new item. NeoAnki2 does
 not search for matching content, so importing the same file twice creates
-duplicates and new due cards.
+duplicates and new due cards. JSON and CSV rows are placed in **Unassigned**.
+There is currently no bulk move, search, or duplicate-cleanup action; organize
+or remove imported items one at a time, and test large imports with a small
+sample first.
 
 ## Export a portable deck
 

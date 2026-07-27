@@ -16,6 +16,11 @@ on:
     branches: [main]
     paths:
       - docs/**
+      - Sources/NeoAnki2/**
+      - NeoAnkiCore/Sources/NeoAnkiCore/**
+      - NeoAnkiCore/Sources/NeoAnkiDeckCLI/**
+      - Tests/NeoAnki2Tests/**
+      - UITests/NeoAnki2UITests/**
       - Scripts/validate-docs.swift
       - Scripts/validate-built-docs.py
       - .github/workflows/docs-pages.yml
@@ -42,6 +47,9 @@ jobs:
       - name: Check changed features have documentation updates
         if: github.event_name == 'pull_request'
         run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "origin/${{ github.base_ref }}"
+      - name: Check direct main changes have documentation updates
+        if: github.event_name == 'push'
+        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "${{ github.event.before }}"
 
   build:
     name: Build documentation site

@@ -4,10 +4,10 @@ primary:
   - title: Start
     url: /user/
     children:
-      - title: First study session
-        url: /user/first-study-session/
       - title: Getting started
         url: /user/getting-started/
+      - title: First study session
+        url: /user/first-study-session/
   - title: Tasks
     url: /user/tasks/
     children:

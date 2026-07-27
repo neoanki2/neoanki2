@@ -655,7 +655,10 @@ public actor ItemStore {
             }
 
             try await database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
-            try await mediaStore?.releaseReservations(scopeID: importScope)
+            // Persistence is already committed. Reservation cleanup is
+            // best-effort so callers never receive a failure for an import
+            // that is present in the library.
+            try? await mediaStore?.releaseReservations(scopeID: importScope)
             return entries.count
         } catch {
             try? await mediaStore?.rollbackReservations(scopeID: importScope)

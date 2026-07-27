@@ -41,6 +41,18 @@ import Testing
     }
 }
 
+@Test func jsonImportAdapterRejectsUnsupportedFieldValueShapes() async {
+    for jsonText in [
+        #"{"itemType":"Basic","rows":[{"Front":"Question","Back":7}]}"#,
+        #"{"itemType":"Basic","rows":[{"Front":"Question","Back":"Answer","Unknown":false}]}"#,
+    ] {
+        let json = Data(jsonText.utf8)
+        await #expect(throws: ImportError.self) {
+            try JSONImportAdapter().parse(json)
+        }
+    }
+}
+
 @Test func csvImportAdapterParsesHeaderAndTagsColumn() throws {
     let csv = """
     Front,Back,tags

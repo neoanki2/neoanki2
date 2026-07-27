@@ -61,6 +61,13 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             enterText("French", into: container.textFields.firstMatch, app: deckApp)
             deckApp.buttons.identified("confirmCreateDeck").click()
         }
+        let childDeck = deckApp.descendants(matching: .any).identified("deckRow-French")
+        if !childDeck.waitForExistence(timeout: 1) {
+            let disclosure = deckApp.disclosureTriangles.firstMatch
+            XCTAssertTrue(disclosure.waitForExistence(timeout: 3))
+            disclosure.click()
+        }
+        XCTAssertTrue(childDeck.waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "decks-nested",
             of: deckApp,
@@ -167,6 +174,15 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             into: advancedApp.textFields.identified("templateNameField"),
             app: advancedApp
         )
+        let advancedSettings = advancedApp.descendants(matching: .any)
+            .identified("templateAdvancedSettings")
+        XCTAssertTrue(advancedSettings.waitForExistence(timeout: 5))
+        advancedSettings.scroll(byDeltaX: 0, deltaY: 450)
+        XCTAssertTrue(
+            advancedApp.descendants(matching: .any)
+                .identified("templateAutomaticSkill")
+                .waitForExistence(timeout: 5)
+        )
         advancedApp.descendants(matching: .any).identified("templateAutomaticSkill").click()
         XCTAssertTrue(advancedApp.popUpButtons.identified("templateSkillInput").waitForExistence(timeout: 3))
         advancedApp.descendants(matching: .any).identified("templateGenerateCondition").click()
@@ -177,7 +193,6 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             of: advancedApp,
             scenario: "advanced template editor with explicit skill mapping and generation rule",
             expectedVisibleIdentifiers: [
-                "templateAdvancedSettings",
                 "templateSkillInput",
                 "templateSkillOutput",
                 "templateSkillOperation",

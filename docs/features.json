@@ -2,11 +2,12 @@
   "schemaVersion": 1,
   "inventory": {
     "sourceRoots": ["Sources/NeoAnki2"],
-    "sourceMarkers": ["CommandMenu(", ".keyboardShortcut(", ".accessibilityIdentifier("],
-    "testRoots": ["UITests/NeoAnki2UITests"],
-    "testMarker": "func test",
+    "sourceMarkers": ["CommandMenu(", "CommandGroup(", ": Commands {", ": View {", ".keyboardShortcut(", ".accessibilityIdentifier("],
+    "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests"],
+    "testMarkers": ["func test", "@Test"],
     "excludedFiles": [
-      "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift"
+      "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift",
+      "Tests/NeoAnki2Tests/DocumentationClaimsTests.swift"
     ]
   },
   "features": [
@@ -15,7 +16,7 @@
       "name": "First launch and local library",
       "article": "user/getting-started.md",
       "sources": ["Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnki2/AppDatabase.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppLaunchSmokeTests.swift"],
       "screenshot": "assets/screenshots/library-empty.png"
     },
     {
@@ -31,7 +32,7 @@
       "name": "All Decks, Unassigned, and deck scopes",
       "article": "user/library-and-decks.md",
       "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift", "Tests/NeoAnki2Tests/DecksModelTests.swift"],
       "screenshot": "assets/screenshots/decks-nested.png"
     },
     {
@@ -39,7 +40,7 @@
       "name": "Create, nest, rename, and delete decks",
       "article": "user/library-and-decks.md",
       "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DecksModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift", "Tests/NeoAnki2Tests/DecksModelCRUDTests.swift"],
       "screenshot": "assets/screenshots/decks-nested.png"
     },
     {
@@ -47,7 +48,7 @@
       "name": "Library item list, counts, and empty states",
       "article": "user/library-and-decks.md",
       "sources": ["Sources/NeoAnki2/DeckDetailView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
     },
     {
@@ -55,7 +56,7 @@
       "name": "Create and edit items",
       "article": "user/authoring-items.md",
       "sources": ["Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"],
       "screenshot": "assets/screenshots/item-add.png"
     },
     {
@@ -63,7 +64,7 @@
       "name": "Read, move, and delete an item",
       "article": "user/authoring-items.md",
       "sources": ["Sources/NeoAnki2/ItemReadingPreview.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemsModelDetailTests.swift", "NeoAnkiCore/Tests/NeoAnkiFlowTests/RevertReviewFlowTests.swift"],
       "screenshot": "assets/screenshots/item-detail.png"
     },
     {
@@ -71,7 +72,7 @@
       "name": "Text and rich-text fields",
       "article": "user/content-and-media.md",
       "sources": ["Sources/NeoAnki2/RichTextFieldEditor.swift", "Sources/NeoAnki2/SpanFormatting.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/RichTextEditingTests.swift", "Tests/NeoAnki2Tests/SpanFormattingTests.swift"],
       "screenshot": "assets/screenshots/item-rich-text.png"
     },
     {
@@ -93,7 +94,7 @@
       "name": "Image, GIF, audio, and video fields",
       "article": "user/content-and-media.md",
       "sources": ["Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift"],
-      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift", "Tests/NeoAnki2Tests/MediaImageLoaderTests.swift", "Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift"],
       "screenshot": "assets/screenshots/item-media.png"
     },
     {
@@ -101,7 +102,7 @@
       "name": "Start a scoped due-card session",
       "article": "user/studying.md",
       "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"],
       "screenshot": "assets/screenshots/study-prompt.png"
     },
     {
@@ -109,7 +110,7 @@
       "name": "Reveal and self-grade interaction",
       "article": "user/studying.md",
       "sources": ["Sources/NeoAnki2/StudyView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudySupportTests.swift"],
       "screenshot": "assets/screenshots/study-answer.png"
     },
     {
@@ -125,7 +126,7 @@
       "name": "Multiple-choice interaction",
       "article": "user/studying.md",
       "sources": ["Sources/NeoAnki2/StudySupport.swift", "Sources/NeoAnki2/StudyView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"]
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyRecordingControllerTests.swift"]
     },
     {
       "id": "study-arrange",
@@ -177,7 +178,7 @@
       "name": "Create, edit, and delete templates",
       "article": "user/item-types-and-templates.md",
       "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "Sources/NeoAnki2/TemplatesModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "Tests/NeoAnki2Tests/TemplatesModelTests.swift", "Tests/NeoAnki2Tests/TemplateItemCoordinationFlowTests.swift"],
       "screenshot": "assets/screenshots/template-editor.png"
     },
     {
@@ -192,8 +193,8 @@
       "id": "import-json-csv",
       "name": "Import JSON and CSV items",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/ImportView.swift", "Sources/NeoAnki2/ImportModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/ImportExportUITests.swift"],
+      "sources": ["Sources/NeoAnki2/ImportView.swift", "Sources/NeoAnki2/ImportModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportAdapter.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift"],
+      "tests": ["UITests/NeoAnki2UITests/ImportExportUITests.swift", "Tests/NeoAnki2Tests/ImportModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ImportAdapterTests.swift"],
       "screenshot": "assets/screenshots/import-sheet.png"
     },
     {
@@ -201,7 +202,7 @@
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
       "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift"],
-      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
     {
@@ -216,7 +217,7 @@
       "name": "Optimize FSRS scheduling",
       "article": "user/scheduling.md",
       "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/SchedulingModelTests.swift"],
       "screenshot": "assets/screenshots/scheduling-result.png"
     },
     {
@@ -224,14 +225,14 @@
       "name": "Menus and keyboard shortcuts",
       "article": "user/shortcuts-accessibility.md",
       "sources": ["Sources/NeoAnki2/LibraryCommands.swift", "Sources/NeoAnki2/StudyCommands.swift", "Sources/NeoAnki2/SchedulingCommands.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift"]
+      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift", "Tests/NeoAnki2Tests/StudyCommandsTests.swift"]
     },
     {
       "id": "accessibility",
       "name": "VoiceOver, focus, contrast, type, and motion",
       "article": "user/shortcuts-accessibility.md",
-      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift"],
-      "tests": ["Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift"]
+      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/MediaViews.swift", "Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
+      "tests": ["Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift", "Tests/NeoAnki2Tests/ContentRenderingTests.swift", "Tests/NeoAnki2Tests/MediaBehaviorTests.swift"]
     },
     {
       "id": "errors-empty-states",

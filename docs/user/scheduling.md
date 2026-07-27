@@ -11,7 +11,9 @@ NeoAnki2 uses FSRS (Free Spaced Repetition Scheduler) to decide when each card
 is due. You do not set an interval while studying. Instead, reveal the answer
 and describe your recall:
 
-- **Again (1):** you did not remember; show the card again soon.
+- **Again (1):** you did not remember; schedule the shortest available
+  interval. NeoAnki2 floors intervals at one day and does not promise an
+  Anki-style same-session relearning step.
 - **Hard (2):** you remembered with difficulty.
 - **Good (3):** you remembered correctly.
 - **Easy (4):** it was too easy; wait longer before the next review.
@@ -36,10 +38,20 @@ When tuning finds a better fit, the result reports:
 - how many review outcomes were used; and
 - the percentage reduction in log loss, a measure of prediction error.
 
+The current app has no retention control: the target remains the built-in
+**90%**, and the maximum interval remains **36,500 days**. Optimization tunes
+FSRS weights only. It does not rewrite cards' existing due dates; new parameters
+take effect as later grades schedule those cards.
+
 If the existing parameters already fit as well as the optimizer can determine,
 NeoAnki2 reports that no change was needed. This is a successful result, not an
 error. Existing cards and review history remain in place; only the saved
 scheduling parameters for the profile are updated.
+
+Review logs are append-only and survive item/card deletion. Unless a grade was
+explicitly undone, outcomes from a deleted studied item can still contribute to
+later optimization. Do not create and grade artificial duplicates to influence
+the optimizer.
 
 [![Scheduling optimization result showing observations and fit]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)
 

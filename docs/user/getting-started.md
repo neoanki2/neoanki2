@@ -76,7 +76,7 @@ Launching NeoAnki2...
 The script builds a debug executable, assembles and ad-hoc signs
 `.build/NeoAnki2.app`, then asks macOS to open it. The app window should appear
 at **All Decks**. The bundle stays inside the checkout; it is not installed in
-`/Applications`. Re-run the script after pulling source changes.
+`/Applications`.
 
 To keep the process attached to Terminal instead, run:
 
@@ -87,6 +87,34 @@ To keep the process attached to Terminal instead, run:
 Expected result: Terminal prints **Building NeoAnki2...** and **Running
 NeoAnki2...**, then the app window appears. Keep that Terminal window open
 while this mode is running.
+
+## Update the development build
+
+Quit NeoAnki2, preserve a current library backup, then run from the checkout:
+
+```bash
+git status --short
+git pull --ff-only
+./Scripts/run-app.sh
+```
+
+Expected result: `git status` is empty before the update, Git fast-forwards (or
+reports that the checkout is current), and the rebuilt app launches. If status
+shows local source changes, do not discard them blindly; commit, move, or review
+them before pulling. If the updated build reports that an older build cannot
+read the library, return to the updated build or restore a compatible backup.
+
+## Uninstall or remove the checkout
+
+1. Quit NeoAnki2.
+2. Delete the source checkout to remove source code, `.build/NeoAnki2.app`, and
+   build artifacts. Nothing was installed in `/Applications`.
+3. To keep your study data for a future checkout, stop here.
+4. To remove all NeoAnki2 data too, first make any backup you intend to keep,
+   then delete `~/Library/Application Support/neoanki2/`.
+
+Deleting the data folder permanently removes the library and managed media.
+There is no in-app uninstall or recovery after deleting it without a backup.
 
 ## First launch
 

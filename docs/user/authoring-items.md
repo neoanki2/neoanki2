@@ -93,10 +93,13 @@ part of the edit sheet.
 3. Change field content.
 4. Choose **Save**.
 
-Editing preserves the item's type, tags, deck assignment, and generated-card
-identity while rebuilding field values from the form. The item type picker and
-deck picker are therefore absent. After saving, the detail preview and library
-row update.
+Editing preserves the item's type, tags, and deck assignment while rebuilding
+field values from the form. Generated cards are reconciled: cards whose
+generation conditions or cloze groups still exist preserve their identity and
+history, while cards that no longer generate are deleted. Recreating removed
+content later creates a new, never-reviewed card. The item type picker and deck
+picker are therefore absent. After saving, the detail preview and library row
+update.
 
 ## Delete an item
 
@@ -107,8 +110,9 @@ row update.
 The confirmation states how many generated study cards will also be removed.
 Deleting an item removes the item and its generated cards; it cannot be undone.
 Append-only review logs are retained for history integrity, but no longer belong
-to an active card. Media no longer referenced by any item is eligible for
-cleanup. Choose **Cancel** to keep the item.
+to an active card. Outcomes that were not undone can still contribute to later
+scheduling optimization. Media no longer referenced by any item is eligible
+for cleanup. Choose **Cancel** to keep the item.
 
 Deleting a deck is different: it moves contained items and does not delete
 them.

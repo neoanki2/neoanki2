@@ -23,6 +23,7 @@ private struct DocumentationClaims: Decodable {
         let maximumRows: Int
         let maximumFieldsPerRow: Int
         let maximumFieldBytes: Int
+        let csvEncoding: String
     }
 
     struct PortableDeck: Decodable {
@@ -106,6 +107,10 @@ private func documentationClaims() throws -> DocumentationClaims {
     #expect(claims.itemImport.maximumRows == ImportLimits.maxRows)
     #expect(claims.itemImport.maximumFieldsPerRow == ImportLimits.maxFieldsPerRow)
     #expect(claims.itemImport.maximumFieldBytes == ImportLimits.maxFieldStringBytes)
+    #expect(claims.itemImport.csvEncoding == "UTF-8")
+    #expect(throws: ImportError.self) {
+        try CSVImportAdapter(itemTypeName: "Basic").parse(Data([0xFF, 0xFE]))
+    }
 
     let portable = PortableDeckLimits.default
     #expect(claims.portableDeck.formatVersion == PortableDeck.version)
@@ -129,7 +134,10 @@ private func documentationClaims() throws -> DocumentationClaims {
         claims.scheduling.minimumReviewOutcomes
             == FSRSOptimizer.defaultMinimumObservations
     )
-    #expect(claims.scheduling.minimumReviewsPerCardForOutcome == 2)
+    #expect(
+        claims.scheduling.minimumReviewsPerCardForOutcome
+            == FSRSOptimizer.minimumReviewsPerCardForOutcome
+    )
 
     let scheduler = FSRSScheduler.Parameters()
     #expect(claims.scheduler.model == "FSRS-\(FSRSScheduler.Parameters.modelVersion)")
