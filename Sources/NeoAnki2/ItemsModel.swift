@@ -239,6 +239,19 @@ final class ItemsModel {
         }
     }
 
+    func deleteAllUnassigned(scope: StudyScope = .unassigned) async -> Int {
+        errorMessage = nil
+        do {
+            let deleted = try await store.deleteAllUnassignedItems()
+            items.removeAll()
+            dueCount = try await store.dueCount(scope: scope.filter)
+            return deleted
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return 0
+        }
+    }
+
     func moveItem(id: UUID, to deckID: UUID?, scope: StudyScope = .allDecks) async -> Bool {
         errorMessage = nil
         do {

@@ -70,6 +70,65 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons.identified("deleteItem").exists)
     }
 
+    func testBackFromItemDetailReturnsToLibrary() throws {
+        let app = launchApp()
+        addBasicItem(front: "Back Test", back: "View", in: app)
+        openItemDetail(named: "Back Test", in: app)
+
+        let back = app.buttons.identified("itemDetailBack")
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.click()
+
+        waitForItem(named: "Back Test", in: app)
+        XCTAssertFalse(app.buttons.identified("deleteItem").exists)
+    }
+
+    func testDeleteAllUnassignedFromToolbar() throws {
+        let app = launchApp()
+        addBasicItem(front: "Loose Item", back: "A", in: app)
+        createDeck(named: "Keep Deck", in: app)
+
+        openAddItem(in: app)
+        let deckPicker = app.popUpButtons.identified("addItemDeckPicker")
+        if deckPicker.waitForExistence(timeout: 2) {
+            deckPicker.click()
+            app.menuItems.identified("Keep Deck").click()
+        }
+        enterText("Deck Item", into: field(named: "Front", in: app), app: app)
+        enterText("B", into: field(named: "Back", in: app), app: app)
+        saveAddItem(in: app)
+
+        selectScope("scopeRow-Unassigned", in: app)
+        waitForItem(named: "Loose Item", in: app)
+
+        let deleteAll = app.buttons.identified("deleteAllUnassignedToolbar")
+        XCTAssertTrue(deleteAll.waitForExistence(timeout: 5))
+        deleteAll.click()
+        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitForExistence(timeout: 5))
+        app.buttons.identified("confirmDeleteAllUnassigned").click()
+
+        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
+        selectScope("scopeRow-AllDecks", in: app)
+        waitForItem(named: "Deck Item", in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Loose Item"].exists)
+    }
+
+    func testDeleteAllUnassignedFromSidebarMenu() throws {
+        let app = launchApp()
+        addBasicItem(front: "Sidebar Delete", back: "A", in: app)
+
+        showSidebar(in: app)
+        let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
+        unassigned.rightClick()
+        app.menuItems.identified("Delete All").click()
+        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitForExistence(timeout: 5))
+        app.buttons.identified("confirmDeleteAllUnassigned").click()
+
+        selectScope("scopeRow-Unassigned", in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Sidebar Delete"].exists)
+    }
+
     func testEditItemFromDetailUpdatesLibraryAndPreview() throws {
         let app = launchApp()
         addBasicItem(front: "France", back: "Paris", in: app)

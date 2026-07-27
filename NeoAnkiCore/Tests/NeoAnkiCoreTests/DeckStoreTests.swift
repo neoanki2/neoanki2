@@ -76,7 +76,7 @@ private func basicItem(deckID: UUID? = nil) -> Item {
     }
 }
 
-@Test func deleteDeckMovesItemsToParent() async throws {
+@Test func deleteDeckRemovesItemsInDeck() async throws {
     let store = try await makeStore()
     let parent = Deck(name: "Geography")
     let child = Deck(name: "Capitals", parentID: parent.id)
@@ -88,15 +88,30 @@ private func basicItem(deckID: UUID? = nil) -> Item {
 
     #expect(try await store.deleteDeck(id: child.id) == true)
 
-    let loaded = try await store.fetchItem(id: item.id)
-    #expect(loaded?.item.deckID == parent.id)
-
-    let cards = try await store.fetchDueCards(scope: .deck(parent.id))
-    #expect(cards.count == 1)
-    #expect(cards.first?.card.deckID == parent.id)
+    #expect(try await store.fetchItem(id: item.id) == nil)
+    #expect(try await store.listItems(scope: .allDecks).isEmpty)
 }
 
-@Test func deleteRootDeckUnassignsItems() async throws {
+@Test func deleteDeckRemovesSubdecksAndNestedItems() async throws {
+    let store = try await makeStore()
+    let parent = Deck(name: "Languages")
+    let child = Deck(name: "French", parentID: parent.id)
+    _ = try await store.createDeck(parent)
+    _ = try await store.createDeck(child)
+
+    let parentItem = basicItem(deckID: parent.id)
+    let childItem = basicItem(deckID: child.id)
+    _ = try await store.createItem(parentItem)
+    _ = try await store.createItem(childItem)
+
+    #expect(try await store.deleteDeck(id: parent.id) == true)
+
+    #expect(try await store.listDecks().isEmpty)
+    #expect(try await store.fetchItem(id: parentItem.id) == nil)
+    #expect(try await store.fetchItem(id: childItem.id) == nil)
+}
+
+@Test func deleteRootDeckRemovesItems() async throws {
     let store = try await makeStore()
     let deck = Deck(name: "Geography")
     _ = try await store.createDeck(deck)
@@ -105,8 +120,20 @@ private func basicItem(deckID: UUID? = nil) -> Item {
 
     #expect(try await store.deleteDeck(id: deck.id) == true)
 
-    let loaded = try await store.fetchItem(id: item.id)
-    #expect(loaded?.item.deckID == nil)
+    #expect(try await store.fetchItem(id: item.id) == nil)
+    #expect(try await store.listItems(scope: .unassigned).isEmpty)
+}
+
+@Test func deleteAllUnassignedItemsRemovesOnlyUnassigned() async throws {
+    let store = try await makeStore()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    _ = try await store.createItem(basicItem(deckID: deck.id))
+    _ = try await store.createItem(basicItem())
+
+    #expect(try await store.deleteAllUnassignedItems() == 1)
+    #expect(try await store.listItems(scope: .unassigned).isEmpty)
+    #expect(try await store.listItems(scope: .deck(deck.id, includeDescendants: false)).count == 1)
 }
 
 @Test func updateItemDeckSyncsCards() async throws {

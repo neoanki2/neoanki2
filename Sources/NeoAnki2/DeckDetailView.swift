@@ -8,6 +8,9 @@ struct DeckDetailView: View {
     @Binding var selectedItemID: SavedItemSummary.ID?
     let onAddItem: () -> Void
     let onStudy: () -> Void
+    let onDeleteAllUnassigned: () -> Void
+
+    @State private var showDeleteAllUnassignedConfirm = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,6 +72,30 @@ struct DeckDetailView: View {
                 .keyboardShortcut("n", modifiers: .command)
                 .accessibilityIdentifier("addItemToolbar")
             }
+            if case .unassigned = scope.filter, !itemsModel.items.isEmpty {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("Delete All", systemImage: "trash", role: .destructive) {
+                        showDeleteAllUnassignedConfirm = true
+                    }
+                    .accessibilityIdentifier("deleteAllUnassignedToolbar")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete all unassigned items?",
+            isPresented: $showDeleteAllUnassignedConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                onDeleteAllUnassigned()
+            }
+            .accessibilityIdentifier("confirmDeleteAllUnassigned")
+            Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("cancelDeleteAllUnassigned")
+        } message: {
+            Text(
+                "This permanently deletes all \(itemsModel.items.count) unassigned items and their study cards."
+            )
         }
     }
 

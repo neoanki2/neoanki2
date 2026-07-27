@@ -52,7 +52,13 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             DeckSidebarView(
                 decksModel: decksModel,
-                selection: $decksModel.selectedScope
+                selection: $decksModel.selectedScope,
+                onDeleteAllUnassigned: {
+                    Task {
+                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
+                        await decksModel.load()
+                    }
+                }
             )
             .navigationSplitViewColumnWidth(
                 min: DesignSystem.sidebarMin,
@@ -126,6 +132,7 @@ struct ContentView: View {
         .sheet(isPresented: $isShowingDeckBuilder) {
             DeckBuilderSheet(
                 registry: deckBuilderRegistry,
+                context: deckBuilderContext,
                 isImporting: portableDeckTransfer.isBusy,
                 onGenerated: importGeneratedDeck,
                 onCancel: { isShowingDeckBuilder = false }
@@ -228,6 +235,14 @@ struct ContentView: View {
             && !isShowingDeckBuilder
     }
 
+    private var deckBuilderContext: DeckBuilderHostContext {
+        DeckBuilderHostContext(
+            rootDecks: decksModel.summaries
+                .filter { $0.parentID == nil }
+                .map { DeckBuilderDeckOption(id: $0.id, name: $0.name) }
+        )
+    }
+
     private var studyCommandHandlers: StudyCommandHandlers {
         if isStudying, let studyModel {
             return StudyCommandHandlers(
@@ -296,10 +311,10 @@ struct ContentView: View {
                     model: itemsModel,
                     decksModel: decksModel,
                     scope: decksModel.studyScope,
-                    summary: item
-                ) {
-                    self.selectedItemID = nil
-                }
+                    summary: item,
+                    onBack: { self.selectedItemID = nil },
+                    onDeleted: { self.selectedItemID = nil }
+                )
             }
         } else {
             DeckDetailView(
@@ -308,7 +323,13 @@ struct ContentView: View {
                 scope: decksModel.studyScope,
                 selectedItemID: $selectedItemID,
                 onAddItem: { openAddItem() },
-                onStudy: { startStudy() }
+                onStudy: { startStudy() },
+                onDeleteAllUnassigned: {
+                    Task {
+                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
+                        await decksModel.load()
+                    }
+                }
             )
         }
     }
@@ -434,6 +455,19 @@ struct ContentView: View {
             defer { generated.cleanup() }
             guard let imported = await portableDeckTransfer.importDeck(from: generated.bundleURL) else {
                 return
+            }
+            if let destinationDeckID = generated.destinationDeckID,
+               let importedRootID = imported.deckIDs.first {
+                do {
+                    var importedRoot = try await itemsModel.store.deck(id: importedRootID)
+                    importedRoot.parentID = destinationDeckID
+                    try await itemsModel.store.updateDeck(importedRoot)
+                } catch {
+                    portableDeckTransfer.notice = PortableDeckTransferNotice(
+                        title: "Deck Imported at Top Level",
+                        message: "The poem was imported, but its selected parent deck was unavailable."
+                    )
+                }
             }
             await refreshAfterPortableDeckImport(imported)
             isShowingDeckBuilder = false

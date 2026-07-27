@@ -367,15 +367,19 @@ class NeoAnkiUITestCase: XCTestCase {
             app.buttons.identified("cancelTemplateEditor").click()
         }
         if app.buttons["deleteItem"].exists {
-            showSidebar(in: app)
-            let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
-            let allDecks = app.descendants(matching: .any).identified("scopeRow-AllDecks")
-            if unassigned.waitForExistence(timeout: 2), allDecks.waitForExistence(timeout: 2) {
-                unassigned.click()
-                _ = app.buttons.identified("deleteItem").waitForNonExistence(timeout: 5)
-                allDecks.click()
+            if app.buttons.identified("itemDetailBack").exists {
+                app.buttons.identified("itemDetailBack").click()
             } else {
-                app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+                showSidebar(in: app)
+                let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
+                let allDecks = app.descendants(matching: .any).identified("scopeRow-AllDecks")
+                if unassigned.waitForExistence(timeout: 2), allDecks.waitForExistence(timeout: 2) {
+                    unassigned.click()
+                    _ = app.buttons.identified("deleteItem").waitForNonExistence(timeout: 5)
+                    allDecks.click()
+                } else {
+                    app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+                }
             }
             _ = app.buttons.identified("deleteItem").waitForNonExistence(timeout: 5)
         }

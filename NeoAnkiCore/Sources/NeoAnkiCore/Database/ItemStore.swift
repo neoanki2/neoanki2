@@ -270,16 +270,27 @@ public actor ItemStore {
         return deck
     }
 
-    /// Deletes a deck, reparents subdecks, and moves items to the parent deck or unassigned.
+    /// Deletes a deck, all nested subdecks, and every item they contain.
     @discardableResult
     public func deleteDeck(id: UUID) async throws -> Bool {
-        guard let deck = try await database.fetchDeck(id: id) else { return false }
+        guard try await database.fetchDeck(id: id) != nil else { return false }
 
-        let reassignTo = deck.parentID
-
-        try await database.deleteDeckMovingContents(id: id, reassignTo: reassignTo)
+        let summaries = try await deckSummaries()
+        let descendantIDs = DeckTree.descendantIDs(of: id, in: summaries)
+        try await database.deleteDeckRecursively(descendantIDs: descendantIDs)
+        _ = try? await collectMediaGarbage()
 
         return true
+    }
+
+    /// Deletes every unassigned item and its generated cards.
+    @discardableResult
+    public func deleteAllUnassignedItems(now: Date = .now) async throws -> Int {
+        let deleted = try await database.deleteAllUnassignedItems(deletedAt: now)
+        if deleted > 0 {
+            _ = try? await collectMediaGarbage()
+        }
+        return deleted
     }
 
     /// Moves an item to another deck and syncs generated cards.

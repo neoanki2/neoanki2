@@ -171,4 +171,36 @@ final class DeckUITests: NeoAnkiUITestCase {
 
         XCTAssertTrue(app.staticTexts["Child"].waitForExistence(timeout: 5))
     }
+
+    func testDeleteDeckRemovesSubdecksAndItems() throws {
+        let app = launchApp()
+        createDeck(named: "Parent", in: app)
+
+        let parent = app.descendants(matching: .any).identified("deckRow-Parent")
+        parent.rightClick()
+        app.menuItems.identified("New Subdeck").click()
+        guard let container = modalContainer(in: app) else {
+            XCTFail("Subdeck dialog did not appear")
+            return
+        }
+        enterText("Child", into: container.textFields.firstMatch, app: app)
+        app.buttons.identified("confirmCreateDeck").click()
+        XCTAssertTrue(app.staticTexts["Child"].waitForExistence(timeout: 5))
+
+        selectScope("deckRow-Child", in: app)
+        addBasicItem(front: "Nested Item", back: "Answer", in: app)
+
+        showSidebar(in: app)
+        parent.rightClick()
+        app.menuItems.matching(
+            NSPredicate(format: "title == 'Delete' AND enabled == true")
+        ).firstMatch.click()
+        XCTAssertTrue(app.buttons.identified("confirmDeleteDeck").waitForExistence(timeout: 5))
+        app.buttons.identified("confirmDeleteDeck").click()
+
+        XCTAssertFalse(app.descendants(matching: .any)["deckRow-Parent"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.descendants(matching: .any)["deckRow-Child"].exists)
+        selectScope("scopeRow-AllDecks", in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Nested Item"].exists)
+    }
 }

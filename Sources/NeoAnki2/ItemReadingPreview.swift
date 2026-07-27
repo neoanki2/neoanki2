@@ -64,6 +64,7 @@ struct ItemDetailView: View {
     @Bindable var decksModel: DecksModel
     let scope: StudyScope
     let summary: SavedItemSummary
+    var onBack: () -> Void = {}
     var onDeleted: () -> Void = {}
 
     @State private var item: Item?
@@ -133,6 +134,13 @@ struct ItemDetailView: View {
         .background(DesignSystem.detailBackground)
         .navigationTitle(summary.title)
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Back", systemImage: "chevron.left") {
+                    onBack()
+                }
+                .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("itemDetailBack")
+            }
             if item != nil, !isLoading {
                 ToolbarItem {
                     Button("Edit", systemImage: "pencil") {

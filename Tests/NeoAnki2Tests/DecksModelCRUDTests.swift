@@ -80,6 +80,21 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.errorMessage == "Deck name can't be empty.")
 }
 
+@Test @MainActor func decksModelDeletesSubdeckSelectionWhenParentRemoved() async throws {
+    let (model, store) = try await makeDecksModel()
+    let parent = Deck(name: "Parent")
+    let child = Deck(name: "Child", parentID: parent.id)
+    _ = try await store.createDeck(parent)
+    _ = try await store.createDeck(child)
+    await model.load()
+    model.selectedScope = .deck(child.id)
+
+    let deleted = await model.deleteDeck(id: parent.id)
+    #expect(deleted == true)
+    #expect(model.selectedScope == .allDecks)
+    #expect(model.deckTree.isEmpty)
+}
+
 @Test @MainActor func decksModelClearsSelectionWhenDeckRemovedExternally() async throws {
     let (model, store) = try await makeDecksModel()
     let deck = Deck(name: "Gone")

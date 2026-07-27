@@ -4,9 +4,11 @@ import SwiftUI
 struct DeckSidebarView: View {
     @Bindable var decksModel: DecksModel
     @Binding var selection: SidebarSelection
+    var onDeleteAllUnassigned: () -> Void = {}
     @State private var deckToRename: DeckSummary?
     @State private var renameText = ""
     @State private var deckToDelete: DeckSummary?
+    @State private var showDeleteAllUnassignedConfirm = false
     @State private var showNewDeckPrompt = false
     @State private var newDeckName = ""
     @State private var newDeckParentID: UUID?
@@ -56,6 +58,14 @@ struct DeckSidebarView: View {
                             systemImage: "tray",
                             tag: .unassigned
                         )
+                        .contextMenu {
+                            if decksModel.unassignedItemCount > 0 {
+                                Button("Delete All", role: .destructive) {
+                                    showDeleteAllUnassignedConfirm = true
+                                }
+                                .accessibilityIdentifier("deleteAllUnassignedMenu")
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                 }
@@ -130,7 +140,23 @@ struct DeckSidebarView: View {
             }
             .accessibilityIdentifier("cancelDeleteDeck")
         } message: {
-            Text("Items move to the parent deck, or become unassigned if this is a top-level deck.")
+            Text("This permanently deletes the deck, all subdecks, and every item they contain.")
+        }
+        .confirmationDialog(
+            "Delete all unassigned items?",
+            isPresented: $showDeleteAllUnassignedConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                onDeleteAllUnassigned()
+            }
+            .accessibilityIdentifier("confirmDeleteAllUnassigned")
+            Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("cancelDeleteAllUnassigned")
+        } message: {
+            Text(
+                "This permanently deletes all \(decksModel.unassignedItemCount) unassigned items and their study cards."
+            )
         }
     }
 

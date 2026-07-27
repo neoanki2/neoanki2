@@ -148,8 +148,11 @@ final class DecksModel {
         errorMessage = nil
         do {
             guard try await store.deleteDeck(id: id) else { return false }
-            if selectedScope == .deck(id) {
-                selectedScope = .allDecks
+            if case let .deck(selectedID) = selectedScope {
+                let deletedIDs = DeckTree.descendantIDs(of: id, in: summaries)
+                if deletedIDs.contains(selectedID) {
+                    selectedScope = .allDecks
+                }
             }
             await load()
             return true

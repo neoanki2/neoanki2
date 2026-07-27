@@ -72,6 +72,33 @@ private func makeItemsModel() async throws -> (ItemsModel, ItemStore) {
     #expect(moved == false)
 }
 
+@Test @MainActor func itemsModelDeleteAllUnassignedClearsList() async throws {
+    let (model, store) = try await makeItemsModel()
+    let deck = Deck(name: "Keep")
+    _ = try await store.createDeck(deck)
+    await model.load()
+
+    _ = await model.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("Keep Me")],
+        BuiltInItemTypes.backFieldID: [Span("A")],
+    ], deckID: deck.id)
+    _ = await model.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("Remove Me")],
+        BuiltInItemTypes.backFieldID: [Span("B")],
+    ])
+
+    await model.load(scope: .unassigned)
+    #expect(model.items.count == 1)
+
+    let deleted = await model.deleteAllUnassigned()
+    #expect(deleted == 1)
+    #expect(model.items.isEmpty)
+
+    let remaining = try await store.listItems(scope: .allDecks)
+    #expect(remaining.count == 1)
+    #expect(remaining.first?.title == "Keep Me")
+}
+
 @Test @MainActor func itemsModelScopedLoadFiltersItems() async throws {
     let (model, store) = try await makeItemsModel()
     let deck = Deck(name: "Scoped")

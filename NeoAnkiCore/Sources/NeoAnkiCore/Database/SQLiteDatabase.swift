@@ -1052,16 +1052,20 @@ actor SQLiteDatabase {
 
     func deleteItemWithMedia(id: UUID, deletedAt: Date) throws -> Bool {
         try inTransaction {
-            guard let persisted = try fetchItem(id: id) else { return false }
-            try applyMediaReferenceDeltas(
-                from: mediaReferenceCounts(in: persisted.item),
-                to: [:],
-                descriptors: [:],
-                now: deletedAt
-            )
-            try deleteItem(id: id)
-            return true
+            try deleteItemWithMediaWithoutTransaction(id: id, deletedAt: deletedAt)
         }
+    }
+
+    func deleteItemWithMediaWithoutTransaction(id: UUID, deletedAt: Date) throws -> Bool {
+        guard let persisted = try fetchItem(id: id) else { return false }
+        try applyMediaReferenceDeltas(
+            from: mediaReferenceCounts(in: persisted.item),
+            to: [:],
+            descriptors: [:],
+            now: deletedAt
+        )
+        try deleteItem(id: id)
+        return true
     }
 
     func insertItem(_ item: Item, createdAt: Date, updatedAt: Date) throws {
@@ -2278,16 +2282,45 @@ actor SQLiteDatabase {
         }
     }
 
-    func deleteDeckMovingContents(id: UUID, reassignTo: UUID?) throws {
+    func deleteAllUnassignedItems(deletedAt: Date) throws -> Int {
         try inTransaction {
-            try reparentChildDecks(from: id, to: reassignTo)
-            let items = try fetchItems(deckID: id)
+            let items = try fetchUnassignedItems()
+            var deleted = 0
             for entry in items {
-                try updateItemDeck(itemID: entry.item.id, deckID: reassignTo)
-                try updateCardsDeck(itemID: entry.item.id, deckID: reassignTo)
+                if try deleteItemWithMediaWithoutTransaction(id: entry.item.id, deletedAt: deletedAt) {
+                    deleted += 1
+                }
             }
-            try deleteDeck(id: id)
+            return deleted
         }
+    }
+
+    func deleteDeckRecursively(descendantIDs: Set<UUID>) throws {
+        try inTransaction {
+            for deckID in descendantIDs {
+                let items = try fetchItems(deckID: deckID)
+                for entry in items {
+                    _ = try deleteItemWithMediaWithoutTransaction(id: entry.item.id, deletedAt: .now)
+                }
+            }
+            for deckID in try deckDeletionOrder(ids: descendantIDs) {
+                try deleteDeck(id: deckID)
+            }
+        }
+    }
+
+    private func deckDeletionOrder(ids: Set<UUID>) throws -> [UUID] {
+        var depth: [UUID: Int] = [:]
+        for id in ids {
+            depth[id] = try deckDepth(id: id, within: ids)
+        }
+        return ids.sorted { depth[$0, default: 0] > depth[$1, default: 0] }
+    }
+
+    private func deckDepth(id: UUID, within ids: Set<UUID>) throws -> Int {
+        guard let deck = try fetchDeck(id: id) else { return 0 }
+        guard let parentID = deck.parentID, ids.contains(parentID) else { return 0 }
+        return 1 + (try deckDepth(id: parentID, within: ids))
     }
 
     private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {
