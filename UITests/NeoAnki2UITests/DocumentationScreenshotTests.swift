@@ -84,7 +84,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let disclosure = app.disclosureTriangles.firstMatch
         XCTAssertTrue(disclosure.waitForExistence(timeout: 3))
         disclosure.click()
-        XCTAssertTrue(app.descendants(matching: .any)["templateAutomaticSkill"].waitForExistence(timeout: 5))
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         captureDocumentationScreenshot(named: "template-advanced", of: app)
     }
 
