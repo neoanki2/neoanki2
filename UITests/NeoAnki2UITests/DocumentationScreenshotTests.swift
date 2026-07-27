@@ -177,7 +177,8 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedSettings = advancedApp.descendants(matching: .any)
             .identified("templateAdvancedSettings")
         XCTAssertTrue(advancedSettings.waitForExistence(timeout: 5))
-        let advancedForm = advancedApp.scrollViews.firstMatch
+        let advancedForm = advancedApp.descendants(matching: .any)
+            .identified("templateEditorForm")
         XCTAssertTrue(advancedForm.waitForExistence(timeout: 3))
         advancedForm.swipeUp()
         XCTAssertTrue(

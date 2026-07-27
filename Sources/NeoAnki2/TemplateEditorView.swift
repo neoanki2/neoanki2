@@ -135,6 +135,7 @@ struct TemplateEditorView: View {
                 }
             }
         }
+        .accessibilityIdentifier("templateEditorForm")
         .formStyle(.grouped)
         .neoAnkiFormTypography()
         .navigationTitle(editingTemplate == nil ? "Add Template" : "Edit Template")
