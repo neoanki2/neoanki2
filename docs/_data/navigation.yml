@@ -71,6 +71,8 @@ primary:
     children:
       - title: Maintaining documentation
         url: /user/maintaining-documentation/
+      - title: Documentation quality audit
+        url: /audits/state-of-art-2026-07-27/
   - title: GitHub
     url: https://github.com/neoanki2/neoanki2
     external: true
