@@ -1,0 +1,198 @@
+{
+  "capturedAt" : "2026-07-27T12:56:53Z",
+  "schemaVersion" : 1,
+  "screenshots" : [
+    {
+      "expectedVisibleIdentifiers" : [
+        "deckRow-Languages",
+        "deckRow-French"
+      ],
+      "filename" : "decks-nested.png",
+      "height" : 743,
+      "scenario" : "library sidebar with nested Languages and French decks",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "bootstrapError"
+      ],
+      "filename" : "error-startup.png",
+      "height" : 716,
+      "scenario" : "database bootstrap failure",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "importSheet",
+        "confirmImport"
+      ],
+      "filename" : "import-sheet.png",
+      "height" : 691,
+      "scenario" : "CSV import mapping sheet",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "cancelAddItem",
+        "field-Front",
+        "field-Back"
+      ],
+      "filename" : "item-add.png",
+      "height" : 716,
+      "scenario" : "new basic item editor",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "deleteItem",
+        "editItem"
+      ],
+      "filename" : "item-detail.png",
+      "height" : 716,
+      "scenario" : "basic item detail",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "saveEditItem",
+        "field-Image"
+      ],
+      "filename" : "item-media.png",
+      "height" : 716,
+      "scenario" : "editing an image item missing its description",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "field-Front",
+        "field-Front-formatBold",
+        "saveAddItem"
+      ],
+      "filename" : "item-rich-text.png",
+      "height" : 716,
+      "scenario" : "basic item editor with visibly bold front text",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "templatesDone",
+        "addTemplateToolbar"
+      ],
+      "filename" : "item-types.png",
+      "height" : 703,
+      "scenario" : "item types and templates panel",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "emptyLibraryState"
+      ],
+      "filename" : "library-empty.png",
+      "height" : 716,
+      "scenario" : "empty library",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "itemRow-What is spaced repetition?",
+        "addItemToolbar"
+      ],
+      "filename" : "library-populated.png",
+      "height" : 716,
+      "scenario" : "library containing one basic item",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "portableDeckConflictUseLocal",
+        "portableDeckConflictImportNew"
+      ],
+      "filename" : "portable-conflict.png",
+      "height" : 703,
+      "scenario" : "portable deck item-type conflict",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "action-button-1"
+      ],
+      "filename" : "scheduling-result.png",
+      "height" : 716,
+      "scenario" : "scheduling optimization result sheet",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "studyAnswer",
+        "gradeGood",
+        "gradeAgain"
+      ],
+      "filename" : "study-answer.png",
+      "height" : 716,
+      "scenario" : "revealed study answer with grading controls",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "studySessionDone"
+      ],
+      "filename" : "study-complete.png",
+      "height" : 716,
+      "scenario" : "completed study session",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "gradeGuidePanel",
+        "primaryStudyAction"
+      ],
+      "filename" : "study-grade-help.png",
+      "height" : 716,
+      "scenario" : "study prompt with grading guide open",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "primaryStudyAction",
+        "gradeHelp"
+      ],
+      "filename" : "study-prompt.png",
+      "height" : 716,
+      "scenario" : "study prompt before revealing the answer",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "studyAnswer",
+        "gradeGood"
+      ],
+      "filename" : "study-type.png",
+      "height" : 716,
+      "scenario" : "typed-answer study result",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "answerSlotSource",
+        "answerSlotReveal",
+        "templateAdvancedSettings"
+      ],
+      "filename" : "template-advanced.png",
+      "height" : 716,
+      "scenario" : "advanced template editor with answer reveal controls and advanced settings entry point",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "templateNameField",
+        "templatePromptField",
+        "templateAnswerField"
+      ],
+      "filename" : "template-editor.png",
+      "height" : 703,
+      "scenario" : "new template editor",
+      "width" : 960
+    }
+  ],
+  "sourceSHA" : "6ddc8b5bc0713b793fdaa73c009e2d48763a2857"
+}
