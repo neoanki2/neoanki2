@@ -40,6 +40,14 @@ fi
 
 /usr/libexec/PlistBuddy -c "Delete :TestConfigurations:0:TestTargets:0:UITargetAppPath" "$XCTESTRUN" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :TestConfigurations:0:TestTargets:0:UITargetAppPath string $APP_PATH" "$XCTESTRUN"
+if [[ -n "${DOC_SCREENSHOT_DIR:-}" ]]; then
+  /usr/libexec/PlistBuddy \
+    -c "Delete :TestConfigurations:0:TestTargets:0:EnvironmentVariables:DOC_SCREENSHOT_DIR" \
+    "$XCTESTRUN" 2>/dev/null || true
+  /usr/libexec/PlistBuddy \
+    -c "Add :TestConfigurations:0:TestTargets:0:EnvironmentVariables:DOC_SCREENSHOT_DIR string $DOC_SCREENSHOT_DIR" \
+    "$XCTESTRUN"
+fi
 
 TEST_ARGUMENTS=()
 if [[ -n "${NEOANKI_UI_ONLY_TESTING:-}" ]]; then
