@@ -1,0 +1,44 @@
+name: Documentation screenshots
+
+on:
+  push:
+    paths:
+      - Sources/NeoAnki2/**
+      - UITests/NeoAnki2UITests/**
+      - UITests/NeoAnki2UITests.xcodeproj/**
+      - Scripts/capture-doc-screenshots.sh
+      - Scripts/run-ui-tests.sh
+      - .github/workflows/docs-screenshots.yml
+  schedule:
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Capture reviewed screenshot artifact
+    runs-on: macos-15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Pin macOS appearance
+        run: |
+          defaults delete -g AppleInterfaceStyle 2>/dev/null || true
+          defaults write -g AppleAccentColor -int 1
+      - name: Capture documentation screenshots
+        run: |
+          chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh Scripts/capture-doc-screenshots.sh
+          ./Scripts/capture-doc-screenshots.sh "$RUNNER_TEMP/neoanki2-doc-screenshots"
+      - name: Upload screenshot artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neoanki2-documentation-screenshots
+          path: ${{ runner.temp }}/neoanki2-doc-screenshots/*.png
+          if-no-files-found: error
+          retention-days: 14

@@ -1,7 +1,15 @@
-# NeoAnki2 documentation
+# NeoAnki2 documentation source
 
-Project docs live here. The repo root [`README.md`](../README.md) is the quick
-start; this folder is the reference library.
+The user manual is published at
+[neoanki2.github.io/neoanki2](https://neoanki2.github.io/neoanki2/). This
+folder is both the Jekyll site source and the project reference library.
+
+| Guide | Purpose |
+| --- | --- |
+| [`user/`](user/) | Complete task-oriented user guide |
+| [`features.md`](features.md) | Generated feature-to-source/test coverage index |
+| [`features.json`](features.json) | Machine-readable documentation ownership manifest |
+| [`reference/`](reference/) | Published reference index |
 
 | Document | Purpose |
 | --- | --- |
@@ -18,3 +26,11 @@ Impeccable and similar tools resolve `PRODUCT.md` and `DESIGN.md` from this
 `docs/` directory when they are not at the project root.
 
 Visual token sidecar: [`.impeccable/design.json`](../.impeccable/design.json).
+
+## Keeping documentation current
+
+Run `swift Scripts/validate-docs.swift --write` after changing
+`docs/features.json`, then run `./Scripts/test-fast.sh`. The validator checks
+feature ownership, referenced source and test files, generated output, and local
+links. Documentation screenshots are captured in reviewed CI artifacts; see
+[`user/maintaining-documentation.md`](user/maintaining-documentation.md).

@@ -41,7 +41,15 @@ fi
 /usr/libexec/PlistBuddy -c "Delete :TestConfigurations:0:TestTargets:0:UITargetAppPath" "$XCTESTRUN" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :TestConfigurations:0:TestTargets:0:UITargetAppPath string $APP_PATH" "$XCTESTRUN"
 
-xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination 'platform=macOS' || {
+TEST_ARGUMENTS=()
+if [[ -n "${NEOANKI_UI_ONLY_TESTING:-}" ]]; then
+  TEST_ARGUMENTS+=("-only-testing:${NEOANKI_UI_ONLY_TESTING}")
+fi
+
+xcodebuild test-without-building \
+  -xctestrun "$XCTESTRUN" \
+  -destination 'platform=macOS' \
+  "${TEST_ARGUMENTS[@]}" || {
   echo "UI smoke tests failed." >&2
   exit 1
 }

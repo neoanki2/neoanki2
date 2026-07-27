@@ -1,3 +1,8 @@
+---
+title: Authoring decks with coding agents
+parent: Reference
+---
+
 # Authoring NeoAnki decks with coding agents
 
 ## Why the format is JSON Lines

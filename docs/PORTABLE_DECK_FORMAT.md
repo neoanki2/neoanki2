@@ -1,3 +1,8 @@
+---
+title: Portable deck format
+parent: Reference
+---
+
 # NeoAnki Portable Deck Format (`.neodeck`)
 
 ## 1. Status and scope

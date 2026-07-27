@@ -1,3 +1,8 @@
+---
+title: Authored deck format
+parent: Reference
+---
+
 # NeoAnki Authored Deck Format (`.neoanki`)
 
 ## 1. Status and purpose

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+    <meta name="description" content="{{ page.description | default: site.description | escape }}">
+    <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="{{ '/' | relative_url }}">NeoAnki2</a>
+      <nav aria-label="Primary">
+        <a href="{{ '/user/' | relative_url }}">User guide</a>
+        <a href="{{ '/features/' | relative_url }}">Feature index</a>
+        <a href="{{ '/reference/' | relative_url }}">Reference</a>
+        <a href="https://github.com/neoanki2/neoanki2">GitHub</a>
+      </nav>
+    </header>
+    <div class="page-shell">
+      <aside class="sidebar" aria-label="Documentation">
+        <strong>User guide</strong>
+        <a href="{{ '/user/getting-started/' | relative_url }}">Getting started</a>
+        <a href="{{ '/user/library-and-decks/' | relative_url }}">Library and decks</a>
+        <a href="{{ '/user/authoring-items/' | relative_url }}">Authoring items</a>
+        <a href="{{ '/user/content-and-media/' | relative_url }}">Content and media</a>
+        <a href="{{ '/user/studying/' | relative_url }}">Studying</a>
+        <a href="{{ '/user/item-types-and-templates/' | relative_url }}">Item types and templates</a>
+        <a href="{{ '/user/import-export/' | relative_url }}">Import and export</a>
+        <a href="{{ '/user/scheduling/' | relative_url }}">Scheduling</a>
+        <a href="{{ '/user/shortcuts-accessibility/' | relative_url }}">Shortcuts and accessibility</a>
+        <a href="{{ '/user/troubleshooting/' | relative_url }}">Troubleshooting</a>
+        <a href="{{ '/user/cli/' | relative_url }}">Deck authoring CLI</a>
+        <strong>Contributors</strong>
+        <a href="{{ '/user/maintaining-documentation/' | relative_url }}">Maintaining documentation</a>
+      </aside>
+      <main id="content">
+        {% if page.parent %}<p class="eyebrow">{{ page.parent }}</p>{% endif %}
+        {{ content }}
+      </main>
+    </div>
+    <footer>
+      NeoAnki2 is open source. Documentation is versioned with the product.
+    </footer>
+  </body>
+</html>

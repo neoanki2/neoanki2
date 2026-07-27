@@ -19,6 +19,10 @@ class NeoAnkiUITestCase: XCTestCase {
 
         let app = XCUIApplication()
         app.launchArguments = ["-NeoAnkiTesting"]
+        if ProcessInfo.processInfo.environment["DOC_SCREENSHOT_DIR"] != nil {
+            app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            app.launchEnvironment["NEOANKI_SCREENSHOT_MODE"] = "1"
+        }
         app.launchEnvironment["NEOANKI_TESTING"] = "1"
         app.launchEnvironment["NEOANKI_TEST_DB_DIR"] = NSTemporaryDirectory() + "neoanki2-ui-\(databaseLabel)"
         if let scenario {
@@ -47,6 +51,37 @@ class NeoAnkiUITestCase: XCTestCase {
             waitForLibraryReady(in: app)
         }
         return app
+    }
+
+    func captureDocumentationScreenshot(
+        named name: String,
+        of app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let outputPath = ProcessInfo.processInfo.environment["DOC_SCREENSHOT_DIR"] else {
+            XCTFail("DOC_SCREENSHOT_DIR must be set for documentation screenshot tests", file: file, line: line)
+            return
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        let outputDirectory = URL(fileURLWithPath: outputPath, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: outputDirectory,
+                withIntermediateDirectories: true
+            )
+            let screenshot = app.screenshot()
+            try screenshot.pngRepresentation.write(
+                to: outputDirectory.appendingPathComponent("\(name).png"),
+                options: .atomic
+            )
+            let attachment = XCTAttachment(screenshot: screenshot)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        } catch {
+            XCTFail("Could not write documentation screenshot '\(name)': \(error)", file: file, line: line)
+        }
     }
 
     func waitForLibraryReady(in app: XCUIApplication, timeout: TimeInterval = 15) {

@@ -1,3 +1,8 @@
+---
+title: Architecture
+parent: Reference
+---
+
 # NeoAnki2 — Architecture
 
 A native macOS spaced-repetition app (Swift 6 / SwiftUI) with its domain logic in

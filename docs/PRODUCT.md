@@ -1,3 +1,8 @@
+---
+title: Product
+parent: Reference
+---
+
 # Product
 
 <!-- impeccable:product-schema 1 -->
