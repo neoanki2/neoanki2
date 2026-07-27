@@ -34,6 +34,9 @@ jobs:
           defaults write -g AppleLanguages -array en
           defaults write -g AppleLocale -string en_US
           defaults write com.apple.universalaccess reduceMotion -bool true
+          defaults write com.apple.dock autohide -bool true
+          defaults write com.apple.dock autohide-delay -float 1000
+          killall Dock || true
       - name: Capture documentation screenshots
         run: |
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh Scripts/capture-doc-screenshots.sh
