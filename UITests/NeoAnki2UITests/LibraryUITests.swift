@@ -9,7 +9,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Could Not Start"].exists)
-        XCTAssertFalse(app.buttons["addItemToolbar"].exists)
+        XCTAssertFalse(app.buttons.identified("addItemToolbar").exists)
     }
 
     func testAppLaunchesWithEmptyLibrary() throws {
@@ -49,7 +49,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
     func testAddItemCancelReturnsToLibrary() throws {
         let app = launchApp()
         openAddItem(in: app)
-        app.buttons["cancelAddItem"].click()
+        app.buttons.identified("cancelAddItem").click()
         assertEmptyLibrary(in: app)
     }
 
@@ -58,7 +58,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         openAddItem(in: app)
         enterText("Only front", into: field(named: "Front", in: app), app: app)
 
-        let save = app.buttons["saveAddItem"]
+        let save = app.buttons.identified("saveAddItem")
         XCTAssertTrue(save.waitForExistence(timeout: 2))
         XCTAssertFalse(save.isEnabled)
     }
@@ -67,7 +67,59 @@ final class LibraryUITests: NeoAnkiUITestCase {
         let app = launchApp()
         addBasicItem(front: "Detail", back: "View", in: app)
         openItemDetail(named: "Detail", in: app)
-        XCTAssertTrue(app.buttons["deleteItem"].exists)
+        XCTAssertTrue(app.buttons.identified("deleteItem").exists)
+    }
+
+    func testEditItemFromDetailUpdatesLibraryAndPreview() throws {
+        let app = launchApp()
+        addBasicItem(front: "France", back: "Paris", in: app)
+        openItemDetail(named: "France", in: app)
+
+        app.buttons.identified("editItem").click()
+        enterText("Japan", into: field(named: "Front", in: app), app: app)
+        enterText("Tokyo", into: field(named: "Back", in: app), app: app)
+        let save = app.buttons.identified("saveEditItem")
+        XCTAssertTrue(save.isEnabled)
+        save.click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", "Japan", "Japan")
+        ).firstMatch.waitForExistence(timeout: 5))
+        returnToLibrary(in: app)
+        waitForItem(named: "Japan", in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-France"].exists)
+    }
+
+    func testDirtyItemEditCanKeepEditingThenDiscard() throws {
+        let app = launchApp()
+        addBasicItem(front: "Original", back: "Answer", in: app)
+        openItemDetail(named: "Original", in: app)
+
+        app.buttons.identified("editItem").click()
+        enterText("Changed", into: field(named: "Front", in: app), app: app)
+        app.buttons.identified("cancelEditItem").click()
+        XCTAssertTrue(app.buttons.identified("cancelDiscardItem").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelDiscardItem").click()
+        XCTAssertTrue(app.buttons.identified("saveEditItem").exists)
+
+        app.buttons.identified("cancelEditItem").click()
+        app.buttons.identified("confirmDiscardItem").click()
+        XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 5))
+        returnToLibrary(in: app)
+        waitForItem(named: "Original", in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Changed"].exists)
+    }
+
+    func testImageEditRequiresDescriptionBeforeSaving() throws {
+        let app = launchApp(scenario: "image-missing-description")
+        waitForItem(named: "Image", in: app)
+        openItemDetail(named: "Image", in: app)
+
+        app.buttons.identified("editItem").click()
+        let save = app.buttons.identified("saveEditItem")
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled)
     }
 
     func testDeleteItemFromDetail() throws {
@@ -75,8 +127,8 @@ final class LibraryUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Remove", back: "Me", in: app)
         openItemDetail(named: "Remove", in: app)
 
-        app.buttons["deleteItem"].click()
-        app.buttons["confirmDeleteItem"].click()
+        app.buttons.identified("deleteItem").click()
+        app.buttons.identified("confirmDeleteItem").click()
 
         assertEmptyLibrary(in: app)
         XCTAssertFalse(app.descendants(matching: .any)["itemRow-Remove"].exists)
@@ -88,10 +140,10 @@ final class LibraryUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Movable", back: "Item", in: app)
         openItemDetail(named: "Movable", in: app)
 
-        let picker = app.descendants(matching: .any)["itemDeckPicker"]
+        let picker = app.descendants(matching: .any).identified("itemDeckPicker")
         XCTAssertTrue(picker.waitForExistence(timeout: 5))
         picker.click()
-        let deckMenuItem = app.menuItems["Target Deck"]
+        let deckMenuItem = app.menuItems.identified("Target Deck")
         XCTAssertTrue(deckMenuItem.waitForExistence(timeout: 3))
         deckMenuItem.click()
 
@@ -105,10 +157,10 @@ final class LibraryUITests: NeoAnkiUITestCase {
         createDeck(named: "History", in: app)
 
         openAddItem(in: app)
-        let deckPicker = app.popUpButtons["addItemDeckPicker"]
+        let deckPicker = app.popUpButtons.identified("addItemDeckPicker")
         if deckPicker.waitForExistence(timeout: 2) {
             deckPicker.click()
-            app.menuItems["History"].click()
+            app.menuItems.identified("History").click()
         }
 
         enterText("Rome", into: field(named: "Front", in: app), app: app)
@@ -124,11 +176,11 @@ final class LibraryUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Keep Item", back: "Still Here", in: app)
         openItemDetail(named: "Keep Item", in: app)
 
-        app.buttons["deleteItem"].click()
-        XCTAssertTrue(app.buttons["cancelDeleteItem"].waitForExistence(timeout: 3))
-        app.buttons["cancelDeleteItem"].click()
+        app.buttons.identified("deleteItem").click()
+        XCTAssertTrue(app.buttons.identified("cancelDeleteItem").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelDeleteItem").click()
 
-        XCTAssertTrue(app.buttons["deleteItem"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 3))
         returnToLibrary(in: app)
         waitForItem(named: "Keep Item", in: app)
     }
@@ -138,7 +190,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         openAddItem(in: app)
         enterText("   ", into: field(named: "Front", in: app), app: app)
 
-        XCTAssertFalse(app.buttons["saveAddItem"].isEnabled)
+        XCTAssertFalse(app.buttons.identified("saveAddItem").isEnabled)
     }
 
     func testJSONImportThroughSystemFilePicker() throws {
@@ -153,19 +205,10 @@ final class LibraryUITests: NeoAnkiUITestCase {
             }
             """
         )
-        let app = launchApp()
-        chooseImportFile(file, in: app)
-
-        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 10))
-        let importButton = app.buttons["confirmImport"]
-        importButton.click()
-        XCTAssertTrue(importButton.waitForNonExistence(timeout: 10))
-        let completion = app.sheets.firstMatch
-        XCTAssertTrue(completion.waitForExistence(timeout: 10))
-        XCTAssertTrue(completion.staticTexts.matching(
-            NSPredicate(format: "value CONTAINS[c] %@", "Import Complete")
-        ).firstMatch.exists)
-        completion.buttons["OK"].click()
+        let app = launchAppForImport(file: file)
+        app.buttons.identified("confirmImport").click()
+        _ = app.buttons.identified("confirmImport").waitForNonExistence(timeout: 30)
+        dismissImportComplete(in: app)
         waitForItem(named: "Imported Question", in: app, timeout: 10)
     }
 
@@ -177,21 +220,13 @@ final class LibraryUITests: NeoAnkiUITestCase {
             CSV Question,CSV Answer,imported
             """
         )
-        let app = launchApp()
-        chooseImportFile(file, in: app)
-
-        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.popUpButtons["importItemTypePicker"].waitForExistence(timeout: 3))
-        let importButton = app.buttons["confirmImport"]
+        let app = launchAppForImport(file: file)
+        XCTAssertTrue(app.popUpButtons.identified("importItemTypePicker").waitForExistence(timeout: 3))
+        let importButton = app.buttons.identified("confirmImport")
         XCTAssertTrue(importButton.isEnabled)
         importButton.click()
-        XCTAssertTrue(importButton.waitForNonExistence(timeout: 10))
-        let completion = app.sheets.firstMatch
-        XCTAssertTrue(completion.waitForExistence(timeout: 10))
-        XCTAssertTrue(completion.staticTexts.matching(
-            NSPredicate(format: "value CONTAINS[c] %@", "Import Complete")
-        ).firstMatch.exists)
-        completion.buttons["OK"].click()
+        _ = importButton.waitForNonExistence(timeout: 30)
+        dismissImportComplete(in: app)
         waitForItem(named: "CSV Question", in: app, timeout: 10)
     }
 
@@ -207,21 +242,20 @@ final class LibraryUITests: NeoAnkiUITestCase {
             }
             """
         )
-        let app = launchApp()
-        chooseImportFile(file, in: app)
+        let app = launchAppForImport(file: file)
 
-        XCTAssertTrue(app.buttons["confirmImport"].waitForExistence(timeout: 10))
-        app.buttons["confirmImport"].click()
+        XCTAssertTrue(app.buttons.identified("confirmImport").waitForExistence(timeout: 10))
+        app.buttons.identified("confirmImport").click()
         XCTAssertTrue(app.descendants(matching: .any)["importError"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["importSheet"].exists)
-        app.buttons["cancelImport"].click()
+        app.buttons.identified("cancelImport").click()
         assertEmptyLibrary(in: app)
     }
 
     func testSchedulingOptimizationReportsInsufficientHistory() throws {
         let app = launchApp()
         app.menuBarItems["Scheduling"].click()
-        let optimize = app.menuItems["Optimize Scheduling…"]
+        let optimize = app.menuItems.identified("Optimize Scheduling…")
         XCTAssertTrue(optimize.waitForExistence(timeout: 3))
         XCTAssertTrue(optimize.isEnabled)
         optimize.click()
@@ -233,13 +267,13 @@ final class LibraryUITests: NeoAnkiUITestCase {
                 NSPredicate(format: "value CONTAINS[c] %@", "review")
             ).firstMatch.exists
         )
-        alert.buttons["OK"].click()
+        alert.buttons.identified("OK").click()
     }
 
     func testSchedulingOptimizationSucceedsWithReviewHistory() throws {
         let app = launchApp(scenario: "scheduling-history")
         app.menuBarItems["Scheduling"].click()
-        app.menuItems["Optimize Scheduling…"].click()
+        app.menuItems.identified("Optimize Scheduling…").click()
 
         let alert = app.sheets.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 20))
@@ -251,6 +285,6 @@ final class LibraryUITests: NeoAnkiUITestCase {
                 NSPredicate(format: "value CONTAINS[c] %@", "129 review outcomes")
             ).firstMatch.exists
         )
-        alert.buttons["OK"].click()
+        alert.buttons.identified("OK").click()
     }
 }

@@ -252,6 +252,16 @@ struct TemplateDraft: Equatable {
         }
     }
 
+    var hasAdvancedSettings: Bool {
+        !usesAutomaticSkill
+            || generateWhen != nil
+            || (promptSlots + answerSlots).contains { slot in
+                slot.sourceKind != .field
+                    || slot.reveal != .always
+                    || slot.media != .default
+            }
+    }
+
     var isValid: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty

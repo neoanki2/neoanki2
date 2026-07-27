@@ -2,8 +2,12 @@ import SwiftUI
 
 struct LibraryCommandHandlers {
     var openImport: (() -> Void)?
+    var openPortableDeckImport: (() -> Void)?
+    var openPortableDeckExport: (() -> Void)?
     var openTemplates: (() -> Void)?
     var canImport = false
+    var canImportPortableDeck = false
+    var canExportPortableDeck = false
     var canOpenTemplates = false
 }
 
@@ -28,6 +32,18 @@ struct LibraryCommands: Commands {
                 handlers?.openImport?()
             }
             .disabled(!(handlers?.canImport ?? false))
+
+            Divider()
+
+            Button("Import Deck…") {
+                handlers?.openPortableDeckImport?()
+            }
+            .disabled(!(handlers?.canImportPortableDeck ?? false))
+
+            Button("Export Deck…") {
+                handlers?.openPortableDeckExport?()
+            }
+            .disabled(!(handlers?.canExportPortableDeck ?? false))
         }
 
         CommandMenu("Library") {

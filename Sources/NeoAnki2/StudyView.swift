@@ -470,6 +470,10 @@ struct StudyView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .keyboardShortcut(
+                    KeyEquivalent(Character(rating.studyShortcutLabel)),
+                    modifiers: []
+                )
                 .help(rating.studyTooltip)
                 .disabled(model.isGrading)
                 .accessibilityLabel(rating.studyAccessibilityLabel)

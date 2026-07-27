@@ -84,6 +84,212 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     #expect(model.items.first?.subtitle == "Answer")
 }
 
+@Test @MainActor func itemsModelUpdatesExistingItemContent() async throws {
+    let (model, store) = try await makeModel()
+    await model.load()
+
+    let frontID = BuiltInItemTypes.frontFieldID
+    let backID = BuiltInItemTypes.backFieldID
+    #expect(await model.addItem(fieldSpans: [
+        frontID: [Span("France")],
+        backID: [Span("Paris")],
+    ]))
+    let itemID = try #require(model.items.first?.id)
+
+    let updated = await model.updateItem(
+        id: itemID,
+        fieldSpans: [
+            frontID: [Span("Japan")],
+            backID: [Span("Tokyo", styles: [.bold])],
+        ]
+    )
+
+    #expect(updated)
+    #expect(model.items.first?.title == "Japan")
+    #expect(model.items.first?.subtitle == "Tokyo")
+    #expect(model.dueCount == 1)
+    let stored = try #require(try await store.fetchItem(id: itemID)?.item)
+    #expect(stored.value(for: frontID) == .text("Japan"))
+    #expect(stored.value(for: backID) == .rich([Span("Tokyo", styles: [.bold])]))
+}
+
+@Test @MainActor func itemsModelRejectsInvalidUpdateWithoutChangingStoredItem() async throws {
+    let (model, store) = try await makeModel()
+    await model.load()
+
+    let frontID = BuiltInItemTypes.frontFieldID
+    let backID = BuiltInItemTypes.backFieldID
+    #expect(await model.addItem(fieldSpans: [
+        frontID: [Span("France")],
+        backID: [Span("Paris")],
+    ]))
+    let itemID = try #require(model.items.first?.id)
+
+    let updated = await model.updateItem(
+        id: itemID,
+        fieldSpans: [frontID: [Span("Japan")]]
+    )
+
+    #expect(updated == false)
+    #expect(model.errorMessage == "Back is required.")
+    let stored = try #require(try await store.fetchItem(id: itemID)?.item)
+    #expect(stored.value(for: frontID) == .text("France"))
+    #expect(stored.value(for: backID) == .text("Paris"))
+}
+
+@Test @MainActor func itemsModelUpdatesAgainstTheLatestStoredSchema() async throws {
+    let (model, store) = try await makeModel()
+    await model.load()
+
+    let frontID = BuiltInItemTypes.frontFieldID
+    let backID = BuiltInItemTypes.backFieldID
+    #expect(await model.addItem(fieldSpans: [
+        frontID: [Span("France")],
+        backID: [Span("Paris")],
+    ]))
+    let itemID = try #require(model.items.first?.id)
+
+    var latestType = try await store.itemType(id: BuiltInItemTypes.basicID)
+    let note = FieldDef(name: "Note", type: .text, isRequired: false)
+    latestType.fields.append(note)
+    _ = try await store.updateItemType(latestType)
+
+    let updated = await model.updateItem(
+        id: itemID,
+        fieldSpans: [
+            frontID: [Span("France")],
+            backID: [Span("Paris")],
+            note.id: [Span("Capital city")],
+        ]
+    )
+
+    #expect(updated)
+    let stored = try #require(try await store.fetchItem(id: itemID)?.item)
+    #expect(stored.value(for: note.id) == .text("Capital city"))
+}
+
+@Test @MainActor func itemsModelUpdateReportsMissingItem() async throws {
+    let (model, _) = try await makeModel()
+    await model.load()
+
+    let updated = await model.updateItem(
+        id: UUID(),
+        fieldSpans: [
+            BuiltInItemTypes.frontFieldID: [Span("Question")],
+            BuiltInItemTypes.backFieldID: [Span("Answer")],
+        ]
+    )
+
+    #expect(updated == false)
+    #expect(model.errorMessage == "This item no longer exists.")
+}
+
+@Test @MainActor func itemsModelUpdatePreservesLanguageMetadataAndTags() async throws {
+    let (model, store) = try await makeModel()
+    let item = Item(
+        itemTypeID: BuiltInItemTypes.basicID,
+        fields: [
+            FieldValue(
+                fieldID: BuiltInItemTypes.frontFieldID,
+                value: .text("Hola", lang: "es")
+            ),
+            FieldValue(
+                fieldID: BuiltInItemTypes.backFieldID,
+                value: .text("Hello", lang: "en")
+            ),
+        ],
+        tags: ["language", "spanish"]
+    )
+    _ = try await store.createItem(item)
+    await model.load()
+
+    #expect(await model.updateItem(
+        id: item.id,
+        fieldSpans: [
+            BuiltInItemTypes.frontFieldID: [Span("Adiós")],
+            BuiltInItemTypes.backFieldID: [Span("Goodbye")],
+        ]
+    ))
+
+    let stored = try #require(try await store.fetchItem(id: item.id)?.item)
+    #expect(stored.value(for: BuiltInItemTypes.frontFieldID) == .text("Adiós", lang: "es"))
+    #expect(stored.value(for: BuiltInItemTypes.backFieldID) == .text("Goodbye", lang: "en"))
+    #expect(stored.tags == ["language", "spanish"])
+}
+
+@Test @MainActor func itemsModelRequiresDescriptionsForImageContent() async throws {
+    let (model, store) = try await makeModel()
+    let imageField = FieldDef(name: "Image", type: .image, isRequired: true)
+    let captionField = FieldDef(name: "Caption", type: .text, isRequired: true)
+    let itemType = ItemType(
+        name: "Image Notes",
+        fields: [imageField, captionField],
+        templates: [
+            Template(
+                name: "Recognize",
+                prompt: Side(slots: [Slot(source: .field(imageField.id))]),
+                answer: Side(slots: [Slot(source: .field(captionField.id))]),
+                interaction: .reveal,
+                skill: Skill(input: .image, output: .text, operation: .recognize)
+            ),
+        ]
+    )
+    _ = try await store.createItemType(itemType)
+    await model.load()
+    model.addItemTypeID = itemType.id
+
+    let saved = await model.addItem(
+        fieldSpans: [captionField.id: [Span("A mountain lake")]],
+        fieldMedia: [
+            imageField.id: MediaRef(
+                kind: .image,
+                assetHash: String(repeating: "0", count: 64),
+                fileExtension: "png"
+            ),
+        ]
+    )
+
+    #expect(saved == false)
+    #expect(model.errorMessage == "Add a description for Image so it works with VoiceOver.")
+    #expect(model.items.isEmpty)
+}
+
+@Test @MainActor func itemsModelRequiresDescriptionsForGIFContent() async throws {
+    let (model, store) = try await makeModel()
+    let gifField = FieldDef(name: "Animation", type: .gif, isRequired: true)
+    let captionField = FieldDef(name: "Caption", type: .text, isRequired: true)
+    let itemType = ItemType(
+        name: "Animated Notes",
+        fields: [gifField, captionField],
+        templates: [
+            Template(
+                name: "Recognize",
+                prompt: Side(slots: [Slot(source: .field(gifField.id))]),
+                answer: Side(slots: [Slot(source: .field(captionField.id))]),
+                interaction: .reveal,
+                skill: Skill(input: .image, output: .text, operation: .recognize)
+            ),
+        ]
+    )
+    _ = try await store.createItemType(itemType)
+    await model.load()
+    model.addItemTypeID = itemType.id
+
+    let saved = await model.addItem(
+        fieldSpans: [captionField.id: [Span("An animation")]],
+        fieldMedia: [
+            gifField.id: MediaRef(
+                kind: .gif,
+                assetHash: String(repeating: "0", count: 64),
+                fileExtension: "gif"
+            ),
+        ]
+    )
+
+    #expect(saved == false)
+    #expect(model.errorMessage == "Add a description for Animation so it works with VoiceOver.")
+}
+
 @Test @MainActor func itemsModelDeletesItemFromList() async throws {
     let (model, _) = try await makeModel()
     await model.load()

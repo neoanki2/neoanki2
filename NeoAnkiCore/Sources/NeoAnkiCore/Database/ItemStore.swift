@@ -80,11 +80,11 @@ private extension FieldType {
 
 /// Persistence for items and generated cards.
 public actor ItemStore {
-    private let database: SQLiteDatabase
+    let database: SQLiteDatabase
     private let schedulerOverride: (any Scheduler)?
     private let profileID: String
     private var fsrsParameters = FSRSScheduler.Parameters()
-    private let mediaStore: MediaStore?
+    let mediaStore: MediaStore?
     private let starterItemTypes: [ItemType]
 
     public init(

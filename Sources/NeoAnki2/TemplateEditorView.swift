@@ -13,6 +13,7 @@ struct TemplateEditorView: View {
     @State private var isSaving = false
     @State private var showDiscardConfirmation = false
     @State private var showDeleteConfirmation = false
+    @State private var showAdvanced: Bool
 
     init(
         model: TemplatesModel,
@@ -27,6 +28,9 @@ struct TemplateEditorView: View {
         let draft = editingTemplate.map { TemplateDraft(template: $0, in: itemType) } ?? TemplateDraft()
         initialDraft = draft
         _draft = State(initialValue: draft)
+        let expandsAdvancedForScreenshot = AppDatabase.isTesting
+            && ProcessInfo.processInfo.environment["NEOANKI_TEST_EXPAND_TEMPLATE_ADVANCED"] == "1"
+        _showAdvanced = State(initialValue: draft.hasAdvancedSettings || expandsAdvancedForScreenshot)
     }
 
     var body: some View {
@@ -46,58 +50,83 @@ struct TemplateEditorView: View {
                 }
             }
 
-            Section("Practice skill") {
-                Toggle("Derive from the first prompt and answer fields", isOn: $draft.usesAutomaticSkill)
-                    .accessibilityIdentifier("templateAutomaticSkill")
-                if !draft.usesAutomaticSkill {
-                    Picker("Input", selection: $draft.skill.input) {
-                        ForEach(Modality.allCases, id: \.self) { modality in
-                            Text(modality.label).tag(modality)
-                        }
-                    }
-                    .accessibilityIdentifier("templateSkillInput")
-                    Picker("Output", selection: $draft.skill.output) {
-                        ForEach(Modality.allCases, id: \.self) { modality in
-                            Text(modality.label).tag(modality)
-                        }
-                    }
-                    .accessibilityIdentifier("templateSkillOutput")
-                    Picker("Operation", selection: $draft.skill.operation) {
-                        ForEach(NeoAnkiCore.Operation.allCases, id: \.self) { operation in
-                            Text(operation.label).tag(operation)
-                        }
-                    }
-                    .accessibilityIdentifier("templateSkillOperation")
-                }
-            }
-
             Section("Prompt") {
                 SlotListEditor(
                     slots: $draft.promptSlots,
                     fields: itemType.fields,
                     sideName: "Prompt",
-                    clozeFieldsDefaultToHidden: draft.interaction == .cloze
+                    clozeFieldsDefaultToHidden: draft.interaction == .cloze,
+                    showAdvanced: showAdvanced
                 )
             }
 
             Section("Answer") {
-                SlotListEditor(slots: $draft.answerSlots, fields: itemType.fields, sideName: "Answer")
+                SlotListEditor(
+                    slots: $draft.answerSlots,
+                    fields: itemType.fields,
+                    sideName: "Answer",
+                    showAdvanced: showAdvanced
+                )
             }
 
-            Section("Card generation") {
-                Toggle(
-                    "Only generate this card when…",
-                    isOn: Binding(
-                        get: { draft.generateWhen != nil },
-                        set: { enabled in
-                            draft.generateWhen = enabled ? .fieldNotEmpty(itemType.fields.first?.id) : nil
+            Section {
+                DisclosureGroup(isExpanded: $showAdvanced) {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                        Text("Practice skill")
+                            .font(DesignSystem.Typography.uiSecondary.weight(.semibold))
+                        Toggle("Derive from the first prompt and answer fields", isOn: $draft.usesAutomaticSkill)
+                            .accessibilityIdentifier("templateAutomaticSkill")
+                        if !draft.usesAutomaticSkill {
+                            Picker("Input", selection: $draft.skill.input) {
+                                ForEach(Modality.allCases, id: \.self) { modality in
+                                    Text(modality.label).tag(modality)
+                                }
+                            }
+                            .accessibilityIdentifier("templateSkillInput")
+                            Picker("Output", selection: $draft.skill.output) {
+                                ForEach(Modality.allCases, id: \.self) { modality in
+                                    Text(modality.label).tag(modality)
+                                }
+                            }
+                            .accessibilityIdentifier("templateSkillOutput")
+                            Picker("Operation", selection: $draft.skill.operation) {
+                                ForEach(NeoAnkiCore.Operation.allCases, id: \.self) { operation in
+                                    Text(operation.label).tag(operation)
+                                }
+                            }
+                            .accessibilityIdentifier("templateSkillOperation")
                         }
-                    )
-                )
-                .accessibilityIdentifier("templateGenerateCondition")
-                if draft.generateWhen != nil {
-                    ConditionEditor(condition: generateWhenBinding, fields: itemType.fields)
+
+                        Divider()
+
+                        Text("Card generation")
+                            .font(DesignSystem.Typography.uiSecondary.weight(.semibold))
+                        Toggle(
+                            "Only generate this card when…",
+                            isOn: Binding(
+                                get: { draft.generateWhen != nil },
+                                set: { enabled in
+                                    draft.generateWhen = enabled
+                                        ? .fieldNotEmpty(itemType.fields.first?.id)
+                                        : nil
+                                }
+                            )
+                        )
+                        .accessibilityIdentifier("templateGenerateCondition")
+                        if draft.generateWhen != nil {
+                            ConditionEditor(condition: generateWhenBinding, fields: itemType.fields)
+                        }
+                    }
+                    .padding(.top, DesignSystem.Spacing.xs)
+                } label: {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                        Text("Advanced")
+                        Text("Skill mapping, reveal behavior, media playback, and generation rules")
+                            .font(DesignSystem.Typography.uiHint)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .accessibilityIdentifier("templateAdvancedSettings")
             }
 
             if let errorMessage = model.errorMessage {
@@ -128,7 +157,7 @@ struct TemplateEditorView: View {
                 Button("Save") {
                     Task { await save() }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(isSaving || !draft.isValid)
                 .accessibilityIdentifier("saveTemplate")
@@ -210,6 +239,7 @@ private struct SlotListEditor: View {
     let fields: [FieldDef]
     let sideName: String
     var clozeFieldsDefaultToHidden = false
+    let showAdvanced: Bool
 
     var body: some View {
         ForEach($slots) { $slot in
@@ -219,38 +249,47 @@ private struct SlotListEditor: View {
             let mediaBehaviors = slot.sourceKind == .field
                 ? MediaBehavior.supported(for: mediaKind)
                 : [.default]
+            let position = (slots.firstIndex { $0.id == slot.id } ?? 0) + 1
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                HStack {
-                    Picker("Source", selection: $slot.sourceKind) {
-                        Text("Field").tag(SlotDraft.SourceKind.field)
-                        Text("Literal text").tag(SlotDraft.SourceKind.literal)
+                if showAdvanced || slots.count > 1 {
+                    HStack {
+                        if showAdvanced {
+                            Picker("Source", selection: $slot.sourceKind) {
+                                Text("Field").tag(SlotDraft.SourceKind.field)
+                                Text("Literal text").tag(SlotDraft.SourceKind.literal)
+                            }
+                            .accessibilityIdentifier("\(sideName.lowercased())SlotSource")
+                            .onChange(of: slot.sourceKind) { _, _ in
+                                slot.media = .default
+                            }
+                        }
+                        Spacer()
+                        if slots.count > 1 {
+                            Button("Move Up", systemImage: "arrow.up") {
+                                move(slot.id, by: -1)
+                            }
+                            .accessibilityIdentifier("\(sideName.lowercased())SlotMoveUp")
+                            .accessibilityLabel("Move \(sideName.lowercased()) slot \(position) up")
+                            .labelStyle(.iconOnly)
+                            .disabled(slots.first?.id == slot.id)
+                            .help("Move slot up")
+                            Button("Move Down", systemImage: "arrow.down") {
+                                move(slot.id, by: 1)
+                            }
+                            .accessibilityIdentifier("\(sideName.lowercased())SlotMoveDown")
+                            .accessibilityLabel("Move \(sideName.lowercased()) slot \(position) down")
+                            .labelStyle(.iconOnly)
+                            .disabled(slots.last?.id == slot.id)
+                            .help("Move slot down")
+                            Button("Remove", systemImage: "minus.circle", role: .destructive) {
+                                slots.removeAll { $0.id == slot.id }
+                            }
+                            .accessibilityIdentifier("\(sideName.lowercased())SlotRemove")
+                            .accessibilityLabel("Remove \(sideName.lowercased()) slot \(position)")
+                            .labelStyle(.iconOnly)
+                            .help("Remove slot")
+                        }
                     }
-                    .accessibilityIdentifier("\(sideName.lowercased())SlotSource")
-                    .onChange(of: slot.sourceKind) { _, _ in
-                        slot.media = .default
-                    }
-                    Spacer()
-                    Button("Move Up", systemImage: "arrow.up") {
-                        move(slot.id, by: -1)
-                    }
-                    .accessibilityIdentifier("\(sideName.lowercased())SlotMoveUp")
-                    .labelStyle(.iconOnly)
-                    .disabled(slots.first?.id == slot.id)
-                    .help("Move slot up")
-                    Button("Move Down", systemImage: "arrow.down") {
-                        move(slot.id, by: 1)
-                    }
-                    .accessibilityIdentifier("\(sideName.lowercased())SlotMoveDown")
-                    .labelStyle(.iconOnly)
-                    .disabled(slots.last?.id == slot.id)
-                    .help("Move slot down")
-                    Button("Remove", systemImage: "minus.circle", role: .destructive) {
-                        slots.removeAll { $0.id == slot.id }
-                    }
-                    .accessibilityIdentifier("\(sideName.lowercased())SlotRemove")
-                    .labelStyle(.iconOnly)
-                    .disabled(slots.count == 1)
-                    .help("Remove slot")
                 }
 
                 if slot.sourceKind == .field {
@@ -279,20 +318,22 @@ private struct SlotListEditor: View {
                         .accessibilityIdentifier("\(sideName.lowercased())SlotLiteral")
                 }
 
-                HStack {
-                    Picker("Reveal", selection: $slot.reveal) {
-                        ForEach(RevealMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .accessibilityIdentifier("\(sideName.lowercased())SlotReveal")
-                    if mediaBehaviors.count > 1 {
-                        Picker("Media", selection: $slot.media) {
-                            ForEach(mediaBehaviors, id: \.self) { behavior in
-                                Text(behavior.label).tag(behavior)
+                if showAdvanced {
+                    HStack {
+                        Picker("Reveal", selection: $slot.reveal) {
+                            ForEach(RevealMode.allCases, id: \.self) { mode in
+                                Text(mode.label).tag(mode)
                             }
                         }
-                        .accessibilityIdentifier("\(sideName.lowercased())SlotMedia")
+                        .accessibilityIdentifier("\(sideName.lowercased())SlotReveal")
+                        if mediaBehaviors.count > 1 {
+                            Picker("Media", selection: $slot.media) {
+                                ForEach(mediaBehaviors, id: \.self) { behavior in
+                                    Text(behavior.label).tag(behavior)
+                                }
+                            }
+                            .accessibilityIdentifier("\(sideName.lowercased())SlotMedia")
+                        }
                     }
                 }
             }

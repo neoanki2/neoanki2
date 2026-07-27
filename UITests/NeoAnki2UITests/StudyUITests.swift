@@ -8,7 +8,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons["studyButton"]
+        let studyButton = app.buttons.identified("studyButton")
         XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
         XCTAssertFalse(studyButton.isEnabled)
     }
@@ -17,13 +17,13 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp()
         addBasicItem(front: "Grade Test", back: "Answer", in: app)
         startStudy(in: app)
-        app.buttons["primaryStudyAction"].click()
+        app.buttons.identified("primaryStudyAction").click()
 
         for gradeID in ["gradeAgain", "gradeHard", "gradeGood", "gradeEasy"] {
-            XCTAssertTrue(app.buttons[gradeID].waitForExistence(timeout: 3), "Missing \(gradeID)")
+            XCTAssertTrue(app.buttons.identified(gradeID).waitForExistence(timeout: 3), "Missing \(gradeID)")
         }
 
-        app.buttons["gradeGood"].click()
+        app.buttons.identified("gradeGood").click()
         finishStudySession(in: app)
     }
 
@@ -61,7 +61,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons["studyButton"]
+        let studyButton = app.buttons.identified("studyButton")
         XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
         XCTAssertFalse(studyButton.isEnabled)
     }
@@ -73,15 +73,15 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
 
-        app.buttons["endStudySession"].click()
-        if app.buttons["confirmEndStudySession"].waitForExistence(timeout: 3) {
-            app.buttons["confirmEndStudySession"].click()
+        app.buttons.identified("endStudySession").click()
+        if app.buttons.identified("confirmEndStudySession").waitForExistence(timeout: 3) {
+            app.buttons.identified("confirmEndStudySession").click()
         } else if let container = modalContainer(in: app) {
-            container.buttons["End Session"].click()
+            container.buttons.identified("End Session").click()
         }
 
         waitForLibraryReady(in: app)
-        XCTAssertTrue(app.buttons["studyButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("studyButton").waitForExistence(timeout: 5))
     }
 
     func testStudyGradeHelpPopover() throws {
@@ -89,7 +89,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Help Q", back: "Help A", in: app)
         startStudy(in: app)
 
-        app.buttons["gradeHelp"].click()
+        app.buttons.identified("gradeHelp").click()
         XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitForExistence(timeout: 5))
     }
 
@@ -97,36 +97,36 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp()
         openTemplates(in: app)
 
-        if app.buttons["addTemplateToolbar"].waitForExistence(timeout: 2) {
-            app.buttons["addTemplateToolbar"].click()
+        if app.buttons.identified("addTemplateToolbar").waitForExistence(timeout: 2) {
+            app.buttons.identified("addTemplateToolbar").click()
         } else {
-            app.buttons["Add Template"].click()
+            app.buttons.identified("Add Template").click()
         }
 
-        app.textFields["templateNameField"].click()
-        app.textFields["templateNameField"].typeText("Reverse")
+        app.textFields.identified("templateNameField").click()
+        app.textFields.identified("templateNameField").typeText("Reverse")
 
-        app.popUpButtons["templatePromptField"].click()
-        app.menuItems["Back"].click()
-        app.popUpButtons["templateAnswerField"].click()
-        app.menuItems["Front"].click()
-        app.buttons["saveTemplate"].click()
+        app.popUpButtons.identified("templatePromptField").click()
+        app.menuItems.identified("Back").click()
+        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuItems.identified("Front").click()
+        app.buttons.identified("saveTemplate").click()
         closeTemplates(in: app)
 
         addBasicItem(front: "Reverse Q", back: "Reverse A", in: app)
         startStudy(in: app)
 
-        let primaryAction = app.buttons["primaryStudyAction"]
+        let primaryAction = app.buttons.identified("primaryStudyAction")
         if primaryAction.waitForExistence(timeout: 5) {
             primaryAction.click()
-            if app.buttons["gradeGood"].waitForExistence(timeout: 2) {
-                app.buttons["gradeGood"].click()
+            if app.buttons.identified("gradeGood").waitForExistence(timeout: 2) {
+                app.buttons.identified("gradeGood").click()
             }
         }
 
-        if app.buttons["primaryStudyAction"].waitForExistence(timeout: 3) {
-            app.buttons["primaryStudyAction"].click()
-            app.buttons["gradeGood"].click()
+        if app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 3) {
+            app.buttons.identified("primaryStudyAction").click()
+            app.buttons.identified("gradeGood").click()
         }
 
         finishStudySession(in: app)
@@ -136,15 +136,15 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-type")
         startStudy(in: app)
 
-        let primary = app.buttons["primaryStudyAction"]
+        let primary = app.buttons.identified("primaryStudyAction")
         primary.click()
         XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
 
-        enterText("Paris", into: app.textFields["typedAnswer"], app: app)
-        app.buttons["primaryStudyAction"].click()
+        enterText("Paris", into: app.textFields.identified("typedAnswer"), app: app)
+        app.buttons.identified("primaryStudyAction").click()
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["gradeGood"].exists)
-        app.buttons["gradeGood"].click()
+        XCTAssertTrue(app.buttons.identified("gradeGood").exists)
+        app.buttons.identified("gradeGood").click()
         finishStudySession(in: app)
     }
 
@@ -152,8 +152,8 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-type")
         startStudy(in: app)
 
-        enterText("London", into: app.textFields["typedAnswer"], app: app)
-        app.buttons["primaryStudyAction"].click()
+        enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
+        app.buttons.identified("primaryStudyAction").click()
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
         let feedback = app.staticTexts.matching(
             NSPredicate(format: "value CONTAINS[c] %@", "Compare your response")
@@ -165,7 +165,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-choose")
         startStudy(in: app)
 
-        app.buttons["primaryStudyAction"].click()
+        app.buttons.identified("primaryStudyAction").click()
         XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
 
         let paris = app.buttons.matching(
@@ -173,7 +173,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         ).firstMatch
         XCTAssertTrue(paris.waitForExistence(timeout: 3))
         paris.click()
-        app.buttons["primaryStudyAction"].click()
+        app.buttons.identified("primaryStudyAction").click()
         XCTAssertTrue(app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 3))
     }
 
@@ -181,8 +181,8 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-arrange")
         startStudy(in: app)
 
-        XCTAssertTrue(app.buttons["arrangementItem0"].waitForExistence(timeout: 3))
-        app.buttons["primaryStudyAction"].click()
+        XCTAssertTrue(app.buttons.identified("arrangementItem0").waitForExistence(timeout: 3))
+        app.buttons.identified("primaryStudyAction").click()
         XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 3))
     }
 
@@ -191,7 +191,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         XCTAssertFalse(app.staticTexts["Paris"].exists)
-        app.buttons["primaryStudyAction"].click()
+        app.buttons.identified("primaryStudyAction").click()
         XCTAssertTrue(
             app.staticTexts.matching(
                 NSPredicate(format: "value CONTAINS[c] %@", "Paris")
@@ -203,10 +203,10 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-record")
         startStudy(in: app)
 
-        XCTAssertTrue(app.buttons["startRecording"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["primaryStudyAction"].isEnabled)
-        app.buttons["revealAndSelfGrade"].click()
-        XCTAssertTrue(app.buttons["gradeGood"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("startRecording").waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons.identified("primaryStudyAction").isEnabled)
+        app.buttons.identified("revealAndSelfGrade").click()
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 3))
     }
 
     func testUndoLastGradeRestoresReviewedCard() throws {
@@ -215,10 +215,10 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
 
-        let undo = app.buttons["undoLastGrade"]
+        let undo = app.buttons.identified("undoLastGrade")
         XCTAssertTrue(undo.waitForExistence(timeout: 5))
         undo.click()
-        XCTAssertTrue(app.buttons["gradeGood"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["studySessionDone"].exists)
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons.identified("studySessionDone").exists)
     }
 }

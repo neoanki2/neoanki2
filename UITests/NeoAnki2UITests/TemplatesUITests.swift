@@ -7,7 +7,7 @@ final class TemplatesUITests: NeoAnkiUITestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["templatesItemTypesHeader"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["templateRow-Card"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("templateRow-Card").waitForExistence(timeout: 5))
 
         closeTemplates(in: app)
         assertEmptyLibrary(in: app)
@@ -17,9 +17,9 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         let app = launchApp()
         openTemplates(in: app)
 
-        let basicRow = app.descendants(matching: .any)["itemTypeRow-Basic"]
-        let cardTemplate = app.buttons["templateRow-Card"]
-        let detailTitle = app.staticTexts["templatesDetailTitle-Basic"]
+        let basicRow = app.descendants(matching: .any).identified("itemTypeRow-Basic")
+        let cardTemplate = app.buttons.identified("templateRow-Card")
+        let detailTitle = app.staticTexts.identified("templatesDetailTitle-Basic")
 
         XCTAssertTrue(basicRow.waitForExistence(timeout: 5))
         XCTAssertTrue(cardTemplate.waitForExistence(timeout: 5))
@@ -37,23 +37,35 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].waitForExistence(timeout: 5))
 
-        if app.buttons["addTemplateToolbar"].waitForExistence(timeout: 2) {
-            app.buttons["addTemplateToolbar"].click()
+        if app.buttons.identified("addTemplateToolbar").waitForExistence(timeout: 2) {
+            app.buttons.identified("addTemplateToolbar").click()
         } else {
-            app.buttons["Add Template"].click()
+            app.buttons.identified("Add Template").click()
         }
 
-        app.textFields["templateNameField"].click()
-        app.textFields["templateNameField"].typeText("Reverse")
+        app.textFields.identified("templateNameField").click()
+        app.textFields.identified("templateNameField").typeText("Reverse")
 
-        app.popUpButtons["templatePromptField"].click()
-        app.menuItems["Back"].click()
-        app.popUpButtons["templateAnswerField"].click()
-        app.menuItems["Front"].click()
-        app.buttons["saveTemplate"].click()
+        app.popUpButtons.identified("templatePromptField").click()
+        app.menuItems.identified("Back").click()
+        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuItems.identified("Front").click()
+        app.buttons.identified("saveTemplate").click()
 
-        XCTAssertTrue(app.buttons["templateRow-Reverse"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("templateRow-Reverse").waitForExistence(timeout: 5))
         closeTemplates(in: app)
+    }
+
+    func testNewTemplateKeepsAdvancedSettingsCollapsedByDefault() throws {
+        let app = launchApp()
+        openTemplates(in: app)
+        app.buttons.identified("addTemplateToolbar").click()
+
+        XCTAssertTrue(app.popUpButtons.identified("templatePromptField").waitForExistence(timeout: 5))
+
+        let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        XCTAssertEqual(advanced.value as? Int, 0)
     }
 
     func testTemplatesCreateItemType() throws {
@@ -61,10 +73,10 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
 
         clickAddItemType(in: app)
-        app.textFields["itemTypeNameField"].click()
-        app.textFields["itemTypeNameField"].typeText("Capitals")
+        app.textFields.identified("itemTypeNameField").click()
+        app.textFields.identified("itemTypeNameField").typeText("Capitals")
 
-        app.buttons["saveItemType"].click()
+        app.buttons.identified("saveItemType").click()
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Capitals"].waitForExistence(timeout: 5))
         closeTemplates(in: app)
     }
@@ -74,16 +86,16 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
 
         clickAddItemType(in: app)
-        app.textFields["itemTypeNameField"].click()
-        app.textFields["itemTypeNameField"].typeText("Editable")
-        app.buttons["saveItemType"].click()
+        app.textFields.identified("itemTypeNameField").click()
+        app.textFields.identified("itemTypeNameField").typeText("Editable")
+        app.buttons.identified("saveItemType").click()
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Editable"].waitForExistence(timeout: 5))
 
-        app.buttons["editItemType"].click()
-        app.textFields["itemTypeNameField"].click()
-        app.textFields["itemTypeNameField"].typeKey("a", modifierFlags: [.command])
-        app.textFields["itemTypeNameField"].typeText("Renamed Type")
-        app.buttons["saveItemType"].click()
+        app.buttons.identified("editItemType").click()
+        app.textFields.identified("itemTypeNameField").click()
+        app.textFields.identified("itemTypeNameField").typeKey("a", modifierFlags: [.command])
+        app.textFields.identified("itemTypeNameField").typeText("Renamed Type")
+        app.buttons.identified("saveItemType").click()
 
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Renamed Type"].waitForExistence(timeout: 5))
         closeTemplates(in: app)
@@ -94,8 +106,8 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
 
         app.descendants(matching: .any)["itemTypeRow-Basic"].click()
-        app.buttons["deleteItemType"].click()
-        app.buttons["confirmDeleteItemType"].click()
+        app.buttons.identified("deleteItemType").click()
+        app.buttons.identified("confirmDeleteItemType").click()
         XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Basic"].waitForExistence(timeout: 2))
         closeTemplates(in: app)
     }
@@ -105,13 +117,13 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
 
         clickAddItemType(in: app)
-        app.textFields["itemTypeNameField"].click()
-        app.textFields["itemTypeNameField"].typeText("Disposable")
-        app.buttons["saveItemType"].click()
+        app.textFields.identified("itemTypeNameField").click()
+        app.textFields.identified("itemTypeNameField").typeText("Disposable")
+        app.buttons.identified("saveItemType").click()
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Disposable"].waitForExistence(timeout: 5))
 
-        app.buttons["deleteItemType"].click()
-        app.buttons["confirmDeleteItemType"].click()
+        app.buttons.identified("deleteItemType").click()
+        app.buttons.identified("confirmDeleteItemType").click()
 
         XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Disposable"].waitForExistence(timeout: 2))
         closeTemplates(in: app)
@@ -121,26 +133,26 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         let app = launchApp()
         openTemplates(in: app)
 
-        app.buttons["addTemplateToolbar"].click()
-        let nameField = app.textFields["templateNameField"]
+        app.buttons.identified("addTemplateToolbar").click()
+        let nameField = app.textFields.identified("templateNameField")
         nameField.click()
         nameField.typeText("Original")
-        app.popUpButtons["templatePromptField"].click()
-        app.menuItems["Front"].click()
-        app.popUpButtons["templateAnswerField"].click()
-        app.menuItems["Back"].click()
-        app.buttons["saveTemplate"].click()
-        XCTAssertTrue(app.buttons["saveTemplate"].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["templateRow-Original"].waitForExistence(timeout: 5))
+        app.popUpButtons.identified("templatePromptField").click()
+        app.menuItems.identified("Front").click()
+        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuItems.identified("Back").click()
+        app.buttons.identified("saveTemplate").click()
+        XCTAssertTrue(app.buttons.identified("saveTemplate").waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.identified("templateRow-Original").waitForExistence(timeout: 5))
 
         openTemplateEditor(named: "Original", in: app)
-        let editNameField = app.textFields["templateNameField"]
+        let editNameField = app.textFields.identified("templateNameField")
         editNameField.click()
         editNameField.typeKey("a", modifierFlags: [.command])
         editNameField.typeText("Renamed")
-        app.buttons["saveTemplate"].click()
+        app.buttons.identified("saveTemplate").click()
 
-        XCTAssertTrue(app.buttons["templateRow-Renamed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("templateRow-Renamed").waitForExistence(timeout: 5))
         closeTemplates(in: app)
     }
 
@@ -148,22 +160,22 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         let app = launchApp()
         openTemplates(in: app)
 
-        app.buttons["addTemplateToolbar"].click()
-        let nameField = app.textFields["templateNameField"]
+        app.buttons.identified("addTemplateToolbar").click()
+        let nameField = app.textFields.identified("templateNameField")
         nameField.click()
         nameField.typeText("To Delete")
-        app.popUpButtons["templatePromptField"].click()
-        app.menuItems["Front"].click()
-        app.popUpButtons["templateAnswerField"].click()
-        app.menuItems["Back"].click()
-        app.buttons["saveTemplate"].click()
-        XCTAssertTrue(app.buttons["saveTemplate"].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["templateRow-To Delete"].waitForExistence(timeout: 5))
+        app.popUpButtons.identified("templatePromptField").click()
+        app.menuItems.identified("Front").click()
+        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuItems.identified("Back").click()
+        app.buttons.identified("saveTemplate").click()
+        XCTAssertTrue(app.buttons.identified("saveTemplate").waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitForExistence(timeout: 5))
 
         openTemplateEditor(named: "To Delete", in: app)
-        app.buttons["deleteTemplate"].click()
+        app.buttons.identified("deleteTemplate").click()
 
-        XCTAssertFalse(app.buttons["templateRow-To Delete"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons.identified("templateRow-To Delete").waitForExistence(timeout: 2))
         closeTemplates(in: app)
     }
 
@@ -171,14 +183,14 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         let app = launchApp()
         openTemplates(in: app)
 
-        app.buttons["addTemplateToolbar"].click()
-        let nameField = app.textFields["templateNameField"]
+        app.buttons.identified("addTemplateToolbar").click()
+        let nameField = app.textFields.identified("templateNameField")
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.click()
         nameField.typeText("Cancelled")
-        app.buttons["cancelTemplateEditor"].click()
+        app.buttons.identified("cancelTemplateEditor").click()
 
-        XCTAssertFalse(app.buttons["templateRow-Cancelled"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons.identified("templateRow-Cancelled").waitForExistence(timeout: 2))
         closeTemplates(in: app)
     }
 
@@ -187,22 +199,22 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
         clickAddItemType(in: app)
 
-        XCTAssertFalse(app.buttons["saveItemType"].isEnabled)
+        XCTAssertFalse(app.buttons.identified("saveItemType").isEnabled)
     }
 
     func testDirtyItemTypeCanKeepEditingThenDiscard() throws {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
-        enterText("Unsaved Type", into: app.textFields["itemTypeNameField"], app: app)
+        enterText("Unsaved Type", into: app.textFields.identified("itemTypeNameField"), app: app)
 
-        app.buttons["cancelItemTypeEditor"].click()
-        XCTAssertTrue(app.buttons["cancelDiscardItemType"].waitForExistence(timeout: 3))
-        app.buttons["cancelDiscardItemType"].click()
-        XCTAssertTrue(app.textFields["itemTypeNameField"].exists)
+        app.buttons.identified("cancelItemTypeEditor").click()
+        XCTAssertTrue(app.buttons.identified("cancelDiscardItemType").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelDiscardItemType").click()
+        XCTAssertTrue(app.textFields.identified("itemTypeNameField").exists)
 
-        app.buttons["cancelItemTypeEditor"].click()
-        app.buttons["confirmDiscardItemType"].click()
+        app.buttons.identified("cancelItemTypeEditor").click()
+        app.buttons.identified("confirmDiscardItemType").click()
         XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Unsaved Type"].exists)
     }
 
@@ -210,9 +222,9 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
-        enterText("Structured", into: app.textFields["itemTypeNameField"], app: app)
+        enterText("Structured", into: app.textFields.identified("itemTypeNameField"), app: app)
 
-        app.buttons["addItemTypeField"].click()
+        app.buttons.identified("addItemTypeField").click()
         let moveUp = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
         )
@@ -235,18 +247,18 @@ final class TemplatesUITests: NeoAnkiUITestCase {
     func testTemplateValidationAndDiscardConfirmation() throws {
         let app = launchApp()
         openTemplates(in: app)
-        app.buttons["addTemplateToolbar"].click()
+        app.buttons.identified("addTemplateToolbar").click()
 
-        XCTAssertFalse(app.buttons["saveTemplate"].isEnabled)
-        enterText("Unsaved Template", into: app.textFields["templateNameField"], app: app)
-        app.buttons["cancelTemplateEditor"].click()
-        XCTAssertTrue(app.buttons["cancelDiscardTemplate"].waitForExistence(timeout: 3))
-        app.buttons["cancelDiscardTemplate"].click()
-        XCTAssertTrue(app.textFields["templateNameField"].exists)
+        XCTAssertFalse(app.buttons.identified("saveTemplate").isEnabled)
+        enterText("Unsaved Template", into: app.textFields.identified("templateNameField"), app: app)
+        app.buttons.identified("cancelTemplateEditor").click()
+        XCTAssertTrue(app.buttons.identified("cancelDiscardTemplate").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelDiscardTemplate").click()
+        XCTAssertTrue(app.textFields.identified("templateNameField").exists)
 
-        app.buttons["cancelTemplateEditor"].click()
-        app.buttons["confirmDiscardTemplate"].click()
-        XCTAssertFalse(app.buttons["templateRow-Unsaved Template"].exists)
+        app.buttons.identified("cancelTemplateEditor").click()
+        app.buttons.identified("confirmDiscardTemplate").click()
+        XCTAssertFalse(app.buttons.identified("templateRow-Unsaved Template").exists)
     }
 
     func testDeleteTemplateCanBeCancelled() throws {
@@ -254,10 +266,10 @@ final class TemplatesUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
         openTemplateEditor(named: "Card", in: app)
 
-        app.buttons["deleteTemplate"].click()
-        XCTAssertTrue(app.buttons["cancelDeleteTemplate"].waitForExistence(timeout: 3))
-        app.buttons["cancelDeleteTemplate"].click()
+        app.buttons.identified("deleteTemplate").click()
+        XCTAssertTrue(app.buttons.identified("cancelDeleteTemplate").waitForExistence(timeout: 3))
+        app.buttons.identified("cancelDeleteTemplate").click()
 
-        XCTAssertTrue(app.textFields["templateNameField"].exists)
+        XCTAssertTrue(app.textFields.identified("templateNameField").exists)
     }
 }

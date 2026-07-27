@@ -1,3 +1,8 @@
+---
+title: Architecture
+parent: Reference
+---
+
 # NeoAnki2 — Architecture
 
 A native macOS spaced-repetition app (Swift 6 / SwiftUI) with its domain logic in
@@ -179,6 +184,25 @@ limits are enforced immediately, before any imported item is persisted.
 | Cloze | `{ "text": "…", "blanks": [{ "group": 1, "start": 0, "length": 3, "hint": "…" }] }` |
 
 CSV supports text fields only; cloze and media require JSON.
+
+### Deck import
+
+Two full-deck paths share the same validated, atomic persistence plan:
+
+- `.neodeck` is the SQLite portable interchange format for application
+  round trips. It preserves item-type provenance and embeds verified media.
+- `.neoanki` is import-only JSON Lines source for coding-agent authoring. It
+  uses symbolic identifiers, inline cloze markers, explicit item shards, and
+  relative media beneath the source bundle.
+
+Both paths validate before mutation, resolve or create item types by canonical
+schema digest, allocate fresh deck/item/card IDs, stage media through
+reservations, and commit item types, decks, items, cards, and references in one
+database transaction. Authored source intentionally carries no scheduling or
+portable provenance.
+
+See [`AUTHORED_DECK_FORMAT.md`](AUTHORED_DECK_FORMAT.md) and
+[`PORTABLE_DECK_FORMAT.md`](PORTABLE_DECK_FORMAT.md).
 
 ### Study resolution
 

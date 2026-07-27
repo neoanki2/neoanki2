@@ -34,8 +34,15 @@ NeoAnkiCore/Sources/NeoAnkiCore/
 
 ## Documentation
 
-All project docs live in [`docs/`](docs/) — see [`docs/README.md`](docs/README.md) for the index:
+The published manual is available at
+**[neoanki2.github.io/neoanki2](https://neoanki2.github.io/neoanki2/)**.
+Documentation is versioned with the source in [`docs/`](docs/):
 
+- [User guide](https://neoanki2.github.io/neoanki2/user/) — every app feature, workflow, shortcut, and limitation
+- [Feature index](https://neoanki2.github.io/neoanki2/features/) — source- and test-backed coverage map
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — domain model, learning-science mapping, FSRS rationale
+- [`docs/AUTHORED_DECK_FORMAT.md`](docs/AUTHORED_DECK_FORMAT.md) — import-only JSONL deck source format
+- [`docs/PORTABLE_DECK_FORMAT.md`](docs/PORTABLE_DECK_FORMAT.md) — portable SQLite deck interchange format
 - [`docs/DESIGN.md`](docs/DESIGN.md) — visual design system (SwiftUI shell)
+- [`docs/LLM_DECK_AUTHORING.md`](docs/LLM_DECK_AUTHORING.md) — coding-agent deck authoring workflow
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product context for design and UX work

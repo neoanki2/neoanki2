@@ -1,5 +1,7 @@
 ---
 name: NeoAnki2
+title: Design system
+parent: Reference
 description: A calm, native Mac study surface where card content is the hero and the app chrome disappears.
 colors:
   accent-study: "{system.controlAccentColor}"

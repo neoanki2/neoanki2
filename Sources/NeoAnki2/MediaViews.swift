@@ -123,22 +123,45 @@ struct ImageMediaView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var playOnTapActive = false
+    @State private var loadedImage: NSImage?
+    @State private var imageLoadFailed = false
 
     var body: some View {
         Group {
             if shouldHide {
                 placeholder
-            } else if let image = NSImage(contentsOf: url) {
+            } else if let image = loadedImage {
                 if kind == .gif {
                     gifView(image)
                 } else {
                     imageView(image)
                 }
+            } else if imageLoadFailed {
+                unavailablePlaceholder
             } else {
-                placeholder
+                ProgressView()
+                    .frame(minHeight: 80)
+                    .accessibilityLabel("Loading \(altText ?? "image")")
             }
         }
         .accessibilityLabel(accessibilityDescription)
+        .task(id: ImageLoadTaskID(url: url, shouldLoad: !shouldHide)) {
+            guard !shouldHide else {
+                loadedImage = nil
+                imageLoadFailed = false
+                return
+            }
+            loadedImage = nil
+            imageLoadFailed = false
+            let image = await MediaImageLoader.shared.image(
+                for: url,
+                kind: kind,
+                maxPixelSize: 1_280
+            )
+            guard !Task.isCancelled else { return }
+            loadedImage = image
+            imageLoadFailed = image == nil
+        }
     }
 
     private var shouldHide: Bool {
@@ -147,6 +170,13 @@ struct ImageMediaView: View {
 
     private var placeholder: some View {
         Text(shouldHide ? "Image hidden until answer" : (altText ?? "Image"))
+            .font(DesignSystem.Typography.uiSecondary)
+            .foregroundStyle(.secondary)
+            .frame(minHeight: 80)
+    }
+
+    private var unavailablePlaceholder: some View {
+        Label("Image unavailable", systemImage: "photo.badge.exclamationmark")
             .font(DesignSystem.Typography.uiSecondary)
             .foregroundStyle(.secondary)
             .frame(minHeight: 80)
@@ -196,6 +226,11 @@ struct ImageMediaView: View {
         } else {
             animated
         }
+    }
+
+    private struct ImageLoadTaskID: Equatable {
+        let url: URL
+        let shouldLoad: Bool
     }
 }
 

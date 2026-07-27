@@ -77,3 +77,41 @@ import Testing
         #expect(geographyDue.first?.item.fields.first?.value == .text("France"))
     }
 }
+
+@Test func parentDeckScopeIncludesChildItemsOnlyWhenRequested() async throws {
+    try await ScenarioRunner.run { ctx in
+        try await ctx.onboard()
+
+        let parent = Deck(name: "Languages")
+        let child = Deck(name: "French", parentID: parent.id)
+        _ = try await ctx.store.createDeck(parent)
+        _ = try await ctx.store.createDeck(child)
+        let itemType = try await ctx.store.defaultItemType()
+        _ = try await ctx.store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("bonjour")),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("hello")),
+                ],
+                deckID: child.id
+            ),
+            now: ctx.clock.now()
+        )
+
+        let includingChildren = DeckScope.deck(parent.id, includeDescendants: true)
+        let parentOnly = DeckScope.deck(parent.id, includeDescendants: false)
+        #expect(try await ctx.store.listItems(scope: includingChildren).count == 1)
+        #expect(try await ctx.store.listItems(scope: parentOnly).isEmpty)
+        #expect(
+            try await ctx.store.fetchDueCards(scope: includingChildren, asOf: ctx.clock.now()).count == 1
+        )
+        #expect(
+            try await ctx.store.fetchDueCards(scope: parentOnly, asOf: ctx.clock.now()).isEmpty
+        )
+
+        let summaries = try await ctx.store.deckSummaries(asOf: ctx.clock.now())
+        #expect(summaries.first { $0.id == parent.id }?.dueCount == 1)
+        #expect(summaries.first { $0.id == child.id }?.dueCount == 1)
+    }
+}

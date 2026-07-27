@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neoanki.app/schemas/authored-type-v1.json",
+  "title": "NeoAnki authored item-type record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "id", "name", "fields", "templates"],
+  "properties": {
+    "kind": {"const": "type"},
+    "id": {"$ref": "#/$defs/id"},
+    "name": {"type": "string", "minLength": 1},
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/field"}
+    },
+    "templates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {"$ref": "#/$defs/template"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"},
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1},
+        "type": {
+          "enum": ["text", "richText", "audio", "image", "gif", "video", "number", "cloze"]
+        },
+        "required": {"type": "boolean"}
+      }
+    },
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "prompt", "answer", "interaction", "skill"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "prompt": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/slot"}},
+        "answer": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/slot"}},
+        "interaction": {"enum": ["reveal", "type", "choose", "record", "cloze", "arrange"]},
+        "skill": {"$ref": "#/$defs/skill"},
+        "generateWhen": {"$ref": "#/$defs/condition"}
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field": {"$ref": "#/$defs/id"},
+        "literal": {"type": "string"},
+        "reveal": {"enum": ["always", "hiddenUntilAnswer", "blurred"]},
+        "media": {"enum": ["default", "autoplay", "playOnTap", "loop"]}
+      },
+      "oneOf": [
+        {"required": ["field"], "not": {"required": ["literal"]}},
+        {"required": ["literal"], "not": {"required": ["field"]}}
+      ]
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output", "operation"],
+      "properties": {
+        "input": {"$ref": "#/$defs/modality"},
+        "output": {"$ref": "#/$defs/modality"},
+        "operation": {
+          "enum": ["recognize", "recall", "discriminate", "classify", "locate", "order", "apply", "explain", "reproduce"]
+        }
+      }
+    },
+    "modality": {
+      "enum": ["text", "audio", "image", "video", "diagram", "none", "freeResponse", "selection", "spatial", "sequence"]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fieldNotEmpty"],
+          "properties": {"fieldNotEmpty": {"$ref": "#/$defs/id"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fieldEmpty"],
+          "properties": {"fieldEmpty": {"$ref": "#/$defs/id"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": {
+            "all": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/condition"}}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": {
+            "any": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/condition"}}
+          }
+        }
+      ]
+    }
+  }
+}

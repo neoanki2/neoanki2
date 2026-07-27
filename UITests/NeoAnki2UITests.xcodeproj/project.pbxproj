@@ -12,6 +12,13 @@
 		A10000000000000000000003 /* DeckUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* DeckUITests.swift */; };
 		A10000000000000000000004 /* StudyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* StudyUITests.swift */; };
 		A10000000000000000000005 /* TemplatesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* TemplatesUITests.swift */; };
+		A10000000000000000000006 /* PortableDeckUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PortableDeckUITests.swift */; };
+		A10000000000000000000007 /* StudyExtendedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* StudyExtendedUITests.swift */; };
+		A10000000000000000000008 /* ImportExportUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* ImportExportUITests.swift */; };
+		A10000000000000000000009 /* AuthoringUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* AuthoringUITests.swift */; };
+		A1000000000000000000000A /* TemplatesAdvancedUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* TemplatesAdvancedUITests.swift */; };
+		A1000000000000000000000B /* NavigationGatingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* NavigationGatingUITests.swift */; };
+		A1000000000000000000000C /* DocumentationScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* DocumentationScreenshotTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,6 +27,13 @@
 		A20000000000000000000006 /* DeckUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckUITests.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* StudyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyUITests.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* TemplatesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatesUITests.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* PortableDeckUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableDeckUITests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000A /* StudyExtendedUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyExtendedUITests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* ImportExportUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportExportUITests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000C /* AuthoringUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthoringUITests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* TemplatesAdvancedUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatesAdvancedUITests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000E /* NavigationGatingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationGatingUITests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* DocumentationScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentationScreenshotTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* NeoAnki2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NeoAnki2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000004 /* NeoAnki2UITests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = NeoAnki2UITests.xctestplan; sourceTree = "<group>"; };
@@ -43,6 +57,13 @@
 				A20000000000000000000006 /* DeckUITests.swift */,
 				A20000000000000000000007 /* StudyUITests.swift */,
 				A20000000000000000000008 /* TemplatesUITests.swift */,
+				A20000000000000000000009 /* PortableDeckUITests.swift */,
+				A2000000000000000000000A /* StudyExtendedUITests.swift */,
+				A2000000000000000000000B /* ImportExportUITests.swift */,
+				A2000000000000000000000C /* AuthoringUITests.swift */,
+				A2000000000000000000000D /* TemplatesAdvancedUITests.swift */,
+				A2000000000000000000000E /* NavigationGatingUITests.swift */,
+				A2000000000000000000000F /* DocumentationScreenshotTests.swift */,
 				A20000000000000000000003 /* Info.plist */,
 			);
 			path = NeoAnki2UITests;
@@ -144,6 +165,13 @@
 				A10000000000000000000003 /* DeckUITests.swift in Sources */,
 				A10000000000000000000004 /* StudyUITests.swift in Sources */,
 				A10000000000000000000005 /* TemplatesUITests.swift in Sources */,
+				A10000000000000000000006 /* PortableDeckUITests.swift in Sources */,
+				A10000000000000000000007 /* StudyExtendedUITests.swift in Sources */,
+				A10000000000000000000008 /* ImportExportUITests.swift in Sources */,
+				A10000000000000000000009 /* AuthoringUITests.swift in Sources */,
+				A1000000000000000000000A /* TemplatesAdvancedUITests.swift in Sources */,
+				A1000000000000000000000B /* NavigationGatingUITests.swift in Sources */,
+				A1000000000000000000000C /* DocumentationScreenshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

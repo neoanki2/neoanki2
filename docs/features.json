@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "app-first-launch",
+      "name": "First launch and local library",
+      "article": "user/getting-started.md",
+      "sources": ["Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnki2/AppDatabase.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "screenshot": "assets/screenshots/library-empty.png"
+    },
+    {
+      "id": "app-navigation",
+      "name": "Split navigation and focus modes",
+      "article": "user/getting-started.md",
+      "sources": ["Sources/NeoAnki2/ContentView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/NavigationGatingUITests.swift"],
+      "screenshot": "assets/screenshots/library-populated.png"
+    },
+    {
+      "id": "deck-scopes",
+      "name": "All Decks, Unassigned, and deck scopes",
+      "article": "user/library-and-decks.md",
+      "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift"],
+      "screenshot": "assets/screenshots/decks-nested.png"
+    },
+    {
+      "id": "deck-management",
+      "name": "Create, nest, rename, and delete decks",
+      "article": "user/library-and-decks.md",
+      "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DecksModel.swift"],
+      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift"],
+      "screenshot": "assets/screenshots/decks-nested.png"
+    },
+    {
+      "id": "library-items",
+      "name": "Library item list, counts, and empty states",
+      "article": "user/library-and-decks.md",
+      "sources": ["Sources/NeoAnki2/DeckDetailView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "screenshot": "assets/screenshots/library-populated.png"
+    },
+    {
+      "id": "item-create-edit",
+      "name": "Create and edit items",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "screenshot": "assets/screenshots/item-add.png"
+    },
+    {
+      "id": "item-detail",
+      "name": "Read, move, and delete an item",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnki2/ItemReadingPreview.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "screenshot": "assets/screenshots/item-detail.png"
+    },
+    {
+      "id": "content-text-rich",
+      "name": "Text and rich-text fields",
+      "article": "user/content-and-media.md",
+      "sources": ["Sources/NeoAnki2/RichTextFieldEditor.swift", "Sources/NeoAnki2/SpanFormatting.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "screenshot": "assets/screenshots/item-rich-text.png"
+    },
+    {
+      "id": "content-number",
+      "name": "Number fields",
+      "article": "user/content-and-media.md",
+      "sources": ["Sources/NeoAnki2/AddItemView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Content/ContentValue.swift"],
+      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift"]
+    },
+    {
+      "id": "content-cloze",
+      "name": "Cloze fields and blank authoring",
+      "article": "user/content-and-media.md",
+      "sources": ["Sources/NeoAnki2/ClozeFieldEditor.swift", "Sources/NeoAnki2/ContentValueView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift", "UITests/NeoAnki2UITests/StudyUITests.swift"]
+    },
+    {
+      "id": "content-media",
+      "name": "Image, GIF, audio, and video fields",
+      "article": "user/content-and-media.md",
+      "sources": ["Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift"],
+      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift"],
+      "screenshot": "assets/screenshots/item-media.png"
+    },
+    {
+      "id": "study-start",
+      "name": "Start a scoped due-card session",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "screenshot": "assets/screenshots/study-prompt.png"
+    },
+    {
+      "id": "study-reveal",
+      "name": "Reveal and self-grade interaction",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "screenshot": "assets/screenshots/study-answer.png"
+    },
+    {
+      "id": "study-type",
+      "name": "Typed-answer interaction",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudySupport.swift", "Sources/NeoAnki2/StudyView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "screenshot": "assets/screenshots/study-type.png"
+    },
+    {
+      "id": "study-choose",
+      "name": "Multiple-choice interaction",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudySupport.swift", "Sources/NeoAnki2/StudyView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"]
+    },
+    {
+      "id": "study-arrange",
+      "name": "Arrange-in-order interaction",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift"]
+    },
+    {
+      "id": "study-record",
+      "name": "Record-and-compare interaction",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyRecordingController.swift", "Sources/NeoAnki2/StudyView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"]
+    },
+    {
+      "id": "study-cloze",
+      "name": "Cloze interaction",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/ClozeFieldEditor.swift", "Sources/NeoAnki2/ContentValueView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"]
+    },
+    {
+      "id": "study-grading",
+      "name": "Again, Hard, Good, and Easy grading",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/ReviewRating+StudyUI.swift", "Sources/NeoAnki2/GradeGuideView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "screenshot": "assets/screenshots/study-grade-help.png"
+    },
+    {
+      "id": "study-undo-end",
+      "name": "Undo, end confirmation, and session completion",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyCommands.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift"],
+      "screenshot": "assets/screenshots/study-complete.png"
+    },
+    {
+      "id": "item-types",
+      "name": "Create, edit, delete, and repair item types",
+      "article": "user/item-types-and-templates.md",
+      "sources": ["Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/ItemTypeEditorView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift"],
+      "screenshot": "assets/screenshots/item-types.png"
+    },
+    {
+      "id": "templates",
+      "name": "Create, edit, and delete templates",
+      "article": "user/item-types-and-templates.md",
+      "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "Sources/NeoAnki2/TemplatesModel.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift"],
+      "screenshot": "assets/screenshots/template-editor.png"
+    },
+    {
+      "id": "template-advanced",
+      "name": "Advanced slots, skills, reveal, media, and generation",
+      "article": "user/item-types-and-templates.md",
+      "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift"],
+      "screenshot": "assets/screenshots/template-advanced.png"
+    },
+    {
+      "id": "import-json-csv",
+      "name": "Import JSON and CSV items",
+      "article": "user/import-export.md",
+      "sources": ["Sources/NeoAnki2/ImportView.swift", "Sources/NeoAnki2/ImportModel.swift"],
+      "tests": ["UITests/NeoAnki2UITests/ImportExportUITests.swift"],
+      "screenshot": "assets/screenshots/import-sheet.png"
+    },
+    {
+      "id": "portable-deck",
+      "name": "Import and export portable decks",
+      "article": "user/import-export.md",
+      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift"],
+      "screenshot": "assets/screenshots/portable-conflict.png"
+    },
+    {
+      "id": "authored-deck",
+      "name": "Import authored deck bundles",
+      "article": "user/import-export.md",
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
+    },
+    {
+      "id": "scheduling-optimize",
+      "name": "Optimize FSRS scheduling",
+      "article": "user/scheduling.md",
+      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
+      "screenshot": "assets/screenshots/scheduling-result.png"
+    },
+    {
+      "id": "menus-shortcuts",
+      "name": "Menus and keyboard shortcuts",
+      "article": "user/shortcuts-accessibility.md",
+      "sources": ["Sources/NeoAnki2/LibraryCommands.swift", "Sources/NeoAnki2/StudyCommands.swift", "Sources/NeoAnki2/SchedulingCommands.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift"]
+    },
+    {
+      "id": "accessibility",
+      "name": "VoiceOver, focus, contrast, type, and motion",
+      "article": "user/shortcuts-accessibility.md",
+      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift"],
+      "tests": ["Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift"]
+    },
+    {
+      "id": "errors-empty-states",
+      "name": "Errors, permissions, and empty states",
+      "article": "user/troubleshooting.md",
+      "sources": ["Sources/NeoAnki2/UserFacingError.swift", "Sources/NeoAnki2/NeoAnki2App.swift"],
+      "tests": ["Tests/NeoAnki2Tests/UserFacingErrorTests.swift", "UITests/NeoAnki2UITests/NavigationGatingUITests.swift"],
+      "screenshot": "assets/screenshots/error-startup.png"
+    },
+    {
+      "id": "deck-cli",
+      "name": "Validate authored decks from the command line",
+      "article": "user/cli.md",
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiDeckCLI/main.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
+    }
+  ]
+}

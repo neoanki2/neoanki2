@@ -70,6 +70,35 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(itemsModel.dueCount == 1)
 }
 
+@Test @MainActor func importModelFailureLeavesExistingLibraryAndDueCountUnchanged() async throws {
+    let (model, itemsModel, directory) = try await makeImportModel()
+    #expect(await itemsModel.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("Existing")],
+        BuiltInItemTypes.backFieldID: [Span("Card")],
+    ]))
+    let originalItems = itemsModel.items
+    let originalDueCount = itemsModel.dueCount
+    let fileURL = directory.appendingPathComponent("invalid-items.json")
+    try """
+    {
+      "itemType": "Basic",
+      "rows": [
+        { "Front": "Question", "Unknown": "Invalid" }
+      ]
+    }
+    """.write(to: fileURL, atomically: true, encoding: .utf8)
+
+    #expect(await model.selectFile(fileURL))
+    let imported = await model.importSelected(scope: .allDecks)
+
+    #expect(imported == false)
+    #expect(model.importedCount == nil)
+    #expect(model.errorMessage != nil)
+    #expect(itemsModel.items == originalItems)
+    #expect(itemsModel.dueCount == originalDueCount)
+    #expect(try await itemsModel.store.listItems().count == 1)
+}
+
 @Test @MainActor func importModelRequiresItemTypeAndImportsCSV() async throws {
     let (model, itemsModel, directory) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("items.csv")
