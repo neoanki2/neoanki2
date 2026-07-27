@@ -1,5 +1,6 @@
 ---
 title: Architecture
+description: Trace NeoAnki2 data, storage, scheduling, media, import, and application boundaries.
 parent: Reference
 ---
 

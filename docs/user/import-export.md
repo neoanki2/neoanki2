@@ -1,5 +1,6 @@
 ---
 title: Import and export
+description: Choose JSON, CSV, portable decks, or authored decks and recover safely from validation and conflict errors.
 nav_order: 7
 parent: User Guide
 ---
@@ -15,13 +16,23 @@ NeoAnki2 has three native ways to bring in content:
 Anki `.apkg` and `.colpkg` packages, shared-deck imports, HTML/CSS cards, and
 Anki template markup are not supported.
 
+<nav class="local-toc" aria-label="On this page" markdown="1">
+**On this page**
+
+- [Import JSON or CSV](#import-json-or-csv)
+- [Export a portable deck](#export-a-portable-deck)
+- [Import `.neodeck` or `.neoanki`](#import-neodeck-or-neoanki)
+- [Choose the right format](#choosing-the-right-format)
+</nav>
+
 ## Import JSON or CSV
 
 Choose **File → Import…**, select one `.json` or `.csv` file, review the import
-sheet, and choose **Import**. Import is unavailable while studying, editing an
-item, managing item types, or another transfer is active.
+sheet, and choose **Import**. Import is unavailable while studying, adding an
+item, managing item types, showing another import sheet, or while a deck
+transfer is active. An item edit sheet does not disable the menu.
 
-![JSON import sheet showing the selected file and duplicate warning]({{ site.baseurl }}/assets/screenshots/import-sheet.png)
+[![JSON import sheet showing the selected file and duplicate warning]({{ site.baseurl }}/assets/screenshots/import-sheet.png)]({{ site.baseurl }}/assets/screenshots/import-sheet.png)
 
 ### JSON
 
@@ -139,7 +150,7 @@ schema, no content is imported until you choose:
   item type.
 - **Cancel** — make no changes.
 
-![Item type conflict choices during portable deck import]({{ site.baseurl }}/assets/screenshots/portable-conflict.png)
+[![Item type conflict choices during portable deck import]({{ site.baseurl }}/assets/screenshots/portable-conflict.png)]({{ site.baseurl }}/assets/screenshots/portable-conflict.png)
 
 Portable imports are atomic. An unsupported version, malformed package,
 conflict left unresolved, media error, size limit, disk error, or cancellation

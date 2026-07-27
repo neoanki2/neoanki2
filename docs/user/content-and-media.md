@@ -1,5 +1,6 @@
 ---
 title: Content and media
+description: Author text, numbers, cloze blanks, images, GIFs, audio, and video in formats NeoAnki2 validates.
 nav_order: 4
 parent: User Guide
 ---
@@ -77,22 +78,20 @@ Media fields accept one file each.
 3. Enter a description when required.
 4. Save the item.
 
-![Media attached to an item]({{ site.baseurl }}/assets/screenshots/item-media.png)
+[![Media attached to an item]({{ site.baseurl }}/assets/screenshots/item-media.png)]({{ site.baseurl }}/assets/screenshots/item-media.png)
 
 **Remove** clears the attachment and its description from the field. Choosing
 another file replaces the current attachment.
 
 The system file chooser offers these formats:
 
-- **Audio:** M4A, MP3, WAV, and AIFF
+- **Audio:** M4A, MP3, WAV, AAC, and CAF
 - **Image:** PNG, JPEG, HEIC, TIFF, and WebP
 - **GIF:** GIF
-- **Video:** MP4 and QuickTime MOV
+- **Video:** MP4, M4V, and QuickTime MOV
 
-Dropped and imported media are checked against supported extensions and file
-signatures; renaming an unsupported file does not make it valid. Core
-validation also recognizes AAC and CAF audio and M4V video where those files
-enter through a supported workflow.
+Dropped, chosen, and imported media are checked against supported extensions
+and file signatures; renaming an unsupported file does not make it valid.
 
 Size limits are:
 

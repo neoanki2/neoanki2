@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "media": {
+    "article": "user/content-and-media.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
+    "maximumBytes": {
+      "audio": 20000000,
+      "image": 10000000,
+      "gif": 15000000,
+      "video": 100000000
+    },
+    "allowedExtensions": {
+      "audio": ["aac", "caf", "m4a", "mp3", "wav"],
+      "image": ["heic", "jpeg", "jpg", "png", "tiff", "webp"],
+      "gif": ["gif"],
+      "video": ["m4v", "mov", "mp4"]
+    }
+  },
+  "itemImport": {
+    "article": "user/import-export.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportLimits.swift",
+    "maximumPayloadBytes": 5000000,
+    "maximumRows": 10000,
+    "maximumFieldsPerRow": 256,
+    "maximumFieldBytes": 32768,
+    "csvEncoding": "UTF-8"
+  },
+  "portableDeck": {
+    "article": "user/import-export.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
+    "formatVersion": 1,
+    "maximumFileBytes": 512000000,
+    "maximumDecks": 1000,
+    "maximumItemTypes": 256,
+    "maximumItems": 100000,
+    "maximumFieldsPerType": 256,
+    "maximumTemplatesPerType": 256,
+    "maximumTagsPerItem": 256,
+    "maximumMediaAssets": 10000,
+    "maximumTotalMediaBytes": 500000000
+  },
+  "authoredDeck": {
+    "article": "user/cli.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift",
+    "maximumSourceBytes": 64000000,
+    "maximumTotalSourceBytes": 64000000,
+    "maximumLineBytes": 1048576,
+    "maximumParts": 1000
+  },
+  "scheduling": {
+    "article": "user/scheduling.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift",
+    "minimumReviewOutcomes": 100,
+    "minimumReviewsPerCardForOutcome": 2
+  },
+  "scheduler": {
+    "article": "user/studying.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift",
+    "model": "FSRS-5",
+    "minimumIntervalDays": 1,
+    "defaultRequestRetention": 0.9,
+    "defaultMaximumIntervalDays": 36500
+  },
+  "appData": {
+    "article": "user/getting-started.md",
+    "source": "Sources/NeoAnki2/AppDatabase.swift",
+    "libraryDirectory": "~/Library/Application Support/neoanki2/"
+  },
+  "history": {
+    "article": "user/authoring-items.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/Database/Schema.swift",
+    "reviewLogRetention": "survives-item-and-card-deletion"
+  },
+  "compatibility": {
+    "article": "user/getting-started.md",
+    "source": "Package.swift",
+    "minimumMacOS": 14,
+    "swiftToolsVersion": "6.0"
+  }
+}

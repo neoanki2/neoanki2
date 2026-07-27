@@ -1,5 +1,6 @@
 ---
 title: Portable deck format
+description: Implement or inspect the versioned SQLite-based .neodeck interchange format and its validation rules.
 parent: Reference
 ---
 

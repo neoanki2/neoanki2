@@ -1,5 +1,6 @@
 ---
 title: Troubleshooting
+description: Match NeoAnki2 app symptoms to safe recovery steps without risking the local library.
 nav_order: 10
 parent: User Guide
 ---
@@ -10,6 +11,22 @@ NeoAnki2 reports recoverable problems in an error banner or alert. With
 VoiceOver, the message is announced and focused. Read the complete message
 before retrying; it normally identifies the missing file, invalid field, data
 requirement, or unavailable action.
+
+## Find your symptom
+
+- **A Terminal command, build, signing step, or launch failed:** use [Build,
+  launch, and support](../support/).
+- **The app says Could Not Start:** see [Startup problems](#startup-problems).
+- **The app looks empty, loading, or caught up:** see [Empty and loading
+  states](#empty-and-loading-states).
+- **Import or export failed:** see [Import and export errors](#import-and-export-errors).
+- **An item, cloze, or media file cannot be saved:** see [Item and media
+  errors](#item-and-media-errors).
+- **Recording is unavailable:** see [Microphone and recording](#microphone-and-recording).
+- **Study or optimization shows a message:** see [Study and scheduling
+  messages](#study-and-scheduling-messages).
+- **You need to report a reproducible bug:** follow [safe issue-report and
+  redaction guidance](../support/#report-an-issue-safely).
 
 ## Where the library is stored
 
@@ -40,7 +57,7 @@ omits learner progress and is not a complete backup.
 During launch, **Starting…** is normal briefly. **Could Not Start** means the
 library could not be opened or bootstrapped.
 
-![Could Not Start state with a local-library error]({{ site.baseurl }}/assets/screenshots/error-startup.png)
+[![Could Not Start state with a local-library error]({{ site.baseurl }}/assets/screenshots/error-startup.png)]({{ site.baseurl }}/assets/screenshots/error-startup.png)
 
 - **Couldn't open your library:** confirm the Application Support folder is
   available and writable. If it is on redirected or managed storage, restore
@@ -166,3 +183,9 @@ NeoAnki2 currently has no Anki `.apkg`/`.colpkg` import or export, shared-deck
 catalog, HTML/CSS rendering, `{{Field}}` templates, progress-bearing portable
 export, or legacy SM-2 scheduler. Do not work around these limits by renaming
 files or injecting HTML into text fields.
+
+---
+
+**Next:** [Build, launch, and issue-report support](../support/)
+
+**Related:** [Task index](../tasks/) · [Shortcuts and accessibility](../shortcuts-accessibility/)

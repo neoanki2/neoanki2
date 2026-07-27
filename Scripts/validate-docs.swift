@@ -4,7 +4,16 @@ import Foundation
 
 struct Manifest: Decodable {
     let schemaVersion: Int
+    let inventory: Inventory
     let features: [Feature]
+}
+
+struct Inventory: Decodable {
+    let sourceRoots: [String]
+    let sourceMarkers: [String]
+    let testRoots: [String]
+    let testMarker: String
+    let excludedFiles: [String]
 }
 
 struct Feature: Decodable {
@@ -16,11 +25,37 @@ struct Feature: Decodable {
     let screenshot: String?
 }
 
+struct ClaimsRegistry: Decodable {
+    struct Evidence: Decodable {
+        let article: String
+        let source: String
+    }
+
+    let schemaVersion: Int
+    let media: Evidence
+    let itemImport: Evidence
+    let portableDeck: Evidence
+    let authoredDeck: Evidence
+    let scheduling: Evidence
+    let scheduler: Evidence
+    let appData: Evidence
+    let history: Evidence
+    let compatibility: Evidence
+
+    var evidence: [Evidence] {
+        [
+            media, itemImport, portableDeck, authoredDeck, scheduling,
+            scheduler, appData, history, compatibility,
+        ]
+    }
+}
+
 let fileManager = FileManager.default
 let scriptURL = URL(fileURLWithPath: #filePath).standardizedFileURL
 let root = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
 let docs = root.appendingPathComponent("docs", isDirectory: true)
 let manifestURL = docs.appendingPathComponent("features.json")
+let claimsURL = docs.appendingPathComponent("claims.json")
 let generatedURL = docs.appendingPathComponent("features.md")
 let arguments = Set(CommandLine.arguments.dropFirst())
 let writeGenerated = arguments.contains("--write")
@@ -43,8 +78,27 @@ else {
     exit(1)
 }
 
+guard
+    let claimsData = try? Data(contentsOf: claimsURL),
+    let claims = try? JSONDecoder().decode(ClaimsRegistry.self, from: claimsData)
+else {
+    fputs("Unable to decode docs/claims.json\n", stderr)
+    exit(1)
+}
+
 if manifest.schemaVersion != 1 {
     fail("Unsupported feature manifest schema version \(manifest.schemaVersion)")
+}
+if claims.schemaVersion != 1 {
+    fail("Unsupported claims registry schema version \(claims.schemaVersion)")
+}
+for claim in claims.evidence {
+    if !exists(claim.article, under: docs) {
+        fail("Claim references missing article docs/\(claim.article)")
+    }
+    if !exists(claim.source) {
+        fail("Claim references missing production source \(claim.source)")
+    }
 }
 
 var identifiers = Set<String>()
@@ -66,6 +120,53 @@ for feature in manifest.features {
     }
 }
 
+let mappedSources = Set(manifest.features.flatMap(\.sources))
+let mappedTests = Set(manifest.features.flatMap(\.tests))
+let excludedInventoryFiles = Set(manifest.inventory.excludedFiles)
+
+func inventoryFiles(under relativeRoot: String) -> [URL] {
+    let directory = root.appendingPathComponent(relativeRoot, isDirectory: true)
+    guard let enumerator = fileManager.enumerator(
+        at: directory,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    ) else {
+        fail("Feature inventory root does not exist: \(relativeRoot)")
+        return []
+    }
+    return (enumerator.allObjects as? [URL] ?? []).filter { $0.pathExtension == "swift" }
+}
+
+for sourceRoot in manifest.inventory.sourceRoots {
+    for file in inventoryFiles(under: sourceRoot) {
+        let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
+        guard !excludedInventoryFiles.contains(relativePath),
+              let text = try? String(contentsOf: file, encoding: .utf8),
+              manifest.inventory.sourceMarkers.contains(where: text.contains)
+        else {
+            continue
+        }
+        if !mappedSources.contains(relativePath) {
+            fail("User-facing source is missing from docs/features.json: \(relativePath)")
+        }
+    }
+}
+
+for testRoot in manifest.inventory.testRoots {
+    for file in inventoryFiles(under: testRoot) {
+        let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
+        guard !excludedInventoryFiles.contains(relativePath),
+              let text = try? String(contentsOf: file, encoding: .utf8),
+              text.contains(manifest.inventory.testMarker)
+        else {
+            continue
+        }
+        if !mappedTests.contains(relativePath) {
+            fail("User-facing test is missing from docs/features.json: \(relativePath)")
+        }
+    }
+}
+
 func featureIndex(_ features: [Feature]) -> String {
     var output = """
     ---
@@ -77,17 +178,24 @@ func featureIndex(_ features: [Feature]) -> String {
 
     # Feature index
 
-    This page is generated from [`features.json`](../features.json). It makes
-    documentation ownership explicit: each user-facing feature points to its guide,
-    implementation evidence, and behavioral tests.
+    Looking for an action rather than engineering evidence? Start with the
+    [task index](../user/tasks/).
+
+    This contributor-facing page is generated from [`features.json`](../features.json).
+    Within its declared app-source and UI-test inventory boundary, each detected
+    user-facing file must map to a guide, implementation evidence, and behavioral
+    tests. The screenshot capture harness is explicitly excluded because it verifies
+    documentation evidence rather than product behavior.
+
+    {% assign source_revision = site.data.build.commit_sha | default: site.documentation.revision %}
 
     | Feature | Guide | Implementation | Tests | Screenshot |
     | --- | --- | --- | --- | --- |
     """
     for feature in features.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) {
         let article = feature.article.replacingOccurrences(of: ".md", with: "/")
-        let sourceLinks = feature.sources.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/main/\($0))" }.joined(separator: "<br>")
-        let testLinks = feature.tests.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/main/\($0))" }.joined(separator: "<br>")
+        let sourceLinks = feature.sources.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/{{ source_revision }}/\($0))" }.joined(separator: "<br>")
+        let testLinks = feature.tests.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/{{ source_revision }}/\($0))" }.joined(separator: "<br>")
         let screenshot = feature.screenshot.map { "[View](../\($0))" } ?? "—"
         output += "\n| \(feature.name) | [Guide](../\(article)) | \(sourceLinks) | \(testLinks) | \(screenshot) |"
     }
@@ -123,6 +231,9 @@ for file in markdownFiles {
         guard let targetRange = Range(match.range(at: 2), in: text) else { continue }
         let isImage = match.range(at: 1).length == 1
         var target = String(text[targetRange])
+        if target.hasPrefix("#") {
+            continue
+        }
         target = target.split(separator: "#", maxSplits: 1).first.map(String.init) ?? target
         target = target.removingPercentEncoding ?? target
         if target.isEmpty || target.hasPrefix("http://") || target.hasPrefix("https://")
@@ -178,12 +289,18 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
         if process.terminationStatus == 0 {
             let changedData = pipe.fileHandleForReading.readDataToEndOfFile()
             let changed = Set(String(decoding: changedData, as: UTF8.self).split(separator: "\n").map(String.init))
-            if !changed.contains("docs/features.json") {
-                for feature in manifest.features where !changed.isDisjoint(with: Set(feature.sources)) {
-                    let articlePath = "docs/\(feature.article)"
-                    if !changed.contains(articlePath) {
-                        fail("Feature '\(feature.id)' changed without updating \(articlePath) or docs/features.json")
-                    }
+            for feature in manifest.features where !changed.isDisjoint(with: Set(feature.sources)) {
+                let articlePath = "docs/\(feature.article)"
+                if !changed.contains(articlePath) {
+                    fail("Feature '\(feature.id)' changed without reviewing and updating \(articlePath)")
+                }
+            }
+            for claim in claims.evidence where changed.contains(claim.source) {
+                let articlePath = "docs/\(claim.article)"
+                if !changed.contains("docs/claims.json") || !changed.contains(articlePath) {
+                    fail(
+                        "High-risk claims source \(claim.source) changed; update docs/claims.json and \(articlePath)"
+                    )
                 }
             }
         } else {

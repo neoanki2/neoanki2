@@ -1,5 +1,6 @@
 ---
 title: Scheduling
+description: Understand FSRS grading and safely optimize scheduling after 100 usable review outcomes.
 nav_order: 8
 parent: User Guide
 ---
@@ -40,7 +41,7 @@ NeoAnki2 reports that no change was needed. This is a successful result, not an
 error. Existing cards and review history remain in place; only the saved
 scheduling parameters for the profile are updated.
 
-![Scheduling optimization result showing observations and fit]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)
+[![Scheduling optimization result showing observations and fit]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)
 
 ## Insufficient data
 
@@ -69,3 +70,6 @@ folder is writable, and retry.
   session.
 - Treat `.neodeck` exports as content exchange, not scheduling backups. To
   preserve progress, back up the whole local library folder.
+
+The 100-outcome threshold and other documented limits are checked against
+production constants by the automated [documentation claims registry](../maintaining-documentation/#high-risk-factual-claims).

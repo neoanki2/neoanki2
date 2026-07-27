@@ -1,5 +1,6 @@
 ---
 title: Authoring decks with coding agents
+description: Generate reviewable .neoanki source bundles with deterministic records, validation, and safe media references.
 parent: Reference
 ---
 

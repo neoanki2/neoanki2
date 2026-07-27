@@ -1,5 +1,6 @@
 ---
 title: Example authored deck
+description: Explore a valid Biology .neoanki bundle with a manifest and split JSON Lines item sources.
 parent: Reference
 ---
 

@@ -25,9 +25,64 @@ for screenshot in "${EXPECTED[@]}"; do
   fi
 done
 
+python3 - "$SOURCE_DIR" "${EXPECTED[@]}" <<'PY'
+import datetime
+import json
+import pathlib
+import re
+import struct
+import sys
+
+directory = pathlib.Path(sys.argv[1])
+expected_files = set(sys.argv[2:])
+manifest_path = directory / "manifest.json"
+
+try:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as error:
+    raise SystemExit(f"Reviewed artifact has an invalid or missing screenshot manifest: {error}")
+
+if manifest.get("schemaVersion") != 1:
+    raise SystemExit("Reviewed screenshot manifest must use schemaVersion 1")
+if re.fullmatch(r"[0-9a-f]{40}", manifest.get("sourceSHA") or "") is None:
+    raise SystemExit("Reviewed screenshot manifest has an invalid sourceSHA")
+try:
+    datetime.datetime.strptime(manifest.get("capturedAt"), "%Y-%m-%dT%H:%M:%SZ")
+except (TypeError, ValueError):
+    raise SystemExit("Reviewed screenshot manifest capturedAt must be a UTC RFC3339 timestamp")
+
+entries = manifest.get("screenshots")
+if not isinstance(entries, list):
+    raise SystemExit("Reviewed screenshot manifest screenshots must be an array")
+by_filename = {entry.get("filename"): entry for entry in entries if isinstance(entry, dict)}
+if set(by_filename) != expected_files or len(entries) != len(expected_files):
+    raise SystemExit("Reviewed screenshot manifest entries do not exactly match the expected screenshots")
+
+for filename in sorted(expected_files):
+    entry = by_filename[filename]
+    path = directory / filename
+    with path.open("rb") as image:
+        header = image.read(24)
+    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"{filename} is not a valid PNG")
+    width, height = struct.unpack(">II", header[16:24])
+    if entry.get("width") != width or entry.get("height") != height or width <= 0 or height <= 0:
+        raise SystemExit(f"Manifest dimensions do not match {filename}")
+    if not isinstance(entry.get("scenario"), str) or not entry["scenario"].strip():
+        raise SystemExit(f"Manifest scenario is missing for {filename}")
+    identifiers = entry.get("expectedVisibleIdentifiers")
+    if (
+        not isinstance(identifiers, list)
+        or not identifiers
+        or any(not isinstance(value, str) or not value.strip() for value in identifiers)
+    ):
+        raise SystemExit(f"Expected visible identifiers are missing for {filename}")
+PY
+
 mkdir -p "$DESTINATION"
 for screenshot in "${EXPECTED[@]}"; do
   cp "$SOURCE_DIR/$screenshot" "$DESTINATION/$screenshot"
 done
+cp "$SOURCE_DIR/manifest.json" "$DESTINATION/manifest.json"
 
-echo "Promoted ${#EXPECTED[@]} reviewed screenshots into docs/assets/screenshots"
+echo "Promoted ${#EXPECTED[@]} reviewed screenshots and validated metadata into docs/assets/screenshots"

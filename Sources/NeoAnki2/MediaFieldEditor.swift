@@ -11,6 +11,21 @@ enum MediaFieldPolicy {
     static func descriptionLabel(for kind: MediaKind) -> String {
         [.image, .gif].contains(kind) ? "Image description (required)" : "Description (optional)"
     }
+
+    static func allowedContentTypes(for kind: MediaKind) -> [UTType] {
+        allowedFilenameExtensions(for: kind).compactMap {
+            UTType(filenameExtension: $0)
+        }
+    }
+
+    static func allowedFilenameExtensions(for kind: MediaKind) -> [String] {
+        switch kind {
+        case .audio: ["m4a", "mp3", "wav", "aac", "caf"]
+        case .image: ["png", "jpg", "jpeg", "heic", "tiff", "webp"]
+        case .gif: ["gif"]
+        case .video: ["mp4", "mov", "m4v"]
+        }
+    }
 }
 
 struct MediaFieldEditor: View {
@@ -122,18 +137,9 @@ struct MediaFieldEditor: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = allowedTypes
+        panel.allowedContentTypes = MediaFieldPolicy.allowedContentTypes(for: kind)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await ingest(url: url) }
-    }
-
-    private var allowedTypes: [UTType] {
-        switch kind {
-        case .audio: [.mpeg4Audio, .mp3, .wav, .aiff]
-        case .image: [.png, .jpeg, .heic, .tiff, .webP]
-        case .gif: [.gif]
-        case .video: [.mpeg4Movie, .quickTimeMovie]
-        }
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

@@ -11,6 +11,10 @@ enum AppDatabase {
         if isTesting {
             return testURL()
         }
+        return productionURL
+    }
+
+    static var productionURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport
             .appendingPathComponent("neoanki2", isDirectory: true)

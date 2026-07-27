@@ -1,6 +1,6 @@
 ---
 title: NeoAnki2 documentation
-description: Learn how to organize knowledge, author native cards, and study with NeoAnki2.
+description: Start studying in five minutes, find a task, or understand NeoAnki2's learning model.
 nav_order: 1
 ---
 
@@ -10,17 +10,32 @@ NeoAnki2 is a native macOS spaced-repetition app built around structured
 knowledge, focused recall, and FSRS scheduling. It uses native text and media
 instead of HTML card templates.
 
-## Start here
+## Start
 
-- [Getting started](user/getting-started/) explains how to build and launch the
-  current development release and where NeoAnki2 stores its library.
-- [Library and decks](user/library-and-decks/) covers organization and scopes.
-- [Authoring items](user/authoring-items/) and [content and
-  media](user/content-and-media/) cover every supported field type.
-- [Studying](user/studying/) explains interactions, grading, shortcuts, and
-  session behavior.
-- [Import and export](user/import-export/) describes JSON, CSV, `.neoanki`, and
-  `.neodeck` workflows.
+- [Build and launch](user/getting-started/)
+- [Complete your first study session](user/first-study-session/)
+
+## Tasks
+
+- [Find a guide by goal](user/tasks/)
+- [Browse the complete user guide](user/)
+
+## Understand
+
+- [Learn the core concepts](user/concepts/)
+- [Read how studying works](user/studying/)
+
+## Troubleshoot
+
+- [Diagnose an app problem](user/troubleshooting/)
+- [Fix build or launch problems and report an issue safely](user/support/)
+
+## Advanced
+
+- [Customize item types and templates](user/item-types-and-templates/)
+- [Import or export content](user/import-export/)
+- [Use the deck authoring CLI](user/cli/)
+- [Browse implementation and format references](reference/)
 
 ## What makes it different
 
@@ -40,3 +55,9 @@ tests, and screenshot associated with every documented capability.
 NeoAnki2 does not yet publish signed application releases. The current app is
 built from source and targets macOS 14 or newer. It intentionally does not
 support Anki `.apkg` packages or HTML/CSS card templates.
+
+---
+
+**Next:** [Build and launch NeoAnki2](user/getting-started/)
+
+**Related:** [Choose a task](user/tasks/) · [Understand the learning model](user/concepts/)

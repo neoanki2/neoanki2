@@ -1,5 +1,14 @@
 {
   "schemaVersion": 1,
+  "inventory": {
+    "sourceRoots": ["Sources/NeoAnki2"],
+    "sourceMarkers": ["CommandMenu(", ".keyboardShortcut(", ".accessibilityIdentifier("],
+    "testRoots": ["UITests/NeoAnki2UITests"],
+    "testMarker": "func test",
+    "excludedFiles": [
+      "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift"
+    ]
+  },
   "features": [
     {
       "id": "app-first-launch",
@@ -206,7 +215,7 @@
       "id": "scheduling-optimize",
       "name": "Optimize FSRS scheduling",
       "article": "user/scheduling.md",
-      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift"],
+      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"],
       "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift"],
       "screenshot": "assets/screenshots/scheduling-result.png"
     },

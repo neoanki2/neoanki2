@@ -1,25 +1,49 @@
 ---
 title: User guide
-description: Complete task-oriented guide to NeoAnki2.
+description: Navigate NeoAnki2 guides by starting point, user goal, concept, or problem.
 nav_order: 2
 permalink: /user/
 ---
 
 # User guide
 
-Follow the guides in order for a first tour, or jump directly to a task.
+Start with the short path if this is your first visit. Otherwise, choose the
+goal or explanation you need.
 
-1. [Getting started](getting-started/)
-2. [Library and decks](library-and-decks/)
-3. [Authoring items](authoring-items/)
-4. [Content and media](content-and-media/)
-5. [Studying](studying/)
-6. [Item types and templates](item-types-and-templates/)
-7. [Import and export](import-export/)
-8. [Scheduling](scheduling/)
-9. [Shortcuts and accessibility](shortcuts-accessibility/)
-10. [Troubleshooting](troubleshooting/)
-11. [Deck authoring CLI](cli/)
+## Start
 
-For implementation and file-format details, see the [reference
-library](../reference/).
+1. [Build and launch NeoAnki2](getting-started/)
+2. [Complete a first study session](first-study-session/)
+
+## Tasks
+
+- [Choose a guide by user goal](tasks/)
+- [Organize the library and decks](library-and-decks/)
+- [Add, edit, or delete items](authoring-items/)
+- [Add text, cloze, and media](content-and-media/)
+- [Study and grade cards](studying/)
+- [Import or export](import-export/)
+
+## Understand
+
+- [Concept model and glossary](concepts/)
+- [Item types and templates](item-types-and-templates/)
+- [Scheduling](scheduling/)
+
+## Troubleshoot
+
+- [App symptoms and recovery](troubleshooting/)
+- [Build, launch, and issue-report support](support/)
+- [Shortcuts and accessibility scope](shortcuts-accessibility/)
+
+## Advanced
+
+- [Deck authoring CLI](cli/)
+- [Maintain this documentation](maintaining-documentation/)
+- [Implementation and file-format reference](../reference/)
+
+---
+
+**Next:** [Build and launch NeoAnki2](getting-started/)
+
+**Related:** [Choose a task](tasks/) · [Learn the concepts](concepts/)
