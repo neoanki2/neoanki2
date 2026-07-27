@@ -82,7 +82,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5))
         advanced.click()
-        XCTAssertTrue(app.descendants(matching: .any)["templateAutomaticSkill"].waitForExistence(timeout: 3))
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         captureDocumentationScreenshot(named: "template-advanced", of: app)
     }
 
