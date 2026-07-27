@@ -162,18 +162,10 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             expectedVisibleIdentifiers: ["templateNameField", "templatePromptField", "templateAnswerField"]
         )
 
-        let advancedApp = launchApp(
-            databaseLabel: "docs-template-advanced",
-            environment: ["NEOANKI_TEST_EXPAND_TEMPLATE_ADVANCED": "1"]
-        )
+        let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
-        advancedApp.buttons.identified("addTemplateToolbar").click()
+        openTemplateEditor(named: "Card", in: advancedApp)
         XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitForExistence(timeout: 5))
-        enterText(
-            "Custom practice card",
-            into: advancedApp.textFields.identified("templateNameField"),
-            app: advancedApp
-        )
         let advancedSettings = advancedApp.descendants(matching: .any)
             .identified("templateAdvancedSettings")
         XCTAssertTrue(advancedSettings.waitForExistence(timeout: 5))
@@ -186,8 +178,6 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 .identified("templateAutomaticSkill")
                 .waitForExistence(timeout: 5)
         )
-        advancedApp.descendants(matching: .any).identified("templateAutomaticSkill").click()
-        advancedForm.swipeUp()
         XCTAssertTrue(advancedApp.popUpButtons.identified("templateSkillInput").waitForExistence(timeout: 3))
         let generateCondition = advancedApp.descendants(matching: .any)
             .identified("templateGenerateCondition")
