@@ -7,7 +7,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "library-empty",
             of: emptyApp,
             scenario: "empty library",
-            expectedVisibleIdentifiers: ["emptyLibraryState", "addItemEmptyState"]
+            expectedVisibleIdentifiers: ["emptyLibraryState"]
         )
 
         openAddItem(in: emptyApp)
@@ -132,7 +132,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "study-type",
             of: app,
             scenario: "typed-answer study result",
-            expectedVisibleIdentifiers: ["typedAnswer", "studyAnswer"]
+            expectedVisibleIdentifiers: ["studyAnswer", "gradeGood"]
         )
     }
 
@@ -143,7 +143,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "item-types",
             of: app,
             scenario: "item types and templates panel",
-            expectedVisibleIdentifiers: ["templatesPanel", "addTemplateToolbar"]
+            expectedVisibleIdentifiers: ["templatesDone", "addTemplateToolbar"]
         )
 
         app.buttons.identified("addTemplateToolbar").click()

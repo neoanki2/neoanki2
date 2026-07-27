@@ -50,7 +50,7 @@ meaningful.
 ## Cloze blanks
 
 A Cloze field stores text plus explicit blank ranges; do not type Anki
-`{{c1::...}}` markup.
+{% raw %}`{{c1::...}}`{% endraw %} markup.
 
 1. Enter the complete sentence or passage.
 2. Select the text to hide.

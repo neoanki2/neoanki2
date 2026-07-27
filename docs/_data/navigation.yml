@@ -51,17 +51,17 @@ primary:
     url: /reference/
     children:
       - title: Product model
-        url: /PRODUCT.html
+        url: /PRODUCT/
       - title: Architecture
-        url: /ARCHITECTURE.html
+        url: /ARCHITECTURE/
       - title: Design system
-        url: /DESIGN.html
+        url: /DESIGN/
       - title: Authored deck format
-        url: /AUTHORED_DECK_FORMAT.html
+        url: /AUTHORED_DECK_FORMAT/
       - title: Portable deck format
-        url: /PORTABLE_DECK_FORMAT.html
+        url: /PORTABLE_DECK_FORMAT/
       - title: LLM deck authoring
-        url: /LLM_DECK_AUTHORING.html
+        url: /LLM_DECK_AUTHORING/
       - title: JSON Schemas
         url: /schemas/
       - title: Example deck

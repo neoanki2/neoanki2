@@ -3,12 +3,18 @@ layout: null
 search: false
 ---
 [
-  {% assign searchable_pages = site.pages | where_exp: "item", "item.title and item.search != false" %}
-  {% for item in searchable_pages %}
+  {% assign emitted_search_result = false %}
+  {% for item in site.pages %}
+    {% if item.title %}
+    {% unless item.search == false %}
+    {% if emitted_search_result %},{% endif %}
     {
       "title": {{ item.title | jsonify }},
       "url": {{ item.url | relative_url | jsonify }},
       "content": {{ item.content | markdownify | strip_html | normalize_whitespace | jsonify }}
-    }{% unless forloop.last %},{% endunless %}
+    }
+    {% assign emitted_search_result = true %}
+    {% endunless %}
+    {% endif %}
   {% endfor %}
 ]

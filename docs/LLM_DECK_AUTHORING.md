@@ -51,7 +51,7 @@ semantic paths:
 Give the agent a content goal and point it to:
 
 1. [`AUTHORED_DECK_FORMAT.md`](AUTHORED_DECK_FORMAT.md)
-2. [`examples/Biology.neoanki`](examples/Biology.neoanki)
+2. the [Biology authored-deck example]({{ site.baseurl }}/examples/)
 3. the validator command below
 
 Ask it to complete this loop:

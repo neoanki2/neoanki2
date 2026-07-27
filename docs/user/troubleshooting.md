@@ -142,7 +142,7 @@ reimporting again will add more copies.
   or unreadable. Restore the complete database-and-media backup together.
 
 Supported authored media is documented in the
-[authored deck format](../../AUTHORED_DECK_FORMAT.html). Active content such as
+[authored deck format]({{ site.baseurl }}/AUTHORED_DECK_FORMAT/). Active content such as
 HTML, SVG, scripts, and playlists is intentionally unsupported.
 
 ## Microphone and recording

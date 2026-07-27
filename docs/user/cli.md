@@ -82,4 +82,4 @@ workflow. Do not use it to convert personal decks, validate content, back up a
 library, or prepare a production import.
 
 For the authored source layout and all supported records, see the
-[Authored Deck Format](../../AUTHORED_DECK_FORMAT.html).
+[Authored Deck Format]({{ site.baseurl }}/AUTHORED_DECK_FORMAT/).
