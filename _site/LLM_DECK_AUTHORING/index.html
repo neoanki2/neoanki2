@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Authoring decks with coding agents · NeoAnki2</title>
+    <meta name="description" content="Generate reviewable .neoanki source bundles with deterministic records, validation, and safe media references.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/LLM_DECK_AUTHORING/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Authoring decks with coding agents">
+    <meta property="og:description" content="Generate reviewable .neoanki source bundles with deterministic records, validation, and safe media references.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/LLM_DECK_AUTHORING/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/reference/" aria-current="location">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/" aria-current="page">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/reference/">Reference</a></li>
+              
+              <li><span aria-current="page">Authoring decks with coding agents</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="authoring-neoanki-decks-with-coding-agents">Authoring NeoAnki decks with coding agents</h1>
+
+<h2 id="why-the-format-is-json-lines">Why the format is JSON Lines</h2>
+
+<p>This workflow targets current filesystem-capable coding agents such as Codex,
+Claude Code, and Cursor, not a chat response copied by hand.</p>
+
+<p>Frontier agents are strong at:</p>
+
+<ul>
+  <li>inspecting repository documentation and examples;</li>
+  <li>editing several files over a long-running task;</li>
+  <li>producing familiar programming and data formats;</li>
+  <li>invoking deterministic tools; and</li>
+  <li>repairing localized compiler or validator diagnostics.</li>
+</ul>
+
+<p>Their remaining weaknesses matter more than old prompt recipes:</p>
+
+<ul>
+  <li>schema-valid output can still contain semantically wrong references;</li>
+  <li>long generated artifacts are vulnerable to truncation and duplicated content;</li>
+  <li>context quality degrades when instructions and repeated structure become
+excessive; and</li>
+  <li>agents can confidently invent identifiers or assume files exist.</li>
+</ul>
+
+<p>The format therefore uses familiar JSON rather than a novel language, one
+record per line rather than a monolithic document, explicit bounded item
+shards rather than implicit discovery, and a semantic validator rather than
+prompt-only compliance.</p>
+
+<p>This follows current official guidance to keep durable instructions concise
+and back them with executable checks:</p>
+
+<ul>
+  <li><a href="https://developers.openai.com/codex/learn/best-practices">OpenAI Codex best practices</a></li>
+  <li><a href="https://code.claude.com/docs/en/best-practices.md">Claude Code best practices</a></li>
+</ul>
+
+<p>It also reflects current structured-generation findings: constrained syntax
+substantially improves shape but does not eliminate structural-reference or
+semantic failures, and hard constraints can steer generation onto worse
+semantic paths:</p>
+
+<ul>
+  <li><a href="https://arxiv.org/html/2606.09395">Empirical Study for Structured Output Control in LLMs for Software Engineering</a></li>
+  <li><a href="https://arxiv.org/html/2603.03305">The Hidden Cost of Structured Generation in LLMs</a></li>
+</ul>
+
+<h2 id="recommended-agent-workflow">Recommended agent workflow</h2>
+
+<p>Give the agent a content goal and point it to:</p>
+
+<ol>
+  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/"><code class="language-plaintext highlighter-rouge">AUTHORED_DECK_FORMAT.md</code></a></li>
+  <li>the <a href="/neoanki2/examples/">Biology authored-deck example</a></li>
+  <li>the validator command below</li>
+</ol>
+
+<p>Ask it to complete this loop:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. Create or update the .neoanki bundle.
+2. Keep deck/type declarations in deck.jsonl.
+3. Split items into coherent, bounded items/*.jsonl files.
+4. Run the validator.
+5. Fix every diagnostic and rerun until validation succeeds.
+6. Summarize item, type, deck, and media counts.
+</code></pre></div></div>
+
+<p>Validation:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>swift run <span class="nt">--package-path</span> NeoAnkiCore neoanki-deck validate path/to/Deck.neoanki
+</code></pre></div></div>
+
+<p>Do not ask the model to generate UUIDs, SHA-256 digests, cloze offsets,
+timestamps, cards, or scheduling state. The importer owns those.</p>
+
+<h2 id="task-template">Task template</h2>
+
+<p>This is context, not a fragile “magic prompt”:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Create &lt;path&gt;.neoanki as a NeoAnki Authored Deck Format v1 bundle.
+Read docs/AUTHORED_DECK_FORMAT.md and use docs/examples/Biology.neoanki as the
+structural example. Cover &lt;learning goals&gt;. Prefer atomic retrieval prompts,
+clear answers, and tags useful for filtering. Split item records into files of
+roughly 100–500 related items. Use only media files that actually exist under
+the bundle's media/ directory. Run:
+
+swift run --package-path NeoAnkiCore neoanki-deck validate &lt;path&gt;.neoanki
+
+Fix all diagnostics before finishing. Do not import the deck or modify a
+NeoAnki library.
+</code></pre></div></div>
+
+<p>The content brief should specify audience, prior knowledge, language, desired
+coverage, and any prohibited material. Those decisions affect learning quality
+and cannot be inferred from serialization.</p>
+
+<h2 id="chunking-large-decks">Chunking large decks</h2>
+
+<ul>
+  <li>Define each type once in <code class="language-plaintext highlighter-rouge">deck.jsonl</code>.</li>
+  <li>Use stable semantic identifiers such as <code class="language-plaintext highlighter-rouge">basic</code>, <code class="language-plaintext highlighter-rouge">listening</code>, and
+<code class="language-plaintext highlighter-rouge">cell_biology</code>; do not encode ordinal position in identifiers unless order is
+meaningful.</li>
+  <li>Keep each item on one physical line.</li>
+  <li>Split by topic before a shard becomes difficult to inspect. Around 100–500
+items per file is a useful working range, not a format limit.</li>
+  <li>Add every shard explicitly to the manifest <code class="language-plaintext highlighter-rouge">parts</code> array.</li>
+  <li>Validate after each shard, not only at the end.</li>
+  <li>Avoid generating several shards concurrently if they would duplicate the
+same learning objectives.</li>
+</ul>
+
+<p>A truncated generation normally damages only its final JSONL record. Delete or
+repair that record; do not regenerate already validated shards.</p>
+
+<h2 id="content-guidance">Content guidance</h2>
+
+<ul>
+  <li>Use one item for one coherent fact or skill.</li>
+  <li>Use multiple templates when the same knowledge genuinely benefits from
+different retrieval routes.</li>
+  <li>Mark optional templates with <code class="language-plaintext highlighter-rouge">generateWhen</code> when their media or field may be
+absent.</li>
+  <li>Use cloze markers instead of calculating offsets.</li>
+  <li>Use native rich spans only when styling carries meaning.</li>
+  <li>Never insert HTML or Markdown expecting it to render as markup.</li>
+  <li>Verify factual correctness separately from format validation. A valid deck
+can still teach false or low-quality material.</li>
+</ul>
+
+<h2 id="diagnostic-repair">Diagnostic repair</h2>
+
+<p>Diagnostics have a stable code, source file, and line. Repair the referenced
+record rather than rewriting the bundle.</p>
+
+<p>Common categories:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">AD01x</code>: source I/O or malformed JSON;</li>
+  <li><code class="language-plaintext highlighter-rouge">AD02x</code>: member shape or primitive type;</li>
+  <li><code class="language-plaintext highlighter-rouge">AD10x</code>: manifest and source-part declarations;</li>
+  <li><code class="language-plaintext highlighter-rouge">AD12x</code>: type/template structure;</li>
+  <li><code class="language-plaintext highlighter-rouge">AD20x</code>: cross-record semantic validation;</li>
+  <li><code class="language-plaintext highlighter-rouge">AD22x</code>: item/reference validation;</li>
+  <li><code class="language-plaintext highlighter-rouge">AD24x</code>–<code class="language-plaintext highlighter-rouge">AD26x</code>: content, media, and cloze validation; and</li>
+  <li><code class="language-plaintext highlighter-rouge">AD30x</code>: destination type-resolution failure.</li>
+</ul>
+
+<p>Validation does not mutate a library. Import remains a deliberate action in
+NeoAnki.</p>
+
+<h2 id="why-not-yaml-or-a-custom-dsl">Why not YAML or a custom DSL</h2>
+
+<p>YAML offers pleasant block strings, but introduces indentation and implicit
+typing failures, a native parser dependency, and a larger untrusted-input
+surface. A safe profile would still need to disable aliases, tags, merge keys,
+directives, and graph features.</p>
+
+<p>A custom DSL could eventually improve terseness and multiline ergonomics, but
+would require a permanent parser, formatter, fuzz corpus, compatibility policy,
+and editor tooling. It should be considered only if real JSONL authoring data
+shows a material token or repair-cost disadvantage.</p>
+
+<p>JSONL is intentionally conservative: current agents already know it, existing
+tools inspect it, and NeoAnki can focus its complexity on semantic validation
+and safe import.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+              <a class="article-previous" href="/neoanki2/PORTABLE_DECK_FORMAT/"><span>Previous</span>Portable deck format</a>
+            
+            
+              <a class="article-next" href="/neoanki2/schemas/"><span>Next</span>JSON Schemas</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

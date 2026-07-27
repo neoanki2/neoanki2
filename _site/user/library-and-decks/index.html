@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Library and decks · NeoAnki2</title>
+    <meta name="description" content="Create, nest, rename, select, and safely remove decks while understanding All Decks and Unassigned.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/user/library-and-decks/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Library and decks">
+    <meta property="og:description" content="Create, nest, rename, select, and safely remove decks while understanding All Decks and Unassigned.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/user/library-and-decks/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/user/tasks/" aria-current="location">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/" aria-current="page">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/user/tasks/">Tasks</a></li>
+              
+              <li><span aria-current="page">Library and decks</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="library-and-decks">Library and decks</h1>
+
+<p>The sidebar controls which items and due cards appear in the detail area.
+Decks organize items without changing their item type or generated cards.</p>
+
+<p><a href="/neoanki2/assets/screenshots/library-populated.png"><img src="/neoanki2/assets/screenshots/library-populated.png" alt="A populated library and its item list" /></a></p>
+
+<h2 id="choose-a-scope">Choose a scope</h2>
+
+<p>Use one of the three kinds of sidebar row:</p>
+
+<ul>
+  <li><strong>All Decks</strong> shows every item, including items that have no deck.</li>
+  <li>A <strong>deck</strong> shows items in that deck and all of its descendant subdecks.
+Starting a study session here uses the same recursive scope.</li>
+  <li><strong>Unassigned</strong> shows only items with no deck.</li>
+</ul>
+
+<p>Changing scope reloads both the item list and due-card count. Sidebar captions
+show direct item counts for each named deck and recursive due counts for that
+deck and its descendants. <strong>Unassigned</strong> reports its item and due counts
+separately.</p>
+
+<p>The detail title reflects the selected scope. <strong>Study</strong> is enabled only when
+that scope has due cards; its badge shows the due count.</p>
+
+<h2 id="create-a-top-level-deck">Create a top-level deck</h2>
+
+<ol>
+  <li>Choose the <strong>+</strong> button in the deck sidebar toolbar.</li>
+  <li>Enter a non-empty name.</li>
+  <li>Choose <strong>Create</strong>.</li>
+</ol>
+
+<p>Leading and trailing whitespace is removed. The new deck becomes the selected
+scope. Choosing <strong>Cancel</strong> leaves the tree unchanged.</p>
+
+<h2 id="create-nested-decks">Create nested decks</h2>
+
+<ol>
+  <li>Control-click or right-click the intended parent deck.</li>
+  <li>Choose <strong>New Subdeck</strong>.</li>
+  <li>Enter a name and choose <strong>Create</strong>.</li>
+</ol>
+
+<p>Parents with children appear as disclosure groups. Expand or collapse them to
+navigate the hierarchy.</p>
+
+<p><a href="/neoanki2/assets/screenshots/decks-nested.png"><img src="/neoanki2/assets/screenshots/decks-nested.png" alt="Nested decks in the sidebar" /></a></p>
+
+<p>Selecting a parent includes content in every level below it. Selecting a child
+limits the list and study session to that child’s subtree.</p>
+
+<h2 id="rename-a-deck">Rename a deck</h2>
+
+<ol>
+  <li>Control-click or right-click the deck.</li>
+  <li>Choose <strong>Rename</strong>.</li>
+  <li>Edit the name and choose <strong>Save</strong>.</li>
+</ol>
+
+<p>Names cannot be empty after trimming whitespace. Renaming changes the label,
+not the deck’s items or hierarchy. Choose <strong>Cancel</strong> to retain the old name.</p>
+
+<h2 id="delete-a-deck-safely">Delete a deck safely</h2>
+
+<ol>
+  <li>Control-click or right-click the deck.</li>
+  <li>Choose <strong>Delete</strong>.</li>
+  <li>Read the confirmation and choose <strong>Delete Deck</strong>.</li>
+</ol>
+
+<p>Deleting a deck does <strong>not</strong> delete its items or subdecks:</p>
+
+<ul>
+  <li>Items directly in the deleted deck move to its parent.</li>
+  <li>If the deleted deck was top-level, its direct items become unassigned.</li>
+  <li>Direct subdecks move to the deleted deck’s parent.</li>
+  <li>If the deleted deck was top-level, its direct subdecks become top-level.</li>
+</ul>
+
+<p>The operation preserves the rest of each nested subtree. Cancel the
+confirmation or press Escape to keep the deck unchanged. If the deleted deck
+was selected, NeoAnki2 returns to <strong>All Decks</strong>.</p>
+
+<h2 id="put-new-items-in-a-deck">Put new items in a deck</h2>
+
+<p>When a named deck is selected, <strong>Add Item</strong> preselects that deck. From <strong>All
+Decks</strong> or <strong>Unassigned</strong>, a new item defaults to <strong>Unassigned</strong>. If the
+library has decks, use the Deck picker in the add form to choose any deck or
+Unassigned before saving.</p>
+
+<p>The <strong>Unassigned</strong> empty state intentionally has no Add Item button; use the
+toolbar’s <strong>Add Item</strong> action instead.</p>
+
+<h2 id="move-an-existing-item">Move an existing item</h2>
+
+<ol>
+  <li>Select the item in the list.</li>
+  <li>In item detail, open the <strong>Deck</strong> menu.</li>
+  <li>Choose another deck or <strong>Unassigned</strong>.</li>
+</ol>
+
+<p>The move happens immediately; there is no separate Save button. Counts and
+the current scoped list refresh after the move. If the destination is outside
+the active scope, return to the list or choose the destination scope to find
+the item.</p>
+
+<h2 id="understand-the-item-list">Understand the item list</h2>
+
+<p>Each row shows:</p>
+
+<ul>
+  <li>content from the item’s first field as its title</li>
+  <li>content from the second field as its subtitle</li>
+  <li>the number of generated cards and the item type name</li>
+</ul>
+
+<p>For media fields, the description is used when available; otherwise the media
+kind is shown. Cloze text is shown with its blanks concealed. Select a row for
+the complete field preview and item actions.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+            
+              <a class="article-next" href="/neoanki2/user/authoring-items/"><span>Next</span>Authoring items</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

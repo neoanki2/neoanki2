@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Product · NeoAnki2</title>
+    <meta name="description" content="Review NeoAnki2 product goals, user workflows, requirements, and deliberate scope boundaries.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/PRODUCT/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Product">
+    <meta property="og:description" content="Review NeoAnki2 product goals, user workflows, requirements, and deliberate scope boundaries.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/PRODUCT/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/reference/" aria-current="location">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/" aria-current="page">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/reference/">Reference</a></li>
+              
+              <li><span aria-current="page">Product</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="product">Product</h1>
+
+<!-- impeccable:product-schema 1 -->
+
+<h2 id="platform">Platform</h2>
+
+<p>adaptive</p>
+
+<p>macOS is the primary shipping target today (Swift 6 / SwiftUI). iOS and iPadOS
+are planned later, sharing <code class="language-plaintext highlighter-rouge">NeoAnkiCore</code>. UI work should follow Apple HIG per
+platform; Mac conventions (split navigation, menus, keyboard study flow) take
+priority until a mobile shell exists.</p>
+
+<h2 id="users">Users</h2>
+
+<p><strong>Primary:</strong> The builder as a general learner — someone who wants spaced
+repetition to feel approachable, not intimidating. Clarity, calm layout, and
+plain language matter more than power-user density or feature sprawl.</p>
+
+<p><strong>Secondary (future):</strong> SRS-literate learners who outgrow Anki’s legacy model
+and want a native alternative; they will tolerate more density once core flows
+are obvious.</p>
+
+<p><strong>Situation:</strong> Solo study at a desk on Mac — short daily review sessions,
+occasionally adding new items. Success means finishing due cards without
+confusion and trusting that scheduling “just works.”</p>
+
+<h2 id="product-purpose">Product Purpose</h2>
+
+<p>NeoAnki2 helps you remember what you choose to learn by turning structured
+knowledge into atomic retrieval practice, scheduled with modern memory science.</p>
+
+<p><strong>Success looks like:</strong></p>
+
+<ul>
+  <li>Due cards are reviewed in a clear, low-friction loop (prompt → respond → grade).</li>
+  <li>Adding items is understandable without reading architecture docs.</li>
+  <li>Scheduling adapts via FSRS without manual ease tuning.</li>
+  <li>The app feels like a native Mac tool, not a prototype web view.</li>
+</ul>
+
+<h2 id="positioning">Positioning</h2>
+
+<p>A ground-up native spaced-repetition app where <strong>content is SwiftUI data, not
+documents</strong> — no HTML/CSS cards, no template markup, no sanitization layer.
+Knowledge is domain-neutral (<code class="language-plaintext highlighter-rouge">ItemType</code>, <code class="language-plaintext highlighter-rouge">FieldDef</code>, <code class="language-plaintext highlighter-rouge">Template</code>); anatomy,
+music, and chemistry are user-declared schemas, not baked-in types. FSRS sits
+behind a swappable <code class="language-plaintext highlighter-rouge">Scheduler</code> protocol. A neighboring product cannot truthfully
+claim all three without abandoning its legacy model.</p>
+
+<p>On first run the app offers a neutral <code class="language-plaintext highlighter-rouge">Basic</code> starter so adding an item requires
+no setup. It is ordinary user-owned schema data: it can be deleted, its one-time
+seed is persisted, and later launches do not recreate it. <code class="language-plaintext highlighter-rouge">NeoAnkiCore</code> clients
+can choose an empty starter set.</p>
+
+<h2 id="operating-context">Operating Context</h2>
+
+<ul>
+  <li><strong>Environment:</strong> macOS desktop, single-user, local SQLite store
+(<code class="language-plaintext highlighter-rouge">AppDatabase.defaultURL</code>).</li>
+  <li><strong>Core workflows today:</strong>
+    <ol>
+      <li>Browse items in the main window</li>
+      <li>Add an item via form (fields from a selected item type)</li>
+      <li>Study due cards in the main detail pane (reveal → Again/Hard/Good/Easy)</li>
+      <li>Manage item types/templates and import JSON or CSV from the native shell</li>
+    </ol>
+  </li>
+  <li><strong>Architecture split:</strong> <code class="language-plaintext highlighter-rouge">NeoAnkiCore</code> (domain, scheduling, persistence);
+<code class="language-plaintext highlighter-rouge">NeoAnki2</code> (SwiftUI shell). See <a href="/neoanki2/ARCHITECTURE/"><code class="language-plaintext highlighter-rouge">ARCHITECTURE.md</code></a> for the three-layer model.</li>
+  <li><strong>Dev verification:</strong> <code class="language-plaintext highlighter-rouge">./Scripts/test-fast.sh</code> for unit/flow tests; UI tests
+are CI/manual unless explicitly requested.</li>
+</ul>
+
+<h2 id="capabilities-and-constraints">Capabilities and Constraints</h2>
+
+<h3 id="confirmed-user--repository">Confirmed (user + repository)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Area</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Native <code class="language-plaintext highlighter-rouge">ContentValue</code> rendering</td>
+      <td>Required — no HTML/CSS templates</td>
+    </tr>
+    <tr>
+      <td>Domain-neutral schema</td>
+      <td>Required — no subject in core types</td>
+    </tr>
+    <tr>
+      <td>FSRS scheduling</td>
+      <td>Required — no SM-2 / ease hell</td>
+    </tr>
+    <tr>
+      <td>Keyboard study flow on Mac</td>
+      <td>Required — grade and navigate without mouse-only dependency</td>
+    </tr>
+    <tr>
+      <td>Minimal system-native UI</td>
+      <td>Required — semantic SwiftUI, no heavy custom chrome</td>
+    </tr>
+    <tr>
+      <td>macOS first</td>
+      <td>Current focus; shared core for future iOS/iPad</td>
+    </tr>
+    <tr>
+      <td>Item list + add + study session</td>
+      <td>Implemented (early)</td>
+    </tr>
+    <tr>
+      <td>Text/rich/number content display</td>
+      <td>Implemented</td>
+    </tr>
+    <tr>
+      <td>Media display (audio/image/gif/video)</td>
+      <td>Implemented — sandbox <code class="language-plaintext highlighter-rouge">MediaStore</code>, study + preview</td>
+    </tr>
+    <tr>
+      <td>Cloze display + authoring</td>
+      <td>Implemented — <code class="language-plaintext highlighter-rouge">FieldType.cloze</code>, structured blanks (no markup)</td>
+    </tr>
+    <tr>
+      <td>Deck organization UI</td>
+      <td>Implemented</td>
+    </tr>
+    <tr>
+      <td>Multiple item types / template authoring UI</td>
+      <td>Implemented</td>
+    </tr>
+    <tr>
+      <td>Native JSON/CSV import (core)</td>
+      <td>Implemented — text fields; media paths + cloze objects in JSON</td>
+    </tr>
+    <tr>
+      <td>Import UI</td>
+      <td>Implemented — File menu/import sheet with JSON and CSV file selection</td>
+    </tr>
+    <tr>
+      <td>Anki import (<code class="language-plaintext highlighter-rouge">.apkg</code>, shared decks)</td>
+      <td><strong>Non-goal</strong> per <a href="/neoanki2/ARCHITECTURE/"><code class="language-plaintext highlighter-rouge">ARCHITECTURE.md</code></a> — clean schema over migration</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="terminology-product-facing">Terminology (product-facing)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Term</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Item</td>
+      <td>One record of knowledge (field values for an item type)</td>
+    </tr>
+    <tr>
+      <td>Item type</td>
+      <td>User-declared schema: fields + templates</td>
+    </tr>
+    <tr>
+      <td>Card</td>
+      <td>One retrieval probe generated from an item × template</td>
+    </tr>
+    <tr>
+      <td>Study session</td>
+      <td>Reviewing due cards sequentially</td>
+    </tr>
+    <tr>
+      <td>Again / Hard / Good / Easy</td>
+      <td>FSRS review grades (1–4)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="open-decisions">Open decisions</h3>
+
+<ul>
+  <li>iOS/iPad interaction model (touch targets, navigation) — deferred until Mac shell is coherent</li>
+</ul>
+
+<h2 id="brand-commitments">Brand Commitments</h2>
+
+<ul>
+  <li><strong>Name:</strong> NeoAnki2</li>
+  <li><strong>Voice:</strong> Calm, direct, learner-facing — explain SRS terms when first shown; avoid jargon in errors</li>
+  <li><strong>Visual stance:</strong> System-native minimalism; SF Symbols; semantic colors and Dynamic Type</li>
+  <li><strong>Explicit non-goals:</strong> No gamification, no hype, no “productivity theater”</li>
+</ul>
+
+<h2 id="evidence-on-hand">Evidence on Hand</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Asset</th>
+      <th>Location</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Architecture &amp; philosophy</td>
+      <td><a href="/neoanki2/ARCHITECTURE/"><code class="language-plaintext highlighter-rouge">ARCHITECTURE.md</code></a></td>
+    </tr>
+    <tr>
+      <td>Visual design system</td>
+      <td><a href="/neoanki2/DESIGN/"><code class="language-plaintext highlighter-rouge">DESIGN.md</code></a></td>
+    </tr>
+    <tr>
+      <td>Product context</td>
+      <td><a href="/neoanki2/PRODUCT/"><code class="language-plaintext highlighter-rouge">PRODUCT.md</code></a></td>
+    </tr>
+    <tr>
+      <td>Documentation index</td>
+      <td><a href="/neoanki2/">Documentation home</a></td>
+    </tr>
+    <tr>
+      <td>Project overview</td>
+      <td><a href="https://github.com/neoanki2/neoanki2#readme">Repository README</a></td>
+    </tr>
+    <tr>
+      <td>Runnable macOS app</td>
+      <td><code class="language-plaintext highlighter-rouge">Sources/NeoAnki2/</code></td>
+    </tr>
+    <tr>
+      <td>Domain package</td>
+      <td><code class="language-plaintext highlighter-rouge">NeoAnkiCore/</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Do not fabricate:</strong> testimonials, user counts, benchmark claims, pricing,
+shared-deck catalogs, or Anki compatibility promises.</p>
+
+<h2 id="product-principles">Product Principles</h2>
+
+<ol>
+  <li><strong>Clarity over cleverness</strong> — if a learner must read docs to use a screen, the screen failed.</li>
+  <li><strong>Native data, native UI</strong> — content and presentation stay in Swift/SwiftUI; no document pipeline.</li>
+  <li><strong>Domain stays out of the core</strong> — new subjects are data, not code changes.</li>
+  <li><strong>Scheduling is invisible until it isn’t</strong> — FSRS runs quietly; surface stats only when they help trust.</li>
+  <li><strong>Mac-first craft</strong> — menus, keyboard, and window structure should match platform expectations before mobile adaptation.</li>
+</ol>
+
+<h2 id="accessibility--inclusion">Accessibility &amp; Inclusion</h2>
+
+<ul>
+  <li>VoiceOver labels on all interactive controls (not just test identifiers)</li>
+  <li>Dynamic Type and Increased Contrast supported via semantic system styles</li>
+  <li>Keyboard-only path through add-item and study flows</li>
+  <li>Plain-language error messages; never color alone for state</li>
+  <li>Reduce Motion honored for custom transitions and media autoplay</li>
+</ul>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+            
+              <a class="article-next" href="/neoanki2/ARCHITECTURE/"><span>Next</span>Architecture</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

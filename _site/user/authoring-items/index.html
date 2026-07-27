@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Authoring items · NeoAnki2</title>
+    <meta name="description" content="Create, edit, move, and delete structured study items without losing track of their generated cards.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/user/authoring-items/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Authoring items">
+    <meta property="og:description" content="Create, edit, move, and delete structured study items without losing track of their generated cards.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/user/authoring-items/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/user/tasks/" aria-current="location">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/" aria-current="page">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/user/tasks/">Tasks</a></li>
+              
+              <li><span aria-current="page">Authoring items</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="authoring-items">Authoring items</h1>
+
+<p>An item stores one structured fact or prompt. Its item type determines the
+fields you fill in and the templates that generate study cards.</p>
+
+<h2 id="add-an-item">Add an item</h2>
+
+<ol>
+  <li>Select the destination deck if you want the new item preassigned there.</li>
+  <li>Choose <strong>Add Item</strong> in the empty state or toolbar, or press Command-N.</li>
+  <li>If more than one item type exists, choose a <strong>Type</strong>.</li>
+  <li>If decks exist, choose a <strong>Deck</strong> or <strong>Unassigned</strong>.</li>
+  <li>Complete the required fields.</li>
+  <li>Choose <strong>Save</strong> or press Return when Save is enabled.</li>
+</ol>
+
+<p><a href="/neoanki2/assets/screenshots/item-add.png"><img src="/neoanki2/assets/screenshots/item-add.png" alt="The Add Item form" /></a></p>
+
+<p>The first text-capable field receives keyboard focus. Tab and Shift-Tab move
+between controls. Switching item type while adding resets the field values for
+the newly selected type.</p>
+
+<p>The selected item type is fixed when the item is created. The current UI
+cannot change an existing item’s type later. To use a different type, create a
+new item and delete the old one after checking the result.</p>
+
+<h2 id="meet-validation-requirements">Meet validation requirements</h2>
+
+<p>Fields marked <strong>(optional)</strong> may be left empty. All other fields are required,
+and whitespace-only text does not count as content. Save remains disabled
+until the visible required content is present.</p>
+
+<p>Additional content rules are checked when needed:</p>
+
+<ul>
+  <li>A required number must parse as a numeric value.</li>
+  <li>A required cloze field needs text and at least one valid marked blank.</li>
+  <li>Every attached image or GIF needs a non-empty image description, even when
+the media field itself is optional.</li>
+  <li>A required media field needs an attached file of its declared kind.</li>
+</ul>
+
+<p>If saving fails, the form remains open and displays an error. Correct the
+field and save again.</p>
+
+<h2 id="use-text-and-rich-text">Use text and rich text</h2>
+
+<p>Text-capable fields provide a native editor and formatting toolbar. Select
+text, then toggle <strong>Bold</strong>, <strong>Italic</strong>, <strong>Underline</strong>, <strong>Strikethrough</strong>,
+<strong>Highlight</strong>, or <strong>Code</strong>. A plain Text field stores ordinary text when no
+formatting is used and preserves semantic rich spans when styles are applied;
+a Rich Text field always stores rich spans.</p>
+
+<p><a href="/neoanki2/assets/screenshots/item-rich-text.png"><img src="/neoanki2/assets/screenshots/item-rich-text.png" alt="Rich-text formatting while authoring" /></a></p>
+
+<p>Formatting is native data, not HTML or CSS. See <a href="../content-and-media/">Content and
+media</a> for number, cloze, and media procedures.</p>
+
+<h2 id="cancel-or-discard">Cancel or discard</h2>
+
+<p>While adding a new item, <strong>Cancel</strong> immediately closes the form and discards
+the unsaved item.</p>
+
+<p>While editing an existing item:</p>
+
+<ul>
+  <li><strong>Cancel</strong> closes immediately if nothing changed.</li>
+  <li>If fields changed, NeoAnki2 asks <strong>Discard item changes?</strong></li>
+  <li>Choose <strong>Keep Editing</strong> to return to the form.</li>
+  <li>Choose <strong>Discard Changes</strong> to restore the saved item and close the editor.</li>
+</ul>
+
+<p>Saving closes the form and refreshes the current library scope.</p>
+
+<h2 id="open-item-detail">Open item detail</h2>
+
+<p>Select an item row to open its detail view.</p>
+
+<p><a href="/neoanki2/assets/screenshots/item-detail.png"><img src="/neoanki2/assets/screenshots/item-detail.png" alt="An item's detail view" /></a></p>
+
+<p>The preview displays non-empty fields in item-type order. The first two fields
+receive prompt-and-answer emphasis; later fields include their field names.
+Below the preview, NeoAnki2 shows the generated card count and item type.</p>
+
+<p>Use the Deck menu here to move the item immediately. Deck assignment is not
+part of the edit sheet.</p>
+
+<h2 id="edit-an-item">Edit an item</h2>
+
+<ol>
+  <li>Open item detail.</li>
+  <li>Choose <strong>Edit</strong>.</li>
+  <li>Change field content.</li>
+  <li>Choose <strong>Save</strong>.</li>
+</ol>
+
+<p>Editing preserves the item’s type, tags, and deck assignment while rebuilding
+field values from the form. Generated cards are reconciled: cards whose
+generation conditions or cloze groups still exist preserve their identity and
+history, while cards that no longer generate are deleted. Recreating removed
+content later creates a new, never-reviewed card. The item type picker and deck
+picker are therefore absent. After saving, the detail preview and library row
+update.</p>
+
+<h2 id="delete-an-item">Delete an item</h2>
+
+<ol>
+  <li>Open item detail.</li>
+  <li>Choose <strong>Delete</strong>.</li>
+  <li>Confirm with <strong>Delete Item</strong>.</li>
+</ol>
+
+<p>The confirmation states how many generated study cards will also be removed.
+Deleting an item removes the item and its generated cards; it cannot be undone.
+Append-only review logs are retained for history integrity, but no longer belong
+to an active card. Outcomes that were not undone can still contribute to later
+scheduling optimization. Media no longer referenced by any item is eligible
+for cleanup. Choose <strong>Cancel</strong> to keep the item.</p>
+
+<p>Deleting a deck is different: it moves contained items and does not delete
+them.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+              <a class="article-previous" href="/neoanki2/user/library-and-decks/"><span>Previous</span>Library and decks</a>
+            
+            
+              <a class="article-next" href="/neoanki2/user/content-and-media/"><span>Next</span>Content and media</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

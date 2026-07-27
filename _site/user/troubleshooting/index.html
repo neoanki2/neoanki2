@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Troubleshooting · NeoAnki2</title>
+    <meta name="description" content="Match NeoAnki2 app symptoms to safe recovery steps without risking the local library.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/user/troubleshooting/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Troubleshooting">
+    <meta property="og:description" content="Match NeoAnki2 app symptoms to safe recovery steps without risking the local library.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/user/troubleshooting/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/user/troubleshooting/" aria-current="page">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/" aria-current="page">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/" aria-current="page">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/user/troubleshooting/">Troubleshoot</a></li>
+              
+              <li><span aria-current="page">Troubleshooting</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="troubleshooting">Troubleshooting</h1>
+
+<p>NeoAnki2 reports recoverable problems in an error banner or alert. With
+VoiceOver, the message is announced and focused. Read the complete message
+before retrying; it normally identifies the missing file, invalid field, data
+requirement, or unavailable action.</p>
+
+<h2 id="find-your-symptom">Find your symptom</h2>
+
+<ul>
+  <li><strong>A Terminal command, build, signing step, or launch failed:</strong> use <a href="../support/">Build,
+launch, and support</a>.</li>
+  <li><strong>The app says Could Not Start:</strong> see <a href="#startup-problems">Startup problems</a>.</li>
+  <li><strong>The app looks empty, loading, or caught up:</strong> see <a href="#empty-and-loading-states">Empty and loading
+states</a>.</li>
+  <li><strong>Import or export failed:</strong> see <a href="#import-and-export-errors">Import and export errors</a>.</li>
+  <li><strong>An item, cloze, or media file cannot be saved:</strong> see <a href="#item-and-media-errors">Item and media
+errors</a>.</li>
+  <li><strong>Recording is unavailable:</strong> see <a href="#microphone-and-recording">Microphone and recording</a>.</li>
+  <li><strong>Study or optimization shows a message:</strong> see <a href="#study-and-scheduling-messages">Study and scheduling
+messages</a>.</li>
+  <li><strong>You need to report a reproducible bug:</strong> follow <a href="../support/#report-an-issue-safely">safe issue-report and
+redaction guidance</a>.</li>
+</ul>
+
+<h2 id="where-the-library-is-stored">Where the library is stored</h2>
+
+<p>The normal library is local to your macOS user account:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>~/Library/Application Support/neoanki2/
+  neoanki2.sqlite
+  media/
+</code></pre></div></div>
+
+<p>The SQLite file contains decks, item types, items, generated cards, review
+history, and scheduling state. Imported media is copied into the adjacent
+managed <code class="language-plaintext highlighter-rouge">media</code> directory with content-addressed filenames.</p>
+
+<p>For a safe manual backup:</p>
+
+<ol>
+  <li>Quit NeoAnki2 completely.</li>
+  <li>Copy the entire <code class="language-plaintext highlighter-rouge">neoanki2</code> folder, including the database and <code class="language-plaintext highlighter-rouge">media</code>.</li>
+  <li>Keep the copy on a reliable, access-controlled volume.</li>
+</ol>
+
+<p>Do not edit the database, rename managed media, replace individual files while
+the app is running, or open a <code class="language-plaintext highlighter-rouge">.neodeck</code> as the library database. A <code class="language-plaintext highlighter-rouge">.neodeck</code>
+omits learner progress and is not a complete backup.</p>
+
+<p>To restore a complete backup safely:</p>
+
+<ol>
+  <li>Quit NeoAnki2 and confirm no Terminal-attached instance remains.</li>
+  <li>In <code class="language-plaintext highlighter-rouge">~/Library/Application Support/</code>, rename the current <code class="language-plaintext highlighter-rouge">neoanki2</code> folder to
+a dated name such as <code class="language-plaintext highlighter-rouge">neoanki2-damaged-2026-07-27</code>. Preserve it until the
+restore is verified.</li>
+  <li>Copy the backed-up <strong>whole</strong> <code class="language-plaintext highlighter-rouge">neoanki2</code> folder into Application Support.
+Do not merge individual database or media files.</li>
+  <li>Confirm your macOS account can read and write the restored folder.</li>
+  <li>Launch the same or a newer compatible NeoAnki2 source revision. Check
+<strong>All Decks</strong>, open an item containing media, and confirm due counts appear.</li>
+  <li>If verification fails, quit immediately, preserve the failed restored copy,
+and put the renamed original folder back before seeking support.</li>
+</ol>
+
+<p>Do not use a build older than the one that last opened the backup. Cloud-syncing
+the live folder while NeoAnki2 is running has not been validated as a backup
+method.</p>
+
+<h2 id="startup-problems">Startup problems</h2>
+
+<p>During launch, <strong>Starting…</strong> is normal briefly. <strong>Could Not Start</strong> means the
+library could not be opened or bootstrapped.</p>
+
+<p><a href="/neoanki2/assets/screenshots/error-startup.png"><img src="/neoanki2/assets/screenshots/error-startup.png" alt="Could Not Start state with a local-library error" /></a></p>
+
+<ul>
+  <li><strong>Couldn’t open your library:</strong> confirm the Application Support folder is
+available and writable. If it is on redirected or managed storage, restore
+normal access, then relaunch.</li>
+  <li><strong>Created by a newer version:</strong> do not force it open with an older build.
+Return to the newer compatible build or restore a backup made by this build.</li>
+  <li><strong>Couldn’t read this library / database may be damaged:</strong> quit the app,
+preserve the current folder as evidence, and restore a known-good complete
+backup. Do not run ad hoc SQLite repair commands on your only copy.</li>
+  <li><strong>Some library data couldn’t be read:</strong> preserve the library and restore a
+backup or seek support. Item Types may separately offer a controlled
+<strong>Archive Original and Repair</strong> action for an unreadable type; it preserves
+the damaged definition and does not delete existing items.</li>
+</ul>
+
+<h2 id="empty-and-loading-states">Empty and loading states</h2>
+
+<p>These states are informational:</p>
+
+<ul>
+  <li><strong>No decks yet:</strong> create a top-level deck with <strong>New Deck</strong>. Items may still
+exist under <strong>All Decks</strong> or <strong>Unassigned</strong>.</li>
+  <li><strong>No Items Yet:</strong> add an item; templates generate its cards.</li>
+  <li><strong>No Items in Deck:</strong> add an item while that deck is selected.</li>
+  <li><strong>No Unassigned Items:</strong> every item currently belongs to a deck.</li>
+  <li><strong>No Item Types:</strong> create an item type to define fields and templates.</li>
+  <li><strong>Select an Item Type:</strong> choose a type in the left pane.</li>
+  <li><strong>No Templates:</strong> add a template; an item without templates generates no
+study cards.</li>
+  <li><strong>You’re Caught Up / No cards due:</strong> there is nothing due in the current
+scope. Return later or add items; this is not a scheduling error.</li>
+  <li><strong>Session Complete:</strong> all due cards loaded for that session were handled.</li>
+</ul>
+
+<p><strong>Loading decks…</strong>, <strong>Loading items…</strong>, <strong>Loading item types…</strong>, <strong>Loading due
+cards…</strong>, <strong>Importing…</strong>, <strong>Transferring deck…</strong>, and <strong>Optimizing
+Scheduling…</strong> indicate active work. Avoid starting another transfer. If a state
+never completes, quit normally, relaunch, and retry once.</p>
+
+<h2 id="import-and-export-errors">Import and export errors</h2>
+
+<ul>
+  <li><strong>Choose a JSON or CSV file:</strong> use the File import for <code class="language-plaintext highlighter-rouge">.json</code>/<code class="language-plaintext highlighter-rouge">.csv</code>, or
+<strong>Import Deck…</strong> for <code class="language-plaintext highlighter-rouge">.neodeck</code>/<code class="language-plaintext highlighter-rouge">.neoanki</code>.</li>
+  <li><strong>File larger than 5 MB / row or field limit:</strong> split a JSON or CSV import
+into smaller valid files.</li>
+  <li><strong>No item type named…:</strong> create that item type first or correct JSON’s
+<code class="language-plaintext highlighter-rouge">itemType</code>. CSV lets you choose an existing type in the sheet.</li>
+  <li><strong>Unknown field / required value missing:</strong> make headers and JSON keys match
+the selected type exactly, and supply every required field.</li>
+  <li><strong>Relative media paths:</strong> choose the folder against which those paths
+resolve. Keep every referenced file inside it, with the expected kind and
+supported signature.</li>
+  <li><strong>Could not read/open selected file:</strong> verify it still exists, is a regular
+accessible file, and is not being replaced by another process; choose it
+again.</li>
+  <li><strong>Item Type Conflict:</strong> choose <strong>Use Matching Local Type</strong> only for an exact
+schema match, <strong>Import as New Type</strong> to keep the revision, or <strong>Cancel</strong>.</li>
+  <li><strong>Unsupported portable version / invalid package:</strong> obtain a valid file from
+a compatible NeoAnki2 build. Renaming another file to <code class="language-plaintext highlighter-rouge">.neodeck</code> does not
+convert it.</li>
+  <li><strong>Disk is full / could not export:</strong> free space and choose a writable
+destination. Failed portable transfers are atomic and should not leave
+imported partial content.</li>
+</ul>
+
+<p>Successful JSON, CSV, authored, and portable imports do not deduplicate item
+content. If duplicates were imported, delete the unwanted items manually;
+reimporting again will add more copies.</p>
+
+<h2 id="item-and-media-errors">Item and media errors</h2>
+
+<ul>
+  <li><strong>Required field:</strong> enter a nonblank value. Images and GIFs also require an
+image description for VoiceOver.</li>
+  <li><strong>Invalid item type:</strong> check that field names are unique and templates have
+complete prompt, answer, interaction, and generation settings.</li>
+  <li><strong>Cloze error:</strong> enter text, select at least one character, avoid overlapping
+blanks, and mark again if edits made a saved range stale.</li>
+  <li><strong>Unsupported or ambiguous media:</strong> choose a standard file of the requested
+kind. A filename extension alone is not enough; NeoAnki2 checks file bytes.</li>
+  <li><strong>File too large:</strong> choose a smaller file. Current per-file limits depend on
+media kind.</li>
+  <li><strong>Media file couldn’t be read / invalid location:</strong> confirm the source still
+exists and choose it again. Import only from locations macOS allows the app
+to access.</li>
+  <li><strong>Image unavailable / preview unavailable:</strong> the managed media may be missing
+or unreadable. Restore the complete database-and-media backup together.</li>
+</ul>
+
+<p>Supported authored media is documented in the
+<a href="/neoanki2/AUTHORED_DECK_FORMAT/">authored deck format</a>. Active content such as
+HTML, SVG, scripts, and playlists is intentionally unsupported.</p>
+
+<h2 id="microphone-and-recording">Microphone and recording</h2>
+
+<p>Record cards ask for microphone permission the first time recording starts. If
+access is off, open <strong>System Settings → Privacy &amp; Security → Microphone</strong>,
+enable NeoAnki2, then retry. A managed Mac may show <strong>restricted</strong> access that
+only an administrator can change.</p>
+
+<p>If recording cannot start, check the selected/input microphone in macOS and
+retry. Use <strong>Command-R</strong> to start or stop, and <strong>Command-P</strong> to play back. Study
+recordings are temporary comparison aids: they are created in the system
+temporary directory and removed when replaced, when the card changes, or when
+the study view closes. They are not attached to the item or retained as review
+history.</p>
+
+<h2 id="study-and-scheduling-messages">Study and scheduling messages</h2>
+
+<ul>
+  <li><strong>Enter an answer, or reveal it to self-grade:</strong> type a nonblank response, or
+use Right Arrow.</li>
+  <li><strong>No usable answer options / nothing to arrange / no checkable answer:</strong> the
+card’s content cannot support automatic checking. Review the revealed answer
+and self-grade; then fix the item or template.</li>
+  <li><strong>There is no recent review to undo:</strong> undo is no longer available for this
+state.</li>
+  <li><strong>Needs at least 100 review outcomes:</strong> keep studying normally. Optimization
+counts usable later reviews in card histories, not simply every button press.</li>
+  <li><strong>Parameters couldn’t be tuned or saved:</strong> current parameters remain in use.
+Accumulate more history, verify storage is writable, and retry later.</li>
+</ul>
+
+<p>All current interaction types—reveal, type, choose, record, cloze, and
+arrange—are supported. Automatic correctness checking can still be unavailable
+when a card lacks suitable answer content; grading remains self-assessed.</p>
+
+<h2 id="intentional-limitations">Intentional limitations</h2>
+
+<p>NeoAnki2 currently has no Anki <code class="language-plaintext highlighter-rouge">.apkg</code>/<code class="language-plaintext highlighter-rouge">.colpkg</code> import or export, shared-deck
+catalog, HTML/CSS rendering, `` templates, progress-bearing portable
+export, or legacy SM-2 scheduler. Do not work around these limits by renaming
+files or injecting HTML into text fields.</p>
+
+<hr />
+
+<p><strong>Next:</strong> <a href="../support/">Build, launch, and issue-report support</a></p>
+
+<p><strong>Related:</strong> <a href="../tasks/">Task index</a> · <a href="../shortcuts-accessibility/">Shortcuts and accessibility</a></p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+            
+              <a class="article-next" href="/neoanki2/user/support/"><span>Next</span>Build, launch, and support</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

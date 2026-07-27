@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Authored deck format · NeoAnki2</title>
+    <meta name="description" content="Implement or inspect editable .neoanki bundles, records, validation rules, and safety limits.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/AUTHORED_DECK_FORMAT/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Authored deck format">
+    <meta property="og:description" content="Implement or inspect editable .neoanki bundles, records, validation rules, and safety limits.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/AUTHORED_DECK_FORMAT/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/reference/" aria-current="location">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/" aria-current="page">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/reference/">Reference</a></li>
+              
+              <li><span aria-current="page">Authored deck format</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="neoanki-authored-deck-format-neoanki">NeoAnki Authored Deck Format (<code class="language-plaintext highlighter-rouge">.neoanki</code>)</h1>
+
+<h2 id="1-status-and-purpose">1. Status and purpose</h2>
+
+<p>This document is the normative specification for NeoAnki Authored Deck Format
+version 1. The key words <strong>MUST</strong>, <strong>MUST NOT</strong>, <strong>REQUIRED</strong>, <strong>SHOULD</strong>,
+<strong>SHOULD NOT</strong>, and <strong>MAY</strong> are interpreted as in RFC 2119 and RFC 8174.</p>
+
+<p>The format is an import-only, text-based source representation for coding
+agents and humans. It can declare deck trees, item types, templates, items,
+tags, and local media. It never contains cards, scheduling state, review
+history, statistics, or stable library identifiers.</p>
+
+<p>An authored deck is not <code class="language-plaintext highlighter-rouge">.neodeck</code>. <code class="language-plaintext highlighter-rouge">.neoanki</code> is editable source; <code class="language-plaintext highlighter-rouge">.neodeck</code>
+is the SQLite-based portable interchange format.</p>
+
+<h2 id="2-bundle-layout">2. Bundle layout</h2>
+
+<p>An authored deck MUST be a regular, non-symlink directory whose name ends in
+<code class="language-plaintext highlighter-rouge">.neoanki</code>:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Biology.neoanki/
+  deck.jsonl
+  items/
+    cells-001.jsonl
+  media/
+    cell.webp
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">deck.jsonl</code> is REQUIRED. Item-part paths are explicitly listed by the manifest.
+The <code class="language-plaintext highlighter-rouge">media/</code> directory is optional. Source and media paths MUST remain inside
+the bundle. URLs, absolute paths, <code class="language-plaintext highlighter-rouge">..</code>, symlinks, globs, recursive discovery,
+macros, and executable includes are forbidden.</p>
+
+<p>Every source file MUST be UTF-8 without a byte-order mark. Each nonblank line
+MUST be one complete JSON object. Comments, trailing commas, <code class="language-plaintext highlighter-rouge">NaN</code>, and
+infinities are invalid. Object member names MUST be unique. Unknown members
+are errors.</p>
+
+<h2 id="3-common-representations">3. Common representations</h2>
+
+<p>Author-visible identifiers match:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[A-Za-z][A-Za-z0-9_-]{0,63}
+</code></pre></div></div>
+
+<p>Identifiers are local to one bundle. They are references, not display names,
+UUIDs, or provenance. Import allocates fresh UUIDs.</p>
+
+<p>Names and tags MUST be non-empty after Unicode whitespace trimming. Names and
+tags are limited to 1,024 UTF-8 bytes. JSON array order is semantic for fields,
+templates, slots, rich spans, and tags.</p>
+
+<h2 id="4-manifest-and-source-parts">4. Manifest and source parts</h2>
+
+<p><code class="language-plaintext highlighter-rouge">deck.jsonl</code> MUST contain exactly one manifest record:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"kind"</span><span class="p">:</span><span class="s2">"neoanki"</span><span class="p">,</span><span class="nl">"version"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nl">"root"</span><span class="p">:</span><span class="s2">"biology"</span><span class="p">,</span><span class="nl">"parts"</span><span class="p">:[</span><span class="s2">"items/cells-001.jsonl"</span><span class="p">]}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Members are exact:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">kind</code>: <code class="language-plaintext highlighter-rouge">"neoanki"</code>;</li>
+  <li><code class="language-plaintext highlighter-rouge">version</code>: integer <code class="language-plaintext highlighter-rouge">1</code>;</li>
+  <li><code class="language-plaintext highlighter-rouge">root</code>: identifier of the root deck; and</li>
+  <li><code class="language-plaintext highlighter-rouge">parts</code>: ordered, unique relative paths to <code class="language-plaintext highlighter-rouge">.jsonl</code> item files.</li>
+</ul>
+
+<p><code class="language-plaintext highlighter-rouge">deck.jsonl</code> may otherwise contain only <code class="language-plaintext highlighter-rouge">type</code> and <code class="language-plaintext highlighter-rouge">deck</code> records. Item parts
+may contain only <code class="language-plaintext highlighter-rouge">item</code> records. Record declaration order does not affect name
+resolution.</p>
+
+<h2 id="5-deck-records">5. Deck records</h2>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"kind"</span><span class="p">:</span><span class="s2">"deck"</span><span class="p">,</span><span class="nl">"id"</span><span class="p">:</span><span class="s2">"cells"</span><span class="p">,</span><span class="nl">"name"</span><span class="p">:</span><span class="s2">"Cells"</span><span class="p">,</span><span class="nl">"parent"</span><span class="p">:</span><span class="s2">"biology"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">parent</code> is omitted or <code class="language-plaintext highlighter-rouge">null</code> only on the manifest root deck. Every other deck
+MUST reference a declared parent. Identifiers are unique and the hierarchy
+MUST be acyclic and connected to the root.</p>
+
+<h2 id="6-item-type-records">6. Item-type records</h2>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"type"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Basic"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Basic"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"fields"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="nl">"id"</span><span class="p">:</span><span class="s2">"front"</span><span class="p">,</span><span class="nl">"name"</span><span class="p">:</span><span class="s2">"Front"</span><span class="p">,</span><span class="nl">"type"</span><span class="p">:</span><span class="s2">"text"</span><span class="p">,</span><span class="nl">"required"</span><span class="p">:</span><span class="kc">true</span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="nl">"id"</span><span class="p">:</span><span class="s2">"back"</span><span class="p">,</span><span class="nl">"name"</span><span class="p">:</span><span class="s2">"Back"</span><span class="p">,</span><span class="nl">"type"</span><span class="p">:</span><span class="s2">"richText"</span><span class="p">}</span><span class="w">
+  </span><span class="p">],</span><span class="w">
+  </span><span class="nl">"templates"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"name"</span><span class="p">:</span><span class="s2">"Forward"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"prompt"</span><span class="p">:[{</span><span class="nl">"field"</span><span class="p">:</span><span class="s2">"front"</span><span class="p">}],</span><span class="w">
+      </span><span class="nl">"answer"</span><span class="p">:[{</span><span class="nl">"field"</span><span class="p">:</span><span class="s2">"back"</span><span class="p">}],</span><span class="w">
+      </span><span class="nl">"interaction"</span><span class="p">:</span><span class="s2">"reveal"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"skill"</span><span class="p">:{</span><span class="nl">"input"</span><span class="p">:</span><span class="s2">"text"</span><span class="p">,</span><span class="nl">"output"</span><span class="p">:</span><span class="s2">"text"</span><span class="p">,</span><span class="nl">"operation"</span><span class="p">:</span><span class="s2">"recall"</span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Field <code class="language-plaintext highlighter-rouge">required</code> defaults to <code class="language-plaintext highlighter-rouge">false</code>. Field types are <code class="language-plaintext highlighter-rouge">text</code>, <code class="language-plaintext highlighter-rouge">richText</code>,
+<code class="language-plaintext highlighter-rouge">audio</code>, <code class="language-plaintext highlighter-rouge">image</code>, <code class="language-plaintext highlighter-rouge">gif</code>, <code class="language-plaintext highlighter-rouge">video</code>, <code class="language-plaintext highlighter-rouge">number</code>, and <code class="language-plaintext highlighter-rouge">cloze</code>. Field identifiers are
+unique within their type. Every type needs at least one field and template.</p>
+
+<h3 id="61-template-slots">6.1 Template slots</h3>
+
+<p>A slot has exactly one source:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"field"</span><span class="p">:</span><span class="s2">"front"</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"literal"</span><span class="p">:</span><span class="s2">"Translate: "</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Optional <code class="language-plaintext highlighter-rouge">reveal</code> is <code class="language-plaintext highlighter-rouge">always</code>, <code class="language-plaintext highlighter-rouge">hiddenUntilAnswer</code>, or <code class="language-plaintext highlighter-rouge">blurred</code>; it defaults
+to <code class="language-plaintext highlighter-rouge">always</code>. Optional <code class="language-plaintext highlighter-rouge">media</code> is <code class="language-plaintext highlighter-rouge">default</code>, <code class="language-plaintext highlighter-rouge">autoplay</code>, <code class="language-plaintext highlighter-rouge">playOnTap</code>, or <code class="language-plaintext highlighter-rouge">loop</code>;
+it defaults to <code class="language-plaintext highlighter-rouge">default</code>. Non-default media behavior is valid only on audio,
+GIF, or video fields.</p>
+
+<p><code class="language-plaintext highlighter-rouge">interaction</code> is <code class="language-plaintext highlighter-rouge">reveal</code>, <code class="language-plaintext highlighter-rouge">type</code>, <code class="language-plaintext highlighter-rouge">choose</code>, <code class="language-plaintext highlighter-rouge">record</code>, <code class="language-plaintext highlighter-rouge">cloze</code>, or <code class="language-plaintext highlighter-rouge">arrange</code>.</p>
+
+<p><code class="language-plaintext highlighter-rouge">skill.input</code> and <code class="language-plaintext highlighter-rouge">skill.output</code> are <code class="language-plaintext highlighter-rouge">text</code>, <code class="language-plaintext highlighter-rouge">audio</code>, <code class="language-plaintext highlighter-rouge">image</code>, <code class="language-plaintext highlighter-rouge">video</code>,
+<code class="language-plaintext highlighter-rouge">diagram</code>, <code class="language-plaintext highlighter-rouge">none</code>, <code class="language-plaintext highlighter-rouge">freeResponse</code>, <code class="language-plaintext highlighter-rouge">selection</code>, <code class="language-plaintext highlighter-rouge">spatial</code>, or <code class="language-plaintext highlighter-rouge">sequence</code>.
+<code class="language-plaintext highlighter-rouge">skill.operation</code> is <code class="language-plaintext highlighter-rouge">recognize</code>, <code class="language-plaintext highlighter-rouge">recall</code>, <code class="language-plaintext highlighter-rouge">discriminate</code>, <code class="language-plaintext highlighter-rouge">classify</code>,
+<code class="language-plaintext highlighter-rouge">locate</code>, <code class="language-plaintext highlighter-rouge">order</code>, <code class="language-plaintext highlighter-rouge">apply</code>, <code class="language-plaintext highlighter-rouge">explain</code>, or <code class="language-plaintext highlighter-rouge">reproduce</code>.</p>
+
+<h3 id="62-generation-conditions">6.2 Generation conditions</h3>
+
+<p><code class="language-plaintext highlighter-rouge">generateWhen</code> is optional. It is exactly one of:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"fieldNotEmpty"</span><span class="p">:</span><span class="s2">"audio"</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"fieldEmpty"</span><span class="p">:</span><span class="s2">"hint"</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"all"</span><span class="p">:[{</span><span class="nl">"fieldNotEmpty"</span><span class="p">:</span><span class="s2">"front"</span><span class="p">},{</span><span class="nl">"fieldNotEmpty"</span><span class="p">:</span><span class="s2">"back"</span><span class="p">}]}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"any"</span><span class="p">:[{</span><span class="nl">"fieldNotEmpty"</span><span class="p">:</span><span class="s2">"image"</span><span class="p">},{</span><span class="nl">"fieldNotEmpty"</span><span class="p">:</span><span class="s2">"audio"</span><span class="p">}]}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Condition arrays are non-empty. Every field reference resolves within the
+owning type. Nesting depth is limited to 64.</p>
+
+<h2 id="7-item-records-and-values">7. Item records and values</h2>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"kind"</span><span class="p">:</span><span class="s2">"item"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"deck"</span><span class="p">:</span><span class="s2">"cells"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"type"</span><span class="p">:</span><span class="s2">"Basic"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"fields"</span><span class="p">:{</span><span class="w">
+    </span><span class="nl">"front"</span><span class="p">:{</span><span class="nl">"text"</span><span class="p">:</span><span class="s2">"What powers the cell?"</span><span class="p">,</span><span class="nl">"lang"</span><span class="p">:</span><span class="s2">"en"</span><span class="p">},</span><span class="w">
+    </span><span class="nl">"back"</span><span class="p">:{</span><span class="nl">"rich"</span><span class="p">:[{</span><span class="nl">"text"</span><span class="p">:</span><span class="s2">"The "</span><span class="p">},{</span><span class="nl">"text"</span><span class="p">:</span><span class="s2">"mitochondrion"</span><span class="p">,</span><span class="nl">"styles"</span><span class="p">:[</span><span class="s2">"bold"</span><span class="p">]}]}</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"tags"</span><span class="p">:[</span><span class="s2">"biology"</span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">deck</code> and <code class="language-plaintext highlighter-rouge">type</code> MUST resolve. <code class="language-plaintext highlighter-rouge">fields</code> keys are source field identifiers.
+Unknown fields are errors. A missing optional field or explicit JSON <code class="language-plaintext highlighter-rouge">null</code>
+means empty. Required fields MUST have a non-empty value. <code class="language-plaintext highlighter-rouge">tags</code> is optional.</p>
+
+<p>Values are selected by the declared field type:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="w">
+</span><span class="p">{</span><span class="nl">"text"</span><span class="p">:</span><span class="s2">"plain text"</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"text"</span><span class="p">:</span><span class="s2">"hola"</span><span class="p">,</span><span class="nl">"lang"</span><span class="p">:</span><span class="s2">"es"</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"rich"</span><span class="p">:[{</span><span class="nl">"text"</span><span class="p">:</span><span class="s2">"important"</span><span class="p">,</span><span class="nl">"styles"</span><span class="p">:[</span><span class="s2">"bold"</span><span class="p">,</span><span class="s2">"highlight"</span><span class="p">]}]}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"number"</span><span class="p">:</span><span class="mf">42.5</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"cloze"</span><span class="p">:</span><span class="s2">"Paris is in {{c1::France::country}}."</span><span class="p">}</span><span class="w">
+</span><span class="p">{</span><span class="nl">"media"</span><span class="p">:{</span><span class="nl">"path"</span><span class="p">:</span><span class="s2">"media/paris.webp"</span><span class="p">,</span><span class="nl">"alt"</span><span class="p">:</span><span class="s2">"Map of Paris"</span><span class="p">,</span><span class="nl">"durationMs"</span><span class="p">:</span><span class="mi">1200</span><span class="p">}}</span><span class="w">
+
+</span></code></pre></div></div>
+
+<p>Rich styles are <code class="language-plaintext highlighter-rouge">bold</code>, <code class="language-plaintext highlighter-rouge">italic</code>, <code class="language-plaintext highlighter-rouge">underline</code>, <code class="language-plaintext highlighter-rouge">strikethrough</code>, <code class="language-plaintext highlighter-rouge">highlight</code>,
+and <code class="language-plaintext highlighter-rouge">code</code>; styles cannot repeat within a span.</p>
+
+<p>Cloze markers have the form <code class="language-plaintext highlighter-rouge">{{cN::answer}}</code> or
+<code class="language-plaintext highlighter-rouge">{{cN::answer::hint}}</code>, where <code class="language-plaintext highlighter-rouge">N</code> is a positive integer and <code class="language-plaintext highlighter-rouge">answer</code> is
+non-empty. Import removes the marker syntax and computes Unicode
+extended-grapheme-cluster offsets. Markers cannot nest; answers and hints
+cannot contain <code class="language-plaintext highlighter-rouge">::</code> or <code class="language-plaintext highlighter-rouge">}}</code>.</p>
+
+<p><code class="language-plaintext highlighter-rouge">durationMs</code> is optional and non-negative. <code class="language-plaintext highlighter-rouge">alt</code> is optional. The declared
+field determines media kind.</p>
+
+<h2 id="8-media">8. Media</h2>
+
+<p>Media paths MUST begin with <code class="language-plaintext highlighter-rouge">media/</code>, resolve to regular files beneath the
+bundle’s <code class="language-plaintext highlighter-rouge">media/</code> directory, and remain there after symlink resolution.</p>
+
+<p>NeoAnki verifies extension, file signature, kind, and size; extensions alone
+are not trusted. Supported formats are:</p>
+
+<ul>
+  <li>image: <code class="language-plaintext highlighter-rouge">png</code>, <code class="language-plaintext highlighter-rouge">jpg</code>/<code class="language-plaintext highlighter-rouge">jpeg</code>, <code class="language-plaintext highlighter-rouge">heic</code>, <code class="language-plaintext highlighter-rouge">webp</code>, <code class="language-plaintext highlighter-rouge">tiff</code>;</li>
+  <li>GIF: <code class="language-plaintext highlighter-rouge">gif</code>;</li>
+  <li>audio: <code class="language-plaintext highlighter-rouge">m4a</code>, <code class="language-plaintext highlighter-rouge">mp3</code>, <code class="language-plaintext highlighter-rouge">wav</code>, <code class="language-plaintext highlighter-rouge">aac</code>, <code class="language-plaintext highlighter-rouge">caf</code>; and</li>
+  <li>video: <code class="language-plaintext highlighter-rouge">mp4</code>, <code class="language-plaintext highlighter-rouge">mov</code>, <code class="language-plaintext highlighter-rouge">m4v</code>.</li>
+</ul>
+
+<p>HTML, SVG, scripts, playlists, remote URLs, and embedded base64 are forbidden.
+Media is hashed with SHA-256, deduplicated by verified bytes, reverified
+immediately before adoption, and copied in bounded chunks.</p>
+
+<h2 id="9-validation-and-limits">9. Validation and limits</h2>
+
+<p>Default implementation limits include:</p>
+
+<ul>
+  <li>64 MB per source file and 64 MB across all JSONL source files;</li>
+  <li>1 MiB per JSONL record;</li>
+  <li>1,000 item parts;</li>
+  <li>1,000 decks;</li>
+  <li>256 item types;</li>
+  <li>256 fields and 256 templates per type;</li>
+  <li>100,000 items;</li>
+  <li>256 tags per item;</li>
+  <li>4,096 rich spans;</li>
+  <li>20 MB audio, 10 MB image, 15 MB GIF, and 100 MB video;</li>
+  <li>10,000 media assets; and</li>
+  <li>500 MB total media.</li>
+</ul>
+
+<p>Implementations MAY impose lower limits. Counts, sizes, and sums are checked
+before mutation with overflow-safe arithmetic.</p>
+
+<p>Validation is all-or-nothing. Syntax, exact members, identifiers, references,
+deck topology, type semantics, field values, cloze markers, limits, and media
+are checked before the destination transaction.</p>
+
+<h2 id="10-import-semantics">10. Import semantics</h2>
+
+<p>Import allocates fresh deck and item UUIDs and generates fresh cards through
+the destination’s normal <code class="language-plaintext highlighter-rouge">CardGenerator</code>. Scheduling starts never-reviewed.</p>
+
+<p>Authored types carry no provenance. An exact canonical schema digest reuses the
+lexicographically first matching local type; otherwise import creates a type.
+Changing a schema creates a distinct type. Re-import creates duplicate content
+but reuses an unchanged schema.</p>
+
+<p>Media is staged through reservation records. Item types, decks, items, cards,
+and media references commit in one database transaction. Any failure rolls
+back the database and media reservations.</p>
+
+<h2 id="11-validation-command">11. Validation command</h2>
+
+<p>From the repository:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>swift run <span class="nt">--package-path</span> NeoAnkiCore neoanki-deck validate path/to/Biology.neoanki
+</code></pre></div></div>
+
+<p>Success exits zero. Failure exits nonzero and emits stable compiler-style
+diagnostics:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Biology.neoanki/items/cells-001.jsonl:18: AD222: Item contains unknown field "backs".
+</code></pre></div></div>
+
+<h2 id="12-evolution">12. Evolution</h2>
+
+<p>Version 1 is closed: writers MUST NOT add members or record kinds not defined
+here. Incompatible changes increment the manifest <code class="language-plaintext highlighter-rouge">version</code>. Importers MUST
+reject unsupported versions rather than guessing.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+              <a class="article-previous" href="/neoanki2/DESIGN/"><span>Previous</span>Design system</a>
+            
+            
+              <a class="article-next" href="/neoanki2/PORTABLE_DECK_FORMAT/"><span>Next</span>Portable deck format</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>
