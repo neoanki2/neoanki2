@@ -81,9 +81,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
 
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5))
-        let advancedLabel = app.staticTexts["Advanced"]
-        XCTAssertTrue(advancedLabel.waitForExistence(timeout: 3))
-        advancedLabel.click()
+        advanced.coordinate(withNormalizedOffset: CGVector(dx: 0.025, dy: 0.5)).click()
         XCTAssertTrue(app.descendants(matching: .any)["templateAutomaticSkill"].waitForExistence(timeout: 5))
         captureDocumentationScreenshot(named: "template-advanced", of: app)
     }
