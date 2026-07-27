@@ -1,3 +1,4 @@
+import CryptoKit
 @preconcurrency import XCTest
 
 @MainActor
@@ -117,6 +118,9 @@ class NeoAnkiUITestCase: XCTestCase {
                     filename: "\(name).png",
                     width: dimensions.width,
                     height: dimensions.height,
+                    sha256: SHA256.hash(data: pngData)
+                        .map { String(format: "%02x", $0) }
+                        .joined(),
                     scenario: scenario,
                     expectedVisibleIdentifiers: expectedVisibleIdentifiers
                 ),
@@ -137,6 +141,7 @@ class NeoAnkiUITestCase: XCTestCase {
             let filename: String
             let width: Int
             let height: Int
+            let sha256: String
             let scenario: String
             let expectedVisibleIdentifiers: [String]
         }

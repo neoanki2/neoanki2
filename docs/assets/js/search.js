@@ -76,6 +76,8 @@
       "anki": "apkg import compatibility",
       "backup": "restore library data",
       "flashcard": "card study",
+      "migrate": "import export anki backup transfer",
+      "migration": "import export anki backup transfer",
       "note": "item",
       "notes": "items",
       "picture": "image media",
@@ -92,12 +94,36 @@
     resultList.replaceChildren();
     status.textContent = "";
     panel.hidden = true;
-    input.setAttribute("aria-expanded", "false");
   }
 
   function showPanel() {
     panel.hidden = false;
-    input.setAttribute("aria-expanded", "true");
+  }
+
+  function resultScore(entry, query, terms) {
+    var title = normalize(entry.title);
+    var content = normalize(entry.content);
+    var score = 0;
+
+    if (title === query) {
+      score += 100;
+    } else if (title.startsWith(query)) {
+      score += 60;
+    } else if (title.includes(query)) {
+      score += 40;
+    }
+    if (content.includes(query)) {
+      score += 12;
+    }
+    terms.slice(1).forEach(function (term) {
+      if (title.includes(term)) {
+        score += 16;
+      }
+      if (content.includes(term)) {
+        score += 3;
+      }
+    });
+    return score;
   }
 
   function createSnippet(content, query) {
@@ -149,12 +175,23 @@
     }
 
     var terms = searchTerms(normalizedQuery);
-    var matches = searchIndex.filter(function (entry) {
+    var matches = searchIndex.map(function (entry) {
       var searchable = normalize(entry.title + " " + entry.content);
-      return terms.some(function (term) {
+      var matchesTerm = terms.some(function (term) {
         return searchable.includes(term);
       });
-    }).slice(0, 8);
+      return {
+        entry: entry,
+        score: matchesTerm ? resultScore(entry, normalizedQuery, terms) : 0
+      };
+    }).filter(function (result) {
+      return result.score > 0;
+    }).sort(function (left, right) {
+      return right.score - left.score
+        || left.entry.title.localeCompare(right.entry.title);
+    }).slice(0, 8).map(function (result) {
+      return result.entry;
+    });
 
     showPanel();
     status.textContent = matches.length === 1

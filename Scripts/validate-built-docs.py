@@ -266,6 +266,12 @@ def validate_reference(
     base = urlsplit(base_url)
     if split.netloc and split.netloc != base.netloc:
         return
+    if split.netloc == base.netloc and split.scheme and split.scheme != base.scheme:
+        report(
+            reference.line,
+            f'internal URL must use the configured "{base.scheme}" scheme: "{value}"',
+        )
+        return
 
     current_url = base_url + current_route
     resolved = urlsplit(urljoin(current_url, value))

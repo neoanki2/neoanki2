@@ -27,6 +27,7 @@ done
 
 python3 - "$SOURCE_DIR" "${EXPECTED[@]}" <<'PY'
 import datetime
+import hashlib
 import json
 import pathlib
 import re
@@ -68,6 +69,9 @@ for filename in sorted(expected_files):
     width, height = struct.unpack(">II", header[16:24])
     if entry.get("width") != width or entry.get("height") != height or width <= 0 or height <= 0:
         raise SystemExit(f"Manifest dimensions do not match {filename}")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if entry.get("sha256") != digest:
+        raise SystemExit(f"Manifest SHA-256 does not match {filename}")
     if not isinstance(entry.get("scenario"), str) or not entry["scenario"].strip():
         raise SystemExit(f"Manifest scenario is missing for {filename}")
     identifiers = entry.get("expectedVisibleIdentifiers")

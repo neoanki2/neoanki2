@@ -2,6 +2,13 @@
   "schemaVersion": 1,
   "inventory": {
     "sourceRoots": ["Sources/NeoAnki2"],
+    "fullyMappedSourceRoots": [
+      "NeoAnkiCore/Sources/NeoAnkiCore/Import",
+      "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck",
+      "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck",
+      "NeoAnkiCore/Sources/NeoAnkiCore/Media",
+      "NeoAnkiCore/Sources/NeoAnkiDeckCLI"
+    ],
     "sourceMarkers": ["CommandMenu(", "CommandGroup(", ": Commands {", ": View {", ".keyboardShortcut(", ".accessibilityIdentifier("],
     "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests"],
     "testMarkers": ["func test", "@Test"],
@@ -93,7 +100,7 @@
       "id": "content-media",
       "name": "Image, GIF, audio, and video fields",
       "article": "user/content-and-media.md",
-      "sources": ["Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift"],
+      "sources": ["Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaAsset.swift"],
       "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift", "Tests/NeoAnki2Tests/MediaImageLoaderTests.swift", "Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift"],
       "screenshot": "assets/screenshots/item-media.png"
     },
@@ -193,7 +200,7 @@
       "id": "import-json-csv",
       "name": "Import JSON and CSV items",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/ImportView.swift", "Sources/NeoAnki2/ImportModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportAdapter.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift"],
+      "sources": ["Sources/NeoAnki2/ImportView.swift", "Sources/NeoAnki2/ImportModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportAdapter.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportLimits.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift"],
       "tests": ["UITests/NeoAnki2UITests/ImportExportUITests.swift", "Tests/NeoAnki2Tests/ImportModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ImportAdapterTests.swift"],
       "screenshot": "assets/screenshots/import-sheet.png"
     },
@@ -201,7 +208,7 @@
       "id": "portable-deck",
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift"],
+      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
       "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
@@ -209,7 +216,7 @@
       "id": "authored-deck",
       "name": "Import authored deck bundles",
       "article": "user/import-export.md",
-      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift"],
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift"],
       "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
     },
     {
@@ -229,7 +236,7 @@
     },
     {
       "id": "accessibility",
-      "name": "VoiceOver, focus, contrast, type, and motion",
+      "name": "Accessibility behavior and documented limitations",
       "article": "user/shortcuts-accessibility.md",
       "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/MediaViews.swift", "Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
       "tests": ["Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift", "Tests/NeoAnki2Tests/ContentRenderingTests.swift", "Tests/NeoAnki2Tests/MediaBehaviorTests.swift"]

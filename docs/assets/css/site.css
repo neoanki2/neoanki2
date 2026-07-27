@@ -102,11 +102,16 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .primary-nav a {
   position: relative;
+  display: inline-flex;
+  min-height: 44px;
+  padding-inline: .35rem;
+  align-items: center;
   color: var(--muted);
   font-size: .93rem;
   font-weight: 560;
   text-decoration: none;
 }
+.primary-nav a:focus-visible { outline-offset: -3px; }
 .primary-nav a:hover,
 .primary-nav a.active { color: var(--text); }
 .primary-nav a.active::after {
@@ -136,7 +141,7 @@ a:hover { text-decoration-thickness: 2px; }
 .site-search { position: relative; }
 .site-search input {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   padding: .55rem .75rem;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -229,8 +234,10 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .sidebar li { min-width: 0; }
 .sidebar li a {
-  display: block;
+  display: flex;
+  min-height: 44px;
   padding: .28rem .5rem;
+  align-items: center;
   border-radius: 6px;
   color: var(--muted);
   line-height: 1.4;

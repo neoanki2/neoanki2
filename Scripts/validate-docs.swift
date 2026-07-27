@@ -1,5 +1,6 @@
 #!/usr/bin/env swift
 
+import CryptoKit
 import Foundation
 
 struct Manifest: Decodable {
@@ -10,6 +11,7 @@ struct Manifest: Decodable {
 
 struct Inventory: Decodable {
     let sourceRoots: [String]
+    let fullyMappedSourceRoots: [String]
     let sourceMarkers: [String]
     let testRoots: [String]
     let testMarkers: [String]
@@ -36,6 +38,12 @@ struct ClaimsRegistry: Decodable {
         let contains: [String]
     }
 
+    struct HistoryClaim: Decodable {
+        let article: String
+        let source: String
+        let reviewLogRetention: String
+    }
+
     let schemaVersion: Int
     let media: Evidence
     let itemImport: Evidence
@@ -44,14 +52,16 @@ struct ClaimsRegistry: Decodable {
     let scheduling: Evidence
     let scheduler: Evidence
     let appData: Evidence
-    let history: Evidence
+    let history: HistoryClaim
     let compatibility: Evidence
     let articleAssertions: [ArticleAssertion]
 
     var evidence: [Evidence] {
         [
             media, itemImport, portableDeck, authoredDeck, scheduling,
-            scheduler, appData, history, compatibility,
+            scheduler, appData,
+            Evidence(article: history.article, source: history.source),
+            compatibility,
         ]
     }
 }
@@ -61,6 +71,7 @@ struct ScreenshotManifest: Decodable {
         let filename: String
         let width: Int
         let height: Int
+        let sha256: String
         let scenario: String
         let expectedVisibleIdentifiers: [String]
     }
@@ -127,6 +138,14 @@ for claim in claims.evidence {
     if !exists(claim.source) {
         fail("Claim references missing production source \(claim.source)")
     }
+}
+let historyBehaviorTest = root.appendingPathComponent(
+    "NeoAnkiCore/Tests/NeoAnkiFlowTests/RevertReviewFlowTests.swift"
+)
+if claims.history.reviewLogRetention != "survives-item-and-card-deletion"
+    || (try? String(contentsOf: historyBehaviorTest, encoding: .utf8))?
+        .contains("deletingCardDoesNotDeleteReviewHistory") != true {
+    fail("Review-log retention claim is not backed by its production behavior test")
 }
 for assertion in claims.articleAssertions {
     let articleURL = docs.appendingPathComponent(assertion.article)
@@ -211,6 +230,21 @@ if requireScreenshots {
     if ISO8601DateFormatter().date(from: screenshotManifest.capturedAt) == nil {
         fail("Screenshot manifest capturedAt must be an ISO-8601 timestamp")
     }
+    let ancestryCheck = Process()
+    ancestryCheck.currentDirectoryURL = root
+    ancestryCheck.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    ancestryCheck.arguments = [
+        "merge-base", "--is-ancestor", screenshotManifest.sourceSHA, "HEAD",
+    ]
+    do {
+        try ancestryCheck.run()
+        ancestryCheck.waitUntilExit()
+        if ancestryCheck.terminationStatus != 0 {
+            fail("Screenshot manifest sourceSHA is not an ancestor of the validated revision")
+        }
+    } catch {
+        fail("Could not verify screenshot manifest source revision")
+    }
     let expectedFilenames = Set(
         manifest.features.compactMap(\.screenshot).map {
             URL(fileURLWithPath: $0).lastPathComponent
@@ -227,8 +261,26 @@ if requireScreenshots {
         fail("Screenshot manifest entries do not match feature screenshot coverage")
     }
     for entry in screenshotManifest.screenshots {
-        if entry.width <= 0 || entry.height <= 0 {
-            fail("Screenshot \(entry.filename) has invalid dimensions in manifest")
+        let screenshotURL = docs
+            .appendingPathComponent("assets/screenshots")
+            .appendingPathComponent(entry.filename)
+        guard let png = try? Data(contentsOf: screenshotURL), png.count >= 24,
+              Array(png.prefix(8)) == [137, 80, 78, 71, 13, 10, 26, 10] else {
+            fail("Screenshot \(entry.filename) is missing or is not a PNG")
+            continue
+        }
+        func pngInteger(at offset: Int) -> Int {
+            png[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
+        }
+        if entry.width != pngInteger(at: 16) || entry.height != pngInteger(at: 20)
+            || entry.width <= 0 || entry.height <= 0 {
+            fail("Screenshot \(entry.filename) dimensions do not match its manifest")
+        }
+        let digest = SHA256.hash(data: png)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        if entry.sha256 != digest {
+            fail("Screenshot \(entry.filename) SHA-256 does not match its manifest")
         }
         if entry.scenario.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || entry.expectedVisibleIdentifiers.isEmpty {
@@ -269,6 +321,15 @@ for sourceRoot in manifest.inventory.sourceRoots {
     }
 }
 
+for sourceRoot in manifest.inventory.fullyMappedSourceRoots {
+    for file in inventoryFiles(under: sourceRoot) {
+        let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
+        if !excludedInventoryFiles.contains(relativePath), !mappedSources.contains(relativePath) {
+            fail("Required core/CLI source is missing from docs/features.json: \(relativePath)")
+        }
+    }
+}
+
 for testRoot in manifest.inventory.testRoots {
     for file in inventoryFiles(under: testRoot) {
         let relativePath = file.path.replacingOccurrences(of: root.path + "/", with: "")
@@ -303,6 +364,10 @@ func featureIndex(_ features: [Feature]) -> String {
     user-facing file must map to a guide, implementation evidence, and behavioral
     tests. The screenshot capture harness is explicitly excluded because it verifies
     documentation evidence rather than product behavior.
+
+        Evidence links establish implementation and test ownership; they are not a
+        conformance claim. In particular, the accessibility guide identifies which
+        VoiceOver, text-size, contrast, and end-to-end checks still require manual testing.
 
     {% assign source_revision = site.data.build.commit_sha | default: site.documentation.revision %}
 
