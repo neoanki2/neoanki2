@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DeckBuilderSheet: View {
     let registry: DeckBuilderRegistry
+    let context: DeckBuilderHostContext
     let isImporting: Bool
     let onGenerated: @MainActor (GeneratedDeckBundle) -> Void
     let onCancel: @MainActor () -> Void
@@ -11,11 +12,13 @@ struct DeckBuilderSheet: View {
 
     init(
         registry: DeckBuilderRegistry,
+        context: DeckBuilderHostContext,
         isImporting: Bool,
         onGenerated: @escaping @MainActor (GeneratedDeckBundle) -> Void,
         onCancel: @escaping @MainActor () -> Void
     ) {
         self.registry = registry
+        self.context = context
         self.isImporting = isImporting
         self.onGenerated = onGenerated
         self.onCancel = onCancel
@@ -26,7 +29,11 @@ struct DeckBuilderSheet: View {
         NavigationStack {
             if let selectedBuilderID,
                let feature = registry.feature(id: selectedBuilderID) {
-                feature.makeView(onGenerated: onGenerated, onCancel: onCancel)
+                feature.makeView(
+                    context: context,
+                    onGenerated: onGenerated,
+                    onCancel: onCancel
+                )
                     .disabled(isImporting)
                     .toolbar {
                         ToolbarItem(placement: .navigation) {

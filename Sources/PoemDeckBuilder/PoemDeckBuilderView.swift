@@ -15,8 +15,9 @@ public enum PoemDeckBuilderFeature {
         workspaceProvider: any DeckBuildWorkspaceProviding = SystemDeckBuildWorkspaceProvider(),
         limits: AuthoredDeckLimits = .default
     ) -> AnyDeckBuilderFeature {
-        AnyDeckBuilderFeature(descriptor: descriptor) { onGenerated, onCancel in
+        AnyDeckBuilderFeature(descriptor: descriptor) { context, onGenerated, onCancel in
             PoemDeckBuilderView(
+                rootDecks: context.rootDecks,
                 workspaceProvider: workspaceProvider,
                 limits: limits,
                 onGenerated: onGenerated,
@@ -31,17 +32,20 @@ public struct PoemDeckBuilderView: View {
     @State private var errorMessage: String?
     @State private var isGenerating = false
 
+    private let rootDecks: [DeckBuilderDeckOption]
     private let workspaceProvider: any DeckBuildWorkspaceProviding
     private let limits: AuthoredDeckLimits
     private let onGenerated: @MainActor (GeneratedDeckBundle) -> Void
     private let onCancel: @MainActor () -> Void
 
     public init(
+        rootDecks: [DeckBuilderDeckOption],
         workspaceProvider: any DeckBuildWorkspaceProviding = SystemDeckBuildWorkspaceProvider(),
         limits: AuthoredDeckLimits = .default,
         onGenerated: @escaping @MainActor (GeneratedDeckBundle) -> Void,
         onCancel: @escaping @MainActor () -> Void
     ) {
+        self.rootDecks = rootDecks
         self.workspaceProvider = workspaceProvider
         self.limits = limits
         self.onGenerated = onGenerated
@@ -52,6 +56,13 @@ public struct PoemDeckBuilderView: View {
         VStack(spacing: 0) {
             Form {
                 Section {
+                    Picker("Root Deck", selection: $input.destinationDeckID) {
+                        Text("Choose a deck").tag(UUID?.none)
+                        ForEach(rootDecks) { deck in
+                            Text(deck.name).tag(Optional(deck.id))
+                        }
+                    }
+                    .accessibilityIdentifier("poemBuilderRootDeck")
                     TextField("Author", text: $input.author)
                         .accessibilityIdentifier("poemBuilderAuthor")
                     TextField("Title", text: $input.title)
@@ -67,7 +78,11 @@ public struct PoemDeckBuilderView: View {
                 } header: {
                     Text("Poem")
                 } footer: {
-                    Text("Each line becomes an answer. The preceding one or two lines become its prompt.")
+                    if rootDecks.isEmpty {
+                        Text("Create a root deck before building a poem deck.")
+                    } else {
+                        Text("The poem becomes a child of the selected deck. Each line becomes an answer.")
+                    }
                 }
 
                 if let errorMessage {

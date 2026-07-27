@@ -33,10 +33,11 @@ Choose **File → Build Deck…** to open the deck-builder catalog, then select
 **Poem Deck**. Enter the author, title, and poem text, then choose **Add to
 Library**. Other bundled builders can appear alongside it in future releases.
 
-NeoAnki2 creates an author deck with a poem subdeck. Every nonblank line after
-the first becomes one Basic card answer. Its prompt contains the preceding one
-or two lines, matching a moving recitation window. For example, a 12-line poem
-creates 11 cards.
+Choose an existing root deck for the poem. NeoAnki2 creates the poem as its
+child and stores the entered author as an `author:<name>` tag on each generated
+item. Every nonblank line after the first becomes one Basic card answer. Its
+prompt contains the preceding one or two lines, matching a moving recitation
+window. For example, a 12-line poem creates 11 cards.
 
 The builder first writes a temporary `.neoanki` bundle, validates the complete
 bundle with the same rules as an imported authored deck, imports it atomically,

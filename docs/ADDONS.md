@@ -45,9 +45,11 @@ Bundled builders are Swift packages compiled into NeoAnki2 and registered by the
 app. They provide an integrated experience on Apple platforms, but users cannot
 install new native code after the app ships.
 
-`PoemDeckBuilder` is the first bundled builder. It creates an author root deck,
-a poem child deck, and one Basic card for each line after the first. Each prompt
-contains the preceding one or two nonblank lines.
+`PoemDeckBuilder` is the first bundled builder. The user selects an existing
+root deck, and the host places the generated poem beneath it after import. The
+builder stores the author as an `author:<name>` item tag and creates one Basic
+card for each line after the first. Each prompt contains the preceding one or
+two nonblank lines.
 
 ### External builders
 

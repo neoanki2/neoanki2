@@ -3,11 +3,18 @@ import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 
 public struct PoemDeckInput: Sendable, Equatable {
+    public var destinationDeckID: UUID?
     public var author: String
     public var title: String
     public var text: String
 
-    public init(author: String = "", title: String = "", text: String = "") {
+    public init(
+        destinationDeckID: UUID? = nil,
+        author: String = "",
+        title: String = "",
+        text: String = ""
+    ) {
+        self.destinationDeckID = destinationDeckID
         self.author = author
         self.title = title
         self.text = text
@@ -17,6 +24,7 @@ public struct PoemDeckInput: Sendable, Equatable {
 public enum PoemDeckBuilderError: Error, Sendable, Equatable, LocalizedError {
     case missingAuthor
     case missingTitle
+    case missingDestinationDeck
     case tooFewLines
     case invalidGeneratedDeck([AuthoredDeckDiagnostic])
 
@@ -26,6 +34,8 @@ public enum PoemDeckBuilderError: Error, Sendable, Equatable, LocalizedError {
             "Enter the poem’s author."
         case .missingTitle:
             "Enter the poem’s title."
+        case .missingDestinationDeck:
+            "Choose a root deck."
         case .tooFewLines:
             "Enter at least two nonblank lines."
         case let .invalidGeneratedDeck(diagnostics):
@@ -45,6 +55,9 @@ public enum PoemDeckGenerator {
 
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { throw PoemDeckBuilderError.missingTitle }
+        guard let destinationDeckID = input.destinationDeckID else {
+            throw PoemDeckBuilderError.missingDestinationDeck
+        }
 
         let lines = usableLines(in: input.text)
         guard lines.count >= 2 else { throw PoemDeckBuilderError.tooFewLines }
@@ -61,7 +74,7 @@ public enum PoemDeckGenerator {
             guard diagnostics.isEmpty else {
                 throw PoemDeckBuilderError.invalidGeneratedDeck(diagnostics)
             }
-            return workspace
+            return workspace.placed(under: destinationDeckID)
         } catch {
             workspace.cleanup()
             throw error
@@ -92,15 +105,11 @@ public enum PoemDeckGenerator {
 
         var manifestData = Data()
         try append(
-            ManifestRecord(kind: "neoanki", version: 1, root: "author", parts: ["items/poem.jsonl"]),
+            ManifestRecord(kind: "neoanki", version: 1, root: "poem", parts: ["items/poem.jsonl"]),
             to: &manifestData
         )
         try append(basicTypeRecord, to: &manifestData)
-        try append(DeckRecord(kind: "deck", id: "author", name: author, parent: nil), to: &manifestData)
-        try append(
-            DeckRecord(kind: "deck", id: "poem", name: title, parent: "author"),
-            to: &manifestData
-        )
+        try append(DeckRecord(kind: "deck", id: "poem", name: title, parent: nil), to: &manifestData)
         try manifestData.write(
             to: bundleURL.appendingPathComponent(AuthoredDeck.manifestName),
             options: .atomic
@@ -117,7 +126,8 @@ public enum PoemDeckGenerator {
                 fields: [
                     "front": TextValue(text: prompt),
                     "back": TextValue(text: lines[answerIndex]),
-                ]
+                ],
+                tags: ["author:\(author)"]
             )
             try append(item, to: &itemData)
         }
@@ -206,6 +216,7 @@ private struct ItemRecord: Encodable {
     let deck: String
     let type: String
     let fields: [String: TextValue]
+    let tags: [String]
 }
 
 private struct TextValue: Encodable {

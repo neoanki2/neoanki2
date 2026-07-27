@@ -15,13 +15,45 @@ public struct DeckBuilderDescriptor: Identifiable, Sendable, Equatable {
     }
 }
 
+public struct DeckBuilderDeckOption: Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public let name: String
+
+    public init(id: UUID, name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+
+public struct DeckBuilderHostContext: Sendable, Equatable {
+    public let rootDecks: [DeckBuilderDeckOption]
+
+    public init(rootDecks: [DeckBuilderDeckOption]) {
+        self.rootDecks = rootDecks
+    }
+}
+
 public struct GeneratedDeckBundle: Sendable {
     public let bundleURL: URL
+    public let destinationDeckID: UUID?
     private let cleanupOperation: @Sendable () -> Void
 
-    public init(bundleURL: URL, cleanup: @escaping @Sendable () -> Void) {
+    public init(
+        bundleURL: URL,
+        destinationDeckID: UUID? = nil,
+        cleanup: @escaping @Sendable () -> Void
+    ) {
         self.bundleURL = bundleURL
+        self.destinationDeckID = destinationDeckID
         cleanupOperation = cleanup
+    }
+
+    public func placed(under destinationDeckID: UUID) -> GeneratedDeckBundle {
+        GeneratedDeckBundle(
+            bundleURL: bundleURL,
+            destinationDeckID: destinationDeckID,
+            cleanup: cleanupOperation
+        )
     }
 
     public func cleanup() {
@@ -65,6 +97,7 @@ public struct SystemDeckBuildWorkspaceProvider: DeckBuildWorkspaceProviding {
 public struct AnyDeckBuilderFeature: Identifiable {
     public let descriptor: DeckBuilderDescriptor
     private let makeViewOperation: (
+        DeckBuilderHostContext,
         @escaping @MainActor (GeneratedDeckBundle) -> Void,
         @escaping @MainActor () -> Void
     ) -> AnyView
@@ -74,21 +107,23 @@ public struct AnyDeckBuilderFeature: Identifiable {
     public init<Content: View>(
         descriptor: DeckBuilderDescriptor,
         @ViewBuilder makeView: @escaping (
+            DeckBuilderHostContext,
             @escaping @MainActor (GeneratedDeckBundle) -> Void,
             @escaping @MainActor () -> Void
         ) -> Content
     ) {
         self.descriptor = descriptor
-        makeViewOperation = { onGenerated, onCancel in
-            AnyView(makeView(onGenerated, onCancel))
+        makeViewOperation = { context, onGenerated, onCancel in
+            AnyView(makeView(context, onGenerated, onCancel))
         }
     }
 
     public func makeView(
+        context: DeckBuilderHostContext,
         onGenerated: @escaping @MainActor (GeneratedDeckBundle) -> Void,
         onCancel: @escaping @MainActor () -> Void
     ) -> AnyView {
-        makeViewOperation(onGenerated, onCancel)
+        makeViewOperation(context, onGenerated, onCancel)
     }
 }
 

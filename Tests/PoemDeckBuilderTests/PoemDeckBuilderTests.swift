@@ -11,20 +11,34 @@ import Testing
 }
 
 @Test func poemBuilderRequiresMetadataAndTwoLines() throws {
+    let destinationDeckID = UUID()
     #expect(throws: PoemDeckBuilderError.missingAuthor) {
         try PoemDeckGenerator.generate(input: .init(title: "Title", text: "one\ntwo"))
     }
     #expect(throws: PoemDeckBuilderError.missingTitle) {
         try PoemDeckGenerator.generate(input: .init(author: "Author", text: "one\ntwo"))
     }
+    #expect(throws: PoemDeckBuilderError.missingDestinationDeck) {
+        try PoemDeckGenerator.generate(
+            input: .init(author: "Author", title: "Title", text: "one\ntwo")
+        )
+    }
     #expect(throws: PoemDeckBuilderError.tooFewLines) {
-        try PoemDeckGenerator.generate(input: .init(author: "Author", title: "Title", text: "one"))
+        try PoemDeckGenerator.generate(
+            input: .init(
+                destinationDeckID: destinationDeckID,
+                author: "Author",
+                title: "Title",
+                text: "one"
+            )
+        )
     }
 }
 
 @Test func poemBuilderWritesValidatedRollingContextDeck() throws {
     let generated = try PoemDeckGenerator.generate(
         input: PoemDeckInput(
+            destinationDeckID: UUID(),
             author: "Ліна",
             title: "спини мене отямся і отям",
             text: "line one\nline \"two\"\nline three\nline four"
@@ -37,13 +51,14 @@ import Testing
         contentsOf: generated.bundleURL.appendingPathComponent("deck.jsonl"),
         encoding: .utf8
     )
-    #expect(manifest.contains(#""name":"Ліна""#))
+    #expect(!manifest.contains(#""name":"Ліна""#))
     #expect(manifest.contains(#""name":"спини мене отямся і отям""#))
 
     let records = try jsonLines(
         at: generated.bundleURL.appendingPathComponent("items/poem.jsonl")
     )
     #expect(records.count == 3)
+    #expect(records.allSatisfy { ($0["tags"] as? [String]) == ["author:Ліна"] })
     #expect(textField("front", in: records[0]) == "line one")
     #expect(textField("back", in: records[0]) == #"line "two""#)
     #expect(textField("front", in: records[1]) == "line one\nline \"two\"")
@@ -60,7 +75,12 @@ import Testing
 
     #expect(throws: PoemDeckBuilderError.self) {
         try PoemDeckGenerator.generate(
-            input: PoemDeckInput(author: "Author", title: "Title", text: "one\ntwo"),
+            input: PoemDeckInput(
+                destinationDeckID: UUID(),
+                author: "Author",
+                title: "Title",
+                text: "one\ntwo"
+            ),
             workspaceProvider: provider,
             limits: limits
         )
@@ -68,9 +88,11 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: rootURL.path))
 }
 
-@Test func poemBuilderImportsHierarchyAndReusesBasicSchema() async throws {
+@Test func poemBuilderImportsPoemRootWithAuthorMetadataAndReusesBasicSchema() async throws {
+    let destinationDeckID = UUID()
     let generated = try PoemDeckGenerator.generate(
         input: PoemDeckInput(
+            destinationDeckID: destinationDeckID,
             author: "Ліна",
             title: "спини мене отямся і отям",
             text: """
@@ -97,16 +119,19 @@ import Testing
     #expect(result.itemCount == 3)
     #expect(result.createdItemTypeCount == 0)
     #expect(result.reusedItemTypeCount == 1)
-    #expect(decks.count == 2)
-    let author = try #require(decks.first { $0.name == "Ліна" })
-    let poem = try #require(decks.first { $0.name == "спини мене отямся і отям" })
-    #expect(poem.parentID == author.id)
+    #expect(generated.destinationDeckID == destinationDeckID)
+    #expect(decks.count == 1)
+    let poem = try #require(decks.first)
+    #expect(poem.name == "спини мене отямся і отям")
+    #expect(poem.parentID == nil)
     #expect(items.count == 3)
     #expect(items.allSatisfy { $0.itemTypeName == "Basic" && $0.cardCount == 1 })
     #expect(items.contains {
         $0.title == "така любов буває раз в ніколи\nвона ж промчить над зламаним життям"
             && $0.subtitle == "за нею ж будуть бігти видноколи"
     })
+    let loaded = try #require(await store.fetchItem(id: items[0].id))
+    #expect(loaded.item.tags == ["author:Ліна"])
     #expect(due.count == 3)
 }
 
