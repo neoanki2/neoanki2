@@ -19,10 +19,6 @@ class NeoAnkiUITestCase: XCTestCase {
 
         let app = XCUIApplication()
         app.launchArguments = ["-NeoAnkiTesting"]
-        if ProcessInfo.processInfo.environment["DOC_SCREENSHOT_DIR"] != nil {
-            app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
-            app.launchEnvironment["NEOANKI_SCREENSHOT_MODE"] = "1"
-        }
         app.launchEnvironment["NEOANKI_TESTING"] = "1"
         app.launchEnvironment["NEOANKI_TEST_DB_DIR"] = NSTemporaryDirectory() + "neoanki2-ui-\(databaseLabel)"
         if let scenario {

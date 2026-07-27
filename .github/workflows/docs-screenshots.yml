@@ -31,6 +31,9 @@ jobs:
         run: |
           defaults delete -g AppleInterfaceStyle 2>/dev/null || true
           defaults write -g AppleAccentColor -int 1
+          defaults write -g AppleLanguages -array en
+          defaults write -g AppleLocale -string en_US
+          defaults write com.apple.universalaccess reduceMotion -bool true
       - name: Capture documentation screenshots
         run: |
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh Scripts/capture-doc-screenshots.sh
