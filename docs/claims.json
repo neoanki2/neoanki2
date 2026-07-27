@@ -55,9 +55,10 @@
   },
   "scheduler": {
     "article": "user/studying.md",
-    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift",
-    "model": "FSRS-5",
-    "minimumIntervalDays": 1,
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/LearningScheduler.swift",
+    "model": "FSRS-6",
+    "reviewMinimumIntervalDays": 0,
+    "learningPolicy": "repair-rounds",
     "defaultRequestRetention": 0.9,
     "defaultMaximumIntervalDays": 36500
   },
@@ -120,7 +121,8 @@
     {
       "article": "user/studying.md",
       "contains": [
-        "Intervals are floored at one day",
+        "repair round",
+        "due immediately",
         "built-in 90%"
       ]
     }

@@ -347,6 +347,44 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(memory.stability == 2.5)
 }
 
+@Test func persistedFSRS5ProfileMigratesToFSRS6AcrossRelaunch() async throws {
+    let databaseURL = tempDatabaseURL()
+    let database = try SQLiteDatabase(path: databaseURL)
+    try await database.migrate()
+    let legacyWeights = [
+        0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046,
+        1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315,
+        2.9898, 0.51655, 0.6621,
+    ]
+    let json = try JSONSerialization.data(withJSONObject: [
+        "weights": legacyWeights,
+        "requestRetention": 0.9,
+        "maximumInterval": 36_500,
+        "enableFuzz": false,
+    ])
+    let hex = json.map { String(format: "%02x", $0) }.joined()
+    try executeTestSQL(
+        """
+        INSERT INTO scheduler_params
+            (profile_id, parameters, optimized_at, sample_count, log_loss)
+        VALUES ('legacy-v5', X'\(hex)', 100, 120, 0.4);
+        """,
+        at: databaseURL
+    )
+
+    let firstOpen = try ItemStore(databaseURL: databaseURL, profileID: "legacy-v5")
+    try await firstOpen.bootstrap()
+    let first = await firstOpen.schedulingParameters()
+    #expect(first.weights.count == 21)
+    #expect(Array(first.weights.prefix(19)) == legacyWeights)
+    #expect(first.weights[19] == 0)
+    #expect(first.weights[20] == 0.5)
+
+    let reopened = try ItemStore(databaseURL: databaseURL, profileID: "legacy-v5")
+    try await reopened.bootstrap()
+    #expect(await reopened.schedulingParameters() == first)
+}
+
 @Test func revertMarksReviewInactiveWithoutDeletingHistory() async throws {
     let databaseURL = tempDatabaseURL()
     let store = try ItemStore(databaseURL: databaseURL)
@@ -372,6 +410,63 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
 
     #expect(try await store.reviewLogCount(for: card.id) == 0)
     #expect(try reviewLogRowCount(at: databaseURL, cardID: card.id) == 1)
+}
+
+@Test func immediateRepairStatePersistsAcrossReopenAndUndoRestoresExactState() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+            ]
+        ),
+        now: start
+    )
+    let original = try #require(await store.fetchDueCards(asOf: start).first)
+
+    let first = try await store.submitReviewWithReceipt(
+        cardID: original.id,
+        rating: .again,
+        now: start
+    )
+    #expect(first.memory.phase == .learning)
+    #expect(first.memory.stepIndex == 0)
+    #expect(first.memory.due == start)
+    #expect(try await store.fetchDueCards(asOf: start).count == 1)
+
+    let reopened = try ItemStore(databaseURL: databaseURL)
+    try await reopened.bootstrap()
+    let due = try #require(
+        await reopened.fetchDueCards(asOf: start).first
+    )
+    #expect(due.card.memory == first.memory)
+
+    let second = try await reopened.submitReviewWithReceipt(
+        cardID: due.id,
+        rating: .again,
+        now: start.addingTimeInterval(30)
+    )
+    #expect(second.memory.lapses == 0)
+    let logs = try await SQLiteDatabase(path: databaseURL).fetchActiveReviewLogs()
+    #expect(logs.count == 2)
+    #expect(logs[1].scheduledDays == 0)
+    #expect(abs(logs[1].elapsedDays - (30 / 86_400)) < 1e-12)
+    #expect(logs[1].phaseBefore == .learning)
+
+    try await reopened.revertReview(
+        reviewLogID: second.reviewLogID,
+        now: start.addingTimeInterval(30)
+    )
+    let restored = try #require(
+        await reopened.fetchDueCards(asOf: start.addingTimeInterval(30)).first
+    )
+    #expect(restored.card.memory == first.memory)
 }
 
 @Test func optimizationPersistsThroughStoreAPIAndReopen() async throws {

@@ -23,7 +23,7 @@ import Testing
     }
 }
 
-@Test func studyAndGradeFlowAgainSchedulesRelearning() async throws {
+@Test func studyAndGradeFlowAgainSchedulesImmediateLearningRepair() async throws {
     try await ScenarioRunner.run { ctx in
         try await ctx.onboard()
         _ = try await ctx.createBasicItem(front: "Q", back: "A")
@@ -32,10 +32,9 @@ import Testing
         let cardID = due[0].card.id
         let memory = try await ctx.grade(.again, on: cardID)
 
-        #expect(memory.phase == .relearning)
-        try await ctx.assertDueCount(0)
-
-        ctx.clock.advanceDays(1)
+        #expect(memory.phase == .learning)
+        #expect(memory.stepIndex == 0)
+        #expect(memory.due == ctx.clock.now())
         try await ctx.assertDueCount(1)
     }
 }

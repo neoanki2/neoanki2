@@ -5,12 +5,14 @@ import Testing
 @testable import NeoAnki2
 
 @MainActor
-private func makeStudyModel() async throws -> (StudyModel, ItemStore) {
+private func makeStudyModel(
+    scheduler: (any Scheduler)? = nil
+) async throws -> (StudyModel, ItemStore) {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-study-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     let databaseURL = url.appendingPathComponent("test.sqlite")
-    let store = try ItemStore(databaseURL: databaseURL)
+    let store = try ItemStore(databaseURL: databaseURL, scheduler: scheduler)
     try await store.bootstrap()
     return (StudyModel(store: store), store)
 }
@@ -266,7 +268,10 @@ private func makeInteractionModel(
         await model.grade(rating)
     }
 
-    #expect(model.isFinished == true)
+    #expect(model.isFinished == false)
+    #expect(model.currentCard != nil)
+    #expect(model.queue.count == ReviewRating.allCases.count + 1)
+    #expect(model.cardsReviewed == ReviewRating.allCases.count)
 }
 
 @Test @MainActor func studyModelEmptyQueueFinishesImmediately() async throws {
@@ -319,8 +324,104 @@ private func makeInteractionModel(
     model.revealAnswer()
     await model.grade(.again)
 
-    #expect(model.isFinished == true)
-    #expect(try await store.dueCount() == 0)
+    #expect(model.isFinished == false)
+    #expect(model.currentCard?.id == model.queue[0].id)
+    #expect(model.queue.count == 2)
+    #expect(model.progressLabel == "Card 2 of 2")
+    #expect(try await store.dueCount() == 1)
+}
+
+@Test @MainActor func studyModelFinishesInitialQueueBeforeRepairRound() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    for index in 1...2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Q\(index)")
+                    ),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+                ]
+            )
+        )
+    }
+
+    await model.startSession()
+    let failedCardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+    await model.grade(.again)
+
+    #expect(model.currentCard?.id != failedCardID)
+
+    model.revealAnswer()
+    await model.grade(.good)
+
+    #expect(model.currentCard?.id == failedCardID)
+    #expect(model.queue.count == 3)
+}
+
+@Test @MainActor func undoAgainRemovesPendingLearningRepeat() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.queue.count == 2)
+    #expect(model.currentCard != nil)
+
+    await model.undoLastGrade()
+
+    #expect(model.queue.count == 1)
+    #expect(model.currentCard != nil)
+    #expect(model.cardsReviewed == 0)
+    #expect(try await store.dueCount() == 1)
+}
+
+@Test @MainActor func failedCardRepeatsAcrossRepairRoundsUntilRemembered() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    let cardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.currentCard?.card.memory.stepIndex == 0)
+
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.currentCard?.card.memory.stepIndex == 1)
+
+    model.revealAnswer()
+    await model.grade(.good)
+
+    #expect(model.isFinished)
+    #expect(model.cardsReviewed == 3)
+    #expect(model.reviewedCardIDs == [cardID])
+    #expect(try await store.reviewLogCount(for: cardID) == 3)
 }
 
 @Test @MainActor func studyModelUndoLastGradeRestoresCard() async throws {

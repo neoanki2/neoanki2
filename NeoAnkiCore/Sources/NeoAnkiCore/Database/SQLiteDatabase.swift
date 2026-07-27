@@ -3,6 +3,10 @@ import Darwin
 import Foundation
 import SQLite3
 
+private struct SchedulerWeightEnvelope: Decodable {
+    let weights: [Double]
+}
+
 public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case openFailed(String)
     case executeFailed(String)
@@ -1218,7 +1222,19 @@ actor SQLiteDatabase {
             bindings: [.text(profileID)]
         )
         guard let data = rows.first?["parameters"] as? Data else { return nil }
-        return try? decoder.decode(FSRSScheduler.Parameters.self, from: data)
+        guard let parameters = try? decoder.decode(FSRSScheduler.Parameters.self, from: data) else {
+            return nil
+        }
+        if let envelope = try? decoder.decode(SchedulerWeightEnvelope.self, from: data),
+           envelope.weights.count == 19 {
+            // Make the 19→21 migration durable while preserving the row's
+            // optimization timestamp, sample count, and loss metadata.
+            try execute(
+                "UPDATE scheduler_params SET parameters = ? WHERE profile_id = ?;",
+                bindings: [.blob(try encode(parameters)), .text(profileID)]
+            )
+        }
+        return parameters
     }
 
     func saveSchedulerParameters(

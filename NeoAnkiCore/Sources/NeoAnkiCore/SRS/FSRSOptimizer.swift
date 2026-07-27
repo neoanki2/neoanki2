@@ -36,7 +36,7 @@ public struct FSRSOptimizationResult: Equatable, Sendable {
     }
 }
 
-/// Fits per-profile FSRS-5 weights from append-only review history.
+/// Fits per-profile FSRS-6 weights from append-only review history.
 ///
 /// The optimizer is deliberately deterministic and dependency-free. It uses
 /// bounded coordinate search against binary recall log loss, with a small
@@ -73,14 +73,20 @@ public struct FSRSOptimizer: Sendable {
         }
 
         let baselineWeights = FSRSScheduler.Parameters.sanitizedWeights(parameters.weights)
-        var candidate = baselineWeights
+        let optimizationBaseline = zip(
+            baselineWeights,
+            FSRSScheduler.Parameters.weightBounds
+        ).map { value, bound in
+            min(bound.upper, max(bound.lower, value))
+        }
+        var candidate = optimizationBaseline
         let previousLoss = Self.logLoss(histories: histories, weights: baselineWeights)
         guard previousLoss.isFinite else { throw FSRSOptimizationError.invalidParameters }
 
         func objective(_ weights: [Double]) -> Double {
             let loss = Self.logLoss(histories: histories, weights: weights)
             guard loss.isFinite else { return .infinity }
-            let penalty = zip(weights, baselineWeights).enumerated().reduce(0.0) { partial, element in
+            let penalty = zip(weights, optimizationBaseline).enumerated().reduce(0.0) { partial, element in
                 let (index, values) = element
                 let width = FSRSScheduler.Parameters.weightBounds[index].upper
                     - FSRSScheduler.Parameters.weightBounds[index].lower
@@ -174,6 +180,10 @@ public struct FSRSOptimizer: Sendable {
                 .map(\.element)
             }
             .filter { $0.count >= Self.minimumReviewsPerCardForOutcome }
+            // A persisted MemoryState snapshot is not part of ReviewLog. Without
+            // the card's first review, replaying a mature partial history from
+            // `.new` would fit against fabricated stability and difficulty.
+            .filter { $0.first?.phaseBefore == .new }
             .sorted { lhs, rhs in
                 (lhs.first?.cardID.uuidString ?? "") < (rhs.first?.cardID.uuidString ?? "")
             }

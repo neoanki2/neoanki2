@@ -69,7 +69,8 @@ A card whose saved due date has arrived. A study session loads the cards due
 now in the selected scope; future cards are not included.
 
 **Study session**  
-A fixed queue of due cards reviewed as prompt → response or reveal → grade.
+A due-card queue reviewed as prompt → response or reveal → grade. Failed cards
+return in repair rounds after the other due cards until they are recalled.
 
 **Review / review log**  
 One saved Again, Hard, Good, or Easy result. NeoAnki2 appends a review record

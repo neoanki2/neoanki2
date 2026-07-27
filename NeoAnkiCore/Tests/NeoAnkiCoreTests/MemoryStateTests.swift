@@ -13,6 +13,7 @@ import Testing
     #expect(state.reps == 0)
     #expect(state.lapses == 0)
     #expect(state.phase == .new)
+    #expect(state.stepIndex == nil)
 }
 
 @Test func memoryStateIsDueWhenPastDueDate() {
@@ -33,13 +34,35 @@ import Testing
         lastReview: Date(timeIntervalSince1970: 1_699_000_000),
         reps: 4,
         lapses: 1,
-        phase: .review
+        phase: .learning,
+        stepIndex: 0
     )
 
     let data = try JSONEncoder().encode(original)
     let decoded = try JSONDecoder().decode(MemoryState.self, from: data)
 
     #expect(decoded == original)
+}
+
+@Test func memoryStateDecodesBeforeStepIndexWasAdded() throws {
+    let data = Data(
+        """
+        {
+          "stability": 1.2,
+          "difficulty": 5.0,
+          "due": 721692800,
+          "lastReview": null,
+          "reps": 1,
+          "lapses": 0,
+          "phase": "review"
+        }
+        """.utf8
+    )
+
+    let decoded = try JSONDecoder().decode(MemoryState.self, from: data)
+
+    #expect(decoded.stepIndex == nil)
+    #expect(decoded.phase == .review)
 }
 
 @Test func phaseRawValuesAreStable() {

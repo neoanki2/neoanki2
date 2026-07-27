@@ -50,7 +50,7 @@ struct StudyView: View {
                 .accessibilityIdentifier("cancelEndStudySession")
         } message: {
             if model.cardsReviewed > 0 {
-                Text("You've reviewed \(model.cardsReviewed) cards. The current card won't be saved.")
+                Text("You've completed \(model.cardsReviewed) reviews. The current card won't be saved.")
             } else {
                 Text("The current card won't be saved.")
             }

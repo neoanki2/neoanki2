@@ -3,7 +3,7 @@ import NeoAnkiCore
 import NeoAnkiTestSupport
 import Testing
 
-@Test func multiCardStudyMixedRatingsCompletesSession() async throws {
+@Test func multiCardStudyMixedRatingsLeaveFailedCardsDueForRepair() async throws {
     try await ScenarioRunner.run { ctx in
         try await ctx.onboard()
 
@@ -19,10 +19,14 @@ import Testing
             _ = try await ctx.grade(ratings[index], on: entry.card.id)
         }
 
-        try await ctx.assertDueCount(0)
+        try await ctx.assertDueCount(1)
 
         due = try await ctx.startStudySession()
-        #expect(due.isEmpty)
+        #expect(due.count == 1)
+        for entry in due {
+            _ = try await ctx.grade(.good, on: entry.card.id)
+        }
+        try await ctx.assertDueCount(0)
     }
 }
 
@@ -35,9 +39,6 @@ import Testing
         let cardID = due[0].card.id
         _ = try await ctx.grade(.again, on: cardID)
 
-        try await ctx.assertDueCount(0)
-
-        ctx.clock.advanceDays(1)
         try await ctx.assertDueCount(1)
     }
 }

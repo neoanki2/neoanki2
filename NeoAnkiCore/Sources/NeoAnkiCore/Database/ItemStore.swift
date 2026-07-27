@@ -526,7 +526,7 @@ public actor ItemStore {
         let phaseBefore = card.memory.phase
         let elapsedDays: Double
         if let lastReview = card.memory.lastReview {
-            elapsedDays = now.timeIntervalSince(lastReview) / 86_400
+            elapsedDays = max(now.timeIntervalSince(lastReview) / 86_400, 0)
         } else {
             elapsedDays = 0
         }
@@ -537,7 +537,7 @@ public actor ItemStore {
         )
 
         let scheduler: any Scheduler = schedulerOverride
-            ?? FSRSScheduler(parameters: fsrsParameters)
+            ?? LearningScheduler(parameters: fsrsParameters)
         let nextMemory = scheduler.schedule(card.memory, rating: rating, now: now)
         card.memory = nextMemory
 

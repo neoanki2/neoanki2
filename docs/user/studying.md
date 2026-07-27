@@ -30,9 +30,16 @@ A session moves through a small set of states:
 2. **Prompt** shows the current card and its interaction.
 3. **Answer** shows the reference answer and, when available, response feedback.
 4. **Grading** saves one rating and advances to the next card.
-5. **Session Complete** reports the number reviewed and offers **Undo Last Grade** or **Done**.
+5. **Repair rounds** repeat failed cards after the current queue until each is
+   recalled or you end the session.
+6. **Session Complete** reports reviews and unique cards, then offers **Undo
+   Last Grade** or **Done**.
 
-The header shows the scope and progress, such as “Biology · Card 2 of 8.” The queue is assembled when the session starts. When no cards are due, NeoAnki2 shows **You’re Caught Up** instead of a prompt.
+The header shows the scope and progress, such as “Biology · Card 2 of 8.” The
+initial queue is assembled when the session starts. Failed cards are due immediately
+but move behind cards already waiting. After that queue finishes, each failed
+card appears once per repair round. When no cards are due, NeoAnki2 shows
+**You’re Caught Up** instead of a prompt.
 
 [![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)]({{ site.baseurl }}/assets/screenshots/study-answer.png)
 
@@ -86,10 +93,9 @@ After reveal, NeoAnki2 may show:
 
 These messages do not choose a rating. Grade based on the quality of your recall:
 
-- **Again (1):** you did not remember; ask NeoAnki2 for its shortest interval.
-  Intervals are floored at one day, so this is not an immediate same-session
-  repeat.
-- **Hard (2):** you remembered with difficulty.
+- **Again (1):** you did not remember. The card moves to the next repair round.
+- **Hard (2):** you remembered with difficulty. FSRS may schedule another
+  review later the same day.
 - **Good (3):** you remembered correctly.
 - **Easy (4):** recall was too easy; allow a longer wait.
 
@@ -97,13 +103,17 @@ Open **Grade Help** from the question-mark button for the same guidance.
 
 [![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
-NeoAnki2 uses FSRS-5. Each saved rating updates the card’s estimated difficulty
+NeoAnki2 uses FSRS-6. Each saved rating updates the card’s estimated difficulty
 and stability, and the next due date is calculated for the built-in 90%
 retention target. The current app does not expose a retention setting. Again
-marks a lapse on an already-reviewed card; Hard reduces growth; Easy can
-increase it. Actual intervals depend on the card’s history, elapsed time,
-scheduler parameters, and small deterministic interval variation. The labels
-are directional guidance, not promises of a particular date or interval.
+marks one lapse when a review card enters relearning; repeated failures during
+that repair sequence do not add more lapses. Hard reduces growth; Easy can
+increase it. Every repair attempt records its actual timestamp and is never
+fuzzed or delayed: failed acquisition returns in the next repair round.
+After recall, FSRS keeps fractional-day precision and may choose an intraday
+review when the memory state calls for it. Longer review intervals depend on
+the card’s history, elapsed time, scheduler parameters, and small deterministic
+interval variation.
 
 ## Keyboard and Study menu
 

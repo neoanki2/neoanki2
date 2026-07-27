@@ -4,7 +4,10 @@ import NeoAnkiCore
 struct PendingGradeUndo: Equatable, Sendable {
     let reviewLogID: UUID
     let previousIndex: Int
+    let previousReviewedCount: Int
+    let previousReviewedCardIDs: Set<UUID>
     let rating: ReviewRating
+    let requeuedCardID: UUID?
 }
 
 @MainActor
@@ -26,8 +29,11 @@ final class StudyModel {
     private(set) var arrangedItems: [String] = []
     private(set) var selectedArrangementIndex: Int?
     private(set) var interactionMessage: String?
+    private(set) var reviewedCount = 0
+    private(set) var reviewedCardIDs: Set<UUID> = []
 
     let store: ItemStore
+    private var repairQueue: [DueCard] = []
 
     init(store: ItemStore) {
         self.store = store
@@ -50,15 +56,14 @@ final class StudyModel {
     }
 
     var cardsReviewed: Int {
-        index
+        reviewedCount
     }
 
     var completionSummary: String {
-        let count = queue.count
-        if count == 1 {
-            return "Reviewed 1 card"
-        }
-        return "Reviewed \(count) cards"
+        let reviewNoun = reviewedCount == 1 ? "review" : "reviews"
+        let cardCount = reviewedCardIDs.count
+        let cardNoun = cardCount == 1 ? "card" : "cards"
+        return "Completed \(reviewedCount) \(reviewNoun) across \(cardCount) \(cardNoun)"
     }
 
     var canUndoLastGrade: Bool {
@@ -71,6 +76,9 @@ final class StudyModel {
         isFinished = false
         isAnswerRevealed = false
         index = 0
+        reviewedCount = 0
+        reviewedCardIDs = []
+        repairQueue = []
         scopeLabel = scope.label
         pendingGradeUndo = nil
 
@@ -193,25 +201,34 @@ final class StudyModel {
         defer { isGrading = false }
 
         let previousIndex = index
+        let now = Date.now
 
         do {
             let submission = try await store.submitReviewWithReceipt(
                 cardID: card.id,
-                rating: rating
+                rating: rating,
+                now: now
             )
+            var repeatedCard = card
+            repeatedCard.card.memory = submission.memory
+            let shouldRequeue = submission.memory.phase == .learning
+                || submission.memory.phase == .relearning
+            if shouldRequeue {
+                repairQueue.append(repeatedCard)
+            }
             pendingGradeUndo = PendingGradeUndo(
                 reviewLogID: submission.reviewLogID,
                 previousIndex: previousIndex,
-                rating: rating
+                previousReviewedCount: reviewedCount,
+                previousReviewedCardIDs: reviewedCardIDs,
+                rating: rating,
+                requeuedCardID: shouldRequeue ? card.id : nil
             )
             index += 1
+            reviewedCount += 1
+            reviewedCardIDs.insert(card.id)
             isAnswerRevealed = false
-
-            if index >= queue.count {
-                isFinished = true
-            } else {
-                prepareCurrentInteraction()
-            }
+            advanceSession()
         } catch DatabaseError.cardNotFound(_) {
             discardMissingCurrentCard(card.id)
         } catch {
@@ -228,7 +245,17 @@ final class StudyModel {
 
         do {
             try await store.revertReview(reviewLogID: undo.reviewLogID)
+            if let requeuedCardID = undo.requeuedCardID {
+                repairQueue.removeAll { $0.id == requeuedCardID }
+                if let queuedRepeat = queue.indices.last(where: {
+                    $0 > undo.previousIndex && queue[$0].id == requeuedCardID
+                }) {
+                    queue.remove(at: queuedRepeat)
+                }
+            }
             index = undo.previousIndex
+            reviewedCount = undo.previousReviewedCount
+            reviewedCardIDs = undo.previousReviewedCardIDs
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
@@ -250,12 +277,7 @@ final class StudyModel {
 
         index += 1
         isAnswerRevealed = false
-
-        if index >= queue.count {
-            isFinished = true
-        } else {
-            prepareCurrentInteraction()
-        }
+        advanceSession()
     }
 
     private func prepareCurrentInteraction() {
@@ -296,6 +318,26 @@ final class StudyModel {
         guard queue.indices.contains(index), queue[index].id == cardID else { return }
         queue.remove(at: index)
         isAnswerRevealed = false
-        isFinished = index >= queue.count
+        repairQueue.removeAll { $0.id == cardID }
+        advanceSession()
+    }
+
+    private func advanceSession() {
+        guard index >= queue.count else {
+            isFinished = false
+            prepareCurrentInteraction()
+            return
+        }
+
+        if !repairQueue.isEmpty {
+            queue.append(contentsOf: repairQueue)
+            repairQueue = []
+            isFinished = false
+            prepareCurrentInteraction()
+            return
+        }
+
+        isFinished = true
+        prepareCurrentInteraction()
     }
 }
