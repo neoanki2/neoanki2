@@ -178,6 +178,93 @@ private let laterEpoch = Date(timeIntervalSince1970: 1_700_086_400)
     #expect(listed.schedule == schedule)
 }
 
+/// Browse rows are projected alongside the items they describe, so every edit
+/// that changes a title, a deck, a card count, or a schedule has to reach the
+/// projection. A stale row would show a learner text they already replaced.
+@Test func browseRowsFollowEveryItemEdit() async throws {
+    let store = try await makeStore()
+    let first = Deck(name: "Geography")
+    let second = Deck(name: "History")
+    _ = try await store.createDeck(first)
+    _ = try await store.createDeck(second)
+    let created = try await store.createItem(
+        item(front: "France", back: "Paris", deckID: first.id),
+        now: epoch
+    )
+
+    var listed = try #require(try await store.listItems().first)
+    #expect(listed.title == "France")
+    #expect(listed.deckID == first.id)
+    #expect(listed.cardCount == 1)
+
+    _ = try await store.updateItem(
+        Item(
+            id: created.id,
+            itemTypeID: BuiltInItemTypes.basicID,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Japan")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Tokyo")),
+            ],
+            deckID: first.id
+        ),
+        now: laterEpoch
+    )
+    listed = try #require(try await store.listItems().first)
+    #expect(listed.title == "Japan")
+    #expect(listed.subtitle == "Tokyo")
+    #expect(listed.createdAt == epoch)
+
+    #expect(try await store.updateItemDeck(itemID: created.id, deckID: second.id))
+    listed = try #require(try await store.listItems().first)
+    #expect(listed.deckID == second.id)
+    #expect(try await store.listItems(scope: .deck(second.id)).count == 1)
+    #expect(try await store.listItems(scope: .deck(first.id)).isEmpty)
+
+    #expect(try await store.updateItemDeck(itemID: created.id, deckID: nil))
+    #expect(try await store.listItems(scope: .unassigned).count == 1)
+
+    #expect(try await store.deleteItem(id: created.id))
+    #expect(try await store.listItems().isEmpty)
+}
+
+/// Grading moves the schedule the browse list reports.
+@Test func browseRowsFollowGrading() async throws {
+    let store = try await makeStore()
+    let created = try await store.createItem(item(front: "France", back: "Paris"), now: epoch)
+    let before = try #require(try await store.listItems().first)
+    #expect(before.schedule?.phase == .new)
+
+    let due = try #require(try await store.fetchDueCards(asOf: epoch).first)
+    _ = try await store.submitReview(cardID: due.card.id, rating: .good, now: epoch)
+
+    let after = try #require(try await store.listItems().first)
+    #expect(after.id == created.id)
+    #expect(after.schedule?.phase != .new)
+    #expect(try #require(after.schedule?.dueAt) > epoch)
+}
+
+/// A renamed item type is shown and searched by its new name without touching
+/// the items themselves.
+@Test func browseRowsFollowItemTypeRenames() async throws {
+    let store = try await makeStore()
+    _ = try await store.createItem(item(front: "France", back: "Paris"), now: epoch)
+    let basic = try #require(try await store.loadItemTypes().itemTypes.first)
+
+    _ = try await store.updateItemType(
+        ItemType(
+            id: basic.id,
+            name: "Capitals",
+            fields: basic.fields,
+            templates: basic.templates
+        ),
+        now: laterEpoch
+    )
+
+    let listed = try #require(try await store.listItems().first)
+    #expect(listed.itemTypeName == "Capitals")
+    #expect(try await store.listItems(search: "Capitals").count == 1)
+}
+
 @Test func itemBrowsingArrangesWithoutRequery() async throws {
     let store = try await makeStore()
     _ = try await store.createItem(item(front: "Zebra", back: "Stripes"), now: epoch)

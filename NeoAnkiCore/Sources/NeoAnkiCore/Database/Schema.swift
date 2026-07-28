@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 16
+    static let version = 17
 
     static let createStatements: [String] = [
         """
@@ -186,6 +186,134 @@ enum Schema {
         CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_local_type
         ON portable_item_type_mappings(local_type_id);
         """,
+    ] + browseProjectionStatements
+
+    static let browseProjectionStatements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS item_browse_rows (
+            item_id TEXT PRIMARY KEY NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            item_type_id TEXT NOT NULL,
+            item_type_name TEXT NOT NULL,
+            title TEXT NOT NULL,
+            subtitle TEXT NOT NULL,
+            deck_id TEXT,
+            created_at REAL NOT NULL,
+            card_count INTEGER NOT NULL DEFAULT 0,
+            due_at REAL,
+            phase TEXT,
+            lapses INTEGER NOT NULL DEFAULT 0
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_item_browse_rows_deck_created
+        ON item_browse_rows(deck_id, created_at, item_id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_item_browse_rows_created
+        ON item_browse_rows(created_at, item_id);
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS item_browse_cards_insert
+        AFTER INSERT ON cards
+        BEGIN
+            UPDATE item_browse_rows
+            SET card_count = (SELECT COUNT(*) FROM cards WHERE item_id = NEW.item_id),
+                due_at = (
+                    SELECT due_at FROM cards
+                    WHERE item_id = NEW.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                phase = (
+                    SELECT phase FROM cards
+                    WHERE item_id = NEW.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                lapses = COALESCE((
+                    SELECT MAX(lapses) FROM cards
+                    WHERE item_id = NEW.item_id AND is_suspended = 0
+                ), 0)
+            WHERE item_id = NEW.item_id;
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS item_browse_cards_update
+        AFTER UPDATE OF item_id, due_at, phase, lapses, is_suspended ON cards
+        BEGIN
+            UPDATE item_browse_rows
+            SET card_count = (SELECT COUNT(*) FROM cards WHERE item_id = OLD.item_id),
+                due_at = (
+                    SELECT due_at FROM cards
+                    WHERE item_id = OLD.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                phase = (
+                    SELECT phase FROM cards
+                    WHERE item_id = OLD.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                lapses = COALESCE((
+                    SELECT MAX(lapses) FROM cards
+                    WHERE item_id = OLD.item_id AND is_suspended = 0
+                ), 0)
+            WHERE item_id = OLD.item_id;
+            UPDATE item_browse_rows
+            SET card_count = (SELECT COUNT(*) FROM cards WHERE item_id = NEW.item_id),
+                due_at = (
+                    SELECT due_at FROM cards
+                    WHERE item_id = NEW.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                phase = (
+                    SELECT phase FROM cards
+                    WHERE item_id = NEW.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                lapses = COALESCE((
+                    SELECT MAX(lapses) FROM cards
+                    WHERE item_id = NEW.item_id AND is_suspended = 0
+                ), 0)
+            WHERE item_id = NEW.item_id;
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS item_browse_cards_delete
+        AFTER DELETE ON cards
+        BEGIN
+            UPDATE item_browse_rows
+            SET card_count = (SELECT COUNT(*) FROM cards WHERE item_id = OLD.item_id),
+                due_at = (
+                    SELECT due_at FROM cards
+                    WHERE item_id = OLD.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                phase = (
+                    SELECT phase FROM cards
+                    WHERE item_id = OLD.item_id AND is_suspended = 0
+                    ORDER BY due_at ASC, id ASC LIMIT 1
+                ),
+                lapses = COALESCE((
+                    SELECT MAX(lapses) FROM cards
+                    WHERE item_id = OLD.item_id AND is_suspended = 0
+                ), 0)
+            WHERE item_id = OLD.item_id;
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS item_browse_item_deck_update
+        AFTER UPDATE OF deck_id ON items
+        BEGIN
+            UPDATE item_browse_rows SET deck_id = NEW.deck_id WHERE item_id = NEW.id;
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS item_browse_item_type_name_update
+        AFTER UPDATE OF name ON item_types
+        BEGIN
+            UPDATE item_browse_rows
+            SET item_type_name = NEW.name
+            WHERE item_type_id = NEW.id;
+        END;
+        """,
     ]
 
     /// Applied when upgrading from schema version 7.
@@ -313,6 +441,8 @@ enum Schema {
         CREATE INDEX IF NOT EXISTS idx_items_deck_id ON items(deck_id);
         """,
     ]
+
+    static let migrationV17Statements = browseProjectionStatements
 
     /// Adds learner-local deck introduction limits without changing portable
     /// deck content. A nullable limit preserves the previous unlimited behavior.

@@ -23,6 +23,15 @@ public struct ItemTypeLoadResult: Sendable, Equatable {
     }
 }
 
+public struct ColdLibrarySnapshot: Sendable, Equatable {
+    public let itemTypes: ItemTypeLoadResult
+    public let items: [SavedItemSummary]
+    public let deckSummaries: [DeckSummary]
+    public let allDecksSummary: ScopeSummary
+    public let unassignedSummary: ScopeSummary
+    public let selectedScopeSummary: ScopeSummary
+}
+
 /// An item loaded from persistence with summary fields for list display.
 public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     public let id: UUID
@@ -458,8 +467,9 @@ public actor ItemStore {
         )
     }
 
-    /// Ordering is applied here rather than in SQL because titles and searchable
-    /// text are derived from encoded field values, not stored columns.
+    /// The default creation order is served straight from SQL. Other orders and
+    /// searches are arranged in memory, where locale-aware title comparison and
+    /// diacritic-insensitive matching behave the way a reader expects.
     public func listItems(
         scope: DeckScope = .allDecks,
         sort: ItemSortOrder = .createdAscending,
@@ -474,25 +484,31 @@ public actor ItemStore {
             return cached.items
         }
 
-        let persisted: [PersistedItem]
+        let cardScope: CardScope
         switch scope {
         case .allDecks:
-            persisted = try await database.fetchItems()
+            cardScope = .all
         case .unassigned:
-            persisted = try await database.fetchUnassignedItems()
+            cardScope = .unassigned
         case let .deck(deckID, includeDescendants):
             if includeDescendants {
                 let tree = try await deckTreeSummaries()
                 let deckIDs = DeckTree.descendantIDs(of: deckID, in: tree)
-                persisted = try await database.fetchItems(deckIDs: deckIDs)
+                cardScope = .decks(deckIDs)
             } else {
-                persisted = try await database.fetchItems(deckID: deckID)
+                cardScope = .decks([deckID])
             }
         }
 
-        let cardStates = try await fetchCardStates(for: scope, persisted: persisted)
-        let all = try await summaries(for: persisted, cardStates: cardStates)
-        let arranged = ItemBrowsing.arrange(all, sort: sort, search: search)
+        // The projection stores a title and subtitle per item, so ordering and
+        // searching no longer need the encoded field values. Rows whose item
+        // type is malformed stay out of browsing: loadItemTypes() is where a
+        // learner is told about them and offered the archive-before-repair path.
+        let projected = try await database.fetchBrowseRows(scope: cardScope)
+        let usable = try await browsableRows(projected)
+        let arranged = cacheable
+            ? usable
+            : ItemBrowsing.arrange(usable, sort: sort, search: search)
         if cacheable {
             let finalToken = try await database.cacheToken()
             itemListCache[scope] = CachedItemList(token: finalToken, items: arranged)
@@ -503,6 +519,34 @@ public actor ItemStore {
     /// Returns all items regardless of deck assignment.
     public func listItems() async throws -> [SavedItemSummary] {
         try await listItems(scope: .allDecks)
+    }
+
+    public func coldLibrarySnapshot(
+        scope: DeckScope = .allDecks,
+        asOf now: Date = .now
+    ) async throws -> ColdLibrarySnapshot {
+        let itemTypes = try await loadItemTypes()
+        let items = try await listItems(scope: scope, sort: .createdAscending)
+        let decks = try await deckSummaries(asOf: now)
+        let allDecks = try await scopeSummary(scope: .allDecks, asOf: now)
+        let unassigned = try await scopeSummary(scope: .unassigned, asOf: now)
+        let selected: ScopeSummary
+        switch scope {
+        case .allDecks:
+            selected = allDecks
+        case .unassigned:
+            selected = unassigned
+        case .deck:
+            selected = try await scopeSummary(scope: scope, asOf: now)
+        }
+        return ColdLibrarySnapshot(
+            itemTypes: itemTypes,
+            items: items,
+            deckSummaries: decks,
+            allDecksSummary: allDecks,
+            unassignedSummary: unassigned,
+            selectedScopeSummary: selected
+        )
     }
 
     /// Returns cards due for review at `now`, hydrated with item and template data.
@@ -738,6 +782,18 @@ public actor ItemStore {
             }
             return try await database.fetchItemCardStates(deckIDs: [deckID])
         }
+    }
+
+    /// Drops projected rows whose item type no longer decodes or validates.
+    /// Only the quarantined types are read, so an intact library skips this.
+    private func browsableRows(
+        _ rows: [SavedItemSummary]
+    ) async throws -> [SavedItemSummary] {
+        let corruptions = try await database.fetchItemTypesWithCorruption().corruptions
+        guard !corruptions.isEmpty else { return rows }
+        let quarantined = Set(corruptions.compactMap { UUID(uuidString: $0.persistedID) })
+        guard !quarantined.isEmpty else { return rows }
+        return rows.filter { !quarantined.contains($0.itemTypeID) }
     }
 
     private func validatedItemTypeMap(

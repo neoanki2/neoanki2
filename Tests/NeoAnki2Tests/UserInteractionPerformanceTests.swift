@@ -73,6 +73,33 @@ private struct InteractionFixture {
     let frontID = fixture.itemType.fields[0].id
     let backID = fixture.itemType.fields[1].id
 
+    let coldStore = try ItemStore(
+        databaseURL: fixture.directory.appendingPathComponent("library.sqlite")
+    )
+    try await coldStore.bootstrap()
+    let coldItemsModel = ItemsModel(store: coldStore, mediaStore: await coldStore.media)
+    let coldDecksModel = DecksModel(store: coldStore)
+    let coldLoad = try await PerformanceHarness.measure(
+        flow: "interaction-cold-library-load",
+        layer: "app",
+        metadata: meta
+    ) {
+        let now = Date.now
+        let snapshot = try await coldStore.coldLibrarySnapshot(scope: .allDecks, asOf: now)
+        coldDecksModel.applyColdSnapshot(snapshot)
+        coldItemsModel.applyColdSnapshot(snapshot, scope: .allDecks)
+        #expect(coldItemsModel.items.count == scale.itemCount)
+        #expect(coldDecksModel.summaries.count == scale.deckCount)
+        return [:]
+    }
+    // A first launch reads the browse list, the per-deck counts, and the
+    // all-decks and unassigned summaries. Those are separate aggregate scans on
+    // one actor, so this budget is deliberately looser than the warm reloads
+    // below, which reuse the caches this measurement populates.
+    if scale == .large {
+        #expect(coldLoad.durationSeconds < 0.3)
+    }
+
     _ = try await PerformanceHarness.measure(
         flow: "interaction-load-scope-home",
         layer: "app",

@@ -238,6 +238,13 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 17, try tableExists("items") {
+                for sql in Schema.migrationV17Statements {
+                    try execute(sql)
+                }
+                try backfillBrowseProjection()
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -581,6 +588,7 @@ actor SQLiteDatabase {
             if let previous {
                 try syncCards(from: previous, to: updated, now: now)
             }
+            try refreshBrowseProjection(itemTypeID: updated.id)
         }
     }
 
@@ -659,6 +667,7 @@ actor SQLiteDatabase {
             for entry in try fetchItems(itemTypeID: id) {
                 let cards = CardGenerator.cards(for: entry.item, type: repaired, now: now)
                 try insertCards(cards)
+                try upsertBrowseProjection(entry.item, itemType: repaired, createdAt: entry.createdAt)
             }
         }
         return repaired
@@ -1013,6 +1022,10 @@ actor SQLiteDatabase {
             )
             try insertItem(item, createdAt: createdAt, updatedAt: updatedAt)
             try insertCards(cards)
+            guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
+                throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+            }
+            try upsertBrowseProjection(item, itemType: itemType, createdAt: createdAt)
             try consumeMediaReservations(ids: mediaReservationIDs(in: item))
         }
     }
@@ -1032,6 +1045,10 @@ actor SQLiteDatabase {
                 )
                 try insertItem(entry.item, createdAt: createdAt, updatedAt: updatedAt)
                 try insertCards(entry.cards)
+                guard let itemType = try fetchValidatedItemType(id: entry.item.itemTypeID) else {
+                    throw DatabaseError.itemTypeNotFound(entry.item.itemTypeID)
+                }
+                try upsertBrowseProjection(entry.item, itemType: itemType, createdAt: createdAt)
                 try consumeMediaReservations(ids: mediaReservationIDs(in: entry.item))
             }
         }
@@ -1124,6 +1141,11 @@ actor SQLiteDatabase {
                         ]
                     )
                 }
+                try upsertBrowseProjection(
+                    entry.item,
+                    itemType: itemType,
+                    createdAt: entry.createdAt
+                )
                 try consumeMediaReservations(ids: mediaReservationIDs(in: entry.item))
             }
         }
@@ -1163,6 +1185,10 @@ actor SQLiteDatabase {
                 ]
             )
             try reconcileCards(for: item.id, desired: desiredCards)
+            guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
+                throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+            }
+            try upsertBrowseProjection(item, itemType: itemType, createdAt: previous.createdAt)
             try consumeMediaReservations(ids: mediaReservationIDs(in: item))
         }
     }
@@ -1839,6 +1865,86 @@ actor SQLiteDatabase {
             """
         )
         return try rows.map { try decodePersistedItem(from: $0) }
+    }
+
+    func fetchBrowseRows(scope: CardScope) throws -> [SavedItemSummary] {
+        guard let handle else {
+            throw DatabaseError.queryFailed("Database is closed.")
+        }
+        let clause = scopeClause(scope, column: "deck_id")
+        let sql = """
+            SELECT item_id, item_type_id, item_type_name, title, subtitle,
+                   card_count, deck_id, created_at, due_at, phase, lapses
+            FROM item_browse_rows
+            WHERE \(clause.sql)
+            ORDER BY created_at ASC, item_id ASC;
+            """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement
+        else {
+            throw DatabaseError.queryFailed(errorMessage(from: handle))
+        }
+        defer { sqlite3_finalize(statement) }
+        try bind(clause.bindings, to: statement)
+
+        func text(_ column: Int32) -> String? {
+            guard sqlite3_column_type(statement, column) != SQLITE_NULL,
+                  let value = sqlite3_column_text(statement, column)
+            else { return nil }
+            return String(cString: value)
+        }
+
+        var rows: [SavedItemSummary] = []
+        while true {
+            let code = sqlite3_step(statement)
+            if code == SQLITE_DONE { break }
+            guard code == SQLITE_ROW,
+                  let itemIDText = text(0),
+                  let itemID = UUID(uuidString: itemIDText),
+                  let itemTypeIDText = text(1),
+                  let itemTypeID = UUID(uuidString: itemTypeIDText),
+                  let itemTypeName = text(2),
+                  let title = text(3),
+                  let subtitle = text(4)
+            else {
+                throw DatabaseError.decodingFailed
+            }
+
+            let dueAt: Date?
+            let phase: Phase?
+            if sqlite3_column_type(statement, 8) == SQLITE_NULL {
+                dueAt = nil
+                phase = nil
+            } else {
+                dueAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 8))
+                guard let phaseText = text(9),
+                      let decodedPhase = Phase(rawValue: phaseText)
+                else {
+                    throw DatabaseError.decodingFailed
+                }
+                phase = decodedPhase
+            }
+            let deckID = text(6).flatMap(UUID.init(uuidString:))
+            rows.append(
+                SavedItemSummary(
+                    id: itemID,
+                    itemTypeID: itemTypeID,
+                    itemTypeName: itemTypeName,
+                    title: title,
+                    subtitle: subtitle,
+                    cardCount: Int(sqlite3_column_int64(statement, 5)),
+                    deckID: deckID,
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
+                    schedule: ItemScheduleSummary(
+                        dueAt: dueAt,
+                        phase: phase,
+                        lapses: Int(sqlite3_column_int64(statement, 10))
+                    )
+                )
+            )
+        }
+        return rows
     }
 
     func fetchItems(itemTypeID: UUID) throws -> [PersistedItem] {
@@ -2802,6 +2908,148 @@ actor SQLiteDatabase {
         guard let deck = try fetchDeck(id: id) else { return 0 }
         guard let parentID = deck.parentID, ids.contains(parentID) else { return 0 }
         return 1 + (try deckDepth(id: parentID, within: ids))
+    }
+
+    private func backfillBrowseProjection() throws {
+        try execute("DELETE FROM item_browse_rows;")
+        let itemTypes = try fetchItemTypesWithCorruption().itemTypes
+        let itemTypesByID = Dictionary(uniqueKeysWithValues: itemTypes.map { ($0.id, $0) })
+        // Libraries old enough to predate the card scheduling columns still get
+        // browsable rows. The aggregates stay at their defaults until the cards
+        // themselves are rewritten, which beats failing the whole upgrade.
+        let includeCardAggregates = try cardsSupportScheduleAggregates()
+        for entry in try fetchItems() {
+            guard let itemType = itemTypesByID[entry.item.itemTypeID] else { continue }
+            try upsertBrowseProjection(
+                entry.item,
+                itemType: itemType,
+                createdAt: entry.createdAt,
+                includeCardAggregates: includeCardAggregates
+            )
+        }
+    }
+
+    private func cardsSupportScheduleAggregates() throws -> Bool {
+        guard try tableExists("cards") else { return false }
+        for column in ["item_id", "due_at", "phase", "lapses", "is_suspended"] {
+            guard try columnExists(column, in: "cards") else { return false }
+        }
+        return true
+    }
+
+    private func refreshBrowseProjection(itemTypeID: UUID) throws {
+        guard let itemType = try fetchValidatedItemType(id: itemTypeID) else {
+            try execute(
+                "DELETE FROM item_browse_rows WHERE item_type_id = ?;",
+                bindings: [.text(itemTypeID.uuidString)]
+            )
+            return
+        }
+        for entry in try fetchItems(itemTypeID: itemTypeID) {
+            try upsertBrowseProjection(
+                entry.item,
+                itemType: itemType,
+                createdAt: entry.createdAt
+            )
+        }
+    }
+
+    private func upsertBrowseProjection(
+        _ item: Item,
+        itemType: ItemType,
+        createdAt: Date,
+        includeCardAggregates: Bool = true
+    ) throws {
+        guard includeCardAggregates else {
+            try upsertBrowseProjectionWithoutCards(
+                item,
+                itemType: itemType,
+                createdAt: createdAt
+            )
+            return
+        }
+        try execute(
+            """
+            INSERT INTO item_browse_rows (
+                item_id, item_type_id, item_type_name, title, subtitle,
+                deck_id, created_at, card_count, due_at, phase, lapses
+            )
+            SELECT ?, ?, ?, ?, ?, ?, ?,
+                   COUNT(cards.id),
+                   (
+                       SELECT due_at FROM cards AS due_card
+                       WHERE due_card.item_id = ?
+                         AND due_card.is_suspended = 0
+                       ORDER BY due_at ASC, id ASC LIMIT 1
+                   ),
+                   (
+                       SELECT phase FROM cards AS phase_card
+                       WHERE phase_card.item_id = ?
+                         AND phase_card.is_suspended = 0
+                       ORDER BY due_at ASC, id ASC LIMIT 1
+                   ),
+                   COALESCE(MAX(CASE WHEN cards.is_suspended = 0 THEN cards.lapses END), 0)
+            FROM cards
+            WHERE cards.item_id = ?
+            ON CONFLICT(item_id) DO UPDATE SET
+                item_type_id = excluded.item_type_id,
+                item_type_name = excluded.item_type_name,
+                title = excluded.title,
+                subtitle = excluded.subtitle,
+                deck_id = excluded.deck_id,
+                created_at = excluded.created_at,
+                card_count = excluded.card_count,
+                due_at = excluded.due_at,
+                phase = excluded.phase,
+                lapses = excluded.lapses;
+            """,
+            bindings: [
+                .text(item.id.uuidString),
+                .text(itemType.id.uuidString),
+                .text(itemType.name),
+                .text(ItemDisplay.title(for: item, in: itemType)),
+                .text(ItemDisplay.subtitle(for: item, in: itemType)),
+                item.deckID.map { .text($0.uuidString) } ?? .null,
+                .double(createdAt.timeIntervalSince1970),
+                .text(item.id.uuidString),
+                .text(item.id.uuidString),
+                .text(item.id.uuidString),
+            ]
+        )
+    }
+
+    /// Writes the display half of a projected row for libraries whose `cards`
+    /// table has not reached the scheduling columns yet.
+    private func upsertBrowseProjectionWithoutCards(
+        _ item: Item,
+        itemType: ItemType,
+        createdAt: Date
+    ) throws {
+        try execute(
+            """
+            INSERT INTO item_browse_rows (
+                item_id, item_type_id, item_type_name, title, subtitle,
+                deck_id, created_at, card_count, due_at, phase, lapses
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, 0)
+            ON CONFLICT(item_id) DO UPDATE SET
+                item_type_id = excluded.item_type_id,
+                item_type_name = excluded.item_type_name,
+                title = excluded.title,
+                subtitle = excluded.subtitle,
+                deck_id = excluded.deck_id,
+                created_at = excluded.created_at;
+            """,
+            bindings: [
+                .text(item.id.uuidString),
+                .text(itemType.id.uuidString),
+                .text(itemType.name),
+                .text(ItemDisplay.title(for: item, in: itemType)),
+                .text(ItemDisplay.subtitle(for: item, in: itemType)),
+                item.deckID.map { .text($0.uuidString) } ?? .null,
+                .double(createdAt.timeIntervalSince1970),
+            ]
+        )
     }
 
     private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {

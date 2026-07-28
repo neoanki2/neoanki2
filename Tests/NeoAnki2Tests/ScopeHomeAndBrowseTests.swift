@@ -284,6 +284,79 @@ private func addItem(
     #expect(model.scopeSummary.dueNow == 1)
 }
 
+// MARK: - Cold start
+
+/// A first launch fills the sidebar and the browse list from one snapshot. It
+/// has to agree with the counts the ordinary reload path produces, or the app
+/// would show one set of totals on launch and another the moment anything moved.
+@Test @MainActor func coldSnapshotMatchesTheOrdinaryLoadedLibrary() async throws {
+    let (model, decksModel, store) = try await makeModels()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    await model.load()
+    #expect(await addItem(model, front: "France", back: "Paris", deckID: deck.id))
+    #expect(await addItem(model, front: "Japan", back: "Tokyo"))
+    await decksModel.load()
+
+    let coldItems = ItemsModel(store: store, mediaStore: await store.media)
+    let coldDecks = DecksModel(store: store)
+    #expect(coldItems.needsInitialLoad)
+    #expect(coldDecks.needsInitialLoad)
+
+    let snapshot = try await store.coldLibrarySnapshot(scope: .allDecks)
+    coldDecks.applyColdSnapshot(snapshot)
+    coldItems.applyColdSnapshot(snapshot, scope: .allDecks)
+
+    #expect(!coldItems.needsInitialLoad)
+    #expect(!coldDecks.needsInitialLoad)
+    #expect(coldItems.items.map(\.title) == model.items.map(\.title))
+    #expect(coldItems.scopeSummary == model.scopeSummary)
+    #expect(coldItems.itemTypes.map(\.id) == model.itemTypes.map(\.id))
+    #expect(coldDecks.summaries == decksModel.summaries)
+    #expect(coldDecks.allDecksDueCount == decksModel.allDecksDueCount)
+    #expect(coldDecks.unassignedDueCount == decksModel.unassignedDueCount)
+    #expect(coldDecks.unassignedItemCount == decksModel.unassignedItemCount)
+    #expect(coldItems.errorMessage == nil)
+    #expect(coldDecks.errorMessage == nil)
+}
+
+/// The browse list is projected per item now, so a scoped cold start has to
+/// narrow to the selected deck rather than hand back the whole library.
+@Test @MainActor func coldSnapshotHonorsTheSelectedDeckScope() async throws {
+    let (model, _, store) = try await makeModels()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    await model.load()
+    _ = await addItem(model, front: "France", back: "Paris", deckID: deck.id)
+    _ = await addItem(model, front: "Japan", back: "Tokyo")
+
+    let scope = StudyScope.deck(deck.id, name: "Geography")
+    let snapshot = try await store.coldLibrarySnapshot(scope: scope.filter)
+    let coldItems = ItemsModel(store: store, mediaStore: await store.media)
+    coldItems.applyColdSnapshot(snapshot, scope: scope)
+
+    #expect(coldItems.items.map(\.title) == ["France"])
+    #expect(coldItems.scopeSummary.itemCount == 1)
+    #expect(snapshot.allDecksSummary.itemCount == 2)
+    #expect(snapshot.unassignedSummary.itemCount == 1)
+}
+
+/// The cold path also runs when only the sidebar is uninitialized, so a browse
+/// column the learner already chose has to survive it.
+@Test @MainActor func coldSnapshotKeepsTheChosenBrowseOrder() async throws {
+    let (model, _, store) = try await makeModels()
+    await model.load()
+    _ = await addItem(model, front: "Zebra", back: "Stripes")
+    _ = await addItem(model, front: "Aardvark", back: "Ants")
+
+    let coldItems = ItemsModel(store: store, mediaStore: await store.media)
+    coldItems.tableSort = [KeyPathComparator(\.title, order: .forward)]
+    let snapshot = try await store.coldLibrarySnapshot(scope: .allDecks)
+    coldItems.applyColdSnapshot(snapshot, scope: .allDecks)
+
+    #expect(coldItems.items.map(\.title) == ["Aardvark", "Zebra"])
+}
+
 // MARK: - Table sort keys
 
 @Test @MainActor func browseSortKeysKeepUnscheduledItemsTogether() async throws {

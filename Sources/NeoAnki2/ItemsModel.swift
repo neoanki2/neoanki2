@@ -24,6 +24,7 @@ final class ItemsModel {
 
     private var hasLoaded = false
     private var itemTypesLoaded = false
+    var needsInitialLoad: Bool { !hasLoaded }
 
     var addItemTypeID: ItemType.ID?
     var addItemDeckID: UUID?
@@ -101,6 +102,31 @@ final class ItemsModel {
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
+        isLoading = false
+    }
+
+    func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot, scope: StudyScope) {
+        cachedScope = scope
+        itemTypes = snapshot.itemTypes.itemTypes
+        if addItemTypeID == nil
+            || !itemTypes.contains(where: { $0.id == addItemTypeID }) {
+            addItemTypeID = itemTypes.first?.id
+        }
+        if snapshot.itemTypes.corruptions.isEmpty {
+            errorMessage = nil
+        } else {
+            let count = snapshot.itemTypes.corruptions.count
+            errorMessage = count == 1
+                ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
+                : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
+        }
+        itemTypesLoaded = true
+        // The snapshot arrives in creation order. Honor the browse comparator
+        // for the same reason `load` does: this path also runs when only the
+        // sidebar is uninitialized, and a chosen column order has to survive it.
+        items = snapshot.items.sorted(using: tableSort)
+        scopeSummary = snapshot.selectedScopeSummary
+        hasLoaded = true
         isLoading = false
     }
 

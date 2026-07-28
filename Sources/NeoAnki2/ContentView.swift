@@ -629,6 +629,22 @@ struct ContentView: View {
     /// about how many cards are due.
     private func refreshLibrary() async {
         let now = Date.now
+        if decksModel.needsInitialLoad || itemsModel.needsInitialLoad {
+            let scope = decksModel.studyScope
+            do {
+                let snapshot = try await itemsModel.store.coldLibrarySnapshot(
+                    scope: scope.filter,
+                    asOf: now
+                )
+                decksModel.applyColdSnapshot(snapshot)
+                itemsModel.setCachedScope(scope)
+                itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
+                itemsModel.applyColdSnapshot(snapshot, scope: scope)
+                return
+            } catch {
+                // Preserve the established model-owned error presentation.
+            }
+        }
         await decksModel.loadOrRefresh(asOf: now)
         await reloadScope(asOf: now)
     }

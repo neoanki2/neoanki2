@@ -39,6 +39,7 @@ final class DecksModel {
     private(set) var errorMessage: String?
 
     private var hasLoaded = false
+    var needsInitialLoad: Bool { !hasLoaded }
 
     var selectedScope: SidebarSelection = .allDecks
 
@@ -91,6 +92,21 @@ final class DecksModel {
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
+        isLoading = false
+    }
+
+    func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot) {
+        summaries = snapshot.deckSummaries
+        deckTree = DeckTree.build(from: summaries)
+        allDecksDueCount = snapshot.allDecksSummary.dueNow
+        unassignedDueCount = snapshot.unassignedSummary.dueNow
+        unassignedItemCount = snapshot.unassignedSummary.itemCount
+        if case let .deck(id) = selectedScope,
+           !summaries.contains(where: { $0.id == id }) {
+            selectedScope = .allDecks
+        }
+        errorMessage = nil
+        hasLoaded = true
         isLoading = false
     }
 
