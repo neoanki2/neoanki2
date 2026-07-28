@@ -246,12 +246,13 @@ private struct DeckSidebarNode: View {
     let onRename: (DeckSummary) -> Void
     let onDelete: (DeckSummary) -> Void
     let onNewSubdeck: (UUID) -> Void
+    @State private var isExpanded = false
 
     var body: some View {
         if node.children.isEmpty {
             deckRow(node.summary)
         } else {
-            DisclosureGroup {
+            DisclosureGroup(isExpanded: $isExpanded) {
                 ForEach(node.children) { child in
                     DeckSidebarNode(
                         node: child,
@@ -265,6 +266,24 @@ private struct DeckSidebarNode: View {
             } label: {
                 deckRow(node.summary)
             }
+            .onChange(of: decksModel.selectedScope, initial: true) { _, selection in
+                guard case let .deck(selectedID) = selection else { return }
+                if containsDeck(selectedID) {
+                    isExpanded = true
+                }
+            }
+        }
+    }
+
+    private func containsDeck(_ id: UUID) -> Bool {
+        node.id == id || node.children.contains { child in
+            child.id == id || containsDeck(id, in: child)
+        }
+    }
+
+    private func containsDeck(_ id: UUID, in node: DeckNode) -> Bool {
+        node.children.contains { child in
+            child.id == id || containsDeck(id, in: child)
         }
     }
 

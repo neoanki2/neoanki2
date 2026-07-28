@@ -13,7 +13,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
 
         openAddItem(in: app)
         let picker = app.popUpButtons.identified("addItemTypePicker")
-        if picker.waitForExistence(timeout: 3) {
+        if picker.waitUntilExists(timeout: 3) {
             selectPopUpOption(named: "Numeric", picker: picker, in: app)
         }
         enterText("Count", into: field(named: "Front", in: app), app: app)
@@ -50,9 +50,9 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         let typePickers = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH 'itemTypeFieldType-'")
         )
-        if typePickers.firstMatch.waitForExistence(timeout: 3) {
+        if typePickers.firstMatch.waitUntilExists(timeout: 3) {
             typePickers.firstMatch.click()
-            if app.menuItems["Cloze"].waitForExistence(timeout: 2) {
+            if app.menuItems["Cloze"].waitUntilExists(timeout: 2) {
                 selectMenuItem("Cloze", in: app)
             }
         }
@@ -71,7 +71,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         let clozeField = app.textViews.matching(
             NSPredicate(format: "identifier BEGINSWITH 'field-'")
         ).firstMatch
-        if clozeField.waitForExistence(timeout: 5) {
+        if clozeField.waitUntilExists(timeout: 5) {
             clozeField.click()
             clozeField.typeText("The capital of France is Paris.")
             clozeField.typeKey("a", modifierFlags: [.command])
@@ -80,7 +80,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         let markBlank = app.buttons.matching(
             NSPredicate(format: "identifier CONTAINS 'markBlank'")
         ).firstMatch
-        if markBlank.waitForExistence(timeout: 3) {
+        if markBlank.waitUntilExists(timeout: 3) {
             markBlank.click()
         }
         app.buttons.identified("cancelAddItem").click()
@@ -93,7 +93,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         app.buttons.identified("editItem").click()
 
         let save = app.buttons.identified("saveEditItem")
-        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.waitUntilExists(timeout: 5))
         XCTAssertFalse(save.isEnabled)
         app.buttons.identified("cancelEditItem").click()
         returnToLibrary(in: app)
@@ -103,9 +103,9 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         let app = launchApp()
         createDeck(named: "Empty Deck", in: app)
         selectScope("deckRow-Empty Deck", in: app)
-        XCTAssertTrue(app.buttons.identified("addItemEmptyState").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("addItemEmptyState").waitUntilExists(timeout: 5))
         app.buttons.identified("addItemEmptyState").click()
-        XCTAssertTrue(field(named: "Front", in: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(field(named: "Front", in: app).waitUntilExists(timeout: 10))
         app.buttons.identified("cancelAddItem").click()
     }
 
@@ -118,9 +118,9 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         )
         selectScope("scopeRow-Unassigned", in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10)
+            app.descendants(matching: .any)["emptyUnassignedState"].waitUntilExists(timeout: 10)
         )
-        XCTAssertFalse(app.buttons.identified("addItemEmptyState").waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons.identified("addItemEmptyState").waitUntilGone(timeout: 2))
     }
 
     func testItemPreviewRendersRichText() throws {
@@ -134,7 +134,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         XCTAssertTrue(
             app.staticTexts.matching(
                 NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", "PreviewBold", "PreviewBold")
-            ).firstMatch.waitForExistence(timeout: 5)
+            ).firstMatch.waitUntilExists(timeout: 5)
         )
         returnToLibrary(in: app)
     }

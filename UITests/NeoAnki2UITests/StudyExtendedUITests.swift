@@ -33,7 +33,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         addBasicItem(front: "Space Q", back: "Space A", in: app)
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.space, modifierFlags: [])
-        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 5))
         clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
@@ -44,7 +44,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
         app.typeKey("z", modifierFlags: [.command])
-        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 5))
         clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
@@ -54,13 +54,13 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         let moveDown = app.buttons.identified("moveArrangementDown")
-        if moveDown.waitForExistence(timeout: 3), moveDown.isEnabled {
+        if moveDown.waitUntilExists(timeout: 3), moveDown.isEnabled {
             moveDown.click()
         }
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 5)
-                || app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 5)
+            app.descendants(matching: .any)["answerCorrect"].waitUntilExists(timeout: 5)
+                || app.descendants(matching: .any)["studyAnswer"].waitUntilExists(timeout: 5)
         )
         if app.buttons.identified("gradeGood").exists {
             clickOrType("gradeGood", shortcut: "3", in: app)
@@ -76,8 +76,8 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: [.command])
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 5)
-                || app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 5)
+            app.descendants(matching: .any)["answerCorrect"].waitUntilExists(timeout: 5)
+                || app.descendants(matching: .any)["answerIncorrect"].waitUntilExists(timeout: 5)
         )
     }
 
@@ -85,7 +85,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-record")
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
-        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 5))
         clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
@@ -106,10 +106,10 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         app.buttons.identified("editStudyCard").click()
-        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitUntilExists(timeout: 5))
         enterText("Capital of France", into: field(named: "Front", in: app), app: app)
         app.buttons.identified("saveEditItem").click()
-        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitUntilGone(timeout: 10))
 
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
@@ -124,10 +124,10 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         app.typeKey("e", modifierFlags: [.command])
-        XCTAssertTrue(app.buttons.identified("cancelEditItem").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("cancelEditItem").waitUntilExists(timeout: 5))
         app.buttons.identified("cancelEditItem").click()
 
-        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitUntilExists(timeout: 5))
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
     }
@@ -139,9 +139,9 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
 
         let dismiss = app.buttons.identified("dismissGradeUndo")
-        if dismiss.waitForExistence(timeout: 3) {
+        if dismiss.waitUntilExists(timeout: 3) {
             dismiss.click()
-            XCTAssertFalse(dismiss.waitForExistence(timeout: 2))
+            XCTAssertTrue(dismiss.waitUntilGone(timeout: 2))
         }
         finishStudySession(in: app)
     }

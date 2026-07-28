@@ -2,6 +2,7 @@ import NeoAnkiCore
 import SwiftUI
 
 struct TemplateEditorView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: TemplatesModel
     var onDismiss: () -> Void = {}
 
@@ -68,7 +69,34 @@ struct TemplateEditorView: View {
             }
 
             Section {
-                DisclosureGroup(isExpanded: $showAdvanced) {
+                Button {
+                    showAdvanced.toggle()
+                } label: {
+                    HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
+                        Image(systemName: "chevron.right")
+                            .rotationEffect(.degrees(showAdvanced ? 90 : 0))
+                            .animation(
+                                reduceMotion ? nil : .easeOut(duration: 0.2),
+                                value: showAdvanced
+                            )
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                            Text("Advanced")
+                            Text("Skill mapping, reveal behavior, media playback, and generation rules")
+                                .font(DesignSystem.Typography.uiHint)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Advanced settings")
+                .accessibilityValue(showAdvanced ? "Expanded" : "Collapsed")
+                .accessibilityIdentifier("templateAdvancedSettings")
+
+                if showAdvanced {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                         Text("Practice skill")
                             .font(DesignSystem.Typography.uiSecondary.weight(.semibold))
@@ -115,16 +143,7 @@ struct TemplateEditorView: View {
                             ConditionEditor(condition: generateWhenBinding, fields: itemType.fields)
                         }
                     }
-                    .padding(.top, DesignSystem.Spacing.xs)
-                } label: {
-                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                        Text("Advanced")
-                        Text("Skill mapping, reveal behavior, media playback, and generation rules")
-                            .font(DesignSystem.Typography.uiHint)
-                            .foregroundStyle(.secondary)
-                    }
                 }
-                .accessibilityIdentifier("templateAdvancedSettings")
             }
 
             if let errorMessage = model.errorMessage {

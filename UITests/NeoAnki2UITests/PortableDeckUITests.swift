@@ -7,7 +7,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         waitForItem(named: "Imported Front", in: app)
         showSidebar(in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any).identified("deckRow-Portable Import").waitForExistence(timeout: 5)
+            app.descendants(matching: .any).identified("deckRow-Portable Import").waitUntilExists(timeout: 5)
         )
     }
 
@@ -46,7 +46,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
             file: fixtureURL("conflict.neodeck")
         )
 
-        XCTAssertTrue(app.buttons.identified("portableDeckConflictUseLocal").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.identified("portableDeckConflictUseLocal").waitUntilExists(timeout: 10))
         XCTAssertTrue(app.buttons.identified("portableDeckConflictImportNew").exists)
         XCTAssertTrue(app.buttons.identified("portableDeckConflictCancel").exists)
     }
@@ -58,7 +58,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         )
         app.buttons.identified("portableDeckConflictUseLocal").click()
         XCTAssertTrue(
-            app.buttons.identified("portableDeckConflictUseLocal").waitForNonExistence(timeout: 15)
+            app.buttons.identified("portableDeckConflictUseLocal").waitUntilGone(timeout: 15)
         )
         waitForPortableImportCompletion(in: app)
         waitForLibraryReady(in: app)
@@ -73,13 +73,13 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         )
         app.buttons.identified("portableDeckConflictImportNew").click()
         XCTAssertTrue(
-            app.buttons.identified("portableDeckConflictUseLocal").waitForNonExistence(timeout: 15)
+            app.buttons.identified("portableDeckConflictUseLocal").waitUntilGone(timeout: 15)
         )
         waitForPortableImportCompletion(in: app)
 
         openTemplates(in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any)["itemTypeRow-Portable Custom Revised"].waitForExistence(timeout: 15)
+            app.descendants(matching: .any)["itemTypeRow-Portable Custom Revised"].waitUntilExists(timeout: 15)
         )
         closeTemplates(in: app)
     }
@@ -88,10 +88,10 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         let app = launchAppWithFixtures(scenario: "type-conflict-local")
         choosePortableDeckImport(fixtureURL("conflict.neodeck"), in: app)
         app.buttons.identified("portableDeckConflictCancel").click()
-        if app.buttons.identified("portableDeckConflictUseLocal").waitForExistence(timeout: 2) {
+        if app.buttons.identified("portableDeckConflictUseLocal").waitUntilExists(timeout: 2) {
             app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
         }
 
-        XCTAssertTrue(app.buttons.identified("portableDeckConflictUseLocal").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("portableDeckConflictUseLocal").waitUntilGone(timeout: 5))
     }
 }

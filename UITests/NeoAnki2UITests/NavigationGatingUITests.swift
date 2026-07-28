@@ -7,7 +7,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         assertSidebarCollapsed(in: app)
         showSidebar(in: app)
-        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitUntilExists(timeout: 3))
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
     }
@@ -17,7 +17,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         openAddItem(in: app)
         assertSidebarCollapsed(in: app)
         showSidebar(in: app)
-        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitUntilExists(timeout: 3))
         app.buttons.identified("cancelAddItem").click()
     }
 
@@ -26,7 +26,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         openTemplates(in: app)
         assertSidebarCollapsed(in: app)
         showSidebar(in: app)
-        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitUntilExists(timeout: 3))
         closeTemplates(in: app)
     }
 
@@ -44,7 +44,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
             environment: ["NEOANKI_TEST_PORTABLE_BUSY": "1"]
         )
         assertMenuDisabled("Import Deck…", in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["portableDeckTransferBusy"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["portableDeckTransferBusy"].waitUntilExists(timeout: 5))
     }
 
     func testBootstrapFailureShowsSafeErrorState() throws {
@@ -53,7 +53,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
             waitForLibrary: false
         )
 
-        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitUntilExists(timeout: 5))
         XCTAssertTrue(app.staticTexts["Could Not Start"].exists)
         XCTAssertFalse(app.buttons.identified("addItemToolbar").exists)
     }

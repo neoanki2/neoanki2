@@ -66,12 +66,12 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             deckApp.buttons.identified("confirmCreateDeck").click()
         }
         let childDeck = deckApp.descendants(matching: .any).identified("deckRow-French")
-        if !childDeck.waitForExistence(timeout: 1) {
+        if !childDeck.waitUntilExists(timeout: 1) {
             let disclosure = deckApp.disclosureTriangles.firstMatch
-            XCTAssertTrue(disclosure.waitForExistence(timeout: 3))
+            XCTAssertTrue(disclosure.waitUntilExists(timeout: 3))
             disclosure.click()
         }
-        XCTAssertTrue(childDeck.waitForExistence(timeout: 5))
+        XCTAssertTrue(childDeck.waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "decks-nested",
             of: deckApp,
@@ -85,7 +85,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         waitForItem(named: "Image", in: app)
         openItemDetail(named: "Image", in: app)
         app.buttons.identified("editItem").click()
-        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "item-media",
             of: app,
@@ -106,7 +106,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
 
         app.buttons.identified("gradeHelp").click()
-        XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-grade-help",
             of: app,
@@ -116,7 +116,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
 
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-answer",
             of: app,
@@ -124,7 +124,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             expectedVisibleIdentifiers: ["studyAnswer", "gradeGood", "gradeAgain"]
         )
         revealAndGrade("gradeGood", in: app)
-        XCTAssertTrue(app.buttons.identified("studySessionDone").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("studySessionDone").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-complete",
             of: app,
@@ -138,7 +138,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         startStudy(in: app)
         enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-type",
             of: app,
@@ -158,7 +158,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
 
         app.buttons.identified("addTemplateToolbar").click()
-        XCTAssertTrue(app.textFields.identified("templateNameField").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "template-editor",
             of: app,
@@ -169,13 +169,13 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
         openTemplateEditor(named: "Card", in: advancedApp)
-        XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitForExistence(timeout: 5))
+        XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
         let advancedSettings = advancedApp.descendants(matching: .any)
             .identified("templateAdvancedSettings")
-        XCTAssertTrue(advancedSettings.waitForExistence(timeout: 5))
+        XCTAssertTrue(advancedSettings.waitUntilExists(timeout: 5))
         let advancedForm = advancedApp.descendants(matching: .any)
             .identified("templateEditorForm")
-        XCTAssertTrue(advancedForm.waitForExistence(timeout: 3))
+        XCTAssertTrue(advancedForm.waitUntilExists(timeout: 3))
         // A form taller than the display has no hit point, so no gesture can be
         // placed on the form itself. This nudge is only to bring the answer
         // controls closer; scrolling by that element below is what the capture
@@ -184,7 +184,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             advancedForm.swipeUp()
         }
         let answerReveal = advancedApp.popUpButtons.identified("answerSlotReveal")
-        XCTAssertTrue(answerReveal.waitForExistence(timeout: 5))
+        XCTAssertTrue(answerReveal.waitUntilExists(timeout: 5))
         answerReveal.scroll(byDeltaX: 0, deltaY: 240)
         captureDocumentationScreenshot(
             named: "template-advanced",
@@ -204,7 +204,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             contents: "Front,Back\nImported question,Imported answer\n"
         )
         let importApp = launchAppForImport(file: importFile, scenario: "alternate-import-type")
-        XCTAssertTrue(importApp.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(importApp.descendants(matching: .any)["importSheet"].waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "import-sheet",
             of: importApp,
@@ -217,7 +217,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             file: fixtureURL("conflict.neodeck")
         )
         XCTAssertTrue(
-            conflictApp.buttons.identified("portableDeckConflictUseLocal").waitForExistence(timeout: 10)
+            conflictApp.buttons.identified("portableDeckConflictUseLocal").waitUntilExists(timeout: 10)
         )
         captureDocumentationScreenshot(
             named: "portable-conflict",
@@ -249,7 +249,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             environment: ["NEOANKI_TEST_BOOTSTRAP_FAILURE": "1"],
             waitForLibrary: false
         )
-        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "error-startup",
             of: app,
@@ -260,7 +260,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
 
     private func appCancelAddItem(in app: XCUIApplication) {
         app.buttons.identified("cancelAddItem").click()
-        if app.buttons.identified("confirmDiscardItem").waitForExistence(timeout: 2) {
+        if app.buttons.identified("confirmDiscardItem").waitUntilExists(timeout: 2) {
             app.buttons.identified("confirmDiscardItem").click()
         }
         waitForLibraryReady(in: app)

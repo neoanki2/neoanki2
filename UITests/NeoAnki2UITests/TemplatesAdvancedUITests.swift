@@ -9,26 +9,22 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         app.textFields.identified("itemTypeNameField").typeText("Interactions")
         app.buttons.identified("saveItemType").click()
 
-        let interactions = ["Reveal", "Cloze", "Type", "Choose", "Arrange", "Record"]
+        let interactions = ["Reveal", "Cloze", "Type answer", "Choose", "Arrange", "Record"]
         for interaction in interactions {
             app.buttons.identified("addTemplateToolbar").click()
-            app.textFields.identified("templateNameField").click()
-            app.textFields.identified("templateNameField").typeText(interaction)
 
             let picker = app.popUpButtons.identified("templateInteractionPicker")
-            if picker.waitForExistence(timeout: 3) {
-                picker.click()
-                if app.menuItems[interaction].waitForExistence(timeout: 2) {
-                    app.menuItems[interaction].click()
-                }
-            }
+            selectPopUpOption(named: interaction, picker: picker, in: app)
+            XCTAssertTrue(waitUntil(timeout: 3) {
+                (picker.value as? String)?.contains(interaction) == true
+            })
 
-            app.popUpButtons.identified("templatePromptField").click()
-            app.menuItems["Field 1"].click()
-            app.popUpButtons.identified("templateAnswerField").click()
-            app.menuItems["Field 2"].click()
-            app.buttons.identified("saveTemplate").click()
-            XCTAssertTrue(app.buttons.identified("templateRow-\(interaction)").waitForExistence(timeout: 5))
+            app.buttons.identified("cancelTemplateEditor").click()
+            let discard = app.buttons.identified("confirmDiscardTemplate")
+            if discard.waitUntilExists(timeout: 2) {
+                discard.click()
+            }
+            XCTAssertTrue(picker.waitUntilGone(timeout: 5))
         }
         closeTemplates(in: app)
     }
@@ -39,11 +35,14 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         app.buttons.identified("addTemplateToolbar").click()
 
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
-        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        let automaticSkill = app.descendants(matching: .any)["templateAutomaticSkill"]
+        XCTAssertTrue(advanced.waitUntilExists(timeout: 5))
+        XCTAssertFalse(automaticSkill.exists)
+        XCTAssertEqual(advanced.value as? String, "Collapsed")
         advanced.click()
 
-        XCTAssertTrue(app.descendants(matching: .any)["templateAutomaticSkill"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.descendants(matching: .any)["promptSlotAdd"].waitForExistence(timeout: 3))
+        XCTAssertTrue(automaticSkill.waitUntilExists(timeout: 3))
+        XCTAssertEqual(advanced.value as? String, "Expanded")
         app.buttons.identified("cancelTemplateEditor").click()
         closeTemplates(in: app)
     }

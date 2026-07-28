@@ -194,6 +194,7 @@ struct SidebarEmptyState: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(title). \(message)")
+            .modifier(OptionalAccessibilityIdentifier(identifier: contentIdentifier))
 
             // An empty surface has exactly one thing worth doing, so this is the
             // primary forward action and is sized like one.
@@ -209,7 +210,6 @@ struct SidebarEmptyState: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.md)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(OptionalAccessibilityIdentifier(identifier: contentIdentifier))
     }
 }
 
