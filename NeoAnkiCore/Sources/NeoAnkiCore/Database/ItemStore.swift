@@ -87,11 +87,43 @@ private extension FieldType {
 public actor ItemStore {
     private static let studyDayRolloverMetadataKey = "study_day_rollover_minutes"
 
+    private struct CachedItemList {
+        let token: DatabaseCacheToken
+        let items: [SavedItemSummary]
+    }
+
+    private struct CachedScopeSummary {
+        let token: DatabaseCacheToken
+        let summary: ScopeSummary
+        let calculatedAt: Date
+        let validUntil: Date?
+
+        func isValid(token currentToken: DatabaseCacheToken, asOf now: Date) -> Bool {
+            guard token == currentToken else { return false }
+            guard now >= calculatedAt else { return false }
+            return validUntil.map { now < $0 } ?? true
+        }
+    }
+
+    private struct CachedDeckSummaries {
+        let token: DatabaseCacheToken
+        let summaries: [DeckSummary]
+        let calculatedAt: Date
+        let validUntil: Date
+
+        func isValid(token currentToken: DatabaseCacheToken, asOf now: Date) -> Bool {
+            token == currentToken && now >= calculatedAt && now < validUntil
+        }
+    }
+
     let database: SQLiteDatabase
     private let schedulerOverride: (any Scheduler)?
     private let profileID: String
     private var fsrsParameters = FSRSScheduler.Parameters()
     let mediaStore: MediaStore?
+    private var itemListCache: [DeckScope: CachedItemList] = [:]
+    private var scopeSummaryCache: [DeckScope: CachedScopeSummary] = [:]
+    private var deckSummariesCache: CachedDeckSummaries?
     private let starterItemTypes: [ItemType]
 
     public init(
@@ -250,9 +282,59 @@ public actor ItemStore {
 
     /// Returns deck metadata with direct item counts and due counts including subdecks.
     public func deckSummaries(asOf now: Date = .now) async throws -> [DeckSummary] {
+        let initialToken = try await database.cacheToken()
+        if let cached = deckSummariesCache,
+           cached.isValid(token: initialToken, asOf: now) {
+            return cached.summaries
+        }
+
         let decks = try await database.fetchAllDecks()
         let studyDay = try await studyDayKey(asOf: now)
+        let tree = deckTreeSummaries(from: decks)
+        let directItemCounts = try await database.countItemsGroupedByDeck()
+        let directDueCounts = try await database.countDueCardsGroupedByDeck(
+            asOf: now,
+            studyDay: studyDay
+        )
+
         let summaries = decks.map { deck in
+            let scope = DeckTree.descendantIDs(of: deck.id, in: tree)
+            let itemCount = scope.reduce(0) { partial, deckID in
+                partial + directItemCounts[deckID, default: 0]
+            }
+            let dueCount = scope.reduce(0) { partial, deckID in
+                partial + directDueCounts[deckID, default: 0]
+            }
+            return DeckSummary(
+                id: deck.id,
+                name: deck.name,
+                parentID: deck.parentID,
+                newCardsPerDay: deck.newCardsPerDay,
+                itemCount: itemCount,
+                dueCount: dueCount
+            )
+        }
+        let rollover = try await studyDayRolloverMinutes()
+        let nextRollover = StudyDay.nextRollover(
+            after: now,
+            rolloverMinutes: rollover
+        )
+        let nextDue = try await database.nextUnsuspendedCardDue(after: now)
+        let validUntil = nextDue.map { min($0, nextRollover) } ?? nextRollover
+        let finalToken = try await database.cacheToken()
+        deckSummariesCache = CachedDeckSummaries(
+            token: finalToken,
+            summaries: summaries,
+            calculatedAt: now,
+            validUntil: validUntil
+        )
+        return summaries
+    }
+
+    /// Deck tree metadata without aggregate counts. Used when only descendant
+    /// expansion is needed, not sidebar totals.
+    private func deckTreeSummaries(from decks: [Deck]) -> [DeckSummary] {
+        decks.map { deck in
             DeckSummary(
                 id: deck.id,
                 name: deck.name,
@@ -262,32 +344,17 @@ public actor ItemStore {
                 dueCount: 0
             )
         }
+    }
 
-        var itemCounts: [UUID: Int] = [:]
-        var dueCounts: [UUID: Int] = [:]
+    private func deckTreeSummaries() async throws -> [DeckSummary] {
+        deckTreeSummaries(from: try await database.fetchAllDecks())
+    }
 
-        // Both counts span the deck and its descendants, because selecting a deck
-        // studies and browses its whole subtree. Counting items directly only
-        // would label a parent that organizes subdecks as empty.
-        for deck in decks {
-            let scope = DeckTree.descendantIDs(of: deck.id, in: summaries)
-            itemCounts[deck.id] = try await database.countItems(deckIDs: scope)
-            dueCounts[deck.id] = try await database.countDueCards(
-                deckIDs: scope,
-                asOf: now,
-                studyDay: studyDay
-            )
-        }
-
-        return decks.map { deck in
-            DeckSummary(
-                id: deck.id,
-                name: deck.name,
-                parentID: deck.parentID,
-                newCardsPerDay: deck.newCardsPerDay,
-                itemCount: itemCounts[deck.id, default: 0],
-                dueCount: dueCounts[deck.id, default: 0]
-            )
+    /// Scheduling summaries for specific items, read in batched queries.
+    public func fetchItemBrowseSchedules(itemIDs: [UUID]) async throws -> [UUID: ItemBrowseSchedule] {
+        let states = try await database.fetchItemCardStates(itemIDs: itemIDs)
+        return states.mapValues { state in
+            ItemBrowseSchedule(cardCount: state.cardCount, schedule: state.scheduleSummary)
         }
     }
 
@@ -398,6 +465,15 @@ public actor ItemStore {
         sort: ItemSortOrder = .createdAscending,
         search: String = ""
     ) async throws -> [SavedItemSummary] {
+        let cacheable = sort == .createdAscending
+            && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let initialToken = try await database.cacheToken()
+        if cacheable,
+           let cached = itemListCache[scope],
+           cached.token == initialToken {
+            return cached.items
+        }
+
         let persisted: [PersistedItem]
         switch scope {
         case .allDecks:
@@ -406,16 +482,22 @@ public actor ItemStore {
             persisted = try await database.fetchUnassignedItems()
         case let .deck(deckID, includeDescendants):
             if includeDescendants {
-                let summaries = try await deckSummaries()
-                let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
+                let tree = try await deckTreeSummaries()
+                let deckIDs = DeckTree.descendantIDs(of: deckID, in: tree)
                 persisted = try await database.fetchItems(deckIDs: deckIDs)
             } else {
                 persisted = try await database.fetchItems(deckID: deckID)
             }
         }
 
-        let all = try await summaries(for: persisted)
-        return ItemBrowsing.arrange(all, sort: sort, search: search)
+        let cardStates = try await fetchCardStates(for: scope, persisted: persisted)
+        let all = try await summaries(for: persisted, cardStates: cardStates)
+        let arranged = ItemBrowsing.arrange(all, sort: sort, search: search)
+        if cacheable {
+            let finalToken = try await database.cacheToken()
+            itemListCache[scope] = CachedItemList(token: finalToken, items: arranged)
+        }
+        return arranged
     }
 
     /// Returns all items regardless of deck assignment.
@@ -438,8 +520,8 @@ public actor ItemStore {
             cards = try await database.fetchUnassignedDueCards(asOf: now, limit: limit)
         case let .deck(deckID, includeDescendants):
             if includeDescendants {
-                let summaries = try await deckSummaries(asOf: now)
-                let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
+                let tree = try await deckTreeSummaries()
+                let deckIDs = DeckTree.descendantIDs(of: deckID, in: tree)
                 cards = try await database.fetchDueCards(
                     deckIDs: deckIDs,
                     asOf: now,
@@ -579,6 +661,12 @@ public actor ItemStore {
         scope: DeckScope = .allDecks,
         asOf now: Date = .now
     ) async throws -> ScopeSummary {
+        let initialToken = try await database.cacheToken()
+        if let cached = scopeSummaryCache[scope],
+           cached.isValid(token: initialToken, asOf: now) {
+            return cached.summary
+        }
+
         let resolved = try await resolveCardScope(scope, asOf: now)
         let studyDay = try await studyDayKey(asOf: now)
         let totals = try await database.cardScheduleTotals(
@@ -590,7 +678,7 @@ public actor ItemStore {
         let itemCount = try await database.countItems(scope: resolved)
         let rollover = try await studyDayRolloverMinutes()
 
-        return ScopeSummary(
+        let summary = ScopeSummary(
             itemCount: itemCount,
             cardCount: totals.cardCount,
             dueNow: totals.dueNow,
@@ -606,6 +694,14 @@ public actor ItemStore {
                 ? StudyDay.nextRollover(after: now, rolloverMinutes: rollover)
                 : nil
         )
+        let finalToken = try await database.cacheToken()
+        scopeSummaryCache[scope] = CachedScopeSummary(
+            token: finalToken,
+            summary: summary,
+            calculatedAt: now,
+            validUntil: summary.nextStudyAt
+        )
+        return summary
     }
 
     /// Expands a requested scope into the deck identifiers it actually covers.
@@ -620,9 +716,42 @@ public actor ItemStore {
             return .unassigned
         case let .deck(deckID, includeDescendants):
             guard includeDescendants else { return .decks([deckID]) }
-            let summaries = try await deckSummaries(asOf: now)
-            return .decks(DeckTree.descendantIDs(of: deckID, in: summaries))
+            let tree = try await deckTreeSummaries()
+            return .decks(DeckTree.descendantIDs(of: deckID, in: tree))
         }
+    }
+
+    private func fetchCardStates(
+        for scope: DeckScope,
+        persisted: [PersistedItem]
+    ) async throws -> [UUID: ItemCardState] {
+        switch scope {
+        case .allDecks:
+            return try await database.fetchItemCardStates()
+        case .unassigned:
+            return try await database.fetchItemCardStatesUnassigned()
+        case let .deck(deckID, includeDescendants):
+            if includeDescendants {
+                let tree = try await deckTreeSummaries()
+                let deckIDs = DeckTree.descendantIDs(of: deckID, in: tree)
+                return try await database.fetchItemCardStates(deckIDs: deckIDs)
+            }
+            return try await database.fetchItemCardStates(deckIDs: [deckID])
+        }
+    }
+
+    private func validatedItemTypeMap(
+        for persisted: [PersistedItem]
+    ) async throws -> [UUID: ItemType] {
+        let neededIDs = Set(persisted.map(\.item.itemTypeID))
+        guard !neededIDs.isEmpty else { return [:] }
+        let loaded = try await database.fetchItemTypesWithCorruption()
+        var map: [UUID: ItemType] = [:]
+        map.reserveCapacity(neededIDs.count)
+        for itemType in loaded.itemTypes where neededIDs.contains(itemType.id) {
+            map[itemType.id] = itemType
+        }
+        return map
     }
 
     public func unassignedDueCount(asOf now: Date = .now) async throws -> Int {
@@ -1029,18 +1158,19 @@ public actor ItemStore {
         return resolved
     }
 
-    private func summaries(for persisted: [PersistedItem]) async throws -> [SavedItemSummary] {
+    private func summaries(
+        for persisted: [PersistedItem],
+        cardStates: [UUID: ItemCardState]
+    ) async throws -> [SavedItemSummary] {
         var summaries: [SavedItemSummary] = []
         summaries.reserveCapacity(persisted.count)
-        let cardStates = try await database.fetchItemCardStates()
+        let itemTypes = try await validatedItemTypeMap(for: persisted)
 
         for entry in persisted {
             // Malformed definitions are reported by loadItemTypes(), where
             // callers receive the persisted ID and the archive-before-repair
             // path. Keep unrelated item rows usable in the meantime.
-            guard let itemType = try await database.fetchValidatedItemType(
-                id: entry.item.itemTypeID
-            ) else { continue }
+            guard let itemType = itemTypes[entry.item.itemTypeID] else { continue }
             let cardState = cardStates[entry.item.id] ?? ItemCardState()
             summaries.append(
                 SavedItemSummary(

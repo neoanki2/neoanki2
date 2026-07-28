@@ -66,6 +66,9 @@ struct ItemDetailView: View {
     let summary: SavedItemSummary
     var onBack: () -> Void = {}
     var onDeleted: () -> Void = {}
+    /// Editing an item can add or retire cards, so the counts outside this pane
+    /// need to hear about a save.
+    var onSaved: () -> Void = {}
 
     @State private var item: Item?
     @State private var itemType: ItemType?
@@ -167,7 +170,10 @@ struct ItemDetailView: View {
                         editingItemType: itemType
                     ) {
                         isEditing = false
-                        Task { await load() }
+                        Task {
+                            await load()
+                            onSaved()
+                        }
                     }
                 }
             }
@@ -222,7 +228,7 @@ struct ItemDetailView: View {
         let now = Date.now
         if await model.moveItem(id: summary.id, to: deckID, scope: scope, asOf: now) {
             item?.deckID = deckID
-            await decksModel.load(asOf: now)
+            await decksModel.refreshCounts(asOf: now)
         } else {
             selectedDeckID = item?.deckID
         }

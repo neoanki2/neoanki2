@@ -110,7 +110,7 @@ struct ItemBrowserView: View {
                     let now = Date.now
                     await itemsModel.deleteItems(ids: ids, scope: scope, asOf: now)
                     selection = []
-                    await decksModel.load(asOf: now)
+                    await decksModel.refreshCounts(asOf: now)
                 }
             }
             .accessibilityIdentifier("browseConfirmDelete")
@@ -260,7 +260,7 @@ struct ItemBrowserView: View {
             let now = Date.now
             await itemsModel.moveItems(ids: ids, to: deckID, scope: scope, asOf: now)
             selection = []
-            await decksModel.load(asOf: now)
+            await decksModel.refreshCounts(asOf: now)
         }
     }
 

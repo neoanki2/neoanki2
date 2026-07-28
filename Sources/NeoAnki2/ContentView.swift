@@ -12,6 +12,7 @@ private struct ImportNotice: Identifiable {
 
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
     @Bindable var schedulingModel: SchedulingModel
@@ -27,6 +28,10 @@ struct ContentView: View {
     @State private var templatesModel: TemplatesModel?
     @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
+    /// Lives here rather than in `StudyView` because the Study menu opens the
+    /// card editor, and every study command has to stand down while it is open:
+    /// the grade keys are unmodified, so they would otherwise land in a field.
+    @State private var isEditingStudyCard = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var importModel: ImportModel?
     @State private var isChoosingImportFile = false
@@ -63,7 +68,7 @@ struct ContentView: View {
                     }
                 },
                 onDeckSettingsSaved: {
-                    await refreshLibrary()
+                    await refreshCounts()
                 }
             )
             .navigationSplitViewColumnWidth(
@@ -111,6 +116,15 @@ struct ContentView: View {
             await refreshLibrary()
             await openTestingTransfersIfRequested()
         }
+        .task {
+            await trackDueCounts()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Coming back to the app can cross any amount of time, including a
+            // study day rollover, so the counts are re-read before they are read.
+            guard phase == .active else { return }
+            Task { await refreshCounts() }
+        }
         .fileImporter(
             isPresented: $isChoosingImportFile,
             allowedContentTypes: [.json, .commaSeparatedText],
@@ -139,7 +153,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
             SchedulingSettingsView(model: schedulingModel) {
-                await refreshLibrary()
+                // A new rollover redraws the day's budget, which is a count
+                // change across every scope and nothing more.
+                await refreshCounts()
             }
         }
         .alert(item: $importNotice) { notice in
@@ -268,6 +284,7 @@ struct ContentView: View {
             return StudyCommandHandlers(
                 startStudy: nil,
                 requestEndSession: { endSessionTrigger = true },
+                editCurrentCard: { isEditingStudyCard = true },
                 grade: { rating in
                     Task { await studyModel.grade(rating) }
                 },
@@ -275,19 +292,26 @@ struct ContentView: View {
                     Task { await studyModel.undoLastGrade() }
                 },
                 canStartStudy: false,
-                canEndSession: true,
+                canEndSession: !isEditingStudyCard,
+                canEditCurrentCard: studyModel.currentCard != nil
+                    && !studyModel.isGrading
+                    && !isEditingStudyCard,
                 canGrade: studyModelCanGrade(studyModel),
-                canUndoLastGrade: studyModel.canUndoLastGrade && !studyModel.isGrading
+                canUndoLastGrade: studyModel.canUndoLastGrade
+                    && !studyModel.isGrading
+                    && !isEditingStudyCard
             )
         }
 
         return StudyCommandHandlers(
             startStudy: { startStudy() },
             requestEndSession: nil,
+            editCurrentCard: nil,
             grade: nil,
             undoLastGrade: nil,
             canStartStudy: itemsModel.dueCount > 0 && !isStudying,
             canEndSession: false,
+            canEditCurrentCard: false,
             canGrade: false,
             canUndoLastGrade: false
         )
@@ -297,6 +321,7 @@ struct ContentView: View {
         guard let card = studyModel.currentCard else { return false }
         return studyModel.isAnswerRevealed
             && !studyModel.isGrading
+            && !isEditingStudyCard
             && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
@@ -310,9 +335,12 @@ struct ContentView: View {
         } else if isStudying, let studyModel {
             StudyView(
                 model: studyModel,
+                itemsModel: itemsModel,
+                decksModel: decksModel,
                 scope: studyScope,
                 mediaStore: itemsModel.mediaStore,
-                endSessionTrigger: $endSessionTrigger
+                endSessionTrigger: $endSessionTrigger,
+                isEditingCard: $isEditingStudyCard
             ) {
                 endStudy()
             }
@@ -333,7 +361,13 @@ struct ContentView: View {
                     scope: decksModel.studyScope,
                     summary: item,
                     onBack: { self.selectedItemID = nil },
-                    onDeleted: { self.selectedItemID = nil }
+                    onDeleted: {
+                        self.selectedItemID = nil
+                        // Deleting from the detail pane retires that item's cards,
+                        // which the sidebar was counting.
+                        Task { await refreshCounts() }
+                    },
+                    onSaved: { Task { await refreshCounts() } }
                 )
             }
         } else if isBrowsing {
@@ -464,7 +498,8 @@ struct ContentView: View {
             message: "\(count) \(noun) imported. Importing the same file again will create duplicates."
         )
         Task {
-            await refreshLibrary()
+            let now = Date.now
+            await decksModel.load(asOf: now)
         }
     }
 
@@ -534,6 +569,7 @@ struct ContentView: View {
            decksModel.summaries.contains(where: { $0.id == rootID }) {
             decksModel.selectedScope = .deck(rootID)
         }
+        itemsModel.invalidateItemTypes()
         await reloadScope(asOf: now)
         await templatesModel?.load()
     }
@@ -578,7 +614,7 @@ struct ContentView: View {
         isAddingItem = false
         columnVisibility = .all
         // A new item changes deck counts too, so the sidebar reloads with it.
-        Task { await refreshLibrary() }
+        Task { await decksModel.refreshCounts() }
     }
 
     private func reloadScope(asOf now: Date = .now) async {
@@ -593,8 +629,48 @@ struct ContentView: View {
     /// about how many cards are due.
     private func refreshLibrary() async {
         let now = Date.now
-        await decksModel.load(asOf: now)
+        await decksModel.refreshCounts(asOf: now)
         await reloadScope(asOf: now)
+    }
+
+    private func refreshAfterStudy(studiedItemIDs: Set<UUID>) async {
+        let now = Date.now
+        await decksModel.refreshCounts(asOf: now)
+        await itemsModel.refreshSchedules(for: studiedItemIDs, asOf: now)
+    }
+
+    /// Re-reads only what is due, on both surfaces, against one instant. This is
+    /// the path for changes the learner did not ask to see — a card falling due,
+    /// a save elsewhere — so it revises numbers in place and never reloads.
+    private func refreshCounts() async {
+        let now = Date.now
+        await decksModel.refreshCounts(asOf: now)
+        await itemsModel.refreshCounts(asOf: now)
+    }
+
+    /// Keeps the due counts true while the window just sits there. Cards come
+    /// back on a schedule, so this waits for the next one rather than polling on
+    /// a fixed beat: precise when something is about to fall due, near-free when
+    /// nothing is.
+    ///
+    /// It runs in every mode. Study reads its own queue and is forbidden from
+    /// showing these numbers, and the editors cover them, so a revision there is
+    /// invisible rather than wrong — and skipping it would mean trusting flags
+    /// this long-lived task cannot see change.
+    private func trackDueCounts() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(dueCountRefreshDelay))
+            guard !Task.isCancelled else { return }
+            await refreshCounts()
+        }
+    }
+
+    private var dueCountRefreshDelay: TimeInterval {
+        // The ceiling bounds how stale decks outside the selected scope can get.
+        // The floor keeps an already-overdue card from spinning this loop.
+        let ceiling: TimeInterval = 60
+        guard let nextStudyAt = itemsModel.scopeSummary.nextStudyAt else { return ceiling }
+        return min(max(nextStudyAt.timeIntervalSinceNow, 5), ceiling)
     }
 
     private func startStudy() {
@@ -605,14 +681,17 @@ struct ContentView: View {
 
     private func endStudy() {
         isStudying = false
+        isEditingStudyCard = false
+        let studiedItemIDs = studyModel?.reviewedItemIDs ?? []
         studyModel = nil
         Task {
-            await refreshLibrary()
+            await refreshAfterStudy(studiedItemIDs: studiedItemIDs)
         }
     }
 
     private func closeItemTypes() {
         Task {
+            itemsModel.invalidateItemTypes()
             await reloadScope()
             isManagingTemplates = false
             columnVisibility = .all

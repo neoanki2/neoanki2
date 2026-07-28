@@ -469,6 +469,47 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(restored.card.memory == first.memory)
 }
 
+@Test func reviewAgainEntersImmediateRelearningThroughStore() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let now = Date(timeIntervalSinceReferenceDate: 806_926_474.635_533)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+            ]
+        ),
+        now: now.addingTimeInterval(-3_600)
+    )
+    let card = try #require(await store.fetchDueCards(asOf: now).first)
+    let reviewMemory = MemoryState(
+        stability: 0.006940758044349528,
+        difficulty: 9.955935509193166,
+        due: Date(timeIntervalSinceReferenceDate: 806_923_269.169_737),
+        lastReview: Date(timeIntervalSinceReferenceDate: 806_922_669.488_242),
+        reps: 7,
+        lapses: 0,
+        phase: .review
+    )
+    try await SQLiteDatabase(path: databaseURL).updateCardMemory(card.id, memory: reviewMemory)
+
+    let submission = try await store.submitReviewWithReceipt(
+        cardID: card.id,
+        rating: .again,
+        now: now
+    )
+
+    #expect(submission.memory.phase == .relearning)
+    #expect(submission.memory.due == now)
+    #expect(submission.memory.lapses == 1)
+    let persisted = try #require(try await SQLiteDatabase(path: databaseURL).fetchCard(id: card.id))
+    #expect(persisted.memory == submission.memory)
+}
+
 @Test func optimizationPersistsThroughStoreAPIAndReopen() async throws {
     let databaseURL = tempDatabaseURL()
     let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")

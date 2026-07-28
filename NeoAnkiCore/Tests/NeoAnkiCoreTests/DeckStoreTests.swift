@@ -82,6 +82,25 @@ private func basicItem(deckID: UUID? = nil) -> Item {
     #expect(summaries.first?.dueCount == 0)
 }
 
+@Test func deckSummaryDueCountMatchesScopeSummary() async throws {
+    let store = try await makeStore()
+    let deck = Deck(name: "Mixed", newCardsPerDay: 5)
+    _ = try await store.createDeck(deck)
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    for _ in 1 ... 3 {
+        _ = try await store.createItem(basicItem(deckID: deck.id), now: now)
+    }
+
+    let summaries = try await store.deckSummaries(asOf: now)
+    let scopeSummary = try await store.scopeSummary(
+        scope: .deck(deck.id, includeDescendants: true),
+        asOf: now
+    )
+
+    #expect(summaries.first?.dueCount == scopeSummary.dueNow)
+    #expect(scopeSummary.dueNow == 3)
+}
+
 @Test func updateDeckRenamesDeck() async throws {
     let store = try await makeStore()
     var deck = Deck(name: "Geography")

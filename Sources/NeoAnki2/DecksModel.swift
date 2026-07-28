@@ -32,8 +32,13 @@ final class DecksModel {
     private(set) var allDecksDueCount = 0
     private(set) var unassignedDueCount = 0
     private(set) var unassignedItemCount = 0
+    /// True only until the sidebar first has something to show. Later reloads
+    /// revise the counts in place, because replacing the tree the learner is
+    /// pointing at with a progress view loses their place to say nothing new.
     private(set) var isLoading = true
     private(set) var errorMessage: String?
+
+    private var hasLoaded = false
 
     var selectedScope: SidebarSelection = .allDecks
 
@@ -78,23 +83,61 @@ final class DecksModel {
     /// Every count in one reload is measured against the same instant, so the
     /// sidebar totals cannot drift from the detail pane's.
     func load(asOf now: Date = .now) async {
-        isLoading = true
+        isLoading = !hasLoaded
         errorMessage = nil
         do {
-            summaries = try await store.deckSummaries(asOf: now)
-            deckTree = DeckTree.build(from: summaries)
-            allDecksDueCount = try await store.dueCount(scope: .allDecks, asOf: now)
-            unassignedDueCount = try await store.unassignedDueCount(asOf: now)
-            unassignedItemCount = try await store.unassignedItemCount()
-
-            if case let .deck(id) = selectedScope,
-               !summaries.contains(where: { $0.id == id }) {
-                selectedScope = .allDecks
-            }
+            try await applyCounts(asOf: now)
+            hasLoaded = true
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
+    }
+
+    /// Revises the counts alone, leaving `isLoading` and the error banner
+    /// untouched. What is due changes on a schedule and after every save, so
+    /// this runs often; anything that made the sidebar flicker would run often
+    /// too. A failure here keeps the previous numbers rather than interrupting.
+    func refreshCounts(asOf now: Date = .now) async {
+        guard hasLoaded else { return }
+        try? await applyCounts(asOf: now)
+    }
+
+    /// Reads every count before assigning any, so the sidebar never renders a
+    /// half-updated set, and assigns only what changed, so an unchanged library
+    /// costs no view updates.
+    private func applyCounts(asOf now: Date) async throws {
+        let loadedSummaries = try await store.deckSummaries(asOf: now)
+        let allDecksSummary = try await store.scopeSummary(
+            scope: .allDecks,
+            asOf: now
+        )
+        let unassignedSummary = try await store.scopeSummary(
+            scope: .unassigned,
+            asOf: now
+        )
+        let allDecksDue = allDecksSummary.dueNow
+        let unassignedDue = unassignedSummary.dueNow
+        let unassignedItems = unassignedSummary.itemCount
+
+        if summaries != loadedSummaries {
+            summaries = loadedSummaries
+            deckTree = DeckTree.build(from: loadedSummaries)
+        }
+        if allDecksDueCount != allDecksDue {
+            allDecksDueCount = allDecksDue
+        }
+        if unassignedDueCount != unassignedDue {
+            unassignedDueCount = unassignedDue
+        }
+        if unassignedItemCount != unassignedItems {
+            unassignedItemCount = unassignedItems
+        }
+
+        if case let .deck(id) = selectedScope,
+           !loadedSummaries.contains(where: { $0.id == id }) {
+            selectedScope = .allDecks
+        }
     }
 
     func createDeck(name: String, parentID: UUID? = nil) async -> Deck? {
@@ -157,7 +200,9 @@ final class DecksModel {
             var deck = try await store.deck(id: id)
             deck.newCardsPerDay = limit
             _ = try await store.updateDeck(deck)
-            await load()
+            // The tree is unchanged; only the limit and the due counts it gates
+            // moved, so there is nothing here worth a reload.
+            await refreshCounts()
             return true
         } catch {
             errorMessage = UserFacingError.message(from: error)

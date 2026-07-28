@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 15
+    static let version = 16
 
     static let createStatements: [String] = [
         """
@@ -106,6 +106,9 @@ enum Schema {
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_items_deck_id ON items(deck_id);
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_cards_item_id ON cards(item_id);
@@ -302,6 +305,12 @@ enum Schema {
         "ALTER TABLE cards ADD COLUMN lapses INTEGER NOT NULL DEFAULT 0;",
         """
         CREATE INDEX IF NOT EXISTS idx_cards_phase ON cards(phase);
+        """,
+    ]
+
+    static let migrationV16Statements: [String] = [
+        """
+        CREATE INDEX IF NOT EXISTS idx_items_deck_id ON items(deck_id);
         """,
     ]
 

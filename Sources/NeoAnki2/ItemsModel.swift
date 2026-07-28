@@ -16,8 +16,14 @@ final class ItemsModel {
     /// The one scheduling snapshot for the selected scope. Everything the app
     /// says about what is due comes from here, so no two surfaces can disagree.
     private(set) var scopeSummary: ScopeSummary = .empty
+    /// True only until the pane first has something to show. Later reloads
+    /// revise what is on screen in place; a progress view where the numbers
+    /// were is not an improvement on numbers a moment out of date.
     private(set) var isLoading = true
     private(set) var errorMessage: String?
+
+    private var hasLoaded = false
+    private var itemTypesLoaded = false
 
     var addItemTypeID: ItemType.ID?
     var addItemDeckID: UUID?
@@ -64,30 +70,42 @@ final class ItemsModel {
     /// `asOf` is passed in so the sidebar and the detail pane read the same
     /// instant. Letting each surface call `.now` is what made them disagree.
     func load(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
-        isLoading = true
+        isLoading = !hasLoaded
         errorMessage = nil
         cachedScope = scope
         do {
-            let loadedItemTypes = try await store.loadItemTypes()
-            itemTypes = loadedItemTypes.itemTypes
-            if addItemTypeID == nil {
-                addItemTypeID = itemTypes.first?.id
-            } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
-                addItemTypeID = itemTypes.first?.id
+            // Everything is read before anything is published, so a reload never
+            // shows this scope's items beside another scope's counts.
+            if !itemTypesLoaded {
+                let loadedItemTypes = try await store.loadItemTypes()
+                itemTypes = loadedItemTypes.itemTypes
+                if addItemTypeID == nil {
+                    addItemTypeID = itemTypes.first?.id
+                } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
+                    addItemTypeID = itemTypes.first?.id
+                }
+                if !loadedItemTypes.corruptions.isEmpty {
+                    let count = loadedItemTypes.corruptions.count
+                    errorMessage = count == 1
+                        ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
+                        : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
+                }
+                itemTypesLoaded = true
             }
-            items = try await store.listItems(scope: scope.filter, sort: .createdAscending)
-            items.sort(using: tableSort)
-            scopeSummary = try await store.scopeSummary(scope: scope.filter, asOf: now)
-            if !loadedItemTypes.corruptions.isEmpty {
-                let count = loadedItemTypes.corruptions.count
-                errorMessage = count == 1
-                    ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
-                    : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
-            }
+            let loadedItems = try await store.listItems(scope: scope.filter, sort: .createdAscending)
+            let summary = try await store.scopeSummary(scope: scope.filter, asOf: now)
+
+            items = loadedItems.sorted(using: tableSort)
+            scopeSummary = summary
+            hasLoaded = true
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
+    }
+
+    func invalidateItemTypes() {
+        itemTypesLoaded = false
     }
 
     func addItem(
@@ -364,5 +382,50 @@ final class ItemsModel {
 
     func setCachedScope(_ scope: StudyScope) {
         cachedScope = scope
+    }
+
+    /// Re-reads the scheduling snapshot for the loaded scope without touching
+    /// `isLoading` or the error banner. Cards come due while the app sits idle,
+    /// so this is the path that keeps the headline honest between reloads.
+    func refreshCounts(asOf now: Date = .now) async {
+        guard hasLoaded,
+              let summary = try? await store.scopeSummary(
+                  scope: currentScopeFilter(),
+                  asOf: now
+              )
+        else { return }
+
+        if scopeSummary != summary {
+            scopeSummary = summary
+        }
+    }
+
+    /// Patches browse schedule columns for specific items without reloading the
+    /// whole list. Used after study when titles and membership are unchanged.
+    func refreshSchedules(for itemIDs: Set<UUID>, asOf now: Date = .now) async {
+        guard hasLoaded, !itemIDs.isEmpty else { return }
+        guard let schedules = try? await store.fetchItemBrowseSchedules(itemIDs: Array(itemIDs)) else {
+            return
+        }
+
+        var updated = items
+        for index in updated.indices {
+            let id = updated[index].id
+            guard itemIDs.contains(id), let browseSchedule = schedules[id] else { continue }
+            let existing = updated[index]
+            updated[index] = SavedItemSummary(
+                id: existing.id,
+                itemTypeID: existing.itemTypeID,
+                itemTypeName: existing.itemTypeName,
+                title: existing.title,
+                subtitle: existing.subtitle,
+                cardCount: browseSchedule.cardCount,
+                deckID: existing.deckID,
+                createdAt: existing.createdAt,
+                schedule: browseSchedule.schedule
+            )
+        }
+        items = updated
+        await refreshCounts(asOf: now)
     }
 }

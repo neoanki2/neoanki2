@@ -84,17 +84,58 @@ private let dailyLimitNow = Date(timeIntervalSince1970: 1_800_000_000)
     #expect(afterUndo.first?.card.memory.phase == .new)
 }
 
-@Test func parentScopesCombineIndependentDeckBudgets() async throws {
+@Test func parentLimitCapsItsEntireSubtree() async throws {
     let store = try await dailyLimitStore()
-    let parent = Deck(name: "Parent", newCardsPerDay: 1)
+    let parent = Deck(name: "Parent", newCardsPerDay: 2)
+    let firstChild = Deck(name: "First child", parentID: parent.id)
+    let secondChild = Deck(name: "Second child", parentID: parent.id)
+    _ = try await store.createDeck(parent)
+    _ = try await store.createDeck(firstChild)
+    _ = try await store.createDeck(secondChild)
+    for index in 1 ... 2 {
+        _ = try await store.createItem(
+            dailyLimitItem("First child \(index)", deckID: firstChild.id),
+            now: dailyLimitNow
+        )
+        _ = try await store.createItem(
+            dailyLimitItem("Second child \(index)", deckID: secondChild.id),
+            now: dailyLimitNow
+        )
+    }
+
+    let due = try await store.fetchDueCards(
+        scope: .deck(parent.id, includeDescendants: true),
+        asOf: dailyLimitNow
+    )
+    #expect(due.count == 2)
+
+    let childDue = try await store.fetchDueCards(
+        scope: .deck(firstChild.id, includeDescendants: false),
+        asOf: dailyLimitNow
+    )
+    #expect(childDue.count == 2)
+
+    _ = try await store.submitReviewWithReceipt(
+        cardID: try #require(childDue.first).card.id,
+        rating: .again,
+        now: dailyLimitNow
+    )
+    let afterGrade = try await store.fetchDueCards(
+        scope: .deck(parent.id, includeDescendants: true),
+        asOf: dailyLimitNow
+    )
+    #expect(afterGrade.count == 2)
+    #expect(afterGrade.count { $0.card.memory.phase == .new } == 1)
+    #expect(afterGrade.count { $0.card.memory.phase == .learning } == 1)
+}
+
+@Test func subdeckCanAddAStricterLimit() async throws {
+    let store = try await dailyLimitStore()
+    let parent = Deck(name: "Parent", newCardsPerDay: 3)
     let child = Deck(name: "Child", parentID: parent.id, newCardsPerDay: 1)
     _ = try await store.createDeck(parent)
     _ = try await store.createDeck(child)
     for index in 1 ... 2 {
-        _ = try await store.createItem(
-            dailyLimitItem("Parent \(index)", deckID: parent.id),
-            now: dailyLimitNow
-        )
         _ = try await store.createItem(
             dailyLimitItem("Child \(index)", deckID: child.id),
             now: dailyLimitNow
@@ -105,8 +146,7 @@ private let dailyLimitNow = Date(timeIntervalSince1970: 1_800_000_000)
         scope: .deck(parent.id, includeDescendants: true),
         asOf: dailyLimitNow
     )
-    #expect(due.count == 2)
-    #expect(Set(due.compactMap(\.card.deckID)) == [parent.id, child.id])
+    #expect(due.count == 1)
 }
 
 @Test func zeroLimitDoesNotRestrictUnassignedCardsOrReviews() async throws {

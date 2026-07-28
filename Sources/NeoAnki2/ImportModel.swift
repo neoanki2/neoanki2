@@ -272,6 +272,7 @@ final class ImportModel {
             }
 
             importedCount = count
+            itemsModel.invalidateItemTypes()
             await itemsModel.load(scope: scope)
             return true
         } catch {

@@ -174,6 +174,25 @@ func goodGraduatesIntradayStep(phase: Phase) {
     }
 }
 
+@Test func reviewAgainFromProductionCardStaysDueNow() {
+    let now = Date(timeIntervalSinceReferenceDate: 806_926_474.635_533)
+    let state = MemoryState(
+        stability: 0.006940758044349528,
+        difficulty: 9.955935509193166,
+        due: Date(timeIntervalSinceReferenceDate: 806_923_269.169_737),
+        lastReview: Date(timeIntervalSinceReferenceDate: 806_922_669.488_242),
+        reps: 7,
+        lapses: 0,
+        phase: .review
+    )
+
+    let next = LearningScheduler().schedule(state, rating: .again, now: now)
+
+    #expect(next.phase == .relearning)
+    #expect(next.due == now)
+    #expect(next.lapses == 1)
+}
+
 @Test func successfulRepairGraduationPreservesFSRSIntradayDue() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let state = MemoryState(

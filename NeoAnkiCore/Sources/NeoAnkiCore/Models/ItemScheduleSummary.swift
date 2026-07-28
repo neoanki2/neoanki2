@@ -29,6 +29,17 @@ public struct ItemScheduleSummary: Sendable, Equatable {
     public var isLeech: Bool { lapses >= ScopeSummary.leechThreshold }
 }
 
+/// Card count and schedule for patching a browse row after study.
+public struct ItemBrowseSchedule: Sendable, Equatable {
+    public let cardCount: Int
+    public let schedule: ItemScheduleSummary
+
+    public init(cardCount: Int, schedule: ItemScheduleSummary) {
+        self.cardCount = cardCount
+        self.schedule = schedule
+    }
+}
+
 /// How a browsed item list is ordered.
 ///
 /// `createdAscending` is the default because authored and generated decks are

@@ -4,10 +4,12 @@ import SwiftUI
 struct StudyCommandHandlers {
     var startStudy: (() -> Void)?
     var requestEndSession: (() -> Void)?
+    var editCurrentCard: (() -> Void)?
     var grade: ((ReviewRating) -> Void)?
     var undoLastGrade: (() -> Void)?
     var canStartStudy = false
     var canEndSession = false
+    var canEditCurrentCard = false
     var canGrade = false
     var canUndoLastGrade = false
 }
@@ -60,6 +62,14 @@ struct StudyCommands: Commands {
                 handlers?.requestEndSession?()
             }
             .disabled(!(handlers?.canEndSession ?? false))
+
+            Divider()
+
+            Button("Edit Card…") {
+                handlers?.editCurrentCard?()
+            }
+            .keyboardShortcut("e", modifiers: [.command])
+            .disabled(!(handlers?.canEditCurrentCard ?? false))
 
             Divider()
 

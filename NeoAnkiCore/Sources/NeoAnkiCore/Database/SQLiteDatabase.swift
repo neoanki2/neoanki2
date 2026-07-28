@@ -69,12 +69,18 @@ struct PersistedItem: Sendable {
     var updatedAt: Date
 }
 
+struct DatabaseCacheToken: Sendable, Equatable {
+    let localRevision: UInt64
+    let dataVersion: Int64
+}
+
 /// Low-level SQLite connection. An actor so callers serialize access.
 actor SQLiteDatabase {
     private nonisolated(unsafe) var handle: OpaquePointer?
     private let databaseURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var localRevision: UInt64 = 0
 
     init(path: URL) throws {
         databaseURL = path.standardizedFileURL
@@ -96,6 +102,15 @@ actor SQLiteDatabase {
         if let handle {
             sqlite3_close(handle)
         }
+    }
+
+    func cacheToken() throws -> DatabaseCacheToken {
+        let rows = try query("PRAGMA data_version;")
+        let dataVersion = rows.first?["data_version"] as? Int64 ?? 0
+        return DatabaseCacheToken(
+            localRevision: localRevision,
+            dataVersion: dataVersion
+        )
     }
 
     func migrate() throws {
@@ -202,13 +217,24 @@ actor SQLiteDatabase {
                 for sql in Schema.migrationV15Statements {
                     try execute(sql)
                 }
-                if try tableExists("cards") {
+                if try tableExists("cards"), !(try columnExists("deck_id", in: "cards")) {
+                    try execute("ALTER TABLE cards ADD COLUMN deck_id TEXT;")
+                }
+                if try tableExists("cards"),
+                   try columnExists("deck_id", in: "cards"),
+                   try columnExists("due_at", in: "cards") {
                     try execute(
                         """
                         CREATE INDEX IF NOT EXISTS idx_cards_deck_due
                         ON cards(deck_id, due_at, id);
                         """
                     )
+                }
+            }
+
+            if current < 16, try tableExists("items") {
+                for sql in Schema.migrationV16Statements {
+                    try execute(sql)
                 }
             }
 
@@ -781,6 +807,45 @@ actor SQLiteDatabase {
         return Int(count)
     }
 
+    /// Direct item counts keyed by deck. Rows with `deck_id IS NULL` are omitted.
+    func countItemsGroupedByDeck() throws -> [UUID: Int] {
+        let rows = try query(
+            """
+            SELECT deck_id, COUNT(*) AS count
+            FROM items
+            WHERE deck_id IS NOT NULL
+            GROUP BY deck_id;
+            """
+        )
+        var counts: [UUID: Int] = [:]
+        for row in rows {
+            guard
+                let deckIDText = row["deck_id"] as? String,
+                let deckID = UUID(uuidString: deckIDText)
+            else { continue }
+            counts[deckID] = Int(row["count"] as? Int64 ?? 0)
+        }
+        return counts
+    }
+
+    /// Eligible due counts keyed by the card's deck. Unassigned cards are omitted.
+    func countDueCardsGroupedByDeck(asOf now: Date, studyDay: String) throws -> [UUID: Int] {
+        let eligible = eligibleDueCardsCTE(scope: .all, asOf: now, studyDay: studyDay)
+        let rows = try query(
+            eligible.sql + "\nSELECT deck_id, COUNT(*) AS count FROM eligible_due GROUP BY deck_id;",
+            bindings: eligible.bindings
+        )
+        var counts: [UUID: Int] = [:]
+        for row in rows {
+            guard
+                let deckIDText = row["deck_id"] as? String,
+                let deckID = UUID(uuidString: deckIDText)
+            else { continue }
+            counts[deckID] = Int(row["count"] as? Int64 ?? 0)
+        }
+        return counts
+    }
+
     func moveItems(fromDeckID: UUID, toDeckID: UUID?) throws {
         try execute(
             """
@@ -1211,6 +1276,20 @@ actor SQLiteDatabase {
         return Int(count)
     }
 
+    func nextUnsuspendedCardDue(after now: Date) throws -> Date? {
+        let rows = try query(
+            """
+            SELECT MIN(due_at) AS next_due_at
+            FROM cards
+            WHERE is_suspended = 0 AND due_at > ?;
+            """,
+            bindings: [.double(now.timeIntervalSince1970)]
+        )
+        return (rows.first?["next_due_at"] as? Double).map {
+            Date(timeIntervalSince1970: $0)
+        }
+    }
+
     /// Card counts and rolled-up scheduling state for every item, read in one
     /// scan. Browsing a few thousand items otherwise costs a query per row.
     func fetchItemCardStates() throws -> [UUID: ItemCardState] {
@@ -1223,6 +1302,63 @@ actor SQLiteDatabase {
                 """
             )
         )
+    }
+
+    func fetchItemCardStates(deckIDs: Set<UUID>) throws -> [UUID: ItemCardState] {
+        guard !deckIDs.isEmpty else { return [:] }
+        let sortedIDs = deckIDs.sorted { $0.uuidString < $1.uuidString }
+        let placeholders = Array(repeating: "?", count: sortedIDs.count).joined(separator: ", ")
+        return foldItemCardStates(
+            try query(
+                """
+                SELECT item_id, phase, due_at, lapses, is_suspended
+                FROM cards
+                WHERE deck_id IN (\(placeholders))
+                ORDER BY item_id ASC, due_at ASC;
+                """,
+                bindings: sortedIDs.map { .text($0.uuidString) }
+            )
+        )
+    }
+
+    func fetchItemCardStatesUnassigned() throws -> [UUID: ItemCardState] {
+        foldItemCardStates(
+            try query(
+                """
+                SELECT item_id, phase, due_at, lapses, is_suspended
+                FROM cards
+                WHERE deck_id IS NULL
+                ORDER BY item_id ASC, due_at ASC;
+                """
+            )
+        )
+    }
+
+    func fetchItemCardStates(itemIDs: [UUID]) throws -> [UUID: ItemCardState] {
+        guard !itemIDs.isEmpty else { return [:] }
+        var merged: [UUID: ItemCardState] = [:]
+        let chunkSize = 500
+        var start = 0
+        while start < itemIDs.count {
+            let end = min(start + chunkSize, itemIDs.count)
+            let chunk = Array(itemIDs[start..<end])
+            start = end
+            let sortedChunk = chunk.sorted { $0.uuidString < $1.uuidString }
+            let placeholders = Array(repeating: "?", count: sortedChunk.count).joined(separator: ", ")
+            let states = foldItemCardStates(
+                try query(
+                    """
+                    SELECT item_id, phase, due_at, lapses, is_suspended
+                    FROM cards
+                    WHERE item_id IN (\(placeholders))
+                    ORDER BY item_id ASC, due_at ASC;
+                    """,
+                    bindings: sortedChunk.map { .text($0.uuidString) }
+                )
+            )
+            merged.merge(states) { _, new in new }
+        }
+        return merged
     }
 
     func fetchItemCardState(itemID: UUID) throws -> ItemCardState {
@@ -1359,40 +1495,69 @@ actor SQLiteDatabase {
     ) -> (sql: String, bindings: [Binding]) {
         let scope = scopeClause(scope, column: "cards.deck_id")
         let sql = """
-            WITH active_introductions AS (
-                SELECT introductions.deck_id, COUNT(*) AS introduced_count
+            WITH RECURSIVE deck_ancestry(descendant_id, ancestor_id) AS (
+                SELECT id, id FROM decks
+                UNION
+                SELECT ancestry.descendant_id, decks.parent_id
+                FROM deck_ancestry AS ancestry
+                JOIN decks ON decks.id = ancestry.ancestor_id
+                WHERE decks.parent_id IS NOT NULL
+            ),
+            active_introductions AS (
+                SELECT ancestry.ancestor_id AS limiter_id, COUNT(*) AS introduced_count
                 FROM new_card_introductions AS introductions
+                JOIN deck_ancestry AS ancestry
+                    ON ancestry.descendant_id = introductions.deck_id
                 LEFT JOIN review_reverts
                     ON review_reverts.review_log_id = introductions.review_log_id
                 WHERE introductions.study_day = ?
                   AND review_reverts.id IS NULL
-                GROUP BY introductions.deck_id
+                GROUP BY ancestry.ancestor_id
             ),
-            ranked_due AS (
-                SELECT
-                    cards.*,
-                    decks.new_cards_per_day,
-                    COALESCE(active_introductions.introduced_count, 0) AS introduced_count,
-                    SUM(CASE WHEN cards.phase = 'new' THEN 1 ELSE 0 END) OVER (
-                        PARTITION BY cards.deck_id
-                        ORDER BY cards.due_at ASC, cards.id ASC
-                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                    ) AS new_rank
+            due_cards AS (
+                SELECT cards.*
                 FROM cards
-                LEFT JOIN decks ON decks.id = cards.deck_id
-                LEFT JOIN active_introductions
-                    ON active_introductions.deck_id = cards.deck_id
                 WHERE cards.is_suspended = 0
                   AND cards.due_at <= ?
                   AND \(scope.sql)
             ),
+            new_positions AS (
+                SELECT
+                    due_cards.id AS card_id,
+                    limiter.id AS limiter_id,
+                    limiter.new_cards_per_day,
+                    COALESCE(active_introductions.introduced_count, 0) AS introduced_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY limiter.id
+                        ORDER BY due_cards.due_at ASC, due_cards.id ASC
+                    ) AS new_rank
+                FROM due_cards
+                JOIN deck_ancestry AS ancestry
+                    ON ancestry.descendant_id = due_cards.deck_id
+                JOIN decks AS limiter
+                    ON limiter.id = ancestry.ancestor_id
+                   AND limiter.new_cards_per_day IS NOT NULL
+                LEFT JOIN active_introductions
+                    ON active_introductions.limiter_id = limiter.id
+                WHERE due_cards.phase = 'new'
+            ),
+            blocked_new AS (
+                SELECT DISTINCT card_id
+                FROM new_positions
+                WHERE new_rank > MAX(new_cards_per_day - introduced_count, 0)
+            ),
             eligible_due AS (
-                SELECT *
-                FROM ranked_due
-                WHERE phase != 'new'
-                   OR deck_id IS NULL
-                   OR new_cards_per_day IS NULL
-                   OR new_rank <= MAX(new_cards_per_day - introduced_count, 0)
+                SELECT due_cards.*
+                FROM due_cards
+                WHERE (
+                      due_cards.phase != 'new'
+                      OR due_cards.deck_id IS NULL
+                      OR NOT EXISTS (
+                          SELECT 1
+                          FROM blocked_new
+                          WHERE blocked_new.card_id = due_cards.id
+                      )
+                  )
             )
             """
         return (
@@ -2670,6 +2835,7 @@ actor SQLiteDatabase {
         guard code == SQLITE_DONE || code == SQLITE_ROW else {
             throw DatabaseError.executeFailed(errorMessage(from: handle))
         }
+        localRevision &+= 1
     }
 
     private func prepareStatement(_ sql: String) throws -> OpaquePointer {
@@ -2698,6 +2864,7 @@ actor SQLiteDatabase {
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw DatabaseError.executeFailed(errorMessage(from: handle))
         }
+        localRevision &+= 1
     }
 
     private func query(_ sql: String, bindings: [Binding] = []) throws -> [[String: Any?]] {

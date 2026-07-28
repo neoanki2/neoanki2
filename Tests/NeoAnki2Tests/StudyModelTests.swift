@@ -619,6 +619,96 @@ private func makeInteractionModel(
     #expect(model.isAnswerRevealed == false)
 }
 
+@Test @MainActor func studyModelReloadShowsEditedContentOnEveryQueuedCardOfThatItem() async throws {
+    let (model, store) = try await makeStudyModel()
+    var itemType = try await store.defaultItemType()
+    itemType.templates[0].interaction = .cloze
+    let frontIndex = try #require(
+        itemType.fields.firstIndex(where: { $0.id == BuiltInItemTypes.frontFieldID })
+    )
+    itemType.fields[frontIndex].type = .cloze
+    _ = try await store.updateItemType(itemType)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(
+                    fieldID: BuiltInItemTypes.frontFieldID,
+                    value: .cloze(
+                        "Alpha Beta",
+                        blanks: [
+                            ClozeSpan(group: 0, start: 0, length: 5),
+                            ClozeSpan(group: 1, start: 6, length: 4),
+                        ]
+                    )
+                ),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Contex")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    #expect(model.queue.count == 2)
+
+    var edited = try #require(model.currentCard?.item)
+    let backIndex = try #require(
+        edited.fields.firstIndex(where: { $0.fieldID == BuiltInItemTypes.backFieldID })
+    )
+    edited.fields[backIndex].value = .text("Context, with the typo fixed")
+    _ = try await store.updateItem(edited)
+
+    await model.reloadCurrentItem()
+
+    #expect(model.errorMessage == nil)
+    #expect(model.queue.count == 2)
+    for card in model.queue {
+        #expect(card.item.value(for: BuiltInItemTypes.backFieldID) == .text("Context, with the typo fixed"))
+    }
+}
+
+@Test @MainActor func studyModelReloadRederivesInteractionBeforeReveal() async throws {
+    let model = try await makeInteractionModel(.choose, answer: .text("Pariss"))
+    #expect(model.choiceOptions.contains("Pariss"))
+
+    var edited = try #require(model.currentCard?.item)
+    let backIndex = try #require(
+        edited.fields.firstIndex(where: { $0.fieldID == BuiltInItemTypes.backFieldID })
+    )
+    edited.fields[backIndex].value = .text("Paris")
+    _ = try await model.store.updateItem(edited)
+
+    await model.reloadCurrentItem()
+
+    #expect(model.choiceOptions.contains("Paris"))
+    #expect(model.choiceOptions.contains("Pariss") == false)
+    #expect(model.isAnswerRevealed == false)
+}
+
+@Test @MainActor func studyModelReloadKeepsRevealedAnswerAndItsFeedback() async throws {
+    let model = try await makeInteractionModel(.type, answer: .text("Paris"))
+    model.updateTypedAnswer("London")
+    model.submitTypedAnswer()
+    #expect(model.isAnswerRevealed)
+    #expect(model.answerEvaluation == .incorrect)
+
+    var edited = try #require(model.currentCard?.item)
+    let frontIndex = try #require(
+        edited.fields.firstIndex(where: { $0.fieldID == BuiltInItemTypes.frontFieldID })
+    )
+    edited.fields[frontIndex].value = .text("Capital of France")
+    _ = try await model.store.updateItem(edited)
+
+    await model.reloadCurrentItem()
+
+    #expect(model.isAnswerRevealed)
+    #expect(model.answerEvaluation == .incorrect)
+    #expect(model.typedAnswer == "London")
+    #expect(
+        model.currentCard?.item.value(for: BuiltInItemTypes.frontFieldID)
+            == .text("Capital of France")
+    )
+}
+
 @Test @MainActor func itemsModelLoadsDueCount() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-app-tests-\(UUID().uuidString)", isDirectory: true)

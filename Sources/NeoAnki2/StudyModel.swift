@@ -6,6 +6,7 @@ struct PendingGradeUndo: Equatable, Sendable {
     let previousIndex: Int
     let previousReviewedCount: Int
     let previousReviewedCardIDs: Set<UUID>
+    let previousReviewedItemIDs: Set<UUID>
     let rating: ReviewRating
     let requeuedCardID: UUID?
 }
@@ -35,6 +36,7 @@ final class StudyModel {
     private(set) var interactionMessage: String?
     private(set) var reviewedCount = 0
     private(set) var reviewedCardIDs: Set<UUID> = []
+    private(set) var reviewedItemIDs: Set<UUID> = []
 
     let store: ItemStore
     private var repairQueue: [DueCard] = []
@@ -82,6 +84,7 @@ final class StudyModel {
         index = 0
         reviewedCount = 0
         reviewedCardIDs = []
+        reviewedItemIDs = []
         repairQueue = []
         scopeLabel = scope.label
         pendingGradeUndo = nil
@@ -227,12 +230,14 @@ final class StudyModel {
                 previousIndex: previousIndex,
                 previousReviewedCount: reviewedCount,
                 previousReviewedCardIDs: reviewedCardIDs,
+                previousReviewedItemIDs: reviewedItemIDs,
                 rating: rating,
                 requeuedCardID: shouldRequeue ? card.id : nil
             )
             index += 1
             reviewedCount += 1
             reviewedCardIDs.insert(card.id)
+            reviewedItemIDs.insert(card.item.id)
             isAnswerRevealed = false
             advanceSession()
         } catch DatabaseError.cardNotFound(_) {
@@ -262,6 +267,7 @@ final class StudyModel {
             index = undo.previousIndex
             reviewedCount = undo.previousReviewedCount
             reviewedCardIDs = undo.previousReviewedCardIDs
+            reviewedItemIDs = undo.previousReviewedItemIDs
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
@@ -274,6 +280,47 @@ final class StudyModel {
 
     func dismissGradeUndo() {
         pendingGradeUndo = nil
+    }
+
+    /// Re-reads the item behind the current card after it was edited mid-session,
+    /// so the rest of the session shows the correction rather than the copy the
+    /// queue was built from. Every queued card drawn from that item is refreshed,
+    /// because one item can own several cards in the same session.
+    func reloadCurrentItem() async {
+        guard let itemID = currentCard?.item.id else { return }
+
+        do {
+            guard let reloaded = try await store.fetchItem(id: itemID) else { return }
+            refreshQueuedCards(for: reloaded.item, itemType: reloaded.itemType)
+            // An answer already on screen keeps its feedback: re-deriving the
+            // interaction here would clear the message the learner is reading,
+            // and the choices or ordering they answered no longer matter.
+            if !isAnswerRevealed {
+                prepareCurrentInteraction()
+            }
+        } catch {
+            errorMessage = userFacingError(from: error)
+        }
+    }
+
+    private func refreshQueuedCards(for item: Item, itemType: ItemType) {
+        func refresh(_ card: inout DueCard) {
+            guard card.item.id == item.id else { return }
+            card.item = item
+            card.itemType = itemType
+            // Editing an item cannot change its templates, but reading the
+            // template back keeps each card rendering from one revision.
+            if let template = itemType.templates.first(where: { $0.id == card.template.id }) {
+                card.template = template
+            }
+        }
+
+        for index in queue.indices {
+            refresh(&queue[index])
+        }
+        for index in repairQueue.indices {
+            refresh(&repairQueue[index])
+        }
     }
 
     func skipCurrentCard() {

@@ -100,6 +100,38 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         assertNothingDue(in: app)
     }
 
+    func testEditCardDuringSessionKeepsStudying() throws {
+        let app = launchApp()
+        addBasicItem(front: "Capital of Frnace", back: "Paris", in: app)
+        startStudy(in: app)
+
+        app.buttons.identified("editStudyCard").click()
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForExistence(timeout: 5))
+        enterText("Capital of France", into: field(named: "Front", in: app), app: app)
+        app.buttons.identified("saveEditItem").click()
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForNonExistence(timeout: 10))
+
+        revealAndGrade("gradeGood", in: app)
+        finishStudySession(in: app)
+
+        waitForItem(named: "Capital of France", in: app)
+        assertNoItem(named: "Capital of Frnace", in: app)
+    }
+
+    func testEditCardViaCommandEThenCancel() throws {
+        let app = launchApp()
+        addBasicItem(front: "Shortcut Q", back: "Shortcut A", in: app)
+        startStudy(in: app)
+
+        app.typeKey("e", modifierFlags: [.command])
+        XCTAssertTrue(app.buttons.identified("cancelEditItem").waitForExistence(timeout: 5))
+        app.buttons.identified("cancelEditItem").click()
+
+        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 5))
+        revealAndGrade("gradeGood", in: app)
+        finishStudySession(in: app)
+    }
+
     func testDismissUndoBanner() throws {
         let app = launchApp()
         addBasicItem(front: "Dismiss Undo Q", back: "Dismiss Undo A", in: app)

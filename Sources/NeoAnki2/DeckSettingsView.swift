@@ -47,8 +47,8 @@ struct DeckSettingsView: View {
                 } footer: {
                     Text(
                         isLimited
-                            ? "A limit of 0 pauses new cards. Reviews and learning cards are never limited."
-                            : "This deck can introduce any number of new cards."
+                            ? "Shared by this deck and all its subdecks. A limit of 0 pauses new cards; reviews and learning cards are never limited."
+                            : "This deck does not add a limit for its subtree."
                     )
                 }
             }

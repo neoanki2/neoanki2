@@ -98,6 +98,53 @@ private func addItem(
     #expect(model.items.count == 1)
 }
 
+/// Reloading a scope must not blank the pane. The counts and the item list are
+/// read before either is published, so the detail pane never shows one scope's
+/// items beside another's totals, and never shows a progress view instead.
+@Test @MainActor func scopeReloadKeepsTheDetailPaneOnScreen() async throws {
+    let (model, _, store) = try await makeModels()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    #expect(model.isLoading)
+
+    await model.load()
+    #expect(!model.isLoading)
+
+    _ = await addItem(model, front: "France", back: "Paris", deckID: deck.id)
+    let reload = Task { await model.load(scope: .deck(deck.id, name: deck.name)) }
+    await Task.yield()
+    #expect(!model.isLoading)
+    await reload.value
+
+    #expect(model.items.count == 1)
+    #expect(model.scopeSummary.dueNow == 1)
+}
+
+/// Cards fall due on a schedule, so the headline has to advance on its own.
+@Test @MainActor func scopeCountsRefreshWithoutReloading() async throws {
+    let (model, _, store) = try await makeModels()
+    await model.load()
+    #expect(model.scopeSummary.dueNow == 0)
+
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("France")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Paris")),
+            ]
+        )
+    )
+
+    await model.refreshCounts()
+
+    #expect(model.scopeSummary.dueNow == 1)
+    #expect(!model.isLoading)
+    // The list is a reload's business; a count refresh only revises counts.
+    #expect(model.items.isEmpty)
+}
+
 @Test @MainActor func scopeSummaryDropsToEmptyAfterDeletingEverything() async throws {
     let (model, _, _) = try await makeModels()
     await model.load()
