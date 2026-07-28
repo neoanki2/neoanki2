@@ -7,6 +7,14 @@ private final class TextViewHolder {
     var lastSelectedRange = NSRange(location: NSNotFound, length: 0)
 }
 
+private final class UndoAttributedString: @unchecked Sendable {
+    let value: NSAttributedString
+
+    init(_ value: NSAttributedString) {
+        self.value = NSAttributedString(attributedString: value)
+    }
+}
+
 struct RichTextFieldEditor: View {
     let label: String
     @Binding var spans: [Span]
@@ -861,23 +869,26 @@ enum RichTextEditing {
         selectedRange: NSRange,
         textView: NSTextView
     ) {
+        let undoValue = UndoAttributedString(attributedString)
         textView.undoManager?.registerUndo(withTarget: textView) { target in
-            guard let textStorage = target.textStorage,
-                  rangeIsValid(range, for: textStorage.length)
-            else {
-                return
-            }
+            MainActor.assumeIsolated {
+                guard let textStorage = target.textStorage,
+                      rangeIsValid(range, for: textStorage.length)
+                else {
+                    return
+                }
 
-            let inverseValue = textStorage.attributedSubstring(from: range)
-            textStorage.replaceCharacters(in: range, with: attributedString)
-            target.setSelectedRange(selectedRange)
-            registerUndo(
-                inverseValue,
-                in: range,
-                selectedRange: selectedRange,
-                textView: target
-            )
-            target.didChangeText()
+                let inverseValue = textStorage.attributedSubstring(from: range)
+                textStorage.replaceCharacters(in: range, with: undoValue.value)
+                target.setSelectedRange(selectedRange)
+                registerUndo(
+                    inverseValue,
+                    in: range,
+                    selectedRange: selectedRange,
+                    textView: target
+                )
+                target.didChangeText()
+            }
         }
         textView.undoManager?.setActionName("Change Formatting")
     }
