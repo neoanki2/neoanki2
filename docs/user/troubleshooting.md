@@ -23,8 +23,8 @@ requirement, or unavailable action.
 - **An item, cloze, or media file cannot be saved:** see [Item and media
   errors](#item-and-media-errors).
 - **Recording is unavailable:** see [Microphone and recording](#microphone-and-recording).
-- **Study or optimization shows a message:** see [Study and scheduling
-  messages](#study-and-scheduling-messages).
+- **Study shows a message, or you are looking for an optimization command:** see
+  [Study and scheduling messages](#study-and-scheduling-messages).
 - **You need to report a reproducible bug:** follow [safe issue-report and
   redaction guidance](../support/#report-an-issue-safely).
 
@@ -109,9 +109,9 @@ These states are informational:
 - **Session Complete:** all due cards loaded for that session were handled.
 
 **Loading decks…**, **Loading items…**, **Loading item types…**, **Loading due
-cards…**, **Importing…**, **Transferring deck…**, and **Optimizing
-Scheduling…** indicate active work. Avoid starting another transfer. If a state
-never completes, quit normally, relaunch, and retry once.
+cards…**, **Importing…**, and **Transferring deck…** indicate active work. Avoid
+starting another transfer. If a state never completes, quit normally, relaunch,
+and retry once.
 
 ## Import and export errors
 
@@ -187,10 +187,14 @@ history.
   and self-grade; then fix the item or template.
 - **There is no recent review to undo:** undo is no longer available for this
   state.
-- **Needs at least 100 review outcomes:** keep studying normally. Optimization
-  counts usable later reviews in card histories, not simply every button press.
-- **Parameters couldn't be tuned or saved:** current parameters remain in use.
-  Accumulate more history, verify storage is writable, and retry later.
+Scheduling optimization reports nothing, successfully or otherwise: it runs
+automatically at the end of a session and only when review history warrants it.
+If you are looking for an **Optimize Scheduling** command, there isn't one, and
+its absence is not a fault. A library with under 100 usable review outcomes has
+simply not been fitted yet; keep studying normally. Optimization counts usable
+later reviews in card histories, not simply every button press. When a fit
+cannot be made or saved, the parameters already in use continue to schedule
+normally and a later session tries again.
 
 All current interaction types—reveal, type, choose, record, cloze, and
 arrange—are supported. Automatic correctness checking can still be unavailable

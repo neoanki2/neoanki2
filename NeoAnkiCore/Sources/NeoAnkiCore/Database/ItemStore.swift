@@ -95,6 +95,7 @@ private extension FieldType {
 /// Persistence for items and generated cards.
 public actor ItemStore {
     private static let studyDayRolloverMetadataKey = "study_day_rollover_minutes"
+    private static let optimizationAttemptMetadataPrefix = "fsrs_optimization_attempt."
 
     private struct CachedItemList {
         let token: DatabaseCacheToken
@@ -936,6 +937,10 @@ public actor ItemStore {
     ) async throws -> FSRSOptimizationResult {
         let logs = try await database.fetchActiveReviewLogs()
         let optimizer = FSRSOptimizer(minimumObservations: minimumObservations)
+        // Recorded before the fit can throw: an attempt that finds too little
+        // usable history has still seen this much of it, and repeating that
+        // reading on every session end would cost the same and answer the same.
+        try await recordOptimizationAttempt(reviewLogCount: logs.count, at: now)
         let result = try optimizer.optimize(logs: logs, startingAt: fsrsParameters)
         guard result.improved else { return result }
 
@@ -948,6 +953,102 @@ public actor ItemStore {
         )
         fsrsParameters = result.parameters
         return result
+    }
+
+    /// Fits weights only when accumulated history warrants it, and reports
+    /// nothing when it does not.
+    ///
+    /// This is the automatic path: study ends, this runs, and the learner is
+    /// never asked to decide when their scheduler should be tuned. The gate is
+    /// one `COUNT` against the last attempt, so a session that adds nothing
+    /// meaningful costs no fit.
+    @discardableResult
+    public func optimizeSchedulingIfNeeded(
+        schedule: FSRSOptimizationSchedule = FSRSOptimizationSchedule(),
+        minimumObservations: Int = FSRSOptimizer.defaultMinimumObservations,
+        now: Date = .now
+    ) async throws -> FSRSOptimizationResult? {
+        let reviewLogCount = try await database.countActiveReviewLogs()
+        guard schedule.needsOptimization(
+            reviewLogCount: reviewLogCount,
+            lastAttempt: try await lastOptimizationAttempt(),
+            now: now
+        ) else {
+            return nil
+        }
+
+        do {
+            return try await optimizeScheduling(
+                minimumObservations: minimumObservations,
+                now: now
+            )
+        } catch let error as FSRSOptimizationError {
+            // Insufficient usable history is the expected outcome for a young
+            // library, and unfittable history is not something the learner can
+            // act on. Either way the attempt is recorded, so this does not
+            // retry until history has grown.
+            _ = error
+            return nil
+        }
+    }
+
+    /// What the most recent automatic or explicit fit saw, if any.
+    public func lastOptimizationAttempt() async throws -> FSRSOptimizationSchedule.Attempt? {
+        guard
+            let stored = try await database.metadataValue(forKey: optimizationAttemptMetadataKey),
+            let attempt = OptimizationAttemptRecord(stored)
+        else {
+            return nil
+        }
+        return FSRSOptimizationSchedule.Attempt(
+            reviewLogCount: attempt.reviewLogCount,
+            attemptedAt: attempt.attemptedAt
+        )
+    }
+
+    private func recordOptimizationAttempt(reviewLogCount: Int, at now: Date) async throws {
+        try await database.setMetadataValue(
+            OptimizationAttemptRecord(
+                reviewLogCount: reviewLogCount,
+                attemptedAt: now
+            ).storedValue,
+            forKey: optimizationAttemptMetadataKey
+        )
+    }
+
+    /// Per profile, because each profile fits its own weights.
+    private var optimizationAttemptMetadataKey: String {
+        "\(Self.optimizationAttemptMetadataPrefix)\(profileID)"
+    }
+
+    /// A count and an instant, stored as one metadata value. Two integers do
+    /// not earn a table, and the pair is only ever read and written together.
+    private struct OptimizationAttemptRecord {
+        let reviewLogCount: Int
+        let attemptedAt: Date
+
+        init(reviewLogCount: Int, attemptedAt: Date) {
+            self.reviewLogCount = reviewLogCount
+            self.attemptedAt = attemptedAt
+        }
+
+        init?(_ stored: String) {
+            let parts = stored.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2,
+                  let count = Int(parts[0]),
+                  count >= 0,
+                  let seconds = Double(parts[1]),
+                  seconds.isFinite
+            else {
+                return nil
+            }
+            reviewLogCount = count
+            attemptedAt = Date(timeIntervalSince1970: seconds)
+        }
+
+        var storedValue: String {
+            "\(reviewLogCount):\(attemptedAt.timeIntervalSince1970)"
+        }
     }
 
     /// Imports rows parsed by a native adapter into an existing item type.

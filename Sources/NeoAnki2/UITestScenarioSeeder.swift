@@ -120,6 +120,18 @@ enum UITestScenarioSeeder {
                 durationMs: 1_000
             )
         }
+        // The reviewed card is now scheduled years out, so a second card gives
+        // the session something to study — automatic fitting happens when a
+        // session ends, and a session needs a due card to end.
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: BuiltInItemTypes.basicID,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Due card")),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Due answer")),
+                ]
+            )
+        )
     }
 
     private static func seedImageMissingDescription(store: ItemStore) async throws {

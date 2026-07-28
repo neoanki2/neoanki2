@@ -244,9 +244,9 @@
     },
     {
       "id": "scheduling-optimize",
-      "name": "Optimize FSRS scheduling",
+      "name": "Automatic FSRS scheduling optimization",
       "article": "user/scheduling.md",
-      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"],
+      "sources": ["Sources/NeoAnki2/SchedulingModel.swift", "Sources/NeoAnki2/SchedulingCommands.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"],
       "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/SchedulingModelTests.swift"],
       "screenshot": "assets/screenshots/scheduling-result.png"
     },

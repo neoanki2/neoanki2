@@ -1,6 +1,6 @@
 ---
 title: Scheduling
-description: Understand FSRS grading and safely optimize scheduling after 100 usable review outcomes.
+description: Understand FSRS grading and how scheduling tunes itself after 100 usable review outcomes.
 nav_order: 8
 parent: User Guide
 ---
@@ -56,58 +56,58 @@ the next due time from the card's stability. That due time keeps fractional-day
 precision, so a weak short-term memory can return in hours while established
 memories normally return in days or longer.
 
-## Optimize scheduling for your history
+## Optimization happens on its own
 
-Choose **Scheduling → Optimize Scheduling…**. NeoAnki2 fits this profile's FSRS
-21 parameters to its saved review outcomes. Saved 19-parameter FSRS-5 profiles
-are migrated with the official compatibility mapping: their learned weights
-are preserved, short-term decay starts disabled, and the forgetting curve
-retains FSRS-5's fixed decay until the next optimization. The menu changes to
-**Optimizing Scheduling…** and is disabled until the operation finishes.
+There is no **Optimize Scheduling** command, and you never need to remember to
+run one. NeoAnki2 fits this profile's FSRS 21 parameters to its saved review
+outcomes by itself, at the end of a study session, whenever accumulated history
+has grown enough for a new fit to mean anything. Saved 19-parameter FSRS-5
+profiles are migrated with the official compatibility mapping: their learned
+weights are preserved, short-term decay starts disabled, and the forgetting
+curve retains FSRS-5's fixed decay until the next optimization.
+
+Nothing is announced. A better fit changes only how later grades schedule cards,
+which is not something to acknowledge mid-study, and a fit that cannot be made
+leaves the working parameters in place. The end of a session looks the same
+either way.
 
 Optimization is deterministic and uses review sequences with at least two
 valid reviews for a card, beginning with its new-card review. The first review
 establishes state; each later review in that sequence contributes one usable
 outcome. Invalid or incomplete history is excluded.
 
-When tuning finds a better fit, the result reports:
-
-- how many review outcomes were used; and
-- the percentage reduction in log loss, a measure of prediction error.
-
 The current app has no retention control: the target remains the built-in
 **90%**, and the maximum interval remains **36,500 days**. Optimization tunes
 FSRS weights only. It does not rewrite cards' existing due dates; new parameters
-take effect as later grades schedule those cards.
-
-If the existing parameters already fit as well as the optimizer can determine,
-NeoAnki2 reports that no change was needed. This is a successful result, not an
-error. Existing cards and review history remain in place; only the saved
-scheduling parameters for the profile are updated.
+take effect as later grades schedule those cards. Existing cards and review
+history remain in place; only the saved scheduling parameters for the profile
+are updated.
 
 Review logs are append-only and survive item/card deletion. Unless a grade was
 explicitly undone, outcomes from a deleted studied item can still contribute to
 later optimization. Do not create and grade artificial duplicates to influence
 the optimizer.
 
-[![Scheduling optimization result showing observations and fit]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)
+[![Library after a study session, with no optimization prompt]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)]({{ site.baseurl }}/assets/screenshots/scheduling-result.png)
 
-## Insufficient data
+## When a fit is attempted
 
-Optimization requires at least **100 usable review outcomes**. This is not
+Fitting requires at least **100 usable review outcomes**. This is not
 necessarily the same as 100 button presses: a card needs a prior review before
-a later review supplies an outcome for fitting.
+a later review supplies an outcome for fitting. Below that, sessions end without
+a fit and nothing changes.
 
-If there are too few, NeoAnki2 shows **Could Not Optimize Scheduling**, states
-the required and currently available counts, and asks you to keep studying and
-try again later. Nothing is changed. There is no benefit to fabricating grades
-or repeatedly optimizing; grade honestly, allow cards to return over time, and
-retry after accumulating more history.
+Past the first fit, NeoAnki2 refits when review history has grown by **25%**
+since the previous attempt, with a floor of **50 new reviews** so a small
+library is not refitted constantly, and after **30 days** once any new history
+exists. Unchanged history is never refitted: the same reviews cannot produce a
+different answer, however long ago they were read.
 
-Other optimization failures leave the current parameters unchanged. If the
-history cannot produce valid parameters, try again after more normal reviews.
-If parameters cannot be saved, close and reopen the app, verify the library
-folder is writable, and retry.
+Because this is automatic, there is nothing to retry and no benefit to
+fabricating grades. Grade honestly and let cards return over time. If a fit
+cannot be made from the available history, or its result cannot be saved, the
+parameters already in use continue to schedule normally and a later session
+tries again.
 
 ## Practical guidance
 
@@ -115,8 +115,6 @@ folder is writable, and retry.
 - Choose the grade that describes recall, not the interval you hope to receive.
 - Use **Undo Last Grade** or **Command-Z** immediately after an accidental
   grade; the card and review history are restored.
-- Run optimization occasionally after substantial new history, not after every
-  session.
 - Treat `.neodeck` exports as content exchange, not scheduling backups. To
   preserve progress, back up the whole local library folder.
 

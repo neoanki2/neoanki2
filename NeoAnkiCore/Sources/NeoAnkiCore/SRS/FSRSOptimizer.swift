@@ -36,6 +36,73 @@ public struct FSRSOptimizationResult: Equatable, Sendable {
     }
 }
 
+/// Decides when accumulated review history is worth refitting weights against.
+///
+/// Fitting is automatic, so the decision runs on every session end and has to
+/// be cheap and stable. It compares the number of active review logs against
+/// the number present at the last attempt — one `COUNT` — rather than replaying
+/// history to count usable outcomes, which is the fit itself.
+public struct FSRSOptimizationSchedule: Sendable, Equatable {
+    /// A fit cannot use more outcomes than there are logs, so this is the
+    /// cheapest sound gate before the first attempt.
+    public static let defaultMinimumReviewLogs = FSRSOptimizer.defaultMinimumObservations
+    public static let defaultMinimumNewReviewLogs = 50
+    public static let defaultGrowthFraction = 0.25
+    public static let defaultStaleInterval: TimeInterval = 30 * 86_400
+
+    /// What the last attempt saw. Recorded whether or not it changed anything,
+    /// so an attempt that finds too little usable history does not repeat on
+    /// every session end.
+    public struct Attempt: Sendable, Equatable {
+        public let reviewLogCount: Int
+        public let attemptedAt: Date
+
+        public init(reviewLogCount: Int, attemptedAt: Date) {
+            self.reviewLogCount = reviewLogCount
+            self.attemptedAt = attemptedAt
+        }
+    }
+
+    public let minimumReviewLogs: Int
+    public let minimumNewReviewLogs: Int
+    public let growthFraction: Double
+    public let staleInterval: TimeInterval
+
+    public init(
+        minimumReviewLogs: Int = Self.defaultMinimumReviewLogs,
+        minimumNewReviewLogs: Int = Self.defaultMinimumNewReviewLogs,
+        growthFraction: Double = Self.defaultGrowthFraction,
+        staleInterval: TimeInterval = Self.defaultStaleInterval
+    ) {
+        self.minimumReviewLogs = max(1, minimumReviewLogs)
+        self.minimumNewReviewLogs = max(1, minimumNewReviewLogs)
+        self.growthFraction = max(0, growthFraction)
+        self.staleInterval = max(0, staleInterval)
+    }
+
+    public func needsOptimization(
+        reviewLogCount: Int,
+        lastAttempt: Attempt?,
+        now: Date
+    ) -> Bool {
+        guard reviewLogCount >= minimumReviewLogs else { return false }
+        guard let lastAttempt else { return true }
+
+        // Refitting against history the last attempt already saw cannot reach a
+        // different answer, however old that attempt is.
+        let newReviewLogs = reviewLogCount - lastAttempt.reviewLogCount
+        guard newReviewLogs > 0 else { return false }
+
+        if now >= lastAttempt.attemptedAt.addingTimeInterval(staleInterval) { return true }
+
+        // Proportional, so a long history is not refitted for a handful of new
+        // reviews that cannot move the weights.
+        let proportional = (Double(lastAttempt.reviewLogCount) * growthFraction).rounded(.up)
+        let required = max(Double(minimumNewReviewLogs), proportional)
+        return Double(newReviewLogs) >= required
+    }
+}
+
 /// Fits per-profile FSRS-6 weights from append-only review history.
 ///
 /// The optimizer is deliberately deterministic and dependency-free. It uses
