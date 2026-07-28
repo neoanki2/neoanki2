@@ -9,7 +9,7 @@ parent: Reference
 ## 1. Status and purpose
 
 This document is the normative specification for NeoAnki Authored Deck Format
-version 1. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
+version 2. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
 **SHOULD NOT**, and **MAY** are interpreted as in RFC 2119 and RFC 8174.
 
 The format is an import-only, text-based source representation for coding
@@ -64,13 +64,13 @@ templates, slots, rich spans, and tags.
 `deck.jsonl` MUST contain exactly one manifest record:
 
 ```json
-{"kind":"neoanki","version":1,"root":"biology","parts":["items/cells-001.jsonl"]}
+{"kind":"neoanki","version":2,"root":"biology","parts":["items/cells-001.jsonl"]}
 ```
 
 Members are exact:
 
 - `kind`: `"neoanki"`;
-- `version`: integer `1`;
+- `version`: integer `2`;
 - `root`: identifier of the root deck; and
 - `parts`: ordered, unique relative paths to `.jsonl` item files.
 
@@ -175,7 +175,7 @@ Values are selected by the declared field type:
 {% raw %}
 {"text":"plain text"}
 {"text":"hola","lang":"es"}
-{"rich":[{"text":"important","styles":["bold","highlight"]}]}
+{"rich":[{"text":"important","styles":["bold","superscript"],"color":"purple","size":"large","link":"https://example.com"}]}
 {"number":42.5}
 {"cloze":"Paris is in {{c1::France::country}}."}
 {"media":{"path":"media/paris.webp","alt":"Map of Paris","durationMs":1200}}
@@ -183,7 +183,18 @@ Values are selected by the declared field type:
 ```
 
 Rich styles are `bold`, `italic`, `underline`, `strikethrough`, `highlight`,
-and `code`; styles cannot repeat within a span.
+`code`, `superscript`, and `subscript`; styles cannot repeat within a span.
+For compatibility with older hand-authored content, a span containing both
+`highlight` and `code` is normalized to `highlight`, and one containing both
+`superscript` and `subscript` is normalized to `superscript`. Writers SHOULD
+emit only the normalized style.
+A span may also have a semantic `color` (`red`, `orange`, `yellow`, `green`,
+`mint`, `teal`, `cyan`, `blue`, `indigo`, `purple`, `pink`, `brown`, or
+`gray`), a relative `size` (`small` or `large`), and an absolute `http`,
+`https`, or `mailto` `link` of at most 2,048 UTF-8 bytes. These additions
+require manifest version 2. JSON Schema `maxLength` counts Unicode characters,
+so the compiler performs the authoritative UTF-8 byte-limit and URL host/path
+validation.
 
 Cloze markers have the form {% raw %}`{{cN::answer}}` or
 `{{cN::answer::hint}}`{% endraw %}, where `N` is a positive integer and `answer` is
@@ -266,6 +277,8 @@ Biology.neoanki/items/cells-001.jsonl:18: AD222: Item contains unknown field "ba
 
 ## 12. Evolution
 
-Version 1 is closed: writers MUST NOT add members or record kinds not defined
-here. Incompatible changes increment the manifest `version`. Importers MUST
-reject unsupported versions rather than guessing.
+Version 2 adds portable inline text color, relative size, links, superscript,
+and subscript. Version 1 remains readable but cannot use those members or
+styles. Writers MUST NOT add members or record kinds not defined here.
+Incompatible changes increment the manifest `version`; importers MUST reject
+unsupported versions rather than guessing.

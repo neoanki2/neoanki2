@@ -9,12 +9,12 @@ parent: Reference
 ## 1. Status and scope
 
 This document is the normative specification for **NeoAnki Portable Deck
-Format version 1**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
+Format version 2**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
 **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described by
 RFC 2119 and RFC 8174.
 
 A `.neodeck` file is one SQLite database containing deck structure, item-type
-definitions, item content, tags, and media bytes. Version 1 is a
+definitions, item content, tags, and media bytes. Version 2 is a
 **content-only** interchange format. It never contains cards, scheduling
 state, review history, statistics, scheduler parameters, suspension state, or
 other learner progress.
@@ -29,7 +29,7 @@ Writers MUST produce a SQLite 3 database with:
 - filename extension `.neodeck`;
 - page-header `application_id` equal to `0x4E44454B` (ASCII `NDEK`,
   decimal `1313097035`);
-- `user_version` equal to `1`;
+- `user_version` equal to `2`;
 - UTF-8 text encoding;
 - foreign-key enforcement enabled while writing; and
 - no attached databases, virtual tables, triggers, views, or executable SQL.
@@ -38,16 +38,16 @@ The required initialization pragmas are:
 
 ```sql
 PRAGMA application_id = 1313097035;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 PRAGMA encoding = 'UTF-8';
 PRAGMA foreign_keys = ON;
 ```
 
 Readers MUST inspect `application_id` and `user_version` before reading
 application data. A reader MUST reject a file with a different
-`application_id`. A version-1 reader MUST reject `user_version > 1`; it MUST
+`application_id`. A version-2 reader MUST reject `user_version > 2`; it MUST
 NOT guess at a newer schema. A reader MAY support older versions through an
-explicit migration, but version 1 defines no older version.
+explicit compatibility path. NeoAnki supports both versions 1 and 2.
 
 The schema uses only portable SQLite storage classes and features available in
 SQLite 3.24 or later. UUIDs and timestamps are text, JSON is UTF-8 text, and
@@ -92,14 +92,14 @@ Columns ending in `_json` MUST contain one complete UTF-8 JSON value:
 - with absent optional members omitted, not set to `null`; and
 - with arrays retained in their specified semantic order.
 
-Readers MUST accept semantically valid non-canonical JSON in version-1 files,
+Readers MUST accept semantically valid non-canonical JSON in version-2 files,
 but MUST canonicalize it before digest comparison. Writers MUST emit canonical
 JSON. Unknown object members are an error unless a future version of this
 document explicitly makes that object extensible.
 
 ## 4. Required schema
 
-The following DDL is exact. A version-1 file MUST contain these tables,
+The following DDL is exact. A version-2 file MUST contain these tables,
 columns, constraints, foreign keys, and indexes. It MUST NOT contain
 application rows outside these tables. Additional indexes are allowed;
 additional tables, columns, views, triggers, and virtual tables are not.
@@ -108,7 +108,7 @@ additional tables, columns, views, triggers, and virtual tables are not.
 CREATE TABLE manifest (
     singleton          INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
     format_name        TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-    format_version     INTEGER NOT NULL CHECK (format_version = 1),
+    format_version     INTEGER NOT NULL CHECK (format_version = 2),
     created_at         TEXT NOT NULL,
     exporter           TEXT NOT NULL,
     source_library_id  TEXT NOT NULL,
@@ -311,7 +311,7 @@ must not exceed the limits in section 9, and all field ordinals MUST exist.
 {"type":"empty"}
 {"type":"text","text":"<Unicode text>"}
 {"type":"text","text":"<Unicode text>","lang":"<BCP-47 language tag>"}
-{"type":"rich","spans":[{"text":"<Unicode text>","styles":["bold","italic"]}]}
+{"type":"rich","spans":[{"text":"<Unicode text>","styles":["bold","italic"],"color":"purple","size":"large","link":"https://example.com"}]}
 {"type":"number","value":12.5}
 {"type":"cloze","text":"Paris is in France","blanks":[{"group":1,"start":0,"length":5}]}
 {"type":"media","digest":"<64 lowercase hex>","kind":"image","extension":"png"}
@@ -319,8 +319,18 @@ must not exceed the limits in section 9, and all field ordinals MUST exist.
 
 Text language tags MUST be structurally valid BCP 47 tags. A rich span's
 `styles` is a set encoded without duplicates in this fixed order when present:
-`bold`, `italic`, `underline`, `strikethrough`, `highlight`, `code`. Empty
-style arrays are allowed.
+`bold`, `italic`, `underline`, `strikethrough`, `highlight`, `code`,
+`superscript`, `subscript`. Empty style arrays are allowed.
+For backward compatibility, readers normalize `highlight` plus `code` to
+`highlight`, and `superscript` plus `subscript` to `superscript`. Writers MUST
+emit only the normalized style from each pair.
+
+A rich span may also have `color`, `size`, and `link`. `color` is one of
+`red`, `orange`, `yellow`, `green`, `mint`, `teal`, `cyan`, `blue`, `indigo`,
+`purple`, `pink`, `brown`, or `gray`. `size` is `small` or `large`; omission
+means the default size. A link MUST be an absolute `http`, `https`, or `mailto`
+URL no larger than 2,048 UTF-8 bytes. These members and the `superscript` and
+`subscript` styles require format version 2.
 
 Numbers MUST be finite IEEE-754 binary64 values. Importers MUST reject values
 that cannot round-trip through binary64.
@@ -414,7 +424,7 @@ is never trusted as a lookup key without this check.
 validated file signatures; a filename or declared MIME type is not evidence of
 content type.
 
-Allowed version-1 combinations are:
+Allowed version-1 and version-2 combinations are:
 
 - image: `image/jpeg`/`jpg`, `image/png`/`png`, `image/webp`/`webp`;
 - gif: `image/gif`/`gif`;
@@ -456,7 +466,7 @@ the file.
 
 No table or JSON value may contain card IDs, review logs, due dates, memory
 state, scheduler parameters, suspension flags, study statistics, or deletion
-tombstones. `content_only` is always `1`; version 1 has no progress-export
+tombstones. `content_only` is always `1`; version 2 has no progress-export
 option.
 
 ### 8.2 Import validation and type resolution
@@ -517,7 +527,7 @@ single import transaction. Media MUST be copied in bounded chunks.
 ## 9. Validation and security limits
 
 An implementation MAY impose lower limits before the user selects a file, but
-a conforming version-1 importer MUST reject a file exceeding any of these hard
+a conforming version-2 importer MUST reject a file exceeding any of these hard
 limits before committing:
 
 - file size: 2 GiB;
@@ -606,18 +616,19 @@ Implementations SHOULD distinguish at least:
 - insufficient space or I/O failure; and
 - user cancellation.
 
-Errors are terminal for the current file. Version 1 has no best-effort,
+Errors are terminal for the current file. Version 2 has no best-effort,
 skip-invalid-row, or partial-import mode.
 
 ## 11. Compatibility rules
 
-A version-1 reader MUST validate exact table and column names and MUST tolerate
+A version-2 reader MUST validate exact table and column names and MUST tolerate
 additional indexes only. It MUST reject missing or additional application
 schema objects because those can change semantics or expand the attack surface.
 
 Format evolution uses `PRAGMA user_version` and `manifest.format_version`
-together. A future incompatible schema increments both. Version-1 writers MUST
-not emit extensions under version 1, and readers MUST not infer support from
+together. Version 2 adds portable inline text color, relative size, links,
+superscript, and subscript without changing table columns. Version-1 writers
+MUST not emit those extensions, and readers MUST not infer support from
 the `.neodeck` filename alone.
 
 Cross-platform implementations MUST derive behavior from this specification,

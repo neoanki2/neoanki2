@@ -31,11 +31,19 @@ Select text and use the formatting toolbar:
 - **Strikethrough**
 - **Highlight**
 - **Code**
+- **Superscript** and **Subscript**
+- **Small**, **Default**, and **Large** relative sizes
+- Adaptive system text colors
+- **Add Link** and **Remove Link**
+- **Clear Formatting**
 
 Clicking an active style removes it. Highlight and Code are mutually exclusive
-when applied through the toolbar. Styles are stored semantically and rendered
-with native macOS typography; arbitrary fonts, colors, HTML, CSS, and embedded
-web content are not supported.
+when applied through the toolbar, as are Superscript and Subscript. Colors are
+derived from the adaptive macOS system palette and contrast-adjusted for
+readability in light and dark appearances. Links accept HTTP, HTTPS, and email
+addresses. Formatting is stored semantically and rendered with native macOS
+typography; arbitrary fonts, arbitrary RGB values, HTML, CSS, and embedded web
+content are not supported.
 
 ## Numbers
 
