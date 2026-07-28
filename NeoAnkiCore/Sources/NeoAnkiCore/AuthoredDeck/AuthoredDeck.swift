@@ -180,6 +180,7 @@ private struct SourceLocation {
 }
 
 private struct ManifestRecord {
+    let version: Int
     let root: String
     let parts: [String]
     let location: SourceLocation
@@ -567,10 +568,12 @@ private struct AuthoredDeckLoader {
         guard try requiredString(object, "kind") == "neoanki" else {
             throw DecodeFailure("AD110", "Manifest kind must be \"neoanki\".")
         }
-        guard try requiredInteger(object, "version") == 1 else {
-            throw DecodeFailure("AD111", "Only authored deck version 1 is supported.")
+        let version = try requiredInteger(object, "version")
+        guard (1...2).contains(version) else {
+            throw DecodeFailure("AD111", "Only authored deck versions 1 and 2 are supported.")
         }
         return .init(
+            version: version,
             root: try identifier(object, "root"),
             parts: try stringArray(object, "parts"),
             location: location
@@ -996,7 +999,14 @@ private struct AuthoredDeckCompiler {
                 guard let span = rawSpan as? [String: Any] else {
                     throw DecodeFailure("AD241", "A rich-text span is malformed.")
                 }
-                try exactKeys(span, required: ["text"], optional: ["styles"])
+                let nativeFormattingKeys = manifest.version >= 2
+                    ? ["color", "size", "link"]
+                    : []
+                try exactKeys(
+                    span,
+                    required: ["text"],
+                    optional: Set(["styles"] + nativeFormattingKeys)
+                )
                 let styles = try optionalStringArray(span, "styles") ?? []
                 let decoded = try styles.map { value -> Span.Style in
                     guard let style = Span.Style(rawValue: value) else {
@@ -1007,9 +1017,35 @@ private struct AuthoredDeckCompiler {
                 guard Set(decoded).count == decoded.count else {
                     throw DecodeFailure("AD243", "Rich-text styles cannot repeat.")
                 }
+                if manifest.version < 2,
+                   decoded.contains(.superscript) || decoded.contains(.subscriptText) {
+                    throw DecodeFailure("AD242", "This rich-text style requires authored deck version 2.")
+                }
                 let text = try requiredString(span, "text")
                 try validateAuthoredText(text)
-                return Span(text, styles: Set(decoded))
+                let textColor = try optionalString(span, "color").map { value -> Span.TextColor in
+                    guard let color = Span.TextColor(rawValue: value) else {
+                        throw DecodeFailure("AD242", "Unknown rich-text color \"\(value)\".")
+                    }
+                    return color
+                }
+                let textSize = try optionalString(span, "size").map { value -> Span.TextSize in
+                    guard let size = Span.TextSize(rawValue: value) else {
+                        throw DecodeFailure("AD242", "Unknown rich-text size \"\(value)\".")
+                    }
+                    return size
+                }
+                let link = try optionalString(span, "link")
+                if let link, !RichTextValidation.isValidLink(link) {
+                    throw DecodeFailure("AD242", "Rich-text link is invalid or uses an unsupported scheme.")
+                }
+                return Span(
+                    text,
+                    styles: Set(decoded),
+                    textColor: textColor,
+                    textSize: textSize,
+                    link: link
+                )
             })
         case .number:
             try exactKeys(object, required: ["number"])

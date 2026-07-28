@@ -81,7 +81,7 @@ public extension FieldDef {
         switch type {
         case .text:
             if plain.isEmpty { return .empty }
-            if merged.allSatisfy({ $0.styles.isEmpty }) {
+            if merged.allSatisfy({ !$0.hasFormatting }) {
                 return .text(plain)
             }
             return .rich(merged)
@@ -113,8 +113,14 @@ public extension FieldDef {
     private static func mergeAdjacent(_ spans: [Span]) -> [Span] {
         spans.reduce(into: [Span]()) { result, span in
             guard !span.text.isEmpty else { return }
-            if let last = result.last, last.styles == span.styles {
-                result[result.count - 1] = Span(last.text + span.text, styles: last.styles)
+            if let last = result.last, last.hasSameFormatting(as: span) {
+                result[result.count - 1] = Span(
+                    last.text + span.text,
+                    styles: last.styles,
+                    textColor: last.textColor,
+                    textSize: last.textSize,
+                    link: last.link
+                )
             } else {
                 result.append(span)
             }

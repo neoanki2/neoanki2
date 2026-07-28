@@ -51,9 +51,11 @@ field and save again.
 
 Text-capable fields provide a native editor and formatting toolbar. Select
 text, then toggle **Bold**, **Italic**, **Underline**, **Strikethrough**,
-**Highlight**, or **Code**. A plain Text field stores ordinary text when no
-formatting is used and preserves semantic rich spans when styles are applied;
-a Rich Text field always stores rich spans.
+**Highlight**, or **Code**. The **More Formatting** menu adds superscript,
+subscript, small/default/large text, adaptive system colors, links, and
+**Clear Formatting**. A plain Text field stores ordinary text when no
+formatting is used and preserves semantic rich spans when formatting is
+applied; a Rich Text field always stores rich spans.
 
 [![Rich-text formatting while authoring]({{ site.baseurl }}/assets/screenshots/item-rich-text.png)]({{ site.baseurl }}/assets/screenshots/item-rich-text.png)
 

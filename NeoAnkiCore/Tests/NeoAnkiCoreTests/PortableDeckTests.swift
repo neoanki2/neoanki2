@@ -21,6 +21,22 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     return store
 }
 
+@Test func portableRichTextNormalizesConflictingLegacyStylesOnReadAndWrite() throws {
+    let decoded = try PortableJSON.decodeContent(
+        #"{"type":"rich","spans":[{"text":"Legacy","styles":["highlight","code","superscript","subscript"]}]}"#,
+        formatVersion: 2
+    )
+
+    #expect(decoded == .rich([
+        Span("Legacy", styles: [.highlight, .superscript]),
+    ]))
+
+    let encoded = try PortableJSON.encodeContent(decoded)
+    #expect(encoded.contains(#""styles":["highlight","superscript"]"#))
+    #expect(!encoded.contains(#""code""#))
+    #expect(!encoded.contains(#""subscript""#))
+}
+
 @Test func portableDeckRoundTripImportsContentAndFreshCards() async throws {
     let directory = try portableTestDirectory()
     let source = try await portableStore(in: directory, name: "source")
@@ -355,6 +371,14 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
         .rich([
             Span("bold", styles: [.bold, .highlight]),
             Span(" code", styles: [.code]),
+            Span(
+                " linked",
+                styles: [.underline, .superscript],
+                textColor: .indigo,
+                textSize: .large,
+                link: "https://neoanki.app/docs"
+            ),
+            Span(" small", styles: [.subscriptText], textColor: .green, textSize: .small),
         ]),
         .number(42.5),
         .cloze("Paris", blanks: [.init(group: 1, start: 0, length: 5, hint: "city")]),

@@ -160,7 +160,8 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 1
+    public static let version = 2
+    fileprivate static let supportedVersions = 1...version
 
     public static func export(
         deckID: UUID,
@@ -324,7 +325,7 @@ private final class PortableDeckDatabase {
                 """
                 INSERT INTO manifest(singleton, format_name, format_version, created_at, exporter,
                     source_library_id, root_deck_id, content_only)
-                VALUES (1, 'neoanki-portable-deck', 1, ?, 'NeoAnki', ?, ?, 1);
+                VALUES (1, 'neoanki-portable-deck', \(PortableDeck.version), ?, 'NeoAnki', ?, ?, 1);
                 """,
                 [
                     .text(Self.timestamp(.now)),
@@ -451,7 +452,7 @@ private final class PortableDeckDatabase {
                 let mimeType = Self.mimeType(record.descriptor.fileExtension)
                 guard mimeType != "application/octet-stream" else {
                     throw PortableDeckError.invalidPackage(
-                        "A media format is not supported by portable deck version 1."
+                        "A media format is not supported by this portable deck version."
                     )
                 }
                 try execute(
@@ -482,7 +483,7 @@ private final class PortableDeckDatabase {
             throw PortableDeckError.invalidPackage("File is not a NeoAnki portable deck.")
         }
         let version = Int(try scalarInteger("PRAGMA user_version;"))
-        guard version == PortableDeck.version else {
+        guard PortableDeck.supportedVersions.contains(version) else {
             throw PortableDeckError.unsupportedVersion(version)
         }
         let rows = try query("PRAGMA quick_check(1);")
@@ -685,6 +686,7 @@ private final class PortableDeckDatabase {
         limits: PortableDeckLimits,
         stagingDirectory: URL
     ) throws -> PortableDeckPackage {
+        let formatVersion = Int(try scalarInteger("PRAGMA user_version;"))
         try enforceCount(table: "decks", maximum: limits.maximumDecks)
         try enforceCount(table: "item_types", maximum: limits.maximumItemTypes)
         try enforceCount(table: "items", maximum: limits.maximumItems)
@@ -700,7 +702,7 @@ private final class PortableDeckDatabase {
         guard manifestRows.count == 1,
               manifestRows[0].integer(0) == 1,
               manifestRows[0].text(1) == "neoanki-portable-deck",
-              manifestRows[0].integer(2) == Int64(PortableDeck.version),
+              manifestRows[0].integer(2) == Int64(formatVersion),
               let sourceLibraryID = manifestRows[0].uuid(3),
               let rootDeckID = manifestRows[0].uuid(4),
               manifestRows[0].integer(5) == 1 else {
@@ -849,7 +851,7 @@ private final class PortableDeckDatabase {
                 }
                 return FieldValue(
                     fieldID: itemType.fields[Int(ordinal)].id,
-                    value: try PortableJSON.decodeContent(json)
+                    value: try PortableJSON.decodeContent(json, formatVersion: formatVersion)
                 )
             }
             let tagRows = tagsByItem[itemKey] ?? []
@@ -1119,11 +1121,12 @@ private func isDigest(_ value: String) -> Bool {
     value.count == 64 && value.allSatisfy { $0.isHexDigit && !$0.isUppercase }
 }
 
-private enum PortableJSON {
+enum PortableJSON {
     private static let maximumJSONBytes = 1_048_576
     private static let maximumTextBytes = 256 * 1_024
     private static let styleOrder: [Span.Style] = [
         .bold, .italic, .underline, .strikethrough, .highlight, .code,
+        .superscript, .subscriptText,
     ]
 
     static func encodeSide(_ side: Side, ordinals: [UUID: Int]) throws -> String {
@@ -1222,10 +1225,21 @@ private enum PortableJSON {
                 "type": "rich",
                 "spans": try spans.map { span -> [String: Any] in
                     try validateText(span.text)
-                    return [
+                    var object: [String: Any] = [
                         "text": span.text,
                         "styles": styleOrder.filter { span.styles.contains($0) }.map(\.rawValue),
                     ]
+                    if let textColor = span.textColor {
+                        object["color"] = textColor.rawValue
+                    }
+                    if let textSize = span.textSize {
+                        object["size"] = textSize.rawValue
+                    }
+                    if let link = span.link {
+                        guard RichTextValidation.isValidLink(link) else { throw invalid() }
+                        object["link"] = link
+                    }
+                    return object
                 },
             ]
         case let .number(number):
@@ -1267,7 +1281,10 @@ private enum PortableJSON {
         return try encode(value)
     }
 
-    static func decodeContent(_ json: String) throws -> ContentValue {
+    static func decodeContent(
+        _ json: String,
+        formatVersion: Int = PortableDeck.version
+    ) throws -> ContentValue {
         let value = try dictionary(object(json))
         guard let type = value["type"] as? String else { throw invalid() }
         switch type {
@@ -1285,7 +1302,13 @@ private enum PortableJSON {
             guard Set(value.keys) == ["type", "spans"], let raw = value["spans"] as? [Any],
                   raw.count <= 4_096 else { throw invalid() }
             return .rich(try raw.map { rawSpan in
-                let span = try dictionary(rawSpan, keys: ["text", "styles"])
+                let span = try dictionary(rawSpan)
+                let optionalKeys: Set<String> = formatVersion >= 2
+                    ? ["color", "size", "link"]
+                    : []
+                guard Set(span.keys).isSubset(of: Set(["text", "styles"]).union(optionalKeys)),
+                      Set(span.keys).isSuperset(of: ["text", "styles"])
+                else { throw invalid() }
                 guard let text = span["text"] as? String, let rawStyles = span["styles"] as? [Any]
                 else { throw invalid() }
                 try validateText(text)
@@ -1296,10 +1319,34 @@ private enum PortableJSON {
                     return style
                 }
                 let styleSet = Set(styles)
-                let canonicalStyles = styleOrder.filter { styleSet.contains($0) }
+                let supportedStyles = formatVersion >= 2
+                    ? styleOrder
+                    : Array(styleOrder.prefix(6))
+                let canonicalStyles = supportedStyles.filter { styleSet.contains($0) }
                 guard styleSet.count == styles.count, styles == canonicalStyles
                 else { throw invalid() }
-                return Span(text, styles: Set(styles))
+                let textColor = try span["color"].map { raw -> Span.TextColor in
+                    guard let value = raw as? String, let color = Span.TextColor(rawValue: value)
+                    else { throw invalid() }
+                    return color
+                }
+                let textSize = try span["size"].map { raw -> Span.TextSize in
+                    guard let value = raw as? String, let size = Span.TextSize(rawValue: value)
+                    else { throw invalid() }
+                    return size
+                }
+                let link = try span["link"].map { raw -> String in
+                    guard let value = raw as? String, RichTextValidation.isValidLink(value)
+                    else { throw invalid() }
+                    return value
+                }
+                return Span(
+                    text,
+                    styles: Set(styles),
+                    textColor: textColor,
+                    textSize: textSize,
+                    link: link
+                )
             })
         case "number":
             guard Set(value.keys) == ["type", "value"],
@@ -1474,7 +1521,7 @@ private let schema = [
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 1),
+        format_version INTEGER NOT NULL CHECK (format_version = 2),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),

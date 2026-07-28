@@ -163,7 +163,7 @@ The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
 of the exported tree.
 
-`.neodeck` version 1 is deliberately **content-only**. It does not contain:
+`.neodeck` version 2 is deliberately **content-only**. It does not contain:
 
 - review history, due dates, or scheduler parameters;
 - card or memory state, suspension state, or study statistics; or

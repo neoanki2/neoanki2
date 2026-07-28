@@ -30,6 +30,11 @@ Validation checks the complete bundle without importing it, including:
 - source-file, record, part, deck, type, field, template, item, and media
   limits.
 
+Rich-text values may use the version 2 span format to preserve supported
+styles, semantic text colors, relative text sizes, and safe HTTP, HTTPS, or
+mailto links. The validator also accepts legacy version 1 rich text; conflicting
+legacy style pairs are normalized during import.
+
 A valid bundle prints:
 
 ```text

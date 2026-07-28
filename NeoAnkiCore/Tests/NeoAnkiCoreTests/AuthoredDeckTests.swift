@@ -31,7 +31,7 @@ private func authoredBundle(
 }
 
 private let authoredManifest =
-    #"{"kind":"neoanki","version":1,"root":"root","parts":["items/items.jsonl"]}"#
+    #"{"kind":"neoanki","version":2,"root":"root","parts":["items/items.jsonl"]}"#
 private let authoredDeck =
     #"{"kind":"deck","id":"root","name":"Authored"}"#
 private let authoredType =
@@ -104,7 +104,7 @@ private let authoredType =
         in: directory,
         manifestRecords: [authoredManifest, authoredType, authoredDeck],
         itemRecords: [
-            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question","lang":"en"},"back":{"rich":[{"text":"Bold","styles":["bold"]},{"text":" answer"}]},"cloze":{"cloze":"A {{c1::mitochondrion::organelle}} makes energy."}},"tags":["biology"]}"#,
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question","lang":"en"},"back":{"rich":[{"text":"Bold","styles":["bold","superscript"],"color":"purple","size":"large","link":"https://neoanki.app"},{"text":" answer","styles":["subscript"],"color":"green","size":"small"}]},"cloze":{"cloze":"A {{c1::mitochondrion::organelle}} makes energy."}},"tags":["biology"]}"#,
         ]
     )
     #expect(AuthoredDeck.validate(at: bundle).isEmpty)
@@ -121,12 +121,107 @@ private let authoredType =
     #expect(items[0].cardCount == 1)
     let loaded = try #require(await store.fetchItem(id: items[0].id))
     #expect(loaded.item.tags == ["biology"])
+    #expect(loaded.item.fields[1].value == .rich([
+        Span(
+            "Bold",
+            styles: [.bold, .superscript],
+            textColor: .purple,
+            textSize: .large,
+            link: "https://neoanki.app"
+        ),
+        Span(" answer", styles: [.subscriptText], textColor: .green, textSize: .small),
+    ]))
     guard case let .cloze(text, blanks) = loaded.item.fields[2].value else {
         Issue.record("Expected compiled cloze content")
         return
     }
     #expect(text == "A mitochondrion makes energy.")
     #expect(blanks == [.init(group: 1, start: 2, length: 13, hint: "organelle")])
+}
+
+@Test func authoredDeckNormalizesConflictingLegacyRichTextStyles() async throws {
+    let directory = try authoredTestDirectory()
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredManifest, authoredType, authoredDeck],
+        itemRecords: [
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question"},"back":{"rich":[{"text":"Legacy","styles":["highlight","code","superscript","subscript"]}]}}}"#,
+        ]
+    )
+
+    #expect(AuthoredDeck.validate(at: bundle).isEmpty)
+
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    _ = try await AuthoredDeck.importDeck(from: bundle, into: store)
+
+    let summary = try #require(try await store.listItems().first)
+    let loaded = try #require(await store.fetchItem(id: summary.id))
+    #expect(loaded.item.fields[1].value == .rich([
+        Span("Legacy", styles: [.highlight, .superscript]),
+    ]))
+}
+
+@Test func authoredLinkSchemaRequiresSupportedSchemeAndHTTPHost() throws {
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let schemaURL = repositoryRoot
+        .appendingPathComponent("docs/schemas/authored-item.schema.json")
+    let data = try Data(contentsOf: schemaURL)
+    let schema = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let definitions = try #require(schema["$defs"] as? [String: Any])
+    let span = try #require(definitions["span"] as? [String: Any])
+    let properties = try #require(span["properties"] as? [String: Any])
+    let link = try #require(properties["link"] as? [String: Any])
+    let pattern = try #require(link["pattern"] as? String)
+    let expression = try NSRegularExpression(pattern: pattern)
+
+    func matches(_ value: String) -> Bool {
+        expression.firstMatch(
+            in: value,
+            range: NSRange(value.startIndex..., in: value)
+        ) != nil
+    }
+
+    #expect(matches("https://neoanki.app/docs"))
+    #expect(matches("http://localhost:8080"))
+    #expect(matches("mailto:study@example.com"))
+    #expect(!matches("https:///missing-host"))
+    #expect(!matches("https://example.com/a path"))
+    #expect(!matches("javascript:alert(1)"))
+}
+
+@Test func authoredDeckVersionOneRemainsReadable() throws {
+    let directory = try authoredTestDirectory()
+    let legacyManifest =
+        #"{"kind":"neoanki","version":1,"root":"root","parts":["items/items.jsonl"]}"#
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [legacyManifest, authoredType, authoredDeck],
+        itemRecords: [
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question"},"back":{"rich":[{"text":"Legacy","styles":["bold"]}]}}}"#,
+        ]
+    )
+
+    #expect(AuthoredDeck.validate(at: bundle).isEmpty)
+}
+
+@Test func authoredDeckVersionOneRejectsVersionTwoRichFormatting() throws {
+    let directory = try authoredTestDirectory()
+    let legacyManifest =
+        #"{"kind":"neoanki","version":1,"root":"root","parts":["items/items.jsonl"]}"#
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [legacyManifest, authoredType, authoredDeck],
+        itemRecords: [
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question"},"back":{"rich":[{"text":"New","color":"purple"}]}}}"#,
+        ]
+    )
+
+    #expect(AuthoredDeck.validate(at: bundle).contains { $0.code == "AD020" })
 }
 
 @Test func authoredDeckAcceptsCompleteTemplateAndFieldVocabulary() throws {
