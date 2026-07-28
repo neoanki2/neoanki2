@@ -24,6 +24,10 @@ enum PortableDeckImportSelection {
         return false
     }
 
+    /// Presents the modal open panel, so this belongs to the main actor. Older
+    /// toolchains inferred that; stating it keeps the app building under strict
+    /// concurrency checking, where AppKit's isolation is enforced.
+    @MainActor
     static func choose() -> PortableDeckImportChoice {
         let panel = NSOpenPanel()
         panel.title = "Import Deck"
