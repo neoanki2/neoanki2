@@ -1833,6 +1833,22 @@ actor SQLiteDatabase {
         return Int(count)
     }
 
+    /// Counts every log an automatic fit would draw on, across all cards. This
+    /// is the whole cost of deciding whether to fit at all.
+    func countActiveReviewLogs() throws -> Int {
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM review_logs
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_reverts.id IS NULL;
+            """
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
     func fetchItem(id: UUID) throws -> PersistedItem? {
         let rows = try query(
             """

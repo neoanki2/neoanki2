@@ -78,8 +78,10 @@ editor is open.
 
 ### Scheduling
 
-- **Optimize Scheduling…** runs profile optimization. While running, it appears
-  as **Optimizing Scheduling…** and is disabled.
+- **Scheduling Settings…** sets when a new study day begins.
+
+There is no optimization command. Parameter fitting runs by itself when review
+history warrants it, so there is no menu item to find, enable, or wait on.
 
 ## Keyboard shortcuts by task
 

@@ -251,6 +251,13 @@ to a target retention. `MemoryState` carries `stability` and `difficulty` as
 algorithm-agnostic parameters; `ReviewLog` history feeds FSRS parameter fitting so
 the schedule adapts to the individual learner.
 
+Fitting is a policy decision, not a user action. `FSRSOptimizationSchedule`
+decides whether accumulated history warrants a new fit from one count of active
+review logs against the last attempt, and `ItemStore.optimizeSchedulingIfNeeded`
+runs the fit only when it does. The app calls it at the end of a study session
+and reports nothing: new weights change future scheduling, which is not a result
+the learner asked for or can act on.
+
 ---
 
 ## 7. Non-Goals

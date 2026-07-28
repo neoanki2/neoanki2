@@ -173,6 +173,10 @@ On import, NeoAnki2 generates fresh cards in never-reviewed state. A
 `.neodeck` is therefore suitable for sharing or moving content, but not for
 backing up learner progress. Back up the complete library folder for that.
 
+Because imported cards carry no history, importing a deck contributes nothing to
+scheduler fitting until you have actually reviewed those cards. See
+[Scheduling](../scheduling/#when-a-fit-is-attempted).
+
 ## Import `.neodeck` or `.neoanki`
 
 Choose **File → Import Deck…**, then select either format.

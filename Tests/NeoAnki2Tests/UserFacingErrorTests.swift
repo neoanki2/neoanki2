@@ -105,23 +105,3 @@ import Testing
             == "Choose a supported video file."
     )
 }
-
-@Test func schedulingMessageExplainsInsufficientDataWithoutTechnicalDetails() {
-    let message = UserFacingError.schedulingMessage(
-        from: FSRSOptimizationError.insufficientData(required: 200, available: 12)
-    )
-    #expect(message.contains("200"))
-    #expect(message.contains("12"))
-    #expect(!message.contains("FSRS"))
-
-    #expect(
-        UserFacingError.schedulingMessage(from: FSRSOptimizationError.invalidParameters)
-            == "Scheduling parameters couldn't be tuned from your review history. Try again later."
-    )
-
-    struct SampleError: Error {}
-    #expect(
-        UserFacingError.schedulingMessage(from: SampleError())
-            == "Scheduling parameters could not be saved. Try again."
-    )
-}

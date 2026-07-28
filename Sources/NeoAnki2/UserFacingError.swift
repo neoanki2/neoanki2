@@ -40,19 +40,6 @@ enum UserFacingError {
         return "NeoAnki2 couldn’t import this file. Check the file and try again."
     }
 
-    static func schedulingMessage(from error: Error) -> String {
-        if let error = error as? FSRSOptimizationError {
-            switch error {
-            case let .insufficientData(required, available):
-                return "NeoAnki2 needs at least \(required) review outcomes to tune scheduling; "
-                    + "you have \(available) so far. Keep studying and try again later."
-            case .invalidParameters:
-                return "Scheduling parameters couldn't be tuned from your review history. Try again later."
-            }
-        }
-        return "Scheduling parameters could not be saved. Try again."
-    }
-
     private static func databaseMessage(_ error: DatabaseError) -> String {
         switch error {
         case .openFailed:

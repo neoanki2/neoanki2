@@ -51,7 +51,10 @@
     "article": "user/scheduling.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift",
     "minimumReviewOutcomes": 100,
-    "minimumReviewsPerCardForOutcome": 2
+    "minimumReviewsPerCardForOutcome": 2,
+    "automaticMinimumNewReviewLogs": 50,
+    "automaticGrowthPercent": 25,
+    "automaticStaleIntervalDays": 30
   },
   "dailyNewCards": {
     "article": "user/scheduling.md",
@@ -108,7 +111,11 @@
         "at least **100 usable review outcomes**",
         "**90%**",
         "**36,500 days**",
-        "default is **4:00 AM**"
+        "default is **4:00 AM**",
+        "There is no **Optimize Scheduling** command",
+        "grown by **25%**",
+        "**50 new reviews**",
+        "after **30 days**"
       ]
     },
     {

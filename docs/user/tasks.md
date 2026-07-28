@@ -35,7 +35,7 @@ Choose what you want to accomplish.
 - **Choose the right grade:** [Feedback and grading](../studying/#feedback-and-grading)
 - **Undo the latest grade:** [Undo and ending a session](../studying/#undo-and-ending-a-session)
 - **Learn what FSRS changes:** [Scheduling](../scheduling/)
-- **Tune scheduling from review history:** [Scheduling](../scheduling/#optimize-scheduling-for-your-history)
+- **Understand when scheduling retunes itself:** [Scheduling](../scheduling/#optimization-happens-on-its-own)
 - **Study with the keyboard:** [Shortcuts and accessibility](../shortcuts-accessibility/#study)
 
 ## Move content in or out

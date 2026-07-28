@@ -200,19 +200,6 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
         .focusedSceneValue(\.libraryCommandHandlers, libraryCommandHandlers)
-        .alert(
-            schedulingModel.notice?.title ?? "Scheduling",
-            isPresented: Binding(
-                get: { schedulingModel.notice != nil },
-                set: { if !$0 { schedulingModel.notice = nil } }
-            )
-        ) {
-            Button("OK") {
-                schedulingModel.notice = nil
-            }
-        } message: {
-            Text(schedulingModel.notice?.message ?? "")
-        }
     }
 
     private var windowTitle: String {
@@ -653,6 +640,10 @@ struct ContentView: View {
         let now = Date.now
         await decksModel.refreshCounts(asOf: now)
         await itemsModel.refreshSchedules(for: studiedItemIDs, asOf: now)
+        // Last, and only after the visible surfaces are true: fitting is the
+        // one thing here the learner is not waiting to see. New parameters
+        // affect grades from here on, not any due time already on screen.
+        await schedulingModel.optimizeIfNeeded()
     }
 
     /// Re-reads only what is due, on both surfaces, against one instant. This is

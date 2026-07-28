@@ -227,16 +227,19 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
     }
 
+    /// There is no optimization result to photograph: fitting is automatic and
+    /// silent. What the guide has to show instead is the end of a session that
+    /// refitted — an ordinary library, with nothing asking to be dismissed.
     func testSchedulingScreenshot() throws {
         let app = launchApp(databaseLabel: "docs-scheduling", scenario: "scheduling-history")
-        app.menuBarItems["Scheduling"].click()
-        app.menuItems.identified("Optimize Scheduling…").click()
-        XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 20))
+        startStudy(in: app)
+        revealAndGrade("gradeGood", in: app)
+        endStudyViaMenu(in: app)
         captureDocumentationScreenshot(
             named: "scheduling-result",
             of: app,
-            scenario: "scheduling optimization result sheet",
-            expectedVisibleIdentifiers: ["action-button-1"]
+            scenario: "library after a session that refitted scheduling, with no prompt",
+            expectedVisibleIdentifiers: ["scopeHome", "scopeHomeDueHeadline"]
         )
     }
 

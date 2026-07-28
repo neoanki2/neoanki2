@@ -552,6 +552,60 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(await reopened.schedulingParameters() == result.parameters)
 }
 
+@Test func automaticOptimizationFitsOnceAndThenWaitsForNewHistory() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+            ]
+        ),
+        now: start
+    )
+    let card = try #require(await store.fetchDueCards(asOf: start).first).card
+
+    // Too little history to fit: the automatic path must not touch parameters
+    // and must not record an attempt it never made.
+    let untuned = await store.schedulingParameters()
+    #expect(try await store.optimizeSchedulingIfNeeded(now: start) == nil)
+    #expect(await store.schedulingParameters() == untuned)
+    #expect(try await store.lastOptimizationAttempt() == nil)
+
+    for index in 0..<130 {
+        let rating: ReviewRating = index == 0 || index % 5 != 0 ? .good : .again
+        _ = try await store.submitReview(
+            cardID: card.id,
+            rating: rating,
+            now: start.addingTimeInterval(Double(index * 12) * 86_400),
+            durationMs: 1_000
+        )
+    }
+    let end = start.addingTimeInterval(130 * 12 * 86_400)
+
+    let result = try #require(try await store.optimizeSchedulingIfNeeded(now: end))
+    #expect(result.improved)
+    #expect(await store.schedulingParameters() == result.parameters)
+    let attempt = try #require(await store.lastOptimizationAttempt())
+    #expect(attempt.reviewLogCount == 130)
+    #expect(attempt.attemptedAt == end)
+
+    // A second call with no new reviews must not refit.
+    #expect(try await store.optimizeSchedulingIfNeeded(now: end) == nil)
+    #expect(await store.schedulingParameters() == result.parameters)
+
+    // Each profile fits its own weights, so a different profile in the same
+    // library starts with no attempt of its own.
+    let otherProfile = try ItemStore(databaseURL: databaseURL, profileID: "learner-c")
+    try await otherProfile.bootstrap()
+    #expect(try await otherProfile.lastOptimizationAttempt() == nil)
+}
+
 private func reviewLogRowCount(at url: URL, cardID: UUID) throws -> Int {
     var db: OpaquePointer?
     guard sqlite3_open_v2(url.path(percentEncoded: false), &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,

@@ -217,6 +217,11 @@ types, or studying. The sidebar collapses automatically to make room, but can
 still be revealed with the normal sidebar control. Leaving the task restores
 the full split view. Reduced Motion is respected when these columns change.
 
+Leaving a study session returns you to the scope home with its counts already
+revised. NeoAnki2 may also retune its scheduler against your review history at
+that moment; this is silent and changes nothing on screen. See
+[Scheduling](../scheduling/#optimization-happens-on-its-own).
+
 ## Current compatibility limits
 
 NeoAnki2 is a rewrite, not an Anki-compatible client. It does not support:

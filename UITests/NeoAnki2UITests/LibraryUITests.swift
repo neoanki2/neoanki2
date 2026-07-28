@@ -311,39 +311,33 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertEmptyLibrary(in: app)
     }
 
-    func testSchedulingOptimizationReportsInsufficientHistory() throws {
+    /// Fitting is automatic, so the Scheduling menu must not offer it — there is
+    /// no decision here for the learner to get wrong or forget to make.
+    func testSchedulingMenuOffersOnlySettings() throws {
         let app = launchApp()
         app.menuBarItems["Scheduling"].click()
-        let optimize = app.menuItems.identified("Optimize Scheduling…")
-        XCTAssertTrue(optimize.waitForExistence(timeout: 3))
-        XCTAssertTrue(optimize.isEnabled)
-        optimize.click()
-
-        let alert = app.sheets.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10))
-        XCTAssertTrue(
-            alert.staticTexts.matching(
-                NSPredicate(format: "value CONTAINS[c] %@", "review")
-            ).firstMatch.exists
-        )
-        alert.buttons.identified("OK").click()
+        let settings = app.menuItems.identified("Scheduling Settings…")
+        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertTrue(settings.isEnabled)
+        XCTAssertFalse(app.menuItems.identified("Optimize Scheduling…").exists)
+        XCTAssertFalse(app.menuItems.identified("Optimizing Scheduling…").exists)
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
     }
 
-    func testSchedulingOptimizationSucceedsWithReviewHistory() throws {
+    /// Ending a session with enough history to refit must tune the profile
+    /// without saying so: the learner asked to study, not to be reported to.
+    func testEndingASessionOptimizesWithoutInterrupting() throws {
         let app = launchApp(scenario: "scheduling-history")
-        app.menuBarItems["Scheduling"].click()
-        app.menuItems.identified("Optimize Scheduling…").click()
+        startStudy(in: app)
+        revealAndGrade("gradeGood", in: app)
+        endStudyViaMenu(in: app)
 
-        let alert = app.sheets.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 20))
-        XCTAssertTrue(alert.staticTexts.matching(
-            NSPredicate(format: "value CONTAINS[c] %@", "Scheduling Optimized")
-        ).firstMatch.exists)
-        XCTAssertTrue(
-            alert.staticTexts.matching(
-                NSPredicate(format: "value CONTAINS[c] %@", "129 review outcomes")
+        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(
+            app.staticTexts.matching(
+                NSPredicate(format: "value CONTAINS[c] %@", "Scheduling Optimized")
             ).firstMatch.exists
         )
-        alert.buttons.identified("OK").click()
+        waitForLibraryReady(in: app)
     }
 }

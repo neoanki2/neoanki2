@@ -272,9 +272,11 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
         layer: "app",
         metadata: ["item_count": "\(libraryCount)", "fsrs_seed_count": "\(fsrsCount)"]
     ) {
-        await model.optimize()
-        #expect(model.notice != nil)
-        return ["notice": model.notice?.title ?? "none"]
+        await model.optimizeIfNeeded()
+        // The seeded history warrants a fit, so this measures the fit itself
+        // rather than the cheap gate that decides against one.
+        let attempt = try #require(await store.lastOptimizationAttempt())
+        return ["review_log_count": "\(attempt.reviewLogCount)"]
     }
 }
 

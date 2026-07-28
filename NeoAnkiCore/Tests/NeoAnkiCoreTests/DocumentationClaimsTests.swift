@@ -55,6 +55,9 @@ private struct DocumentationClaims: Decodable {
         let source: String
         let minimumReviewOutcomes: Int
         let minimumReviewsPerCardForOutcome: Int
+        let automaticMinimumNewReviewLogs: Int
+        let automaticGrowthPercent: Int
+        let automaticStaleIntervalDays: Int
     }
 
     struct Scheduler: Decodable {
@@ -138,6 +141,22 @@ private func documentationClaims() throws -> DocumentationClaims {
     #expect(
         claims.scheduling.minimumReviewsPerCardForOutcome
             == FSRSOptimizer.minimumReviewsPerCardForOutcome
+    )
+    #expect(
+        claims.scheduling.automaticMinimumNewReviewLogs
+            == FSRSOptimizationSchedule.defaultMinimumNewReviewLogs
+    )
+    #expect(
+        Double(claims.scheduling.automaticGrowthPercent) / 100
+            == FSRSOptimizationSchedule.defaultGrowthFraction
+    )
+    #expect(
+        Double(claims.scheduling.automaticStaleIntervalDays) * 86_400
+            == FSRSOptimizationSchedule.defaultStaleInterval
+    )
+    #expect(
+        FSRSOptimizationSchedule.defaultMinimumReviewLogs
+            == claims.scheduling.minimumReviewOutcomes
     )
 
     let scheduler = FSRSScheduler.Parameters()
