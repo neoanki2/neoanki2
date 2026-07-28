@@ -75,7 +75,7 @@ Launching NeoAnki2...
 
 The script builds a debug executable, assembles and ad-hoc signs
 `.build/NeoAnki2.app`, then asks macOS to open it. The app window should appear
-at **All Decks**. The bundle stays inside the checkout; it is not installed in
+at **All Decks**. The bundle stays inside the checkout; nothing is installed in
 `/Applications`.
 
 To keep the process attached to Terminal instead, run:
@@ -87,6 +87,47 @@ To keep the process attached to Terminal instead, run:
 Expected result: Terminal prints **Building NeoAnki2...** and **Running
 NeoAnki2...**, then the app window appears. Keep that Terminal window open
 while this mode is running.
+
+## Install to /Applications
+
+Running from the checkout means launching through a script every time. To use
+NeoAnki2 the way you use any other Mac app — Spotlight, Launchpad, the Dock —
+install it:
+
+```bash
+./Scripts/install-app.sh --restart
+```
+
+Expected result:
+
+```text
+Building NeoAnki2 (release)...
+Assembling NeoAnki2.app...
+Installing to /Applications/NeoAnki2.app...
+Installed NeoAnki2 (abc1234, build 90) at /Applications/NeoAnki2.app
+```
+
+This is a release build, not the debug build `run-app.sh` produces, and it is
+signed with no entitlements — the test bundle grants itself debugger attachment
+and Apple Events so automated tests can drive it, and the copy you study with
+does not need either. The commit it came from is recorded in the bundle, so you
+can always tell which build you are running:
+
+```bash
+/usr/libexec/PlistBuddy -c 'Print :NeoAnkiGitRevision' \
+  /Applications/NeoAnki2.app/Contents/Info.plist
+```
+
+A `-dirty` suffix means the checkout had uncommitted changes when you installed.
+
+`--restart` quits a running NeoAnki2 before replacing it and launches the new
+build afterwards. Without that flag, a running instance stops the install rather
+than risking two processes writing one library. To install somewhere else, pass
+`--dest ~/Applications`.
+
+Your library lives in `~/Library/Application Support/neoanki2/` either way, so
+the installed app and a build launched from the checkout read the same data.
+Never run both at once.
 
 ## Update the development build
 
@@ -104,13 +145,18 @@ shows local source changes, do not discard them blindly; commit, move, or review
 them before pulling. If the updated build reports that an older build cannot
 read the library, return to the updated build or restore a compatible backup.
 
+If you installed to `/Applications`, substitute `./Scripts/install-app.sh
+--restart` for `./Scripts/run-app.sh` in that sequence. Pulling new source does
+not change the installed app until you install again.
+
 ## Uninstall or remove the checkout
 
 1. Quit NeoAnki2.
 2. Delete the source checkout to remove source code, `.build/NeoAnki2.app`, and
-   build artifacts. Nothing was installed in `/Applications`.
-3. To keep your study data for a future checkout, stop here.
-4. To remove all NeoAnki2 data too, first make any backup you intend to keep,
+   build artifacts.
+3. If you installed to `/Applications`, drag `NeoAnki2.app` to the Trash as well.
+4. To keep your study data for a future checkout, stop here.
+5. To remove all NeoAnki2 data too, first make any backup you intend to keep,
    then delete `~/Library/Application Support/neoanki2/`.
 
 Deleting the data folder permanently removes the library and managed media.

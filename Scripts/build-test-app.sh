@@ -13,7 +13,7 @@ swift build -c debug
 
 mkdir -p "$MACOS"
 cp "$BUILD_DIR/NeoAnki2" "$MACOS/NeoAnki2"
-cp "$ROOT/UITests/AppBundle/Info.plist" "$CONTENTS/Info.plist"
+cp "$ROOT/Packaging/Info.plist" "$CONTENTS/Info.plist"
 chmod +x "$MACOS/NeoAnki2"
 xattr -cr "$APP_DIR" 2>/dev/null || true
 codesign --force --deep --sign - --timestamp=none \
