@@ -1,4 +1,6 @@
 import NeoAnkiCore
+import NeoAnkiDeckBuilderKit
+import PoemDeckBuilder
 import SwiftUI
 
 @main
@@ -9,6 +11,12 @@ struct NeoAnki2App: App {
     @State private var schedulingModel: SchedulingModel?
     @State private var bootstrapError: String?
 
+    init() {
+        if AppDatabase.isTesting {
+            AppPreferences.resetForTesting()
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -16,7 +24,8 @@ struct NeoAnki2App: App {
                     ContentView(
                         itemsModel: itemsModel,
                         decksModel: decksModel,
-                        schedulingModel: schedulingModel
+                        schedulingModel: schedulingModel,
+                        deckBuilderRegistry: .production
                     )
                 } else if let bootstrapError {
                     ContentUnavailableView {
@@ -30,10 +39,12 @@ struct NeoAnki2App: App {
                         .task { await bootstrap() }
                 }
             }
+            // A window taller than the display puts the study grade buttons out
+            // of reach. Neither restored frames nor content may grow past it.
+            .fitWindowToScreen()
         }
         .defaultSize(width: 960, height: 640)
         .commands {
-            CommandGroup(replacing: .newItem) {}
             LibraryCommands()
             StudyCommands()
             SchedulingCommands(model: schedulingModel)
@@ -58,5 +69,13 @@ struct NeoAnki2App: App {
         } catch {
             bootstrapError = UserFacingError.message(from: error)
         }
+    }
+}
+
+private extension DeckBuilderRegistry {
+    static var production: DeckBuilderRegistry {
+        DeckBuilderRegistry([
+            PoemDeckBuilderFeature.makeFeature(),
+        ])
     }
 }

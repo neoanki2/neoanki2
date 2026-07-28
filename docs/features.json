@@ -7,10 +7,12 @@
       "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck",
       "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck",
       "NeoAnkiCore/Sources/NeoAnkiCore/Media",
-      "NeoAnkiCore/Sources/NeoAnkiDeckCLI"
+      "NeoAnkiCore/Sources/NeoAnkiDeckCLI",
+      "Sources/NeoAnkiDeckBuilderKit",
+      "Sources/PoemDeckBuilder"
     ],
     "sourceMarkers": ["CommandMenu(", "CommandGroup(", ": Commands {", ": View {", ".keyboardShortcut(", ".accessibilityIdentifier("],
-    "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests"],
+    "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests", "Tests/PoemDeckBuilderTests"],
     "testMarkers": ["func test", "@Test"],
     "excludedFiles": [
       "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift",
@@ -38,7 +40,7 @@
       "id": "deck-scopes",
       "name": "All Decks, Unassigned, and deck scopes",
       "article": "user/library-and-decks.md",
-      "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
+      "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/ScopeHomeView.swift"],
       "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift", "Tests/NeoAnki2Tests/DecksModelTests.swift"],
       "screenshot": "assets/screenshots/decks-nested.png"
     },
@@ -51,11 +53,18 @@
       "screenshot": "assets/screenshots/decks-nested.png"
     },
     {
+      "id": "daily-new-card-limits",
+      "name": "Limit daily new cards by deck",
+      "article": "user/scheduling.md",
+      "sources": ["Sources/NeoAnki2/DeckSettingsView.swift", "Sources/NeoAnki2/SchedulingSettingsView.swift", "Sources/NeoAnki2/ScopeHomeView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/StudyDay.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/DailyNewCardLimitTests.swift", "Tests/NeoAnki2Tests/DecksModelCRUDTests.swift", "Tests/NeoAnki2Tests/SchedulingModelTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"]
+    },
+    {
       "id": "library-items",
-      "name": "Library item list, counts, and empty states",
+      "name": "Scope home, browse mode, and empty states",
       "article": "user/library-and-decks.md",
-      "sources": ["Sources/NeoAnki2/DeckDetailView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift"],
+      "sources": ["Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemBrowserView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/ScopeHomeAndBrowseUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ScopeHomeAndBrowseTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceCompleteTests.swift", "Tests/NeoAnki2Tests/UserInteractionPerformanceTests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
     },
     {
@@ -165,6 +174,13 @@
       "screenshot": "assets/screenshots/study-grade-help.png"
     },
     {
+      "id": "study-edit-card",
+      "name": "Edit the card you are reviewing",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnki2/StudyCommands.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"]
+    },
+    {
       "id": "study-undo-end",
       "name": "Undo, end confirmation, and session completion",
       "article": "user/studying.md",
@@ -208,8 +224,8 @@
       "id": "portable-deck",
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
-      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift"],
+      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "Sources/NeoAnki2/PortableDeckImportPanel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
     {
@@ -218,6 +234,13 @@
       "article": "user/import-export.md",
       "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift"],
       "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
+    },
+    {
+      "id": "deck-builders",
+      "name": "Build poem decks from guided input",
+      "article": "user/import-export.md",
+      "sources": ["Sources/NeoAnki2/DeckBuilderSheet.swift", "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift", "Sources/PoemDeckBuilder/PoemDeckBuilderView.swift", "Sources/PoemDeckBuilder/PoemDeckGenerator.swift"],
+      "tests": ["Tests/NeoAnki2Tests/DeckBuilderIntegrationTests.swift", "Tests/PoemDeckBuilderTests/PoemDeckBuilderTests.swift"]
     },
     {
       "id": "scheduling-optimize",
@@ -238,7 +261,7 @@
       "id": "accessibility",
       "name": "Accessibility behavior and documented limitations",
       "article": "user/shortcuts-accessibility.md",
-      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/MediaViews.swift", "Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
+      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/MediaViews.swift", "Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/ItemBrowserView.swift"],
       "tests": ["Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift", "Tests/NeoAnki2Tests/ContentRenderingTests.swift", "Tests/NeoAnki2Tests/MediaBehaviorTests.swift"]
     },
     {

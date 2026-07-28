@@ -1,5 +1,5 @@
 {
-  "capturedAt" : "2026-07-27T13:13:03Z",
+  "capturedAt" : "2026-07-28T16:46:01Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -10,7 +10,7 @@
       "filename" : "decks-nested.png",
       "height" : 743,
       "scenario" : "library sidebar with nested Languages and French decks",
-      "sha256" : "d197563c1f749c6e135afa23a7fd83d3cbd3ee372b2d49b24d902f3099b1c2ed",
+      "sha256" : "3420d3ac62f7d038a32c61dc6de19280d7fa4b8710b2c4a37807889df6669a45",
       "width" : 960
     },
     {
@@ -18,9 +18,9 @@
         "bootstrapError"
       ],
       "filename" : "error-startup.png",
-      "height" : 716,
+      "height" : 640,
       "scenario" : "database bootstrap failure",
-      "sha256" : "be1ed951f93aa7137b526c2d68ba2f188fb643c4ce4ef3bfcc3dfd6b67e82f48",
+      "sha256" : "1abc22dbf3282daac65a5657674f6942ccb4e0353ecdd573e69cf9f49aa2cbc5",
       "width" : 960
     },
     {
@@ -29,9 +29,9 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 703,
+      "height" : 743,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "1df2daaa9f92615e877aed80c44ff9dfd5affaf6d22a6af7c5f970ea308ee57b",
+      "sha256" : "7b3f4a264499228714719544ec9e874e6dc2128ad6480eacd2c4ec4389bdf42d",
       "width" : 960
     },
     {
@@ -41,9 +41,9 @@
         "field-Back"
       ],
       "filename" : "item-add.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "new basic item editor",
-      "sha256" : "a1ffefb7c49b6ac15c374edb8a88ac799d83659e9093b84109f899fabbd10c96",
+      "sha256" : "e61e912d450b6a584ca549fa37922bd195ea436b7dfabc45de7ba0c7f19d71fb",
       "width" : 960
     },
     {
@@ -52,9 +52,9 @@
         "editItem"
       ],
       "filename" : "item-detail.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "basic item detail",
-      "sha256" : "b4d59ea63c1dd990ba93371887a44248ba1e6341a56038d6444c405ae45d3dd1",
+      "sha256" : "9f540eeb2b83f91b766897834fdc5688ba8da39cf4d10546d97b2f1779c1ae50",
       "width" : 960
     },
     {
@@ -63,9 +63,9 @@
         "field-Image"
       ],
       "filename" : "item-media.png",
-      "height" : 716,
+      "height" : 640,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "29cc4792d49e32e690d1f2897cc341f0c619ba95efbdba20dadfaaca9a751319",
+      "sha256" : "cf2672210151827639dacb168ac9ecaf3387274203dee922f692a2b53cb9ba62",
       "width" : 960
     },
     {
@@ -75,9 +75,9 @@
         "saveAddItem"
       ],
       "filename" : "item-rich-text.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "basic item editor with visibly bold front text",
-      "sha256" : "62286ad364de8600e7a4f19c19b6e2fc43e8252ac73b27625f2ed4b114f050da",
+      "sha256" : "673ffc7d3b7dc2ae0030912926319728737ebff2c209228f1e2f62eb695c2af6",
       "width" : 960
     },
     {
@@ -86,9 +86,9 @@
         "addTemplateToolbar"
       ],
       "filename" : "item-types.png",
-      "height" : 703,
+      "height" : 743,
       "scenario" : "item types and templates panel",
-      "sha256" : "71c1cd8d8143068f7e20d7212c12930aae6069d6e44c11bc97ea13ca026ed23d",
+      "sha256" : "20f11b063a467ce86538db2117cd2b7d515c619a693bbef69e3ca165cc92d0b8",
       "width" : 960
     },
     {
@@ -96,20 +96,21 @@
         "emptyLibraryState"
       ],
       "filename" : "library-empty.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "empty library",
-      "sha256" : "61013302fc1d65d1e0ce51b4473a55c16ac04ff16edd8a733c346200f8e8a62f",
+      "sha256" : "8bd43849bd7167fb5235bc3278b040baf5a172a78b6fe84dc629292e6c302923",
       "width" : 960
     },
     {
       "expectedVisibleIdentifiers" : [
+        "itemBrowserTable",
         "itemRow-What is spaced repetition?",
         "addItemToolbar"
       ],
       "filename" : "library-populated.png",
-      "height" : 716,
-      "scenario" : "library containing one basic item",
-      "sha256" : "ee3d519ed215c2794430cf05ac95b23041256936117bcee4fa35fb246c969aa4",
+      "height" : 743,
+      "scenario" : "browse mode listing one basic item",
+      "sha256" : "8dce0214bee7cb66ae0ed0ce55b7e453349bcd839cb299d3e42305c6a68db3e7",
       "width" : 960
     },
     {
@@ -118,9 +119,9 @@
         "portableDeckConflictImportNew"
       ],
       "filename" : "portable-conflict.png",
-      "height" : 703,
+      "height" : 640,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "b1c5d5d1c83f4b749308cf3cd99c787de3d6b85f2e51d6771bdc9209f90927d8",
+      "sha256" : "c2cac3f932be68287e465d1ef1b5b3c9268d6b67a761a0e711a63b180d5b32eb",
       "width" : 960
     },
     {
@@ -128,9 +129,9 @@
         "action-button-1"
       ],
       "filename" : "scheduling-result.png",
-      "height" : 716,
+      "height" : 640,
       "scenario" : "scheduling optimization result sheet",
-      "sha256" : "3a1a89fc6cebb17091bca12cda45a82892d3193a2755b5fc1a28344d33b557bd",
+      "sha256" : "c0fb9524c21bb6648b214cff1d33414bac806614bbd7fb5eccd74c2248f9b37e",
       "width" : 960
     },
     {
@@ -140,9 +141,9 @@
         "gradeAgain"
       ],
       "filename" : "study-answer.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "10ec02ee9a03153091d16f0fbc7ed69b56beb03c953952a6b1d9f1e379700056",
+      "sha256" : "db4a6b4607a1eb4741f7913dd93f7fab5a2cd9df3820204f3573980b7713d70a",
       "width" : 960
     },
     {
@@ -150,9 +151,9 @@
         "studySessionDone"
       ],
       "filename" : "study-complete.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "completed study session",
-      "sha256" : "63aa9866c8ea47b2f8132f3ccccbf32386a03a6725552a7746f6c7fcab518f4f",
+      "sha256" : "ec2ec1baf531814c766180fadc7917446f305a7230435636862b70388fc0b05e",
       "width" : 960
     },
     {
@@ -161,9 +162,9 @@
         "primaryStudyAction"
       ],
       "filename" : "study-grade-help.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "5baca465b870a5dabc8a64a715bca2dea510460151155f91017c0bf959c0369f",
+      "sha256" : "bf79e9fe057feb58bd545081510cb8c8d0aa952ad1599deb706e9f26a7209a32",
       "width" : 960
     },
     {
@@ -172,9 +173,9 @@
         "gradeHelp"
       ],
       "filename" : "study-prompt.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "041f5f6fc361712d14b41989f1040f4cd0f2a70f09572ae90d54590a4e68c5b4",
+      "sha256" : "f13fee3f374274489e060a17d48f80f216d384ff8efa80e665153190f1ae9f7f",
       "width" : 960
     },
     {
@@ -183,9 +184,9 @@
         "gradeGood"
       ],
       "filename" : "study-type.png",
-      "height" : 716,
+      "height" : 640,
       "scenario" : "typed-answer study result",
-      "sha256" : "232d104b6f0d68e83ecb2462cec6486d610aeca4fdeac3757ea01712aeb9b5cb",
+      "sha256" : "7a31cd26470c22e28e6a73b0a6efd6b02882dcb34277c18a3b8d141158392fe0",
       "width" : 960
     },
     {
@@ -195,9 +196,9 @@
         "templateAdvancedSettings"
       ],
       "filename" : "template-advanced.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "advanced template editor with answer reveal controls and advanced settings entry point",
-      "sha256" : "624fbf2574440ad206c2f84ae4b6d7626dd49de183c991975df736bf3302d1df",
+      "sha256" : "39c17960e0e147659e1ad42cb84b5e4ad16fcc32bdb9e0f4a5cb07312a4a797e",
       "width" : 960
     },
     {
@@ -207,11 +208,11 @@
         "templateAnswerField"
       ],
       "filename" : "template-editor.png",
-      "height" : 716,
+      "height" : 743,
       "scenario" : "new template editor",
-      "sha256" : "a09c951e565a324f9b2a8250973d2fed6647dcbf452b82f56a8d203840946140",
+      "sha256" : "57e26a429ab73df9bd96aa0d21c45a1682146e56e5a6be940a04b262dad1aa51",
       "width" : 960
     }
   ],
-  "sourceSHA" : "e16beb324373404499e0301e4d59470b3125b7c4"
+  "sourceSHA" : "fe24274836e83e4e0b65d51474b51256d7f7d79d"
 }

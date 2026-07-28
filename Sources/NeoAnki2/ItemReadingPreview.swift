@@ -64,7 +64,11 @@ struct ItemDetailView: View {
     @Bindable var decksModel: DecksModel
     let scope: StudyScope
     let summary: SavedItemSummary
+    var onBack: () -> Void = {}
     var onDeleted: () -> Void = {}
+    /// Editing an item can add or retire cards, so the counts outside this pane
+    /// need to hear about a save.
+    var onSaved: () -> Void = {}
 
     @State private var item: Item?
     @State private var itemType: ItemType?
@@ -133,6 +137,13 @@ struct ItemDetailView: View {
         .background(DesignSystem.detailBackground)
         .navigationTitle(summary.title)
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Back", systemImage: "chevron.left") {
+                    onBack()
+                }
+                .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("itemDetailBack")
+            }
             if item != nil, !isLoading {
                 ToolbarItem {
                     Button("Edit", systemImage: "pencil") {
@@ -159,7 +170,10 @@ struct ItemDetailView: View {
                         editingItemType: itemType
                     ) {
                         isEditing = false
-                        Task { await load() }
+                        Task {
+                            await load()
+                            onSaved()
+                        }
                     }
                 }
             }
@@ -211,9 +225,10 @@ struct ItemDetailView: View {
         isMovingDeck = true
         defer { isMovingDeck = false }
 
-        if await model.moveItem(id: summary.id, to: deckID, scope: scope) {
+        let now = Date.now
+        if await model.moveItem(id: summary.id, to: deckID, scope: scope, asOf: now) {
             item?.deckID = deckID
-            await decksModel.load()
+            await decksModel.refreshCounts(asOf: now)
         } else {
             selectedDeckID = item?.deckID
         }

@@ -26,3 +26,20 @@ import Testing
     #expect(message.contains("Keep studying"))
     #expect(!message.contains("FSRS"))
 }
+
+@MainActor
+@Test func schedulingModelLoadsAndSavesRollover() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-scheduling-settings-\(UUID().uuidString)")
+        .appendingPathComponent("test.sqlite")
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    let model = SchedulingModel(store: store)
+
+    await model.loadSettings()
+    #expect(model.rolloverMinutes == 240)
+
+    #expect(await model.saveRolloverMinutes(120))
+    #expect(model.rolloverMinutes == 120)
+    #expect(try await store.studyDayRolloverMinutes() == 120)
+}

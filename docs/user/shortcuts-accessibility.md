@@ -45,21 +45,25 @@ The app adds these commands to the standard macOS menu bar.
 
 ### File
 
+- **New Item** — **Command-N** — adds an item to the selected scope.
 - **Import…** opens a JSON or CSV file.
 - **Import Deck…** opens a `.neodeck` file or `.neoanki` bundle.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
 
-The standard **New** command is removed. Create decks and items with controls in
-the library instead.
+There is no **New Window** or **New Tab**; NeoAnki2 has one library. Create decks
+with the controls in the sidebar.
 
 ### Library
 
+- **Browse Items** — **Command-Option-B**
+- **Show / Hide Answer Column** — **Command-Option-A** (browse mode only)
 - **Item Types…** — **Command-Shift-T**
 
 ### Study
 
 - **Start Study** — **Command-Shift-S**
 - **End Session**
+- **Edit Card…** — **Command-E** — opens the current card's item editor.
 - **Continue** — **Space** from the Study menu; **Return** also activates the
   in-view default action.
 - **Grade: Again** — **1**
@@ -69,7 +73,8 @@ the library instead.
 - **Undo Last Grade** — **Command-Z**
 
 Commands become available only in the relevant state. Grades are disabled until
-the answer is revealed.
+the answer is revealed, and every study command is disabled while the card
+editor is open.
 
 ### Scheduling
 
@@ -82,10 +87,13 @@ the answer is revealed.
 
 - **Command-N:** add an item from the library view.
 - **Command-Shift-S:** start studying when the selected scope has due cards.
+- **Command-Option-B:** open browse mode for the selected scope.
+- **Command-Option-A:** show or hide the Answer column while browsing.
 - **Command-Shift-T:** open Item Types.
 - **Return:** activate the default save, create, import, check, or reveal action
   in the current sheet or editor.
-- **Escape:** cancel a sheet/editor or close Item Types with **Done**.
+- **Escape:** cancel a sheet/editor, leave browse mode, or close Item Types with
+  **Done**.
 
 ### Study
 
@@ -95,6 +103,8 @@ the answer is revealed.
   choice, record, and arrange cards.
 - **1–4:** select Again, Hard, Good, or Easy after reveal. Before reveal, the
   same number keys choose a multiple-choice option when one is present.
+- **Command-E:** edit the item behind the current card, then **Return** to save
+  or **Escape** to cancel.
 - **Command-Z:** undo the most recent grade when undo is available.
 - **Escape:** request to end the session. If at least one card was reviewed and
   the session is still active, NeoAnki2 asks for confirmation.

@@ -12,7 +12,7 @@ public enum TestDatabase {
 
     public static func makeStore(
         label: String = UUID().uuidString,
-        scheduler: any Scheduler = FSRSScheduler(),
+        scheduler: any Scheduler = LearningScheduler(),
         now: Date? = nil
     ) async throws -> (store: ItemStore, context: ScenarioContext) {
         let url = makeURL(label: label)

@@ -28,9 +28,10 @@ two applicable templates, one item can generate two cards—for example,
 country → capital and capital → country—and each card is scheduled
 independently.
 
-A deck does not generate or schedule cards. It only groups items and defines a
-scope for browsing and studying. A parent deck's scope includes its descendant
-decks.
+A deck does not generate cards or choose their review intervals. It groups
+items, defines a scope for browsing and studying, and can optionally throttle
+how many of its own new cards are introduced each study day. A parent deck's
+scope includes its descendant decks.
 
 ## Glossary
 
@@ -60,16 +61,18 @@ different times.
 How a card asks you to respond: reveal, type, choose, record, cloze, or arrange.
 Automatic checking, when available, gives feedback; you still choose the grade.
 
-**Deck**  
-A hierarchical organizer and study scope. Deleting a deck moves its items
-rather than deleting them.
+**Deck**
+A hierarchical organizer and study scope. Deleting a deck deletes everything
+inside it — subdecks, items, and their cards. Move items out first if you want
+to keep them.
 
 **Due card**  
 A card whose saved due date has arrived. A study session loads the cards due
 now in the selected scope; future cards are not included.
 
 **Study session**  
-A fixed queue of due cards reviewed as prompt → response or reveal → grade.
+A due-card queue reviewed as prompt → response or reveal → grade. Failed cards
+return in repair rounds after the other due cards until they are recalled.
 
 **Review / review log**  
 One saved Again, Hard, Good, or Easy result. NeoAnki2 appends a review record

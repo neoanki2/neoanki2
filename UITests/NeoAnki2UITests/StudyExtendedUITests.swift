@@ -16,14 +16,14 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
         endStudyViaMenu(in: app)
-        XCTAssertTrue(app.buttons.identified("studyButton").waitForExistence(timeout: 5))
+        assertDueCardsAvailable(in: app)
     }
 
     func testGradeViaKeyboardShortcuts() throws {
         let app = launchApp()
         addBasicItem(front: "Keyboard Q", back: "Keyboard A", in: app)
         startStudy(in: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         gradeViaKeyboard(3, in: app)
         finishStudySession(in: app)
     }
@@ -34,7 +34,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.space, modifierFlags: [])
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -45,7 +45,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         app.typeKey("z", modifierFlags: [.command])
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -57,13 +57,13 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         if moveDown.waitForExistence(timeout: 3), moveDown.isEnabled {
             moveDown.click()
         }
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 5)
                 || app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 5)
         )
         if app.buttons.identified("gradeGood").exists {
-            app.buttons.identified("gradeGood").click()
+            clickOrType("gradeGood", shortcut: "3", in: app)
         }
         finishStudySession(in: app)
     }
@@ -74,7 +74,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
 
         app.buttons.identified("arrangementItem0").click()
         app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: [.command])
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 5)
                 || app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 5)
@@ -86,7 +86,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -97,9 +97,39 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons.identified("studyButton")
-        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(studyButton.isEnabled)
+        assertNothingDue(in: app)
+    }
+
+    func testEditCardDuringSessionKeepsStudying() throws {
+        let app = launchApp()
+        addBasicItem(front: "Capital of Frnace", back: "Paris", in: app)
+        startStudy(in: app)
+
+        app.buttons.identified("editStudyCard").click()
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForExistence(timeout: 5))
+        enterText("Capital of France", into: field(named: "Front", in: app), app: app)
+        app.buttons.identified("saveEditItem").click()
+        XCTAssertTrue(app.buttons.identified("saveEditItem").waitForNonExistence(timeout: 10))
+
+        revealAndGrade("gradeGood", in: app)
+        finishStudySession(in: app)
+
+        waitForItem(named: "Capital of France", in: app)
+        assertNoItem(named: "Capital of Frnace", in: app)
+    }
+
+    func testEditCardViaCommandEThenCancel() throws {
+        let app = launchApp()
+        addBasicItem(front: "Shortcut Q", back: "Shortcut A", in: app)
+        startStudy(in: app)
+
+        app.typeKey("e", modifierFlags: [.command])
+        XCTAssertTrue(app.buttons.identified("cancelEditItem").waitForExistence(timeout: 5))
+        app.buttons.identified("cancelEditItem").click()
+
+        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 5))
+        revealAndGrade("gradeGood", in: app)
+        finishStudySession(in: app)
     }
 
     func testDismissUndoBanner() throws {

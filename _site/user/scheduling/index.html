@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Scheduling · NeoAnki2</title>
+    <meta name="description" content="Understand FSRS grading and safely optimize scheduling after 100 usable review outcomes.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/user/scheduling/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Scheduling">
+    <meta property="og:description" content="Understand FSRS grading and safely optimize scheduling after 100 usable review outcomes.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/user/scheduling/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/user/tasks/" aria-current="location">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/" aria-current="page">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/user/tasks/">Tasks</a></li>
+              
+              <li><span aria-current="page">Scheduling</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="scheduling">Scheduling</h1>
+
+<p>NeoAnki2 uses FSRS (Free Spaced Repetition Scheduler) to decide when each card
+is due. You do not set an interval while studying. Instead, reveal the answer
+and describe your recall:</p>
+
+<ul>
+  <li><strong>Again (1):</strong> you did not remember. The card remains due immediately and
+enters the session’s repair queue.</li>
+  <li><strong>Hard (2):</strong> you remembered with difficulty. A new, learning, or relearning
+card remains in the repair queue for another attempt.</li>
+  <li><strong>Good (3):</strong> you remembered correctly.</li>
+  <li><strong>Easy (4):</strong> it was too easy; wait longer before the next review.</li>
+</ul>
+
+<p>Each grade updates that card’s memory state and appends a review outcome. A new
+or newly imported card starts never-reviewed and is due immediately. Portable
+and authored deck imports do not carry scheduling history.</p>
+
+<p>Learning and relearning use criterion-based <strong>repair rounds</strong>, not fixed minute
+intervals. NeoAnki2 finishes the current queue, then shows every failed card
+again. Again or Hard moves that card to the end of the next repair round;
+Good or Easy lets it graduate. Rounds continue until every card is recalled or
+you end the session. Unfinished cards stay due immediately for the next
+session. After successful recall, FSRS chooses the next review interval, with a
+minimum of one day.</p>
+
+<h2 id="optimize-scheduling-for-your-history">Optimize scheduling for your history</h2>
+
+<p>Choose <strong>Scheduling → Optimize Scheduling…</strong>. NeoAnki2 fits this profile’s FSRS
+parameters to its saved review outcomes. The menu changes to <strong>Optimizing
+Scheduling…</strong> and is disabled until the operation finishes.</p>
+
+<p>Optimization is deterministic and uses review sequences with at least two
+valid reviews for a card. The first review establishes state; each later review
+in that sequence contributes one usable outcome. Invalid or incomplete history
+is excluded.</p>
+
+<p>When tuning finds a better fit, the result reports:</p>
+
+<ul>
+  <li>how many review outcomes were used; and</li>
+  <li>the percentage reduction in log loss, a measure of prediction error.</li>
+</ul>
+
+<p>The current app has no retention control: the target remains the built-in
+<strong>90%</strong>, and the maximum interval remains <strong>36,500 days</strong>. Optimization tunes
+FSRS weights only. It does not rewrite cards’ existing due dates; new parameters
+take effect as later grades schedule those cards.</p>
+
+<p>If the existing parameters already fit as well as the optimizer can determine,
+NeoAnki2 reports that no change was needed. This is a successful result, not an
+error. Existing cards and review history remain in place; only the saved
+scheduling parameters for the profile are updated.</p>
+
+<p>Review logs are append-only and survive item/card deletion. Unless a grade was
+explicitly undone, outcomes from a deleted studied item can still contribute to
+later optimization. Do not create and grade artificial duplicates to influence
+the optimizer.</p>
+
+<p><a href="/neoanki2/assets/screenshots/scheduling-result.png"><img src="/neoanki2/assets/screenshots/scheduling-result.png" alt="Scheduling optimization result showing observations and fit" /></a></p>
+
+<h2 id="insufficient-data">Insufficient data</h2>
+
+<p>Optimization requires at least <strong>100 usable review outcomes</strong>. This is not
+necessarily the same as 100 button presses: a card needs a prior review before
+a later review supplies an outcome for fitting.</p>
+
+<p>If there are too few, NeoAnki2 shows <strong>Could Not Optimize Scheduling</strong>, states
+the required and currently available counts, and asks you to keep studying and
+try again later. Nothing is changed. There is no benefit to fabricating grades
+or repeatedly optimizing; grade honestly, allow cards to return over time, and
+retry after accumulating more history.</p>
+
+<p>Other optimization failures leave the current parameters unchanged. If the
+history cannot produce valid parameters, try again after more normal reviews.
+If parameters cannot be saved, close and reopen the app, verify the library
+folder is writable, and retry.</p>
+
+<h2 id="practical-guidance">Practical guidance</h2>
+
+<ul>
+  <li>Study due cards regularly rather than forcing large one-time sessions.</li>
+  <li>Choose the grade that describes recall, not the interval you hope to receive.</li>
+  <li>Use <strong>Undo Last Grade</strong> or <strong>Command-Z</strong> immediately after an accidental
+grade; the card and review history are restored.</li>
+  <li>Run optimization occasionally after substantial new history, not after every
+session.</li>
+  <li>Treat <code class="language-plaintext highlighter-rouge">.neodeck</code> exports as content exchange, not scheduling backups. To
+preserve progress, back up the whole local library folder.</li>
+</ul>
+
+<p>The 100-outcome threshold and other documented limits are checked against
+production constants by the automated <a href="../maintaining-documentation/#high-risk-factual-claims">documentation claims registry</a>.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+              <a class="article-previous" href="/neoanki2/user/import-export/"><span>Previous</span>Import and export</a>
+            
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

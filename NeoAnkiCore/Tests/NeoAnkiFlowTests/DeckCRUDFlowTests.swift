@@ -45,8 +45,8 @@ import Testing
         #expect(deleted == true)
 
         let items = try await ctx.store.listItems()
-        #expect(items.count == 1)
-        #expect(items.first?.deckID == sibling.id)
+        #expect(items.isEmpty)
+        #expect(try await ctx.store.listDecks().count == 2)
     }
 }
 
@@ -68,7 +68,7 @@ import Testing
     }
 }
 
-@Test func deckCRUDDeleteRootUnassignsItems() async throws {
+@Test func deckCRUDDeleteRootRemovesItems() async throws {
     try await ScenarioRunner.run { ctx in
         try await ctx.onboard()
 
@@ -90,8 +90,7 @@ import Testing
 
         _ = try await ctx.store.deleteDeck(id: deck.id)
 
-        let unassigned = try await ctx.store.listItems(scope: .unassigned)
-        #expect(unassigned.count == 1)
-        #expect(unassigned.first?.deckID == nil)
+        #expect(try await ctx.store.listItems(scope: .unassigned).isEmpty)
+        #expect(try await ctx.store.listItems(scope: .allDecks).isEmpty)
     }
 }

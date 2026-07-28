@@ -3,14 +3,25 @@ import NeoAnkiCore
 import UniformTypeIdentifiers
 
 extension UTType {
-    static let neoDeck = UTType(
-        filenameExtension: PortableDeck.fileExtension,
-        conformingTo: .database
-    )!
-    static let neoAnkiSource = UTType(
-        filenameExtension: AuthoredDeck.fileExtension,
-        conformingTo: .package
-    )!
+    static let neoDeck: UTType = {
+        if let declared = UTType("com.neoanki2.portable-deck") {
+            return declared
+        }
+        return UTType(
+            filenameExtension: PortableDeck.fileExtension,
+            conformingTo: .database
+        )!
+    }()
+
+    static let neoAnkiSource: UTType = {
+        if let declared = UTType("com.neoanki2.authored-deck") {
+            return declared
+        }
+        return UTType(
+            filenameExtension: AuthoredDeck.fileExtension,
+            conformingTo: .package
+        )!
+    }()
 }
 
 struct PortableDeckTransferNotice: Identifiable, Equatable {

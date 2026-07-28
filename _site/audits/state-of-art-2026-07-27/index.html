@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Documentation quality audit — July 2026 · NeoAnki2</title>
+    <meta name="description" content="Final adversarial assessment of NeoAnki2 documentation accuracy, task coverage, accessibility, evidence, and maintenance controls.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/audits/state-of-art-2026-07-27/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Documentation quality audit — July 2026">
+    <meta property="og:description" content="Final adversarial assessment of NeoAnki2 documentation accuracy, task coverage, accessibility, evidence, and maintenance controls.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/audits/state-of-art-2026-07-27/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/user/maintaining-documentation/" aria-current="location">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/" aria-current="page">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/user/maintaining-documentation/">Contribute</a></li>
+              
+              <li><span aria-current="page">Documentation quality audit — July 2026</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="documentation-quality-audit--july-2026">Documentation quality audit — July 2026</h1>
+
+<p><strong>Result: 9.2/10, publication ready with disclosed limitations.</strong></p>
+
+<p>This audit assessed the documentation as a product, not only as a collection of
+pages. Reviewers attempted first-run, migration, recovery, deck-authoring,
+keyboard, accessibility, and maintenance tasks; compared high-risk statements
+with production source and tests; built and crawled the rendered GitHub Pages
+site; and reviewed every promoted product screenshot.</p>
+
+<h2 id="scorecard">Scorecard</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Area</th>
+      <th style="text-align: right">Score</th>
+      <th>Evidence</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Task completion</td>
+      <td style="text-align: right">9.5</td>
+      <td>Five-minute first success, task index, migration cautions, update/removal, backup, and complete restore procedure</td>
+    </tr>
+    <tr>
+      <td>Safety and factual accuracy</td>
+      <td style="text-align: right">9.5</td>
+      <td>Production-backed claims registry, prose assertions, import hardening, explicit destructive-action and scheduling semantics</td>
+    </tr>
+    <tr>
+      <td>Clarity and learning architecture</td>
+      <td style="text-align: right">9.0</td>
+      <td>Task-first navigation, concepts/glossary, progressive advanced material, troubleshooting and support paths</td>
+    </tr>
+    <tr>
+      <td>Findability</td>
+      <td style="text-align: right">9.0</td>
+      <td>Hierarchical navigation, breadcrumbs, previous/next links, ranked local search, aliases, sitemap, and recovery links</td>
+    </tr>
+    <tr>
+      <td>Keyboard and responsive use</td>
+      <td style="text-align: right">9.0</td>
+      <td>Skip target focus, mobile focus management and Escape, 44 px targets, visible focus, reduced-motion and print handling</td>
+    </tr>
+    <tr>
+      <td>Screen-reader semantics</td>
+      <td style="text-align: right">8.5</td>
+      <td>Landmarks, current-location state, live search count, descriptive links and alt text; manual Safari/VoiceOver verification still required</td>
+    </tr>
+    <tr>
+      <td>Feature and test evidence</td>
+      <td style="text-align: right">9.0</td>
+      <td>31-feature source/test map, app UI inventory, app test inventory, and fully mapped import/media/deck-format/CLI boundaries</td>
+    </tr>
+    <tr>
+      <td>Drift detection</td>
+      <td style="text-align: right">9.5</td>
+      <td>Constants and prose checked, source/article/screenshot coupling on PRs and direct pushes, rendered-site crawl</td>
+    </tr>
+    <tr>
+      <td>Screenshot evidence</td>
+      <td style="text-align: right">9.5</td>
+      <td>19 focused, state-specific app-window images with scenario, visible identifiers, dimensions, source revision, and SHA-256</td>
+    </tr>
+    <tr>
+      <td>Rendered-site quality</td>
+      <td style="text-align: right">9.5</td>
+      <td>Jekyll 3.10 build, route/fragment/asset crawl, canonical and heading checks, metadata, custom 404, and HTTPS enforcement</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="defects-found-and-resolved">Defects found and resolved</h2>
+
+<p>The adversarial passes found and drove fixes for:</p>
+
+<ul>
+  <li>ambiguous <strong>Again</strong> and optimizer semantics, deleted-history effects, card
+reconciliation, import placement, fixed retention, and restore steps;</li>
+  <li>absent update/removal and first-run Xcode guidance;</li>
+  <li>stale or malformed links, Jekyll-incompatible Liquid, and pretty-URL errors;</li>
+  <li>search ordering that hid migration and backup help;</li>
+  <li>unreliable skip/mobile-navigation focus and unclear search popup semantics;</li>
+  <li>media-picker/core format drift and silently discarded malformed JSON fields;</li>
+  <li>authored-media schema paths that disagreed with the production validator;</li>
+  <li>incomplete claims/prose, command/view, app-test, core-format, and direct-push
+freshness enforcement; and</li>
+  <li>screenshots that lacked committed provenance, state assertions, content hashes,
+or unobscured bottom controls.</li>
+</ul>
+
+<h2 id="verification-gates">Verification gates</h2>
+
+<p>Publication requires:</p>
+
+<ol>
+  <li>fast core, flow, and app-model tests;</li>
+  <li>source, test, article, claims, and screenshot ownership validation;</li>
+  <li>a GitHub Pages-compatible Jekyll build;</li>
+  <li>a rendered crawl of internal routes, fragments, assets, metadata, headings,
+image alternatives, landmarks, and canonical HTTPS URLs; and</li>
+  <li>separately captured and reviewed screenshot evidence before promotion.</li>
+</ol>
+
+<p>The <a href="/neoanki2/features/">feature index</a> shows current ownership. The
+<a href="/neoanki2/user/maintaining-documentation/">maintenance guide</a> explains
+the update and screenshot workflows.</p>
+
+<h2 id="residual-limitations">Residual limitations</h2>
+
+<p>The score is not a WCAG conformance claim. A manual Safari/VoiceOver,
+high-contrast, text-size, and complete focus-order pass remains a release
+activity. The feature inventory deliberately combines broad app-layer detection
+with fully mapped high-risk core/CLI boundaries; it is strong change ownership,
+not a mathematical proof that arbitrary future code is user-facing.</p>
+
+<p>NeoAnki2 also remains a source-built development application without signed
+releases. The documentation states that constraint rather than presenting a
+consumer installation path that does not exist.</p>
+
+<h2 id="re-audit-triggers">Re-audit triggers</h2>
+
+<p>Repeat task-based review when installation changes, a new import/export format
+is added, scheduling semantics change, navigation/search behavior changes, or
+the accessibility limitations can be narrowed through manual verification.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+              <a class="article-previous" href="/neoanki2/user/maintaining-documentation/"><span>Previous</span>Maintaining documentation</a>
+            
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

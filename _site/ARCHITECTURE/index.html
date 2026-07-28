@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Architecture · NeoAnki2</title>
+    <meta name="description" content="Trace NeoAnki2 data, storage, scheduling, media, import, and application boundaries.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/ARCHITECTURE/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Architecture">
+    <meta property="og:description" content="Trace NeoAnki2 data, storage, scheduling, media, import, and application boundaries.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/ARCHITECTURE/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/reference/" aria-current="location">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/" aria-current="page">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/reference/">Reference</a></li>
+              
+              <li><span aria-current="page">Architecture</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="neoanki2--architecture">NeoAnki2 — Architecture</h1>
+
+<p>A native macOS spaced-repetition app (Swift 6 / SwiftUI) with its domain logic in
+a standalone package, <code class="language-plaintext highlighter-rouge">NeoAnkiCore</code>. A ground-up rewrite of the Anki idea, not a
+port.</p>
+
+<hr />
+
+<h2 id="1-principles">1. Principles</h2>
+
+<ul>
+  <li><strong>Native-only.</strong> Card content is data, not documents: every renderable value is
+a <code class="language-plaintext highlighter-rouge">ContentValue</code> case drawn by SwiftUI. No HTML, no CSS, no template language,
+nothing to sanitize. Styling is semantic (<code class="language-plaintext highlighter-rouge">Span.Style</code>: <code class="language-plaintext highlighter-rouge">.bold</code>, <code class="language-plaintext highlighter-rouge">.highlight</code>,
+<code class="language-plaintext highlighter-rouge">.code</code>, …), not visual markup.</li>
+  <li><strong>No Anki interop.</strong> No <code class="language-plaintext highlighter-rouge">.apkg</code>/<code class="language-plaintext highlighter-rouge">.colpkg</code>, no shared-deck import, no ``
+templates. A clean schema is chosen over a migration path.</li>
+  <li>
+    <p><strong>Generic and domain-neutral.</strong> The core knows no subject. Fields, item types,
+and templates are user-declared data. The app offers a neutral <code class="language-plaintext highlighter-rouge">Basic</code> schema
+as a first-run convenience, not as protected domain logic: starter seeding is
+recorded once per library, <code class="language-plaintext highlighter-rouge">Basic</code> is user-deletable, and it is never
+recreated after deletion. Core clients may configure an empty starter set.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Example item type</th>
+          <th>Example generated cards</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Anatomy</td>
+          <td>Bone (name, region, image)</td>
+          <td>image → recall name; name → locate</td>
+        </tr>
+        <tr>
+          <td>Music</td>
+          <td>Interval (name, audio, notation)</td>
+          <td>audio → name interval; notation → reproduce</td>
+        </tr>
+        <tr>
+          <td>Chemistry</td>
+          <td>Element (symbol, name, number)</td>
+          <td>symbol → name; name → atomic number</td>
+        </tr>
+        <tr>
+          <td>Geography</td>
+          <td>Country (name, map, capital)</td>
+          <td>map → name; name → capital</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Acceptance test:</strong> deleting a subject (its items and item type) must require
+no change to any Swift type, enum case, or scheduler. If it does, the design has
+leaked domain knowledge and is wrong. The flow suite exercises this with a
+novel spatial/sequence arrange-and-reproduce schema through creation, card
+generation, study, and deletion.</p>
+  </li>
+  <li><strong>Grounded in learning science.</strong> Every structural decision maps to a finding
+in §2.</li>
+</ul>
+
+<hr />
+
+<h2 id="2-learning-science-foundations">2. Learning-Science Foundations</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Principle</th>
+      <th>Structural decision</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Testing effect</strong></td>
+      <td>Knowledge (<code class="language-plaintext highlighter-rouge">Item</code>) is separated from its tests (<code class="language-plaintext highlighter-rouge">Card</code>s); one item spawns many independent retrieval events.</td>
+    </tr>
+    <tr>
+      <td><strong>Encoding specificity</strong></td>
+      <td><code class="language-plaintext highlighter-rouge">Skill = input Modality × output Modality × Operation</code>; each card trains one explicit route.</td>
+    </tr>
+    <tr>
+      <td><strong>Desirable difficulties (Bjork)</strong></td>
+      <td><code class="language-plaintext highlighter-rouge">Interaction</code> (<code class="language-plaintext highlighter-rouge">.reveal</code>, <code class="language-plaintext highlighter-rouge">.type</code>, <code class="language-plaintext highlighter-rouge">.choose</code>, <code class="language-plaintext highlighter-rouge">.record</code>, <code class="language-plaintext highlighter-rouge">.cloze</code>, <code class="language-plaintext highlighter-rouge">.arrange</code>) dials the effort a card demands.</td>
+    </tr>
+    <tr>
+      <td><strong>Dual coding</strong></td>
+      <td>Media is a first-class <code class="language-plaintext highlighter-rouge">ContentValue</code> (<code class="language-plaintext highlighter-rouge">.media(MediaRef)</code>), not an attachment on text.</td>
+    </tr>
+    <tr>
+      <td><strong>Atomicity / minimum information</strong></td>
+      <td>Cards are per-template probes; an item fans out into many atomic cards.</td>
+    </tr>
+    <tr>
+      <td><strong>Interleaving</strong></td>
+      <td>Scheduling operates on the flat pool of due cards; <code class="language-plaintext highlighter-rouge">Deck</code>s are organizational only.</td>
+    </tr>
+    <tr>
+      <td><strong>Modern scheduling (FSRS / DSR)</strong></td>
+      <td><code class="language-plaintext highlighter-rouge">MemoryState</code> exposes <code class="language-plaintext highlighter-rouge">stability</code>/<code class="language-plaintext highlighter-rouge">difficulty</code>; the <code class="language-plaintext highlighter-rouge">Scheduler</code> protocol is implemented by FSRS.</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="3-architecture-three-layers">3. Architecture: Three Layers</h2>
+
+<p><em>What you know</em>, <em>how it is shown and tested</em>, and <em>how it is remembered</em> never
+bleed into each other.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Layer 1 — CONTENT (domain-neutral, native)
+  ContentValue, Span, ClozeSpan, MediaRef
+
+Layer 2 — SCHEMA / PRESENTATION (user-declared)
+  ItemType → [FieldDef], [Template]
+  Template → prompt/answer Side → [Slot(SlotSource + Presentation)]
+  Interaction, SlotCondition, Skill
+
+Layer 3 — MEMORY / SCHEDULING (algorithm-agnostic)
+  MemoryState behind Scheduler protocol; ReviewRating 1–4; ReviewLog; FSRS
+</code></pre></div></div>
+
+<h3 id="layer-1--content">Layer 1 — Content</h3>
+
+<div class="language-swift highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">public</span> <span class="kd">enum</span> <span class="kt">ContentValue</span><span class="p">:</span> <span class="kt">Codable</span><span class="p">,</span> <span class="kt">Equatable</span><span class="p">,</span> <span class="kt">Sendable</span> <span class="p">{</span>
+    <span class="k">case</span> <span class="nf">text</span><span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="nv">lang</span><span class="p">:</span> <span class="kt">String</span><span class="p">?</span> <span class="o">=</span> <span class="kc">nil</span><span class="p">)</span>
+    <span class="k">case</span> <span class="nf">rich</span><span class="p">([</span><span class="kt">Span</span><span class="p">])</span>          <span class="c1">// semantic spans, not markup</span>
+    <span class="k">case</span> <span class="nf">media</span><span class="p">(</span><span class="kt">MediaRef</span><span class="p">)</span>       <span class="c1">// audio, image, gif, video</span>
+    <span class="k">case</span> <span class="nf">cloze</span><span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="nv">blanks</span><span class="p">:</span> <span class="p">[</span><span class="kt">ClozeSpan</span><span class="p">])</span>
+    <span class="k">case</span> <span class="nf">number</span><span class="p">(</span><span class="kt">Double</span><span class="p">)</span>
+    <span class="k">case</span> <span class="n">empty</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">MediaRef</code> is a serializable handle into a content-addressed store (<code class="language-plaintext highlighter-rouge">MediaStore</code>:
+SHA-256 hash, files under <code class="language-plaintext highlighter-rouge">{AppSupport}/neoanki2/media/</code>). Legacy URL-based refs
+are rejected during decoding; only validated hash references resolve. Content
+carries no presentation, so the same value can appear differently on prompt vs.
+answer via <code class="language-plaintext highlighter-rouge">Presentation</code> on each <code class="language-plaintext highlighter-rouge">Slot</code>.</p>
+
+<h3 id="layer-2--schema--presentation">Layer 2 — Schema / Presentation</h3>
+
+<div class="language-swift highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">public</span> <span class="kd">struct</span> <span class="kt">ItemType</span> <span class="p">{</span> <span class="k">var</span> <span class="nv">name</span><span class="p">:</span> <span class="kt">String</span><span class="p">;</span> <span class="k">var</span> <span class="nv">fields</span><span class="p">:</span> <span class="p">[</span><span class="kt">FieldDef</span><span class="p">];</span> <span class="k">var</span> <span class="nv">templates</span><span class="p">:</span> <span class="p">[</span><span class="kt">Template</span><span class="p">]</span> <span class="p">}</span>
+
+<span class="kd">public</span> <span class="kd">struct</span> <span class="kt">Template</span> <span class="p">{</span>
+    <span class="k">var</span> <span class="nv">prompt</span><span class="p">:</span> <span class="kt">Side</span>                 <span class="c1">// what the learner sees first</span>
+    <span class="k">var</span> <span class="nv">answer</span><span class="p">:</span> <span class="kt">Side</span>                 <span class="c1">// what is revealed / checked</span>
+    <span class="k">var</span> <span class="nv">interaction</span><span class="p">:</span> <span class="kt">Interaction</span>     <span class="c1">// how the learner responds</span>
+    <span class="k">var</span> <span class="nv">skill</span><span class="p">:</span> <span class="kt">Skill</span>                 <span class="c1">// the cognitive route trained</span>
+    <span class="k">var</span> <span class="nv">generateWhen</span><span class="p">:</span> <span class="kt">SlotCondition</span><span class="p">?</span> <span class="c1">// optional gate on generation</span>
+<span class="p">}</span>
+
+<span class="kd">public</span> <span class="kd">struct</span> <span class="kt">Skill</span> <span class="p">{</span> <span class="k">var</span> <span class="nv">input</span><span class="p">:</span> <span class="kt">Modality</span><span class="p">;</span> <span class="k">var</span> <span class="nv">output</span><span class="p">:</span> <span class="kt">Modality</span><span class="p">;</span> <span class="k">var</span> <span class="nv">operation</span><span class="p">:</span> <span class="kt">Operation</span> <span class="p">}</span>
+<span class="c1">// Modality:  text, audio, image, video, diagram, none, freeResponse, selection, spatial, sequence</span>
+<span class="c1">// Operation: recognize, recall, discriminate, classify, locate, order, apply, explain, reproduce</span>
+</code></pre></div></div>
+
+<p>A <code class="language-plaintext highlighter-rouge">Side</code> is an ordered list of <code class="language-plaintext highlighter-rouge">Slot</code>s; each <code class="language-plaintext highlighter-rouge">Slot</code> pairs a <code class="language-plaintext highlighter-rouge">SlotSource</code>
+(<code class="language-plaintext highlighter-rouge">.field(UUID)</code> or <code class="language-plaintext highlighter-rouge">.literal(String)</code>) with a <code class="language-plaintext highlighter-rouge">Presentation</code> (<code class="language-plaintext highlighter-rouge">RevealMode</code> +
+<code class="language-plaintext highlighter-rouge">MediaBehavior</code>).</p>
+
+<h3 id="layer-3--memory--scheduling">Layer 3 — Memory / Scheduling</h3>
+
+<div class="language-swift highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">public</span> <span class="kd">protocol</span> <span class="kt">Scheduler</span><span class="p">:</span> <span class="kt">Sendable</span> <span class="p">{</span>
+    <span class="kd">func</span> <span class="nf">schedule</span><span class="p">(</span><span class="n">_</span> <span class="nv">state</span><span class="p">:</span> <span class="kt">MemoryState</span><span class="p">,</span> <span class="nv">rating</span><span class="p">:</span> <span class="kt">ReviewRating</span><span class="p">,</span> <span class="nv">now</span><span class="p">:</span> <span class="kt">Date</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">MemoryState</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Cards hold only a <code class="language-plaintext highlighter-rouge">MemoryState</code>, so the scheduler is swappable without migrating
+cards. <code class="language-plaintext highlighter-rouge">ReviewRating</code> is a 1–4 grade; every review appends a <code class="language-plaintext highlighter-rouge">ReviewLog</code>.</p>
+
+<hr />
+
+<h2 id="4-data-model-reference">4. Data Model Reference</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Entity</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ItemType</code></td>
+      <td>User-declared schema: fields items hold and templates that make cards.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">FieldDef</code></td>
+      <td>One named, typed slot (<code class="language-plaintext highlighter-rouge">text</code>, <code class="language-plaintext highlighter-rouge">richText</code>, <code class="language-plaintext highlighter-rouge">audio</code>, <code class="language-plaintext highlighter-rouge">image</code>, <code class="language-plaintext highlighter-rouge">gif</code>, <code class="language-plaintext highlighter-rouge">video</code>, <code class="language-plaintext highlighter-rouge">number</code>, <code class="language-plaintext highlighter-rouge">cloze</code>).</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Template</code></td>
+      <td>Pure-data recipe turning one item into one card.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Item</code></td>
+      <td>Field values for an item type, plus tags and optional deck.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">FieldValue</code></td>
+      <td>One field’s <code class="language-plaintext highlighter-rouge">ContentValue</code>, keyed by <code class="language-plaintext highlighter-rouge">FieldDef</code> UUID.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Card</code></td>
+      <td>A reviewable probe: one item × one template, plus <code class="language-plaintext highlighter-rouge">MemoryState</code>.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Deck</code></td>
+      <td>Hierarchical study grouping; organization only.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">MemoryState</code></td>
+      <td>Per-card memory: <code class="language-plaintext highlighter-rouge">stability</code>, <code class="language-plaintext highlighter-rouge">difficulty</code>, <code class="language-plaintext highlighter-rouge">due</code>, <code class="language-plaintext highlighter-rouge">reps</code>, <code class="language-plaintext highlighter-rouge">lapses</code>, <code class="language-plaintext highlighter-rouge">phase</code>.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ReviewLog</code></td>
+      <td>Append-only record of one review; drives stats and scheduler optimization.</td>
+    </tr>
+  </tbody>
+</table>
+
+<pre><code class="language-mermaid">graph TD
+    NT[ItemType] --&gt;|fields| FD[FieldDef]
+    NT --&gt;|templates| CT[Template]
+    N[Item] --&gt;|itemTypeID| NT
+    N --&gt;|fields| FV[FieldValue]
+    N --&gt;|CardGenerator.cards| C[Card]
+    CT -.-&gt;|one card per template| C
+    C --&gt;|memory| MS[MemoryState]
+    C --&gt;|reviews| RL[ReviewLog]
+    RL -.-&gt;|optimizes| SCH[Scheduler / FSRS]
+    SCH -.-&gt;|updates| MS
+</code></pre>
+
+<p>A <code class="language-plaintext highlighter-rouge">Card</code> stores only <code class="language-plaintext highlighter-rouge">itemID</code>, <code class="language-plaintext highlighter-rouge">templateID</code>, cached <code class="language-plaintext highlighter-rouge">skill</code>, and memory; content
+is resolved from item and template at study time, so cards stay small and in sync
+with edits.</p>
+
+<h3 id="mediastore">MediaStore</h3>
+
+<ul>
+  <li><strong>Ingest:</strong> copy bytes into <code class="language-plaintext highlighter-rouge">{AppSupport}/neoanki2/media/{sha256}.{ext}</code>; dedupe by hash.</li>
+  <li><strong>Validation:</strong> MIME/extension allow-list, magic-byte check, per-kind size caps (e.g. audio 20 MB, video 100 MB).</li>
+  <li><strong>Security:</strong> never persist user-supplied absolute <code class="language-plaintext highlighter-rouge">file://</code> URLs; resolve only inside the sandbox.</li>
+  <li><strong>Schema v7:</strong> <code class="language-plaintext highlighter-rouge">media_assets</code> tracks hash, kind, byte size, extension, creation time,
+and the number of persisted field references. Item create/edit/delete applies
+reference deltas in the same SQLite transaction as the item write; zero-reference
+assets are removed by sandbox-checked orphan collection.</li>
+</ul>
+
+<h3 id="import-json--csv">Import (JSON / CSV)</h3>
+
+<p>Bulk import stats the file and enforces the <strong>5 MB payload-byte limit before any
+full read or parse</strong>; its bounded read repeats the cap check. After decoding,
+the <strong>10 000-row</strong>, <strong>256-fields-per-row</strong>, and <strong>32 KB UTF-8 per field string</strong>
+limits are enforced immediately, before any imported item is persisted.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field type</th>
+      <th>JSON cell shape</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Text-like</td>
+      <td>string</td>
+    </tr>
+    <tr>
+      <td>Media</td>
+      <td>relative path (under import bundle) or base64 object <code class="language-plaintext highlighter-rouge">{ "base64": "…", "altText": "…" }</code>; kind comes from the field and extension is inferred from validated bytes</td>
+    </tr>
+    <tr>
+      <td>Cloze</td>
+      <td><code class="language-plaintext highlighter-rouge">{ "text": "…", "blanks": [{ "group": 1, "start": 0, "length": 3, "hint": "…" }] }</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>CSV supports text fields only; cloze and media require JSON.</p>
+
+<h3 id="deck-import">Deck import</h3>
+
+<p>Two full-deck paths share the same validated, atomic persistence plan:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">.neodeck</code> is the SQLite portable interchange format for application
+round trips. It preserves item-type provenance and embeds verified media.</li>
+  <li><code class="language-plaintext highlighter-rouge">.neoanki</code> is import-only JSON Lines source for coding-agent authoring. It
+uses symbolic identifiers, inline cloze markers, explicit item shards, and
+relative media beneath the source bundle.</li>
+</ul>
+
+<p>Both paths validate before mutation, resolve or create item types by canonical
+schema digest, allocate fresh deck/item/card IDs, stage media through
+reservations, and commit item types, decks, items, cards, and references in one
+database transaction. Authored source intentionally carries no scheduling or
+portable provenance.</p>
+
+<p>See <a href="/neoanki2/AUTHORED_DECK_FORMAT/"><code class="language-plaintext highlighter-rouge">AUTHORED_DECK_FORMAT.md</code></a> and
+<a href="/neoanki2/PORTABLE_DECK_FORMAT/"><code class="language-plaintext highlighter-rouge">PORTABLE_DECK_FORMAT.md</code></a>.</p>
+
+<h3 id="study-resolution">Study resolution</h3>
+
+<p><code class="language-plaintext highlighter-rouge">SideContent.resolvedSlots</code> yields <code class="language-plaintext highlighter-rouge">ResolvedSlot(value:presentation:)</code> so renderers honor
+<code class="language-plaintext highlighter-rouge">RevealMode</code> and meaningful <code class="language-plaintext highlighter-rouge">MediaBehavior</code> values (default controls, autoplay,
+play-on-tap, and looping). Reduce Motion suppresses automatic audio, video, and
+GIF playback; static images cannot be authored with playback-only behavior.</p>
+
+<p>The macOS shell exposes item-type/template authoring and study as first-class
+detail-pane modes. File import is selected from the File menu and configured in
+a native import sheet.</p>
+
+<hr />
+
+<h2 id="5-worked-example">5. Worked Example</h2>
+
+<p>A <strong>Capitals</strong> item type — three fields, three templates:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Type</th>
+      <th>Required</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Country</code></td>
+      <td><code class="language-plaintext highlighter-rouge">text</code></td>
+      <td>yes</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Capital</code></td>
+      <td><code class="language-plaintext highlighter-rouge">text</code></td>
+      <td>yes</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Map</code></td>
+      <td><code class="language-plaintext highlighter-rouge">image</code></td>
+      <td>no</td>
+    </tr>
+  </tbody>
+</table>
+
+<ol>
+  <li><strong>Recognize</strong> — prompt <code class="language-plaintext highlighter-rouge">Country</code>, reveal <code class="language-plaintext highlighter-rouge">Capital</code>. <code class="language-plaintext highlighter-rouge">.reveal</code>, <code class="language-plaintext highlighter-rouge">text → text, recognize</code>.</li>
+  <li><strong>Produce</strong> — prompt <code class="language-plaintext highlighter-rouge">Capital</code>, type <code class="language-plaintext highlighter-rouge">Country</code>. <code class="language-plaintext highlighter-rouge">.type</code>, <code class="language-plaintext highlighter-rouge">text → freeResponse, recall</code>.</li>
+  <li><strong>Locate</strong> — prompt <code class="language-plaintext highlighter-rouge">Map</code>, reveal <code class="language-plaintext highlighter-rouge">Country</code>. <code class="language-plaintext highlighter-rouge">.reveal</code>, <code class="language-plaintext highlighter-rouge">image → spatial, locate</code>, <code class="language-plaintext highlighter-rouge">generateWhen = .fieldNotEmpty(mapFieldID)</code>.</li>
+</ol>
+
+<div class="language-swift highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="nv">cards</span> <span class="o">=</span> <span class="kt">CardGenerator</span><span class="o">.</span><span class="nf">cards</span><span class="p">(</span><span class="nv">for</span><span class="p">:</span> <span class="n">item</span><span class="p">,</span> <span class="nv">type</span><span class="p">:</span> <span class="n">capitalsType</span><span class="p">)</span>
+<span class="c1">// with a map  → 3 cards; without a map → 2 (template 3 skipped)</span>
+</code></pre></div></div>
+
+<p>One item, up to three atomic cards, each training a distinct <code class="language-plaintext highlighter-rouge">Skill</code>, scheduled
+independently. Adding an <code class="language-plaintext highlighter-rouge">audio</code> field plus a template yields a listening card
+with no change to any core type.</p>
+
+<hr />
+
+<h2 id="6-scheduling">6. Scheduling</h2>
+
+<p>FSRS is the scheduler, behind the <code class="language-plaintext highlighter-rouge">Scheduler</code> protocol. It models memory with the
+<strong>DSR</strong> trio — Difficulty, Stability, Retrievability — and schedules each review
+to a target retention. <code class="language-plaintext highlighter-rouge">MemoryState</code> carries <code class="language-plaintext highlighter-rouge">stability</code> and <code class="language-plaintext highlighter-rouge">difficulty</code> as
+algorithm-agnostic parameters; <code class="language-plaintext highlighter-rouge">ReviewLog</code> history feeds FSRS parameter fitting so
+the schedule adapts to the individual learner.</p>
+
+<hr />
+
+<h2 id="7-non-goals">7. Non-Goals</h2>
+
+<p>NeoAnki2 will not render HTML/CSS, import or export <code class="language-plaintext highlighter-rouge">.apkg</code>/<code class="language-plaintext highlighter-rouge">.colpkg</code>, support
+`` interpolation, bake any domain into the schema, or store presentation
+inside content. These boundaries keep the model native, generic, and grounded.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+              <a class="article-previous" href="/neoanki2/PRODUCT/"><span>Previous</span>Product model</a>
+            
+            
+              <a class="article-next" href="/neoanki2/DESIGN/"><span>Next</span>Design system</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

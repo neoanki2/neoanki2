@@ -9,14 +9,51 @@ private enum ItemEditingError: Error {
 @MainActor
 @Observable
 final class ItemsModel {
-    private(set) var items: [SavedItemSummary] = []
+    private(set) var items: [SavedItemSummary] = [] {
+        didSet { refreshVisibleItems() }
+    }
     private(set) var itemTypes: [ItemType] = []
-    private(set) var dueCount = 0
+    /// The one scheduling snapshot for the selected scope. Everything the app
+    /// says about what is due comes from here, so no two surfaces can disagree.
+    private(set) var scopeSummary: ScopeSummary = .empty
+    /// True only until the pane first has something to show. Later reloads
+    /// revise what is on screen in place; a progress view where the numbers
+    /// were is not an improvement on numbers a moment out of date.
     private(set) var isLoading = true
     private(set) var errorMessage: String?
 
+    private var hasLoaded = false
+    private var itemTypesLoaded = false
+    var needsInitialLoad: Bool { !hasLoaded }
+
     var addItemTypeID: ItemType.ID?
     var addItemDeckID: UUID?
+
+    /// Browse-mode ordering, and the single ordering authority once items are
+    /// loaded. Sorting stays local because a header click should not cost a
+    /// query. The initial comparator mirrors `ItemSortOrder.createdAscending`,
+    /// the order the store already returns.
+    var tableSort: [KeyPathComparator<SavedItemSummary>] = [
+        KeyPathComparator(\.createdAt, order: .forward),
+    ] {
+        didSet { items.sort(using: tableSort) }
+    }
+
+    var searchText = "" {
+        didSet { refreshVisibleItems() }
+    }
+
+    var dueCount: Int { scopeSummary.dueNow }
+
+    /// Items after the browse search, kept separate from `items` so a search
+    /// never invalidates a selection or a lookup by identifier. Stored rather
+    /// than computed: a table reads it several times per render pass, and each
+    /// read would otherwise rescan every item.
+    private(set) var visibleItems: [SavedItemSummary] = []
+
+    private func refreshVisibleItems() {
+        visibleItems = ItemBrowsing.filter(items, search: searchText)
+    }
 
     let store: ItemStore
     let mediaStore: MediaStore?
@@ -31,29 +68,70 @@ final class ItemsModel {
         return itemTypes.first { $0.id == addItemTypeID } ?? itemTypes.first
     }
 
-    func load(scope: StudyScope = .allDecks) async {
-        isLoading = true
+    /// `asOf` is passed in so the sidebar and the detail pane read the same
+    /// instant. Letting each surface call `.now` is what made them disagree.
+    func load(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
+        isLoading = !hasLoaded
         errorMessage = nil
+        cachedScope = scope
         do {
-            let loadedItemTypes = try await store.loadItemTypes()
-            itemTypes = loadedItemTypes.itemTypes
-            if addItemTypeID == nil {
-                addItemTypeID = itemTypes.first?.id
-            } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
-                addItemTypeID = itemTypes.first?.id
+            // Everything is read before anything is published, so a reload never
+            // shows this scope's items beside another scope's counts.
+            if !itemTypesLoaded {
+                let loadedItemTypes = try await store.loadItemTypes()
+                itemTypes = loadedItemTypes.itemTypes
+                if addItemTypeID == nil {
+                    addItemTypeID = itemTypes.first?.id
+                } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
+                    addItemTypeID = itemTypes.first?.id
+                }
+                if !loadedItemTypes.corruptions.isEmpty {
+                    let count = loadedItemTypes.corruptions.count
+                    errorMessage = count == 1
+                        ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
+                        : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
+                }
+                itemTypesLoaded = true
             }
-            items = try await store.listItems(scope: scope.filter)
-            dueCount = try await store.dueCount(scope: scope.filter)
-            if !loadedItemTypes.corruptions.isEmpty {
-                let count = loadedItemTypes.corruptions.count
-                errorMessage = count == 1
-                    ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
-                    : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
-            }
+            let loadedItems = try await store.listItems(scope: scope.filter, sort: .createdAscending)
+            let summary = try await store.scopeSummary(scope: scope.filter, asOf: now)
+
+            items = loadedItems.sorted(using: tableSort)
+            scopeSummary = summary
+            hasLoaded = true
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
+    }
+
+    func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot, scope: StudyScope) {
+        cachedScope = scope
+        itemTypes = snapshot.itemTypes.itemTypes
+        if addItemTypeID == nil
+            || !itemTypes.contains(where: { $0.id == addItemTypeID }) {
+            addItemTypeID = itemTypes.first?.id
+        }
+        if snapshot.itemTypes.corruptions.isEmpty {
+            errorMessage = nil
+        } else {
+            let count = snapshot.itemTypes.corruptions.count
+            errorMessage = count == 1
+                ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
+                : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
+        }
+        itemTypesLoaded = true
+        // The snapshot arrives in creation order. Honor the browse comparator
+        // for the same reason `load` does: this path also runs when only the
+        // sidebar is uninitialized, and a chosen column order has to survive it.
+        items = snapshot.items.sorted(using: tableSort)
+        scopeSummary = snapshot.selectedScopeSummary
+        hasLoaded = true
+        isLoading = false
+    }
+
+    func invalidateItemTypes() {
+        itemTypesLoaded = false
     }
 
     func addItem(
@@ -84,8 +162,9 @@ final class ItemsModel {
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
             let saved = try await store.createItem(item)
-            items.insert(saved, at: 0)
-            dueCount = try await store.dueCount(scope: currentScopeFilter())
+            items.append(saved)
+            items.sort(using: tableSort)
+            scopeSummary = try await store.scopeSummary(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -135,7 +214,7 @@ final class ItemsModel {
             if let index = items.firstIndex(where: { $0.id == saved.id }) {
                 items[index] = saved
             }
-            dueCount = try await store.dueCount(scope: currentScopeFilter())
+            scopeSummary = try await store.scopeSummary(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -231,7 +310,7 @@ final class ItemsModel {
         do {
             guard try await store.deleteItem(id: id) else { return false }
             items.removeAll { $0.id == id }
-            dueCount = try await store.dueCount(scope: scope.filter)
+            scopeSummary = try await store.scopeSummary(scope: scope.filter)
             return true
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -239,16 +318,86 @@ final class ItemsModel {
         }
     }
 
-    func moveItem(id: UUID, to deckID: UUID?, scope: StudyScope = .allDecks) async -> Bool {
+    func deleteAllUnassigned(scope: StudyScope = .unassigned) async -> Int {
+        errorMessage = nil
+        do {
+            let deleted = try await store.deleteAllUnassignedItems()
+            items.removeAll()
+            scopeSummary = try await store.scopeSummary(scope: scope.filter)
+            return deleted
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return 0
+        }
+    }
+
+    func moveItem(
+        id: UUID,
+        to deckID: UUID?,
+        scope: StudyScope = .allDecks,
+        asOf now: Date = .now
+    ) async -> Bool {
         errorMessage = nil
         do {
             guard try await store.updateItemDeck(itemID: id, deckID: deckID) else { return false }
-            await load(scope: scope)
+            await load(scope: scope, asOf: now)
             return true
         } catch {
             errorMessage = UserFacingError.message(from: error)
             return false
         }
+    }
+
+    /// Moves a browse selection. Reports how many moved so a partial result is
+    /// visible rather than silently rounded to success or failure. `asOf` is the
+    /// caller's instant, so the reload agrees with the sidebar's.
+    @discardableResult
+    func moveItems(
+        ids: Set<UUID>,
+        to deckID: UUID?,
+        scope: StudyScope = .allDecks,
+        asOf now: Date = .now
+    ) async -> Int {
+        errorMessage = nil
+        var moved = 0
+        do {
+            for id in orderedSelection(ids) {
+                if try await store.updateItemDeck(itemID: id, deckID: deckID) {
+                    moved += 1
+                }
+            }
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+        }
+        await load(scope: scope, asOf: now)
+        return moved
+    }
+
+    @discardableResult
+    func deleteItems(
+        ids: Set<UUID>,
+        scope: StudyScope = .allDecks,
+        asOf now: Date = .now
+    ) async -> Int {
+        errorMessage = nil
+        var deleted = 0
+        do {
+            for id in orderedSelection(ids) {
+                if try await store.deleteItem(id: id) {
+                    deleted += 1
+                }
+            }
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+        }
+        await load(scope: scope, asOf: now)
+        return deleted
+    }
+
+    /// Acts in the order the user sees, so a failure part-way through leaves a
+    /// comprehensible result.
+    private func orderedSelection(_ ids: Set<UUID>) -> [UUID] {
+        items.map(\.id).filter(ids.contains)
     }
 
     private var cachedScope: StudyScope = .allDecks
@@ -259,5 +408,50 @@ final class ItemsModel {
 
     func setCachedScope(_ scope: StudyScope) {
         cachedScope = scope
+    }
+
+    /// Re-reads the scheduling snapshot for the loaded scope without touching
+    /// `isLoading` or the error banner. Cards come due while the app sits idle,
+    /// so this is the path that keeps the headline honest between reloads.
+    func refreshCounts(asOf now: Date = .now) async {
+        guard hasLoaded,
+              let summary = try? await store.scopeSummary(
+                  scope: currentScopeFilter(),
+                  asOf: now
+              )
+        else { return }
+
+        if scopeSummary != summary {
+            scopeSummary = summary
+        }
+    }
+
+    /// Patches browse schedule columns for specific items without reloading the
+    /// whole list. Used after study when titles and membership are unchanged.
+    func refreshSchedules(for itemIDs: Set<UUID>, asOf now: Date = .now) async {
+        guard hasLoaded, !itemIDs.isEmpty else { return }
+        guard let schedules = try? await store.fetchItemBrowseSchedules(itemIDs: Array(itemIDs)) else {
+            return
+        }
+
+        var updated = items
+        for index in updated.indices {
+            let id = updated[index].id
+            guard itemIDs.contains(id), let browseSchedule = schedules[id] else { continue }
+            let existing = updated[index]
+            updated[index] = SavedItemSummary(
+                id: existing.id,
+                itemTypeID: existing.itemTypeID,
+                itemTypeName: existing.itemTypeName,
+                title: existing.title,
+                subtitle: existing.subtitle,
+                cardCount: browseSchedule.cardCount,
+                deckID: existing.deckID,
+                createdAt: existing.createdAt,
+                schedule: browseSchedule.schedule
+            )
+        }
+        items = updated
+        await refreshCounts(asOf: now)
     }
 }

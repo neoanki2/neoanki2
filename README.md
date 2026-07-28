@@ -14,6 +14,13 @@ On macOS 14+ with a Swift 6 Xcode toolchain, clone the repository and run:
 ./Scripts/run-app.sh
 ```
 
+That builds and launches a debug bundle from the checkout. To install a release
+build into `/Applications` and launch it like any other Mac app:
+
+```bash
+./Scripts/install-app.sh --restart
+```
+
 See [Getting started](https://neoanki2.github.io/neoanki2/user/getting-started/)
 for prerequisite checks, expected output, updates, and removal.
 

@@ -53,11 +53,18 @@
     "minimumReviewOutcomes": 100,
     "minimumReviewsPerCardForOutcome": 2
   },
+  "dailyNewCards": {
+    "article": "user/scheduling.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/StudyDay.swift",
+    "defaultRolloverMinutes": 240,
+    "unlimitedDeckValue": null
+  },
   "scheduler": {
     "article": "user/studying.md",
-    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift",
-    "model": "FSRS-5",
-    "minimumIntervalDays": 1,
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/LearningScheduler.swift",
+    "model": "FSRS-6",
+    "reviewMinimumIntervalDays": 0,
+    "learningPolicy": "repair-rounds",
     "defaultRequestRetention": 0.9,
     "defaultMaximumIntervalDays": 36500
   },
@@ -100,7 +107,8 @@
       "contains": [
         "at least **100 usable review outcomes**",
         "**90%**",
-        "**36,500 days**"
+        "**36,500 days**",
+        "default is **4:00 AM**"
       ]
     },
     {
@@ -120,7 +128,8 @@
     {
       "article": "user/studying.md",
       "contains": [
-        "Intervals are floored at one day",
+        "repair round",
+        "due immediately",
         "built-in 90%"
       ]
     }

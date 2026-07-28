@@ -4,9 +4,14 @@ import SwiftUI
 struct StudyView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var model: StudyModel
+    @Bindable var itemsModel: ItemsModel
+    @Bindable var decksModel: DecksModel
     let scope: StudyScope
     let mediaStore: MediaStore?
     @Binding var endSessionTrigger: Bool
+    /// Owned by the host so the Study menu can open the editor, and so the
+    /// unmodified grade shortcuts stay disabled while it is open.
+    @Binding var isEditingCard: Bool
     let onEndSession: () -> Void
 
     @State private var showGradeGuide = false
@@ -19,6 +24,8 @@ struct StudyView: View {
         Group {
             if model.isLoading {
                 loadingView
+            } else if model.didFailToLoad {
+                loadFailureView
             } else if model.isFinished {
                 finishedView
             } else if let card = model.currentCard {
@@ -50,7 +57,7 @@ struct StudyView: View {
                 .accessibilityIdentifier("cancelEndStudySession")
         } message: {
             if model.cardsReviewed > 0 {
-                Text("You've reviewed \(model.cardsReviewed) cards. The current card won't be saved.")
+                Text("You've completed \(model.cardsReviewed) reviews. The current card won't be saved.")
             } else {
                 Text("The current card won't be saved.")
             }
@@ -61,7 +68,30 @@ struct StudyView: View {
                 answerAccessibilityFocused = true
             }
         }
+        .sheet(isPresented: $isEditingCard) {
+            cardEditor
+        }
         .focusedSceneValue(\.studyPrimaryActionHandler, primaryActionHandler)
+    }
+
+    /// The library's item editor, opened on the card in front of you. Saving
+    /// reconciles cards the way an edit from the library does, so a correction
+    /// costs the session nothing beyond the cards the edit itself retires.
+    @ViewBuilder
+    private var cardEditor: some View {
+        if let card = model.currentCard {
+            NavigationStack {
+                AddItemView(
+                    model: itemsModel,
+                    decksModel: decksModel,
+                    editingItem: card.item,
+                    editingItemType: card.itemType
+                ) {
+                    isEditingCard = false
+                    Task { await model.reloadCurrentItem() }
+                }
+            }
+        }
     }
 
     private var primaryActionHandler: StudyPrimaryActionHandler {
@@ -72,7 +102,7 @@ struct StudyView: View {
                     model.performPrimaryAction()
                 }
             },
-            isEnabled: canShowAnswer && recordingIsReady
+            isEnabled: canShowAnswer && recordingIsReady && !isEditingCard
         )
     }
 
@@ -101,17 +131,43 @@ struct StudyView: View {
         .accessibilityIdentifier("studyLoading")
     }
 
+    /// Reached only when a session opens on an empty queue. The scope home is
+    /// where "nothing is due" is answered properly, with the time the next card
+    /// returns, so this state's job is to send you back there.
     private var emptyDueView: some View {
         ContentUnavailableView {
-            Label("You're Caught Up", systemImage: "calendar.badge.clock")
+            Label("Nothing Due Right Now", systemImage: "calendar.badge.clock")
         } description: {
-            Text("No cards are due right now. Add items to create new study cards.")
+            Text("Leave the session to see when the next card in this scope comes back.")
         } actions: {
-            Button("Back to Items") {
+            Button("Back to Library") {
                 onEndSession()
             }
-            .accessibilityIdentifier("studyBackToItems")
+            .accessibilityIdentifier("studyBackToLibrary")
         }
+    }
+
+    /// A queue that could not be read is not a finished session. Saying so, and
+    /// offering the retry, keeps a single unreadable card from looking like the
+    /// scope had nothing left to study.
+    private var loadFailureView: some View {
+        ContentUnavailableView {
+            Label("Couldn't Load Due Cards", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(model.errorMessage ?? "The due cards for this scope could not be read.")
+        } actions: {
+            Button("Try Again") {
+                Task { await model.startSession(scope: scope) }
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("studyRetryLoad")
+
+            Button("Back to Library") {
+                onEndSession()
+            }
+            .accessibilityIdentifier("studyBackToLibrary")
+        }
+        .accessibilityIdentifier("studyLoadFailure")
     }
 
     private var finishedView: some View {
@@ -189,6 +245,14 @@ struct StudyView: View {
                 .accessibilityIdentifier("studyProgress")
 
             Spacer()
+
+            Button("Edit Card") {
+                isEditingCard = true
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.isGrading)
+            .help("Fix or extend this card (Command-E)")
+            .accessibilityIdentifier("editStudyCard")
 
             Button {
                 showGradeGuide = true

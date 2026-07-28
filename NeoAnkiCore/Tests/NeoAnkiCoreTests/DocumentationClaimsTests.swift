@@ -61,7 +61,8 @@ private struct DocumentationClaims: Decodable {
         let article: String
         let source: String
         let model: String
-        let minimumIntervalDays: Int
+        let reviewMinimumIntervalDays: Int
+        let learningPolicy: String
         let defaultRequestRetention: Double
         let defaultMaximumIntervalDays: Int
     }
@@ -142,9 +143,10 @@ private func documentationClaims() throws -> DocumentationClaims {
     let scheduler = FSRSScheduler.Parameters()
     #expect(claims.scheduler.model == "FSRS-\(FSRSScheduler.Parameters.modelVersion)")
     #expect(
-        claims.scheduler.minimumIntervalDays
+        claims.scheduler.reviewMinimumIntervalDays
             == FSRSScheduler.Parameters.minimumInterval
     )
+    #expect(claims.scheduler.learningPolicy == LearningScheduler.policyIdentifier)
     #expect(
         claims.scheduler.defaultRequestRetention
             == scheduler.requestRetention

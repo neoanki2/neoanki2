@@ -4,9 +4,13 @@ import SwiftUI
 struct DeckSidebarView: View {
     @Bindable var decksModel: DecksModel
     @Binding var selection: SidebarSelection
+    var onDeleteAllUnassigned: () -> Void = {}
+    var onDeckSettingsSaved: () async -> Void = {}
     @State private var deckToRename: DeckSummary?
+    @State private var deckToConfigure: DeckSummary?
     @State private var renameText = ""
     @State private var deckToDelete: DeckSummary?
+    @State private var showDeleteAllUnassignedConfirm = false
     @State private var showNewDeckPrompt = false
     @State private var newDeckName = ""
     @State private var newDeckParentID: UUID?
@@ -42,6 +46,7 @@ struct DeckSidebarView: View {
                                     DeckSidebarNode(
                                         node: node,
                                         decksModel: decksModel,
+                                        onConfigure: { deckToConfigure = $0 },
                                         onRename: beginRename,
                                         onDelete: { deckToDelete = $0 },
                                         onNewSubdeck: beginNewSubdeck
@@ -56,6 +61,14 @@ struct DeckSidebarView: View {
                             systemImage: "tray",
                             tag: .unassigned
                         )
+                        .contextMenu {
+                            if decksModel.unassignedItemCount > 0 {
+                                Button("Delete All", role: .destructive) {
+                                    showDeleteAllUnassignedConfirm = true
+                                }
+                                .accessibilityIdentifier("deleteAllUnassignedMenu")
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                 }
@@ -64,6 +77,13 @@ struct DeckSidebarView: View {
         }
         .background(DesignSystem.sidebarBackground)
         .navigationTitle("Decks")
+        .sheet(item: $deckToConfigure) { deck in
+            DeckSettingsView(
+                decksModel: decksModel,
+                deck: deck,
+                onSaved: onDeckSettingsSaved
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("New Deck", systemImage: "plus") {
@@ -130,19 +150,31 @@ struct DeckSidebarView: View {
             }
             .accessibilityIdentifier("cancelDeleteDeck")
         } message: {
-            Text("Items move to the parent deck, or become unassigned if this is a top-level deck.")
+            Text("This permanently deletes the deck, all subdecks, and every item they contain.")
+        }
+        .confirmationDialog(
+            "Delete all unassigned items?",
+            isPresented: $showDeleteAllUnassignedConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                onDeleteAllUnassigned()
+            }
+            .accessibilityIdentifier("confirmDeleteAllUnassigned")
+            Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("cancelDeleteAllUnassigned")
+        } message: {
+            Text(
+                "This permanently deletes all \(decksModel.unassignedItemCount) unassigned items and their study cards."
+            )
         }
     }
 
     private var unassignedCaption: String {
-        var parts: [String] = []
-        if decksModel.unassignedItemCount > 0 {
-            parts.append("\(decksModel.unassignedItemCount) items")
-        }
-        if decksModel.unassignedDueCount > 0 {
-            parts.append("\(decksModel.unassignedDueCount) due")
-        }
-        return parts.isEmpty ? "No items" : parts.joined(separator: " · ")
+        SidebarScopeCaption.text(
+            itemCount: decksModel.unassignedItemCount,
+            dueCount: decksModel.unassignedDueCount
+        )
     }
 
     private var renamePresented: Binding<Bool> {
@@ -180,9 +212,9 @@ struct DeckSidebarView: View {
         Label {
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                 Text(title)
-                    .font(.headline)
+                    .font(DesignSystem.Typography.uiRowTitle)
                 Text(subtitle)
-                    .font(.caption)
+                    .font(DesignSystem.Typography.uiRowMeta)
                     .foregroundStyle(.tertiary)
             }
         } icon: {
@@ -210,6 +242,7 @@ struct DeckSidebarView: View {
 private struct DeckSidebarNode: View {
     let node: DeckNode
     @Bindable var decksModel: DecksModel
+    let onConfigure: (DeckSummary) -> Void
     let onRename: (DeckSummary) -> Void
     let onDelete: (DeckSummary) -> Void
     let onNewSubdeck: (UUID) -> Void
@@ -223,6 +256,7 @@ private struct DeckSidebarNode: View {
                     DeckSidebarNode(
                         node: child,
                         decksModel: decksModel,
+                        onConfigure: onConfigure,
                         onRename: onRename,
                         onDelete: onDelete,
                         onNewSubdeck: onNewSubdeck
@@ -238,9 +272,9 @@ private struct DeckSidebarNode: View {
         Label {
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                 Text(summary.name)
-                    .font(.headline)
+                    .font(DesignSystem.Typography.uiRowTitle)
                 Text(rowSubtitle(for: summary))
-                    .font(.caption)
+                    .font(DesignSystem.Typography.uiRowMeta)
                     .foregroundStyle(.tertiary)
             }
         } icon: {
@@ -248,6 +282,11 @@ private struct DeckSidebarNode: View {
         }
         .tag(SidebarSelection.deck(summary.id))
         .contextMenu {
+            Button("Deck Settings…") {
+                onConfigure(summary)
+            }
+            .accessibilityIdentifier("deckSettingsMenu")
+            Divider()
             Button("New Subdeck") {
                 onNewSubdeck(summary.id)
             }
@@ -264,13 +303,21 @@ private struct DeckSidebarNode: View {
     }
 
     private func rowSubtitle(for summary: DeckSummary) -> String {
+        SidebarScopeCaption.text(itemCount: summary.itemCount, dueCount: summary.dueCount)
+    }
+}
+
+/// The line under a sidebar scope's name. Every scope row uses this, so a deck
+/// and Unassigned cannot describe the same emptiness in different words.
+enum SidebarScopeCaption {
+    static func text(itemCount: Int, dueCount: Int) -> String {
         var parts: [String] = []
-        if summary.itemCount > 0 {
-            parts.append("\(summary.itemCount) items")
+        if itemCount > 0 {
+            parts.append(itemCount == 1 ? "1 item" : "\(itemCount) items")
         }
-        if summary.dueCount > 0 {
-            parts.append("\(summary.dueCount) due")
+        if dueCount > 0 {
+            parts.append("\(dueCount) due")
         }
-        return parts.isEmpty ? "Empty" : parts.joined(separator: " · ")
+        return parts.isEmpty ? "No items" : parts.joined(separator: " · ")
     }
 }

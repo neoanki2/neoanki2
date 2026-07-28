@@ -1,5 +1,6 @@
 import AppKit
 import NeoAnkiCore
+import NeoAnkiDeckBuilderKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -11,29 +12,40 @@ private struct ImportNotice: Identifiable {
 
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
     @Bindable var schedulingModel: SchedulingModel
     @State private var isAddingItem = false
     @State private var isManagingTemplates = false
     @State private var isStudying = false
+    @State private var isBrowsing = false
+    /// Persisted per user, not per browse session: whether you want to see
+    /// answers is a standing preference, not something to rediscover.
+    @AppStorage(AppPreferences.browseShowsAnswerColumn) private var browseShowsAnswerColumn = false
     @State private var studyModel: StudyModel?
     @State private var studyScope: StudyScope = .allDecks
     @State private var templatesModel: TemplatesModel?
     @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
+    /// Lives here rather than in `StudyView` because the Study menu opens the
+    /// card editor, and every study command has to stand down while it is open:
+    /// the grade keys are unmodified, so they would otherwise land in a field.
+    @State private var isEditingStudyCard = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var importModel: ImportModel?
     @State private var isChoosingImportFile = false
     @State private var isShowingImport = false
     @State private var importNotice: ImportNotice?
     @State private var portableDeckTransfer: PortableDeckTransferModel
-    @State private var isChoosingPortableDeck = false
+    @State private var isShowingDeckBuilder = false
+    private let deckBuilderRegistry: DeckBuilderRegistry
 
     init(
         itemsModel: ItemsModel,
         decksModel: DecksModel,
-        schedulingModel: SchedulingModel
+        schedulingModel: SchedulingModel,
+        deckBuilderRegistry: DeckBuilderRegistry
     ) {
         self.itemsModel = itemsModel
         self.decksModel = decksModel
@@ -41,13 +53,23 @@ struct ContentView: View {
         _portableDeckTransfer = State(
             initialValue: PortableDeckTransferModel(store: itemsModel.store)
         )
+        self.deckBuilderRegistry = deckBuilderRegistry
     }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             DeckSidebarView(
                 decksModel: decksModel,
-                selection: $decksModel.selectedScope
+                selection: $decksModel.selectedScope,
+                onDeleteAllUnassigned: {
+                    Task {
+                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
+                        await refreshLibrary()
+                    }
+                },
+                onDeckSettingsSaved: {
+                    await refreshCounts()
+                }
             )
             .navigationSplitViewColumnWidth(
                 min: DesignSystem.sidebarMin,
@@ -91,21 +113,23 @@ struct ContentView: View {
             Task { await reloadScope() }
         }
         .task {
-            await decksModel.load()
-            await reloadScope()
+            await refreshLibrary()
             await openTestingTransfersIfRequested()
+        }
+        .task {
+            await trackDueCounts()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Coming back to the app can cross any amount of time, including a
+            // study day rollover, so the counts are re-read before they are read.
+            guard phase == .active else { return }
+            Task { await refreshCounts() }
         }
         .fileImporter(
             isPresented: $isChoosingImportFile,
             allowedContentTypes: [.json, .commaSeparatedText],
             allowsMultipleSelection: false,
             onCompletion: handleImportFile
-        )
-        .fileImporter(
-            isPresented: $isChoosingPortableDeck,
-            allowedContentTypes: [.neoDeck, .neoAnkiSource],
-            allowsMultipleSelection: false,
-            onCompletion: handlePortableDeckFile
         )
         .sheet(isPresented: $isShowingImport) {
             if let importModel {
@@ -116,6 +140,22 @@ struct ContentView: View {
                     onCancel: { isShowingImport = false },
                     onImported: finishImport
                 )
+            }
+        }
+        .sheet(isPresented: $isShowingDeckBuilder) {
+            DeckBuilderSheet(
+                registry: deckBuilderRegistry,
+                context: deckBuilderContext,
+                isImporting: portableDeckTransfer.isBusy,
+                onGenerated: importGeneratedDeck,
+                onCancel: { isShowingDeckBuilder = false }
+            )
+        }
+        .sheet(isPresented: $schedulingModel.isShowingSettings) {
+            SchedulingSettingsView(model: schedulingModel) {
+                // A new rollover redraws the day's budget, which is a count
+                // change across every scope and nothing more.
+                await refreshCounts()
             }
         }
         .alert(item: $importNotice) { notice in
@@ -184,19 +224,38 @@ struct ContentView: View {
 
     private var libraryCommandHandlers: LibraryCommandHandlers {
         LibraryCommandHandlers(
+            openAddItem: { openAddItem() },
             openImport: { openImport() },
-            openPortableDeckImport: { isChoosingPortableDeck = true },
+            openPortableDeckImport: openPortableDeckImport,
             openPortableDeckExport: { openPortableDeckExport() },
+            openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
+            openBrowse: { openBrowse() },
+            toggleAnswerColumn: { browseShowsAnswerColumn.toggle() },
+            isAnswerColumnVisible: browseShowsAnswerColumn,
+            canToggleAnswerColumn: isBrowsing,
+            canAddItem: !itemsModel.itemTypes.isEmpty
+                && !isStudying
+                && !isManagingTemplates
+                && !isAddingItem
+                && !isShowingImport
+                && !isShowingDeckBuilder,
             canImport: !itemsModel.isLoading
                 && !itemsModel.itemTypes.isEmpty
                 && !isStudying
                 && !isManagingTemplates
                 && !isAddingItem
-                && !isShowingImport,
+                && !isShowingImport
+                && !isShowingDeckBuilder,
             canImportPortableDeck: canTransferPortableDeck,
             canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
-            canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem
+            canOpenDeckBuilder: canTransferPortableDeck && !deckBuilderRegistry.features.isEmpty,
+            canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem,
+            canBrowse: !isBrowsing
+                && !isStudying
+                && !isManagingTemplates
+                && !isAddingItem
+                && !itemsModel.items.isEmpty
         )
     }
 
@@ -209,6 +268,15 @@ struct ContentView: View {
             && !isManagingTemplates
             && !isAddingItem
             && !isShowingImport
+            && !isShowingDeckBuilder
+    }
+
+    private var deckBuilderContext: DeckBuilderHostContext {
+        DeckBuilderHostContext(
+            rootDecks: decksModel.summaries
+                .filter { $0.parentID == nil }
+                .map { DeckBuilderDeckOption(id: $0.id, name: $0.name) }
+        )
     }
 
     private var studyCommandHandlers: StudyCommandHandlers {
@@ -216,6 +284,7 @@ struct ContentView: View {
             return StudyCommandHandlers(
                 startStudy: nil,
                 requestEndSession: { endSessionTrigger = true },
+                editCurrentCard: { isEditingStudyCard = true },
                 grade: { rating in
                     Task { await studyModel.grade(rating) }
                 },
@@ -223,19 +292,26 @@ struct ContentView: View {
                     Task { await studyModel.undoLastGrade() }
                 },
                 canStartStudy: false,
-                canEndSession: true,
+                canEndSession: !isEditingStudyCard,
+                canEditCurrentCard: studyModel.currentCard != nil
+                    && !studyModel.isGrading
+                    && !isEditingStudyCard,
                 canGrade: studyModelCanGrade(studyModel),
-                canUndoLastGrade: studyModel.canUndoLastGrade && !studyModel.isGrading
+                canUndoLastGrade: studyModel.canUndoLastGrade
+                    && !studyModel.isGrading
+                    && !isEditingStudyCard
             )
         }
 
         return StudyCommandHandlers(
             startStudy: { startStudy() },
             requestEndSession: nil,
+            editCurrentCard: nil,
             grade: nil,
             undoLastGrade: nil,
             canStartStudy: itemsModel.dueCount > 0 && !isStudying,
             canEndSession: false,
+            canEditCurrentCard: false,
             canGrade: false,
             canUndoLastGrade: false
         )
@@ -245,6 +321,7 @@ struct ContentView: View {
         guard let card = studyModel.currentCard else { return false }
         return studyModel.isAnswerRevealed
             && !studyModel.isGrading
+            && !isEditingStudyCard
             && StudySupport.isSupportedInteraction(card.template.interaction)
     }
 
@@ -258,9 +335,12 @@ struct ContentView: View {
         } else if isStudying, let studyModel {
             StudyView(
                 model: studyModel,
+                itemsModel: itemsModel,
+                decksModel: decksModel,
                 scope: studyScope,
                 mediaStore: itemsModel.mediaStore,
-                endSessionTrigger: $endSessionTrigger
+                endSessionTrigger: $endSessionTrigger,
+                isEditingCard: $isEditingStudyCard
             ) {
                 endStudy()
             }
@@ -279,21 +359,53 @@ struct ContentView: View {
                     model: itemsModel,
                     decksModel: decksModel,
                     scope: decksModel.studyScope,
-                    summary: item
-                ) {
-                    self.selectedItemID = nil
-                }
+                    summary: item,
+                    onBack: { self.selectedItemID = nil },
+                    onDeleted: {
+                        self.selectedItemID = nil
+                        // Deleting from the detail pane retires that item's cards,
+                        // which the sidebar was counting.
+                        Task { await refreshCounts() }
+                    },
+                    onSaved: { Task { await refreshCounts() } }
+                )
             }
-        } else {
-            DeckDetailView(
+        } else if isBrowsing {
+            ItemBrowserView(
                 itemsModel: itemsModel,
                 decksModel: decksModel,
+                showsAnswerColumn: $browseShowsAnswerColumn,
                 scope: decksModel.studyScope,
-                selectedItemID: $selectedItemID,
+                onOpenItem: { selectedItemID = $0 },
                 onAddItem: { openAddItem() },
-                onStudy: { startStudy() }
+                onStudy: { startStudy() },
+                onDone: { closeBrowse() }
+            )
+        } else {
+            ScopeHomeView(
+                itemsModel: itemsModel,
+                scope: decksModel.studyScope,
+                onStudy: { startStudy() },
+                onBrowse: { openBrowse() },
+                onAddItem: { openAddItem() },
+                onDeleteAllUnassigned: {
+                    Task {
+                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
+                        await refreshLibrary()
+                    }
+                }
             )
         }
+    }
+
+    private func openBrowse() {
+        selectedItemID = nil
+        isBrowsing = true
+    }
+
+    private func closeBrowse() {
+        isBrowsing = false
+        itemsModel.searchText = ""
     }
 
     private func openAddItem() {
@@ -386,8 +498,22 @@ struct ContentView: View {
             message: "\(count) \(noun) imported. Importing the same file again will create duplicates."
         )
         Task {
-            await decksModel.load()
-            await reloadScope()
+            let now = Date.now
+            await decksModel.load(asOf: now)
+        }
+    }
+
+    private func openPortableDeckImport() {
+        switch PortableDeckImportSelection.choose() {
+        case .cancelled:
+            return
+        case .invalidSelection:
+            portableDeckTransfer.notice = PortableDeckTransferNotice(
+                title: "Could Not Import Deck",
+                message: "Choose a .neoanki folder or a .neodeck file."
+            )
+        case let .selected(source):
+            handlePortableDeckFile(.success([source]))
         }
     }
 
@@ -412,13 +538,39 @@ struct ContentView: View {
         }
     }
 
+    private func importGeneratedDeck(_ generated: GeneratedDeckBundle) {
+        Task {
+            defer { generated.cleanup() }
+            guard let imported = await portableDeckTransfer.importDeck(from: generated.bundleURL) else {
+                return
+            }
+            if let destinationDeckID = generated.destinationDeckID,
+               let importedRootID = imported.deckIDs.first {
+                do {
+                    var importedRoot = try await itemsModel.store.deck(id: importedRootID)
+                    importedRoot.parentID = destinationDeckID
+                    try await itemsModel.store.updateDeck(importedRoot)
+                } catch {
+                    portableDeckTransfer.notice = PortableDeckTransferNotice(
+                        title: "Deck Imported at Top Level",
+                        message: "The poem was imported, but its selected parent deck was unavailable."
+                    )
+                }
+            }
+            await refreshAfterPortableDeckImport(imported)
+            isShowingDeckBuilder = false
+        }
+    }
+
     private func refreshAfterPortableDeckImport(_ result: PortableDeckImportResult) async {
-        await decksModel.load()
+        let now = Date.now
+        await decksModel.load(asOf: now)
         if let rootID = result.deckIDs.first,
            decksModel.summaries.contains(where: { $0.id == rootID }) {
             decksModel.selectedScope = .deck(rootID)
         }
-        await reloadScope()
+        itemsModel.invalidateItemTypes()
+        await reloadScope(asOf: now)
         await templatesModel?.load()
     }
 
@@ -461,14 +613,80 @@ struct ContentView: View {
     private func closeAddItem() {
         isAddingItem = false
         columnVisibility = .all
-        Task { await reloadScope() }
+        // A new item changes deck counts too, so the sidebar reloads with it.
+        Task { await decksModel.refreshCounts() }
     }
 
-    private func reloadScope() async {
+    private func reloadScope(asOf now: Date = .now) async {
         let scope = decksModel.studyScope
         itemsModel.setCachedScope(scope)
         itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
-        await itemsModel.load(scope: scope)
+        await itemsModel.load(scope: scope, asOf: now)
+    }
+
+    /// Reloads decks and the selected scope against one instant. Two separate
+    /// `.now` reads are what let the sidebar total and the detail pane disagree
+    /// about how many cards are due.
+    private func refreshLibrary() async {
+        let now = Date.now
+        if decksModel.needsInitialLoad || itemsModel.needsInitialLoad {
+            let scope = decksModel.studyScope
+            do {
+                let snapshot = try await itemsModel.store.coldLibrarySnapshot(
+                    scope: scope.filter,
+                    asOf: now
+                )
+                decksModel.applyColdSnapshot(snapshot)
+                itemsModel.setCachedScope(scope)
+                itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
+                itemsModel.applyColdSnapshot(snapshot, scope: scope)
+                return
+            } catch {
+                // Preserve the established model-owned error presentation.
+            }
+        }
+        await decksModel.loadOrRefresh(asOf: now)
+        await reloadScope(asOf: now)
+    }
+
+    private func refreshAfterStudy(studiedItemIDs: Set<UUID>) async {
+        let now = Date.now
+        await decksModel.refreshCounts(asOf: now)
+        await itemsModel.refreshSchedules(for: studiedItemIDs, asOf: now)
+    }
+
+    /// Re-reads only what is due, on both surfaces, against one instant. This is
+    /// the path for changes the learner did not ask to see — a card falling due,
+    /// a save elsewhere — so it revises numbers in place and never reloads.
+    private func refreshCounts() async {
+        let now = Date.now
+        await decksModel.refreshCounts(asOf: now)
+        await itemsModel.refreshCounts(asOf: now)
+    }
+
+    /// Keeps the due counts true while the window just sits there. Cards come
+    /// back on a schedule, so this waits for the next one rather than polling on
+    /// a fixed beat: precise when something is about to fall due, near-free when
+    /// nothing is.
+    ///
+    /// It runs in every mode. Study reads its own queue and is forbidden from
+    /// showing these numbers, and the editors cover them, so a revision there is
+    /// invisible rather than wrong — and skipping it would mean trusting flags
+    /// this long-lived task cannot see change.
+    private func trackDueCounts() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(dueCountRefreshDelay))
+            guard !Task.isCancelled else { return }
+            await refreshCounts()
+        }
+    }
+
+    private var dueCountRefreshDelay: TimeInterval {
+        // The ceiling bounds how stale decks outside the selected scope can get.
+        // The floor keeps an already-overdue card from spinning this loop.
+        let ceiling: TimeInterval = 60
+        guard let nextStudyAt = itemsModel.scopeSummary.nextStudyAt else { return ceiling }
+        return min(max(nextStudyAt.timeIntervalSinceNow, 5), ceiling)
     }
 
     private func startStudy() {
@@ -479,15 +697,17 @@ struct ContentView: View {
 
     private func endStudy() {
         isStudying = false
+        isEditingStudyCard = false
+        let studiedItemIDs = studyModel?.reviewedItemIDs ?? []
         studyModel = nil
         Task {
-            await decksModel.load()
-            await reloadScope()
+            await refreshAfterStudy(studiedItemIDs: studiedItemIDs)
         }
     }
 
     private func closeItemTypes() {
         Task {
+            itemsModel.invalidateItemTypes()
             await reloadScope()
             isManagingTemplates = false
             columnVisibility = .all

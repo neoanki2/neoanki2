@@ -9,7 +9,8 @@ import Foundation
 ///   set on its first review).
 ///
 /// The remaining fields (`due`, `lastReview`, `reps`, `lapses`, `phase`) are
-/// used directly by the app for queuing and stats.
+/// used directly by the app for queuing and stats. `stepIndex` counts failed
+/// repair rounds while a card is in learning or relearning.
 public struct MemoryState: Codable, Equatable, Sendable {
     public var stability: Double
     public var difficulty: Double
@@ -18,6 +19,7 @@ public struct MemoryState: Codable, Equatable, Sendable {
     public var reps: Int
     public var lapses: Int
     public var phase: Phase
+    public var stepIndex: Int?
 
     public init(
         stability: Double = 0,
@@ -26,7 +28,8 @@ public struct MemoryState: Codable, Equatable, Sendable {
         lastReview: Date? = nil,
         reps: Int = 0,
         lapses: Int = 0,
-        phase: Phase = .new
+        phase: Phase = .new,
+        stepIndex: Int? = nil
     ) {
         self.stability = stability
         self.difficulty = difficulty
@@ -35,6 +38,7 @@ public struct MemoryState: Codable, Equatable, Sendable {
         self.reps = reps
         self.lapses = lapses
         self.phase = phase
+        self.stepIndex = stepIndex
     }
 
     /// A brand-new, never-reviewed memory due at `due`.
@@ -44,6 +48,31 @@ public struct MemoryState: Codable, Equatable, Sendable {
 
     public func isDue(asOf now: Date = .now) -> Bool {
         due <= now
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case stability
+        case difficulty
+        case due
+        case lastReview
+        case reps
+        case lapses
+        case phase
+        case stepIndex
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            stability: try values.decode(Double.self, forKey: .stability),
+            difficulty: try values.decode(Double.self, forKey: .difficulty),
+            due: try values.decode(Date.self, forKey: .due),
+            lastReview: try values.decodeIfPresent(Date.self, forKey: .lastReview),
+            reps: try values.decode(Int.self, forKey: .reps),
+            lapses: try values.decode(Int.self, forKey: .lapses),
+            phase: try values.decode(Phase.self, forKey: .phase),
+            stepIndex: try values.decodeIfPresent(Int.self, forKey: .stepIndex)
+        )
     }
 }
 

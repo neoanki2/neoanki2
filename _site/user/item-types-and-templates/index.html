@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Item Types and Templates · NeoAnki2</title>
+    <meta name="description" content="Define reusable fields and templates that generate accessible, interactive study cards.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/user/item-types-and-templates/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Item Types and Templates">
+    <meta property="og:description" content="Define reusable fields and templates that generate accessible, interactive study cards.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/user/item-types-and-templates/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/user/item-types-and-templates/" aria-current="page">Advanced authoring</a>
+        
+          
+          
+          
+          <a href="/neoanki2/features/">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/" aria-current="page">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/" aria-current="page">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+                <li><a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a></li>
+              
+              <li><span aria-current="page">Item Types and Templates</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="item-types-and-templates">Item Types and Templates</h1>
+
+<p>An <strong>item type</strong> defines the fields an item stores. Its <strong>templates</strong> turn those fields into study cards: each template chooses what appears on the prompt and answer, how the learner responds, and when the card should exist.</p>
+
+<p>Open <strong>Item Types</strong> from the library to manage both. The left column lists types; the detail shows fields and templates for the selected type.</p>
+
+<p><a href="/neoanki2/assets/screenshots/item-types.png"><img src="/neoanki2/assets/screenshots/item-types.png" alt="The Item Types manager" /></a></p>
+
+<nav class="local-toc" aria-label="On this page">
+  <p><strong>On this page</strong></p>
+
+  <ul>
+    <li><a href="#starter-item-types">Starter item types</a></li>
+    <li><a href="#create-and-edit-an-item-type">Create and edit an item type</a></li>
+    <li><a href="#repair-a-damaged-definition">Repair a damaged definition</a></li>
+    <li><a href="#create-edit-and-delete-templates">Create, edit, and delete templates</a></li>
+    <li><a href="#choose-an-interaction">Choose an interaction</a></li>
+    <li><a href="#build-prompt-and-answer-sides">Build prompt and answer sides</a></li>
+    <li><a href="#advanced-settings">Advanced settings</a></li>
+  </ul>
+</nav>
+
+<h2 id="starter-item-types">Starter item types</h2>
+
+<p>NeoAnki2 creates two ordinary starter types on first run:</p>
+
+<ul>
+  <li><strong>Basic</strong> has required Text fields named <strong>Front</strong> and <strong>Back</strong>. Its <strong>Card</strong> template prompts with Front, answers with Back, and uses Reveal.</li>
+  <li><strong>Cloze</strong> has a required Cloze field named <strong>Text</strong> and an optional Rich Text field named <strong>Context</strong>. Its <strong>Cloze</strong> template shows Text with the current blank concealed plus Context on the prompt, then Text on the answer. Each distinct blank group generates a separate card.</li>
+</ul>
+
+<p>Starter types are not protected system definitions. You may edit or delete them under the same rules as a custom type.</p>
+
+<h2 id="create-and-edit-an-item-type">Create and edit an item type</h2>
+
+<p>Choose <strong>Add</strong> above the type list. A new draft starts with required <strong>Front</strong> and <strong>Back</strong> Text fields. Enter a type name, then configure each field:</p>
+
+<ul>
+  <li><strong>Name:</strong> must not be blank and must be unique within the type, ignoring case.</li>
+  <li><strong>Type:</strong> Text, Rich Text, Number, Audio, Image, GIF, Video, or Cloze.</li>
+  <li><strong>Required:</strong> controls whether an item must supply a value for that field.</li>
+</ul>
+
+<p>Use <strong>Add Field</strong> to append another field. Use each row’s arrows to move it up or down; field order affects item editing, display, and automatic skill derivation. A type edited in the app must retain at least two fields, so remove controls disappear at two.</p>
+
+<p>Save is available only when the type has a nonblank name, at least two fields, and complete, unique field names. A newly created type must also have at least two text-like fields so NeoAnki2 can create its initial <strong>Card</strong> template from the first two of them.</p>
+
+<p>Editing preserves field identities and existing templates. You cannot remove a field used by a template’s prompt, answer, or card-generation condition. Edit or delete those references first. Changing a field type can also make an existing cloze or media configuration invalid; NeoAnki2 reports the validation problem instead of saving an inconsistent definition.</p>
+
+<p>Cancel closes an unchanged draft immediately. If there are edits, choose <strong>Discard Changes</strong> or <strong>Keep Editing</strong>.</p>
+
+<h3 id="delete-an-item-type">Delete an item type</h3>
+
+<p>The Delete action is available only when no items use the selected type. Delete or move through any dependent items first. Confirmation removes the item type and all of its templates. This applies to starter and custom types alike.</p>
+
+<h2 id="repair-a-damaged-definition">Repair a damaged definition</h2>
+
+<p>If NeoAnki2 cannot read an item-type definition, it keeps other types available and shows the damaged type with <strong>Repair</strong>. Items linked to an unreadable type are skipped until it is repaired.</p>
+
+<p>Choose <strong>Repair</strong>, then <strong>Archive Original and Repair</strong>. NeoAnki2 archives the unreadable definition, preserves the existing items, and installs a minimal editable replacement with required Text fields named Front and Back and a default Card template. The archived source is retained for recovery; repair does not reconstruct custom fields or templates from unreadable data. Review the replacement and existing items before studying. A definition whose identifier itself is invalid requires manual recovery and cannot use this flow.</p>
+
+<h2 id="create-edit-and-delete-templates">Create, edit, and delete templates</h2>
+
+<p>Select an item type and choose <strong>Add Template</strong>, or select an existing template to edit it. A template needs:</p>
+
+<ol>
+  <li>A nonblank name.</li>
+  <li>At least one complete prompt slot.</li>
+  <li>At least one complete answer slot.</li>
+  <li>A valid interaction and, when enabled, a complete generation rule.</li>
+</ol>
+
+<p>Save is disabled until these requirements are met. Cancel asks before discarding edits. Editing an existing template also offers Delete with confirmation; deleting a template can remove cards generated by it and cannot be undone. An item type must always retain at least one template, so its final template cannot be deleted.</p>
+
+<p><a href="/neoanki2/assets/screenshots/template-editor.png"><img src="/neoanki2/assets/screenshots/template-editor.png" alt="The template editor" /></a></p>
+
+<h2 id="choose-an-interaction">Choose an interaction</h2>
+
+<p>The Interaction selector provides six study experiences:</p>
+
+<ul>
+  <li><strong>Reveal:</strong> recall mentally, reveal the answer, and self-grade.</li>
+  <li><strong>Type answer:</strong> type a response for automatic comparison, then self-grade.</li>
+  <li><strong>Choose:</strong> select from answer-derived options, check, then self-grade.</li>
+  <li><strong>Arrange:</strong> reorder answer units, check the sequence, then self-grade.</li>
+  <li><strong>Record:</strong> make and optionally replay a temporary audio recording before comparing with the answer.</li>
+  <li><strong>Cloze:</strong> conceal the current cloze group in the prompt and reveal it with the answer.</li>
+</ul>
+
+<p>Type, Choose, and Arrange depend on usable text representations from the answer side. Record requires microphone permission for recording but always permits reveal-and-self-grade. A Cloze template must reference exactly one Cloze field on its prompt side; selecting Cloze automatically changes an always-visible prompt slot for a Cloze field to <strong>Hidden until answer</strong>.</p>
+
+<h2 id="build-prompt-and-answer-sides">Build prompt and answer sides</h2>
+
+<p>Prompt and answer sides are ordered lists of <strong>slots</strong>. A simple template has one field slot on each side. Select the prompt field that supplies the cue and the answer field that supplies the reference response.</p>
+
+<p>Open <strong>Advanced</strong> to expose source and presentation controls. <strong>Add Prompt Slot</strong> and <strong>Add Answer Slot</strong> build richer sides, and the arrows reorder their elements. A slot may be removed while more than one exists; each side must still contain at least one valid slot when saved.</p>
+
+<p>Slot order matters. It controls the order content is rendered, the first field summarized in the type view, which fields contribute to automatic answer checking, and which first prompt and answer fields are used for automatic skill mapping.</p>
+
+<h2 id="advanced-settings">Advanced settings</h2>
+
+<p><a href="/neoanki2/assets/screenshots/template-advanced.png"><img src="/neoanki2/assets/screenshots/template-advanced.png" alt="Advanced template settings" /></a></p>
+
+<h3 id="skill-mapping">Skill mapping</h3>
+
+<p>With <strong>Derive from the first prompt and answer fields</strong> enabled, NeoAnki2 maps the first field-backed prompt and answer slots to modalities:</p>
+
+<ul>
+  <li>Text, Rich Text, Number, and Cloze become Text.</li>
+  <li>Audio becomes Audio.</li>
+  <li>Image and GIF become Image.</li>
+  <li>Video becomes Video.</li>
+</ul>
+
+<p>It derives <strong>Recognize</strong> when the prompt field comes before the answer field in the item type, and <strong>Recall</strong> when their order is reversed.</p>
+
+<p>Turn automatic derivation off to choose the skill explicitly. Input and Output offer Text, Audio, Image, Video, Diagram, None, Free response, Selection, Spatial, and Sequence. Operation offers Recognize, Recall, Discriminate, Classify, Locate, Order, Apply, Explain, and Reproduce. Skill mapping describes the cognitive route stored on generated cards; it does not itself change the selected study interaction.</p>
+
+<h3 id="field-and-literal-sources">Field and literal sources</h3>
+
+<p>A slot’s <strong>Source</strong> can be:</p>
+
+<ul>
+  <li><strong>Field:</strong> dynamic content from the current item.</li>
+  <li><strong>Literal text:</strong> fixed wording such as “Translate:” or “Explain why:”.</li>
+</ul>
+
+<p>Every field slot must select a field, and literal text cannot be blank. Literal slots can clarify a multi-part prompt without adding redundant data to each item.</p>
+
+<h3 id="multiple-slots">Multiple slots</h3>
+
+<p>Use multiple slots to combine labels, context, and media. For example, a prompt can contain the literal “Name this structure,” an Image field, and a Context field, while the answer can contain Name and Explanation fields. Reorder slots to match the reading sequence.</p>
+
+<h3 id="reveal-behavior">Reveal behavior</h3>
+
+<p>Each slot can be:</p>
+
+<ul>
+  <li><strong>Always visible:</strong> shown before and after answer reveal.</li>
+  <li><strong>Hidden until answer:</strong> replaced by a non-revealing placeholder before reveal.</li>
+  <li><strong>Blurred until answer:</strong> images and GIFs are visibly blurred; other content is concealed by a placeholder.</li>
+</ul>
+
+<p>Cloze values are handled specially: the surrounding sentence remains readable while only the current blank is masked. Hidden media is not resolved before reveal, which avoids exposing it to assistive technology or loading it prematurely.</p>
+
+<h3 id="media-behavior">Media behavior</h3>
+
+<p>Audio, GIF, and Video field slots can use <strong>Default</strong>, <strong>Autoplay</strong>, <strong>Play on tap</strong>, or <strong>Loop</strong>. Image fields and non-media or literal slots support Default only. Changing a slot’s source or selecting a field incompatible with the current behavior resets it to Default. Unsupported media behavior prevents an invalid template from being saved.</p>
+
+<h3 id="card-generation-conditions">Card-generation conditions</h3>
+
+<p>Enable <strong>Only generate this card when…</strong> to make a template conditional for each item. Rules can test:</p>
+
+<ul>
+  <li><strong>Field is not empty</strong></li>
+  <li><strong>Field is empty</strong></li>
+  <li><strong>All rules match</strong></li>
+  <li><strong>Any rule matches</strong></li>
+</ul>
+
+<p>All and Any can contain nested child rules. Every field rule must select a field, and every All or Any group must contain at least one complete child. If the condition is false, that template generates no card for that item. This is useful for optional media—for example, create a listening card only when Audio is present. Without a condition, the template generates normally for every valid item; Cloze still generates one card per distinct blank group.</p>
+
+        
+          <nav class="article-navigation" aria-label="Previous and next guides">
+            
+            
+              <a class="article-next" href="/neoanki2/user/cli/"><span>Next</span>Deck authoring CLI</a>
+            
+          </nav>
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

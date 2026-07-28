@@ -70,6 +70,65 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons.identified("deleteItem").exists)
     }
 
+    func testBackFromItemDetailReturnsToLibrary() throws {
+        let app = launchApp()
+        addBasicItem(front: "Back Test", back: "View", in: app)
+        openItemDetail(named: "Back Test", in: app)
+
+        let back = app.buttons.identified("itemDetailBack")
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        back.click()
+
+        waitForItem(named: "Back Test", in: app)
+        XCTAssertFalse(app.buttons.identified("deleteItem").exists)
+    }
+
+    func testDeleteAllUnassignedFromToolbar() throws {
+        let app = launchApp()
+        addBasicItem(front: "Loose Item", back: "A", in: app)
+        createDeck(named: "Keep Deck", in: app)
+
+        openAddItem(in: app)
+        let deckPicker = app.popUpButtons.identified("addItemDeckPicker")
+        if deckPicker.waitForExistence(timeout: 2) {
+            deckPicker.click()
+            app.menuItems.identified("Keep Deck").click()
+        }
+        enterText("Deck Item", into: field(named: "Front", in: app), app: app)
+        enterText("B", into: field(named: "Back", in: app), app: app)
+        saveAddItem(in: app)
+
+        selectScope("scopeRow-Unassigned", in: app)
+        waitForItem(named: "Loose Item", in: app)
+
+        let deleteAll = app.buttons.identified("deleteAllUnassignedToolbar")
+        XCTAssertTrue(deleteAll.waitForExistence(timeout: 5))
+        deleteAll.click()
+        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitForExistence(timeout: 5))
+        app.buttons.identified("confirmDeleteAllUnassigned").click()
+
+        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
+        selectScope("scopeRow-AllDecks", in: app)
+        waitForItem(named: "Deck Item", in: app)
+        assertNoItem(named: "Loose Item", in: app)
+    }
+
+    func testDeleteAllUnassignedFromSidebarMenu() throws {
+        let app = launchApp()
+        addBasicItem(front: "Sidebar Delete", back: "A", in: app)
+
+        showSidebar(in: app)
+        let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
+        unassigned.rightClick()
+        app.menuItems.identified("Delete All").click()
+        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitForExistence(timeout: 5))
+        app.buttons.identified("confirmDeleteAllUnassigned").click()
+
+        selectScope("scopeRow-Unassigned", in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
+        assertNoItem(named: "Sidebar Delete", in: app)
+    }
+
     func testEditItemFromDetailUpdatesLibraryAndPreview() throws {
         let app = launchApp()
         addBasicItem(front: "France", back: "Paris", in: app)
@@ -88,7 +147,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         ).firstMatch.waitForExistence(timeout: 5))
         returnToLibrary(in: app)
         waitForItem(named: "Japan", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-France"].exists)
+        assertNoItem(named: "France", in: app)
     }
 
     func testDirtyItemEditCanKeepEditingThenDiscard() throws {
@@ -108,7 +167,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 5))
         returnToLibrary(in: app)
         waitForItem(named: "Original", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Changed"].exists)
+        assertNoItem(named: "Changed", in: app)
     }
 
     func testImageEditRequiresDescriptionBeforeSaving() throws {
@@ -131,7 +190,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         app.buttons.identified("confirmDeleteItem").click()
 
         assertEmptyLibrary(in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Remove"].exists)
+        assertNoItem(named: "Remove", in: app)
     }
 
     func testMoveItemToDeckFromDetail() throws {

@@ -1,16 +1,19 @@
 import Foundation
 import NeoAnkiCore
+import SQLite3
 import Testing
 
 @testable import NeoAnki2
 
 @MainActor
-private func makeStudyModel() async throws -> (StudyModel, ItemStore) {
+private func makeStudyModel(
+    scheduler: (any Scheduler)? = nil
+) async throws -> (StudyModel, ItemStore) {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-study-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     let databaseURL = url.appendingPathComponent("test.sqlite")
-    let store = try ItemStore(databaseURL: databaseURL)
+    let store = try ItemStore(databaseURL: databaseURL, scheduler: scheduler)
     try await store.bootstrap()
     return (StudyModel(store: store), store)
 }
@@ -77,6 +80,35 @@ private func makeInteractionModel(
 
     #expect(model.queue.count == 1)
     #expect(model.scopeLabel == "Geography")
+}
+
+@Test @MainActor func studyModelRespectsDeckDailyNewLimit() async throws {
+    let (model, store) = try await makeStudyModel()
+    let deck = Deck(name: "Geography", newCardsPerDay: 1)
+    _ = try await store.createDeck(deck)
+    let itemType = try await store.defaultItemType()
+    for index in 1 ... 2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Question \(index)")
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("Answer \(index)")
+                    ),
+                ],
+                deckID: deck.id
+            )
+        )
+    }
+
+    await model.startSession(scope: .deck(deck.id, name: deck.name))
+
+    #expect(model.queue.count == 1)
 }
 
 @Test @MainActor func studyModelStartsSessionWithDueCards() async throws {
@@ -266,7 +298,10 @@ private func makeInteractionModel(
         await model.grade(rating)
     }
 
-    #expect(model.isFinished == true)
+    #expect(model.isFinished == false)
+    #expect(model.currentCard != nil)
+    #expect(model.queue.count == ReviewRating.allCases.count + 1)
+    #expect(model.cardsReviewed == ReviewRating.allCases.count)
 }
 
 @Test @MainActor func studyModelEmptyQueueFinishesImmediately() async throws {
@@ -319,8 +354,104 @@ private func makeInteractionModel(
     model.revealAnswer()
     await model.grade(.again)
 
-    #expect(model.isFinished == true)
-    #expect(try await store.dueCount() == 0)
+    #expect(model.isFinished == false)
+    #expect(model.currentCard?.id == model.queue[0].id)
+    #expect(model.queue.count == 2)
+    #expect(model.progressLabel == "Card 2 of 2")
+    #expect(try await store.dueCount() == 1)
+}
+
+@Test @MainActor func studyModelFinishesInitialQueueBeforeRepairRound() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    for index in 1...2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Q\(index)")
+                    ),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+                ]
+            )
+        )
+    }
+
+    await model.startSession()
+    let failedCardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+    await model.grade(.again)
+
+    #expect(model.currentCard?.id != failedCardID)
+
+    model.revealAnswer()
+    await model.grade(.good)
+
+    #expect(model.currentCard?.id == failedCardID)
+    #expect(model.queue.count == 3)
+}
+
+@Test @MainActor func undoAgainRemovesPendingLearningRepeat() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.queue.count == 2)
+    #expect(model.currentCard != nil)
+
+    await model.undoLastGrade()
+
+    #expect(model.queue.count == 1)
+    #expect(model.currentCard != nil)
+    #expect(model.cardsReviewed == 0)
+    #expect(try await store.dueCount() == 1)
+}
+
+@Test @MainActor func failedCardRepeatsAcrossRepairRoundsUntilRemembered() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    let cardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.currentCard?.card.memory.stepIndex == 0)
+
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.currentCard?.card.memory.stepIndex == 1)
+
+    model.revealAnswer()
+    await model.grade(.good)
+
+    #expect(model.isFinished)
+    #expect(model.cardsReviewed == 3)
+    #expect(model.reviewedCardIDs == [cardID])
+    #expect(try await store.reviewLogCount(for: cardID) == 3)
 }
 
 @Test @MainActor func studyModelUndoLastGradeRestoresCard() async throws {
@@ -488,6 +619,96 @@ private func makeInteractionModel(
     #expect(model.isAnswerRevealed == false)
 }
 
+@Test @MainActor func studyModelReloadShowsEditedContentOnEveryQueuedCardOfThatItem() async throws {
+    let (model, store) = try await makeStudyModel()
+    var itemType = try await store.defaultItemType()
+    itemType.templates[0].interaction = .cloze
+    let frontIndex = try #require(
+        itemType.fields.firstIndex(where: { $0.id == BuiltInItemTypes.frontFieldID })
+    )
+    itemType.fields[frontIndex].type = .cloze
+    _ = try await store.updateItemType(itemType)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(
+                    fieldID: BuiltInItemTypes.frontFieldID,
+                    value: .cloze(
+                        "Alpha Beta",
+                        blanks: [
+                            ClozeSpan(group: 0, start: 0, length: 5),
+                            ClozeSpan(group: 1, start: 6, length: 4),
+                        ]
+                    )
+                ),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Contex")),
+            ]
+        )
+    )
+
+    await model.startSession()
+    #expect(model.queue.count == 2)
+
+    var edited = try #require(model.currentCard?.item)
+    let backIndex = try #require(
+        edited.fields.firstIndex(where: { $0.fieldID == BuiltInItemTypes.backFieldID })
+    )
+    edited.fields[backIndex].value = .text("Context, with the typo fixed")
+    _ = try await store.updateItem(edited)
+
+    await model.reloadCurrentItem()
+
+    #expect(model.errorMessage == nil)
+    #expect(model.queue.count == 2)
+    for card in model.queue {
+        #expect(card.item.value(for: BuiltInItemTypes.backFieldID) == .text("Context, with the typo fixed"))
+    }
+}
+
+@Test @MainActor func studyModelReloadRederivesInteractionBeforeReveal() async throws {
+    let model = try await makeInteractionModel(.choose, answer: .text("Pariss"))
+    #expect(model.choiceOptions.contains("Pariss"))
+
+    var edited = try #require(model.currentCard?.item)
+    let backIndex = try #require(
+        edited.fields.firstIndex(where: { $0.fieldID == BuiltInItemTypes.backFieldID })
+    )
+    edited.fields[backIndex].value = .text("Paris")
+    _ = try await model.store.updateItem(edited)
+
+    await model.reloadCurrentItem()
+
+    #expect(model.choiceOptions.contains("Paris"))
+    #expect(model.choiceOptions.contains("Pariss") == false)
+    #expect(model.isAnswerRevealed == false)
+}
+
+@Test @MainActor func studyModelReloadKeepsRevealedAnswerAndItsFeedback() async throws {
+    let model = try await makeInteractionModel(.type, answer: .text("Paris"))
+    model.updateTypedAnswer("London")
+    model.submitTypedAnswer()
+    #expect(model.isAnswerRevealed)
+    #expect(model.answerEvaluation == .incorrect)
+
+    var edited = try #require(model.currentCard?.item)
+    let frontIndex = try #require(
+        edited.fields.firstIndex(where: { $0.fieldID == BuiltInItemTypes.frontFieldID })
+    )
+    edited.fields[frontIndex].value = .text("Capital of France")
+    _ = try await model.store.updateItem(edited)
+
+    await model.reloadCurrentItem()
+
+    #expect(model.isAnswerRevealed)
+    #expect(model.answerEvaluation == .incorrect)
+    #expect(model.typedAnswer == "London")
+    #expect(
+        model.currentCard?.item.value(for: BuiltInItemTypes.frontFieldID)
+            == .text("Capital of France")
+    )
+}
+
 @Test @MainActor func itemsModelLoadsDueCount() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-app-tests-\(UUID().uuidString)", isDirectory: true)
@@ -510,4 +731,40 @@ private func makeInteractionModel(
     await model.load()
 
     #expect(model.dueCount == 1)
+}
+
+/// A queue that cannot be read is not a finished session. Reporting completion
+/// here sent learners back to a scope home that still said cards were due.
+@Test @MainActor func studyModelReportsAQueueThatCannotBeReadAsAFailure() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki2-study-failure-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    let databaseURL = url.appendingPathComponent("test.sqlite")
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    var handle: OpaquePointer?
+    #expect(sqlite3_open(databaseURL.path(percentEncoded: false), &handle) == SQLITE_OK)
+    #expect(
+        sqlite3_exec(handle, "UPDATE cards SET memory = X'6e6f74206a736f6e';", nil, nil, nil)
+            == SQLITE_OK
+    )
+    sqlite3_close(handle)
+
+    let model = StudyModel(store: store)
+    await model.startSession()
+
+    #expect(model.didFailToLoad)
+    #expect(model.errorMessage != nil)
+    #expect(model.currentCard == nil)
 }

@@ -1,0 +1,34 @@
+{"kind": "neoanki", "version": 1, "root": "movanekalka", "parts": ["items/letter_ye.jsonl", "items/letter_i.jsonl", "items/letter_yi.jsonl", "items/letter_a.jsonl", "items/letter_b-001.jsonl", "items/letter_b-002.jsonl", "items/letter_v-001.jsonl", "items/letter_v-002.jsonl", "items/letter_v-003.jsonl", "items/letter_h.jsonl", "items/letter_d-001.jsonl", "items/letter_d-002.jsonl", "items/letter_d-003.jsonl", "items/letter_e.jsonl", "items/letter_zh.jsonl", "items/letter_z-001.jsonl", "items/letter_z-002.jsonl", "items/letter_z-003.jsonl", "items/letter_j.jsonl", "items/letter_k-001.jsonl", "items/letter_k-002.jsonl", "items/letter_l.jsonl", "items/letter_m.jsonl", "items/letter_n-001.jsonl", "items/letter_n-002.jsonl", "items/letter_n-003.jsonl", "items/letter_n-004.jsonl", "items/letter_o-001.jsonl", "items/letter_o-002.jsonl", "items/letter_p-001.jsonl", "items/letter_p-002.jsonl", "items/letter_p-003.jsonl", "items/letter_p-004.jsonl", "items/letter_p-005.jsonl", "items/letter_r-001.jsonl", "items/letter_r-002.jsonl", "items/letter_s-001.jsonl", "items/letter_s-002.jsonl", "items/letter_t.jsonl", "items/letter_u-001.jsonl", "items/letter_u-002.jsonl", "items/letter_f.jsonl", "items/letter_kh.jsonl", "items/letter_ts.jsonl", "items/letter_ch.jsonl", "items/letter_sh.jsonl", "items/letter_shch.jsonl", "items/letter_yu.jsonl", "items/letter_ya.jsonl", "items/letter_g.jsonl"]}
+{"kind": "type", "id": "DictionaryEntry", "name": "Словниковий запис", "fields": [{"id": "calque", "name": "Так кажуть", "type": "text", "required": true}, {"id": "ukrainian", "name": "А ми радимо", "type": "text", "required": true}], "templates": [{"name": "Калька → Українська", "prompt": [{"field": "calque"}], "answer": [{"field": "ukrainian"}], "interaction": "reveal", "skill": {"input": "text", "output": "text", "operation": "recall"}}]}
+{"kind": "deck", "id": "movanekalka", "name": "Мова – не калька"}
+{"kind": "deck", "id": "letter_ye", "name": "Літера Є", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_i", "name": "Літера І", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_yi", "name": "Літера Ї", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_a", "name": "Літера А", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_b", "name": "Літера Б", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_v", "name": "Літера В", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_h", "name": "Літера Г", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_d", "name": "Літера Д", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_e", "name": "Літера Е", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_zh", "name": "Літера Ж", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_z", "name": "Літера З", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_j", "name": "Літера Й", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_k", "name": "Літера К", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_l", "name": "Літера Л", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_m", "name": "Літера М", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_n", "name": "Літера Н", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_o", "name": "Літера О", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_p", "name": "Літера П", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_r", "name": "Літера Р", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_s", "name": "Літера С", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_t", "name": "Літера Т", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_u", "name": "Літера У", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_f", "name": "Літера Ф", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_kh", "name": "Літера Х", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_ts", "name": "Літера Ц", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_ch", "name": "Літера Ч", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_sh", "name": "Літера Ш", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_shch", "name": "Літера Щ", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_yu", "name": "Літера Ю", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_ya", "name": "Літера Я", "parent": "movanekalka"}
+{"kind": "deck", "id": "letter_g", "name": "Літера Ґ", "parent": "movanekalka"}

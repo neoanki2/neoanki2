@@ -13,7 +13,8 @@ fields you fill in and the templates that generate study cards.
 ## Add an item
 
 1. Select the destination deck if you want the new item preassigned there.
-2. Choose **Add Item** in the empty state or toolbar, or press Command-N.
+2. Choose **Add Item** in the empty state or toolbar, choose **File ▸ New Item**,
+   or press Command-N.
 3. If more than one item type exists, choose a **Type**.
 4. If decks exist, choose a **Deck** or **Unassigned**.
 5. Complete the required fields.
@@ -93,6 +94,9 @@ part of the edit sheet.
 3. Change field content.
 4. Choose **Save**.
 
+A card you are reviewing can be corrected without leaving the session; see [Fix
+a card during a session](../studying/#fix-a-card-during-a-session).
+
 Editing preserves the item's type, tags, and deck assignment while rebuilding
 field values from the form. Generated cards are reconciled: cards whose
 generation conditions or cloze groups still exist preserve their identity and
@@ -114,5 +118,6 @@ to an active card. Outcomes that were not undone can still contribute to later
 scheduling optimization. Media no longer referenced by any item is eligible
 for cleanup. Choose **Cancel** to keep the item.
 
-Deleting a deck is different: it moves contained items and does not delete
-them.
+Deleting a deck is broader, not gentler: it deletes the deck's subdecks and every
+item inside them too. See [Delete a
+deck](../library-and-decks/#delete-a-deck).

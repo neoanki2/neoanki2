@@ -50,6 +50,7 @@ struct ClaimsRegistry: Decodable {
     let portableDeck: Evidence
     let authoredDeck: Evidence
     let scheduling: Evidence
+    let dailyNewCards: Evidence
     let scheduler: Evidence
     let appData: Evidence
     let history: HistoryClaim
@@ -58,7 +59,7 @@ struct ClaimsRegistry: Decodable {
 
     var evidence: [Evidence] {
         [
-            media, itemImport, portableDeck, authoredDeck, scheduling,
+            media, itemImport, portableDeck, authoredDeck, scheduling, dailyNewCards,
             scheduler, appData,
             Evidence(article: history.article, source: history.source),
             compatibility,

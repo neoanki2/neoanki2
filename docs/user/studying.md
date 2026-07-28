@@ -17,6 +17,7 @@ NeoAnki2 builds a study session from cards that are due now in the scope selecte
 - [Session states](#session-states)
 - [Card interactions](#card-interactions)
 - [Feedback and grading](#feedback-and-grading)
+- [Fix a card during a session](#fix-a-card-during-a-session)
 - [Keyboard and Study menu](#keyboard-and-study-menu)
 - [Undo and ending a session](#undo-and-ending-a-session)
 - [Motion and accessibility](#motion-and-accessibility)
@@ -30,9 +31,17 @@ A session moves through a small set of states:
 2. **Prompt** shows the current card and its interaction.
 3. **Answer** shows the reference answer and, when available, response feedback.
 4. **Grading** saves one rating and advances to the next card.
-5. **Session Complete** reports the number reviewed and offers **Undo Last Grade** or **Done**.
+5. **Repair rounds** repeat failed cards after the current queue until each is
+   recalled or you end the session.
+6. **Session Complete** reports reviews and unique cards, then offers **Undo
+   Last Grade** or **Done**.
 
-The header shows the scope and progress, such as “Biology · Card 2 of 8.” The queue is assembled when the session starts. When no cards are due, NeoAnki2 shows **You’re Caught Up** instead of a prompt.
+The header shows the scope and progress, such as “Biology · Card 2 of 8.” The
+initial queue is assembled when the session starts. Failed cards are due immediately
+but move behind cards already waiting. After that queue finishes, each failed
+card appears once per repair round. When no cards are due, the scope home says
+**You’re caught up** and tells you when the next card returns, and a session
+opened on an empty queue shows **Nothing Due Right Now**.
 
 [![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)]({{ site.baseurl }}/assets/screenshots/study-answer.png)
 
@@ -86,10 +95,9 @@ After reveal, NeoAnki2 may show:
 
 These messages do not choose a rating. Grade based on the quality of your recall:
 
-- **Again (1):** you did not remember; ask NeoAnki2 for its shortest interval.
-  Intervals are floored at one day, so this is not an immediate same-session
-  repeat.
-- **Hard (2):** you remembered with difficulty.
+- **Again (1):** you did not remember. The card moves to the next repair round.
+- **Hard (2):** you remembered with difficulty. FSRS may schedule another
+  review later the same day.
 - **Good (3):** you remembered correctly.
 - **Easy (4):** recall was too easy; allow a longer wait.
 
@@ -97,13 +105,45 @@ Open **Grade Help** from the question-mark button for the same guidance.
 
 [![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
-NeoAnki2 uses FSRS-5. Each saved rating updates the card’s estimated difficulty
+NeoAnki2 uses FSRS-6. Each saved rating updates the card’s estimated difficulty
 and stability, and the next due date is calculated for the built-in 90%
 retention target. The current app does not expose a retention setting. Again
-marks a lapse on an already-reviewed card; Hard reduces growth; Easy can
-increase it. Actual intervals depend on the card’s history, elapsed time,
-scheduler parameters, and small deterministic interval variation. The labels
-are directional guidance, not promises of a particular date or interval.
+marks one lapse when a review card enters relearning; repeated failures during
+that repair sequence do not add more lapses. Hard reduces growth; Easy can
+increase it. Every repair attempt records its actual timestamp and is never
+fuzzed or delayed: failed acquisition returns in the next repair round.
+After recall, FSRS keeps fractional-day precision and may choose an intraday
+review when the memory state calls for it. Longer review intervals depend on
+the card’s history, elapsed time, scheduler parameters, and small deterministic
+interval variation.
+
+## Fix a card during a session
+
+Reviewing is when card problems surface: a typo, a missing detail, a definition
+that needs more context. Choose **Edit Card** in the session header, choose
+**Study ▸ Edit Card…**, or press Command-E to open the current card's item in
+the same editor the library uses.
+
+1. Correct or extend the fields.
+2. Choose **Save**, or **Cancel** to leave the item unchanged.
+3. The session stays on the same card and shows the saved content.
+
+Saving behaves exactly like [editing from the
+library](../authoring-items/#edit-an-item): the item's type, tags, and deck
+assignment are preserved, and generated cards are reconciled, so a card that
+still generates keeps its review history. When one item contributes several
+cards to the session, every one of them shows the correction. Editing does not
+change when a card is next due; only a grade does that. An edit that retires the
+current card, such as removing the cloze blank it was generated from, leaves
+nothing to grade: the session drops that card and continues when you grade.
+
+The editor shows every field of the item, including the answer side. Opening it
+before reveal therefore shows you the answer, and grading remains yours to
+choose honestly. A revealed answer stays revealed and keeps its feedback; before
+reveal, choices and arrange items are rebuilt from the saved content.
+
+While the editor is open, the study commands are disabled, so the unmodified
+grade keys type into the form instead of grading the card behind it.
 
 ## Keyboard and Study menu
 
@@ -113,6 +153,7 @@ The **Study** menu mirrors the main actions:
 - Space or Return: continue with the primary action when it is available.
 - 1, 2, 3, 4: grade Again, Hard, Good, or Easy after reveal.
 - Right Arrow: reveal without checking for Type, Choose, Arrange, or Record.
+- Command-E: edit the card you are reviewing.
 - Command-Z: undo the last saved grade while undo is available.
 - Escape: request the end of the session.
 

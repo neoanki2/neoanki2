@@ -47,6 +47,20 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.deckName(for: deck.id) == "New Name")
 }
 
+@Test @MainActor func decksModelUpdatesDailyNewCardLimit() async throws {
+    let (model, store) = try await makeDecksModel()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    await model.load()
+
+    #expect(await model.updateNewCardsPerDay(id: deck.id, limit: 12))
+    #expect(try await store.deck(id: deck.id).newCardsPerDay == 12)
+    #expect(model.summaries.first?.newCardsPerDay == 12)
+
+    #expect(await model.updateNewCardsPerDay(id: deck.id, limit: nil))
+    #expect(try await store.deck(id: deck.id).newCardsPerDay == nil)
+}
+
 @Test @MainActor func decksModelRejectsEmptyRename() async throws {
     let (model, store) = try await makeDecksModel()
     let deck = Deck(name: "Valid")
@@ -80,6 +94,21 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.errorMessage == "Deck name can't be empty.")
 }
 
+@Test @MainActor func decksModelDeletesSubdeckSelectionWhenParentRemoved() async throws {
+    let (model, store) = try await makeDecksModel()
+    let parent = Deck(name: "Parent")
+    let child = Deck(name: "Child", parentID: parent.id)
+    _ = try await store.createDeck(parent)
+    _ = try await store.createDeck(child)
+    await model.load()
+    model.selectedScope = .deck(child.id)
+
+    let deleted = await model.deleteDeck(id: parent.id)
+    #expect(deleted == true)
+    #expect(model.selectedScope == .allDecks)
+    #expect(model.deckTree.isEmpty)
+}
+
 @Test @MainActor func decksModelClearsSelectionWhenDeckRemovedExternally() async throws {
     let (model, store) = try await makeDecksModel()
     let deck = Deck(name: "Gone")
@@ -91,4 +120,15 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     await model.load()
 
     #expect(model.selectedScope == .allDecks)
+}
+
+@Test func sidebarCaptionOnlySaysNoItemsWhenThereAreNone() {
+    #expect(SidebarScopeCaption.text(itemCount: 0, dueCount: 0) == "No items")
+    #expect(SidebarScopeCaption.text(itemCount: 11, dueCount: 0) == "11 items")
+    #expect(SidebarScopeCaption.text(itemCount: 11, dueCount: 4) == "11 items · 4 due")
+}
+
+@Test func sidebarCaptionAgreesWithItselfAboutOne() {
+    #expect(SidebarScopeCaption.text(itemCount: 1, dueCount: 0) == "1 item")
+    #expect(SidebarScopeCaption.text(itemCount: 1, dueCount: 1) == "1 item · 1 due")
 }

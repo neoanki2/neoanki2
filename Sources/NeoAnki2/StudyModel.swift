@@ -4,7 +4,11 @@ import NeoAnkiCore
 struct PendingGradeUndo: Equatable, Sendable {
     let reviewLogID: UUID
     let previousIndex: Int
+    let previousReviewedCount: Int
+    let previousReviewedCardIDs: Set<UUID>
+    let previousReviewedItemIDs: Set<UUID>
     let rating: ReviewRating
+    let requeuedCardID: UUID?
 }
 
 @MainActor
@@ -17,6 +21,10 @@ final class StudyModel {
     private(set) var isGrading = false
     private(set) var errorMessage: String?
     private(set) var isFinished = false
+    /// Set only when the queue could not be read at all. Without it a failed
+    /// load is indistinguishable from an empty one, and a session that never
+    /// opened reports itself complete.
+    private(set) var didFailToLoad = false
     private(set) var scopeLabel = ""
     private(set) var pendingGradeUndo: PendingGradeUndo?
     private(set) var typedAnswer = ""
@@ -26,8 +34,12 @@ final class StudyModel {
     private(set) var arrangedItems: [String] = []
     private(set) var selectedArrangementIndex: Int?
     private(set) var interactionMessage: String?
+    private(set) var reviewedCount = 0
+    private(set) var reviewedCardIDs: Set<UUID> = []
+    private(set) var reviewedItemIDs: Set<UUID> = []
 
     let store: ItemStore
+    private var repairQueue: [DueCard] = []
 
     init(store: ItemStore) {
         self.store = store
@@ -50,15 +62,14 @@ final class StudyModel {
     }
 
     var cardsReviewed: Int {
-        index
+        reviewedCount
     }
 
     var completionSummary: String {
-        let count = queue.count
-        if count == 1 {
-            return "Reviewed 1 card"
-        }
-        return "Reviewed \(count) cards"
+        let reviewNoun = reviewedCount == 1 ? "review" : "reviews"
+        let cardCount = reviewedCardIDs.count
+        let cardNoun = cardCount == 1 ? "card" : "cards"
+        return "Completed \(reviewedCount) \(reviewNoun) across \(cardCount) \(cardNoun)"
     }
 
     var canUndoLastGrade: Bool {
@@ -71,8 +82,13 @@ final class StudyModel {
         isFinished = false
         isAnswerRevealed = false
         index = 0
+        reviewedCount = 0
+        reviewedCardIDs = []
+        reviewedItemIDs = []
+        repairQueue = []
         scopeLabel = scope.label
         pendingGradeUndo = nil
+        didFailToLoad = false
 
         do {
             queue = try await store.fetchDueCards(scope: scope.filter)
@@ -82,6 +98,7 @@ final class StudyModel {
             errorMessage = userFacingError(from: error)
             queue = []
             isFinished = true
+            didFailToLoad = true
         }
 
         isLoading = false
@@ -193,25 +210,36 @@ final class StudyModel {
         defer { isGrading = false }
 
         let previousIndex = index
+        let now = Date.now
 
         do {
             let submission = try await store.submitReviewWithReceipt(
                 cardID: card.id,
-                rating: rating
+                rating: rating,
+                now: now
             )
+            var repeatedCard = card
+            repeatedCard.card.memory = submission.memory
+            let shouldRequeue = submission.memory.phase == .learning
+                || submission.memory.phase == .relearning
+            if shouldRequeue {
+                repairQueue.append(repeatedCard)
+            }
             pendingGradeUndo = PendingGradeUndo(
                 reviewLogID: submission.reviewLogID,
                 previousIndex: previousIndex,
-                rating: rating
+                previousReviewedCount: reviewedCount,
+                previousReviewedCardIDs: reviewedCardIDs,
+                previousReviewedItemIDs: reviewedItemIDs,
+                rating: rating,
+                requeuedCardID: shouldRequeue ? card.id : nil
             )
             index += 1
+            reviewedCount += 1
+            reviewedCardIDs.insert(card.id)
+            reviewedItemIDs.insert(card.item.id)
             isAnswerRevealed = false
-
-            if index >= queue.count {
-                isFinished = true
-            } else {
-                prepareCurrentInteraction()
-            }
+            advanceSession()
         } catch DatabaseError.cardNotFound(_) {
             discardMissingCurrentCard(card.id)
         } catch {
@@ -228,7 +256,18 @@ final class StudyModel {
 
         do {
             try await store.revertReview(reviewLogID: undo.reviewLogID)
+            if let requeuedCardID = undo.requeuedCardID {
+                repairQueue.removeAll { $0.id == requeuedCardID }
+                if let queuedRepeat = queue.indices.last(where: {
+                    $0 > undo.previousIndex && queue[$0].id == requeuedCardID
+                }) {
+                    queue.remove(at: queuedRepeat)
+                }
+            }
             index = undo.previousIndex
+            reviewedCount = undo.previousReviewedCount
+            reviewedCardIDs = undo.previousReviewedCardIDs
+            reviewedItemIDs = undo.previousReviewedItemIDs
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
@@ -243,6 +282,47 @@ final class StudyModel {
         pendingGradeUndo = nil
     }
 
+    /// Re-reads the item behind the current card after it was edited mid-session,
+    /// so the rest of the session shows the correction rather than the copy the
+    /// queue was built from. Every queued card drawn from that item is refreshed,
+    /// because one item can own several cards in the same session.
+    func reloadCurrentItem() async {
+        guard let itemID = currentCard?.item.id else { return }
+
+        do {
+            guard let reloaded = try await store.fetchItem(id: itemID) else { return }
+            refreshQueuedCards(for: reloaded.item, itemType: reloaded.itemType)
+            // An answer already on screen keeps its feedback: re-deriving the
+            // interaction here would clear the message the learner is reading,
+            // and the choices or ordering they answered no longer matter.
+            if !isAnswerRevealed {
+                prepareCurrentInteraction()
+            }
+        } catch {
+            errorMessage = userFacingError(from: error)
+        }
+    }
+
+    private func refreshQueuedCards(for item: Item, itemType: ItemType) {
+        func refresh(_ card: inout DueCard) {
+            guard card.item.id == item.id else { return }
+            card.item = item
+            card.itemType = itemType
+            // Editing an item cannot change its templates, but reading the
+            // template back keeps each card rendering from one revision.
+            if let template = itemType.templates.first(where: { $0.id == card.template.id }) {
+                card.template = template
+            }
+        }
+
+        for index in queue.indices {
+            refresh(&queue[index])
+        }
+        for index in repairQueue.indices {
+            refresh(&repairQueue[index])
+        }
+    }
+
     func skipCurrentCard() {
         errorMessage = nil
         pendingGradeUndo = nil
@@ -250,12 +330,7 @@ final class StudyModel {
 
         index += 1
         isAnswerRevealed = false
-
-        if index >= queue.count {
-            isFinished = true
-        } else {
-            prepareCurrentInteraction()
-        }
+        advanceSession()
     }
 
     private func prepareCurrentInteraction() {
@@ -296,6 +371,26 @@ final class StudyModel {
         guard queue.indices.contains(index), queue[index].id == cardID else { return }
         queue.remove(at: index)
         isAnswerRevealed = false
-        isFinished = index >= queue.count
+        repairQueue.removeAll { $0.id == cardID }
+        advanceSession()
+    }
+
+    private func advanceSession() {
+        guard index >= queue.count else {
+            isFinished = false
+            prepareCurrentInteraction()
+            return
+        }
+
+        if !repairQueue.isEmpty {
+            queue.append(contentsOf: repairQueue)
+            repairQueue = []
+            isFinished = false
+            prepareCurrentInteraction()
+            return
+        }
+
+        isFinished = true
+        prepareCurrentInteraction()
     }
 }

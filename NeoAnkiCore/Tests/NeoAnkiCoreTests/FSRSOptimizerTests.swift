@@ -11,6 +11,35 @@ import Testing
     }
 }
 
+@Test func optimizerRejectsHistoryMissingTheNewCardReview() {
+    let cardID = UUID()
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let logs = [
+        ReviewLog(
+            cardID: cardID,
+            reviewedAt: start,
+            rating: .good,
+            elapsedDays: 7,
+            scheduledDays: 7,
+            phaseBefore: .review,
+            durationMs: 500
+        ),
+        ReviewLog(
+            cardID: cardID,
+            reviewedAt: start.addingTimeInterval(7 * 86_400),
+            rating: .good,
+            elapsedDays: 7,
+            scheduledDays: 7,
+            phaseBefore: .review,
+            durationMs: 500
+        ),
+    ]
+
+    #expect(throws: FSRSOptimizationError.insufficientData(required: 1, available: 0)) {
+        try FSRSOptimizer(minimumObservations: 1).optimize(logs: logs)
+    }
+}
+
 @Test func optimizerIgnoresMalformedAndNonFiniteHistory() throws {
     var logs = syntheticLogs(cardCount: 8, reviewsPerCard: 4)
     logs.append(
@@ -27,7 +56,7 @@ import Testing
     let result = try FSRSOptimizer(minimumObservations: 20, passes: 2).optimize(logs: logs)
 
     #expect(result.observationCount == 24)
-    #expect(result.parameters.weights.count == 19)
+    #expect(result.parameters.weights.count == 21)
     for (weight, bound) in zip(result.parameters.weights, FSRSScheduler.Parameters.weightBounds) {
         #expect(weight.isFinite)
         #expect(weight >= bound.lower)
@@ -61,6 +90,25 @@ import Testing
         #expect(weight >= bound.lower && weight <= bound.upper)
         #expect(abs(weight - baseline.weights[index]) <= bound.upper - bound.lower)
     }
+}
+
+@Test func successfulOptimizationPromotesLegacyW19IntoNativeFSRS6Bounds() throws {
+    let legacyWeights = [
+        0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046,
+        1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315,
+        2.9898, 0.51655, 0.6621,
+    ]
+    let starting = FSRSScheduler.Parameters(weights: legacyWeights, enableFuzz: false)
+    #expect(starting.weights[19] == 0)
+
+    let result = try FSRSOptimizer(minimumObservations: 300, passes: 7).optimize(
+        logs: syntheticLogs(cardCount: 80, reviewsPerCard: 8),
+        startingAt: starting
+    )
+
+    #expect(result.improved)
+    #expect(result.parameters.weights[19] >= FSRSScheduler.Parameters.weightBounds[19].lower)
+    #expect(result.parameters.weights[19] <= FSRSScheduler.Parameters.weightBounds[19].upper)
 }
 
 @Test func optimizerRecoversTowardGeneratingWeightsOnHeldOutData() throws {
@@ -130,6 +178,50 @@ import Testing
     let orderedLoss = optimizer.logLoss(logs: fetched)
     let shuffledLoss = optimizer.logLoss(logs: Array(fetched.reversed()))
     #expect(orderedLoss == shuffledLoss)
+}
+
+@Test func optimizerAcceptsFractionalDayLearningHistory() throws {
+    let epoch = Date(timeIntervalSince1970: 1_700_000_000)
+    let scheduler = LearningScheduler(
+        parameters: .init(enableFuzz: false)
+    )
+    var logs: [ReviewLog] = []
+
+    for cardIndex in 0..<60 {
+        let cardID = stableUUID(50_000 + cardIndex)
+        var state = MemoryState.new(due: epoch)
+        var now = epoch
+        for (reviewIndex, rating) in [ReviewRating.again, .good, .good].enumerated() {
+            let elapsed = state.lastReview.map {
+                now.timeIntervalSince($0) / 86_400
+            } ?? 0
+            let scheduled = state.lastReview.map {
+                max(state.due.timeIntervalSince($0) / 86_400, 0)
+            } ?? 0
+            logs.append(
+                ReviewLog(
+                    id: stableUUID(60_000 + cardIndex * 10 + reviewIndex),
+                    cardID: cardID,
+                    reviewedAt: now,
+                    rating: rating,
+                    elapsedDays: elapsed,
+                    scheduledDays: scheduled,
+                    phaseBefore: state.phase,
+                    durationMs: 500
+                )
+            )
+            state = scheduler.schedule(state, rating: rating, now: now)
+            now = state.due
+        }
+    }
+
+    let optimizer = FSRSOptimizer(minimumObservations: 100)
+    let result = try optimizer.optimize(logs: logs)
+
+    #expect(result.observationCount == 120)
+    #expect(result.previousLoss.isFinite)
+    #expect(result.optimizedLoss.isFinite)
+    #expect(result.parameters.weights.allSatisfy { $0.isFinite })
 }
 
 private func syntheticTrueWeights() -> [Double] {

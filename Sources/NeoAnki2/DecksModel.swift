@@ -32,8 +32,14 @@ final class DecksModel {
     private(set) var allDecksDueCount = 0
     private(set) var unassignedDueCount = 0
     private(set) var unassignedItemCount = 0
+    /// True only until the sidebar first has something to show. Later reloads
+    /// revise the counts in place, because replacing the tree the learner is
+    /// pointing at with a progress view loses their place to say nothing new.
     private(set) var isLoading = true
     private(set) var errorMessage: String?
+
+    private var hasLoaded = false
+    var needsInitialLoad: Bool { !hasLoaded }
 
     var selectedScope: SidebarSelection = .allDecks
 
@@ -75,24 +81,89 @@ final class DecksModel {
         selectedDeckID
     }
 
-    func load() async {
-        isLoading = true
+    /// Every count in one reload is measured against the same instant, so the
+    /// sidebar totals cannot drift from the detail pane's.
+    func load(asOf now: Date = .now) async {
+        isLoading = !hasLoaded
         errorMessage = nil
         do {
-            summaries = try await store.deckSummaries()
-            deckTree = DeckTree.build(from: summaries)
-            allDecksDueCount = try await store.dueCount(scope: .allDecks)
-            unassignedDueCount = try await store.unassignedDueCount()
-            unassignedItemCount = try await store.unassignedItemCount()
-
-            if case let .deck(id) = selectedScope,
-               !summaries.contains(where: { $0.id == id }) {
-                selectedScope = .allDecks
-            }
+            try await applyCounts(asOf: now)
+            hasLoaded = true
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
+    }
+
+    func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot) {
+        summaries = snapshot.deckSummaries
+        deckTree = DeckTree.build(from: summaries)
+        allDecksDueCount = snapshot.allDecksSummary.dueNow
+        unassignedDueCount = snapshot.unassignedSummary.dueNow
+        unassignedItemCount = snapshot.unassignedSummary.itemCount
+        if case let .deck(id) = selectedScope,
+           !summaries.contains(where: { $0.id == id }) {
+            selectedScope = .allDecks
+        }
+        errorMessage = nil
+        hasLoaded = true
+        isLoading = false
+    }
+
+    /// Revises the counts alone, leaving `isLoading` and the error banner
+    /// untouched. What is due changes on a schedule and after every save, so
+    /// this runs often; anything that made the sidebar flicker would run often
+    /// too. A failure here keeps the previous numbers rather than interrupting.
+    func refreshCounts(asOf now: Date = .now) async {
+        guard hasLoaded else { return }
+        try? await applyCounts(asOf: now)
+    }
+
+    /// Loads the sidebar on first presentation and otherwise takes the
+    /// non-flickering count refresh path.
+    func loadOrRefresh(asOf now: Date = .now) async {
+        if hasLoaded {
+            await refreshCounts(asOf: now)
+        } else {
+            await load(asOf: now)
+        }
+    }
+
+    /// Reads every count before assigning any, so the sidebar never renders a
+    /// half-updated set, and assigns only what changed, so an unchanged library
+    /// costs no view updates.
+    private func applyCounts(asOf now: Date) async throws {
+        let loadedSummaries = try await store.deckSummaries(asOf: now)
+        let allDecksSummary = try await store.scopeSummary(
+            scope: .allDecks,
+            asOf: now
+        )
+        let unassignedSummary = try await store.scopeSummary(
+            scope: .unassigned,
+            asOf: now
+        )
+        let allDecksDue = allDecksSummary.dueNow
+        let unassignedDue = unassignedSummary.dueNow
+        let unassignedItems = unassignedSummary.itemCount
+
+        if summaries != loadedSummaries {
+            summaries = loadedSummaries
+            deckTree = DeckTree.build(from: loadedSummaries)
+        }
+        if allDecksDueCount != allDecksDue {
+            allDecksDueCount = allDecksDue
+        }
+        if unassignedDueCount != unassignedDue {
+            unassignedDueCount = unassignedDue
+        }
+        if unassignedItemCount != unassignedItems {
+            unassignedItemCount = unassignedItems
+        }
+
+        if case let .deck(id) = selectedScope,
+           !loadedSummaries.contains(where: { $0.id == id }) {
+            selectedScope = .allDecks
+        }
     }
 
     func createDeck(name: String, parentID: UUID? = nil) async -> Deck? {
@@ -144,12 +215,36 @@ final class DecksModel {
         }
     }
 
+    func updateNewCardsPerDay(id: UUID, limit: Int?) async -> Bool {
+        errorMessage = nil
+        if let limit, limit < 0 {
+            errorMessage = "New cards per day cannot be negative."
+            return false
+        }
+
+        do {
+            var deck = try await store.deck(id: id)
+            deck.newCardsPerDay = limit
+            _ = try await store.updateDeck(deck)
+            // The tree is unchanged; only the limit and the due counts it gates
+            // moved, so there is nothing here worth a reload.
+            await refreshCounts()
+            return true
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
     func deleteDeck(id: UUID) async -> Bool {
         errorMessage = nil
         do {
             guard try await store.deleteDeck(id: id) else { return false }
-            if selectedScope == .deck(id) {
-                selectedScope = .allDecks
+            if case let .deck(selectedID) = selectedScope {
+                let deletedIDs = DeckTree.descendantIDs(of: id, in: summaries)
+                if deletedIDs.contains(selectedID) {
+                    selectedScope = .allDecks
+                }
             }
             await load()
             return true

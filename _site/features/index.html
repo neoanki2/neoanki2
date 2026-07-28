@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    
+    
+    
+    <title>Feature index · NeoAnki2</title>
+    <meta name="description" content="Coverage map from every NeoAnki2 feature to its guide, implementation, tests, and screenshot.">
+    <link rel="canonical" href="https://neoanki2.github.io/neoanki2/features/">
+    <meta property="og:site_name" content="NeoAnki2">
+    <meta property="og:title" content="Feature index">
+    <meta property="og:description" content="Coverage map from every NeoAnki2 feature to its guide, implementation, tests, and screenshot.">
+    <meta property="og:url" content="https://neoanki2.github.io/neoanki2/features/">
+    <meta property="og:type" content="article">
+    
+    <link rel="stylesheet" href="/neoanki2/assets/css/site.css">
+    <script src="/neoanki2/assets/js/search.js" defer></script>
+  </head>
+  <body class="page-features">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="header-bar">
+        <a class="brand" href="/neoanki2/">NeoAnki2</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+          <span aria-hidden="true">☰</span>
+          <span>Browse</span>
+        </button>
+      </div>
+      <nav class="primary-nav" aria-label="Primary">
+        
+          
+          
+          
+          <a href="/neoanki2/">Home</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/">Start</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/tasks/">Tasks</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/concepts/">Understand</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+        
+          
+          
+          
+          <a class="active" href="/neoanki2/features/" aria-current="page">Features</a>
+        
+          
+          
+          
+          <a href="/neoanki2/reference/">Reference</a>
+        
+          
+          
+          
+          <a href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+        
+          
+          
+          
+          <a href="https://github.com/neoanki2/neoanki2" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+        
+      </nav>
+      <form class="site-search" role="search" action="/neoanki2/search.json" data-guide-url="/neoanki2/user/getting-started/" data-features-url="/neoanki2/features/">
+        <label class="visually-hidden" for="site-search-input">Search documentation</label>
+        <input id="site-search-input" name="q" type="search" placeholder="Search docs" autocomplete="off" spellcheck="false" aria-controls="search-results" aria-describedby="search-hint">
+        <span id="search-hint" class="visually-hidden">Type two or more characters. Use the arrow keys to move through results.</span>
+        <div id="search-results" class="search-results" role="region" aria-label="Search results" hidden>
+          <p class="search-status" aria-live="polite"></p>
+          <ol></ol>
+        </div>
+      </form>
+    </header>
+    <div class="page-shell">
+      <aside id="site-navigation" class="sidebar" aria-label="Documentation">
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/">Start</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/getting-started/">Getting started</a></li>
+                
+                  <li><a href="/neoanki2/user/first-study-session/">First study session</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/tasks/">Tasks</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/library-and-decks/">Library and decks</a></li>
+                
+                  <li><a href="/neoanki2/user/authoring-items/">Authoring items</a></li>
+                
+                  <li><a href="/neoanki2/user/content-and-media/">Content and media</a></li>
+                
+                  <li><a href="/neoanki2/user/studying/">Studying</a></li>
+                
+                  <li><a href="/neoanki2/user/import-export/">Import and export</a></li>
+                
+                  <li><a href="/neoanki2/user/scheduling/">Scheduling</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/concepts/">Understand</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/concepts/">Concepts and glossary</a></li>
+                
+                  <li><a href="/neoanki2/user/shortcuts-accessibility/">Shortcuts and accessibility</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/troubleshooting/">Troubleshoot</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/troubleshooting/">Troubleshooting</a></li>
+                
+                  <li><a href="/neoanki2/user/support/">Build, launch, and support</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/item-types-and-templates/">Advanced authoring</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/item-types-and-templates/">Item types and templates</a></li>
+                
+                  <li><a href="/neoanki2/user/cli/">Deck authoring CLI</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/reference/">Reference</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/PRODUCT/">Product model</a></li>
+                
+                  <li><a href="/neoanki2/ARCHITECTURE/">Architecture</a></li>
+                
+                  <li><a href="/neoanki2/DESIGN/">Design system</a></li>
+                
+                  <li><a href="/neoanki2/AUTHORED_DECK_FORMAT/">Authored deck format</a></li>
+                
+                  <li><a href="/neoanki2/PORTABLE_DECK_FORMAT/">Portable deck format</a></li>
+                
+                  <li><a href="/neoanki2/LLM_DECK_AUTHORING/">LLM deck authoring</a></li>
+                
+                  <li><a href="/neoanki2/schemas/">JSON Schemas</a></li>
+                
+                  <li><a href="/neoanki2/examples/">Example deck</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+            <section class="sidebar-section">
+              <a class="sidebar-heading" href="/neoanki2/user/maintaining-documentation/">Contribute</a>
+              <ul>
+                
+                  <li><a href="/neoanki2/user/maintaining-documentation/">Maintaining documentation</a></li>
+                
+                  <li><a href="/neoanki2/audits/state-of-art-2026-07-27/">Documentation quality audit</a></li>
+                
+              </ul>
+            </section>
+          
+        
+          
+        
+      </aside>
+      <main id="content" tabindex="-1">
+        
+        
+        
+        
+        
+        
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li><a href="/neoanki2/">Home</a></li>
+              
+              <li><span aria-current="page">Feature index</span></li>
+            </ol>
+          </nav>
+        
+        <h1 id="feature-index">Feature index</h1>
+
+<p>Looking for an action rather than engineering evidence? Start with the
+<a href="../user/tasks/">task index</a>.</p>
+
+<p>This contributor-facing page is generated from <a href="../features.json"><code class="language-plaintext highlighter-rouge">features.json</code></a>.
+Within its declared app-source and UI-test inventory boundary, each detected
+user-facing file must map to a guide, implementation evidence, and behavioral
+tests. The screenshot capture harness is explicitly excluded because it verifies
+documentation evidence rather than product behavior.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Evidence links establish implementation and test ownership; they are not a
+conformance claim. In particular, the accessibility guide identifies which
+VoiceOver, text-size, contrast, and end-to-end checks still require manual testing.
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Feature</th>
+      <th>Guide</th>
+      <th>Implementation</th>
+      <th>Tests</th>
+      <th>Screenshot</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Accessibility behavior and documented limitations</td>
+      <td><a href="../user/shortcuts-accessibility/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/AccessibilityRouting.swift"><code class="language-plaintext highlighter-rouge">AccessibilityRouting.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DesignSystem.swift"><code class="language-plaintext highlighter-rouge">DesignSystem.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/MediaViews.swift"><code class="language-plaintext highlighter-rouge">MediaViews.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DeckSidebarView.swift"><code class="language-plaintext highlighter-rouge">DeckSidebarView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DeckDetailView.swift"><code class="language-plaintext highlighter-rouge">DeckDetailView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift"><code class="language-plaintext highlighter-rouge">AccessibilityRoutingTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ContentRenderingTests.swift"><code class="language-plaintext highlighter-rouge">ContentRenderingTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/MediaBehaviorTests.swift"><code class="language-plaintext highlighter-rouge">MediaBehaviorTests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Advanced slots, skills, reveal, media, and generation</td>
+      <td><a href="../user/item-types-and-templates/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/TemplateEditorView.swift"><code class="language-plaintext highlighter-rouge">TemplateEditorView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift"><code class="language-plaintext highlighter-rouge">Template.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift"><code class="language-plaintext highlighter-rouge">TemplatesAdvancedUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/template-advanced.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Again, Hard, Good, and Easy grading</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ReviewRating+StudyUI.swift"><code class="language-plaintext highlighter-rouge">ReviewRating+StudyUI.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/GradeGuideView.swift"><code class="language-plaintext highlighter-rouge">GradeGuideView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/study-grade-help.png">View</a></td>
+    </tr>
+    <tr>
+      <td>All Decks, Unassigned, and deck scopes</td>
+      <td><a href="../user/library-and-decks/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DeckSidebarView.swift"><code class="language-plaintext highlighter-rouge">DeckSidebarView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DeckDetailView.swift"><code class="language-plaintext highlighter-rouge">DeckDetailView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/DeckUITests.swift"><code class="language-plaintext highlighter-rouge">DeckUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/DecksModelTests.swift"><code class="language-plaintext highlighter-rouge">DecksModelTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/decks-nested.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Arrange-in-order interaction</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyExtendedUITests.swift"><code class="language-plaintext highlighter-rouge">StudyExtendedUITests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Cloze fields and blank authoring</td>
+      <td><a href="../user/content-and-media/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ClozeFieldEditor.swift"><code class="language-plaintext highlighter-rouge">ClozeFieldEditor.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ContentValueView.swift"><code class="language-plaintext highlighter-rouge">ContentValueView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/AuthoringUITests.swift"><code class="language-plaintext highlighter-rouge">AuthoringUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Cloze interaction</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ClozeFieldEditor.swift"><code class="language-plaintext highlighter-rouge">ClozeFieldEditor.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ContentValueView.swift"><code class="language-plaintext highlighter-rouge">ContentValueView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Create and edit items</td>
+      <td><a href="../user/authoring-items/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/AddItemView.swift"><code class="language-plaintext highlighter-rouge">AddItemView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ItemEditorState.swift"><code class="language-plaintext highlighter-rouge">ItemEditorState.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/LibraryUITests.swift"><code class="language-plaintext highlighter-rouge">LibraryUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ItemEditorStateTests.swift"><code class="language-plaintext highlighter-rouge">ItemEditorStateTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/EditorDecisionStateTests.swift"><code class="language-plaintext highlighter-rouge">EditorDecisionStateTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"><code class="language-plaintext highlighter-rouge">ItemEditReconciliationFlowTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/item-add.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Create, edit, and delete templates</td>
+      <td><a href="../user/item-types-and-templates/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/TemplateEditorView.swift"><code class="language-plaintext highlighter-rouge">TemplateEditorView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/TemplatesModel.swift"><code class="language-plaintext highlighter-rouge">TemplatesModel.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/TemplatesUITests.swift"><code class="language-plaintext highlighter-rouge">TemplatesUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/TemplatesModelTests.swift"><code class="language-plaintext highlighter-rouge">TemplatesModelTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/TemplateItemCoordinationFlowTests.swift"><code class="language-plaintext highlighter-rouge">TemplateItemCoordinationFlowTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/template-editor.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Create, edit, delete, and repair item types</td>
+      <td><a href="../user/item-types-and-templates/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/TemplatesView.swift"><code class="language-plaintext highlighter-rouge">TemplatesView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ItemTypeEditorView.swift"><code class="language-plaintext highlighter-rouge">ItemTypeEditorView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift"><code class="language-plaintext highlighter-rouge">TemplatesAdvancedUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/item-types.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Create, nest, rename, and delete decks</td>
+      <td><a href="../user/library-and-decks/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DeckSidebarView.swift"><code class="language-plaintext highlighter-rouge">DeckSidebarView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DecksModel.swift"><code class="language-plaintext highlighter-rouge">DecksModel.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/DeckUITests.swift"><code class="language-plaintext highlighter-rouge">DeckUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/DecksModelCRUDTests.swift"><code class="language-plaintext highlighter-rouge">DecksModelCRUDTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/decks-nested.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Errors, permissions, and empty states</td>
+      <td><a href="../user/troubleshooting/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/UserFacingError.swift"><code class="language-plaintext highlighter-rouge">UserFacingError.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/NeoAnki2App.swift"><code class="language-plaintext highlighter-rouge">NeoAnki2App.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/UserFacingErrorTests.swift"><code class="language-plaintext highlighter-rouge">UserFacingErrorTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/NavigationGatingUITests.swift"><code class="language-plaintext highlighter-rouge">NavigationGatingUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/error-startup.png">View</a></td>
+    </tr>
+    <tr>
+      <td>First launch and local library</td>
+      <td><a href="../user/getting-started/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/NeoAnki2App.swift"><code class="language-plaintext highlighter-rouge">NeoAnki2App.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/AppDatabase.swift"><code class="language-plaintext highlighter-rouge">AppDatabase.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/LibraryUITests.swift"><code class="language-plaintext highlighter-rouge">LibraryUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/AppDatabaseTests.swift"><code class="language-plaintext highlighter-rouge">AppDatabaseTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/AppLaunchSmokeTests.swift"><code class="language-plaintext highlighter-rouge">AppLaunchSmokeTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/library-empty.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Image, GIF, audio, and video fields</td>
+      <td><a href="../user/content-and-media/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/MediaFieldEditor.swift"><code class="language-plaintext highlighter-rouge">MediaFieldEditor.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/MediaViews.swift"><code class="language-plaintext highlighter-rouge">MediaViews.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift"><code class="language-plaintext highlighter-rouge">MediaStore.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift"><code class="language-plaintext highlighter-rouge">MediaValidation.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaAsset.swift"><code class="language-plaintext highlighter-rouge">MediaAsset.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/AuthoringUITests.swift"><code class="language-plaintext highlighter-rouge">AuthoringUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/MediaImageLoaderTests.swift"><code class="language-plaintext highlighter-rouge">MediaImageLoaderTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift"><code class="language-plaintext highlighter-rouge">ItemsModelMediaFlowTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/item-media.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Import and export portable decks</td>
+      <td><a href="../user/import-export/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/PortableDeckTransferModel.swift"><code class="language-plaintext highlighter-rouge">PortableDeckTransferModel.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift"><code class="language-plaintext highlighter-rouge">PortableDeck.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift"><code class="language-plaintext highlighter-rouge">PortableItemTypeIdentity.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"><code class="language-plaintext highlighter-rouge">ItemStore+PortableDeck.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/PortableDeckUITests.swift"><code class="language-plaintext highlighter-rouge">PortableDeckUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift"><code class="language-plaintext highlighter-rouge">PortableDeckTransferModelTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/portable-conflict.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Import authored deck bundles</td>
+      <td><a href="../user/import-export/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift"><code class="language-plaintext highlighter-rouge">AuthoredDeck.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift"><code class="language-plaintext highlighter-rouge">ItemStore+AuthoredDeck.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"><code class="language-plaintext highlighter-rouge">AuthoredDeckTests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Import JSON and CSV items</td>
+      <td><a href="../user/import-export/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ImportView.swift"><code class="language-plaintext highlighter-rouge">ImportView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ImportModel.swift"><code class="language-plaintext highlighter-rouge">ImportModel.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportAdapter.swift"><code class="language-plaintext highlighter-rouge">ImportAdapter.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Import/ImportLimits.swift"><code class="language-plaintext highlighter-rouge">ImportLimits.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift"><code class="language-plaintext highlighter-rouge">ItemStore.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/ImportExportUITests.swift"><code class="language-plaintext highlighter-rouge">ImportExportUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ImportModelTests.swift"><code class="language-plaintext highlighter-rouge">ImportModelTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Tests/NeoAnkiCoreTests/ImportAdapterTests.swift"><code class="language-plaintext highlighter-rouge">ImportAdapterTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/import-sheet.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Library item list, counts, and empty states</td>
+      <td><a href="../user/library-and-decks/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/DeckDetailView.swift"><code class="language-plaintext highlighter-rouge">DeckDetailView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/LibraryUITests.swift"><code class="language-plaintext highlighter-rouge">LibraryUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ItemsModelTests.swift"><code class="language-plaintext highlighter-rouge">ItemsModelTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/library-populated.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Menus and keyboard shortcuts</td>
+      <td><a href="../user/shortcuts-accessibility/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/LibraryCommands.swift"><code class="language-plaintext highlighter-rouge">LibraryCommands.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyCommands.swift"><code class="language-plaintext highlighter-rouge">StudyCommands.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/SchedulingCommands.swift"><code class="language-plaintext highlighter-rouge">SchedulingCommands.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyExtendedUITests.swift"><code class="language-plaintext highlighter-rouge">StudyExtendedUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/StudyCommandsTests.swift"><code class="language-plaintext highlighter-rouge">StudyCommandsTests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Multiple-choice interaction</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudySupport.swift"><code class="language-plaintext highlighter-rouge">StudySupport.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/StudyRecordingControllerTests.swift"><code class="language-plaintext highlighter-rouge">StudyRecordingControllerTests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Number fields</td>
+      <td><a href="../user/content-and-media/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/AddItemView.swift"><code class="language-plaintext highlighter-rouge">AddItemView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/Content/ContentValue.swift"><code class="language-plaintext highlighter-rouge">ContentValue.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/AuthoringUITests.swift"><code class="language-plaintext highlighter-rouge">AuthoringUITests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Optimize FSRS scheduling</td>
+      <td><a href="../user/scheduling/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/SchedulingModel.swift"><code class="language-plaintext highlighter-rouge">SchedulingModel.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/SchedulingCommands.swift"><code class="language-plaintext highlighter-rouge">SchedulingCommands.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSScheduler.swift"><code class="language-plaintext highlighter-rouge">FSRSScheduler.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/LibraryUITests.swift"><code class="language-plaintext highlighter-rouge">LibraryUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/SchedulingModelTests.swift"><code class="language-plaintext highlighter-rouge">SchedulingModelTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/scheduling-result.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Read, move, and delete an item</td>
+      <td><a href="../user/authoring-items/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ItemReadingPreview.swift"><code class="language-plaintext highlighter-rouge">ItemReadingPreview.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/LibraryUITests.swift"><code class="language-plaintext highlighter-rouge">LibraryUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/ItemsModelDetailTests.swift"><code class="language-plaintext highlighter-rouge">ItemsModelDetailTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Tests/NeoAnkiFlowTests/RevertReviewFlowTests.swift"><code class="language-plaintext highlighter-rouge">RevertReviewFlowTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/item-detail.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Record-and-compare interaction</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyRecordingController.swift"><code class="language-plaintext highlighter-rouge">StudyRecordingController.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Reveal and self-grade interaction</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/StudySupportTests.swift"><code class="language-plaintext highlighter-rouge">StudySupportTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/study-answer.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Split navigation and focus modes</td>
+      <td><a href="../user/getting-started/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/ContentView.swift"><code class="language-plaintext highlighter-rouge">ContentView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/NavigationGatingUITests.swift"><code class="language-plaintext highlighter-rouge">NavigationGatingUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/library-populated.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Start a scoped due-card session</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyModel.swift"><code class="language-plaintext highlighter-rouge">StudyModel.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/StudyModelTests.swift"><code class="language-plaintext highlighter-rouge">StudyModelTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/study-prompt.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Text and rich-text fields</td>
+      <td><a href="../user/content-and-media/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/RichTextFieldEditor.swift"><code class="language-plaintext highlighter-rouge">RichTextFieldEditor.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/SpanFormatting.swift"><code class="language-plaintext highlighter-rouge">SpanFormatting.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/LibraryUITests.swift"><code class="language-plaintext highlighter-rouge">LibraryUITests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/RichTextEditingTests.swift"><code class="language-plaintext highlighter-rouge">RichTextEditingTests.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Tests/NeoAnki2Tests/SpanFormattingTests.swift"><code class="language-plaintext highlighter-rouge">SpanFormattingTests.swift</code></a></td>
+      <td><a href="../assets/screenshots/item-rich-text.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Typed-answer interaction</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudySupport.swift"><code class="language-plaintext highlighter-rouge">StudySupport.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyUITests.swift"><code class="language-plaintext highlighter-rouge">StudyUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/study-type.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Undo, end confirmation, and session completion</td>
+      <td><a href="../user/studying/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyView.swift"><code class="language-plaintext highlighter-rouge">StudyView.swift</code></a><br /><a href="https://github.com/neoanki2/neoanki2/blob/main/Sources/NeoAnki2/StudyCommands.swift"><code class="language-plaintext highlighter-rouge">StudyCommands.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/UITests/NeoAnki2UITests/StudyExtendedUITests.swift"><code class="language-plaintext highlighter-rouge">StudyExtendedUITests.swift</code></a></td>
+      <td><a href="../assets/screenshots/study-complete.png">View</a></td>
+    </tr>
+    <tr>
+      <td>Validate authored decks from the command line</td>
+      <td><a href="../user/cli/">Guide</a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Sources/NeoAnkiDeckCLI/main.swift"><code class="language-plaintext highlighter-rouge">main.swift</code></a></td>
+      <td><a href="https://github.com/neoanki2/neoanki2/blob/main/NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"><code class="language-plaintext highlighter-rouge">AuthoredDeckTests.swift</code></a></td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+        
+      </main>
+    </div>
+    
+    
+    <footer class="site-footer">
+      <p>Development documentation for NeoAnki2.</p>
+      <p>
+        <a href="https://github.com/neoanki2/neoanki2/tree/main/docs">Source revision main</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="2026-07-27T00:00:00+00:00">July 27, 2026 at 00:00 UTC</time>
+      </p>
+    </footer>
+  </body>
+</html>

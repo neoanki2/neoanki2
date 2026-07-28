@@ -1,0 +1,217 @@
+{
+  "capturedAt" : "2026-07-27T13:13:03Z",
+  "schemaVersion" : 1,
+  "screenshots" : [
+    {
+      "expectedVisibleIdentifiers" : [
+        "deckRow-Languages",
+        "deckRow-French"
+      ],
+      "filename" : "decks-nested.png",
+      "height" : 743,
+      "scenario" : "library sidebar with nested Languages and French decks",
+      "sha256" : "d197563c1f749c6e135afa23a7fd83d3cbd3ee372b2d49b24d902f3099b1c2ed",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "bootstrapError"
+      ],
+      "filename" : "error-startup.png",
+      "height" : 716,
+      "scenario" : "database bootstrap failure",
+      "sha256" : "be1ed951f93aa7137b526c2d68ba2f188fb643c4ce4ef3bfcc3dfd6b67e82f48",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "importSheet",
+        "confirmImport"
+      ],
+      "filename" : "import-sheet.png",
+      "height" : 703,
+      "scenario" : "CSV import mapping sheet",
+      "sha256" : "1df2daaa9f92615e877aed80c44ff9dfd5affaf6d22a6af7c5f970ea308ee57b",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "cancelAddItem",
+        "field-Front",
+        "field-Back"
+      ],
+      "filename" : "item-add.png",
+      "height" : 716,
+      "scenario" : "new basic item editor",
+      "sha256" : "a1ffefb7c49b6ac15c374edb8a88ac799d83659e9093b84109f899fabbd10c96",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "deleteItem",
+        "editItem"
+      ],
+      "filename" : "item-detail.png",
+      "height" : 716,
+      "scenario" : "basic item detail",
+      "sha256" : "b4d59ea63c1dd990ba93371887a44248ba1e6341a56038d6444c405ae45d3dd1",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "saveEditItem",
+        "field-Image"
+      ],
+      "filename" : "item-media.png",
+      "height" : 716,
+      "scenario" : "editing an image item missing its description",
+      "sha256" : "29cc4792d49e32e690d1f2897cc341f0c619ba95efbdba20dadfaaca9a751319",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "field-Front",
+        "field-Front-formatBold",
+        "saveAddItem"
+      ],
+      "filename" : "item-rich-text.png",
+      "height" : 716,
+      "scenario" : "basic item editor with visibly bold front text",
+      "sha256" : "62286ad364de8600e7a4f19c19b6e2fc43e8252ac73b27625f2ed4b114f050da",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "templatesDone",
+        "addTemplateToolbar"
+      ],
+      "filename" : "item-types.png",
+      "height" : 703,
+      "scenario" : "item types and templates panel",
+      "sha256" : "71c1cd8d8143068f7e20d7212c12930aae6069d6e44c11bc97ea13ca026ed23d",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "emptyLibraryState"
+      ],
+      "filename" : "library-empty.png",
+      "height" : 716,
+      "scenario" : "empty library",
+      "sha256" : "61013302fc1d65d1e0ce51b4473a55c16ac04ff16edd8a733c346200f8e8a62f",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "itemRow-What is spaced repetition?",
+        "addItemToolbar"
+      ],
+      "filename" : "library-populated.png",
+      "height" : 716,
+      "scenario" : "library containing one basic item",
+      "sha256" : "ee3d519ed215c2794430cf05ac95b23041256936117bcee4fa35fb246c969aa4",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "portableDeckConflictUseLocal",
+        "portableDeckConflictImportNew"
+      ],
+      "filename" : "portable-conflict.png",
+      "height" : 703,
+      "scenario" : "portable deck item-type conflict",
+      "sha256" : "b1c5d5d1c83f4b749308cf3cd99c787de3d6b85f2e51d6771bdc9209f90927d8",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "action-button-1"
+      ],
+      "filename" : "scheduling-result.png",
+      "height" : 716,
+      "scenario" : "scheduling optimization result sheet",
+      "sha256" : "3a1a89fc6cebb17091bca12cda45a82892d3193a2755b5fc1a28344d33b557bd",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "studyAnswer",
+        "gradeGood",
+        "gradeAgain"
+      ],
+      "filename" : "study-answer.png",
+      "height" : 716,
+      "scenario" : "revealed study answer with grading controls",
+      "sha256" : "10ec02ee9a03153091d16f0fbc7ed69b56beb03c953952a6b1d9f1e379700056",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "studySessionDone"
+      ],
+      "filename" : "study-complete.png",
+      "height" : 716,
+      "scenario" : "completed study session",
+      "sha256" : "63aa9866c8ea47b2f8132f3ccccbf32386a03a6725552a7746f6c7fcab518f4f",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "gradeGuidePanel",
+        "primaryStudyAction"
+      ],
+      "filename" : "study-grade-help.png",
+      "height" : 716,
+      "scenario" : "study prompt with grading guide open",
+      "sha256" : "5baca465b870a5dabc8a64a715bca2dea510460151155f91017c0bf959c0369f",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "primaryStudyAction",
+        "gradeHelp"
+      ],
+      "filename" : "study-prompt.png",
+      "height" : 716,
+      "scenario" : "study prompt before revealing the answer",
+      "sha256" : "041f5f6fc361712d14b41989f1040f4cd0f2a70f09572ae90d54590a4e68c5b4",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "studyAnswer",
+        "gradeGood"
+      ],
+      "filename" : "study-type.png",
+      "height" : 716,
+      "scenario" : "typed-answer study result",
+      "sha256" : "232d104b6f0d68e83ecb2462cec6486d610aeca4fdeac3757ea01712aeb9b5cb",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "answerSlotSource",
+        "answerSlotReveal",
+        "templateAdvancedSettings"
+      ],
+      "filename" : "template-advanced.png",
+      "height" : 716,
+      "scenario" : "advanced template editor with answer reveal controls and advanced settings entry point",
+      "sha256" : "624fbf2574440ad206c2f84ae4b6d7626dd49de183c991975df736bf3302d1df",
+      "width" : 960
+    },
+    {
+      "expectedVisibleIdentifiers" : [
+        "templateNameField",
+        "templatePromptField",
+        "templateAnswerField"
+      ],
+      "filename" : "template-editor.png",
+      "height" : 716,
+      "scenario" : "new template editor",
+      "sha256" : "a09c951e565a324f9b2a8250973d2fed6647dcbf452b82f56a8d203840946140",
+      "width" : 960
+    }
+  ],
+  "sourceSHA" : "e16beb324373404499e0301e4d59470b3125b7c4"
+}

@@ -7,14 +7,14 @@ parent: User Guide
 
 # Scheduling
 
-NeoAnki2 uses FSRS (Free Spaced Repetition Scheduler) to decide when each card
+NeoAnki2 uses FSRS-6 (Free Spaced Repetition Scheduler) to decide when each card
 is due. You do not set an interval while studying. Instead, reveal the answer
 and describe your recall:
 
-- **Again (1):** you did not remember; schedule the shortest available
-  interval. NeoAnki2 floors intervals at one day and does not promise an
-  Anki-style same-session relearning step.
-- **Hard (2):** you remembered with difficulty.
+- **Again (1):** you did not remember. The card remains due immediately and
+  enters the session's repair queue.
+- **Hard (2):** you remembered with difficulty. FSRS may schedule the next
+  review later the same day.
 - **Good (3):** you remembered correctly.
 - **Easy (4):** it was too easy; wait longer before the next review.
 
@@ -22,16 +22,53 @@ Each grade updates that card's memory state and appends a review outcome. A new
 or newly imported card starts never-reviewed and is due immediately. Portable
 and authored deck imports do not carry scheduling history.
 
+## Limit new cards per day
+
+To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,
+and turn on **Limit new cards per day**. Existing decks are unlimited until you
+set a limit. A limit of **0** pauses new cards in that deck and its subdecks
+without hiding learning or review cards.
+
+The allowance is shared by the deck and its entire subtree. When you set a
+parent deck to 20, at most 20 new cards total are available from that parent and
+all of its subdecks that study day. A subdeck can add a stricter limit of its
+own; cards in that subdeck must fit both allowances. Unassigned cards remain
+unlimited. The scope home keeps **New** as the full backlog while explaining
+how many due new cards are available today and how many are deferred.
+
+A new card consumes one slot when you grade it for the first time, including
+**Again**. Ending a session before grading does not consume a slot. Undoing that
+first grade restores the slot. Learning, relearning, and review cards never
+count toward this limit.
+
+Choose **Scheduling → Scheduling Settings…** to set when a new study day begins
+in local time. The default is **4:00 AM**. The app follows the Mac's current
+time zone, and deferred new cards become available at the next rollover.
+
+Learning and relearning use criterion-based **repair rounds**, not fixed minute
+intervals. NeoAnki2 finishes the current queue, then shows every failed card
+again. Again moves that card to the end of the next repair round; Hard, Good,
+or Easy lets it graduate. Rounds continue until every card is recalled or you
+end the session. Unfinished cards stay due immediately for the next
+session. Repair rounds are an acquisition policy, not a fixed-time learning
+step: they deliberately do not wait. After successful recall, FSRS-6 chooses
+the next due time from the card's stability. That due time keeps fractional-day
+precision, so a weak short-term memory can return in hours while established
+memories normally return in days or longer.
+
 ## Optimize scheduling for your history
 
 Choose **Scheduling → Optimize Scheduling…**. NeoAnki2 fits this profile's FSRS
-parameters to its saved review outcomes. The menu changes to **Optimizing
-Scheduling…** and is disabled until the operation finishes.
+21 parameters to its saved review outcomes. Saved 19-parameter FSRS-5 profiles
+are migrated with the official compatibility mapping: their learned weights
+are preserved, short-term decay starts disabled, and the forgetting curve
+retains FSRS-5's fixed decay until the next optimization. The menu changes to
+**Optimizing Scheduling…** and is disabled until the operation finishes.
 
 Optimization is deterministic and uses review sequences with at least two
-valid reviews for a card. The first review establishes state; each later review
-in that sequence contributes one usable outcome. Invalid or incomplete history
-is excluded.
+valid reviews for a card, beginning with its new-card review. The first review
+establishes state; each later review in that sequence contributes one usable
+outcome. Invalid or incomplete history is excluded.
 
 When tuning finds a better fit, the result reports:
 

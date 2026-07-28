@@ -1,0 +1,27 @@
+{"flow":"bootstrap-fresh-library","layer":"core","peakRSSBytes":299204608,"scale":"large","metadata":{"item_count":"0"},"durationSeconds":3.2020235}
+{"layer":"core","durationSeconds":3.553669375,"metadata":{"imported_items":"2","imported_decks":"1"},"scale":"large","peakRSSBytes":349913088,"flow":"authored-deck-import"}
+{"metadata":{"imported_items":"25000","import_batches":"3","item_count":"25000"},"layer":"core","durationSeconds":3.611523,"flow":"import-csv-items","scale":"large","peakRSSBytes":358416384}
+{"flow":"import-json-items","layer":"core","peakRSSBytes":360038400,"metadata":{"import_batches":"3","imported_items":"25000","item_count":"25000"},"durationSeconds":3.618683042,"scale":"large"}
+{"flow":"deck-summaries","layer":"core","peakRSSBytes":360038400,"metadata":{"deck_summaries":"100","deck_count":"100","item_count":"25001"},"durationSeconds":0.435490042,"scale":"large"}
+{"flow":"scope-summary-all-decks","layer":"core","peakRSSBytes":382500864,"metadata":{"due_now":"25000","item_count":"25000","total_items":"25000"},"durationSeconds":0.081784875,"scale":"large"}
+{"flow":"list-items","layer":"core","peakRSSBytes":639287296,"metadata":{"listed_items":"25000","item_count":"25000"},"durationSeconds":3.521213792,"scale":"large"}
+{"layer":"core","durationSeconds":0.125026833,"metadata":{"matches":"11111","item_count":"25000"},"scale":"large","peakRSSBytes":647675904,"flow":"item-browse-filter"}
+{"metadata":{"due_cards":"25000","item_count":"25000"},"layer":"core","durationSeconds":4.165302583,"flow":"fetch-due-cards","scale":"large","peakRSSBytes":682246144}
+{"peakRSSBytes":684457984,"metadata":{"update_count":"2500","item_count":"25000","updated_items":"2500"},"scale":"large","flow":"update-items-sample","durationSeconds":3.018887625,"layer":"core"}
+{"layer":"core","durationSeconds":10.662155375,"metadata":{"item_count":"25000","reverted_reviews":"2500","batch_size":"2500"},"scale":"large","peakRSSBytes":684457984,"flow":"revert-review-batch"}
+{"layer":"core","durationSeconds":0.825474625,"metadata":{"review_count":"5000","fsrs_seed_count":"2500","item_count":"25000","improved":"true","observation_count":"2500"},"scale":"large","peakRSSBytes":684457984,"flow":"fsrs-optimize"}
+{"layer":"core","durationSeconds":7.195432333,"metadata":{"item_count":"25000","package_bytes":"21676032"},"scale":"large","peakRSSBytes":684457984,"flow":"portable-deck-export"}
+{"layer":"core","durationSeconds":32.5541585,"metadata":{"item_count":"25000","graded_cards":"25000","study_count":"25000"},"scale":"large","peakRSSBytes":684949504,"flow":"study-grade-loop"}
+{"layer":"core","durationSeconds":14.472194834,"metadata":{"item_count":"25000","package_bytes":"21676032","imported_items":"25000"},"scale":"large","peakRSSBytes":684949504,"flow":"portable-deck-import"}
+{"peakRSSBytes":31539200,"flow":"templates-model-load","durationSeconds":0.003136375,"metadata":{"item_type_count":"2"},"scale":"large","layer":"app"}
+{"durationSeconds":0.528678125,"layer":"app","peakRSSBytes":528384000,"flow":"decks-model-load","metadata":{"root_decks":"1","scope_due_count":"25000","item_count":"25000","deck_count":"100"},"scale":"large"}
+{"durationSeconds":0.169484625,"layer":"app","peakRSSBytes":566706176,"flow":"items-model-search","metadata":{"visible_items":"25000","item_count":"25000"},"scale":"large"}
+{"durationSeconds":5.190514041,"layer":"app","peakRSSBytes":566706176,"flow":"items-model-load","metadata":{"loaded_items":"25000","item_count":"25000","due_now":"25000"},"scale":"large"}
+{"layer":"app","flow":"item-editor-state-build","durationSeconds":0.623192375,"peakRSSBytes":566706176,"scale":"large","metadata":{"item_count":"25000","sample_count":"2500","editor_states":"2500"}}
+{"durationSeconds":1.325977459,"layer":"app","peakRSSBytes":566706176,"flow":"study-support-interactions","metadata":{"arrangements":"5000","sample_count":"5000","choice_options":"10000","item_count":"25000"},"scale":"large"}
+{"peakRSSBytes":566706176,"flow":"import-model-json","metadata":{"item_count":"25000","import_batches":"3","loaded_items":"25000"},"scale":"large","durationSeconds":10.991149542,"layer":"app"}
+{"durationSeconds":1.043767916,"layer":"app","peakRSSBytes":566706176,"flow":"scheduling-model-optimize","metadata":{"notice":"Scheduling Optimized","fsrs_seed_count":"2500","item_count":"25000"},"scale":"large"}
+{"durationSeconds":7.73344625,"layer":"app","peakRSSBytes":566706176,"flow":"study-model-typed-interaction","metadata":{"sample_count":"5000","item_count":"25000","evaluations":"5000"},"scale":"large"}
+{"durationSeconds":7.080298375,"layer":"app","peakRSSBytes":566706176,"flow":"portable-transfer-export","metadata":{"item_count":"25000"},"scale":"large"}
+{"durationSeconds":34.817632542,"layer":"app","peakRSSBytes":566706176,"flow":"study-model-full-session","metadata":{"cards_reviewed":"25000","reviewed_count":"25000","item_count":"25000","study_count":"25000"},"scale":"large"}
+{"scale":"large","flow":"portable-transfer-import","layer":"app","durationSeconds":14.236768167,"peakRSSBytes":566706176,"metadata":{"item_count":"25000","imported_items":"25000"}}

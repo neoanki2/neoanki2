@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neoanki.app/schemas/authored-manifest-v1.json",
+  "title": "NeoAnki authored deck manifest record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "root", "parts"],
+  "properties": {
+    "kind": {"const": "neoanki"},
+    "version": {"const": 1},
+    "root": {"$ref": "#/$defs/id"},
+    "parts": {
+      "type": "array",
+      "maxItems": 1000,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^items/(?!\\.{1,2}/)(?!.*?/\\.{1,2}/)(?:[^/]+/)*[^/]+\\.jsonl$"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"}
+  }
+}

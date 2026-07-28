@@ -21,13 +21,15 @@ Use one of the three kinds of sidebar row:
   Starting a study session here uses the same recursive scope.
 - **Unassigned** shows only items with no deck.
 
-Changing scope reloads both the item list and due-card count. Sidebar captions
-show direct item counts for each named deck and recursive due counts for that
-deck and its descendants. **Unassigned** reports its item and due counts
-separately.
+Changing scope reloads the scope home and its counts. A deck's caption counts the
+items and due cards in that deck **and all its subdecks**, which is the same
+scope you get by selecting it — so a deck that only organizes subdecks reports
+their contents rather than reading as empty. A caption says **No items** only
+when the deck and everything under it is empty. **Unassigned** reports its own
+item and due counts. Every count in one reload is measured at the same instant,
+so the sidebar and the detail pane always agree.
 
-The detail title reflects the selected scope. **Study** is enabled only when
-that scope has due cards; its badge shows the due count.
+Selecting a scope opens its **scope home**, described below.
 
 ## Create a top-level deck
 
@@ -52,6 +54,22 @@ navigate the hierarchy.
 Selecting a parent includes content in every level below it. Selecting a child
 limits the list and study session to that child's subtree.
 
+## Set a daily new-card limit
+
+1. Control-click or right-click the deck.
+2. Choose **Deck Settings…**.
+3. Turn on **Limit new cards per day**, choose the allowance, and save.
+
+The setting is one shared allowance for the deck and all of its subdecks. A new
+card graded anywhere in that subtree consumes one of the parent's slots. A
+subdeck can add a stricter limit of its own; cards there must fit both limits.
+Turn the limit off to remove that deck's cap, or set it to **0** to pause new
+cards throughout its subtree while continuing scheduled learning and reviews.
+
+Daily limits are local study preferences. They are not included in portable or
+authored deck files. See [Scheduling](../scheduling/) for first-grade accounting,
+undo behavior, and the configurable study-day rollover.
+
 ## Rename a deck
 
 1. Control-click or right-click the deck.
@@ -61,22 +79,24 @@ limits the list and study session to that child's subtree.
 Names cannot be empty after trimming whitespace. Renaming changes the label,
 not the deck's items or hierarchy. Choose **Cancel** to retain the old name.
 
-## Delete a deck safely
+## Delete a deck
 
 1. Control-click or right-click the deck.
 2. Choose **Delete**.
 3. Read the confirmation and choose **Delete Deck**.
 
-Deleting a deck does **not** delete its items or subdecks:
+**Deleting a deck destroys its contents.** It removes the deck, every subdeck
+beneath it, every item in any of them, and the study cards those items
+generated, along with all review history. Nothing moves to the parent deck, and
+there is no undo.
 
-- Items directly in the deleted deck move to its parent.
-- If the deleted deck was top-level, its direct items become unassigned.
-- Direct subdecks move to the deleted deck's parent.
-- If the deleted deck was top-level, its direct subdecks become top-level.
+Because a deck's sidebar caption counts its whole subtree, that caption tells
+you what you are about to lose. To keep the items, move them out first — open
+browse mode on the deck, select them, and use **Move to Deck** — then delete the
+empty deck.
 
-The operation preserves the rest of each nested subtree. Cancel the
-confirmation or press Escape to keep the deck unchanged. If the deleted deck
-was selected, NeoAnki2 returns to **All Decks**.
+Cancel the confirmation or press Escape to keep the deck unchanged. If the
+deleted deck was selected, NeoAnki2 returns to **All Decks**.
 
 ## Put new items in a deck
 
@@ -88,25 +108,73 @@ Unassigned before saving.
 The **Unassigned** empty state intentionally has no Add Item button; use the
 toolbar's **Add Item** action instead.
 
+## Read the scope home
+
+Choosing a scope opens its home, which answers one question: is there anything
+to study right now?
+
+- The **due count** leads, with **Study** beside it. Studying is one click from
+  the moment you pick a scope.
+- When nothing is due, the count is replaced by when the next card comes back —
+  for example, "The next card is due in 3 hours." There is no disabled Study
+  button left sitting there without explanation.
+- **Cards** breaks the scope down into **New**, **Learning**, and **Review**.
+  Relearning cards count as learning, because relearning is a repair round.
+- When a daily limit defers new cards, a note separates today's available new
+  cards from the deferred backlog and reports when more become available.
+- If cards in the scope keep lapsing, a note says how many. Rewriting a
+  confusing item usually works better than repeating it.
+- **Browse *n* Items** opens browse mode.
+
+The scope home never shows an item's answer.
+
+## Browse and search items
+
+Open browse mode from the scope home link, from **Library ▸ Browse Items**, or
+with ⌥⌘B. Press Escape or choose **Done** to return to the scope home.
+
+Browse mode is a sortable table, one row per item:
+
+| Column | Shows |
+| --- | --- |
+| Prompt | Content from the item's first field |
+| Due | When the item's soonest card is due, or **Now** |
+| State | New, Learning, Relearning, or Review for that card |
+| Lapses | How many times the item's cards have been forgotten |
+| Type | The item type name |
+| Cards | How many cards the item generated |
+| Answer | Hidden by default — see below |
+
+Click a column header to sort by it; click again to reverse. Items with no
+scheduled card group together at one end.
+
+**The Answer column is hidden on purpose.** Reading an answer before you have
+been asked the question spends the review. When you do need to verify content —
+proofreading an import, hunting a typo — choose **Library ▸ Show Answer Column**
+or press ⌥⌘A, and **Library ▸ Hide Answer Column** when you are done. Your choice
+is remembered, so the column stays as you left it the next time you browse.
+Control-clicking the table header works too.
+
+Search still matches answer text whether or not the column is visible, so you
+can find an item by a half-remembered answer without being shown it.
+
+Use the search field to filter by prompt, answer, or item type. The window
+subtitle reports how many of the scope's items are showing.
+
+Double-click a row to open the item. Select several rows to act on them
+together:
+
+- **Move to Deck** moves the whole selection, including to **No Deck**.
+- **Delete** asks for confirmation and removes the items and their cards.
+
 ## Move an existing item
 
-1. Select the item in the list.
+1. Open browse mode and select the item, or open it from the table.
 2. In item detail, open the **Deck** menu.
 3. Choose another deck or **Unassigned**.
 
-The move happens immediately; there is no separate Save button. Counts and
-the current scoped list refresh after the move. If the destination is outside
-the active scope, return to the list or choose the destination scope to find
-the item.
+The move happens immediately; there is no separate Save button. Counts and the
+current scoped list refresh after the move. If the destination is outside the
+active scope, choose the destination scope to find the item.
 
-## Understand the item list
-
-Each row shows:
-
-- content from the item's first field as its title
-- content from the second field as its subtitle
-- the number of generated cards and the item type name
-
-For media fields, the description is used when available; otherwise the media
-kind is shown. Cloze text is shown with its blanks concealed. Select a row for
-the complete field preview and item actions.
+For several items at once, select them in browse mode and use **Move to Deck**.

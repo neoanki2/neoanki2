@@ -40,8 +40,12 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         captureDocumentationScreenshot(
             named: "library-populated",
             of: emptyApp,
-            scenario: "library containing one basic item",
-            expectedVisibleIdentifiers: ["itemRow-What is spaced repetition?", "addItemToolbar"]
+            scenario: "browse mode listing one basic item",
+            expectedVisibleIdentifiers: [
+                "itemBrowserTable",
+                "itemRow-What is spaced repetition?",
+                "addItemToolbar",
+            ]
         )
         openItemDetail(named: "What is spaced repetition?", in: emptyApp)
         captureDocumentationScreenshot(
@@ -111,7 +115,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
 
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-answer",
@@ -119,7 +123,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "revealed study answer with grading controls",
             expectedVisibleIdentifiers: ["studyAnswer", "gradeGood", "gradeAgain"]
         )
-        app.buttons.identified("gradeGood").click()
+        revealAndGrade("gradeGood", in: app)
         XCTAssertTrue(app.buttons.identified("studySessionDone").waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-complete",
@@ -133,7 +137,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let app = launchApp(databaseLabel: "docs-study-type", scenario: "study-type")
         startStudy(in: app)
         enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-type",
@@ -172,7 +176,13 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedForm = advancedApp.descendants(matching: .any)
             .identified("templateEditorForm")
         XCTAssertTrue(advancedForm.waitForExistence(timeout: 3))
-        advancedForm.swipeUp()
+        // A form taller than the display has no hit point, so no gesture can be
+        // placed on the form itself. This nudge is only to bring the answer
+        // controls closer; scrolling by that element below is what the capture
+        // actually depends on, so skip it rather than fail the run.
+        if advancedForm.isHittable {
+            advancedForm.swipeUp()
+        }
         let answerReveal = advancedApp.popUpButtons.identified("answerSlotReveal")
         XCTAssertTrue(answerReveal.waitForExistence(timeout: 5))
         answerReveal.scroll(byDeltaX: 0, deltaY: 240)

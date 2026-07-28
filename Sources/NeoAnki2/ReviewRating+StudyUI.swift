@@ -26,8 +26,8 @@ extension ReviewRating {
 
     var studyTooltip: String {
         switch self {
-        case .again: "Didn't remember — show this card again soon"
-        case .hard: "Remembered with difficulty"
+        case .again: "Didn't remember — repeat this card later in this session"
+        case .hard: "Remembered with difficulty — may return later today"
         case .good: "Remembered correctly"
         case .easy: "Too easy — wait longer before the next review"
         }
