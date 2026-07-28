@@ -682,32 +682,49 @@ class NeoAnkiUITestCase: XCTestCase {
             || app.buttons.identified("studySessionDone").waitForExistence(timeout: 2))
     }
 
-    func revealAndGrade(_ gradeID: String, in app: XCUIApplication) {
-        let primaryAction = app.buttons.identified("primaryStudyAction")
-        if primaryAction.waitForExistence(timeout: 2) {
-            if primaryAction.isHittable {
-                primaryAction.click()
-            } else {
-                app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
-            }
-        }
-        let gradeButton = app.buttons.identified(gradeID)
-        XCTAssertTrue(gradeButton.waitForExistence(timeout: 5))
-        if gradeButton.isHittable {
-            gradeButton.click()
+    /// Clicks a control, falling back to its keyboard shortcut when a tall
+    /// window has pushed it off a short display. Both reach the same action, and
+    /// the screenshot is taken from the resulting state either way.
+    func clickOrType(_ identifier: String, shortcut: String, in app: XCUIApplication) {
+        let button = app.buttons.identified(identifier)
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        if button.isHittable {
+            button.click()
         } else {
-            let shortcut = [
-                "gradeAgain": "1",
-                "gradeHard": "2",
-                "gradeGood": "3",
-                "gradeEasy": "4",
-            ][gradeID]
-            XCTAssertNotNil(shortcut)
-            if let shortcut {
-                app.typeKey(shortcut, modifierFlags: [])
-            }
+            app.typeKey(shortcut, modifierFlags: [])
         }
     }
+
+    /// Activates the primary study action. The button carries the default-action
+    /// keyboard shortcut, so Return reaches it even when a tall window has
+    /// pushed it past the bottom of a short display and clicking cannot.
+    func triggerPrimaryStudyAction(in app: XCUIApplication) {
+        let primaryAction = app.buttons.identified("primaryStudyAction")
+        XCTAssertTrue(primaryAction.waitForExistence(timeout: 5))
+        if primaryAction.isHittable {
+            primaryAction.click()
+        } else {
+            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+        }
+    }
+
+    func revealAndGrade(_ gradeID: String, in app: XCUIApplication) {
+        if app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 2) {
+            triggerPrimaryStudyAction(in: app)
+        }
+        let shortcut = Self.gradeShortcuts[gradeID]
+        XCTAssertNotNil(shortcut)
+        if let shortcut {
+            clickOrType(gradeID, shortcut: shortcut, in: app)
+        }
+    }
+
+    static let gradeShortcuts = [
+        "gradeAgain": "1",
+        "gradeHard": "2",
+        "gradeGood": "3",
+        "gradeEasy": "4",
+    ]
 
     func finishStudySession(in app: XCUIApplication) {
         if app.buttons.identified("studySessionDone").waitForExistence(timeout: 5) {

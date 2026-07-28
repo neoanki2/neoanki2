@@ -15,13 +15,13 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp()
         addBasicItem(front: "Grade Test", back: "Answer", in: app)
         startStudy(in: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
 
         for gradeID in ["gradeAgain", "gradeHard", "gradeGood", "gradeEasy"] {
             XCTAssertTrue(app.buttons.identified(gradeID).waitForExistence(timeout: 3), "Missing \(gradeID)")
         }
 
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -116,13 +116,13 @@ final class StudyUITests: NeoAnkiUITestCase {
         if primaryAction.waitForExistence(timeout: 5) {
             primaryAction.click()
             if app.buttons.identified("gradeGood").waitForExistence(timeout: 2) {
-                app.buttons.identified("gradeGood").click()
+                clickOrType("gradeGood", shortcut: "3", in: app)
             }
         }
 
         if app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 3) {
-            app.buttons.identified("primaryStudyAction").click()
-            app.buttons.identified("gradeGood").click()
+            triggerPrimaryStudyAction(in: app)
+            clickOrType("gradeGood", shortcut: "3", in: app)
         }
 
         finishStudySession(in: app)
@@ -137,10 +137,10 @@ final class StudyUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
 
         enterText("Paris", into: app.textFields.identified("typedAnswer"), app: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons.identified("gradeGood").exists)
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -149,7 +149,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
         let feedback = app.staticTexts.matching(
             NSPredicate(format: "value CONTAINS[c] %@", "Compare your response")
@@ -161,7 +161,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-choose")
         startStudy(in: app)
 
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
 
         let paris = app.buttons.matching(
@@ -169,7 +169,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         ).firstMatch
         XCTAssertTrue(paris.waitForExistence(timeout: 3))
         paris.click()
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 3))
     }
 
@@ -178,7 +178,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         XCTAssertTrue(app.buttons.identified("arrangementItem0").waitForExistence(timeout: 3))
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 3))
     }
 
@@ -187,7 +187,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         XCTAssertFalse(app.staticTexts["Paris"].exists)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
             app.staticTexts.matching(
                 NSPredicate(format: "value CONTAINS[c] %@", "Paris")

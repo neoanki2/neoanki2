@@ -115,7 +115,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
 
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-answer",
@@ -123,7 +123,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "revealed study answer with grading controls",
             expectedVisibleIdentifiers: ["studyAnswer", "gradeGood", "gradeAgain"]
         )
-        app.buttons.identified("gradeGood").click()
+        revealAndGrade("gradeGood", in: app)
         XCTAssertTrue(app.buttons.identified("studySessionDone").waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-complete",
@@ -137,7 +137,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let app = launchApp(databaseLabel: "docs-study-type", scenario: "study-type")
         startStudy(in: app)
         enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-type",

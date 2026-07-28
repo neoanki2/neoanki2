@@ -23,7 +23,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         let app = launchApp()
         addBasicItem(front: "Keyboard Q", back: "Keyboard A", in: app)
         startStudy(in: app)
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         gradeViaKeyboard(3, in: app)
         finishStudySession(in: app)
     }
@@ -34,7 +34,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.space, modifierFlags: [])
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -45,7 +45,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         app.typeKey("z", modifierFlags: [.command])
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
@@ -57,13 +57,13 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         if moveDown.waitForExistence(timeout: 3), moveDown.isEnabled {
             moveDown.click()
         }
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 5)
                 || app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 5)
         )
         if app.buttons.identified("gradeGood").exists {
-            app.buttons.identified("gradeGood").click()
+            clickOrType("gradeGood", shortcut: "3", in: app)
         }
         finishStudySession(in: app)
     }
@@ -74,7 +74,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
 
         app.buttons.identified("arrangementItem0").click()
         app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: [.command])
-        app.buttons.identified("primaryStudyAction").click()
+        triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 5)
                 || app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 5)
@@ -86,7 +86,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
         XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
-        app.buttons.identified("gradeGood").click()
+        clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
     }
 
