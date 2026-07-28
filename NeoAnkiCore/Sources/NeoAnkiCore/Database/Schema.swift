@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 14
+    static let version = 15
 
     static let createStatements: [String] = [
         """
@@ -93,7 +93,15 @@ enum Schema {
         CREATE TABLE IF NOT EXISTS decks (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
-            parent_id TEXT REFERENCES decks(id)
+            parent_id TEXT REFERENCES decks(id),
+            new_cards_per_day INTEGER CHECK(new_cards_per_day >= 0)
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS new_card_introductions (
+            review_log_id TEXT PRIMARY KEY NOT NULL REFERENCES review_logs(id),
+            deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            study_day TEXT NOT NULL
         );
         """,
         """
@@ -109,10 +117,18 @@ enum Schema {
         CREATE INDEX IF NOT EXISTS idx_cards_phase ON cards(phase);
         """,
         """
+        CREATE INDEX IF NOT EXISTS idx_cards_deck_due
+        ON cards(deck_id, due_at, id);
+        """,
+        """
         CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_review_reverts_log_id ON review_reverts(review_log_id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_new_card_introductions_deck_day
+        ON new_card_introductions(deck_id, study_day);
         """,
         """
         CREATE TABLE IF NOT EXISTS media_assets (
@@ -286,6 +302,33 @@ enum Schema {
         "ALTER TABLE cards ADD COLUMN lapses INTEGER NOT NULL DEFAULT 0;",
         """
         CREATE INDEX IF NOT EXISTS idx_cards_phase ON cards(phase);
+        """,
+    ]
+
+    /// Adds learner-local deck introduction limits without changing portable
+    /// deck content. A nullable limit preserves the previous unlimited behavior.
+    static let migrationV15Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS decks (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT REFERENCES decks(id)
+        );
+        """,
+        """
+        ALTER TABLE decks
+        ADD COLUMN new_cards_per_day INTEGER CHECK(new_cards_per_day >= 0);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS new_card_introductions (
+            review_log_id TEXT PRIMARY KEY NOT NULL REFERENCES review_logs(id),
+            deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            study_day TEXT NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_new_card_introductions_deck_day
+        ON new_card_introductions(deck_id, study_day);
         """,
     ]
 

@@ -5,7 +5,9 @@ struct DeckSidebarView: View {
     @Bindable var decksModel: DecksModel
     @Binding var selection: SidebarSelection
     var onDeleteAllUnassigned: () -> Void = {}
+    var onDeckSettingsSaved: () async -> Void = {}
     @State private var deckToRename: DeckSummary?
+    @State private var deckToConfigure: DeckSummary?
     @State private var renameText = ""
     @State private var deckToDelete: DeckSummary?
     @State private var showDeleteAllUnassignedConfirm = false
@@ -44,6 +46,7 @@ struct DeckSidebarView: View {
                                     DeckSidebarNode(
                                         node: node,
                                         decksModel: decksModel,
+                                        onConfigure: { deckToConfigure = $0 },
                                         onRename: beginRename,
                                         onDelete: { deckToDelete = $0 },
                                         onNewSubdeck: beginNewSubdeck
@@ -74,6 +77,13 @@ struct DeckSidebarView: View {
         }
         .background(DesignSystem.sidebarBackground)
         .navigationTitle("Decks")
+        .sheet(item: $deckToConfigure) { deck in
+            DeckSettingsView(
+                decksModel: decksModel,
+                deck: deck,
+                onSaved: onDeckSettingsSaved
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("New Deck", systemImage: "plus") {
@@ -232,6 +242,7 @@ struct DeckSidebarView: View {
 private struct DeckSidebarNode: View {
     let node: DeckNode
     @Bindable var decksModel: DecksModel
+    let onConfigure: (DeckSummary) -> Void
     let onRename: (DeckSummary) -> Void
     let onDelete: (DeckSummary) -> Void
     let onNewSubdeck: (UUID) -> Void
@@ -245,6 +256,7 @@ private struct DeckSidebarNode: View {
                     DeckSidebarNode(
                         node: child,
                         decksModel: decksModel,
+                        onConfigure: onConfigure,
                         onRename: onRename,
                         onDelete: onDelete,
                         onNewSubdeck: onNewSubdeck
@@ -270,6 +282,11 @@ private struct DeckSidebarNode: View {
         }
         .tag(SidebarSelection.deck(summary.id))
         .contextMenu {
+            Button("Deck Settings…") {
+                onConfigure(summary)
+            }
+            .accessibilityIdentifier("deckSettingsMenu")
+            Divider()
             Button("New Subdeck") {
                 onNewSubdeck(summary.id)
             }

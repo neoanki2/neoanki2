@@ -142,12 +142,15 @@ struct ScopeHomeView: View {
     /// Replaces the disabled Study button that used to sit here explaining
     /// nothing. Cards become due on a schedule; saying when is the answer.
     private var nextDueSentence: String {
-        guard let nextDueAt = summary.nextDueAt else {
+        guard let nextStudyAt = summary.nextStudyAt else {
             return "Nothing is scheduled yet. Cards become due after their first review."
         }
         // Named presentation reads as plain language ("tomorrow") where numeric
         // does not.
-        let relative = nextDueAt.formatted(.relative(presentation: .named, unitsStyle: .wide))
+        let relative = nextStudyAt.formatted(.relative(presentation: .named, unitsStyle: .wide))
+        if summary.nextNewCardsAt == nextStudyAt {
+            return "More new cards become available \(relative)."
+        }
         return "The next card is due \(relative)."
     }
 
@@ -173,6 +176,17 @@ struct ScopeHomeView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(cardStateAccessibilityLabel)
             .accessibilityIdentifier("scopeHomeCardStates")
+
+            if summary.hiddenNewCount > 0 {
+                let noun = summary.hiddenNewCount == 1 ? "card" : "cards"
+                Text(
+                    "\(summary.availableNewCount) new available today; "
+                        + "\(summary.hiddenNewCount) \(noun) deferred by daily limits."
+                )
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("scopeHomeDailyNewLimit")
+            }
         }
     }
 

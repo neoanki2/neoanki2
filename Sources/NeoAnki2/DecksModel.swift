@@ -146,6 +146,25 @@ final class DecksModel {
         }
     }
 
+    func updateNewCardsPerDay(id: UUID, limit: Int?) async -> Bool {
+        errorMessage = nil
+        if let limit, limit < 0 {
+            errorMessage = "New cards per day cannot be negative."
+            return false
+        }
+
+        do {
+            var deck = try await store.deck(id: id)
+            deck.newCardsPerDay = limit
+            _ = try await store.updateDeck(deck)
+            await load()
+            return true
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
     func deleteDeck(id: UUID) async -> Bool {
         errorMessage = nil
         do {

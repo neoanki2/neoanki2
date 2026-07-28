@@ -17,9 +17,51 @@ import Testing
     #expect(try columnExists("cloze_group", in: "cards", at: url))
     #expect(try tableExists("media_reservations", at: url))
     #expect(try tableExists("portable_item_type_mappings", at: url))
+    #expect(try tableExists("new_card_introductions", at: url))
+    #expect(try columnExists("new_cards_per_day", in: "decks", at: url))
     let firstLibraryID = try await database.getOrCreateLibraryID()
     let secondLibraryID = try await database.getOrCreateLibraryID()
     #expect(firstLibraryID == secondLibraryID)
+}
+
+@Test func versionFourteenMigrationAddsUnlimitedDeckLimits() async throws {
+    let url = migrationDatabaseURL()
+    let deckID = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (14);
+        CREATE TABLE app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE review_logs (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL,
+            reviewed_at REAL NOT NULL,
+            log BLOB NOT NULL,
+            memory_before BLOB NOT NULL,
+            sequence INTEGER NOT NULL UNIQUE
+        );
+        CREATE TABLE decks (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT REFERENCES decks(id)
+        );
+        INSERT INTO decks VALUES ('\(deckID.uuidString)', 'Existing', NULL);
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try columnExists("new_cards_per_day", in: "decks", at: url))
+    #expect(try tableExists("new_card_introductions", at: url))
+    #expect(try integer(
+        "SELECT COUNT(*) FROM decks WHERE id = '\(deckID.uuidString)' AND new_cards_per_day IS NULL;",
+        at: url
+    ) == 1)
 }
 
 @Test func versionTwelveMigrationPreservesLibraryIdentityAndAddsPortableMappings() async throws {

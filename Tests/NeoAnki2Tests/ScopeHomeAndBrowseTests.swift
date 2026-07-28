@@ -68,6 +68,20 @@ private func addItem(
     #expect(model.scopeSummary.dueNow == 2)
 }
 
+@Test @MainActor func scopeHomeSummaryReportsNewCardsDeferredByLimit() async throws {
+    let (model, _, store) = try await makeModels()
+    let deck = Deck(name: "Paused", newCardsPerDay: 0)
+    _ = try await store.createDeck(deck)
+    await model.load(scope: .deck(deck.id, name: deck.name))
+
+    #expect(await addItem(model, front: "France", back: "Paris", deckID: deck.id))
+    #expect(model.scopeSummary.dueNow == 0)
+    #expect(model.scopeSummary.newCount == 1)
+    #expect(model.scopeSummary.availableNewCount == 0)
+    #expect(model.scopeSummary.hiddenNewCount == 1)
+    #expect(model.scopeSummary.nextNewCardsAt != nil)
+}
+
 /// The bug this closes: adding an item inside a deck used to refresh the summary
 /// against every deck, so the scope home reported counts from another scope.
 @Test @MainActor func addingAnItemRefreshesTheLoadedScopeOnly() async throws {

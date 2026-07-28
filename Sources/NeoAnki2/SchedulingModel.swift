@@ -23,12 +23,48 @@ final class SchedulingModel {
     }
 
     private(set) var isOptimizing = false
+    private(set) var rolloverMinutes = StudyDay.defaultRolloverMinutes
+    private(set) var isLoadingSettings = false
+    private(set) var isSavingSettings = false
+    var isShowingSettings = false
+    var settingsError: String?
     var notice: Notice?
 
     private let store: ItemStore
 
     init(store: ItemStore) {
         self.store = store
+    }
+
+    func openSettings() {
+        isShowingSettings = true
+        Task { await loadSettings() }
+    }
+
+    func loadSettings() async {
+        isLoadingSettings = true
+        settingsError = nil
+        defer { isLoadingSettings = false }
+        do {
+            rolloverMinutes = try await store.studyDayRolloverMinutes()
+        } catch {
+            settingsError = UserFacingError.message(from: error)
+        }
+    }
+
+    func saveRolloverMinutes(_ minutes: Int) async -> Bool {
+        guard !isSavingSettings else { return false }
+        isSavingSettings = true
+        settingsError = nil
+        defer { isSavingSettings = false }
+        do {
+            try await store.setStudyDayRolloverMinutes(minutes)
+            rolloverMinutes = minutes
+            return true
+        } catch {
+            settingsError = UserFacingError.message(from: error)
+            return false
+        }
     }
 
     func optimize() async {

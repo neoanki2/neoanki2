@@ -14,6 +14,10 @@ public struct ScopeSummary: Sendable, Equatable {
     /// Cards whose due date has arrived and that are not suspended.
     public let dueNow: Int
     public let newCount: Int
+    /// Due new cards that remain inside today's per-deck budgets.
+    public let availableNewCount: Int
+    /// Due new cards deferred until the next study day.
+    public let hiddenNewCount: Int
     public let learningCount: Int
     public let relearningCount: Int
     public let reviewCount: Int
@@ -24,6 +28,7 @@ public struct ScopeSummary: Sendable, Equatable {
     /// Nil means nothing is scheduled ahead: either the scope is empty or every
     /// card is already due.
     public let nextDueAt: Date?
+    public let nextNewCardsAt: Date?
 
     /// Lapse count at which a card is reported as a leech.
     public static let leechThreshold = 8
@@ -33,21 +38,27 @@ public struct ScopeSummary: Sendable, Equatable {
         cardCount: Int,
         dueNow: Int,
         newCount: Int,
+        availableNewCount: Int = 0,
+        hiddenNewCount: Int = 0,
         learningCount: Int,
         relearningCount: Int,
         reviewCount: Int,
         leechCount: Int,
-        nextDueAt: Date?
+        nextDueAt: Date?,
+        nextNewCardsAt: Date? = nil
     ) {
         self.itemCount = itemCount
         self.cardCount = cardCount
         self.dueNow = dueNow
         self.newCount = newCount
+        self.availableNewCount = availableNewCount
+        self.hiddenNewCount = hiddenNewCount
         self.learningCount = learningCount
         self.relearningCount = relearningCount
         self.reviewCount = reviewCount
         self.leechCount = leechCount
         self.nextDueAt = nextDueAt
+        self.nextNewCardsAt = nextNewCardsAt
     }
 
     public static let empty = ScopeSummary(
@@ -68,4 +79,13 @@ public struct ScopeSummary: Sendable, Equatable {
 
     public var hasItems: Bool { itemCount > 0 }
     public var hasDueCards: Bool { dueNow > 0 }
+
+    public var nextStudyAt: Date? {
+        switch (nextDueAt, nextNewCardsAt) {
+        case let (scheduled?, newCards?): min(scheduled, newCards)
+        case let (scheduled?, nil): scheduled
+        case let (nil, newCards?): newCards
+        case (nil, nil): nil
+        }
+    }
 }

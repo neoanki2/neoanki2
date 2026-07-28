@@ -198,6 +198,20 @@ actor SQLiteDatabase {
                 try backfillCardScheduleColumns()
             }
 
+            if current < 15 {
+                for sql in Schema.migrationV15Statements {
+                    try execute(sql)
+                }
+                if try tableExists("cards") {
+                    try execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_cards_deck_due
+                        ON cards(deck_id, due_at, id);
+                        """
+                    )
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -242,6 +256,24 @@ actor SQLiteDatabase {
 
     func libraryID() throws -> UUID {
         try getOrCreateLibraryID()
+    }
+
+    func metadataValue(forKey key: String) throws -> String? {
+        try query(
+            "SELECT value FROM app_metadata WHERE key = ? LIMIT 1;",
+            bindings: [.text(key)]
+        ).first?["value"] as? String
+    }
+
+    func setMetadataValue(_ value: String, forKey key: String) throws {
+        try execute(
+            """
+            INSERT INTO app_metadata (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+            """,
+            bindings: [.text(key), .text(value)]
+        )
     }
 
     func portableDeckLibrarySnapshot() throws -> PortableDeckLibrarySnapshot {
@@ -624,20 +656,21 @@ actor SQLiteDatabase {
     func insertDeck(_ deck: Deck) throws {
         try execute(
             """
-            INSERT INTO decks (id, name, parent_id)
-            VALUES (?, ?, ?);
+            INSERT INTO decks (id, name, parent_id, new_cards_per_day)
+            VALUES (?, ?, ?, ?);
             """,
             bindings: [
                 .text(deck.id.uuidString),
                 .text(deck.name),
                 deck.parentID.map { .text($0.uuidString) } ?? .null,
+                deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
             ]
         )
     }
 
     func fetchDeck(id: UUID) throws -> Deck? {
         let rows = try query(
-            "SELECT id, name, parent_id FROM decks WHERE id = ? LIMIT 1;",
+            "SELECT id, name, parent_id, new_cards_per_day FROM decks WHERE id = ? LIMIT 1;",
             bindings: [.text(id.uuidString)]
         )
         guard let row = rows.first,
@@ -647,13 +680,19 @@ actor SQLiteDatabase {
         else { return nil }
 
         let parentID = (row["parent_id"] as? String).flatMap(UUID.init(uuidString:))
-        return Deck(id: deckID, name: name, parentID: parentID)
+        let newCardsPerDay = (row["new_cards_per_day"] as? Int64).map(Int.init)
+        return Deck(
+            id: deckID,
+            name: name,
+            parentID: parentID,
+            newCardsPerDay: newCardsPerDay
+        )
     }
 
     func fetchAllDecks() throws -> [Deck] {
         let rows = try query(
             """
-            SELECT id, name, parent_id
+            SELECT id, name, parent_id, new_cards_per_day
             FROM decks
             ORDER BY name ASC;
             """
@@ -665,7 +704,13 @@ actor SQLiteDatabase {
                 let name = row["name"] as? String
             else { return nil }
             let parentID = (row["parent_id"] as? String).flatMap(UUID.init(uuidString:))
-            return Deck(id: deckID, name: name, parentID: parentID)
+            let newCardsPerDay = (row["new_cards_per_day"] as? Int64).map(Int.init)
+            return Deck(
+                id: deckID,
+                name: name,
+                parentID: parentID,
+                newCardsPerDay: newCardsPerDay
+            )
         }
     }
 
@@ -673,12 +718,13 @@ actor SQLiteDatabase {
         try execute(
             """
             UPDATE decks
-            SET name = ?, parent_id = ?
+            SET name = ?, parent_id = ?, new_cards_per_day = ?
             WHERE id = ?;
             """,
             bindings: [
                 .text(deck.name),
                 deck.parentID.map { .text($0.uuidString) } ?? .null,
+                deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
                 .text(deck.id.uuidString),
             ]
         )
@@ -819,23 +865,26 @@ actor SQLiteDatabase {
         return try rows.map { try decodePersistedItem(from: $0) }
     }
 
-    func fetchDueCards(deckIDs: Set<UUID>, asOf now: Date, limit: Int? = nil) throws -> [Card] {
+    func fetchDueCards(
+        deckIDs: Set<UUID>,
+        asOf now: Date,
+        studyDay: String,
+        limit: Int? = nil
+    ) throws -> [Card] {
         guard !deckIDs.isEmpty else { return [] }
-        let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
-        var sql = """
+        let eligible = eligibleDueCardsCTE(scope: .decks(deckIDs), asOf: now, studyDay: studyDay)
+        var sql = eligible.sql + """
+
             SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
-            FROM cards
-            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IN (\(placeholders))
-            ORDER BY due_at ASC
+            FROM eligible_due
+            ORDER BY due_at ASC, id ASC
             """
-        var bindings: [Binding] = [.double(now.timeIntervalSince1970)]
-        bindings.append(contentsOf: deckIDs.sorted { $0.uuidString < $1.uuidString }.map { .text($0.uuidString) })
         if let limit {
-            sql += " LIMIT \(limit);"
+            sql += " LIMIT \(max(limit, 0));"
         } else {
             sql += ";"
         }
-        let rows = try query(sql, bindings: bindings)
+        let rows = try query(sql, bindings: eligible.bindings)
         return try rows.map { try decodeCard(from: $0) }
     }
 
@@ -855,25 +904,19 @@ actor SQLiteDatabase {
         return try rows.map { try decodeCard(from: $0) }
     }
 
-    func countDueCards(deckIDs: Set<UUID>, asOf now: Date) throws -> Int {
+    func countDueCards(deckIDs: Set<UUID>, asOf now: Date, studyDay: String) throws -> Int {
         guard !deckIDs.isEmpty else { return 0 }
-        let placeholders = Array(repeating: "?", count: deckIDs.count).joined(separator: ", ")
-        var bindings: [Binding] = [.double(now.timeIntervalSince1970)]
-        bindings.append(contentsOf: deckIDs.sorted { $0.uuidString < $1.uuidString }.map { .text($0.uuidString) })
+        let eligible = eligibleDueCardsCTE(scope: .decks(deckIDs), asOf: now, studyDay: studyDay)
         let rows = try query(
-            """
-            SELECT COUNT(*) AS count
-            FROM cards
-            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IN (\(placeholders));
-            """,
-            bindings: bindings
+            eligible.sql + "\nSELECT COUNT(*) AS count FROM eligible_due;",
+            bindings: eligible.bindings
         )
         guard let count = rows.first?["count"] as? Int64 else { return 0 }
         return Int(count)
     }
 
-    func countDueCards(deckID: UUID, asOf now: Date) throws -> Int {
-        try countDueCards(deckIDs: [deckID], asOf: now)
+    func countDueCards(deckID: UUID, asOf now: Date, studyDay: String) throws -> Int {
+        try countDueCards(deckIDs: [deckID], asOf: now, studyDay: studyDay)
     }
 
     func countUnassignedDueCards(asOf now: Date) throws -> Int {
@@ -1140,31 +1183,29 @@ actor SQLiteDatabase {
         return try decodeCard(from: row)
     }
 
-    func fetchDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
-        var sql = """
+    func fetchDueCards(asOf now: Date, studyDay: String, limit: Int? = nil) throws -> [Card] {
+        let eligible = eligibleDueCardsCTE(scope: .all, asOf: now, studyDay: studyDay)
+        var sql = eligible.sql + """
+
             SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
-            FROM cards
-            WHERE is_suspended = 0 AND due_at <= ?
-            ORDER BY due_at ASC
+            FROM eligible_due
+            ORDER BY due_at ASC, id ASC
             """
         if let limit {
-            sql += " LIMIT \(limit);"
+            sql += " LIMIT \(max(limit, 0));"
         } else {
             sql += ";"
         }
 
-        let rows = try query(sql, bindings: [.double(now.timeIntervalSince1970)])
+        let rows = try query(sql, bindings: eligible.bindings)
         return try rows.map { try decodeCard(from: $0) }
     }
 
-    func countDueCards(asOf now: Date) throws -> Int {
+    func countDueCards(asOf now: Date, studyDay: String) throws -> Int {
+        let eligible = eligibleDueCardsCTE(scope: .all, asOf: now, studyDay: studyDay)
         let rows = try query(
-            """
-            SELECT COUNT(*) AS count
-            FROM cards
-            WHERE is_suspended = 0 AND due_at <= ?;
-            """,
-            bindings: [.double(now.timeIntervalSince1970)]
+            eligible.sql + "\nSELECT COUNT(*) AS count FROM eligible_due;",
+            bindings: eligible.bindings
         )
         guard let count = rows.first?["count"] as? Int64 else { return 0 }
         return Int(count)
@@ -1232,14 +1273,17 @@ actor SQLiteDatabase {
     func cardScheduleTotals(
         scope: CardScope,
         asOf now: Date,
+        studyDay: String,
         leechThreshold: Int
     ) throws -> CardScheduleTotals {
-        let scope = scopeClause(scope, column: "deck_id")
+        let cardScope = scope
+        let scopeFilter = scopeClause(cardScope, column: "deck_id")
         let rows = try query(
             """
             SELECT
                 COUNT(*) AS card_count,
-                SUM(CASE WHEN is_suspended = 0 AND due_at <= ? THEN 1 ELSE 0 END) AS due_now,
+                SUM(CASE WHEN is_suspended = 0 AND phase = 'new' AND due_at <= ?
+                    THEN 1 ELSE 0 END) AS due_new_count,
                 SUM(CASE WHEN is_suspended = 0 AND phase = 'new' THEN 1 ELSE 0 END) AS new_count,
                 SUM(CASE WHEN is_suspended = 0 AND phase = 'learning' THEN 1 ELSE 0 END)
                     AS learning_count,
@@ -1250,13 +1294,13 @@ actor SQLiteDatabase {
                 SUM(CASE WHEN is_suspended = 0 AND lapses >= ? THEN 1 ELSE 0 END) AS leech_count,
                 MIN(CASE WHEN is_suspended = 0 AND due_at > ? THEN due_at END) AS next_due_at
             FROM cards
-            WHERE \(scope.sql);
+            WHERE \(scopeFilter.sql);
             """,
             bindings: [
                 .double(now.timeIntervalSince1970),
                 .int(Int64(leechThreshold)),
                 .double(now.timeIntervalSince1970),
-            ] + scope.bindings
+            ] + scopeFilter.bindings
         )
 
         guard let row = rows.first else { return CardScheduleTotals() }
@@ -1265,10 +1309,29 @@ actor SQLiteDatabase {
             return Int(value)
         }
 
+        let eligible = eligibleDueCardsCTE(scope: cardScope, asOf: now, studyDay: studyDay)
+        let eligibleRow = try query(
+            eligible.sql + """
+
+            SELECT
+                COUNT(*) AS due_now,
+                SUM(CASE WHEN phase = 'new' THEN 1 ELSE 0 END) AS available_new_count
+            FROM eligible_due;
+            """,
+            bindings: eligible.bindings
+        ).first
+        func eligibleCount(_ key: String) -> Int {
+            guard let value = eligibleRow?[key] as? Int64 else { return 0 }
+            return Int(value)
+        }
+        let availableNewCount = eligibleCount("available_new_count")
+
         return CardScheduleTotals(
             cardCount: count("card_count"),
-            dueNow: count("due_now"),
+            dueNow: eligibleCount("due_now"),
             newCount: count("new_count"),
+            availableNewCount: availableNewCount,
+            hiddenNewCount: max(count("due_new_count") - availableNewCount, 0),
             learningCount: count("learning_count"),
             relearningCount: count("relearning_count"),
             reviewCount: count("review_count"),
@@ -1287,6 +1350,55 @@ actor SQLiteDatabase {
         )
         guard let count = rows.first?["count"] as? Int64 else { return 0 }
         return Int(count)
+    }
+
+    private func eligibleDueCardsCTE(
+        scope: CardScope,
+        asOf now: Date,
+        studyDay: String
+    ) -> (sql: String, bindings: [Binding]) {
+        let scope = scopeClause(scope, column: "cards.deck_id")
+        let sql = """
+            WITH active_introductions AS (
+                SELECT introductions.deck_id, COUNT(*) AS introduced_count
+                FROM new_card_introductions AS introductions
+                LEFT JOIN review_reverts
+                    ON review_reverts.review_log_id = introductions.review_log_id
+                WHERE introductions.study_day = ?
+                  AND review_reverts.id IS NULL
+                GROUP BY introductions.deck_id
+            ),
+            ranked_due AS (
+                SELECT
+                    cards.*,
+                    decks.new_cards_per_day,
+                    COALESCE(active_introductions.introduced_count, 0) AS introduced_count,
+                    SUM(CASE WHEN cards.phase = 'new' THEN 1 ELSE 0 END) OVER (
+                        PARTITION BY cards.deck_id
+                        ORDER BY cards.due_at ASC, cards.id ASC
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    ) AS new_rank
+                FROM cards
+                LEFT JOIN decks ON decks.id = cards.deck_id
+                LEFT JOIN active_introductions
+                    ON active_introductions.deck_id = cards.deck_id
+                WHERE cards.is_suspended = 0
+                  AND cards.due_at <= ?
+                  AND \(scope.sql)
+            ),
+            eligible_due AS (
+                SELECT *
+                FROM ranked_due
+                WHERE phase != 'new'
+                   OR deck_id IS NULL
+                   OR new_cards_per_day IS NULL
+                   OR new_rank <= MAX(new_cards_per_day - introduced_count, 0)
+            )
+            """
+        return (
+            sql,
+            [.text(studyDay), .double(now.timeIntervalSince1970)] + scope.bindings
+        )
     }
 
     /// Deck identifiers are interpolated only as `?` placeholders; every value
@@ -1428,11 +1540,26 @@ actor SQLiteDatabase {
         cardID: UUID,
         memoryBefore: MemoryState,
         memoryAfter: MemoryState,
-        log: ReviewLog
+        log: ReviewLog,
+        introducedDeckID: UUID?,
+        introductionStudyDay: String?
     ) throws {
         try inTransaction {
             try updateCardMemory(cardID, memory: memoryAfter)
             try insertReviewLog(log, memoryBefore: memoryBefore)
+            if let introducedDeckID, let introductionStudyDay {
+                try execute(
+                    """
+                    INSERT INTO new_card_introductions (review_log_id, deck_id, study_day)
+                    VALUES (?, ?, ?);
+                    """,
+                    bindings: [
+                        .text(log.id.uuidString),
+                        .text(introducedDeckID.uuidString),
+                        .text(introductionStudyDay),
+                    ]
+                )
+            }
         }
     }
 

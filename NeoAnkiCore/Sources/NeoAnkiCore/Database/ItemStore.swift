@@ -85,6 +85,8 @@ private extension FieldType {
 
 /// Persistence for items and generated cards.
 public actor ItemStore {
+    private static let studyDayRolloverMetadataKey = "study_day_rollover_minutes"
+
     let database: SQLiteDatabase
     private let schedulerOverride: (any Scheduler)?
     private let profileID: String
@@ -198,9 +200,10 @@ public actor ItemStore {
         return itemType
     }
 
-    /// Persists a deck used for organization only.
+    /// Persists a deck and its learner-local new-card introduction policy.
     @discardableResult
     public func createDeck(_ deck: Deck) async throws -> Deck {
+        try validateDeckLimit(deck.newCardsPerDay)
         try await database.insertDeck(deck)
         return deck
     }
@@ -217,14 +220,44 @@ public actor ItemStore {
         try await database.fetchAllDecks()
     }
 
+    public func studyDayRolloverMinutes() async throws -> Int {
+        guard
+            let stored = try await database.metadataValue(
+                forKey: Self.studyDayRolloverMetadataKey
+            ),
+            let minutes = Int(stored),
+            StudyDay.validRolloverMinutes.contains(minutes)
+        else {
+            return StudyDay.defaultRolloverMinutes
+        }
+        return minutes
+    }
+
+    public func setStudyDayRolloverMinutes(_ minutes: Int) async throws {
+        guard StudyDay.validRolloverMinutes.contains(minutes) else {
+            throw DatabaseError.invalidDeck("Study day rollover must be a valid local time.")
+        }
+        try await database.setMetadataValue(
+            String(minutes),
+            forKey: Self.studyDayRolloverMetadataKey
+        )
+    }
+
+    private func studyDayKey(asOf now: Date) async throws -> String {
+        let rollover = try await studyDayRolloverMinutes()
+        return StudyDay.key(for: now, rolloverMinutes: rollover)
+    }
+
     /// Returns deck metadata with direct item counts and due counts including subdecks.
     public func deckSummaries(asOf now: Date = .now) async throws -> [DeckSummary] {
         let decks = try await database.fetchAllDecks()
+        let studyDay = try await studyDayKey(asOf: now)
         let summaries = decks.map { deck in
             DeckSummary(
                 id: deck.id,
                 name: deck.name,
                 parentID: deck.parentID,
+                newCardsPerDay: deck.newCardsPerDay,
                 itemCount: 0,
                 dueCount: 0
             )
@@ -239,7 +272,11 @@ public actor ItemStore {
         for deck in decks {
             let scope = DeckTree.descendantIDs(of: deck.id, in: summaries)
             itemCounts[deck.id] = try await database.countItems(deckIDs: scope)
-            dueCounts[deck.id] = try await database.countDueCards(deckIDs: scope, asOf: now)
+            dueCounts[deck.id] = try await database.countDueCards(
+                deckIDs: scope,
+                asOf: now,
+                studyDay: studyDay
+            )
         }
 
         return decks.map { deck in
@@ -247,6 +284,7 @@ public actor ItemStore {
                 id: deck.id,
                 name: deck.name,
                 parentID: deck.parentID,
+                newCardsPerDay: deck.newCardsPerDay,
                 itemCount: itemCounts[deck.id, default: 0],
                 dueCount: dueCounts[deck.id, default: 0]
             )
@@ -256,6 +294,7 @@ public actor ItemStore {
     /// Renames or reparents a deck. Rejects cycles.
     @discardableResult
     public func updateDeck(_ deck: Deck) async throws -> Deck {
+        try validateDeckLimit(deck.newCardsPerDay)
         guard try await database.fetchDeck(id: deck.id) != nil else {
             throw DatabaseError.deckNotFound(deck.id)
         }
@@ -390,19 +429,30 @@ public actor ItemStore {
         asOf now: Date = .now,
         limit: Int? = nil
     ) async throws -> [DueCard] {
+        let studyDay = try await studyDayKey(asOf: now)
         let cards: [Card]
         switch scope {
         case .allDecks:
-            cards = try await database.fetchDueCards(asOf: now, limit: limit)
+            cards = try await database.fetchDueCards(asOf: now, studyDay: studyDay, limit: limit)
         case .unassigned:
             cards = try await database.fetchUnassignedDueCards(asOf: now, limit: limit)
         case let .deck(deckID, includeDescendants):
             if includeDescendants {
                 let summaries = try await deckSummaries(asOf: now)
                 let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
-                cards = try await database.fetchDueCards(deckIDs: deckIDs, asOf: now, limit: limit)
+                cards = try await database.fetchDueCards(
+                    deckIDs: deckIDs,
+                    asOf: now,
+                    studyDay: studyDay,
+                    limit: limit
+                )
             } else {
-                cards = try await database.fetchDueCards(deckIDs: [deckID], asOf: now, limit: limit)
+                cards = try await database.fetchDueCards(
+                    deckIDs: [deckID],
+                    asOf: now,
+                    studyDay: studyDay,
+                    limit: limit
+                )
             }
         }
         return try await hydrateDueCards(cards)
@@ -495,18 +545,27 @@ public actor ItemStore {
     }
 
     public func dueCount(scope: DeckScope = .allDecks, asOf now: Date = .now) async throws -> Int {
+        let studyDay = try await studyDayKey(asOf: now)
         switch scope {
         case .allDecks:
-            return try await database.countDueCards(asOf: now)
+            return try await database.countDueCards(asOf: now, studyDay: studyDay)
         case .unassigned:
             return try await database.countUnassignedDueCards(asOf: now)
         case let .deck(deckID, includeDescendants):
             if includeDescendants {
                 let summaries = try await deckSummaries(asOf: now)
                 let deckIDs = DeckTree.descendantIDs(of: deckID, in: summaries)
-                return try await database.countDueCards(deckIDs: deckIDs, asOf: now)
+                return try await database.countDueCards(
+                    deckIDs: deckIDs,
+                    asOf: now,
+                    studyDay: studyDay
+                )
             }
-            return try await database.countDueCards(deckID: deckID, asOf: now)
+            return try await database.countDueCards(
+                deckID: deckID,
+                asOf: now,
+                studyDay: studyDay
+            )
         }
     }
 
@@ -521,23 +580,31 @@ public actor ItemStore {
         asOf now: Date = .now
     ) async throws -> ScopeSummary {
         let resolved = try await resolveCardScope(scope, asOf: now)
+        let studyDay = try await studyDayKey(asOf: now)
         let totals = try await database.cardScheduleTotals(
             scope: resolved,
             asOf: now,
+            studyDay: studyDay,
             leechThreshold: ScopeSummary.leechThreshold
         )
         let itemCount = try await database.countItems(scope: resolved)
+        let rollover = try await studyDayRolloverMinutes()
 
         return ScopeSummary(
             itemCount: itemCount,
             cardCount: totals.cardCount,
             dueNow: totals.dueNow,
             newCount: totals.newCount,
+            availableNewCount: totals.availableNewCount,
+            hiddenNewCount: totals.hiddenNewCount,
             learningCount: totals.learningCount,
             relearningCount: totals.relearningCount,
             reviewCount: totals.reviewCount,
             leechCount: totals.leechCount,
-            nextDueAt: totals.nextDueAt
+            nextDueAt: totals.nextDueAt,
+            nextNewCardsAt: totals.hiddenNewCount > 0
+                ? StudyDay.nextRollover(after: now, rolloverMinutes: rollover)
+                : nil
         )
     }
 
@@ -622,12 +689,25 @@ public actor ItemStore {
             phaseBefore: phaseBefore,
             durationMs: durationMs
         )
+        let introducedDeckID = phaseBefore == .new ? card.deckID : nil
+        let introductionStudyDay: String?
+        if introducedDeckID != nil {
+            let rollover = try await studyDayRolloverMinutes()
+            introductionStudyDay = StudyDay.key(
+                for: now,
+                rolloverMinutes: rollover
+            )
+        } else {
+            introductionStudyDay = nil
+        }
 
         try await database.persistReview(
             cardID: card.id,
             memoryBefore: memoryBefore,
             memoryAfter: nextMemory,
-            log: log
+            log: log,
+            introducedDeckID: introducedDeckID,
+            introductionStudyDay: introductionStudyDay
         )
 
         return ReviewSubmission(memory: nextMemory, reviewLogID: log.id)
@@ -635,6 +715,12 @@ public actor ItemStore {
 
     public func revertReview(reviewLogID: UUID, now: Date = .now) async throws {
         try await database.revertReview(reviewLogID: reviewLogID, revertedAt: now)
+    }
+
+    private func validateDeckLimit(_ limit: Int?) throws {
+        if let limit, limit < 0 {
+            throw DatabaseError.invalidDeck("New cards per day cannot be negative.")
+        }
     }
 
     /// Active review count retained for source compatibility with statistics callers.

@@ -53,6 +53,12 @@
     "minimumReviewOutcomes": 100,
     "minimumReviewsPerCardForOutcome": 2
   },
+  "dailyNewCards": {
+    "article": "user/scheduling.md",
+    "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/StudyDay.swift",
+    "defaultRolloverMinutes": 240,
+    "unlimitedDeckValue": null
+  },
   "scheduler": {
     "article": "user/studying.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/LearningScheduler.swift",
@@ -101,7 +107,8 @@
       "contains": [
         "at least **100 usable review outcomes**",
         "**90%**",
-        "**36,500 days**"
+        "**36,500 days**",
+        "default is **4:00 AM**"
       ]
     },
     {

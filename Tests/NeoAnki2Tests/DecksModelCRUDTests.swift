@@ -47,6 +47,20 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.deckName(for: deck.id) == "New Name")
 }
 
+@Test @MainActor func decksModelUpdatesDailyNewCardLimit() async throws {
+    let (model, store) = try await makeDecksModel()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    await model.load()
+
+    #expect(await model.updateNewCardsPerDay(id: deck.id, limit: 12))
+    #expect(try await store.deck(id: deck.id).newCardsPerDay == 12)
+    #expect(model.summaries.first?.newCardsPerDay == 12)
+
+    #expect(await model.updateNewCardsPerDay(id: deck.id, limit: nil))
+    #expect(try await store.deck(id: deck.id).newCardsPerDay == nil)
+}
+
 @Test @MainActor func decksModelRejectsEmptyRename() async throws {
     let (model, store) = try await makeDecksModel()
     let deck = Deck(name: "Valid")

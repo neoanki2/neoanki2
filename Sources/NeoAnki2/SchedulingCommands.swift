@@ -5,6 +5,13 @@ struct SchedulingCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Scheduling") {
+            Button("Scheduling Settings…") {
+                model?.openSettings()
+            }
+            .disabled(model == nil)
+
+            Divider()
+
             Button(model?.isOptimizing == true ? "Optimizing Scheduling…" : "Optimize Scheduling…") {
                 guard let model else { return }
                 Task { await model.optimize() }

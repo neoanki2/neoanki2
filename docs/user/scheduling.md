@@ -22,6 +22,28 @@ Each grade updates that card's memory state and appends a review outcome. A new
 or newly imported card starts never-reviewed and is due immediately. Portable
 and authored deck imports do not carry scheduling history.
 
+## Limit new cards per day
+
+To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,
+and turn on **Limit new cards per day**. Existing decks are unlimited until you
+set a limit. A limit of **0** pauses new cards in that deck without hiding
+learning or review cards.
+
+The allowance belongs to the exact deck that contains each card. When you study
+a parent or **All Decks**, each included deck contributes its own allowance;
+one deck cannot consume another deck's slots. Unassigned cards remain
+unlimited. The scope home keeps **New** as the full backlog while explaining how
+many due new cards are available today and how many are deferred.
+
+A new card consumes one slot when you grade it for the first time, including
+**Again**. Ending a session before grading does not consume a slot. Undoing that
+first grade restores the slot. Learning, relearning, and review cards never
+count toward this limit.
+
+Choose **Scheduling → Scheduling Settings…** to set when a new study day begins
+in local time. The default is **4:00 AM**. The app follows the Mac's current
+time zone, and deferred new cards become available at the next rollover.
+
 Learning and relearning use criterion-based **repair rounds**, not fixed minute
 intervals. NeoAnki2 finishes the current queue, then shows every failed card
 again. Again moves that card to the end of the next repair round; Hard, Good,

@@ -139,7 +139,7 @@ cards. `ReviewRating` is a 1–4 grade; every review appends a `ReviewLog`.
 | `Item` | Field values for an item type, plus tags and optional deck. |
 | `FieldValue` | One field's `ContentValue`, keyed by `FieldDef` UUID. |
 | `Card` | A reviewable probe: one item × one template, plus `MemoryState`. |
-| `Deck` | Hierarchical study grouping; organization only. |
+| `Deck` | Hierarchical study grouping with an optional daily new-card throttle. |
 | `MemoryState` | Per-card memory: `stability`, `difficulty`, `due`, `reps`, `lapses`, `phase`. |
 | `ReviewLog` | Append-only record of one review; drives stats and scheduler optimization. |
 

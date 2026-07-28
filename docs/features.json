@@ -53,6 +53,13 @@
       "screenshot": "assets/screenshots/decks-nested.png"
     },
     {
+      "id": "daily-new-card-limits",
+      "name": "Limit daily new cards by deck",
+      "article": "user/scheduling.md",
+      "sources": ["Sources/NeoAnki2/DeckSettingsView.swift", "Sources/NeoAnki2/SchedulingSettingsView.swift", "Sources/NeoAnki2/ScopeHomeView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/SRS/StudyDay.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/DailyNewCardLimitTests.swift", "Tests/NeoAnki2Tests/DecksModelCRUDTests.swift", "Tests/NeoAnki2Tests/SchedulingModelTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"]
+    },
+    {
       "id": "library-items",
       "name": "Scope home, browse mode, and empty states",
       "article": "user/library-and-decks.md",

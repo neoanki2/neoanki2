@@ -28,9 +28,10 @@ two applicable templates, one item can generate two cards—for example,
 country → capital and capital → country—and each card is scheduled
 independently.
 
-A deck does not generate or schedule cards. It only groups items and defines a
-scope for browsing and studying. A parent deck's scope includes its descendant
-decks.
+A deck does not generate cards or choose their review intervals. It groups
+items, defines a scope for browsing and studying, and can optionally throttle
+how many of its own new cards are introduced each study day. A parent deck's
+scope includes its descendant decks.
 
 ## Glossary
 

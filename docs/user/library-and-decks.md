@@ -54,6 +54,21 @@ navigate the hierarchy.
 Selecting a parent includes content in every level below it. Selecting a child
 limits the list and study session to that child's subtree.
 
+## Set a daily new-card limit
+
+1. Control-click or right-click the deck.
+2. Choose **Deck Settings…**.
+3. Turn on **Limit new cards per day**, choose the allowance, and save.
+
+The setting applies only to cards directly in that deck. Subdecks keep their
+own limits, so selecting a parent combines the independent allowances of every
+deck in its subtree. Turn the limit off for unlimited new cards, or set it to
+**0** to pause new cards while continuing scheduled learning and reviews.
+
+Daily limits are local study preferences. They are not included in portable or
+authored deck files. See [Scheduling](../scheduling/) for first-grade accounting,
+undo behavior, and the configurable study-day rollover.
+
 ## Rename a deck
 
 1. Control-click or right-click the deck.
@@ -104,6 +119,8 @@ to study right now?
   button left sitting there without explanation.
 - **Cards** breaks the scope down into **New**, **Learning**, and **Review**.
   Relearning cards count as learning, because relearning is a repair round.
+- When a daily limit defers new cards, a note separates today's available new
+  cards from the deferred backlog and reports when more become available.
 - If cards in the scope keep lapsing, a note says how many. Rewriting a
   confusing item usually works better than repeating it.
 - **Browse *n* Items** opens browse mode.

@@ -61,6 +61,9 @@ struct ContentView: View {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
                         await refreshLibrary()
                     }
+                },
+                onDeckSettingsSaved: {
+                    await refreshLibrary()
                 }
             )
             .navigationSplitViewColumnWidth(
@@ -133,6 +136,11 @@ struct ContentView: View {
                 onGenerated: importGeneratedDeck,
                 onCancel: { isShowingDeckBuilder = false }
             )
+        }
+        .sheet(isPresented: $schedulingModel.isShowingSettings) {
+            SchedulingSettingsView(model: schedulingModel) {
+                await refreshLibrary()
+            }
         }
         .alert(item: $importNotice) { notice in
             Alert(

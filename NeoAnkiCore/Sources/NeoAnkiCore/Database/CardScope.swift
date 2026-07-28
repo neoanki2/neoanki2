@@ -26,6 +26,8 @@ struct CardScheduleTotals: Sendable, Equatable {
     var cardCount: Int = 0
     var dueNow: Int = 0
     var newCount: Int = 0
+    var availableNewCount: Int = 0
+    var hiddenNewCount: Int = 0
     var learningCount: Int = 0
     var relearningCount: Int = 0
     var reviewCount: Int = 0

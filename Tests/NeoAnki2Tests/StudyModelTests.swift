@@ -81,6 +81,35 @@ private func makeInteractionModel(
     #expect(model.scopeLabel == "Geography")
 }
 
+@Test @MainActor func studyModelRespectsDeckDailyNewLimit() async throws {
+    let (model, store) = try await makeStudyModel()
+    let deck = Deck(name: "Geography", newCardsPerDay: 1)
+    _ = try await store.createDeck(deck)
+    let itemType = try await store.defaultItemType()
+    for index in 1 ... 2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Question \(index)")
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("Answer \(index)")
+                    ),
+                ],
+                deckID: deck.id
+            )
+        )
+    }
+
+    await model.startSession(scope: .deck(deck.id, name: deck.name))
+
+    #expect(model.queue.count == 1)
+}
+
 @Test @MainActor func studyModelStartsSessionWithDueCards() async throws {
     let (model, store) = try await makeStudyModel()
     let itemType = try await store.defaultItemType()
