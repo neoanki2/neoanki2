@@ -27,7 +27,7 @@ let package = Package(
             name: "NeoAnkiDeckCLI",
             dependencies: ["NeoAnkiCore"]
         ),
-        .testTarget(name: "NeoAnkiCoreTests", dependencies: ["NeoAnkiCore"]),
+        .testTarget(name: "NeoAnkiCoreTests", dependencies: ["NeoAnkiCore", "NeoAnkiTestSupport"]),
         .testTarget(
             name: "NeoAnkiFlowTests",
             dependencies: ["NeoAnkiCore", "NeoAnkiTestSupport"]

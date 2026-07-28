@@ -41,6 +41,7 @@ let package = Package(
             dependencies: [
                 "NeoAnki2",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+                .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
                 "NeoAnkiDeckBuilderKit",
                 "PoemDeckBuilder",
             ],

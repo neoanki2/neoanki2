@@ -1,11 +1,11 @@
-import Darwin
 import Foundation
+import NeoAnkiCore
+import NeoAnkiTestSupport
 import Testing
-@testable import NeoAnkiCore
 
-/// Opt-in benchmark:
+/// Legacy entry point kept for direct invocations:
 /// `NEOANKI_RUN_PORTABLE_BENCHMARKS=10000 swift test --filter portableDeckImportBenchmark`
-/// Repeat with `100000` for the large regression fixture.
+/// Prefer `./Scripts/run-performance-tests.sh` with `NEOANKI_PERF_SCALE=large|stress`.
 @Test func portableDeckImportBenchmark() async throws {
     guard let rawCount = ProcessInfo.processInfo.environment["NEOANKI_RUN_PORTABLE_BENCHMARKS"],
           let itemCount = Int(rawCount),
@@ -24,26 +24,21 @@ import Testing
     )
     try await source.bootstrap()
     let deck = try await source.createDeck(Deck(name: "Benchmark"))
-    let type = try await source.defaultItemType()
-    let now = Date.now
-    let entries = (0..<itemCount).map { index in
-        let item = Item(
-            itemTypeID: type.id,
-            fields: [
-                FieldValue(fieldID: type.fields[0].id, value: .text("Question \(index)")),
-                FieldValue(fieldID: type.fields[1].id, value: .text("Answer \(index)")),
-            ],
-            tags: ["benchmark"],
-            deckID: deck.id
-        )
-        return (item: item, cards: CardGenerator.cards(for: item, type: type, now: now))
+    _ = try await PerformanceFixtures.seedBasicItems(count: itemCount, in: source)
+    for item in try await source.listItems() {
+        _ = try await source.updateItemDeck(itemID: item.id, deckID: deck.id)
     }
-    try await source.database.insertItemsWithCards(entries, createdAt: now, updatedAt: now)
 
     let packageURL = directory.appendingPathComponent("benchmark.neodeck")
-    let exportStart = ContinuousClock.now
-    try await PortableDeck.export(deckID: deck.id, from: source, to: packageURL)
-    let exportDuration = exportStart.duration(to: .now)
+    let exportMeasurement = try await PerformanceHarness.measure(
+        flow: "portable-deck-export-legacy",
+        metadata: ["item_count": "\(itemCount)"]
+    ) {
+        try await PortableDeck.export(deckID: deck.id, from: source, to: packageURL)
+        let packageBytes = try packageURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        return ["package_bytes": "\(packageBytes)"]
+    }
+    _ = exportMeasurement
 
     let destinationRoot = directory.appendingPathComponent("destination", isDirectory: true)
     let destination = try ItemStore(
@@ -51,20 +46,18 @@ import Testing
         mediaStore: MediaStore(rootDirectory: destinationRoot)
     )
     try await destination.bootstrap()
-    let importStart = ContinuousClock.now
-    let result = try await PortableDeck.importDeck(from: packageURL, into: destination)
-    let importDuration = importStart.duration(to: .now)
-    let packageBytes = try packageURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-    var usage = rusage()
-    _ = getrusage(RUSAGE_SELF, &usage)
 
-    print(
-        "portable-deck-benchmark items=\(itemCount) package_bytes=\(packageBytes) "
-            + "peak_rss_bytes=\(usage.ru_maxrss) "
-            + "export=\(exportDuration) import=\(importDuration)"
-    )
-    #expect(result.itemCount == itemCount)
-    #expect(try await destination.listItems().count == itemCount)
-    // Initial guardrail: at least 500 imported items/second plus fixed startup allowance.
-    #expect(importDuration < .seconds(Double(itemCount) / 500.0 + 5.0))
+    let measurement = try await PerformanceHarness.measure(
+        flow: "portable-deck-import-legacy",
+        metadata: [
+            "item_count": "\(itemCount)",
+            "package_bytes": exportMeasurement.metadata["package_bytes"] ?? "0",
+        ]
+    ) {
+        let result = try await PortableDeck.importDeck(from: packageURL, into: destination)
+        #expect(result.itemCount == itemCount)
+        #expect(try await destination.listItems().count == itemCount)
+        return ["imported_items": "\(result.itemCount)"]
+    }
+    #expect(measurement.durationSeconds < Double(itemCount) / 500.0 + 5.0)
 }
