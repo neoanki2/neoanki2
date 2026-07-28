@@ -24,5 +24,44 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>NeoAnki2 records your practice so you can compare it with the card answer.</string>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.neoanki2.authored-deck</string>
+            <key>UTTypeDescription</key>
+            <string>NeoAnki Authored Deck</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>com.apple.package</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>neoanki</string>
+                </array>
+            </dict>
+            <key>LSTypeIsPackage</key>
+            <true/>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.neoanki2.portable-deck</string>
+            <key>UTTypeDescription</key>
+            <string>NeoAnki Portable Deck</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>neodeck</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

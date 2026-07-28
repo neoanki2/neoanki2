@@ -210,8 +210,8 @@
       "id": "portable-deck",
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
-      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift"],
+      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "Sources/NeoAnki2/PortableDeckImportPanel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
     {

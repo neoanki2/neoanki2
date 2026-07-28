@@ -33,7 +33,6 @@ struct ContentView: View {
     @State private var isShowingImport = false
     @State private var importNotice: ImportNotice?
     @State private var portableDeckTransfer: PortableDeckTransferModel
-    @State private var isChoosingPortableDeck = false
     @State private var isShowingDeckBuilder = false
     private let deckBuilderRegistry: DeckBuilderRegistry
 
@@ -114,12 +113,6 @@ struct ContentView: View {
             allowedContentTypes: [.json, .commaSeparatedText],
             allowsMultipleSelection: false,
             onCompletion: handleImportFile
-        )
-        .fileImporter(
-            isPresented: $isChoosingPortableDeck,
-            allowedContentTypes: [.neoDeck, .neoAnkiSource],
-            allowsMultipleSelection: false,
-            onCompletion: handlePortableDeckFile
         )
         .sheet(isPresented: $isShowingImport) {
             if let importModel {
@@ -209,7 +202,7 @@ struct ContentView: View {
         LibraryCommandHandlers(
             openAddItem: { openAddItem() },
             openImport: { openImport() },
-            openPortableDeckImport: { isChoosingPortableDeck = true },
+            openPortableDeckImport: openPortableDeckImport,
             openPortableDeckExport: { openPortableDeckExport() },
             openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
@@ -464,6 +457,20 @@ struct ContentView: View {
         )
         Task {
             await refreshLibrary()
+        }
+    }
+
+    private func openPortableDeckImport() {
+        switch PortableDeckImportSelection.choose() {
+        case .cancelled:
+            return
+        case .invalidSelection:
+            portableDeckTransfer.notice = PortableDeckTransferNotice(
+                title: "Could Not Import Deck",
+                message: "Choose a .neoanki folder or a .neodeck file."
+            )
+        case let .selected(source):
+            handlePortableDeckFile(.success([source]))
         }
     }
 
