@@ -47,7 +47,7 @@ struct RichTextFieldEditor: View {
     }
 
     private var formattingToolbar: some View {
-        HStack(spacing: DesignSystem.Spacing.rowTight) {
+        HStack(spacing: 2) {
             FormatButton(title: "Bold", systemImage: "bold", accessibilityIdentifier: formatButtonID("formatBold")) {
                 RichTextEditing.toggleStyle(.bold, in: textViewHolder.textView, preferredRange: textViewHolder.lastSelectedRange)
             }
