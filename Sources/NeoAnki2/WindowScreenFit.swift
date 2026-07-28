@@ -48,6 +48,18 @@ final class WindowScreenFitDelegate: NSObject, NSWindowDelegate {
         window.clampToScreen()
     }
 
+    /// `windowWillResize(_:to:)` is only consulted for resizes the window itself
+    /// negotiates — a user drag, or a zoom. SwiftUI growing the window to fit
+    /// its content, and AppKit restoring an autosaved frame, both bypass it and
+    /// land here instead, which is the path that actually produced windows
+    /// taller than the screen.
+    @MainActor
+    func windowDidResize(_ notification: Notification) {
+        forwarding?.windowDidResize?(notification)
+        guard let window = notification.object as? NSWindow else { return }
+        window.clampToScreen()
+    }
+
     override nonisolated func responds(to selector: Selector!) -> Bool {
         if super.responds(to: selector) { return true }
         return forwarding?.responds(to: selector) ?? false
@@ -79,6 +91,22 @@ extension NSWindow {
               let visible = screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         else {
             return
+        }
+
+        // Detail panes render inline rather than in sheets, so their minimum
+        // heights accumulate into the window's content minimum. When that
+        // minimum exceeds the window, the split view lays out at the minimum
+        // instead — hanging its top edge above the window and carrying the
+        // sidebar rows out of reach, which is what makes them unclickable even
+        // though the window itself fits the screen. Capping the minimum is what
+        // keeps the content inside the frame.
+        let chrome = frame.height - contentRect(forFrameRect: frame).height
+        let maxContentHeight = max(limit.height - chrome, 0)
+        if contentMinSize.height > maxContentHeight {
+            contentMinSize = NSSize(width: contentMinSize.width, height: maxContentHeight)
+        }
+        if contentMinSize.width > limit.width {
+            contentMinSize = NSSize(width: limit.width, height: contentMinSize.height)
         }
 
         var target = frame

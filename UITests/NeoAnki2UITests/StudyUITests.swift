@@ -18,7 +18,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         triggerPrimaryStudyAction(in: app)
 
         for gradeID in ["gradeAgain", "gradeHard", "gradeGood", "gradeEasy"] {
-            XCTAssertTrue(app.buttons.identified(gradeID).waitForExistence(timeout: 3), "Missing \(gradeID)")
+            XCTAssertTrue(app.buttons.identified(gradeID).waitUntilExists(timeout: 3), "Missing \(gradeID)")
         }
 
         clickOrType("gradeGood", shortcut: "3", in: app)
@@ -70,7 +70,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
 
         app.buttons.identified("endStudySession").click()
-        if app.buttons.identified("confirmEndStudySession").waitForExistence(timeout: 3) {
+        if app.buttons.identified("confirmEndStudySession").waitUntilExists(timeout: 3) {
             app.buttons.identified("confirmEndStudySession").click()
         } else if let container = modalContainer(in: app) {
             container.buttons.identified("End Session").click()
@@ -86,14 +86,14 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         app.buttons.identified("gradeHelp").click()
-        XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitUntilExists(timeout: 5))
     }
 
     func testStudyReverseTemplate() throws {
         let app = launchApp()
         openTemplates(in: app)
 
-        if app.buttons.identified("addTemplateToolbar").waitForExistence(timeout: 2) {
+        if app.buttons.identified("addTemplateToolbar").waitUntilExists(timeout: 2) {
             app.buttons.identified("addTemplateToolbar").click()
         } else {
             app.buttons.identified("Add Template").click()
@@ -113,14 +113,14 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         let primaryAction = app.buttons.identified("primaryStudyAction")
-        if primaryAction.waitForExistence(timeout: 5) {
+        if primaryAction.waitUntilExists(timeout: 5) {
             primaryAction.click()
-            if app.buttons.identified("gradeGood").waitForExistence(timeout: 2) {
+            if app.buttons.identified("gradeGood").waitUntilExists(timeout: 2) {
                 clickOrType("gradeGood", shortcut: "3", in: app)
             }
         }
 
-        if app.buttons.identified("primaryStudyAction").waitForExistence(timeout: 3) {
+        if app.buttons.identified("primaryStudyAction").waitUntilExists(timeout: 3) {
             triggerPrimaryStudyAction(in: app)
             clickOrType("gradeGood", shortcut: "3", in: app)
         }
@@ -134,11 +134,11 @@ final class StudyUITests: NeoAnkiUITestCase {
 
         let primary = app.buttons.identified("primaryStudyAction")
         primary.click()
-        XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitUntilExists(timeout: 3))
 
         enterText("Paris", into: app.textFields.identified("typedAnswer"), app: app)
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitUntilExists(timeout: 3))
         XCTAssertTrue(app.buttons.identified("gradeGood").exists)
         clickOrType("gradeGood", shortcut: "3", in: app)
         finishStudySession(in: app)
@@ -150,11 +150,11 @@ final class StudyUITests: NeoAnkiUITestCase {
 
         enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitUntilExists(timeout: 3))
         let feedback = app.staticTexts.matching(
             NSPredicate(format: "value CONTAINS[c] %@", "Compare your response")
         ).firstMatch
-        XCTAssertTrue(feedback.waitForExistence(timeout: 3))
+        XCTAssertTrue(feedback.waitUntilExists(timeout: 3))
     }
 
     func testChoiceRequiresSelectionThenChecksCorrectChoice() throws {
@@ -162,24 +162,24 @@ final class StudyUITests: NeoAnkiUITestCase {
         startStudy(in: app)
 
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitUntilExists(timeout: 3))
 
         let paris = app.buttons.matching(
             NSPredicate(format: "label CONTAINS[c] %@", "Paris")
         ).firstMatch
-        XCTAssertTrue(paris.waitForExistence(timeout: 3))
+        XCTAssertTrue(paris.waitUntilExists(timeout: 3))
         paris.click()
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["answerCorrect"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["answerCorrect"].waitUntilExists(timeout: 3))
     }
 
     func testArrangeUncheckedOrderIsReportedIncorrect() throws {
         let app = launchApp(scenario: "study-arrange")
         startStudy(in: app)
 
-        XCTAssertTrue(app.buttons.identified("arrangementItem0").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("arrangementItem0").waitUntilExists(timeout: 3))
         triggerPrimaryStudyAction(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitUntilExists(timeout: 3))
     }
 
     func testClozeConcealsThenRevealsBlank() throws {
@@ -191,7 +191,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         XCTAssertTrue(
             app.staticTexts.matching(
                 NSPredicate(format: "value CONTAINS[c] %@", "Paris")
-            ).firstMatch.waitForExistence(timeout: 3)
+            ).firstMatch.waitUntilExists(timeout: 3)
         )
     }
 
@@ -199,10 +199,10 @@ final class StudyUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "study-record")
         startStudy(in: app)
 
-        XCTAssertTrue(app.buttons.identified("startRecording").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("startRecording").waitUntilExists(timeout: 3))
         XCTAssertFalse(app.buttons.identified("primaryStudyAction").isEnabled)
         app.buttons.identified("revealAndSelfGrade").click()
-        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 3))
     }
 
     func testUndoLastGradeRestoresReviewedCard() throws {
@@ -212,9 +212,9 @@ final class StudyUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
 
         let undo = app.buttons.identified("undoLastGrade")
-        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        XCTAssertTrue(undo.waitUntilExists(timeout: 5))
         undo.click()
-        XCTAssertTrue(app.buttons.identified("gradeGood").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 5))
         XCTAssertFalse(app.buttons.identified("studySessionDone").exists)
     }
 }

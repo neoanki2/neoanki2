@@ -13,8 +13,16 @@ trap cleanup_apps EXIT
 
 cd "$ROOT/UITests"
 
-# Remove stale unsigned runners that Gatekeeper may have cached as "damaged".
-rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/NeoAnki2UITests-*
+# Gatekeeper can cache an unsigned runner as "damaged", and the only cure is a
+# clean rebuild — but that costs ~12s, so it is not worth paying on every run.
+# Discard the cache only when asked, or when the last build left no signed
+# runner behind for us to reuse.
+DERIVED_DATA_GLOB=("$HOME/Library/Developer/Xcode/DerivedData"/NeoAnki2UITests-*)
+RUNNER=$(find "${DERIVED_DATA_GLOB[@]}" -maxdepth 4 -name 'NeoAnki2UITests-Runner.app' 2>/dev/null | head -1)
+if [[ -n "${NEOANKI_UI_CLEAN:-}" ]] || [[ -z "$RUNNER" ]] \
+  || ! codesign --verify --quiet "$RUNNER" 2>/dev/null; then
+  rm -rf "${DERIVED_DATA_GLOB[@]}"
+fi
 
 xcodebuild build-for-testing \
   -project NeoAnki2UITests.xcodeproj \
@@ -54,10 +62,11 @@ if [[ -n "${NEOANKI_UI_ONLY_TESTING:-}" ]]; then
   TEST_ARGUMENTS+=("-only-testing:${NEOANKI_UI_ONLY_TESTING}")
 fi
 
+# bash 3.2 treats "${empty[@]}" as unbound under `set -u`, so guard the expansion.
 xcodebuild test-without-building \
   -xctestrun "$XCTESTRUN" \
   -destination 'platform=macOS' \
-  "${TEST_ARGUMENTS[@]}" || {
+  ${TEST_ARGUMENTS[@]+"${TEST_ARGUMENTS[@]}"} || {
   echo "UI smoke tests failed." >&2
   exit 1
 }

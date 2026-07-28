@@ -7,7 +7,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
             waitForLibrary: false
         )
 
-        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["bootstrapError"].waitUntilExists(timeout: 5))
         XCTAssertTrue(app.staticTexts["Could Not Start"].exists)
         XCTAssertFalse(app.buttons.identified("addItemToolbar").exists)
     }
@@ -59,7 +59,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         enterText("Only front", into: field(named: "Front", in: app), app: app)
 
         let save = app.buttons.identified("saveAddItem")
-        XCTAssertTrue(save.waitForExistence(timeout: 2))
+        XCTAssertTrue(save.waitUntilExists(timeout: 2))
         XCTAssertFalse(save.isEnabled)
     }
 
@@ -76,7 +76,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         openItemDetail(named: "Back Test", in: app)
 
         let back = app.buttons.identified("itemDetailBack")
-        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        XCTAssertTrue(back.waitUntilExists(timeout: 5))
         back.click()
 
         waitForItem(named: "Back Test", in: app)
@@ -90,7 +90,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         openAddItem(in: app)
         let deckPicker = app.popUpButtons.identified("addItemDeckPicker")
-        if deckPicker.waitForExistence(timeout: 2) {
+        if deckPicker.waitUntilExists(timeout: 2) {
             deckPicker.click()
             app.menuItems.identified("Keep Deck").click()
         }
@@ -100,14 +100,15 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         selectScope("scopeRow-Unassigned", in: app)
         waitForItem(named: "Loose Item", in: app)
+        returnToLibrary(in: app)
 
         let deleteAll = app.buttons.identified("deleteAllUnassignedToolbar")
-        XCTAssertTrue(deleteAll.waitForExistence(timeout: 5))
+        XCTAssertTrue(deleteAll.waitUntilExists(timeout: 5))
         deleteAll.click()
-        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitUntilExists(timeout: 5))
         app.buttons.identified("confirmDeleteAllUnassigned").click()
 
-        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitUntilExists(timeout: 10))
         selectScope("scopeRow-AllDecks", in: app)
         waitForItem(named: "Deck Item", in: app)
         assertNoItem(named: "Loose Item", in: app)
@@ -121,11 +122,11 @@ final class LibraryUITests: NeoAnkiUITestCase {
         let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
         unassigned.rightClick()
         app.menuItems.identified("Delete All").click()
-        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitUntilExists(timeout: 5))
         app.buttons.identified("confirmDeleteAllUnassigned").click()
 
         selectScope("scopeRow-Unassigned", in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitUntilExists(timeout: 10))
         assertNoItem(named: "Sidebar Delete", in: app)
     }
 
@@ -140,11 +141,11 @@ final class LibraryUITests: NeoAnkiUITestCase {
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.isEnabled)
         save.click()
-        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(save.waitUntilGone(timeout: 10))
 
         XCTAssertTrue(app.staticTexts.matching(
             NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", "Japan", "Japan")
-        ).firstMatch.waitForExistence(timeout: 5))
+        ).firstMatch.waitUntilExists(timeout: 5))
         returnToLibrary(in: app)
         waitForItem(named: "Japan", in: app)
         assertNoItem(named: "France", in: app)
@@ -158,13 +159,13 @@ final class LibraryUITests: NeoAnkiUITestCase {
         app.buttons.identified("editItem").click()
         enterText("Changed", into: field(named: "Front", in: app), app: app)
         app.buttons.identified("cancelEditItem").click()
-        XCTAssertTrue(app.buttons.identified("cancelDiscardItem").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("cancelDiscardItem").waitUntilExists(timeout: 3))
         app.buttons.identified("cancelDiscardItem").click()
         XCTAssertTrue(app.buttons.identified("saveEditItem").exists)
 
         app.buttons.identified("cancelEditItem").click()
         app.buttons.identified("confirmDiscardItem").click()
-        XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.identified("deleteItem").waitUntilExists(timeout: 5))
         returnToLibrary(in: app)
         waitForItem(named: "Original", in: app)
         assertNoItem(named: "Changed", in: app)
@@ -177,7 +178,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         app.buttons.identified("editItem").click()
         let save = app.buttons.identified("saveEditItem")
-        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.waitUntilExists(timeout: 5))
         XCTAssertFalse(save.isEnabled)
     }
 
@@ -200,10 +201,10 @@ final class LibraryUITests: NeoAnkiUITestCase {
         openItemDetail(named: "Movable", in: app)
 
         let picker = app.descendants(matching: .any).identified("itemDeckPicker")
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertTrue(picker.waitUntilExists(timeout: 5))
         picker.click()
         let deckMenuItem = app.menuItems.identified("Target Deck")
-        XCTAssertTrue(deckMenuItem.waitForExistence(timeout: 3))
+        XCTAssertTrue(deckMenuItem.waitUntilExists(timeout: 3))
         deckMenuItem.click()
 
         returnToLibrary(in: app)
@@ -217,7 +218,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         openAddItem(in: app)
         let deckPicker = app.popUpButtons.identified("addItemDeckPicker")
-        if deckPicker.waitForExistence(timeout: 2) {
+        if deckPicker.waitUntilExists(timeout: 2) {
             deckPicker.click()
             app.menuItems.identified("History").click()
         }
@@ -236,10 +237,10 @@ final class LibraryUITests: NeoAnkiUITestCase {
         openItemDetail(named: "Keep Item", in: app)
 
         app.buttons.identified("deleteItem").click()
-        XCTAssertTrue(app.buttons.identified("cancelDeleteItem").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("cancelDeleteItem").waitUntilExists(timeout: 3))
         app.buttons.identified("cancelDeleteItem").click()
 
-        XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.identified("deleteItem").waitUntilExists(timeout: 3))
         returnToLibrary(in: app)
         waitForItem(named: "Keep Item", in: app)
     }
@@ -266,7 +267,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         )
         let app = launchAppForImport(file: file)
         app.buttons.identified("confirmImport").click()
-        _ = app.buttons.identified("confirmImport").waitForNonExistence(timeout: 30)
+        _ = app.buttons.identified("confirmImport").waitUntilGone(timeout: 30)
         dismissImportComplete(in: app)
         waitForItem(named: "Imported Question", in: app, timeout: 10)
     }
@@ -280,11 +281,11 @@ final class LibraryUITests: NeoAnkiUITestCase {
             """
         )
         let app = launchAppForImport(file: file)
-        XCTAssertTrue(app.popUpButtons.identified("importItemTypePicker").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.popUpButtons.identified("importItemTypePicker").waitUntilExists(timeout: 3))
         let importButton = app.buttons.identified("confirmImport")
         XCTAssertTrue(importButton.isEnabled)
         importButton.click()
-        _ = importButton.waitForNonExistence(timeout: 30)
+        _ = importButton.waitUntilGone(timeout: 30)
         dismissImportComplete(in: app)
         waitForItem(named: "CSV Question", in: app, timeout: 10)
     }
@@ -303,9 +304,9 @@ final class LibraryUITests: NeoAnkiUITestCase {
         )
         let app = launchAppForImport(file: file)
 
-        XCTAssertTrue(app.buttons.identified("confirmImport").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons.identified("confirmImport").waitUntilExists(timeout: 10))
         app.buttons.identified("confirmImport").click()
-        XCTAssertTrue(app.descendants(matching: .any)["importError"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["importError"].waitUntilExists(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["importSheet"].exists)
         app.buttons.identified("cancelImport").click()
         assertEmptyLibrary(in: app)
@@ -317,7 +318,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         let app = launchApp()
         app.menuBarItems["Scheduling"].click()
         let settings = app.menuItems.identified("Scheduling Settings…")
-        XCTAssertTrue(settings.waitForExistence(timeout: 3))
+        XCTAssertTrue(settings.waitUntilExists(timeout: 3))
         XCTAssertTrue(settings.isEnabled)
         XCTAssertFalse(app.menuItems.identified("Optimize Scheduling…").exists)
         XCTAssertFalse(app.menuItems.identified("Optimizing Scheduling…").exists)
@@ -332,7 +333,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         endStudyViaMenu(in: app)
 
-        XCTAssertFalse(app.sheets.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.sheets.firstMatch.waitUntilGone(timeout: 5))
         XCTAssertFalse(
             app.staticTexts.matching(
                 NSPredicate(format: "value CONTAINS[c] %@", "Scheduling Optimized")

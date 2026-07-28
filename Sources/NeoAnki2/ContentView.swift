@@ -57,6 +57,17 @@ struct ContentView: View {
     }
 
     var body: some View {
+        GeometryReader { available in
+            interface
+                .frame(
+                    width: available.size.width,
+                    height: available.size.height,
+                    alignment: .topLeading
+                )
+        }
+    }
+
+    private var interface: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             DeckSidebarView(
                 decksModel: decksModel,
