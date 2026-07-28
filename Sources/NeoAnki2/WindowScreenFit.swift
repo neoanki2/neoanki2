@@ -12,16 +12,23 @@ import SwiftUI
 /// `windowWillResize(_:to:)`, and answers there are applied during the window's
 /// own layout rather than in the middle of a constraint pass. Clamping here is
 /// what keeps this from reentering AppKit's layout.
-@MainActor
 final class WindowScreenFitDelegate: NSObject, NSWindowDelegate {
-    /// Retains any delegate SwiftUI already installed so its behavior survives.
-    private weak var forwarding: NSWindowDelegate?
+    /// Whatever delegate SwiftUI installed. Messages this class does not
+    /// implement are forwarded there, so SwiftUI keeps its own behavior.
+    ///
+    /// `nonisolated(unsafe)` because AppKit consults `responds(to:)` and
+    /// `forwardingTarget(for:)` through the Objective-C runtime, which offers no
+    /// place to state isolation. Every access is on the main thread: AppKit
+    /// messages window delegates there, and this is only ever assigned from the
+    /// main actor during installation.
+    private nonisolated(unsafe) weak var forwarding: NSWindowDelegate?
 
     init(forwarding: NSWindowDelegate?) {
         self.forwarding = forwarding
         super.init()
     }
 
+    @MainActor
     func windowWillResize(
         _ sender: NSWindow,
         to frameSize: NSSize
@@ -34,18 +41,19 @@ final class WindowScreenFitDelegate: NSObject, NSWindowDelegate {
         )
     }
 
+    @MainActor
     func windowDidChangeScreen(_ notification: Notification) {
         forwarding?.windowDidChangeScreen?(notification)
         guard let window = notification.object as? NSWindow else { return }
         window.clampToScreen()
     }
 
-    override func responds(to selector: Selector!) -> Bool {
+    override nonisolated func responds(to selector: Selector!) -> Bool {
         if super.responds(to: selector) { return true }
         return forwarding?.responds(to: selector) ?? false
     }
 
-    override func forwardingTarget(for selector: Selector!) -> Any? {
+    override nonisolated func forwardingTarget(for selector: Selector!) -> Any? {
         if let forwarding, forwarding.responds(to: selector) { return forwarding }
         return super.forwardingTarget(for: selector)
     }
