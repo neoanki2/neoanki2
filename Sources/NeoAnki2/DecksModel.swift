@@ -103,6 +103,16 @@ final class DecksModel {
         try? await applyCounts(asOf: now)
     }
 
+    /// Loads the sidebar on first presentation and otherwise takes the
+    /// non-flickering count refresh path.
+    func loadOrRefresh(asOf now: Date = .now) async {
+        if hasLoaded {
+            await refreshCounts(asOf: now)
+        } else {
+            await load(asOf: now)
+        }
+    }
+
     /// Reads every count before assigning any, so the sidebar never renders a
     /// half-updated set, and assigns only what changed, so an unchanged library
     /// costs no view updates.

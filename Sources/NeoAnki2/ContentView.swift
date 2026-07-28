@@ -629,7 +629,7 @@ struct ContentView: View {
     /// about how many cards are due.
     private func refreshLibrary() async {
         let now = Date.now
-        await decksModel.refreshCounts(asOf: now)
+        await decksModel.loadOrRefresh(asOf: now)
         await reloadScope(asOf: now)
     }
 

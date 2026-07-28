@@ -113,3 +113,14 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.deckTree.isEmpty)
     #expect(model.isLoading)
 }
+
+@Test @MainActor func decksModelLoadOrRefreshPopulatesTheInitialSidebar() async throws {
+    let (model, store) = try await makeDecksModel()
+    _ = try await store.createDeck(Deck(name: "Geography"))
+
+    await model.loadOrRefresh()
+
+    #expect(model.deckTree.count == 1)
+    #expect(model.summaries.first?.name == "Geography")
+    #expect(!model.isLoading)
+}
