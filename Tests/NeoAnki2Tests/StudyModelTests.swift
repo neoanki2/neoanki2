@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiCore
+import SQLite3
 import Testing
 
 @testable import NeoAnki2
@@ -640,4 +641,40 @@ private func makeInteractionModel(
     await model.load()
 
     #expect(model.dueCount == 1)
+}
+
+/// A queue that cannot be read is not a finished session. Reporting completion
+/// here sent learners back to a scope home that still said cards were due.
+@Test @MainActor func studyModelReportsAQueueThatCannotBeReadAsAFailure() async throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki2-study-failure-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    let databaseURL = url.appendingPathComponent("test.sqlite")
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+
+    var handle: OpaquePointer?
+    #expect(sqlite3_open(databaseURL.path(percentEncoded: false), &handle) == SQLITE_OK)
+    #expect(
+        sqlite3_exec(handle, "UPDATE cards SET memory = X'6e6f74206a736f6e';", nil, nil, nil)
+            == SQLITE_OK
+    )
+    sqlite3_close(handle)
+
+    let model = StudyModel(store: store)
+    await model.startSession()
+
+    #expect(model.didFailToLoad)
+    #expect(model.errorMessage != nil)
+    #expect(model.currentCard == nil)
 }

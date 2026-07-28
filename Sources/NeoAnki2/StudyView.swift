@@ -19,6 +19,8 @@ struct StudyView: View {
         Group {
             if model.isLoading {
                 loadingView
+            } else if model.didFailToLoad {
+                loadFailureView
             } else if model.isFinished {
                 finishedView
             } else if let card = model.currentCard {
@@ -115,6 +117,29 @@ struct StudyView: View {
             }
             .accessibilityIdentifier("studyBackToLibrary")
         }
+    }
+
+    /// A queue that could not be read is not a finished session. Saying so, and
+    /// offering the retry, keeps a single unreadable card from looking like the
+    /// scope had nothing left to study.
+    private var loadFailureView: some View {
+        ContentUnavailableView {
+            Label("Couldn't Load Due Cards", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(model.errorMessage ?? "The due cards for this scope could not be read.")
+        } actions: {
+            Button("Try Again") {
+                Task { await model.startSession(scope: scope) }
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("studyRetryLoad")
+
+            Button("Back to Library") {
+                onEndSession()
+            }
+            .accessibilityIdentifier("studyBackToLibrary")
+        }
+        .accessibilityIdentifier("studyLoadFailure")
     }
 
     private var finishedView: some View {

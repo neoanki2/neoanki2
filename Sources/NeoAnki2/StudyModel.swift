@@ -20,6 +20,10 @@ final class StudyModel {
     private(set) var isGrading = false
     private(set) var errorMessage: String?
     private(set) var isFinished = false
+    /// Set only when the queue could not be read at all. Without it a failed
+    /// load is indistinguishable from an empty one, and a session that never
+    /// opened reports itself complete.
+    private(set) var didFailToLoad = false
     private(set) var scopeLabel = ""
     private(set) var pendingGradeUndo: PendingGradeUndo?
     private(set) var typedAnswer = ""
@@ -81,6 +85,7 @@ final class StudyModel {
         repairQueue = []
         scopeLabel = scope.label
         pendingGradeUndo = nil
+        didFailToLoad = false
 
         do {
             queue = try await store.fetchDueCards(scope: scope.filter)
@@ -90,6 +95,7 @@ final class StudyModel {
             errorMessage = userFacingError(from: error)
             queue = []
             isFinished = true
+            didFailToLoad = true
         }
 
         isLoading = false
