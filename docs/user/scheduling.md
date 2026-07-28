@@ -26,14 +26,15 @@ and authored deck imports do not carry scheduling history.
 
 To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,
 and turn on **Limit new cards per day**. Existing decks are unlimited until you
-set a limit. A limit of **0** pauses new cards in that deck without hiding
-learning or review cards.
+set a limit. A limit of **0** pauses new cards in that deck and its subdecks
+without hiding learning or review cards.
 
-The allowance belongs to the exact deck that contains each card. When you study
-a parent or **All Decks**, each included deck contributes its own allowance;
-one deck cannot consume another deck's slots. Unassigned cards remain
-unlimited. The scope home keeps **New** as the full backlog while explaining how
-many due new cards are available today and how many are deferred.
+The allowance is shared by the deck and its entire subtree. When you set a
+parent deck to 20, at most 20 new cards total are available from that parent and
+all of its subdecks that study day. A subdeck can add a stricter limit of its
+own; cards in that subdeck must fit both allowances. Unassigned cards remain
+unlimited. The scope home keeps **New** as the full backlog while explaining
+how many due new cards are available today and how many are deferred.
 
 A new card consumes one slot when you grade it for the first time, including
 **Again**. Ending a session before grading does not consume a slot. Undoing that

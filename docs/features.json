@@ -64,7 +64,7 @@
       "name": "Scope home, browse mode, and empty states",
       "article": "user/library-and-decks.md",
       "sources": ["Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemBrowserView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/ScopeHomeAndBrowseUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ScopeHomeAndBrowseTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/ScopeHomeAndBrowseUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ScopeHomeAndBrowseTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceCompleteTests.swift", "Tests/NeoAnki2Tests/UserInteractionPerformanceTests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
     },
     {
@@ -172,6 +172,13 @@
       "sources": ["Sources/NeoAnki2/ReviewRating+StudyUI.swift", "Sources/NeoAnki2/GradeGuideView.swift"],
       "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
       "screenshot": "assets/screenshots/study-grade-help.png"
+    },
+    {
+      "id": "study-edit-card",
+      "name": "Edit the card you are reviewing",
+      "article": "user/studying.md",
+      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnki2/StudyCommands.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"]
     },
     {
       "id": "study-undo-end",

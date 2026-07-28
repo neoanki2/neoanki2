@@ -60,10 +60,11 @@ limits the list and study session to that child's subtree.
 2. Choose **Deck Settings…**.
 3. Turn on **Limit new cards per day**, choose the allowance, and save.
 
-The setting applies only to cards directly in that deck. Subdecks keep their
-own limits, so selecting a parent combines the independent allowances of every
-deck in its subtree. Turn the limit off for unlimited new cards, or set it to
-**0** to pause new cards while continuing scheduled learning and reviews.
+The setting is one shared allowance for the deck and all of its subdecks. A new
+card graded anywhere in that subtree consumes one of the parent's slots. A
+subdeck can add a stricter limit of its own; cards there must fit both limits.
+Turn the limit off to remove that deck's cap, or set it to **0** to pause new
+cards throughout its subtree while continuing scheduled learning and reviews.
 
 Daily limits are local study preferences. They are not included in portable or
 authored deck files. See [Scheduling](../scheduling/) for first-grade accounting,

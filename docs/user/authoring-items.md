@@ -94,6 +94,9 @@ part of the edit sheet.
 3. Change field content.
 4. Choose **Save**.
 
+A card you are reviewing can be corrected without leaving the session; see [Fix
+a card during a session](../studying/#fix-a-card-during-a-session).
+
 Editing preserves the item's type, tags, and deck assignment while rebuilding
 field values from the form. Generated cards are reconciled: cards whose
 generation conditions or cloze groups still exist preserve their identity and
