@@ -191,7 +191,6 @@ struct SidebarEmptyState: View {
                     .font(DesignSystem.Typography.emptyMessage)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(title). \(message)")

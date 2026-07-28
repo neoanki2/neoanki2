@@ -127,7 +127,6 @@ struct ScopeHomeView: View {
                 Text(nextDueSentence)
                     .font(DesignSystem.Typography.uiBody)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("scopeHomeNextDue")
             }
         }
@@ -227,7 +226,6 @@ struct ScopeHomeView: View {
                 "\(summary.leechCount) \(noun) lapsing. Rewriting an item usually works "
                     + "better than repeating it."
             )
-            .fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: "repeat")
                 .accessibilityHidden(true)

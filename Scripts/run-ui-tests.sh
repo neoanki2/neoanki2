@@ -54,10 +54,16 @@ if [[ -n "${NEOANKI_UI_ONLY_TESTING:-}" ]]; then
   TEST_ARGUMENTS+=("-only-testing:${NEOANKI_UI_ONLY_TESTING}")
 fi
 
-xcodebuild test-without-building \
-  -xctestrun "$XCTESTRUN" \
-  -destination 'platform=macOS' \
-  "${TEST_ARGUMENTS[@]}" || {
+TEST_COMMAND=(
+  xcodebuild test-without-building
+  -xctestrun "$XCTESTRUN"
+  -destination 'platform=macOS'
+)
+if [[ ${#TEST_ARGUMENTS[@]} -gt 0 ]]; then
+  TEST_COMMAND+=("${TEST_ARGUMENTS[@]}")
+fi
+
+"${TEST_COMMAND[@]}" || {
   echo "UI smoke tests failed." >&2
   exit 1
 }

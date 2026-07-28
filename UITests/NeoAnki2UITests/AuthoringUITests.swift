@@ -111,6 +111,11 @@ final class AuthoringUITests: NeoAnkiUITestCase {
 
     func testUnassignedScopeEmptyState() throws {
         let app = launchApp()
+        XCTAssertLessThanOrEqual(
+            app.windows.firstMatch.frame.height,
+            700,
+            "The empty-state content must not override the app's 640-point default window height."
+        )
         selectScope("scopeRow-Unassigned", in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10)
