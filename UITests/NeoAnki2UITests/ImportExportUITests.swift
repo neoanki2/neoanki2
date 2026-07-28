@@ -8,7 +8,7 @@ final class ImportExportUITests: NeoAnkiUITestCase {
         )
 
         let chooseMedia = app.buttons.identified("chooseImportMediaDirectory")
-        if chooseMedia.waitForExistence(timeout: 3) {
+        if chooseMedia.waitUntilExists(timeout: 3) {
             chooseMedia.click()
             chooseFileInOpenPanel(fixturesDirectory().appendingPathComponent("media"), in: app)
         }
@@ -24,11 +24,11 @@ final class ImportExportUITests: NeoAnkiUITestCase {
         app.menuBarItems["File"].click()
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         let importItem = app.menuItems.identified("Import…")
-        XCTAssertTrue(importItem.waitForExistence(timeout: 3))
+        XCTAssertTrue(importItem.waitUntilExists(timeout: 3))
         importItem.click()
 
         cancelFilePicker(in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["importSheet"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.descendants(matching: .any)["importSheet"].waitUntilGone(timeout: 2))
         assertEmptyLibrary(in: app)
     }
 
@@ -39,12 +39,12 @@ final class ImportExportUITests: NeoAnkiUITestCase {
 
         app.menuBarItems["File"].click()
         let importItem = app.menuItems.identified("Import…")
-        XCTAssertTrue(importItem.waitForExistence(timeout: 3))
+        XCTAssertTrue(importItem.waitUntilExists(timeout: 3))
         XCTAssertFalse(importItem.isEnabled)
         dismissOpenMenus(in: app)
 
         app.buttons.identified("endStudySession").click()
-        if app.buttons.identified("confirmEndStudySession").waitForExistence(timeout: 2) {
+        if app.buttons.identified("confirmEndStudySession").waitUntilExists(timeout: 2) {
             app.buttons.identified("confirmEndStudySession").click()
         }
         waitForLibraryReady(in: app)
@@ -66,7 +66,7 @@ final class ImportExportUITests: NeoAnkiUITestCase {
         let app = launchAppForImport(file: file)
         app.buttons.identified("confirmImport").click()
         let progress = app.descendants(matching: .any)["importProgress"]
-        _ = progress.waitForExistence(timeout: 2)
+        _ = progress.waitUntilExists(timeout: 2)
         dismissImportComplete(in: app)
         waitForItem(named: "Bulk 0", in: app, timeout: 15)
     }
@@ -81,7 +81,7 @@ final class ImportExportUITests: NeoAnkiUITestCase {
         )
         let app = launchAppForImport(file: file, scenario: "alternate-import-type")
         let picker = app.popUpButtons.identified("importItemTypePicker")
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertTrue(picker.waitUntilExists(timeout: 5))
         selectPopUpOption(named: "Alternate", picker: picker, in: app)
 
         app.buttons.identified("confirmImport").click()

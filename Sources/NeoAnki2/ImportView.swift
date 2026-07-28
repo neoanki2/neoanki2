@@ -53,7 +53,6 @@ struct ImportView: View {
                 Section {
                     Label {
                         Text("Every row is added as a new item. Importing the same file again creates duplicates.")
-                            .fixedSize(horizontal: false, vertical: true)
                     } icon: {
                         Image(systemName: "doc.on.doc")
                             .foregroundStyle(.secondary)

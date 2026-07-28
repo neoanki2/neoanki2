@@ -39,9 +39,6 @@ struct NeoAnki2App: App {
                         .task { await bootstrap() }
                 }
             }
-            // A window taller than the display puts the study grade buttons out
-            // of reach. Neither restored frames nor content may grow past it.
-            .fitWindowToScreen()
         }
         .defaultSize(width: 960, height: 640)
         .commands {

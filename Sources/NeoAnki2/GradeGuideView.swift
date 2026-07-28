@@ -10,7 +10,6 @@ struct GradeGuideView: View {
             Text("After you reveal or check your answer, pick the option that best matches how well you recalled it. NeoAnki2 uses your choice to schedule the next review.")
                 .font(DesignSystem.Typography.uiBody)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
@@ -22,7 +21,6 @@ struct GradeGuideView: View {
                     Text(rating.studyTooltip)
                         .font(DesignSystem.Typography.uiBody)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 

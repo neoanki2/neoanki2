@@ -303,7 +303,6 @@ struct StudyView: View {
                 .font(DesignSystem.Typography.uiSecondary)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("studyInteractionMessage")
         }
 
