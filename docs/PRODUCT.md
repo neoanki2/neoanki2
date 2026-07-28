@@ -61,10 +61,12 @@ can choose an empty starter set.
 
 - **Environment:** macOS desktop, single-user, local SQLite store
   (`AppDatabase.defaultURL`).
-- **Core workflows today:**
-  1. Browse items in the main window
+- **Core workflows today**, in the order they matter:
+  1. Open a scope and see what is due, then study it in the main detail pane
+     (reveal → Again/Hard/Good/Easy)
   2. Add an item via form (fields from a selected item type)
-  3. Study due cards in the main detail pane (reveal → Again/Hard/Good/Easy)
+  3. Browse, search, and triage items in a dedicated browse mode when something
+     needs fixing or moving
   4. Manage item types/templates and import JSON or CSV from the native shell
 - **Architecture split:** `NeoAnkiCore` (domain, scheduling, persistence);
   `NeoAnki2` (SwiftUI shell). See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the three-layer model.

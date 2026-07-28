@@ -40,7 +40,7 @@
       "id": "deck-scopes",
       "name": "All Decks, Unassigned, and deck scopes",
       "article": "user/library-and-decks.md",
-      "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
+      "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/ScopeHomeView.swift"],
       "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift", "Tests/NeoAnki2Tests/DecksModelTests.swift"],
       "screenshot": "assets/screenshots/decks-nested.png"
     },
@@ -54,10 +54,10 @@
     },
     {
       "id": "library-items",
-      "name": "Library item list, counts, and empty states",
+      "name": "Scope home, browse mode, and empty states",
       "article": "user/library-and-decks.md",
-      "sources": ["Sources/NeoAnki2/DeckDetailView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift"],
+      "sources": ["Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemBrowserView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/ScopeHomeAndBrowseUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ScopeHomeAndBrowseTests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
     },
     {
@@ -247,7 +247,7 @@
       "id": "accessibility",
       "name": "Accessibility behavior and documented limitations",
       "article": "user/shortcuts-accessibility.md",
-      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/MediaViews.swift", "Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DeckDetailView.swift"],
+      "sources": ["Sources/NeoAnki2/AccessibilityRouting.swift", "Sources/NeoAnki2/DesignSystem.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/MediaViews.swift", "Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/ItemBrowserView.swift"],
       "tests": ["Tests/NeoAnki2Tests/AccessibilityRoutingTests.swift", "Tests/NeoAnki2Tests/ContentRenderingTests.swift", "Tests/NeoAnki2Tests/MediaBehaviorTests.swift"]
     },
     {

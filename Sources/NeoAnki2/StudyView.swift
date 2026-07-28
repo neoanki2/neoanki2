@@ -101,16 +101,19 @@ struct StudyView: View {
         .accessibilityIdentifier("studyLoading")
     }
 
+    /// Reached only when a session opens on an empty queue. The scope home is
+    /// where "nothing is due" is answered properly, with the time the next card
+    /// returns, so this state's job is to send you back there.
     private var emptyDueView: some View {
         ContentUnavailableView {
-            Label("You're Caught Up", systemImage: "calendar.badge.clock")
+            Label("Nothing Due Right Now", systemImage: "calendar.badge.clock")
         } description: {
-            Text("No cards are due right now. Add items to create new study cards.")
+            Text("Leave the session to see when the next card in this scope comes back.")
         } actions: {
-            Button("Back to Items") {
+            Button("Back to Library") {
                 onEndSession()
             }
-            .accessibilityIdentifier("studyBackToItems")
+            .accessibilityIdentifier("studyBackToLibrary")
         }
     }
 

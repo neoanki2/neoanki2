@@ -116,7 +116,7 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 ### Named Rules
 
-**The One Accent Rule.** The system accent appears only on primary forward actions (Study, Show Answer, Done on completion). Grade buttons, list rows, and chrome stay neutral bordered styles.
+**The One Accent Rule.** The system accent appears only on primary forward actions (Study, Show Answer, Done on completion, and an empty state's single call to action). Grade buttons, list rows, browse chrome, and toolbars stay neutral bordered styles.
 
 **The No Gamification Palette Rule.** Do not introduce streak orange, achievement gold, or chart rainbow colors. Progress is text (“Card 3 of 12”), not rings or bars.
 
@@ -132,25 +132,32 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 - **Card Prompt** (regular, `.largeTitle` / ~34pt, 1.25 line-height): Primary retrieval question; center-aligned in study column; multiline supported.
 - **Card Answer** (regular, `.title` / ~28pt, 1.3 line-height): Revealed content; visually subordinate to prompt but still comfortable to read.
-- **Title** (semibold, `.title2` / `.title3`): Item titles in sidebar and detail preview.
+- **Display** (bold, `.title2`): The one number a pane exists to deliver — today, the scope home's due headline. Bold, not larger, because size above this belongs to the card. Whatever sits near it must be quieter than a section heading, or the weight stops reading as hierarchy.
+- **Title** (semibold, `.title2` / `.title3`): Pane headlines and section headings.
+- **Row Title / Row Meta** (`.headline` over `.caption`): The two lines of a sidebar
+  scope row. Denser than body text because a list row is not prose.
 - **Body** (regular, `.body` / ~17pt): Form labels, descriptions, empty-state copy. Max ~65 characters per line in study column.
 - **Caption** (regular, `.subheadline` / ~15pt): Progress, card counts, metadata, error banners.
 
 ### Named Rules
 
-**The Card Type Scale Rule.** Only card prompt uses `.largeTitle`; only card answer uses `.title`. UI chrome never borrows card sizes — prevents “everything shouts.”
+**The Card Type Scale Rule.** Only card prompt uses `.largeTitle`; only card answer uses `.title`. UI chrome never borrows card sizes — prevents “everything shouts.” Chrome that must lead a pane reaches for `uiDisplay`'s weight and the space around it, and demotes its neighbors, rather than asking for an exception to this rule.
 
 **The Dynamic Type Rule.** Use semantic SwiftUI text styles via `DesignSystem.Typography` — never hard-coded `.font(.system(size:))` in production views.
 
 ## Layout
 
-**Spatial model:** `NavigationSplitView` — sidebar (items) + detail (study or preview). This matches Mac user expectations (Reminders, Notes) and the confirmed study-flow brief.
+**Spatial model:** `NavigationSplitView` — sidebar (deck scopes) + detail (scope home, study, browse, or item). This matches Mac user expectations (Reminders, Notes) and the confirmed study-flow brief.
+
+The sidebar navigates **scopes**, not items: All Decks, the deck tree, Unassigned. The detail pane defaults to a **scope home** that answers "is there anything to study right now, and can I start" — not an enumeration of the library. Enumerating items is **browse mode**, a deliberate destination reached from the scope home link, the Library menu, or ⌥⌘B, and left with Escape.
 
 | Region | Width | Behavior |
 |--------|-------|----------|
-| Sidebar | 220–340pt (ideal 260) | Item list, selection, empty state |
-| Detail | Flexible | Study session or item preview |
+| Sidebar | 220–340pt (ideal 260) | Deck scopes, selection, due counts |
+| Detail | Flexible | Scope home (default), study session, browse mode, or item |
 | Study reading column | max 600pt centered | Card content; never full-bleed text on ultrawide windows |
+| Scope home column | max 600pt | Summary prose obeys the reading measure |
+| Browse table | Full detail width | Dense state columns; the reading measure governs card text, not tables |
 | Window default | 960×640pt | Comfortable split at launch |
 
 **Spacing rhythm (8pt grid):** 8 / 12 / 16 / 24 / 32pt — padding in study header (12×20), card area (24×32), footer actions (20).
@@ -168,7 +175,11 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 **The Split-First Rule.** Study never returns to a sheet modal on Mac. Detail pane owns the session.
 
-**The Reading Measure Rule.** Card text lives in a centered column capped at 600pt (~65ch for typical content). Wide windows add margin, not longer line lengths.
+**The Reading Measure Rule.** Card text lives in a centered column capped at 600pt (~65ch for typical content). Wide windows add margin, not longer line lengths. The cap governs prose and card content; dense tables in browse mode take the full detail width.
+
+**The Study-Forward Default Rule.** The detail pane's default branch answers what to do now. A bare list of everything is never the landing state for a scope.
+
+**The No Answers by Default Rule.** No library surface reveals an item's answer without an explicit request. Browse mode ships the Answer column hidden; row subtitles never carry it. Encountering an answer before being asked the question is a spoiled review, and the app's whole value is the asking. A considered default still owes the user a way out: the reveal lives in the menu bar with a shortcut, not only behind a header context menu, and the choice persists — otherwise the rule reads as a restriction nobody can lift.
 
 ## Elevation & Depth
 
@@ -201,7 +212,8 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 ### Buttons
 
 - **Shape:** System bordered styles (6–8pt effective radius)
-- **Primary:** `.borderedProminent` — Study, Show Answer, Done on completion; uses accent tint
+- **Primary:** `.borderedProminent` — Study, Show Answer, Done on completion, and
+  the single call to action in an empty state; uses accent tint
 - **Secondary:** `.bordered` — grade buttons (Again/Hard/Good/Easy), Cancel, Skip Card
 - **Tertiary:** `.borderless` — Grade help icon, End Session text in header
 - **Hover / Focus:** System-default; ensure keyboard focus ring visible
@@ -223,6 +235,12 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 - **Component:** `ContentUnavailableView` + SF Symbol + one primary action
 - **Tone:** Direct, encouraging, no exclamation-mark hype
+- **Content:** Teach what the app will do with what you add, rather than
+  reporting that nothing is here
+- **Action size:** `.borderedProminent` at `.controlSize(.large)` — an empty
+  surface has exactly one thing worth doing, so it is not a small button
+- **Iconography:** Each state that can be reached in sequence carries a distinct
+  symbol; "nothing due yet" and "session complete" must not look identical
 
 ### Sheets
 
@@ -264,7 +282,8 @@ The centered prompt → divider → answer stack is the product’s visual signa
 - **Don't** put custom shadows, gradients, or glass on card content.
 - **Don't** use display serifs, condensed fonts, or “flashcard app cute” illustration styles.
 - **Don't** copy Anki’s dense toolbar/grid aesthetic or Quizlet’s bright game UI.
-- **Don't** show scheduling statistics during active review — study is for retrieval, not analytics.
+- **Don't** show scheduling statistics during active review — study is for retrieval, not analytics. The scope home is the sanctioned place for due counts, the new/learning/review breakdown, and the next due time, because it is read *before* a session, not during one. Rendering the same numbers on the study stage remains prohibited.
+- **Don't** reveal an answer anywhere in the library without being asked — see The No Answers by Default Rule.
 
 ## Research Summary (strategy rationale)
 

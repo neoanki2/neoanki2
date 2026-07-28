@@ -33,6 +33,9 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     public let cardCount: Int
     public let deckID: UUID?
     public let createdAt: Date
+    /// Rolled-up scheduling state. Optional so callers that only describe a
+    /// freshly written item need not query for it.
+    public let schedule: ItemScheduleSummary?
 
     public init(
         id: UUID,
@@ -42,7 +45,8 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
         subtitle: String,
         cardCount: Int,
         deckID: UUID? = nil,
-        createdAt: Date
+        createdAt: Date,
+        schedule: ItemScheduleSummary? = nil
     ) {
         self.id = id
         self.itemTypeID = itemTypeID
@@ -52,6 +56,7 @@ public struct SavedItemSummary: Sendable, Identifiable, Equatable {
         self.cardCount = cardCount
         self.deckID = deckID
         self.createdAt = createdAt
+        self.schedule = schedule
     }
 }
 
@@ -342,11 +347,18 @@ public actor ItemStore {
             subtitle: ItemDisplay.subtitle(for: item, in: itemType),
             cardCount: cards.count,
             deckID: item.deckID,
-            createdAt: now
+            createdAt: now,
+            schedule: try await database.fetchItemCardState(itemID: item.id).scheduleSummary
         )
     }
 
-    public func listItems(scope: DeckScope = .allDecks) async throws -> [SavedItemSummary] {
+    /// Ordering is applied here rather than in SQL because titles and searchable
+    /// text are derived from encoded field values, not stored columns.
+    public func listItems(
+        scope: DeckScope = .allDecks,
+        sort: ItemSortOrder = .createdAscending,
+        search: String = ""
+    ) async throws -> [SavedItemSummary] {
         let persisted: [PersistedItem]
         switch scope {
         case .allDecks:
@@ -362,7 +374,9 @@ public actor ItemStore {
                 persisted = try await database.fetchItems(deckID: deckID)
             }
         }
-        return try await summaries(for: persisted)
+
+        let all = try await summaries(for: persisted)
+        return ItemBrowsing.arrange(all, sort: sort, search: search)
     }
 
     /// Returns all items regardless of deck assignment.
@@ -444,7 +458,10 @@ public actor ItemStore {
             subtitle: ItemDisplay.subtitle(for: item, in: itemType),
             cardCount: desiredCards.count,
             deckID: item.deckID,
-            createdAt: previous.createdAt
+            createdAt: previous.createdAt,
+            // Read back rather than derived from `desiredCards`: reconciliation
+            // preserves the memory of cards that survived the edit.
+            schedule: try await database.fetchItemCardState(itemID: item.id).scheduleSummary
         )
     }
 
@@ -495,6 +512,50 @@ public actor ItemStore {
 
     public func dueCount(asOf now: Date = .now) async throws -> Int {
         try await dueCount(scope: .allDecks, asOf: now)
+    }
+
+    /// Everything the scope home needs in one snapshot, so the sidebar and the
+    /// detail pane cannot disagree about how many cards are due.
+    public func scopeSummary(
+        scope: DeckScope = .allDecks,
+        asOf now: Date = .now
+    ) async throws -> ScopeSummary {
+        let resolved = try await resolveCardScope(scope, asOf: now)
+        let totals = try await database.cardScheduleTotals(
+            scope: resolved,
+            asOf: now,
+            leechThreshold: ScopeSummary.leechThreshold
+        )
+        let itemCount = try await database.countItems(scope: resolved)
+
+        return ScopeSummary(
+            itemCount: itemCount,
+            cardCount: totals.cardCount,
+            dueNow: totals.dueNow,
+            newCount: totals.newCount,
+            learningCount: totals.learningCount,
+            relearningCount: totals.relearningCount,
+            reviewCount: totals.reviewCount,
+            leechCount: totals.leechCount,
+            nextDueAt: totals.nextDueAt
+        )
+    }
+
+    /// Expands a requested scope into the deck identifiers it actually covers.
+    private func resolveCardScope(
+        _ scope: DeckScope,
+        asOf now: Date = .now
+    ) async throws -> CardScope {
+        switch scope {
+        case .allDecks:
+            return .all
+        case .unassigned:
+            return .unassigned
+        case let .deck(deckID, includeDescendants):
+            guard includeDescendants else { return .decks([deckID]) }
+            let summaries = try await deckSummaries(asOf: now)
+            return .decks(DeckTree.descendantIDs(of: deckID, in: summaries))
+        }
     }
 
     public func unassignedDueCount(asOf now: Date = .now) async throws -> Int {
@@ -885,6 +946,7 @@ public actor ItemStore {
     private func summaries(for persisted: [PersistedItem]) async throws -> [SavedItemSummary] {
         var summaries: [SavedItemSummary] = []
         summaries.reserveCapacity(persisted.count)
+        let cardStates = try await database.fetchItemCardStates()
 
         for entry in persisted {
             // Malformed definitions are reported by loadItemTypes(), where
@@ -893,7 +955,7 @@ public actor ItemStore {
             guard let itemType = try await database.fetchValidatedItemType(
                 id: entry.item.itemTypeID
             ) else { continue }
-            let cardCount = try await database.countCards(for: entry.item.id)
+            let cardState = cardStates[entry.item.id] ?? ItemCardState()
             summaries.append(
                 SavedItemSummary(
                     id: entry.item.id,
@@ -901,9 +963,10 @@ public actor ItemStore {
                     itemTypeName: itemType.name,
                     title: ItemDisplay.title(for: entry.item, in: itemType),
                     subtitle: ItemDisplay.subtitle(for: entry.item, in: itemType),
-                    cardCount: cardCount,
+                    cardCount: cardState.cardCount,
                     deckID: entry.item.deckID,
-                    createdAt: entry.createdAt
+                    createdAt: entry.createdAt,
+                    schedule: cardState.scheduleSummary
                 )
             )
         }

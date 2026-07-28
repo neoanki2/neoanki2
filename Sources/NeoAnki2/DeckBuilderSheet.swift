@@ -49,10 +49,10 @@ struct DeckBuilderSheet: View {
                         selectedBuilderID = feature.id
                     } label: {
                         Label {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                                 Text(feature.descriptor.title)
                                 Text(feature.descriptor.subtitle)
-                                    .font(.caption)
+                                    .font(DesignSystem.Typography.uiRowMeta)
                                     .foregroundStyle(.secondary)
                             }
                         } icon: {

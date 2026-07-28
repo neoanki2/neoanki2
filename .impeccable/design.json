@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-24T22:05:00Z",
+  "generatedAt": "2026-07-28T09:20:00Z",
   "title": "Design System: NeoAnki2",
   "extensions": {
     "colorMeta": {
@@ -35,15 +35,35 @@
     "typographyMeta": {
       "card-prompt": {
         "displayName": "Card Prompt",
-        "purpose": "Primary retrieval question in study column; SwiftUI .title"
+        "purpose": "Primary retrieval question in study column; SwiftUI .largeTitle"
       },
       "card-answer": {
         "displayName": "Card Answer",
-        "purpose": "Revealed answer; SwiftUI .title2"
+        "purpose": "Revealed answer; SwiftUI .title"
+      },
+      "card-secondary": {
+        "displayName": "Card Secondary",
+        "purpose": "Supporting card content beneath the answer; SwiftUI .title2"
+      },
+      "ui-display": {
+        "displayName": "UI Display",
+        "purpose": "The one number a pane exists to deliver, today the scope home due headline; SwiftUI .title2 bold with monospaced digits. Bold rather than larger, because sizes above this belong to the card."
+      },
+      "ui-title": {
+        "displayName": "UI Title",
+        "purpose": "Pane titles and sheet headlines; SwiftUI .title2 semibold. Emphasis here is weight and space, never card sizes."
       },
       "ui-body": {
         "displayName": "UI Body",
         "purpose": "Forms, empty states, descriptions; SwiftUI .body"
+      },
+      "ui-row-title": {
+        "displayName": "UI Row Title",
+        "purpose": "Sidebar scope row name; SwiftUI .headline"
+      },
+      "ui-row-meta": {
+        "displayName": "UI Row Meta",
+        "purpose": "Sidebar scope row counts under the name; SwiftUI .caption"
       },
       "ui-caption": {
         "displayName": "UI Caption",
@@ -81,7 +101,7 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Study, Show Answer, Done. SwiftUI .borderedProminent with app tint.",
+      "description": "Study, Show Answer, Done, and an empty state's single call to action. SwiftUI .borderedProminent with app tint; .controlSize(.large) in empty states.",
       "html": "<button class=\"ds-btn-primary\">Show Answer</button>",
       "css": ".ds-btn-primary { background: #4A6FA5; color: #fff; padding: 8px 16px; border: none; border-radius: 8px; font: 400 13px/1.4 -apple-system, 'SF Pro', system-ui; cursor: pointer; } .ds-btn-primary:hover { background: #3d5f8f; } .ds-btn-primary:focus-visible { outline: 2px solid #4A6FA5; outline-offset: 2px; }"
     },
@@ -99,14 +119,28 @@
       "refersTo": "study-column-max",
       "description": "Centered card stage, max 600pt. Prompt, divider, answer — no shadow box.",
       "html": "<div class=\"ds-study-column\"><p class=\"ds-prompt\">What is the capital of France?</p><hr class=\"ds-divider\" /><p class=\"ds-answer\">Paris</p></div>",
-      "css": ".ds-study-column { max-width: 600px; margin: 0 auto; text-align: center; padding: 24px 32px; } .ds-prompt { font: 400 28px/1.25 -apple-system, 'SF Pro', system-ui; margin: 0 0 24px; } .ds-divider { border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 24px 0; } .ds-answer { font: 400 22px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.85); margin: 0; }"
+      "css": ".ds-study-column { max-width: 600px; margin: 0 auto; text-align: center; padding: 24px 32px; } .ds-prompt { font: 400 34px/1.25 -apple-system, 'SF Pro', system-ui; margin: 0 0 24px; } .ds-divider { border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 24px 0; } .ds-answer { font: 400 28px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.85); margin: 0; }"
     },
     {
-      "name": "Sidebar List Row",
+      "name": "Scope Home Summary",
       "kind": "custom",
-      "description": "Item title, subtitle, metadata. SwiftUI List selection row.",
-      "html": "<div class=\"ds-list-row\"><div class=\"ds-row-title\">France</div><div class=\"ds-row-sub\">Paris</div><div class=\"ds-row-meta\">2 cards · Basic</div></div>",
-      "css": ".ds-list-row { padding: 4px 0; } .ds-row-title { font: 600 13px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-row-sub { font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.55); } .ds-row-meta { font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.35); margin-top: 4px; }"
+      "description": "Default detail pane for a sidebar scope: the due count as a bold display headline, one prominent Study action, a neutral typographic card-state breakdown under a quiet group label, and a secondary link into browse mode. The scope name lives in the window title, not above the headline — the headline has nothing to compete with, and everything below it is quieter than a section heading. No card type sizes, no colored stat pills, no progress rings.",
+      "html": "<section class=\"ds-scope-home\"><div class=\"ds-due-block\"><h1 class=\"ds-due-headline\">9 cards due</h1><button class=\"ds-btn-primary\">Study</button></div><div><p class=\"ds-group-label\">Cards</p><dl class=\"ds-card-states\"><div><dd>4</dd><dt>New</dt></div><div><dd>2</dd><dt>Learning</dt></div><div><dd>3</dd><dt>Review</dt></div></dl></div><a class=\"ds-scope-link\" href=\"#\">Browse 12 Items</a></section>",
+      "css": ".ds-scope-home { max-width: 600px; display: flex; flex-direction: column; gap: 24px; padding: 24px 32px; } .ds-due-block { padding-bottom: 8px; } .ds-due-headline { font: 700 22px/1.25 -apple-system, 'SF Pro', system-ui; font-variant-numeric: tabular-nums; margin: 0 0 12px; } .ds-group-label { font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.55); margin: 0 0 12px; } .ds-card-states { display: flex; gap: 32px; margin: 0; } .ds-card-states dd { font: 600 17px/1.3 -apple-system, 'SF Pro', system-ui; font-variant-numeric: tabular-nums; margin: 0; } .ds-card-states dt { font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.55); } .ds-scope-link { font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; color: #4A6FA5; }"
+    },
+    {
+      "name": "Browse Table Row",
+      "kind": "custom",
+      "description": "One row of the browse-mode table: prompt plus scheduling state. The Answer column exists but ships hidden through TableColumnCustomization, so opening the library never spoils a card; revealing it is a Library menu command with a shortcut, and the choice persists across browse sessions.",
+      "html": "<tr class=\"ds-browse-row\"><td class=\"ds-cell-prompt\">Ozymandias, line 1</td><td class=\"ds-cell-state\">Now</td><td class=\"ds-cell-state\">Review</td><td class=\"ds-cell-num\">2</td><td class=\"ds-cell-state\">Basic</td><td class=\"ds-cell-num\">1</td></tr>",
+      "css": ".ds-browse-row td { padding: 4px 8px; font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; border-bottom: 1px solid rgba(0,0,0,0.06); } .ds-cell-prompt { color: #1d1d1f; } .ds-cell-state { color: rgba(0,0,0,0.55); } .ds-cell-num { color: rgba(0,0,0,0.55); font-variant-numeric: tabular-nums; text-align: right; }"
+    },
+    {
+      "name": "Sidebar Scope Row",
+      "kind": "custom",
+      "description": "Deck or scope row in the sidebar: name over a due/item metadata line. Selection is the system List highlight; no custom row background.",
+      "html": "<div class=\"ds-scope-row\"><div class=\"ds-row-title\">Poetry</div><div class=\"ds-row-sub\">12 items · 9 due</div></div>",
+      "css": ".ds-scope-row { padding: 4px 0; } .ds-row-title { font: 600 13px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-row-sub { font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.55); margin-top: 4px; }"
     },
     {
       "name": "Error Banner",
@@ -118,7 +152,7 @@
   ],
   "narrative": {
     "northStar": "The Quiet Desk",
-    "overview": "NeoAnki2 should feel like a well-lit desk: one open page (the card), a tidy stack of notes to the side (the item list), and almost nothing else competing for attention. Platform-native restraint and content-forward layout. The card is the only hero per screen.",
+    "overview": "NeoAnki2 should feel like a well-lit desk: one open page (the card), a tidy shelf of decks to the side, and almost nothing else competing for attention. Selecting a scope answers what to study now; enumerating items is a deliberate browse mode you ask for. Platform-native restraint and content-forward layout. The card is the only hero per screen.",
     "keyCharacteristics": [
       "Content-first study column",
       "Mac-native NavigationSplitView",
@@ -130,7 +164,7 @@
     "rules": [
       {
         "name": "The One Accent Rule",
-        "body": "Custom accent color appears only on primary forward actions (Study, Show Answer, Done on completion).",
+        "body": "Custom accent color appears only on primary forward actions (Study, Show Answer, Done on completion, and an empty state's single call to action). Browse mode gets no prominent accent button.",
         "section": "colors"
       },
       {
@@ -140,7 +174,7 @@
       },
       {
         "name": "The Card Type Scale Rule",
-        "body": "Only card prompt uses .title; only card answer uses .title2. UI chrome never borrows card sizes.",
+        "body": "Only card prompt uses .largeTitle; only card answer uses .title. UI chrome never borrows card sizes — the scope home's due headline earns emphasis from weight and space instead.",
         "section": "typography"
       },
       {
@@ -155,7 +189,17 @@
       },
       {
         "name": "The Reading Measure Rule",
-        "body": "Card text lives in a centered column capped at 600pt.",
+        "body": "Card text and prose live in a centered column capped at 600pt. Dense tables in browse mode take the full detail width.",
+        "section": "layout"
+      },
+      {
+        "name": "The Study-Forward Default Rule",
+        "body": "The detail pane's default branch answers what to do now. A bare list of everything is never the landing state for a scope.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Answers by Default Rule",
+        "body": "No library surface reveals an item's answer without an explicit request. Browse mode ships the Answer column hidden; row subtitles never carry it. The reveal is a menu command with a shortcut and it persists, so the default is considered rather than a restriction nobody can lift.",
         "section": "layout"
       },
       {
@@ -182,7 +226,8 @@
       "Don't put shadows, gradients, or glass on card content",
       "Don't use display serifs or cute illustration styles",
       "Don't copy Anki density or Quizlet game UI",
-      "Don't show scheduling stats during active review"
+      "Don't show scheduling stats during active review — the scope home is where they belong, read before a session rather than during one",
+      "Don't reveal an item's answer anywhere in the library without being asked"
     ]
   }
 }

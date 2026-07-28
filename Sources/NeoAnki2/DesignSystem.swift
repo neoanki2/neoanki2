@@ -29,6 +29,8 @@ enum DesignSystem {
     // MARK: - Spacing (8pt grid)
 
     enum Spacing {
+        /// Half step, and the only one. It binds a label to the line directly
+        /// beneath it; anything that separates two ideas uses `xs` or larger.
         static let rowTight: CGFloat = 4
         static let xs: CGFloat = 8
         static let sm: CGFloat = 12
@@ -44,17 +46,29 @@ enum DesignSystem {
 
     // MARK: - Typography
     //
-    // Semantic styles bumped one step above the baseline in DESIGN.md for better
-    // desk-distance readability while preserving hierarchy and Dynamic Type support.
+    // Semantic styles only, so every surface scales with Dynamic Type. The card
+    // sizes here are the ones DESIGN.md and .impeccable/design.json record; UI
+    // chrome must not borrow them.
 
     enum Typography {
         static let cardPrompt = Font.largeTitle
         static let cardAnswer = Font.title
         static let cardSecondary = Font.title2
 
+        /// The one number a pane exists to deliver. Bold rather than large,
+        /// because card sizes belong to the card — so whatever sits near this
+        /// has to be quieter than a section heading for the weight to read.
+        static let uiDisplay = Font.title2.weight(.bold)
+
         static let uiTitle = Font.title2.weight(.semibold)
         static let uiSection = Font.title3.weight(.semibold)
         static let uiBody = Font.body
+
+        /// The two lines of a sidebar scope row: a name and the counts under it.
+        /// Denser than `uiBody`/`uiCaption` because a list row is not prose.
+        static let uiRowTitle = Font.headline
+        static let uiRowMeta = Font.caption
+
         static let uiSecondary = Font.callout
         static let uiCaption = Font.subheadline
         static let uiHint = Font.subheadline
@@ -182,10 +196,12 @@ struct SidebarEmptyState: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(title). \(message)")
 
+            // An empty surface has exactly one thing worth doing, so this is the
+            // primary forward action and is sized like one.
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .padding(.top, DesignSystem.Spacing.xs)
                     .accessibilityIdentifier(actionIdentifier ?? actionTitle)
             }

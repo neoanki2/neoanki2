@@ -38,8 +38,9 @@ A session moves through a small set of states:
 The header shows the scope and progress, such as “Biology · Card 2 of 8.” The
 initial queue is assembled when the session starts. Failed cards are due immediately
 but move behind cards already waiting. After that queue finishes, each failed
-card appears once per repair round. When no cards are due, NeoAnki2 shows
-**You’re Caught Up** instead of a prompt.
+card appears once per repair round. When no cards are due, the scope home says
+**You’re caught up** and tells you when the next card returns, and a session
+opened on an empty queue shows **Nothing Due Right Now**.
 
 [![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)]({{ site.baseurl }}/assets/screenshots/study-answer.png)
 

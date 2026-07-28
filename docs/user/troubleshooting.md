@@ -103,8 +103,9 @@ These states are informational:
 - **Select an Item Type:** choose a type in the left pane.
 - **No Templates:** add a template; an item without templates generates no
   study cards.
-- **You're Caught Up / No cards due:** there is nothing due in the current
-  scope. Return later or add items; this is not a scheduling error.
+- **You're caught up / Nothing Due Right Now:** there is nothing due in the
+  current scope. The scope home names the time the next card returns; this is
+  not a scheduling error.
 - **Session Complete:** all due cards loaded for that session were handled.
 
 **Loading decks…**, **Loading items…**, **Loading item types…**, **Loading due

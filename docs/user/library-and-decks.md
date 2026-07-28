@@ -21,13 +21,13 @@ Use one of the three kinds of sidebar row:
   Starting a study session here uses the same recursive scope.
 - **Unassigned** shows only items with no deck.
 
-Changing scope reloads both the item list and due-card count. Sidebar captions
-show direct item counts for each named deck and recursive due counts for that
-deck and its descendants. **Unassigned** reports its item and due counts
-separately.
+Changing scope reloads the scope home and its counts. Sidebar captions show
+direct item counts for each named deck and recursive due counts for that deck
+and its descendants. **Unassigned** reports its item and due counts separately.
+Every count in one reload is measured at the same instant, so the sidebar and
+the detail pane always agree.
 
-The detail title reflects the selected scope. **Study** is enabled only when
-that scope has due cards; its badge shows the due count.
+Selecting a scope opens its **scope home**, described below.
 
 ## Create a top-level deck
 
@@ -88,25 +88,71 @@ Unassigned before saving.
 The **Unassigned** empty state intentionally has no Add Item button; use the
 toolbar's **Add Item** action instead.
 
+## Read the scope home
+
+Choosing a scope opens its home, which answers one question: is there anything
+to study right now?
+
+- The **due count** leads, with **Study** beside it. Studying is one click from
+  the moment you pick a scope.
+- When nothing is due, the count is replaced by when the next card comes back —
+  for example, "The next card is due in 3 hours." There is no disabled Study
+  button left sitting there without explanation.
+- **Cards** breaks the scope down into **New**, **Learning**, and **Review**.
+  Relearning cards count as learning, because relearning is a repair round.
+- If cards in the scope keep lapsing, a note says how many. Rewriting a
+  confusing item usually works better than repeating it.
+- **Browse *n* Items** opens browse mode.
+
+The scope home never shows an item's answer.
+
+## Browse and search items
+
+Open browse mode from the scope home link, from **Library ▸ Browse Items**, or
+with ⌥⌘B. Press Escape or choose **Done** to return to the scope home.
+
+Browse mode is a sortable table, one row per item:
+
+| Column | Shows |
+| --- | --- |
+| Prompt | Content from the item's first field |
+| Due | When the item's soonest card is due, or **Now** |
+| State | New, Learning, Relearning, or Review for that card |
+| Lapses | How many times the item's cards have been forgotten |
+| Type | The item type name |
+| Cards | How many cards the item generated |
+| Answer | Hidden by default — see below |
+
+Click a column header to sort by it; click again to reverse. Items with no
+scheduled card group together at one end.
+
+**The Answer column is hidden on purpose.** Reading an answer before you have
+been asked the question spends the review. When you do need to verify content —
+proofreading an import, hunting a typo — choose **Library ▸ Show Answer Column**
+or press ⌥⌘A, and **Library ▸ Hide Answer Column** when you are done. Your choice
+is remembered, so the column stays as you left it the next time you browse.
+Control-clicking the table header works too.
+
+Search still matches answer text whether or not the column is visible, so you
+can find an item by a half-remembered answer without being shown it.
+
+Use the search field to filter by prompt, answer, or item type. The window
+subtitle reports how many of the scope's items are showing.
+
+Double-click a row to open the item. Select several rows to act on them
+together:
+
+- **Move to Deck** moves the whole selection, including to **No Deck**.
+- **Delete** asks for confirmation and removes the items and their cards.
+
 ## Move an existing item
 
-1. Select the item in the list.
+1. Open browse mode and select the item, or open it from the table.
 2. In item detail, open the **Deck** menu.
 3. Choose another deck or **Unassigned**.
 
-The move happens immediately; there is no separate Save button. Counts and
-the current scoped list refresh after the move. If the destination is outside
-the active scope, return to the list or choose the destination scope to find
-the item.
+The move happens immediately; there is no separate Save button. Counts and the
+current scoped list refresh after the move. If the destination is outside the
+active scope, choose the destination scope to find the item.
 
-## Understand the item list
-
-Each row shows:
-
-- content from the item's first field as its title
-- content from the second field as its subtitle
-- the number of generated cards and the item type name
-
-For media fields, the description is used when available; otherwise the media
-kind is shown. Cloze text is shown with its blanks concealed. Select a row for
-the complete field preview and item actions.
+For several items at once, select them in browse mode and use **Move to Deck**.

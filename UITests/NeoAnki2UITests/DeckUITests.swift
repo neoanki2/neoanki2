@@ -80,11 +80,11 @@ final class DeckUITests: NeoAnkiUITestCase {
 
         selectScope("scopeRow-Unassigned", in: app)
         waitForItem(named: "Unassigned Item", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Deck Item"].exists)
+        assertNoItem(named: "Deck Item", in: app)
 
         selectScope("deckRow-Scoped", in: app)
         waitForItem(named: "Deck Item", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Unassigned Item"].exists)
+        assertNoItem(named: "Unassigned Item", in: app)
     }
 
     func testScopedStudyFromDeckSelection() throws {
@@ -109,9 +109,7 @@ final class DeckUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons.identified("studyButton")
-        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(studyButton.isEnabled)
+        assertNothingDue(in: app)
     }
 
     func testCancelCreatingDeckLeavesSidebarUnchanged() throws {
@@ -201,6 +199,6 @@ final class DeckUITests: NeoAnkiUITestCase {
         XCTAssertFalse(app.descendants(matching: .any)["deckRow-Parent"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.descendants(matching: .any)["deckRow-Child"].exists)
         selectScope("scopeRow-AllDecks", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Nested Item"].exists)
+        assertNoItem(named: "Nested Item", in: app)
     }
 }

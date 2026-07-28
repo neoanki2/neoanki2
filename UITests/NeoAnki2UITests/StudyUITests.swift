@@ -8,9 +8,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons.identified("studyButton")
-        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(studyButton.isEnabled)
+        assertNothingDue(in: app)
     }
 
     func testStudyAllGradeButtons() throws {
@@ -61,9 +59,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons.identified("studyButton")
-        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(studyButton.isEnabled)
+        assertNothingDue(in: app)
     }
 
     func testStudyEndSessionWithConfirmation() throws {
@@ -81,7 +77,7 @@ final class StudyUITests: NeoAnkiUITestCase {
         }
 
         waitForLibraryReady(in: app)
-        XCTAssertTrue(app.buttons.identified("studyButton").waitForExistence(timeout: 5))
+        assertDueCardsAvailable(in: app)
     }
 
     func testStudyGradeHelpPopover() throws {

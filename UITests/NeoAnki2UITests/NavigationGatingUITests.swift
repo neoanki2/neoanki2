@@ -36,11 +36,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         showSidebar(in: app)
         selectScope("deckRow-Due Deck", in: app)
 
-        let studyButton = app.buttons.matching(
-            NSPredicate(format: "identifier == 'studyButton' OR label CONTAINS[c] 'Study'")
-        ).firstMatch
-        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(studyButton.isEnabled)
+        assertDueCardsAvailable(in: app)
     }
 
     func testTransferBusyDisablesImport() throws {

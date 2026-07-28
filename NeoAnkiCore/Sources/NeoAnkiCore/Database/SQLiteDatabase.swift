@@ -191,6 +191,13 @@ actor SQLiteDatabase {
                 _ = try getOrCreateLibraryID()
             }
 
+            if current < 14, try tableExists("cards") {
+                for sql in Schema.migrationV14Statements {
+                    try execute(sql)
+                }
+                try backfillCardScheduleColumns()
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -959,10 +966,10 @@ actor SQLiteDatabase {
             let cardStatement = try prepareStatement(
                 """
                 INSERT INTO cards (
-                    id, item_id, template_id, skill, memory, due_at,
+                    id, item_id, template_id, skill, memory, due_at, phase, lapses,
                     is_suspended, deck_id, cloze_group
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """
             )
             defer {
@@ -1001,6 +1008,8 @@ actor SQLiteDatabase {
                             .blob(try encode(card.skill)),
                             .blob(try encode(card.memory)),
                             .double(card.memory.due.timeIntervalSince1970),
+                            .text(card.memory.phase.rawValue),
+                            .int(Int64(card.memory.lapses)),
                             .int(card.isSuspended ? 1 : 0),
                             card.deckID.map { .text($0.uuidString) } ?? .null,
                             card.clozeGroup.map { .int(Int64($0)) } ?? .null,
@@ -1095,9 +1104,10 @@ actor SQLiteDatabase {
             try execute(
                 """
                 INSERT INTO cards (
-                    id, item_id, template_id, skill, memory, due_at, is_suspended, deck_id, cloze_group
+                    id, item_id, template_id, skill, memory, due_at, phase, lapses,
+                    is_suspended, deck_id, cloze_group
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 bindings: [
                     .text(card.id.uuidString),
@@ -1106,6 +1116,8 @@ actor SQLiteDatabase {
                     .blob(skill),
                     .blob(memory),
                     .double(card.memory.due.timeIntervalSince1970),
+                    .text(card.memory.phase.rawValue),
+                    .int(Int64(card.memory.lapses)),
                     .int(card.isSuspended ? 1 : 0),
                     card.deckID.map { .text($0.uuidString) } ?? .null,
                     card.clozeGroup.map { .int(Int64($0)) } ?? .null,
@@ -1158,17 +1170,158 @@ actor SQLiteDatabase {
         return Int(count)
     }
 
+    /// Card counts and rolled-up scheduling state for every item, read in one
+    /// scan. Browsing a few thousand items otherwise costs a query per row.
+    func fetchItemCardStates() throws -> [UUID: ItemCardState] {
+        foldItemCardStates(
+            try query(
+                """
+                SELECT item_id, phase, due_at, lapses, is_suspended
+                FROM cards
+                ORDER BY item_id ASC, due_at ASC;
+                """
+            )
+        )
+    }
+
+    func fetchItemCardState(itemID: UUID) throws -> ItemCardState {
+        let states = foldItemCardStates(
+            try query(
+                """
+                SELECT item_id, phase, due_at, lapses, is_suspended
+                FROM cards
+                WHERE item_id = ?
+                ORDER BY due_at ASC;
+                """,
+                bindings: [.text(itemID.uuidString)]
+            )
+        )
+        return states[itemID] ?? ItemCardState()
+    }
+
+    /// Expects rows ordered by `due_at` ascending within each item.
+    private func foldItemCardStates(_ rows: [[String: Any?]]) -> [UUID: ItemCardState] {
+        var states: [UUID: ItemCardState] = [:]
+        for row in rows {
+            guard
+                let itemIDText = row["item_id"] as? String,
+                let itemID = UUID(uuidString: itemIDText)
+            else { continue }
+
+            var state = states[itemID] ?? ItemCardState()
+            state.cardCount += 1
+
+            let isSuspended = (row["is_suspended"] as? Int64 ?? 0) != 0
+            if !isSuspended {
+                state.lapses = max(state.lapses, Int(row["lapses"] as? Int64 ?? 0))
+                // Rows arrive due-ascending, so the first unsuspended card seen
+                // for an item is the one the learner meets next.
+                if state.dueAt == nil, let dueAt = row["due_at"] as? Double {
+                    state.dueAt = Date(timeIntervalSince1970: dueAt)
+                    state.phase = (row["phase"] as? String).flatMap(Phase.init(rawValue:))
+                }
+            }
+
+            states[itemID] = state
+        }
+        return states
+    }
+
+    /// Resolves every library-summary aggregate in one pass. Conditional
+    /// aggregates keep this to a single scan instead of one query per statistic.
+    func cardScheduleTotals(
+        scope: CardScope,
+        asOf now: Date,
+        leechThreshold: Int
+    ) throws -> CardScheduleTotals {
+        let scope = scopeClause(scope, column: "deck_id")
+        let rows = try query(
+            """
+            SELECT
+                COUNT(*) AS card_count,
+                SUM(CASE WHEN is_suspended = 0 AND due_at <= ? THEN 1 ELSE 0 END) AS due_now,
+                SUM(CASE WHEN is_suspended = 0 AND phase = 'new' THEN 1 ELSE 0 END) AS new_count,
+                SUM(CASE WHEN is_suspended = 0 AND phase = 'learning' THEN 1 ELSE 0 END)
+                    AS learning_count,
+                SUM(CASE WHEN is_suspended = 0 AND phase = 'relearning' THEN 1 ELSE 0 END)
+                    AS relearning_count,
+                SUM(CASE WHEN is_suspended = 0 AND phase = 'review' THEN 1 ELSE 0 END)
+                    AS review_count,
+                SUM(CASE WHEN is_suspended = 0 AND lapses >= ? THEN 1 ELSE 0 END) AS leech_count,
+                MIN(CASE WHEN is_suspended = 0 AND due_at > ? THEN due_at END) AS next_due_at
+            FROM cards
+            WHERE \(scope.sql);
+            """,
+            bindings: [
+                .double(now.timeIntervalSince1970),
+                .int(Int64(leechThreshold)),
+                .double(now.timeIntervalSince1970),
+            ] + scope.bindings
+        )
+
+        guard let row = rows.first else { return CardScheduleTotals() }
+        func count(_ key: String) -> Int {
+            guard let value = row[key] as? Int64 else { return 0 }
+            return Int(value)
+        }
+
+        return CardScheduleTotals(
+            cardCount: count("card_count"),
+            dueNow: count("due_now"),
+            newCount: count("new_count"),
+            learningCount: count("learning_count"),
+            relearningCount: count("relearning_count"),
+            reviewCount: count("review_count"),
+            leechCount: count("leech_count"),
+            nextDueAt: (row["next_due_at"] as? Double).map {
+                Date(timeIntervalSince1970: $0)
+            }
+        )
+    }
+
+    func countItems(scope: CardScope) throws -> Int {
+        let scope = scopeClause(scope, column: "deck_id")
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM items WHERE \(scope.sql);",
+            bindings: scope.bindings
+        )
+        guard let count = rows.first?["count"] as? Int64 else { return 0 }
+        return Int(count)
+    }
+
+    /// Deck identifiers are interpolated only as `?` placeholders; every value
+    /// is bound, never inlined.
+    private func scopeClause(
+        _ scope: CardScope,
+        column: String
+    ) -> (sql: String, bindings: [Binding]) {
+        switch scope {
+        case .all:
+            return ("1 = 1", [])
+        case .unassigned:
+            return ("\(column) IS NULL", [])
+        case let .decks(deckIDs):
+            guard !deckIDs.isEmpty else { return ("0 = 1", []) }
+            let placeholders = Array(repeating: "?", count: deckIDs.count)
+                .joined(separator: ", ")
+            let ordered = deckIDs.sorted { $0.uuidString < $1.uuidString }
+            return ("\(column) IN (\(placeholders))", ordered.map { .text($0.uuidString) })
+        }
+    }
+
     func updateCardMemory(_ cardID: UUID, memory: MemoryState) throws {
         let memoryData = try encode(memory)
         try execute(
             """
             UPDATE cards
-            SET memory = ?, due_at = ?
+            SET memory = ?, due_at = ?, phase = ?, lapses = ?
             WHERE id = ?;
             """,
             bindings: [
                 .blob(memoryData),
                 .double(memory.due.timeIntervalSince1970),
+                .text(memory.phase.rawValue),
+                .int(Int64(memory.lapses)),
                 .text(cardID.uuidString),
             ]
         )
@@ -1997,6 +2150,16 @@ actor SQLiteDatabase {
         return !rows.isEmpty
     }
 
+    /// Absent tables report no columns, so this answers for both questions.
+    /// Uses the table-valued pragma so the table name stays a bound value.
+    private func columnExists(_ column: String, in table: String) throws -> Bool {
+        let rows = try query(
+            "SELECT name FROM pragma_table_info(?) WHERE name = ? LIMIT 1;",
+            bindings: [.text(table), .text(column)]
+        )
+        return !rows.isEmpty
+    }
+
     private func backfillCardDueDates() throws {
         let rows = try query(
             """
@@ -2017,6 +2180,32 @@ actor SQLiteDatabase {
                 "UPDATE cards SET due_at = ? WHERE id = ?;",
                 bindings: [
                     .double(memory.due.timeIntervalSince1970),
+                    .text(cardID.uuidString),
+                ]
+            )
+        }
+    }
+
+    /// Every pre-v14 card carries the column defaults, so each row is rewritten
+    /// from its own encoded memory rather than filtered on a sentinel value.
+    private func backfillCardScheduleColumns() throws {
+        guard try columnExists("memory", in: "cards") else { return }
+        let rows = try query("SELECT id, memory FROM cards;")
+        for row in rows {
+            guard
+                let idText = row["id"] as? String,
+                let cardID = UUID(uuidString: idText),
+                let memoryData = row["memory"] as? Data
+            else { continue }
+
+            // A card whose memory cannot be decoded is already unschedulable.
+            // Leaving it on the column defaults beats failing the whole upgrade.
+            guard let memory = try? decode(MemoryState.self, from: memoryData) else { continue }
+            try execute(
+                "UPDATE cards SET phase = ?, lapses = ? WHERE id = ?;",
+                bindings: [
+                    .text(memory.phase.rawValue),
+                    .int(Int64(memory.lapses)),
                     .text(cardID.uuidString),
                 ]
             )

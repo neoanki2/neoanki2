@@ -11,6 +11,12 @@ struct NeoAnki2App: App {
     @State private var schedulingModel: SchedulingModel?
     @State private var bootstrapError: String?
 
+    init() {
+        if AppDatabase.isTesting {
+            AppPreferences.resetForTesting()
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -36,7 +42,6 @@ struct NeoAnki2App: App {
         }
         .defaultSize(width: 960, height: 640)
         .commands {
-            CommandGroup(replacing: .newItem) {}
             LibraryCommands()
             StudyCommands()
             SchedulingCommands(model: schedulingModel)

@@ -232,12 +232,18 @@ class NeoAnkiUITestCase: XCTestCase {
         if app.descendants(matching: .any)["emptyLibraryState"].exists { return true }
         if app.buttons["addItemEmptyState"].exists { return true }
         if app.buttons["addItemToolbar"].exists { return true }
+        if app.descendants(matching: .any)["scopeHome"].exists { return true }
+        if app.descendants(matching: .any)["itemBrowserTable"].exists { return true }
         if app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH 'itemRow-'")
         ).firstMatch.exists {
             return true
         }
-        let emptyTitles = ["No Items Yet", "No Unassigned Items", "No Items in Deck"]
+        let emptyTitles = [
+            "Nothing to Remember Yet",
+            "No Unassigned Items",
+            "No Items in This Deck",
+        ]
         for title in emptyTitles {
             let label = NSPredicate(format: "label CONTAINS[c] %@", title)
             if app.descendants(matching: .any).matching(label).firstMatch.exists { return true }
@@ -326,7 +332,48 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.waitForNonExistence(timeout: 10))
     }
 
+    /// Item rows live in browse mode, not on the scope home, so anything that
+    /// asserts on a row has to get there first.
+    func isBrowsing(in app: XCUIApplication) -> Bool {
+        app.descendants(matching: .any)["itemBrowserTable"].exists
+            || app.descendants(matching: .any)["browseNoSearchResults"].exists
+            || app.buttons.identified("browseDone").exists
+    }
+
+    func enterBrowseMode(in app: XCUIApplication, timeout: TimeInterval = 10) {
+        if isBrowsing(in: app) { return }
+        waitForLibraryReady(in: app)
+        if isBrowsing(in: app) { return }
+
+        let browse = app.buttons.identified("browseToolbar")
+        if browse.waitForExistence(timeout: 3), browse.isEnabled {
+            browse.click()
+        } else {
+            app.typeKey("b", modifierFlags: [.command, .option])
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if isBrowsing(in: app) { return }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        XCTFail("Browse mode did not open within \(timeout)s")
+    }
+
+    func leaveBrowseMode(in app: XCUIApplication) {
+        guard isBrowsing(in: app) else { return }
+        let done = app.buttons.identified("browseDone")
+        if done.exists {
+            done.click()
+        } else {
+            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        }
+        _ = done.waitForNonExistence(timeout: 5)
+        waitForLibraryReady(in: app)
+    }
+
     func waitForItem(named title: String, in app: XCUIApplication, timeout: TimeInterval = 10) {
+        enterBrowseMode(in: app, timeout: timeout)
         let row = app.descendants(matching: .any).identified("itemRow-\(title)")
         if row.waitForExistence(timeout: timeout) {
             return
@@ -335,6 +382,54 @@ class NeoAnkiUITestCase: XCTestCase {
         let labelPredicate = NSPredicate(format: "label CONTAINS[c] %@", title)
         let match = app.descendants(matching: .any).matching(labelPredicate).firstMatch
         XCTAssertTrue(match.waitForExistence(timeout: 2))
+    }
+
+    /// A scope with no items cannot be browsed at all, which is itself proof the
+    /// item is gone.
+    func assertNoItem(
+        named title: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        returnToLibrary(in: app)
+        let browse = app.buttons.identified("browseToolbar")
+        if !isBrowsing(in: app), browse.exists, browse.isEnabled {
+            enterBrowseMode(in: app)
+        }
+        XCTAssertFalse(
+            app.descendants(matching: .any)["itemRow-\(title)"].exists,
+            file: file,
+            line: line
+        )
+    }
+
+    /// The scope home replaces the old dead disabled Study button with the time
+    /// the next card comes back, so "caught up" is an absence plus a sentence.
+    func assertNothingDue(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        leaveBrowseMode(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["scopeHomeNextDue"].waitForExistence(timeout: 10),
+            "Expected the scope home to say when the next card is due",
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(app.buttons.identified("studyButton").exists, file: file, line: line)
+    }
+
+    func assertDueCardsAvailable(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        leaveBrowseMode(in: app)
+        let studyButton = app.buttons.identified("studyButton")
+        XCTAssertTrue(studyButton.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(studyButton.isEnabled, file: file, line: line)
     }
 
     func field(named name: String, in app: XCUIApplication) -> XCUIElement {
@@ -354,8 +449,8 @@ class NeoAnkiUITestCase: XCTestCase {
         if app.buttons.identified("studySessionDone").exists {
             app.buttons.identified("studySessionDone").click()
         }
-        if app.buttons.identified("studyBackToItems").exists {
-            app.buttons.identified("studyBackToItems").click()
+        if app.buttons.identified("studyBackToLibrary").exists {
+            app.buttons.identified("studyBackToLibrary").click()
         }
         if app.buttons.identified("cancelAddItem").exists {
             app.buttons.identified("cancelAddItem").click()
@@ -409,6 +504,17 @@ class NeoAnkiUITestCase: XCTestCase {
             app.buttons.identified("templatesDone").waitForExistence(timeout: 10)
                 || app.descendants(matching: .any)["templatesItemTypesHeader"].waitForExistence(timeout: 10)
         )
+    }
+
+    /// `waitForExistence` has no negative counterpart, and asserting absence
+    /// immediately races the animation that removes the element.
+    func waitForDisappearance(of element: XCUIElement, timeout: TimeInterval = 5) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if !element.exists { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return !element.exists
     }
 
     func selectMenuItem(_ name: String, in app: XCUIApplication) {
@@ -560,6 +666,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func openItemDetail(named title: String, in app: XCUIApplication) {
         returnToLibrary(in: app)
+        enterBrowseMode(in: app)
         let row = app.descendants(matching: .any).identified("itemRow-\(title)")
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.doubleClick()
@@ -605,8 +712,8 @@ class NeoAnkiUITestCase: XCTestCase {
     func finishStudySession(in app: XCUIApplication) {
         if app.buttons.identified("studySessionDone").waitForExistence(timeout: 5) {
             app.buttons.identified("studySessionDone").click()
-        } else if app.buttons.identified("studyBackToItems").waitForExistence(timeout: 2) {
-            app.buttons.identified("studyBackToItems").click()
+        } else if app.buttons.identified("studyBackToLibrary").waitForExistence(timeout: 2) {
+            app.buttons.identified("studyBackToLibrary").click()
         }
         waitForLibraryReady(in: app)
     }

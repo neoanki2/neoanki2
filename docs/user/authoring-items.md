@@ -13,7 +13,8 @@ fields you fill in and the templates that generate study cards.
 ## Add an item
 
 1. Select the destination deck if you want the new item preassigned there.
-2. Choose **Add Item** in the empty state or toolbar, or press Command-N.
+2. Choose **Add Item** in the empty state or toolbar, choose **File ▸ New Item**,
+   or press Command-N.
 3. If more than one item type exists, choose a **Type**.
 4. If decks exist, choose a **Deck** or **Unassigned**.
 5. Complete the required fields.

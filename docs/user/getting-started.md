@@ -158,12 +158,13 @@ remove the library. Deleting the Application Support directory does.
 The main window is a split view:
 
 - The sidebar contains **All Decks**, the deck tree, and **Unassigned**.
-- The detail area shows the selected scope's item list, empty state, item
-  detail, or the active task.
+- The detail area shows the selected scope's home, browse mode, item detail, or
+  the active task.
 
-Select an item row to open its detail. Select another sidebar scope to
-filter the list and clear the current item selection. The sidebar can also be shown
-or hidden with the standard macOS split-view controls.
+Selecting a scope opens its home: what is due, what to study, and a link into
+browse mode. Browse mode is where you search items and open one for editing;
+open it with **Command-Option-B** and leave it with **Escape**. The sidebar can
+also be shown or hidden with the standard macOS split-view controls.
 
 NeoAnki2 uses focused, detail-only modes while adding an item, managing item
 types, or studying. The sidebar collapses automatically to make room, but can

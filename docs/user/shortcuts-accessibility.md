@@ -45,15 +45,18 @@ The app adds these commands to the standard macOS menu bar.
 
 ### File
 
+- **New Item** — **Command-N** — adds an item to the selected scope.
 - **Import…** opens a JSON or CSV file.
 - **Import Deck…** opens a `.neodeck` file or `.neoanki` bundle.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
 
-The standard **New** command is removed. Create decks and items with controls in
-the library instead.
+There is no **New Window** or **New Tab**; NeoAnki2 has one library. Create decks
+with the controls in the sidebar.
 
 ### Library
 
+- **Browse Items** — **Command-Option-B**
+- **Show / Hide Answer Column** — **Command-Option-A** (browse mode only)
 - **Item Types…** — **Command-Shift-T**
 
 ### Study
@@ -82,10 +85,13 @@ the answer is revealed.
 
 - **Command-N:** add an item from the library view.
 - **Command-Shift-S:** start studying when the selected scope has due cards.
+- **Command-Option-B:** open browse mode for the selected scope.
+- **Command-Option-A:** show or hide the Answer column while browsing.
 - **Command-Shift-T:** open Item Types.
 - **Return:** activate the default save, create, import, check, or reveal action
   in the current sheet or editor.
-- **Escape:** cancel a sheet/editor or close Item Types with **Done**.
+- **Escape:** cancel a sheet/editor, leave browse mode, or close Item Types with
+  **Done**.
 
 ### Study
 

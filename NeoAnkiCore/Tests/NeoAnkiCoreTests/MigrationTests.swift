@@ -46,7 +46,7 @@ import Testing
 
     try await database.migrate()
 
-    #expect(try integer("SELECT version FROM schema_version;", at: url) == 13)
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
     #expect(try tableExists("portable_item_type_mappings", at: url))
     #expect(try await database.getOrCreateLibraryID() == libraryID)
     #expect(try integer(
@@ -139,6 +139,112 @@ import Testing
     #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
     #expect(try columnExists("cloze_group", in: "cards", at: url))
     #expect(try integer("SELECT COUNT(*) FROM cards;", at: url) == 1)
+}
+
+@Test func versionThirteenMigrationBackfillsPhaseAndLapsesFromMemory() async throws {
+    let url = migrationDatabaseURL()
+    let reviewID = UUID()
+    let newID = UUID()
+    let reviewMemory = MemoryState(
+        stability: 12,
+        difficulty: 6,
+        due: Date(timeIntervalSince1970: 1_725_000_000),
+        lastReview: Date(timeIntervalSince1970: 1_724_000_000),
+        reps: 9,
+        lapses: 3,
+        phase: .review
+    )
+    let reviewHex = try memoryHex(reviewMemory)
+    let newHex = try memoryHex(MemoryState(due: Date(timeIntervalSince1970: 1_726_000_000)))
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (13);
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY NOT NULL,
+            item_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            skill BLOB NOT NULL,
+            memory BLOB NOT NULL,
+            due_at REAL NOT NULL DEFAULT 0,
+            is_suspended INTEGER NOT NULL DEFAULT 0,
+            deck_id TEXT,
+            cloze_group INTEGER
+        );
+        INSERT INTO cards (id, item_id, template_id, skill, memory, due_at)
+        VALUES (
+            '\(reviewID.uuidString)', '\(UUID().uuidString)', '\(UUID().uuidString)',
+            X'7b7d', X'\(reviewHex)', \(reviewMemory.due.timeIntervalSince1970)
+        );
+        INSERT INTO cards (id, item_id, template_id, skill, memory, due_at)
+        VALUES (
+            '\(newID.uuidString)', '\(UUID().uuidString)', '\(UUID().uuidString)',
+            X'7b7d', X'\(newHex)', 1726000000
+        );
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try columnExists("phase", in: "cards", at: url))
+    #expect(try columnExists("lapses", in: "cards", at: url))
+    #expect(try text(
+        "SELECT phase FROM cards WHERE id = '\(reviewID.uuidString)';",
+        at: url
+    ) == "review")
+    #expect(try integer(
+        "SELECT lapses FROM cards WHERE id = '\(reviewID.uuidString)';",
+        at: url
+    ) == 3)
+    #expect(try text("SELECT phase FROM cards WHERE id = '\(newID.uuidString)';", at: url) == "new")
+    #expect(try integer(
+        "SELECT lapses FROM cards WHERE id = '\(newID.uuidString)';",
+        at: url
+    ) == 0)
+    #expect(try integer(
+        """
+        SELECT COUNT(*) FROM sqlite_master
+        WHERE type = 'index' AND name = 'idx_cards_phase';
+        """,
+        at: url
+    ) == 1)
+}
+
+@Test func versionThirteenMigrationSurvivesUndecodableMemory() async throws {
+    let url = migrationDatabaseURL()
+    let cardID = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (13);
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY NOT NULL,
+            item_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            skill BLOB NOT NULL,
+            memory BLOB NOT NULL,
+            due_at REAL NOT NULL DEFAULT 0,
+            is_suspended INTEGER NOT NULL DEFAULT 0,
+            deck_id TEXT,
+            cloze_group INTEGER
+        );
+        INSERT INTO cards (id, item_id, template_id, skill, memory, due_at)
+        VALUES (
+            '\(cardID.uuidString)', '\(UUID().uuidString)', '\(UUID().uuidString)',
+            X'7b7d', X'7b7d', 0
+        );
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try text("SELECT phase FROM cards WHERE id = '\(cardID.uuidString)';", at: url) == "new")
 }
 
 @Test func versionOneMigrationBackfillsDueDateAndReachesCurrentSchema() async throws {
@@ -326,6 +432,28 @@ private func integer(_ sql: String, at url: URL) throws -> Int {
         }
         return Int(sqlite3_column_int64(statement, 0))
     }
+}
+
+private func text(_ sql: String, at url: URL) throws -> String {
+    try withMigrationDatabase(at: url) { database in
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement
+        else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(database)))
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let value = sqlite3_column_text(statement, 0)
+        else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(database)))
+        }
+        return String(cString: value)
+    }
+}
+
+private func memoryHex(_ memory: MemoryState) throws -> String {
+    try JSONEncoder().encode(memory).map { String(format: "%02x", $0) }.joined()
 }
 
 private func double(_ sql: String, at url: URL) throws -> Double {

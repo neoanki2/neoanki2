@@ -18,6 +18,10 @@ struct ContentView: View {
     @State private var isAddingItem = false
     @State private var isManagingTemplates = false
     @State private var isStudying = false
+    @State private var isBrowsing = false
+    /// Persisted per user, not per browse session: whether you want to see
+    /// answers is a standing preference, not something to rediscover.
+    @AppStorage(AppPreferences.browseShowsAnswerColumn) private var browseShowsAnswerColumn = false
     @State private var studyModel: StudyModel?
     @State private var studyScope: StudyScope = .allDecks
     @State private var templatesModel: TemplatesModel?
@@ -56,7 +60,7 @@ struct ContentView: View {
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await decksModel.load()
+                        await refreshLibrary()
                     }
                 }
             )
@@ -102,8 +106,7 @@ struct ContentView: View {
             Task { await reloadScope() }
         }
         .task {
-            await decksModel.load()
-            await reloadScope()
+            await refreshLibrary()
             await openTestingTransfersIfRequested()
         }
         .fileImporter(
@@ -204,11 +207,22 @@ struct ContentView: View {
 
     private var libraryCommandHandlers: LibraryCommandHandlers {
         LibraryCommandHandlers(
+            openAddItem: { openAddItem() },
             openImport: { openImport() },
             openPortableDeckImport: { isChoosingPortableDeck = true },
             openPortableDeckExport: { openPortableDeckExport() },
             openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
+            openBrowse: { openBrowse() },
+            toggleAnswerColumn: { browseShowsAnswerColumn.toggle() },
+            isAnswerColumnVisible: browseShowsAnswerColumn,
+            canToggleAnswerColumn: isBrowsing,
+            canAddItem: !itemsModel.itemTypes.isEmpty
+                && !isStudying
+                && !isManagingTemplates
+                && !isAddingItem
+                && !isShowingImport
+                && !isShowingDeckBuilder,
             canImport: !itemsModel.isLoading
                 && !itemsModel.itemTypes.isEmpty
                 && !isStudying
@@ -219,7 +233,12 @@ struct ContentView: View {
             canImportPortableDeck: canTransferPortableDeck,
             canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
             canOpenDeckBuilder: canTransferPortableDeck && !deckBuilderRegistry.features.isEmpty,
-            canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem
+            canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem,
+            canBrowse: !isBrowsing
+                && !isStudying
+                && !isManagingTemplates
+                && !isAddingItem
+                && !itemsModel.items.isEmpty
         )
     }
 
@@ -316,22 +335,42 @@ struct ContentView: View {
                     onDeleted: { self.selectedItemID = nil }
                 )
             }
-        } else {
-            DeckDetailView(
+        } else if isBrowsing {
+            ItemBrowserView(
                 itemsModel: itemsModel,
                 decksModel: decksModel,
+                showsAnswerColumn: $browseShowsAnswerColumn,
                 scope: decksModel.studyScope,
-                selectedItemID: $selectedItemID,
+                onOpenItem: { selectedItemID = $0 },
                 onAddItem: { openAddItem() },
                 onStudy: { startStudy() },
+                onDone: { closeBrowse() }
+            )
+        } else {
+            ScopeHomeView(
+                itemsModel: itemsModel,
+                scope: decksModel.studyScope,
+                onStudy: { startStudy() },
+                onBrowse: { openBrowse() },
+                onAddItem: { openAddItem() },
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await decksModel.load()
+                        await refreshLibrary()
                     }
                 }
             )
         }
+    }
+
+    private func openBrowse() {
+        selectedItemID = nil
+        isBrowsing = true
+    }
+
+    private func closeBrowse() {
+        isBrowsing = false
+        itemsModel.searchText = ""
     }
 
     private func openAddItem() {
@@ -424,8 +463,7 @@ struct ContentView: View {
             message: "\(count) \(noun) imported. Importing the same file again will create duplicates."
         )
         Task {
-            await decksModel.load()
-            await reloadScope()
+            await refreshLibrary()
         }
     }
 
@@ -475,12 +513,13 @@ struct ContentView: View {
     }
 
     private func refreshAfterPortableDeckImport(_ result: PortableDeckImportResult) async {
-        await decksModel.load()
+        let now = Date.now
+        await decksModel.load(asOf: now)
         if let rootID = result.deckIDs.first,
            decksModel.summaries.contains(where: { $0.id == rootID }) {
             decksModel.selectedScope = .deck(rootID)
         }
-        await reloadScope()
+        await reloadScope(asOf: now)
         await templatesModel?.load()
     }
 
@@ -523,14 +562,24 @@ struct ContentView: View {
     private func closeAddItem() {
         isAddingItem = false
         columnVisibility = .all
-        Task { await reloadScope() }
+        // A new item changes deck counts too, so the sidebar reloads with it.
+        Task { await refreshLibrary() }
     }
 
-    private func reloadScope() async {
+    private func reloadScope(asOf now: Date = .now) async {
         let scope = decksModel.studyScope
         itemsModel.setCachedScope(scope)
         itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
-        await itemsModel.load(scope: scope)
+        await itemsModel.load(scope: scope, asOf: now)
+    }
+
+    /// Reloads decks and the selected scope against one instant. Two separate
+    /// `.now` reads are what let the sidebar total and the detail pane disagree
+    /// about how many cards are due.
+    private func refreshLibrary() async {
+        let now = Date.now
+        await decksModel.load(asOf: now)
+        await reloadScope(asOf: now)
     }
 
     private func startStudy() {
@@ -543,8 +592,7 @@ struct ContentView: View {
         isStudying = false
         studyModel = nil
         Task {
-            await decksModel.load()
-            await reloadScope()
+            await refreshLibrary()
         }
     }
 

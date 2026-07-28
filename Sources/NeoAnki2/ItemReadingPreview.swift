@@ -219,9 +219,10 @@ struct ItemDetailView: View {
         isMovingDeck = true
         defer { isMovingDeck = false }
 
-        if await model.moveItem(id: summary.id, to: deckID, scope: scope) {
+        let now = Date.now
+        if await model.moveItem(id: summary.id, to: deckID, scope: scope, asOf: now) {
             item?.deckID = deckID
-            await decksModel.load()
+            await decksModel.load(asOf: now)
         } else {
             selectedDeckID = item?.deckID
         }

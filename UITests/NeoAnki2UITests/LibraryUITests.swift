@@ -110,7 +110,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
         selectScope("scopeRow-AllDecks", in: app)
         waitForItem(named: "Deck Item", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Loose Item"].exists)
+        assertNoItem(named: "Loose Item", in: app)
     }
 
     func testDeleteAllUnassignedFromSidebarMenu() throws {
@@ -126,7 +126,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
         selectScope("scopeRow-Unassigned", in: app)
         XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Sidebar Delete"].exists)
+        assertNoItem(named: "Sidebar Delete", in: app)
     }
 
     func testEditItemFromDetailUpdatesLibraryAndPreview() throws {
@@ -147,7 +147,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         ).firstMatch.waitForExistence(timeout: 5))
         returnToLibrary(in: app)
         waitForItem(named: "Japan", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-France"].exists)
+        assertNoItem(named: "France", in: app)
     }
 
     func testDirtyItemEditCanKeepEditingThenDiscard() throws {
@@ -167,7 +167,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons.identified("deleteItem").waitForExistence(timeout: 5))
         returnToLibrary(in: app)
         waitForItem(named: "Original", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Changed"].exists)
+        assertNoItem(named: "Changed", in: app)
     }
 
     func testImageEditRequiresDescriptionBeforeSaving() throws {
@@ -190,7 +190,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         app.buttons.identified("confirmDeleteItem").click()
 
         assertEmptyLibrary(in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["itemRow-Remove"].exists)
+        assertNoItem(named: "Remove", in: app)
     }
 
     func testMoveItemToDeckFromDetail() throws {

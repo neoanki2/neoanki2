@@ -40,8 +40,12 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         captureDocumentationScreenshot(
             named: "library-populated",
             of: emptyApp,
-            scenario: "library containing one basic item",
-            expectedVisibleIdentifiers: ["itemRow-What is spaced repetition?", "addItemToolbar"]
+            scenario: "browse mode listing one basic item",
+            expectedVisibleIdentifiers: [
+                "itemBrowserTable",
+                "itemRow-What is spaced repetition?",
+                "addItemToolbar",
+            ]
         )
         openItemDetail(named: "What is spaced repetition?", in: emptyApp)
         captureDocumentationScreenshot(

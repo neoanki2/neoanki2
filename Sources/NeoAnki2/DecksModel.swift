@@ -75,14 +75,16 @@ final class DecksModel {
         selectedDeckID
     }
 
-    func load() async {
+    /// Every count in one reload is measured against the same instant, so the
+    /// sidebar totals cannot drift from the detail pane's.
+    func load(asOf now: Date = .now) async {
         isLoading = true
         errorMessage = nil
         do {
-            summaries = try await store.deckSummaries()
+            summaries = try await store.deckSummaries(asOf: now)
             deckTree = DeckTree.build(from: summaries)
-            allDecksDueCount = try await store.dueCount(scope: .allDecks)
-            unassignedDueCount = try await store.unassignedDueCount()
+            allDecksDueCount = try await store.dueCount(scope: .allDecks, asOf: now)
+            unassignedDueCount = try await store.unassignedDueCount(asOf: now)
             unassignedItemCount = try await store.unassignedItemCount()
 
             if case let .deck(id) = selectedScope,

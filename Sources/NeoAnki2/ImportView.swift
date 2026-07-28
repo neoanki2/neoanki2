@@ -26,7 +26,7 @@ struct ImportView: View {
                         .accessibilityIdentifier("importItemTypePicker")
                     } else {
                         Text("JSON files choose the item type named in the file.")
-                            .font(.callout)
+                            .font(DesignSystem.Typography.uiSecondary)
                             .foregroundStyle(.secondary)
                     }
 
@@ -42,7 +42,7 @@ struct ImportView: View {
                         }
                         .accessibilityIdentifier("chooseImportMediaDirectory")
                         Text("This file uses relative media paths. Choose the containing folder so NeoAnki2 can securely access those files during import.")
-                            .font(.callout)
+                            .font(DesignSystem.Typography.uiSecondary)
                             .foregroundStyle(.secondary)
                     }
                 } header: {

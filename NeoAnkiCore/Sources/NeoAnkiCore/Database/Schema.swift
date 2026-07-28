@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 13
+    static let version = 14
 
     static let createStatements: [String] = [
         """
@@ -49,6 +49,8 @@ enum Schema {
             skill BLOB NOT NULL,
             memory BLOB NOT NULL,
             due_at REAL NOT NULL DEFAULT 0,
+            phase TEXT NOT NULL DEFAULT 'new',
+            lapses INTEGER NOT NULL DEFAULT 0,
             is_suspended INTEGER NOT NULL DEFAULT 0,
             deck_id TEXT,
             cloze_group INTEGER
@@ -102,6 +104,9 @@ enum Schema {
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_cards_due_at ON cards(due_at);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_phase ON cards(phase);
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
@@ -269,6 +274,18 @@ enum Schema {
         """
         CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_local_type
         ON portable_item_type_mappings(local_type_id);
+        """,
+    ]
+
+    /// Lifts `phase` and `lapses` out of the encoded `memory` blob so library
+    /// summaries and per-item scheduling state resolve in SQL instead of
+    /// decoding every card. Values are backfilled from `memory` by
+    /// SQLiteDatabase inside the migration transaction.
+    static let migrationV14Statements: [String] = [
+        "ALTER TABLE cards ADD COLUMN phase TEXT NOT NULL DEFAULT 'new';",
+        "ALTER TABLE cards ADD COLUMN lapses INTEGER NOT NULL DEFAULT 0;",
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_phase ON cards(phase);
         """,
     ]
 

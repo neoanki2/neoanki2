@@ -139,7 +139,7 @@ struct TemplatesView: View {
                                 .font(DesignSystem.Typography.uiCaption)
                                 .foregroundStyle(.tertiary)
                         }
-                        .padding(.vertical, 2)
+                        .padding(.vertical, DesignSystem.Spacing.rowTight)
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(
                             "\(itemType.name), \(itemType.templates.count) templates, \(itemType.fields.count) fields"

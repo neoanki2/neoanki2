@@ -16,7 +16,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
         endStudyViaMenu(in: app)
-        XCTAssertTrue(app.buttons.identified("studyButton").waitForExistence(timeout: 5))
+        assertDueCardsAvailable(in: app)
     }
 
     func testGradeViaKeyboardShortcuts() throws {
@@ -97,9 +97,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
 
-        let studyButton = app.buttons.identified("studyButton")
-        XCTAssertTrue(studyButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(studyButton.isEnabled)
+        assertNothingDue(in: app)
     }
 
     func testDismissUndoBanner() throws {

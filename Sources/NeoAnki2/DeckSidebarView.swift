@@ -206,9 +206,9 @@ struct DeckSidebarView: View {
         Label {
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                 Text(title)
-                    .font(.headline)
+                    .font(DesignSystem.Typography.uiRowTitle)
                 Text(subtitle)
-                    .font(.caption)
+                    .font(DesignSystem.Typography.uiRowMeta)
                     .foregroundStyle(.tertiary)
             }
         } icon: {
@@ -264,9 +264,9 @@ private struct DeckSidebarNode: View {
         Label {
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                 Text(summary.name)
-                    .font(.headline)
+                    .font(DesignSystem.Typography.uiRowTitle)
                 Text(rowSubtitle(for: summary))
-                    .font(.caption)
+                    .font(DesignSystem.Typography.uiRowMeta)
                     .foregroundStyle(.tertiary)
             }
         } icon: {
