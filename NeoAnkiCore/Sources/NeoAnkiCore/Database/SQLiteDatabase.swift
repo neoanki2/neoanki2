@@ -480,7 +480,7 @@ actor SQLiteDatabase {
             "SELECT definition FROM item_types WHERE id = ? LIMIT 1;",
             bindings: [.text(id.uuidString)]
         )
-        guard let row = rows.first, let data = payload(row["definition"]) else { return nil }
+        guard let row = rows.first, let data = payload(row, "definition") else { return nil }
         return try decode(ItemType.self, from: data)
     }
 
@@ -491,7 +491,7 @@ actor SQLiteDatabase {
             "SELECT definition FROM item_types WHERE id = ? LIMIT 1;",
             bindings: [.text(id.uuidString)]
         )
-        guard let row = rows.first, let data = payload(row["definition"]) else { return nil }
+        guard let row = rows.first, let data = payload(row, "definition") else { return nil }
         do {
             let itemType = try decode(ItemType.self, from: data)
             try ItemTypeValidation.validate(itemType)
@@ -508,7 +508,7 @@ actor SQLiteDatabase {
             "SELECT definition FROM item_types WHERE name = ? LIMIT 1;",
             bindings: [.text(name)]
         )
-        guard let row = rows.first, let data = payload(row["definition"]) else { return nil }
+        guard let row = rows.first, let data = payload(row, "definition") else { return nil }
         return try decode(ItemType.self, from: data)
     }
 
@@ -572,7 +572,7 @@ actor SQLiteDatabase {
         for row in rows {
             let persistedID = row["id"] as? String ?? ""
             let name = row["name"] as? String ?? "Unnamed item type"
-            guard let data = payload(row["definition"]) else {
+            guard let data = payload(row, "definition") else {
                 corruptions.append(.init(persistedID: persistedID, name: name))
                 continue
             }
@@ -598,7 +598,7 @@ actor SQLiteDatabase {
         )
         guard let row = rows.first,
               let name = row["name"] as? String,
-              let definition = payload(row["definition"])
+              let definition = payload(row, "definition")
         else {
             throw DatabaseError.itemTypeNotFound(id)
         }
@@ -1472,7 +1472,7 @@ actor SQLiteDatabase {
             """
         )
         return rows.compactMap { row in
-            guard let data = payload(row["log"]),
+            guard let data = payload(row, "log"),
                   let sequence = row["sequence"] as? Int64,
                   let log = try? decoder.decode(ReviewLog.self, from: data)
             else { return nil }
@@ -1490,7 +1490,7 @@ actor SQLiteDatabase {
             """,
             bindings: [.text(profileID)]
         )
-        guard let data = payload(rows.first?["parameters"]) else { return nil }
+        guard let row = rows.first, let data = payload(row, "parameters") else { return nil }
         guard let parameters = try? decoder.decode(FSRSScheduler.Parameters.self, from: data) else {
             return nil
         }
@@ -1593,7 +1593,7 @@ actor SQLiteDatabase {
             else {
                 throw DatabaseError.reviewLogNotFound(reviewLogID)
             }
-            guard let memoryData = payload(row["memory_before"]) else {
+            guard let memoryData = payload(row, "memory_before") else {
                 throw DatabaseError.queryFailed(
                     "This legacy review does not contain restorable memory."
                 )
@@ -2299,7 +2299,7 @@ actor SQLiteDatabase {
             guard
                 let idText = row["id"] as? String,
                 let cardID = UUID(uuidString: idText),
-                let memoryData = payload(row["memory"])
+                let memoryData = payload(row, "memory")
             else { continue }
 
             let memory = try decode(MemoryState.self, from: memoryData)
@@ -2322,7 +2322,7 @@ actor SQLiteDatabase {
             guard
                 let idText = row["id"] as? String,
                 let cardID = UUID(uuidString: idText),
-                let memoryData = payload(row["memory"])
+                let memoryData = payload(row, "memory")
             else { continue }
 
             // A card whose memory cannot be decoded is already unschedulable.
@@ -2346,7 +2346,7 @@ actor SQLiteDatabase {
         let rows = try query("SELECT id, fields FROM items;")
         for row in rows {
             guard let id = row["id"] as? String,
-                  let data = payload(row["fields"]),
+                  let data = payload(row, "fields"),
                   let object = try? JSONSerialization.jsonObject(with: data)
             else { continue }
             let (converted, changed) = try convertLegacyMediaObject(object)
@@ -2523,8 +2523,8 @@ actor SQLiteDatabase {
             let itemID = UUID(uuidString: itemIDText),
             let templateIDText = row["template_id"] as? String,
             let templateID = UUID(uuidString: templateIDText),
-            let skillData = payload(row["skill"]),
-            let memoryData = payload(row["memory"]),
+            let skillData = payload(row, "skill"),
+            let memoryData = payload(row, "memory"),
             let suspendedValue = row["is_suspended"] as? Int64
         else {
             throw DatabaseError.decodingFailed
@@ -2553,8 +2553,8 @@ actor SQLiteDatabase {
             let id = UUID(uuidString: idText),
             let itemTypeText = row["item_type_id"] as? String,
             let itemTypeID = UUID(uuidString: itemTypeText),
-            let fieldsData = payload(row["fields"]),
-            let tagsData = payload(row["tags"]),
+            let fieldsData = payload(row, "fields"),
+            let tagsData = payload(row, "tags"),
             let createdAt = row["created_at"] as? Double,
             let updatedAt = row["updated_at"] as? Double
         else {
@@ -2805,8 +2805,8 @@ actor SQLiteDatabase {
     /// affinity, so SQLite keeps whatever storage class a writer bound. A row
     /// repaired by an external tool that bound the same JSON as text is still
     /// readable, and reading it beats failing every query that selects the row.
-    private func payload(_ value: Any?) -> Data? {
-        switch value {
+    private func payload(_ row: [String: Any?], _ column: String) -> Data? {
+        switch row[column] ?? nil {
         case let data as Data:
             return data
         case let text as String:
