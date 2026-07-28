@@ -176,13 +176,12 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedForm = advancedApp.descendants(matching: .any)
             .identified("templateEditorForm")
         XCTAssertTrue(advancedForm.waitForExistence(timeout: 3))
-        // A form taller than the display has no hit point, so a swipe gesture
-        // cannot be placed on it. Scrolling reaches the same content without
-        // needing one.
+        // A form taller than the display has no hit point, so no gesture can be
+        // placed on the form itself. This nudge is only to bring the answer
+        // controls closer; scrolling by that element below is what the capture
+        // actually depends on, so skip it rather than fail the run.
         if advancedForm.isHittable {
             advancedForm.swipeUp()
-        } else {
-            advancedForm.scroll(byDeltaX: 0, deltaY: 240)
         }
         let answerReveal = advancedApp.popUpButtons.identified("answerSlotReveal")
         XCTAssertTrue(answerReveal.waitForExistence(timeout: 5))
