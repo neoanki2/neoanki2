@@ -161,14 +161,10 @@ struct DeckSidebarView: View {
     }
 
     private var unassignedCaption: String {
-        var parts: [String] = []
-        if decksModel.unassignedItemCount > 0 {
-            parts.append("\(decksModel.unassignedItemCount) items")
-        }
-        if decksModel.unassignedDueCount > 0 {
-            parts.append("\(decksModel.unassignedDueCount) due")
-        }
-        return parts.isEmpty ? "No items" : parts.joined(separator: " · ")
+        SidebarScopeCaption.text(
+            itemCount: decksModel.unassignedItemCount,
+            dueCount: decksModel.unassignedDueCount
+        )
     }
 
     private var renamePresented: Binding<Bool> {
@@ -290,13 +286,21 @@ private struct DeckSidebarNode: View {
     }
 
     private func rowSubtitle(for summary: DeckSummary) -> String {
+        SidebarScopeCaption.text(itemCount: summary.itemCount, dueCount: summary.dueCount)
+    }
+}
+
+/// The line under a sidebar scope's name. Every scope row uses this, so a deck
+/// and Unassigned cannot describe the same emptiness in different words.
+enum SidebarScopeCaption {
+    static func text(itemCount: Int, dueCount: Int) -> String {
         var parts: [String] = []
-        if summary.itemCount > 0 {
-            parts.append("\(summary.itemCount) items")
+        if itemCount > 0 {
+            parts.append(itemCount == 1 ? "1 item" : "\(itemCount) items")
         }
-        if summary.dueCount > 0 {
-            parts.append("\(summary.dueCount) due")
+        if dueCount > 0 {
+            parts.append("\(dueCount) due")
         }
-        return parts.isEmpty ? "Empty" : parts.joined(separator: " · ")
+        return parts.isEmpty ? "No items" : parts.joined(separator: " · ")
     }
 }

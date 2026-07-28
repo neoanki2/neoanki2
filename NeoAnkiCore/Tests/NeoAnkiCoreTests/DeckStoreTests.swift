@@ -50,6 +50,38 @@ private func basicItem(deckID: UUID? = nil) -> Item {
     #expect(summaries.first?.dueCount == 1)
 }
 
+/// A parent whose items all live in subdecks is not empty. Selecting it studies
+/// and browses the whole subtree, so its counts have to span the subtree too.
+@Test func deckSummariesCountItemsAcrossDescendants() async throws {
+    let store = try await makeStore()
+    let parent = Deck(name: "Ліна")
+    let child = Deck(name: "Спини мене", parentID: parent.id)
+    let grandchild = Deck(name: "Строфа", parentID: child.id)
+    _ = try await store.createDeck(parent)
+    _ = try await store.createDeck(child)
+    _ = try await store.createDeck(grandchild)
+    _ = try await store.createItem(basicItem(deckID: child.id))
+    _ = try await store.createItem(basicItem(deckID: grandchild.id))
+
+    let summaries = try await store.deckSummaries()
+
+    #expect(summaries.first { $0.id == parent.id }?.itemCount == 2)
+    #expect(summaries.first { $0.id == child.id }?.itemCount == 2)
+    #expect(summaries.first { $0.id == grandchild.id }?.itemCount == 1)
+}
+
+/// A leaf with nothing in it still reports zero, so "no items" keeps meaning it.
+@Test func deckSummariesReportZeroForATrulyEmptyDeck() async throws {
+    let store = try await makeStore()
+    let deck = Deck(name: "Unused")
+    _ = try await store.createDeck(deck)
+
+    let summaries = try await store.deckSummaries()
+
+    #expect(summaries.first?.itemCount == 0)
+    #expect(summaries.first?.dueCount == 0)
+}
+
 @Test func updateDeckRenamesDeck() async throws {
     let store = try await makeStore()
     var deck = Deck(name: "Geography")

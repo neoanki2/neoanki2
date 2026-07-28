@@ -115,5 +115,6 @@ to an active card. Outcomes that were not undone can still contribute to later
 scheduling optimization. Media no longer referenced by any item is eligible
 for cleanup. Choose **Cancel** to keep the item.
 
-Deleting a deck is different: it moves contained items and does not delete
-them.
+Deleting a deck is broader, not gentler: it deletes the deck's subdecks and every
+item inside them too. See [Delete a
+deck](../library-and-decks/#delete-a-deck).

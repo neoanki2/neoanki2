@@ -233,12 +233,12 @@ public actor ItemStore {
         var itemCounts: [UUID: Int] = [:]
         var dueCounts: [UUID: Int] = [:]
 
-        for deck in decks {
-            itemCounts[deck.id] = try await database.countItems(deckID: deck.id)
-        }
-
+        // Both counts span the deck and its descendants, because selecting a deck
+        // studies and browses its whole subtree. Counting items directly only
+        // would label a parent that organizes subdecks as empty.
         for deck in decks {
             let scope = DeckTree.descendantIDs(of: deck.id, in: summaries)
+            itemCounts[deck.id] = try await database.countItems(deckIDs: scope)
             dueCounts[deck.id] = try await database.countDueCards(deckIDs: scope, asOf: now)
         }
 

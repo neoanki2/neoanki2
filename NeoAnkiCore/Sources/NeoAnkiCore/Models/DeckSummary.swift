@@ -5,7 +5,8 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
     public let id: UUID
     public let name: String
     public let parentID: UUID?
-    /// Items assigned directly to this deck (not nested subdecks).
+    /// Items in this deck and all descendant decks, matching the scope you get
+    /// by selecting the deck.
     public let itemCount: Int
     /// Due cards in this deck and all descendant decks.
     public let dueCount: Int

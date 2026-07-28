@@ -107,3 +107,14 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
 
     #expect(model.selectedScope == .allDecks)
 }
+
+@Test func sidebarCaptionOnlySaysNoItemsWhenThereAreNone() {
+    #expect(SidebarScopeCaption.text(itemCount: 0, dueCount: 0) == "No items")
+    #expect(SidebarScopeCaption.text(itemCount: 11, dueCount: 0) == "11 items")
+    #expect(SidebarScopeCaption.text(itemCount: 11, dueCount: 4) == "11 items · 4 due")
+}
+
+@Test func sidebarCaptionAgreesWithItselfAboutOne() {
+    #expect(SidebarScopeCaption.text(itemCount: 1, dueCount: 0) == "1 item")
+    #expect(SidebarScopeCaption.text(itemCount: 1, dueCount: 1) == "1 item · 1 due")
+}

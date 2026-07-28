@@ -60,9 +60,10 @@ different times.
 How a card asks you to respond: reveal, type, choose, record, cloze, or arrange.
 Automatic checking, when available, gives feedback; you still choose the grade.
 
-**Deck**  
-A hierarchical organizer and study scope. Deleting a deck moves its items
-rather than deleting them.
+**Deck**
+A hierarchical organizer and study scope. Deleting a deck deletes everything
+inside it — subdecks, items, and their cards. Move items out first if you want
+to keep them.
 
 **Due card**  
 A card whose saved due date has arrived. A study session loads the cards due

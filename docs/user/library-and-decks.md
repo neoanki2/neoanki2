@@ -21,11 +21,13 @@ Use one of the three kinds of sidebar row:
   Starting a study session here uses the same recursive scope.
 - **Unassigned** shows only items with no deck.
 
-Changing scope reloads the scope home and its counts. Sidebar captions show
-direct item counts for each named deck and recursive due counts for that deck
-and its descendants. **Unassigned** reports its item and due counts separately.
-Every count in one reload is measured at the same instant, so the sidebar and
-the detail pane always agree.
+Changing scope reloads the scope home and its counts. A deck's caption counts the
+items and due cards in that deck **and all its subdecks**, which is the same
+scope you get by selecting it — so a deck that only organizes subdecks reports
+their contents rather than reading as empty. A caption says **No items** only
+when the deck and everything under it is empty. **Unassigned** reports its own
+item and due counts. Every count in one reload is measured at the same instant,
+so the sidebar and the detail pane always agree.
 
 Selecting a scope opens its **scope home**, described below.
 
@@ -61,22 +63,24 @@ limits the list and study session to that child's subtree.
 Names cannot be empty after trimming whitespace. Renaming changes the label,
 not the deck's items or hierarchy. Choose **Cancel** to retain the old name.
 
-## Delete a deck safely
+## Delete a deck
 
 1. Control-click or right-click the deck.
 2. Choose **Delete**.
 3. Read the confirmation and choose **Delete Deck**.
 
-Deleting a deck does **not** delete its items or subdecks:
+**Deleting a deck destroys its contents.** It removes the deck, every subdeck
+beneath it, every item in any of them, and the study cards those items
+generated, along with all review history. Nothing moves to the parent deck, and
+there is no undo.
 
-- Items directly in the deleted deck move to its parent.
-- If the deleted deck was top-level, its direct items become unassigned.
-- Direct subdecks move to the deleted deck's parent.
-- If the deleted deck was top-level, its direct subdecks become top-level.
+Because a deck's sidebar caption counts its whole subtree, that caption tells
+you what you are about to lose. To keep the items, move them out first — open
+browse mode on the deck, select them, and use **Move to Deck** — then delete the
+empty deck.
 
-The operation preserves the rest of each nested subtree. Cancel the
-confirmation or press Escape to keep the deck unchanged. If the deleted deck
-was selected, NeoAnki2 returns to **All Decks**.
+Cancel the confirmation or press Escape to keep the deck unchanged. If the
+deleted deck was selected, NeoAnki2 returns to **All Decks**.
 
 ## Put new items in a deck
 
