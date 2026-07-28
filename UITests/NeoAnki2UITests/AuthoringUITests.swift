@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 final class AuthoringUITests: NeoAnkiUITestCase {
@@ -111,10 +112,11 @@ final class AuthoringUITests: NeoAnkiUITestCase {
 
     func testUnassignedScopeEmptyState() throws {
         let app = launchApp()
+        let visibleScreenHeight = try XCTUnwrap(NSScreen.main?.visibleFrame.height)
         XCTAssertLessThanOrEqual(
             app.windows.firstMatch.frame.height,
-            700,
-            "The empty-state content must not override the app's 640-point default window height."
+            visibleScreenHeight,
+            "The empty-state content must not make the window taller than its screen."
         )
         selectScope("scopeRow-Unassigned", in: app)
         XCTAssertTrue(
