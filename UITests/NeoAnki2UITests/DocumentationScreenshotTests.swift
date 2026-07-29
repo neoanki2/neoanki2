@@ -7,7 +7,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "library-empty",
             of: emptyApp,
             scenario: "empty library",
-            expectedVisibleIdentifiers: ["scopeHome", "scopeHomeBrowseLink"]
+            expectedVisibleIdentifiers: ["emptyLibraryState"]
         )
 
         openAddItem(in: emptyApp)

@@ -79,7 +79,7 @@ struct NeoAnki2App: App {
 
         if AppDatabase.isTesting,
            activeTestingEnvironment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] == "1"
-            || UserDefaults.standard.bool(forKey: "NEOANKI_TEST_BOOTSTRAP_FAILURE") {
+            || ProcessInfo.processInfo.arguments.contains("-NeoAnkiBootstrapFailure") {
             bootstrapError = "NeoAnki2 couldn’t open the test library."
             return
         }

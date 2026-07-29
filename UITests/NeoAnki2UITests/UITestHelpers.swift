@@ -26,6 +26,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     private static var sharedApp: XCUIApplication?
     private static var controlSequence = 0
+    private static var launchedDatabaseDirectories = Set<String>()
     private static let controlSessionID = UUID().uuidString
     private static let controlDirectory: URL = {
         if let configured = ProcessInfo.processInfo.environment["NEOANKI_UI_DIAGNOSTIC_DIR"],
@@ -62,6 +63,11 @@ class NeoAnkiUITestCase: XCTestCase {
                 _ = waitUntil(timeout: 3) { previousApp.state == .notRunning }
                 Self.sharedApp = nil
             }
+            if Self.launchedDatabaseDirectories.insert(databaseDirectory).inserted {
+                try? FileManager.default.removeItem(
+                    at: URL(fileURLWithPath: databaseDirectory, isDirectory: true)
+                )
+            }
             app = XCUIApplication()
             app.launchArguments = ["-NeoAnkiTesting"]
             app.launchEnvironment["NEOANKI_TESTING"] = "1"
@@ -75,14 +81,12 @@ class NeoAnkiUITestCase: XCTestCase {
                 app.launchEnvironment[key] = value
             }
             if let bootstrapFailure = environment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] {
-                // Also pass this launch-only contract through UserDefaults.
                 // macOS may reuse launch-services environment state after a
                 // rapid terminate/relaunch, while launch arguments are always
                 // applied to the new process.
-                app.launchArguments += [
-                    "-NEOANKI_TEST_BOOTSTRAP_FAILURE",
-                    bootstrapFailure,
-                ]
+                if bootstrapFailure == "1" {
+                    app.launchArguments.append("-NeoAnkiBootstrapFailure")
+                }
             }
             try? FileManager.default.createDirectory(
                 at: Self.controlDirectory,
