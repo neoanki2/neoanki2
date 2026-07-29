@@ -123,6 +123,10 @@ include counts, item rows include title, summary, card count, and item type, and
 study progress is labeled as progress. Choice and arrange controls announce
 their position and selected state.
 
+Parent deck selection and disclosure remain separate actions. Activating the
+row selects that deck's scope without expanding it; use the disclosure triangle
+to show or hide its children. A focused UI test verifies both actions.
+
 NeoAnki2 also routes important changes to accessibility focus:
 
 - revealing an answer announces **Answer revealed** and moves focus to the
