@@ -9,6 +9,7 @@ struct LibraryCommandHandlers {
     var openTemplates: (() -> Void)?
     var openBrowse: (() -> Void)?
     var toggleAnswerColumn: (() -> Void)?
+    var showSidebar: (() -> Void)?
     var isAnswerColumnVisible = false
     var canToggleAnswerColumn = false
     var canAddItem = false
@@ -76,6 +77,16 @@ struct LibraryCommands: Commands {
         }
 
         CommandMenu("Library") {
+#if DEBUG
+            if AppDatabase.isTesting {
+                Button("Show Sidebar") {
+                    handlers?.showSidebar?()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+
+                Divider()
+            }
+#endif
             Button("Browse Items") {
                 handlers?.openBrowse?()
             }

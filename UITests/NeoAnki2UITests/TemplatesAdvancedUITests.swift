@@ -1,7 +1,7 @@
 import XCTest
 
-final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
-    func testTemplateInteractionPickerAllTypes() throws {
+extension FastFunctionalJourneyTests {
+    func checkTemplatesAdvancedUITestsTemplateInteractionPickerAllTypes() throws {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
@@ -29,7 +29,7 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testTemplateAdvancedSettingsExpand() throws {
+    func checkTemplatesAdvancedUITestsTemplateAdvancedSettingsExpand() throws {
         let app = launchApp()
         openTemplates(in: app)
         app.buttons.identified("addTemplateToolbar").click()
@@ -47,7 +47,7 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testRepairCorruptedItemType() throws {
+    func checkTemplatesAdvancedUITestsRepairCorruptedItemType() throws {
         let app = launchApp(scenario: "corrupted-item-type")
         openTemplates(in: app)
 
@@ -60,7 +60,7 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testFieldTypePicker() throws {
+    func checkTemplatesAdvancedUITestsFieldTypePicker() throws {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
@@ -83,7 +83,7 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testDeleteTemplateCancel() throws {
+    func checkTemplatesAdvancedUITestsDeleteTemplateCancel() throws {
         let app = launchApp()
         openTemplates(in: app)
         openTemplateEditor(named: "Card", in: app)
@@ -94,7 +94,7 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testCannotDeleteItemTypeWithItems() throws {
+    func checkTemplatesAdvancedUITestsCannotDeleteItemTypeWithItems() throws {
         let app = launchApp()
         addBasicItem(front: "Block Delete", back: "Answer", in: app)
         openTemplates(in: app)
@@ -107,7 +107,7 @@ final class TemplatesAdvancedUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testTemplatesKeyboardShortcut() throws {
+    func checkTemplatesAdvancedUITestsTemplatesKeyboardShortcut() throws {
         let app = launchApp()
         app.typeKey("t", modifierFlags: [.command, .shift])
         XCTAssertTrue(app.buttons.identified("templatesDone").waitForExistence(timeout: 5))

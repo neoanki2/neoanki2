@@ -1,7 +1,7 @@
 import XCTest
 
-final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
-    func testScopeHomeLeadsWithDueCountAndStudy() throws {
+extension FastFunctionalJourneyTests {
+    func checkScopeHomeAndBrowseUITestsScopeHomeLeadsWithDueCountAndStudy() throws {
         let app = launchApp()
         addBasicItem(front: "France", back: "Paris", in: app)
         leaveBrowseMode(in: app)
@@ -15,7 +15,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
 
     /// The scope home never prints an item's answer, which is the whole reason
     /// the detail pane stopped being a list.
-    func testScopeHomeDoesNotRevealAnswers() throws {
+    func checkScopeHomeAndBrowseUITestsScopeHomeDoesNotRevealAnswers() throws {
         let app = launchApp()
         addBasicItem(front: "Capital of France", back: "Paris", in: app)
         leaveBrowseMode(in: app)
@@ -30,7 +30,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         )
     }
 
-    func testScopeHomeReportsNextDueInsteadOfADeadStudyButton() throws {
+    func checkScopeHomeAndBrowseUITestsScopeHomeReportsNextDueInsteadOfADeadStudyButton() throws {
         let app = launchApp()
         addBasicItem(front: "Caught Up Q", back: "Caught Up A", in: app)
         startStudy(in: app)
@@ -42,7 +42,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         XCTAssertTrue(nextDue.waitUntilExists(timeout: 10))
     }
 
-    func testBrowseOpensWithKeyboardShortcutAndClosesWithEscape() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseOpensWithKeyboardShortcutAndClosesWithEscape() throws {
         let app = launchApp()
         addBasicItem(front: "Browse Me", back: "Answer", in: app)
         leaveBrowseMode(in: app)
@@ -59,7 +59,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         )
     }
 
-    func testBrowseOpensFromTheLibraryMenu() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseOpensFromTheLibraryMenu() throws {
         let app = launchApp()
         addBasicItem(front: "Menu Browse", back: "Answer", in: app)
         leaveBrowseMode(in: app)
@@ -72,7 +72,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         )
     }
 
-    func testBrowseSearchNarrowsRowsAndReportsNoResults() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseSearchNarrowsRowsAndReportsNoResults() throws {
         let app = launchApp()
         addBasicItem(front: "France", back: "Paris", in: app)
         addBasicItem(front: "Japan", back: "Tokyo", in: app)
@@ -94,7 +94,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         )
     }
 
-    func testBrowseHidesTheAnswerColumnByDefault() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseHidesTheAnswerColumnByDefault() throws {
         let app = launchApp()
         addBasicItem(front: "Capital of France", back: "Paris", in: app)
         enterBrowseMode(in: app)
@@ -110,7 +110,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
     /// Menu navigation is the standard Mac discovery path, and the only one
     /// VoiceOver menu users have, so the app's second most common verb has to
     /// appear there rather than living solely on a toolbar button.
-    func testAddItemHasAMenuHomeUnderFile() throws {
+    func checkScopeHomeAndBrowseUITestsAddItemHasAMenuHomeUnderFile() throws {
         let app = launchApp()
 
         app.menuBarItems["File"].click()
@@ -122,7 +122,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
 
     /// A hidden-by-default column is only a considered default if the user can
     /// find the way to reveal it, so the reveal has to live in the menu bar.
-    func testBrowseRevealsTheAnswerColumnFromTheLibraryMenu() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseRevealsTheAnswerColumnFromTheLibraryMenu() throws {
         let app = launchApp()
         addBasicItem(front: "Capital of France", back: "Paris", in: app)
         enterBrowseMode(in: app)
@@ -143,7 +143,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
 
     /// Whether you want to see answers is a standing preference, not something
     /// to rediscover every time you open browse mode.
-    func testAnswerColumnChoiceSurvivesLeavingBrowseMode() throws {
+    func checkScopeHomeAndBrowseUITestsAnswerColumnChoiceSurvivesLeavingBrowseMode() throws {
         let app = launchApp()
         addBasicItem(front: "Capital of Japan", back: "Tokyo", in: app)
         enterBrowseMode(in: app)
@@ -159,7 +159,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         XCTAssertTrue(answer.waitUntilExists(timeout: 5))
     }
 
-    func testBrowseDeletesASelectedItem() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseDeletesASelectedItem() throws {
         let app = launchApp()
         addBasicItem(front: "Delete Me", back: "Answer", in: app)
         addBasicItem(front: "Keep Me", back: "Answer", in: app)
@@ -181,7 +181,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["itemRow-Keep Me"].exists)
     }
 
-    func testBrowseMovesASelectedItemToADeck() throws {
+    func checkScopeHomeAndBrowseUITestsBrowseMovesASelectedItemToADeck() throws {
         let app = launchApp()
         createDeck(named: "Target Deck", in: app)
         addBasicItem(front: "Movable", back: "Item", in: app)
@@ -191,8 +191,7 @@ final class ScopeHomeAndBrowseUITests: NeoAnkiUITestCase {
         XCTAssertTrue(row.waitUntilExists(timeout: 5))
         row.click()
 
-        let moveMenu = app.buttons.identified("browseMoveToDeck")
-        let menu = moveMenu.exists ? moveMenu : app.menuButtons.identified("browseMoveToDeck")
+        let menu = app.descendants(matching: .any).identified("browseMoveToDeck")
         XCTAssertTrue(menu.waitUntilExists(timeout: 5))
         menu.click()
         selectMenuItem("Target Deck", in: app)

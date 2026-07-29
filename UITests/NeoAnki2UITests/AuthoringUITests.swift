@@ -1,8 +1,8 @@
 import AppKit
 import XCTest
 
-final class AuthoringUITests: NeoAnkiUITestCase {
-    func testAddItemWithNumberField() throws {
+extension FastFunctionalJourneyTests {
+    func checkAuthoringUITestsAddItemWithNumberField() throws {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
@@ -23,7 +23,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         waitForItem(named: "Count", in: app)
     }
 
-    func testAddItemWithMultipleItemTypes() throws {
+    func checkAuthoringUITestsAddItemWithMultipleItemTypes() throws {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
@@ -41,7 +41,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         app.buttons.identified("cancelAddItem").click()
     }
 
-    func testClozeAuthoringMarkBlank() throws {
+    func checkAuthoringUITestsClozeAuthoringMarkBlank() throws {
         let app = launchApp()
         openTemplates(in: app)
         clickAddItemType(in: app)
@@ -87,11 +87,11 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         app.buttons.identified("cancelAddItem").click()
     }
 
-    func testMediaFieldRequiresDescription() throws {
+    func checkAuthoringUITestsMediaFieldRequiresDescription() throws {
         let app = launchApp(scenario: "image-missing-description")
         waitForItem(named: "Image", in: app)
         openItemDetail(named: "Image", in: app)
-        app.buttons.identified("editItem").click()
+        openItemEditor(in: app)
 
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
@@ -100,7 +100,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         returnToLibrary(in: app)
     }
 
-    func testEmptyDeckAddItem() throws {
+    func checkAuthoringUITestsEmptyDeckAddItem() throws {
         let app = launchApp()
         createDeck(named: "Empty Deck", in: app)
         selectScope("deckRow-Empty Deck", in: app)
@@ -110,7 +110,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         app.buttons.identified("cancelAddItem").click()
     }
 
-    func testUnassignedScopeEmptyState() throws {
+    func checkAuthoringUITestsUnassignedScopeEmptyState() throws {
         let app = launchApp()
         let visibleScreenHeight = try XCTUnwrap(NSScreen.main?.visibleFrame.height)
         XCTAssertLessThanOrEqual(
@@ -125,7 +125,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons.identified("addItemEmptyState").waitUntilGone(timeout: 2))
     }
 
-    func testItemPreviewRendersRichText() throws {
+    func checkAuthoringUITestsItemPreviewRendersRichText() throws {
         let app = launchApp()
         openAddItem(in: app)
         assertFormattedField(named: "Front", buttonID: "formatBold", style: "bold", text: "PreviewBold", in: app)
@@ -141,7 +141,7 @@ final class AuthoringUITests: NeoAnkiUITestCase {
         returnToLibrary(in: app)
     }
 
-    func testEditItemChangeItemType() throws {
+    func checkAuthoringUITestsEditItemChangeItemType() throws {
         throw XCTSkip("Changing item type after creation is not supported in the current UI.")
     }
 }

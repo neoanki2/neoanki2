@@ -29,14 +29,17 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:NeoAnki2UITests.xctestplan"
+            reference = "container:FastFunctional.xctestplan"
             default = "YES">
+         </TestPlanReference>
+         <TestPlanReference
+            reference = "container:DocumentationScreenshots.xctestplan">
          </TestPlanReference>
       </TestPlans>
       <Testables>
          <TestableReference
             skipped = "NO"
-            parallelizable = "YES">
+            parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A40000000000000000000001"

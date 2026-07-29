@@ -128,7 +128,7 @@ struct ErrorBanner: View {
 
 enum StudyAnimation {
     static func revealAnswer(reduceMotion: Bool, action: () -> Void) {
-        if reduceMotion {
+        if reduceMotion || AppDatabase.isTesting {
             action()
         } else {
             withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {

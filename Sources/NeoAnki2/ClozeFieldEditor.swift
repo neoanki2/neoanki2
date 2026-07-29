@@ -22,7 +22,8 @@ struct ClozeFieldEditor: View {
                 text: $text,
                 selectionStart: $selectionStart,
                 selectionLength: $selectionLength,
-                accessibilityLabel: label
+                accessibilityLabel: label,
+                accessibilityIdentifier: accessibilityIdentifier
             )
                 .frame(minHeight: 100)
                 .accessibilityLabel(label)
@@ -220,6 +221,7 @@ private struct ClozeTextEditor: NSViewRepresentable {
     @Binding var selectionStart: Int?
     @Binding var selectionLength: Int
     let accessibilityLabel: String
+    let accessibilityIdentifier: String
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -239,6 +241,7 @@ private struct ClozeTextEditor: NSViewRepresentable {
         textView.font = NSFont.preferredFont(forTextStyle: .body)
         textView.string = text
         textView.setAccessibilityLabel(accessibilityLabel)
+        textView.setAccessibilityIdentifier(accessibilityIdentifier)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -252,6 +255,7 @@ private struct ClozeTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView, textView.string != text else { return }
         let selectedRange = textView.selectedRange()
         textView.string = text
+        textView.setAccessibilityIdentifier(accessibilityIdentifier)
         textView.setSelectedRange(NSIntersectionRange(selectedRange, NSRange(location: 0, length: text.utf16.count)))
     }
 

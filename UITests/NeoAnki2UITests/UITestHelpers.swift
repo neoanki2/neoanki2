@@ -3,7 +3,42 @@ import CryptoKit
 
 @MainActor
 class NeoAnkiUITestCase: XCTestCase {
+    private struct ControlCommand: Codable {
+        let sessionID: String
+        let sequence: Int
+        let action: String
+        let databaseDirectory: String
+        let scenario: String?
+        let initialRoute: String
+        let path: String?
+        let enabled: Bool?
+        let environment: [String: String]
+    }
+
+    private struct ControlAcknowledgement: Codable {
+        let sessionID: String
+        let sequence: Int
+        let state: String
+        let scenario: String?
+        let route: String
+        let message: String?
+    }
+
+    private static var sharedApp: XCUIApplication?
+    private static var controlSequence = 0
+    private static var launchedDatabaseDirectories = Set<String>()
+    private static let controlSessionID = UUID().uuidString
+    private static let controlDirectory: URL = {
+        if let configured = ProcessInfo.processInfo.environment["NEOANKI_UI_DIAGNOSTIC_DIR"],
+           !configured.isEmpty {
+            return URL(fileURLWithPath: configured, isDirectory: true)
+        }
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki2-ui-control-\(controlSessionID)", isDirectory: true)
+    }()
+
     var runningApp: XCUIApplication?
+    private var teardownRegistered = false
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -16,38 +51,194 @@ class NeoAnkiUITestCase: XCTestCase {
         environment: [String: String] = [:],
         waitForLibrary: Bool = true
     ) -> XCUIApplication {
-        runningApp?.terminate()
+        let databaseDirectory = NSTemporaryDirectory() + "neoanki2-ui-\(databaseLabel)"
+        let requiresLaunch = Self.sharedApp == nil
+            || Self.sharedApp?.state == .notRunning
+            || environment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] == "1"
+        let app: XCUIApplication
 
-        let app = XCUIApplication()
-        app.launchArguments = ["-NeoAnkiTesting"]
-        app.launchEnvironment["NEOANKI_TESTING"] = "1"
-        app.launchEnvironment["NEOANKI_TEST_DB_DIR"] = NSTemporaryDirectory() + "neoanki2-ui-\(databaseLabel)"
-        if let scenario {
-            app.launchEnvironment["NEOANKI_TEST_SCENARIO"] = scenario
+        if requiresLaunch {
+            if let previousApp = Self.sharedApp {
+                previousApp.terminate()
+                _ = waitUntil(timeout: 3) { previousApp.state == .notRunning }
+                Self.sharedApp = nil
+            }
+            if Self.launchedDatabaseDirectories.insert(databaseDirectory).inserted {
+                try? FileManager.default.removeItem(
+                    at: URL(fileURLWithPath: databaseDirectory, isDirectory: true)
+                )
+            }
+            app = XCUIApplication()
+            app.launchArguments = ["-NeoAnkiTesting"]
+            app.launchEnvironment["NEOANKI_TESTING"] = "1"
+            app.launchEnvironment["NEOANKI_TEST_DB_DIR"] = databaseDirectory
+            app.launchEnvironment["NEOANKI_TEST_CONTROL_DIR"] = Self.controlDirectory.path
+            app.launchEnvironment["NEOANKI_TEST_SESSION_ID"] = Self.controlSessionID
+            if let scenario {
+                app.launchEnvironment["NEOANKI_TEST_SCENARIO"] = scenario
+            }
+            for (key, value) in environment {
+                app.launchEnvironment[key] = value
+            }
+            if let bootstrapFailure = environment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] {
+                // macOS may reuse launch-services environment state after a
+                // rapid terminate/relaunch, while launch arguments are always
+                // applied to the new process.
+                if bootstrapFailure == "1" {
+                    app.launchArguments.append("-NeoAnkiBootstrapFailure")
+                }
+            }
+            try? FileManager.default.createDirectory(
+                at: Self.controlDirectory,
+                withIntermediateDirectories: true
+            )
+            app.launch()
+            Self.sharedApp = app
+        } else {
+            app = Self.sharedApp!
+            resetRunningApp(
+                app,
+                databaseDirectory: databaseDirectory,
+                scenario: scenario,
+                environment: environment
+            )
         }
-        for (key, value) in environment {
-            app.launchEnvironment[key] = value
-        }
-        app.launch()
 
         runningApp = app
-        addTeardownBlock { @MainActor [weak self, weak app] in
+        if !teardownRegistered {
+            teardownRegistered = true
+            addTeardownBlock { @MainActor [weak self] in
             guard let self else { return }
+            let app = self.runningApp
             if let failure = self.testRun?.failureCount, failure > 0, let app {
                 let attachment = XCTAttachment(screenshot: app.screenshot())
                 attachment.name = "\(self.name)-failure"
                 attachment.lifetime = .keepAlways
                 self.add(attachment)
+                self.attachControlArtifact(named: "last-command")
+                self.attachControlArtifact(named: "last-ack")
             }
             app?.terminate()
+            if let app {
+                _ = self.waitUntil(timeout: 3) { app.state == .notRunning }
+            }
+            if Self.sharedApp === app {
+                Self.sharedApp = nil
+            }
             if self.runningApp === app {
                 self.runningApp = nil
+            }
             }
         }
         if waitForLibrary {
             waitForLibraryReady(in: app)
         }
         return app
+    }
+
+    private func resetRunningApp(
+        _ app: XCUIApplication,
+        databaseDirectory: String,
+        scenario: String?,
+        environment: [String: String]
+    ) {
+        Self.controlSequence += 1
+        let sequence = Self.controlSequence
+        try? FileManager.default.removeItem(
+            at: URL(fileURLWithPath: databaseDirectory, isDirectory: true)
+        )
+
+        var runtimeEnvironment = environment
+        runtimeEnvironment["NEOANKI_TESTING"] = "1"
+        let action: String
+        if environment["NEOANKI_TEST_IMPORT_PATH"] != nil {
+            action = "openImport"
+        } else if environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"] != nil {
+            action = "openPortableImport"
+        } else if environment["NEOANKI_TEST_PORTABLE_BUSY"] == "1" {
+            action = "setPortableBusy"
+        } else {
+            action = "reset"
+        }
+        let command = ControlCommand(
+            sessionID: Self.controlSessionID,
+            sequence: sequence,
+            action: action,
+            databaseDirectory: databaseDirectory,
+            scenario: scenario,
+            initialRoute: "library",
+            path: environment["NEOANKI_TEST_IMPORT_PATH"]
+                ?? environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"],
+            enabled: environment["NEOANKI_TEST_PORTABLE_BUSY"].map { $0 == "1" },
+            environment: runtimeEnvironment
+        )
+        deliver(command, to: app)
+    }
+
+    private func deliver(_ command: ControlCommand, to app: XCUIApplication) {
+        let commandURL = Self.controlDirectory
+            .appendingPathComponent("command-\(Self.controlSessionID).json")
+        let acknowledgementURL = Self.controlDirectory
+            .appendingPathComponent("ack-\(Self.controlSessionID).json")
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(command)
+            try data.write(to: commandURL, options: .atomic)
+            try data.write(
+                to: Self.controlDirectory.appendingPathComponent("last-command.json"),
+                options: .atomic
+            )
+        } catch {
+            XCTFail("Could not send UI test reset command: \(error)")
+            return
+        }
+
+        let notification = Notification.Name(
+            "com.neoanki2.uitest.command.\(Self.controlSessionID)"
+        )
+        let deadline = Date().addingTimeInterval(15)
+        var acknowledgement: ControlAcknowledgement?
+        repeat {
+            DistributedNotificationCenter.default().postNotificationName(
+                notification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
+            if let data = try? Data(contentsOf: acknowledgementURL),
+               let decoded = try? JSONDecoder().decode(ControlAcknowledgement.self, from: data),
+               decoded.sessionID == Self.controlSessionID,
+               decoded.sequence == command.sequence {
+                acknowledgement = decoded
+                break
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        } while Date() < deadline
+
+        guard let acknowledgement else {
+            XCTFail("UI test command \(command.sequence) was not acknowledged")
+            return
+        }
+        XCTAssertEqual(
+            acknowledgement.state,
+            "ready",
+            acknowledgement.message ?? "UI test reset failed"
+        )
+        app.activate()
+    }
+
+    private func attachControlArtifact(named name: String) {
+        let filename = name == "last-command"
+            ? "command-\(Self.controlSessionID).json"
+            : "ack-\(Self.controlSessionID).json"
+        let url = Self.controlDirectory.appendingPathComponent(filename)
+        guard let data = try? Data(contentsOf: url) else { return }
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func captureDocumentationScreenshot(
@@ -213,6 +404,15 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func libraryIsReady(in app: XCUIApplication) -> Bool {
+        if app.descendants(matching: .any)["libraryReady"].exists { return true }
+        if app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier IN %@", ["scopeHomeLoading", "itemBrowserLoading"])
+        ).firstMatch.exists {
+            return false
+        }
+
+        // Compatibility fallback for an older test build or the brief interval
+        // before SwiftUI exposes the route-level readiness marker.
         // A loading placeholder means the window exists but has not settled.
         if app.staticTexts["Starting…"].exists || app.staticTexts["Loading items…"].exists
             || app.staticTexts["Loading decks…"].exists {
@@ -463,7 +663,8 @@ class NeoAnkiUITestCase: XCTestCase {
     func field(named name: String, in app: XCUIApplication) -> XCUIElement {
         let id = "field-\(name)"
         let candidates = [app.textViews.identified(id), app.textFields.identified(id)]
-        return firstExisting(of: candidates, timeout: 3) ?? app.descendants(matching: .any)[id]
+        return firstExisting(of: candidates, timeout: 3)
+            ?? app.descendants(matching: .any)[id]
     }
 
     func returnToLibrary(in app: XCUIApplication) {
@@ -505,7 +706,7 @@ class NeoAnkiUITestCase: XCTestCase {
         waitForLibraryReady(in: app)
     }
 
-    func openAddItem(in app: XCUIApplication) {
+    func openAddItem(in app: XCUIApplication, waitForDefaultField: Bool = true) {
         returnToLibrary(in: app)
         guard let add = firstExisting(
             of: [
@@ -520,7 +721,23 @@ class NeoAnkiUITestCase: XCTestCase {
         add.click()
 
         XCTAssertTrue(app.buttons.identified("cancelAddItem").waitUntilExists(timeout: 10))
-        XCTAssertTrue(field(named: "Front", in: app).waitUntilExists(timeout: 10))
+        if waitForDefaultField {
+            XCTAssertTrue(field(named: "Front", in: app).waitUntilExists(timeout: 10))
+        }
+    }
+
+    func openItemEditor(in app: XCUIApplication) {
+        let edit = app.buttons.identified("editItem")
+        let save = app.buttons.identified("saveEditItem")
+        let cancel = app.buttons.identified("cancelEditItem")
+        XCTAssertTrue(edit.waitUntilHittable(timeout: 3))
+        for _ in 0..<3 {
+            edit.click()
+            if waitUntil(timeout: 2) { save.exists && cancel.exists } {
+                return
+            }
+        }
+        XCTFail("Item editor did not open")
     }
 
     func saveItemType(in app: XCUIApplication) {
@@ -550,10 +767,11 @@ class NeoAnkiUITestCase: XCTestCase {
         let item = app.menuItems[name]
         XCTAssertTrue(item.waitUntilExists(timeout: 3))
         item.click()
-        // The menu should close on its own; only force it if it lingers.
-        if !item.waitUntilGone(timeout: 1) {
-            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        let dismissed = waitUntil(timeout: 1) {
+            !item.exists || !item.isHittable
         }
+        if dismissed { return }
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
     }
 
     func selectPopUpOption(named name: String, picker: XCUIElement, in app: XCUIApplication) {
@@ -574,19 +792,21 @@ class NeoAnkiUITestCase: XCTestCase {
         for _ in 0..<12 {
             if (picker.value as? String)?.contains(name) == true {
                 app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+                _ = picker.menuItems.firstMatch.waitUntilGone(timeout: 1)
                 return
             }
             app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        _ = picker.menuItems.firstMatch.waitUntilGone(timeout: 1)
     }
 
     func dismissOpenMenus(in app: XCUIApplication) {
         app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+        _ = waitUntil(timeout: 0.25) {
+            let menu = app.menus.firstMatch
+            return !menu.exists || !menu.isHittable
+        }
     }
 
     func addBasicItem(front: String, back: String, in app: XCUIApplication) {
@@ -662,15 +882,16 @@ class NeoAnkiUITestCase: XCTestCase {
     /// placeholder to appear and clear is what actually tracks the reload; when
     /// no placeholder shows up at all the load was already synchronous.
     private func waitForScopeSelection(in app: XCUIApplication) {
-        let loading = app.staticTexts.identified("Loading items…")
+        let loading = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier IN %@", ["scopeHomeLoading", "itemBrowserLoading"])
+        ).firstMatch
         if loading.waitUntilExists(timeout: 0.5) {
             XCTAssertTrue(loading.waitUntilGone(timeout: 10))
         }
-        waitForLibraryReady(in: app)
-        // The scope home and its toolbar arrive a frame after the items do.
-        _ = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier IN %@", ["scopeHome", "itemBrowserTable"])
-        ).firstMatch.waitUntilExists(timeout: 3)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["libraryReady"].waitUntilExists(timeout: 3),
+            "Selected scope did not become ready"
+        )
     }
 
     func createDeck(named name: String, in app: XCUIApplication) {
@@ -771,12 +992,16 @@ class NeoAnkiUITestCase: XCTestCase {
     /// end on its own and neither exit button ever appears. Ending it explicitly
     /// is what gets back to the library from any grade.
     func finishStudySession(in app: XCUIApplication) {
+        if app.buttons.identified("primaryStudyAction").exists {
+            endStudyViaMenu(in: app)
+            return
+        }
         if let exit = firstExisting(
             of: [
                 app.buttons.identified("studySessionDone"),
                 app.buttons.identified("studyBackToLibrary"),
             ],
-            timeout: 5
+            timeout: 2
         ) {
             exit.click()
         } else if app.buttons.identified("primaryStudyAction").exists {
@@ -786,24 +1011,31 @@ class NeoAnkiUITestCase: XCTestCase {
         waitForLibraryReady(in: app)
     }
 
-    func waitForFormattedField(
+    func formattedField(
         _ fieldName: String,
         containing expectedToken: String,
         in app: XCUIApplication,
         timeout: TimeInterval = 5
-    ) {
+    ) -> Bool {
         let mirror = app.descendants(matching: .any).identified("field-\(fieldName)-spans")
-        XCTAssertTrue(mirror.waitUntilExists(timeout: 2))
+        guard mirror.waitUntilExists(timeout: 2) else { return false }
 
-        let matched = waitUntil(timeout: timeout) {
-            [mirror.value as? String, mirror.label]
-                .contains { $0?.contains(expectedToken) == true }
+        let expectedParts = expectedToken.split(separator: ":", maxSplits: 1).map(String.init)
+        func containsExpectedToken(_ description: String) -> Bool {
+            if description.contains(expectedToken) { return true }
+            guard expectedParts.count == 2 else { return false }
+            return description.split(separator: "|").contains { run in
+                let parts = run.split(separator: ":", maxSplits: 1).map(String.init)
+                guard parts.count == 2 else { return false }
+                return parts[0].split(separator: "+").contains(Substring(expectedParts[0]))
+                    && parts[1].contains(expectedParts[1])
+            }
         }
-        if matched { return }
 
-        let value = mirror.value as? String ?? "<nil>"
-        let label = mirror.label
-        XCTFail("Expected field-\(fieldName) to contain \(expectedToken), got value=\(value) label=\(label)")
+        return waitUntil(timeout: timeout) {
+            [mirror.value as? String, mirror.label]
+                .contains { $0.map(containsExpectedToken) == true }
+        }
     }
 
     func replaceAndSelectText(_ text: String, in field: XCUIElement) {
@@ -827,10 +1059,53 @@ class NeoAnkiUITestCase: XCTestCase {
         replaceAndSelectText(text, in: editorField)
 
         let formatButton = app.buttons.identified("field-\(fieldName)-\(buttonID)")
-        XCTAssertTrue(formatButton.waitUntilExists(timeout: 2), "Missing format button \(buttonID) for \(fieldName)")
+        XCTAssertTrue(formatButton.waitUntilHittable(timeout: 2), "Missing format button \(buttonID) for \(fieldName)")
         formatButton.click()
+        if !formattedField(fieldName, containing: "\(style):\(text)", in: app, timeout: 1) {
+            editorField.click()
+            editorField.typeKey("a", modifierFlags: [.command])
+            formatButton.click()
+        }
+        XCTAssertTrue(
+            formattedField(fieldName, containing: "\(style):\(text)", in: app),
+            "Expected field-\(fieldName) to contain \(style):\(text)"
+        )
+    }
 
-        waitForFormattedField(fieldName, containing: "\(style):\(text)", in: app)
+    func assertFormattedStyles(
+        named fieldName: String,
+        text: String,
+        styles: [(buttonID: String, style: String)],
+        in app: XCUIApplication
+    ) {
+        let editorField = field(named: fieldName, in: app)
+        XCTAssertTrue(editorField.waitUntilExists(timeout: 5))
+        replaceAndSelectText(text, in: editorField)
+
+        for style in styles {
+            let button = app.buttons.identified("field-\(fieldName)-\(style.buttonID)")
+            XCTAssertTrue(
+                button.waitUntilHittable(timeout: 2),
+                "Missing format button \(style.buttonID) for \(fieldName)"
+            )
+            editorField.click()
+            editorField.typeKey("a", modifierFlags: [.command])
+            button.click()
+            if !formattedField(
+                fieldName,
+                containing: "\(style.style):\(text)",
+                in: app,
+                timeout: 1
+            ) {
+                editorField.click()
+                editorField.typeKey("a", modifierFlags: [.command])
+                button.click()
+            }
+            XCTAssertTrue(
+                formattedField(fieldName, containing: "\(style.style):\(text)", in: app),
+                "Expected field-\(fieldName) to contain \(style.style):\(text)"
+            )
+        }
     }
 
     func makeImportFixture(name: String, contents: String) throws -> URL {
@@ -847,7 +1122,6 @@ class NeoAnkiUITestCase: XCTestCase {
         waitForLibraryReady(in: app)
         dismissOpenMenus(in: app)
         app.activate()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
 
         app.menuBarItems["File"].click()
         let importItem = app.menuItems.identified("Import…")
@@ -855,7 +1129,7 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(importItem.isEnabled, "Import should be enabled before opening the file picker")
         importItem.click()
 
-        RunLoop.current.run(until: Date().addingTimeInterval(1.0))
+        XCTAssertTrue(app.sheets.firstMatch.waitUntilExists(timeout: 8))
         chooseFileInOpenPanel(url, in: app)
     }
 
@@ -895,14 +1169,22 @@ class NeoAnkiUITestCase: XCTestCase {
             waitForLibrary: waitForLibrary
         )
         let deadline = Date().addingTimeInterval(30)
+        var sawBusy = false
         while Date() < deadline {
-            if app.alerts.firstMatch.exists || app.sheets.firstMatch.exists {
-                return app
-            }
             if app.buttons.identified("portableDeckConflictUseLocal").exists {
                 return app
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            let busy = app.descendants(matching: .any)["portableDeckTransferBusy"]
+            if busy.exists {
+                sawBusy = true
+            } else if sawBusy && libraryIsReady(in: app) {
+                return app
+            }
+            let noticeAction = app.buttons["action-button-1"]
+            if noticeAction.exists, noticeAction.isHittable {
+                return app
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
         return app
     }
@@ -918,17 +1200,32 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func cancelFilePicker(in app: XCUIApplication) {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        if app.textFields["PathTextField"].exists || app.sheets.firstMatch.exists {
+        let cancel = firstExisting(
+            of: [
+                app.sheets.firstMatch.buttons["Cancel"],
+                app.dialogs.firstMatch.buttons["Cancel"],
+                app.buttons["Cancel"],
+            ],
+            timeout: 2
+        )
+        if let cancel, cancel.isHittable {
+            cancel.click()
+        } else {
             app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
         }
+        XCTAssertTrue(
+            waitUntil(timeout: 3) {
+                !app.sheets.firstMatch.exists
+                    && !app.dialogs.firstMatch.exists
+                    && !app.textFields["PathTextField"].exists
+            },
+            "Open panel did not close"
+        )
     }
 
     func assertSidebarCollapsed(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let scopeRow = app.descendants(matching: .any).identified("scopeRow-AllDecks")
-        if scopeRow.waitUntilExists(timeout: 2) {
+        if scopeRow.exists {
             XCTAssertFalse(scopeRow.isHittable, file: file, line: line)
         }
     }
@@ -967,18 +1264,23 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func chooseFileInOpenPanel(_ url: URL, in app: XCUIApplication) {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        _ = app.sheets.firstMatch.waitUntilExists(timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.sheets.firstMatch.exists
+                    || app.dialogs.firstMatch.exists
+                    || app.textFields["PathTextField"].exists
+            },
+            "Open panel did not appear"
+        )
 
         for _ in 0..<3 {
             app.typeKey("g", modifierFlags: [.command, .shift])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             if let goToFolderField = waitForGoToFolderField(in: app, timeout: 3) {
                 goToFolderField.click()
                 goToFolderField.typeKey("a", modifierFlags: [.command])
                 goToFolderField.typeText(url.path)
                 app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+                _ = goToFolderField.waitUntilGone(timeout: 3)
                 app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
                 return
             }
@@ -987,7 +1289,14 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func chooseFileInSavePanel(_ url: URL, in app: XCUIApplication) {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.sheets.firstMatch.exists
+                    || app.dialogs.firstMatch.exists
+                    || app.textFields["PathTextField"].exists
+            },
+            "Save panel did not appear"
+        )
         app.typeKey("g", modifierFlags: [.command, .shift])
 
         guard let goToFolderField = waitForGoToFolderField(in: app) else {
@@ -999,7 +1308,7 @@ class NeoAnkiUITestCase: XCTestCase {
         goToFolderField.typeText(url.deletingLastPathComponent().path)
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
 
-        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        _ = goToFolderField.waitUntilGone(timeout: 3)
         if let panel = activeFilePanel(in: app) {
             let nameField = panel.textFields.matching(
                 NSPredicate(format: "identifier != 'PathTextField'")
@@ -1073,21 +1382,17 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func waitForPortableImportCompletion(in app: XCUIApplication) {
         let busy = app.descendants(matching: .any)["portableDeckTransferBusy"]
-        if busy.waitUntilExists(timeout: 3) {
+        if busy.exists {
             _ = busy.waitUntilGone(timeout: 45)
         }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
     @discardableResult
     func dismissPortableDeckNoticeIfPresent(titled title: String, in app: XCUIApplication) -> Bool {
         let deadline = Date().addingTimeInterval(15)
         while Date() < deadline {
-            let titleVisible = app.staticTexts.matching(
-                NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", title, title)
-            ).firstMatch.exists
             let ok = app.buttons["action-button-1"]
-            if titleVisible && ok.exists && ok.isHittable {
+            if ok.exists && ok.isHittable {
                 ok.click()
                 return true
             }
@@ -1120,21 +1425,21 @@ class NeoAnkiUITestCase: XCTestCase {
         dismissAnyAlertOK(in: app, timeout: 2)
     }
 
-    func dismissImportComplete(in app: XCUIApplication, timeout: TimeInterval = 60) {
+    func dismissImportComplete(in app: XCUIApplication, timeout: TimeInterval = 15) {
         let importButton = app.buttons.identified("confirmImport")
         if importButton.exists {
             _ = importButton.waitUntilGone(timeout: timeout)
         }
         let importSheet = app.descendants(matching: .any)["importSheet"]
-        if importSheet.exists {
-            _ = importSheet.waitUntilGone(timeout: 15)
-        }
+        _ = importSheet.waitUntilGone(timeout: timeout)
 
-        let completeNotice = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", "Import Complete", "Import Complete")
-        ).firstMatch
-        if completeNotice.waitUntilExists(timeout: 30) {
-            dismissAnyAlertOK(in: app, timeout: 10)
+        // AppKit does not consistently expose a SwiftUI Alert's title as a
+        // static text. The action is the synchronization point that matters,
+        // and querying it directly avoids a guaranteed 30-second title wait
+        // on runners where the alert is represented only by its button.
+        let ok = app.buttons["action-button-1"]
+        if ok.exists, ok.isHittable {
+            ok.click()
         }
     }
 
@@ -1153,9 +1458,11 @@ class NeoAnkiUITestCase: XCTestCase {
         let end = app.menuItems.identified("End Session")
         XCTAssertTrue(end.waitUntilExists(timeout: 3))
         end.click()
-        if app.buttons.identified("confirmEndStudySession").waitUntilExists(timeout: 3) {
-            app.buttons.identified("confirmEndStudySession").click()
-        } else if let container = modalContainer(in: app) {
+
+        let confirm = app.buttons.identified("confirmEndStudySession")
+        if confirm.exists {
+            confirm.click()
+        } else if let container = modalContainer(in: app, timeout: 0.5) {
             container.buttons.identified("End Session").click()
         }
         waitForLibraryReady(in: app)

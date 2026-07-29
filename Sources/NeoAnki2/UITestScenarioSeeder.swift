@@ -10,6 +10,20 @@ enum UITestScenarioSeeder {
             return
         }
 
+        try await seed(
+            scenario: scenario,
+            environment: ProcessInfo.processInfo.environment,
+            store: store
+        )
+    }
+
+    static func seed(
+        scenario: String?,
+        environment: [String: String],
+        store: ItemStore
+    ) async throws {
+        guard let scenario, !scenario.isEmpty else { return }
+
         switch scenario {
         case "study-type":
             try await seedTextInteraction(.type, store: store, answer: "Paris")
@@ -21,22 +35,36 @@ enum UITestScenarioSeeder {
             try await seedTextInteraction(.record, store: store, answer: "Spoken answer")
         case "study-cloze":
             try await seedCloze(store: store)
+        case "study-reverse":
+            try await seedReverseStudy(store: store)
+        case "study-edit":
+            try await seedBasicItem(
+                front: "Capital of Frnace",
+                back: "Paris",
+                store: store
+            )
+        case "library-browse":
+            try await seedLibraryBrowse(store: store)
         case "scheduling-history":
             try await seedSchedulingHistory(store: store)
         case "image-missing-description":
             try await seedImageMissingDescription(store: store)
         case "deck-with-due-items":
             try await seedDeckWithDueItems(store: store)
+        case "deck-scoping":
+            try await seedDeckScoping(store: store)
         case "portable-export-source":
             try await seedPortableExportSource(store: store)
         case "type-conflict-local":
-            try await seedTypeConflictLocal(store: store)
+            try await seedTypeConflictLocal(environment: environment, store: store)
         case "corrupted-item-type":
             try await seedCorruptedItemType(store: store)
         case "import-with-media":
-            try await seedImportWithMedia(store: store)
+            try await seedImportWithMedia(environment: environment, store: store)
         case "alternate-import-type":
             try await seedAlternateImportType(store: store)
+        case "authoring-fields":
+            try await seedAuthoringFieldTypes(store: store)
         default:
             break
         }
@@ -98,6 +126,95 @@ enum UITestScenarioSeeder {
         )
     }
 
+    private static func seedReverseStudy(store: ItemStore) async throws {
+        let front = FieldDef(name: "Front", type: .text, isRequired: true)
+        let back = FieldDef(name: "Back", type: .text, isRequired: true)
+        let forward = Template(
+            name: "Card",
+            prompt: Side(slots: [Slot(source: .field(front.id))]),
+            answer: Side(slots: [Slot(source: .field(back.id))]),
+            interaction: .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )
+        let reverse = Template(
+            name: "Reverse",
+            prompt: Side(slots: [Slot(source: .field(back.id))]),
+            answer: Side(slots: [Slot(source: .field(front.id))]),
+            interaction: .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )
+        let itemType = ItemType(
+            name: "UI Reverse",
+            fields: [front, back],
+            templates: [forward, reverse]
+        )
+        _ = try await store.createItemType(itemType)
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: front.id, value: .text("Reverse Q")),
+                    FieldValue(fieldID: back.id, value: .text("Reverse A")),
+                ]
+            )
+        )
+    }
+
+    private static func seedBasicItem(
+        front: String,
+        back: String,
+        store: ItemStore
+    ) async throws {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: BuiltInItemTypes.basicID,
+                fields: [
+                    FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text(front)),
+                    FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text(back)),
+                ]
+            )
+        )
+    }
+
+    private static func seedLibraryBrowse(store: ItemStore) async throws {
+        let target = try await store.createDeck(Deck(name: "Target Deck"))
+        let history = try await store.createDeck(Deck(name: "History"))
+        let keep = try await store.createDeck(Deck(name: "Keep Deck"))
+        let unassigned = [
+            ("Original", "Answer"),
+            ("Keep Item", "Still Here"),
+            ("Remove", "Me"),
+            ("Movable", "Item"),
+            ("Browse Delete", "Answer"),
+            ("Browse Move", "Answer"),
+        ]
+        for (front, back) in unassigned {
+            try await seedBasicItem(front: front, back: back, store: store)
+        }
+        for (front, back, deckID) in [
+            ("Deck Item", "B", keep.id),
+            ("Target Seed", "Target", target.id),
+            ("History Seed", "History", history.id),
+        ] {
+            _ = try await store.createItem(
+                Item(
+                    itemTypeID: BuiltInItemTypes.basicID,
+                    fields: [
+                        FieldValue(
+                            fieldID: BuiltInItemTypes.frontFieldID,
+                            value: .text(front)
+                        ),
+                        FieldValue(
+                            fieldID: BuiltInItemTypes.backFieldID,
+                            value: .text(back)
+                        ),
+                    ],
+                    deckID: deckID
+                )
+            )
+        }
+    }
+
     private static func seedSchedulingHistory(store: ItemStore) async throws {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         _ = try await store.createItem(
@@ -120,15 +237,30 @@ enum UITestScenarioSeeder {
                 durationMs: 1_000
             )
         }
-        // The reviewed card is now scheduled years out, so a second card gives
-        // the session something to study — automatic fitting happens when a
-        // session ends, and a session needs a due card to end.
+        // The reviewed card is now scheduled years out. Two fresh cards let the
+        // journey grade one, explicitly end with another still due, and verify
+        // that automatic fitting never interrupts the session.
         _ = try await store.createItem(
             Item(
                 itemTypeID: BuiltInItemTypes.basicID,
                 fields: [
                     FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Due card")),
                     FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Due answer")),
+                ]
+            )
+        )
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: BuiltInItemTypes.basicID,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Remaining due card")
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("Remaining due answer")
+                    ),
                 ]
             )
         )
@@ -185,6 +317,31 @@ enum UITestScenarioSeeder {
         }
     }
 
+    private static func seedDeckScoping(store: ItemStore) async throws {
+        let deck = try await store.createDeck(Deck(name: "Scoped"))
+        try await seedBasicItem(
+            front: "Unassigned Item",
+            back: "A",
+            store: store
+        )
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: BuiltInItemTypes.basicID,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Deck Item")
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("B")
+                    ),
+                ],
+                deckID: deck.id
+            )
+        )
+    }
+
     private static func seedPortableExportSource(store: ItemStore) async throws {
         let deck = try await store.createDeck(Deck(name: "Export Deck"))
         _ = try await store.createItem(
@@ -199,8 +356,11 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedTypeConflictLocal(store: ItemStore) async throws {
-        guard let fixtureDirectory = ProcessInfo.processInfo.environment["NEOANKI_TEST_FIXTURE_DIR"],
+    private static func seedTypeConflictLocal(
+        environment: [String: String],
+        store: ItemStore
+    ) async throws {
+        guard let fixtureDirectory = environment["NEOANKI_TEST_FIXTURE_DIR"],
               !fixtureDirectory.isEmpty
         else {
             return
@@ -248,8 +408,11 @@ enum UITestScenarioSeeder {
         _ = try await store.loadItemTypes()
     }
 
-    private static func seedImportWithMedia(store: ItemStore) async throws {
-        guard let fixtureDirectory = ProcessInfo.processInfo.environment["NEOANKI_TEST_FIXTURE_DIR"],
+    private static func seedImportWithMedia(
+        environment: [String: String],
+        store: ItemStore
+    ) async throws {
+        guard let fixtureDirectory = environment["NEOANKI_TEST_FIXTURE_DIR"],
               !fixtureDirectory.isEmpty
         else {
             return
@@ -275,5 +438,47 @@ enum UITestScenarioSeeder {
         )
         let itemType = ItemType(name: "Alternate", fields: [front, back], templates: [template])
         _ = try await store.createItemType(itemType)
+    }
+
+    private static func seedAuthoringFieldTypes(store: ItemStore) async throws {
+        _ = try await store.createDeck(Deck(name: "Empty Deck"))
+        try await createAuthoringItemType(
+            name: "Numeric",
+            frontType: .richText,
+            backType: .number,
+            store: store
+        )
+        try await createAuthoringItemType(
+            name: "Secondary",
+            frontType: .richText,
+            backType: .richText,
+            store: store
+        )
+        try await createAuthoringItemType(
+            name: "Cloze Author",
+            frontType: .cloze,
+            backType: .richText,
+            store: store
+        )
+    }
+
+    private static func createAuthoringItemType(
+        name: String,
+        frontType: FieldType,
+        backType: FieldType,
+        store: ItemStore
+    ) async throws {
+        let front = FieldDef(name: "Front", type: frontType, isRequired: true)
+        let back = FieldDef(name: "Back", type: backType, isRequired: true)
+        let template = Template(
+            name: "Card",
+            prompt: Side(slots: [Slot(source: .field(front.id))]),
+            answer: Side(slots: [Slot(source: .field(back.id))]),
+            interaction: frontType == .cloze ? .cloze : .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )
+        _ = try await store.createItemType(
+            ItemType(name: name, fields: [front, back], templates: [template])
+        )
     }
 }

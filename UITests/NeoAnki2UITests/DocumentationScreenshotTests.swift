@@ -84,7 +84,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let app = launchApp(databaseLabel: "docs-media", scenario: "image-missing-description")
         waitForItem(named: "Image", in: app)
         openItemDetail(named: "Image", in: app)
-        app.buttons.identified("editItem").click()
+        openItemEditor(in: app)
         XCTAssertTrue(app.buttons.identified("saveEditItem").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "item-media",

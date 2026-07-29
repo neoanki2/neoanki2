@@ -16,7 +16,9 @@
     "testMarkers": ["func test", "@Test"],
     "excludedFiles": [
       "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift",
-      "Tests/NeoAnki2Tests/DocumentationClaimsTests.swift"
+      "UITests/NeoAnki2UITests/FastFunctionalJourneyTests.swift",
+      "Tests/NeoAnki2Tests/DocumentationClaimsTests.swift",
+      "Tests/NeoAnki2Tests/FunctionalUICoverageManifestTests.swift"
     ]
   },
   "features": [

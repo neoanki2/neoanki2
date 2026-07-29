@@ -30,6 +30,15 @@ struct ItemBrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+#if DEBUG
+            if AppDatabase.isTesting, !itemsModel.isLoading {
+                Text("Library ready")
+                    .font(.system(size: 1))
+                    .frame(width: 1, height: 1)
+                    .opacity(0.001)
+                    .accessibilityIdentifier("libraryReady")
+            }
+#endif
             if let errorMessage = itemsModel.errorMessage, !itemsModel.isLoading {
                 ErrorBanner(message: errorMessage)
             }

@@ -1,7 +1,74 @@
 import XCTest
 
-final class NavigationGatingUITests: NeoAnkiUITestCase {
-    func testSidebarHiddenDuringStudy() throws {
+extension FastFunctionalJourneyTests {
+    func runSharedLaunchGatingAndAccessibilityJourney() throws {
+        let app = launchApp(scenario: "deck-with-due-items")
+
+        try runJourneyActivity("NavigationGatingUITests.testSidebarHiddenDuringAddItem") {
+            openAddItem(in: app)
+            assertSidebarCollapsed(in: app)
+            showSidebar(in: app)
+            XCTAssertTrue(app.buttons.identified("newDeckToolbar").exists)
+            app.buttons.identified("cancelAddItem").click()
+        }
+
+        try runJourneyActivity("NavigationGatingUITests.testSidebarHiddenDuringTemplates") {
+            openTemplates(in: app)
+            assertSidebarCollapsed(in: app)
+            showSidebar(in: app)
+            XCTAssertTrue(app.buttons.identified("newDeckToolbar").exists)
+            runJourneyActivity("ImportExportUITests.testImportDisabledDuringTemplates") {
+                assertMenuDisabled("Import…", in: app)
+            }
+            closeTemplates(in: app)
+        }
+
+        try runJourneyActivity("NavigationGatingUITests.testStudyButtonShowsDueBadge") {
+            assertDueCardsAvailable(in: app)
+        }
+
+        try runJourneyActivity("NavigationGatingUITests.testSidebarHiddenDuringStudy") {
+            startStudy(in: app)
+            assertSidebarCollapsed(in: app)
+            showSidebar(in: app)
+            XCTAssertTrue(app.buttons.identified("newDeckToolbar").exists)
+            runJourneyActivity("ImportExportUITests.testImportDisabledDuringStudy") {
+                assertMenuDisabled("Import…", in: app)
+            }
+            revealAndGrade("gradeGood", in: app)
+            finishStudySession(in: app)
+        }
+
+        try runJourneyActivity("NavigationGatingUITests.testTransferBusyDisablesImport") {
+            let busyApp = launchApp(
+                environment: ["NEOANKI_TEST_PORTABLE_BUSY": "1"]
+            )
+            assertMenuDisabled("Import Deck…", in: busyApp)
+            XCTAssertTrue(
+                busyApp.descendants(matching: .any)["portableDeckTransferBusy"]
+                    .waitUntilExists(timeout: 3)
+            )
+        }
+
+        let failedApp = launchApp(
+            environment: ["NEOANKI_TEST_BOOTSTRAP_FAILURE": "1"],
+            waitForLibrary: false
+        )
+        try runJourneyActivity("NavigationGatingUITests.testBootstrapFailureShowsSafeErrorState") {
+            XCTAssertTrue(
+                failedApp.descendants(matching: .any)["bootstrapError"].waitUntilExists(timeout: 5)
+            )
+            XCTAssertTrue(failedApp.staticTexts["Could Not Start"].exists)
+            XCTAssertFalse(failedApp.buttons.identified("addItemToolbar").exists)
+        }
+        try runJourneyActivity("LibraryUITests.testBootstrapFailureShowsSafeErrorState") {
+            XCTAssertTrue(failedApp.descendants(matching: .any)["bootstrapError"].exists)
+            XCTAssertTrue(failedApp.staticTexts["Could Not Start"].exists)
+            XCTAssertFalse(failedApp.buttons.identified("addItemToolbar").exists)
+        }
+    }
+
+    func checkNavigationGatingUITestsSidebarHiddenDuringStudy() throws {
         let app = launchApp()
         addBasicItem(front: "Sidebar Study Q", back: "Sidebar Study A", in: app)
         startStudy(in: app)
@@ -12,7 +79,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testSidebarHiddenDuringAddItem() throws {
+    func checkNavigationGatingUITestsSidebarHiddenDuringAddItem() throws {
         let app = launchApp()
         openAddItem(in: app)
         assertSidebarCollapsed(in: app)
@@ -21,7 +88,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         app.buttons.identified("cancelAddItem").click()
     }
 
-    func testSidebarHiddenDuringTemplates() throws {
+    func checkNavigationGatingUITestsSidebarHiddenDuringTemplates() throws {
         let app = launchApp()
         openTemplates(in: app)
         assertSidebarCollapsed(in: app)
@@ -30,7 +97,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testStudyButtonShowsDueBadge() throws {
+    func checkNavigationGatingUITestsStudyButtonShowsDueBadge() throws {
         let app = launchAppWithFixtures(scenario: "deck-with-due-items")
         waitForItem(named: "Due 1", in: app, timeout: 15)
         showSidebar(in: app)
@@ -39,7 +106,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         assertDueCardsAvailable(in: app)
     }
 
-    func testTransferBusyDisablesImport() throws {
+    func checkNavigationGatingUITestsTransferBusyDisablesImport() throws {
         let app = launchAppWithFixtures(
             environment: ["NEOANKI_TEST_PORTABLE_BUSY": "1"]
         )
@@ -47,7 +114,7 @@ final class NavigationGatingUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["portableDeckTransferBusy"].waitUntilExists(timeout: 5))
     }
 
-    func testBootstrapFailureShowsSafeErrorState() throws {
+    func checkNavigationGatingUITestsBootstrapFailureShowsSafeErrorState() throws {
         let app = launchApp(
             environment: ["NEOANKI_TEST_BOOTSTRAP_FAILURE": "1"],
             waitForLibrary: false
