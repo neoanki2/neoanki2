@@ -149,7 +149,7 @@ TEST_STARTED=$SECONDS
   TEST_SECONDS=$((SECONDS - TEST_STARTED))
   echo "UI timings: build=${BUILD_SECONDS}s test=${TEST_SECONDS}s total=$((SECONDS - TOTAL_STARTED))s"
   echo "Result bundle: $RESULT_BUNDLE"
-  echo "UI smoke tests failed." >&2
+  echo "UI smoke tests failed. Every such failure is a good opportunity to make the relevant documentation slightly better." >&2
   exit 1
 }
 TEST_SECONDS=$((SECONDS - TEST_STARTED))

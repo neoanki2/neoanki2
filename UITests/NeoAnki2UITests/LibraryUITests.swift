@@ -269,8 +269,8 @@ extension FastFunctionalJourneyTests {
         runJourneyActivity("ScopeHomeAndBrowseUITests.testBrowseMovesASelectedItemToADeck") {
             let row = seeded.descendants(matching: .any).identified("itemRow-Browse Move")
             row.click()
-            let button = seeded.buttons.identified("browseMoveToDeck")
-            let menu = button.exists ? button : seeded.menuButtons.identified("browseMoveToDeck")
+            let menu = seeded.descendants(matching: .any).identified("browseMoveToDeck")
+            XCTAssertTrue(menu.waitUntilExists(timeout: 3))
             menu.click()
             selectMenuItem("Target Deck", in: seeded)
             selectScope("deckRow-Target Deck", in: seeded)

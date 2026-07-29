@@ -191,8 +191,7 @@ extension FastFunctionalJourneyTests {
         XCTAssertTrue(row.waitUntilExists(timeout: 5))
         row.click()
 
-        let moveMenu = app.buttons.identified("browseMoveToDeck")
-        let menu = moveMenu.exists ? moveMenu : app.menuButtons.identified("browseMoveToDeck")
+        let menu = app.descendants(matching: .any).identified("browseMoveToDeck")
         XCTAssertTrue(menu.waitUntilExists(timeout: 5))
         menu.click()
         selectMenuItem("Target Deck", in: app)
