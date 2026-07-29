@@ -172,10 +172,12 @@ struct TemplatesView: View {
                             } label: {
                                 Label("Included with Decks", systemImage: "shippingbox")
                                     .font(DesignSystem.Typography.uiTitle)
+                                    .accessibilityLabel("Included with Decks")
+                                    .accessibilityHint(
+                                        "Shows read-only item types provided by imported decks."
+                                    )
+                                    .accessibilityIdentifier("includedWithDecksDisclosure")
                             }
-                            .accessibilityLabel("Included with Decks")
-                            .accessibilityHint("Shows read-only item types provided by imported decks.")
-                            .accessibilityIdentifier("includedWithDecksDisclosure")
                         }
                     }
                     .listStyle(.plain)

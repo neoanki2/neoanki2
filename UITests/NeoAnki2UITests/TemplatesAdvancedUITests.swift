@@ -122,7 +122,7 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
         let deck = app.descendants(matching: .any).identified("deckRow-Poetry Lab")
         XCTAssertTrue(deck.waitUntilExists(timeout: 5))
         deck.click()
-        openAddItem(in: app)
+        openAddItem(in: app, waitForDefaultField: false)
 
         XCTAssertTrue(field(named: "Previous Lines", in: app).waitUntilExists(timeout: 5))
         XCTAssertTrue(field(named: "Next Line", in: app).exists)
@@ -141,7 +141,7 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
         let app = launchApp(scenario: "deck-included-item-types")
         showSidebar(in: app)
         app.descendants(matching: .any).identified("deckRow-Poetry Lab").click()
-        openAddItem(in: app)
+        openAddItem(in: app, waitForDefaultField: false)
         enterText(
             "An entered line",
             into: field(named: "Previous Lines", in: app),
@@ -163,7 +163,9 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
         let disclosure = app.descendants(matching: .any)
             .identified("includedWithDecksDisclosure")
         XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
-        disclosure.click()
+        let disclosureTriangle = app.disclosureTriangles.firstMatch
+        XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
+        disclosureTriangle.click()
 
         let included = app.descendants(matching: .any)
             .identified("includedItemTypeRow-Poem Line")

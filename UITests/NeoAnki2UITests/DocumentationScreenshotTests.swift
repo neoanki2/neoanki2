@@ -10,28 +10,6 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             expectedVisibleIdentifiers: ["emptyLibraryState"]
         )
 
-        let contextualApp = launchApp(
-            databaseLabel: "docs-item-add",
-            scenario: "deck-included-item-types"
-        )
-        showSidebar(in: contextualApp)
-        contextualApp.descendants(matching: .any)
-            .identified("deckRow-Poetry Lab")
-            .click()
-        openAddItem(in: contextualApp)
-        captureDocumentationScreenshot(
-            named: "item-add",
-            of: contextualApp,
-            scenario: "new item editor using the deck's recommended included type",
-            expectedVisibleIdentifiers: [
-                "addItemDeckPicker",
-                "addItemTypePicker",
-                "field-Previous Lines",
-                "field-Next Line",
-            ]
-        )
-        appCancelAddItem(in: contextualApp)
-
         openAddItem(in: emptyApp)
         assertFormattedField(
             named: "Front",
@@ -70,6 +48,30 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "basic item detail",
             expectedVisibleIdentifiers: ["deleteItem", "editItem"]
         )
+        emptyApp.terminate()
+
+        let contextualApp = launchApp(
+            databaseLabel: "docs-item-add",
+            scenario: "deck-included-item-types"
+        )
+        showSidebar(in: contextualApp)
+        contextualApp.descendants(matching: .any)
+            .identified("deckRow-Poetry Lab")
+            .click()
+        openAddItem(in: contextualApp, waitForDefaultField: false)
+        captureDocumentationScreenshot(
+            named: "item-add",
+            of: contextualApp,
+            scenario: "new item editor using the deck's recommended included type",
+            expectedVisibleIdentifiers: [
+                "addItemDeckPicker",
+                "addItemTypePicker",
+                "field-Previous Lines",
+                "field-Next Line",
+            ]
+        )
+        appCancelAddItem(in: contextualApp)
+        contextualApp.terminate()
 
         let deckApp = launchApp(databaseLabel: "docs-decks", scenario: "deck-with-due-items")
         showSidebar(in: deckApp)
@@ -172,7 +174,9 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let disclosure = app.descendants(matching: .any)
             .identified("includedWithDecksDisclosure")
         XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
-        disclosure.click()
+        let disclosureTriangle = app.disclosureTriangles.firstMatch
+        XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
+        disclosureTriangle.click()
         let included = app.descendants(matching: .any)
             .identified("includedItemTypeRow-Poem Line")
         XCTAssertTrue(included.waitUntilExists(timeout: 5))

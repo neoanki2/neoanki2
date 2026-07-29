@@ -34,6 +34,9 @@ struct AddItemView: View {
         self.editingItem = editingItem
         self.editingItemType = editingItemType
         self.onDismiss = onDismiss
+        _selectedDeckID = State(
+            initialValue: editingItem?.deckID ?? model.addItemDeckID
+        )
     }
 
     private var itemType: ItemType? { editingItemType ?? model.itemType }
@@ -318,7 +321,6 @@ struct AddItemView: View {
     private func initializeIfNeeded() {
         guard !didInitialize else { return }
         didInitialize = true
-        selectedDeckID = editingItem?.deckID ?? model.addItemDeckID
         if let editingItem {
             loadFields(from: editingItem)
         } else {
