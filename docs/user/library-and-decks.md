@@ -46,8 +46,11 @@ scope. Choosing **Cancel** leaves the tree unchanged.
 2. Choose **New Subdeck**.
 3. Enter a name and choose **Create**.
 
-Parents with children appear as disclosure groups. Expand or collapse them to
-navigate the hierarchy.
+Parents with children appear as disclosure groups. Use the disclosure triangle
+to expand or collapse them. Clicking a parent deck's row selects its scope
+without changing whether its children are visible. When a child deck becomes
+selected through another action, its ancestors expand so the selection remains
+visible in the hierarchy.
 
 [![Nested decks in the sidebar]({{ site.baseurl }}/assets/screenshots/decks-nested.png)]({{ site.baseurl }}/assets/screenshots/decks-nested.png)
 

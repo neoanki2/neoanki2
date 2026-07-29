@@ -1,5 +1,5 @@
 {
-  "capturedAt" : "2026-07-28T22:54:30Z",
+  "capturedAt" : "2026-07-29T13:59:45Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -10,7 +10,7 @@
       "filename" : "decks-nested.png",
       "height" : 716,
       "scenario" : "library sidebar with nested Languages and French decks",
-      "sha256" : "d339badcb137e836870f6a92567721f9a3f633dcb7e9f818654dfdd5267c0c92",
+      "sha256" : "09c2e1b1a1b6bb753d6a9cfa5c12827c2f4cc4875e2c34feeca84522a7cfd6d7",
       "width" : 960
     },
     {
@@ -20,7 +20,7 @@
       "filename" : "error-startup.png",
       "height" : 716,
       "scenario" : "database bootstrap failure",
-      "sha256" : "1dbec65d79d5d980618b046cfc6758bb64e4ef64cc1f7309cfd4b81c1f232512",
+      "sha256" : "e14d5814f5198771bc15cf6097d1c9a82aba3b5d4473557e499afb30e9289859",
       "width" : 960
     },
     {
@@ -31,7 +31,7 @@
       "filename" : "import-sheet.png",
       "height" : 640,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "b2c68a0d34b5d2f84fbee024894d89f8644843dff3429d681121670cda2c6750",
+      "sha256" : "e695983e6fd9082d55cd9e40c7ed0ecdeef2445f64bd352d022ad6db31115480",
       "width" : 960
     },
     {
@@ -43,7 +43,7 @@
       "filename" : "item-add.png",
       "height" : 716,
       "scenario" : "new basic item editor",
-      "sha256" : "e119fac305cfd96a182ff3b9919fa48aa3398d504b98a3e2012638ce8872ff46",
+      "sha256" : "4f4ff2e9c04c2785a7696f3cd7b9c7cef78d35a4baa42b162803c210f3ba40ba",
       "width" : 960
     },
     {
@@ -54,7 +54,7 @@
       "filename" : "item-detail.png",
       "height" : 716,
       "scenario" : "basic item detail",
-      "sha256" : "5e3e79ace6eef98cef8fafdef760698ce77edc04216ae45a82dc141117e5753f",
+      "sha256" : "63cae00f7a3d6649560a28a0ea7d8a3e9b8808776564c1188fb34e8383636b62",
       "width" : 960
     },
     {
@@ -65,7 +65,7 @@
       "filename" : "item-media.png",
       "height" : 716,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "95204d6f2a57807d65f6a9b2a8e04d972ccc3a9ba72ffdf5d812fcc95440cad2",
+      "sha256" : "20d9f2a0a753109f3648c0621607dc8432bc439bba34c9ba8adbc777b4904ec9",
       "width" : 960
     },
     {
@@ -77,7 +77,7 @@
       "filename" : "item-rich-text.png",
       "height" : 716,
       "scenario" : "basic item editor with visibly bold front text",
-      "sha256" : "c41667881c0e05f800802da19dc6b12e378b99ee554937224a0bd45c1cd4637e",
+      "sha256" : "437645b7d58d702799a6e0ce567f029dd2ed0af0514b2f8e81a4a5c8a751f914",
       "width" : 960
     },
     {
@@ -88,7 +88,7 @@
       "filename" : "item-types.png",
       "height" : 640,
       "scenario" : "item types and templates panel",
-      "sha256" : "bd4cd6e2d84b3c54029183c39f69c27f1c78594b49a7c837c673e675782fb7c9",
+      "sha256" : "3bf403f6041a5b4e7c0ec26bb1e10a4e22ce72b72711c7f8216fe659ad8f75c5",
       "width" : 960
     },
     {
@@ -98,7 +98,7 @@
       "filename" : "library-empty.png",
       "height" : 716,
       "scenario" : "empty library",
-      "sha256" : "44d4b54e99cae8abbf611d9705f6e769e7d71e2a62907cef28ebe4940fab1f6d",
+      "sha256" : "01dea48b61e52402911a1152f9c99b957249bf88bc1e40cd6adf80f9defe9f10",
       "width" : 960
     },
     {
@@ -110,7 +110,7 @@
       "filename" : "library-populated.png",
       "height" : 716,
       "scenario" : "browse mode listing one basic item",
-      "sha256" : "13c6f69155eebc4fb4236817876405ea6bc97819e03545c410dc496ec046483c",
+      "sha256" : "843eebf4b15eaa546b7a2b38cf4dfaa177c90387ee909f6e90466c1bcfe52c1b",
       "width" : 960
     },
     {
@@ -121,7 +121,7 @@
       "filename" : "portable-conflict.png",
       "height" : 640,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "32fa56f417ebde3bf43b87b3914b11b30de66a139b1fcd0e5bc6a663769c4172",
+      "sha256" : "e151197edc78a0ddc40169e320eacaf097f059e97e00fce5cb37f2dc52f103bd",
       "width" : 960
     },
     {
@@ -132,7 +132,7 @@
       "filename" : "scheduling-result.png",
       "height" : 716,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "e8c7824500b681d015f1badc34457a568e3cfd5549d0bb5e332ad9a8cf868fb7",
+      "sha256" : "b3665a8aa6187329d570b965bc7313a0e750ad80ff25ad359562ee698c52df5a",
       "width" : 960
     },
     {
@@ -144,7 +144,7 @@
       "filename" : "study-answer.png",
       "height" : 716,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "f2a2b7e4d96fa7e65184040d2e8431fa31f0e6b261d508193835e2c8b594d3a8",
+      "sha256" : "bcbe89f78633dc6502a883696e12da7eeb31491b5617108d6cdc2ed2b601aa68",
       "width" : 960
     },
     {
@@ -154,7 +154,7 @@
       "filename" : "study-complete.png",
       "height" : 716,
       "scenario" : "completed study session",
-      "sha256" : "8acf9eab1d7de5a400399e536642bd89384d94492bf59c16c7a60748ea9d1478",
+      "sha256" : "cec443dfbd6724ad23289ff02b3a329fdd6e7ebfddca57025f2d02c6517ae1b6",
       "width" : 960
     },
     {
@@ -165,7 +165,7 @@
       "filename" : "study-grade-help.png",
       "height" : 716,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "d3cd1632236632bf1a1ea7fa52f2848f778d3b3d944cf9c6a7b1fad22426a32f",
+      "sha256" : "cfb4a5cd51a8f9d25013093240f929fbd6fbbf4401c9939fa0f4dc24f1f977fe",
       "width" : 960
     },
     {
@@ -176,7 +176,7 @@
       "filename" : "study-prompt.png",
       "height" : 716,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "d68a040590195cf092a179a7155c9f83dc851762fbef04fc8425fc19c62d8116",
+      "sha256" : "2cec551c287bb559a1b77894dbb14c2a145efe135444b008d7c0e751421288d6",
       "width" : 960
     },
     {
@@ -187,7 +187,7 @@
       "filename" : "study-type.png",
       "height" : 716,
       "scenario" : "typed-answer study result",
-      "sha256" : "e3746fda2327608f8204de3e99937b07ed56dd38598a1982bd6294c6f5a47a5a",
+      "sha256" : "e5180185e4de533ded4fe8e675dfd14f88e2b991b0c151ebfab7e3cfc7cc82b2",
       "width" : 960
     },
     {
@@ -199,7 +199,7 @@
       "filename" : "template-advanced.png",
       "height" : 716,
       "scenario" : "advanced template editor with answer reveal controls and advanced settings entry point",
-      "sha256" : "d5d5e2d9bc3d062a28eef8b45297c239ad73c64717504f6e38a9647fe6ef3a09",
+      "sha256" : "df2570cba290c6c0d0b31f936fe336adb4444370a9cf1aae44686c8c29825089",
       "width" : 960
     },
     {
@@ -211,9 +211,9 @@
       "filename" : "template-editor.png",
       "height" : 691,
       "scenario" : "new template editor",
-      "sha256" : "3f7b5ef9875764305a21fa3a9c1e7f1c549d76f8584ac3d070a88a6c1f8fd330",
+      "sha256" : "e0869d70bb884079524c2fa540bff5ae9372971b0d25b79c7f21dfc81e0de362",
       "width" : 960
     }
   ],
-  "sourceSHA" : "55b4b9b8eac65cda689fe07a8316da36da849b00"
+  "sourceSHA" : "cf1d7c8058bafa9cae7f9e4c02453efef7a4463b"
 }
