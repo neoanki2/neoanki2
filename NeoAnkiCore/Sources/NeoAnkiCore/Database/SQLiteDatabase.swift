@@ -245,6 +245,12 @@ actor SQLiteDatabase {
                 try backfillBrowseProjection()
             }
 
+            if current < 18, try tableExists("item_types") {
+                for sql in Schema.migrationV18Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -317,7 +323,10 @@ actor SQLiteDatabase {
                 decks: try fetchAllDecks(),
                 items: try fetchItems(),
                 itemTypes: try fetchAllItemTypes(),
-                mappings: try allPortableItemTypeMappings()
+                mappings: try allPortableItemTypeMappings(),
+                libraryItemTypeIDs: try fetchLibraryItemTypeIDs(),
+                includedItemTypes: try fetchIncludedItemTypeOwners(),
+                itemTypePolicies: try fetchDeckItemTypePolicyEntries()
             )
             try execute("COMMIT;")
             return snapshot
@@ -492,6 +501,14 @@ actor SQLiteDatabase {
                         .blob(data),
                     ]
                 )
+                try execute(
+                    """
+                    INSERT INTO library_item_types (item_type_id)
+                    VALUES (?)
+                    ON CONFLICT(item_type_id) DO NOTHING;
+                    """,
+                    bindings: [.text(itemType.id.uuidString)]
+                )
             }
 
             try execute(
@@ -558,6 +575,78 @@ actor SQLiteDatabase {
                 .blob(data),
             ]
         )
+    }
+
+    func insertLibraryItemType(_ itemType: ItemType) throws {
+        try inTransaction {
+            try insertItemType(itemType)
+            try markItemTypeAsLibrary(itemType.id)
+        }
+    }
+
+    func markItemTypeAsLibrary(_ id: UUID) throws {
+        try execute(
+            """
+            INSERT INTO library_item_types (item_type_id)
+            VALUES (?)
+            ON CONFLICT(item_type_id) DO NOTHING;
+            """,
+            bindings: [.text(id.uuidString)]
+        )
+    }
+
+    func fetchLibraryItemTypeIDs() throws -> Set<UUID> {
+        Set(try query(
+            "SELECT item_type_id FROM library_item_types ORDER BY item_type_id;"
+        ).compactMap { row in
+            (row["item_type_id"] as? String).flatMap(UUID.init(uuidString:))
+        })
+    }
+
+    func fetchIncludedItemTypeOwners() throws -> [IncludedItemTypeOwner] {
+        try query(
+            """
+            SELECT root_deck_id, item_type_id, ordinal
+            FROM deck_included_item_types
+            ORDER BY root_deck_id, ordinal;
+            """
+        ).compactMap { row in
+            guard let rootText = row["root_deck_id"] as? String,
+                  let rootID = UUID(uuidString: rootText),
+                  let typeText = row["item_type_id"] as? String,
+                  let typeID = UUID(uuidString: typeText),
+                  let ordinal = row["ordinal"] as? Int64
+            else { return nil }
+            return IncludedItemTypeOwner(
+                rootDeckID: rootID,
+                itemTypeID: typeID,
+                ordinal: Int(ordinal)
+            )
+        }
+    }
+
+    func fetchDeckItemTypePolicyEntries() throws -> [DeckItemTypePolicyEntry] {
+        try query(
+            """
+            SELECT deck_id, item_type_id, ordinal, is_default
+            FROM deck_item_type_policy_entries
+            ORDER BY deck_id, ordinal;
+            """
+        ).compactMap { row in
+            guard let deckText = row["deck_id"] as? String,
+                  let deckID = UUID(uuidString: deckText),
+                  let typeText = row["item_type_id"] as? String,
+                  let typeID = UUID(uuidString: typeText),
+                  let ordinal = row["ordinal"] as? Int64,
+                  let isDefault = row["is_default"] as? Int64
+            else { return nil }
+            return DeckItemTypePolicyEntry(
+                deckID: deckID,
+                itemTypeID: typeID,
+                ordinal: Int(ordinal),
+                isDefault: isDefault != 0
+            )
+        }
     }
 
     func updateItemType(_ itemType: ItemType) throws {
@@ -1062,6 +1151,9 @@ actor SQLiteDatabase {
             for itemType in plan.itemTypes {
                 try insertItemType(itemType)
             }
+            for itemTypeID in plan.libraryItemTypeIDs {
+                try markItemTypeAsLibrary(itemTypeID)
+            }
             for mapping in plan.mappings {
                 try persistPortableItemTypeMapping(
                     originLibraryID: mapping.originLibraryID,
@@ -1072,6 +1164,37 @@ actor SQLiteDatabase {
             }
             for deck in plan.decks {
                 try insertDeck(deck)
+            }
+            for owner in plan.includedItemTypes {
+                try execute(
+                    """
+                    INSERT INTO deck_included_item_types
+                        (root_deck_id, item_type_id, ordinal)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(root_deck_id, item_type_id) DO UPDATE SET
+                        ordinal = excluded.ordinal;
+                    """,
+                    bindings: [
+                        .text(owner.rootDeckID.uuidString),
+                        .text(owner.itemTypeID.uuidString),
+                        .int(Int64(owner.ordinal)),
+                    ]
+                )
+            }
+            for entry in plan.itemTypePolicies {
+                try execute(
+                    """
+                    INSERT INTO deck_item_type_policy_entries
+                        (deck_id, item_type_id, ordinal, is_default)
+                    VALUES (?, ?, ?, ?);
+                    """,
+                    bindings: [
+                        .text(entry.deckID.uuidString),
+                        .text(entry.itemTypeID.uuidString),
+                        .int(Int64(entry.ordinal)),
+                        .int(entry.isDefault ? 1 : 0),
+                    ]
+                )
             }
             var itemTypesByID = Dictionary(uniqueKeysWithValues: plan.itemTypes.map { ($0.id, $0) })
             for itemTypeID in Set(plan.items.map(\.item.itemTypeID))
@@ -2908,6 +3031,37 @@ actor SQLiteDatabase {
             }
             for deckID in try deckDeletionOrder(ids: descendantIDs) {
                 try deleteDeck(id: deckID)
+            }
+            try reconcileOrphanedIncludedItemTypes()
+        }
+    }
+
+    private func reconcileOrphanedIncludedItemTypes() throws {
+        let rows = try query(
+            """
+            SELECT item_types.id AS id, COUNT(items.id) AS item_count
+            FROM item_types
+            LEFT JOIN items ON items.item_type_id = item_types.id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM library_item_types
+                WHERE library_item_types.item_type_id = item_types.id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM deck_included_item_types
+                WHERE deck_included_item_types.item_type_id = item_types.id
+            )
+            GROUP BY item_types.id;
+            """
+        )
+        for row in rows {
+            guard let idText = row["id"] as? String,
+                  let id = UUID(uuidString: idText),
+                  let itemCount = row["item_count"] as? Int64
+            else { continue }
+            if itemCount > 0 {
+                try markItemTypeAsLibrary(id)
+            } else {
+                try deleteItemType(id: id)
             }
         }
     }

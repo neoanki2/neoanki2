@@ -44,6 +44,15 @@ The reusable schema for items: which fields they contain and which templates
 can generate cards. Basic and Cloze are starter item types, not special
 hard-coded subjects.
 
+**Included item type**
+An import-provided schema owned by a deck. It can be recommended for that
+deck without crowding the ordinary Item Types list. It is read-only until you
+choose **Duplicate as Item Type…**.
+
+**Deck item-type policy**
+The ordered types a deck offers for new items and, optionally, its recommended
+default. Descendants inherit the nearest policy unless they declare their own.
+
 **Field**  
 One named value in an item, such as Front, Back, image, audio, number, or cloze
 text. A field definition sets its content type and whether it is required.

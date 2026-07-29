@@ -58,7 +58,8 @@ Ask it to complete this loop:
 
 ```text
 1. Create or update the .neoanki bundle.
-2. Keep deck/type declarations in deck.jsonl.
+2. Keep deck/type declarations in deck.jsonl and declare the version-3 root
+   itemTypes policy.
 3. Split items into coherent, bounded items/*.jsonl files.
 4. Run the validator.
 5. Fix every diagnostic and rerun until validation succeeds.
@@ -79,12 +80,14 @@ timestamps, cards, or scheduling state. The importer owns those.
 This is context, not a fragile “magic prompt”:
 
 ```text
-Create <path>.neoanki as a NeoAnki Authored Deck Format v1 bundle.
+Create <path>.neoanki as a NeoAnki Authored Deck Format v3 bundle.
 Read docs/AUTHORED_DECK_FORMAT.md and use docs/examples/Biology.neoanki as the
 structural example. Cover <learning goals>. Prefer atomic retrieval prompts,
 clear answers, and tags useful for filtering. Split item records into files of
 roughly 100–500 related items. Use only media files that actually exist under
-the bundle's media/ directory. Run:
+the bundle's media/ directory. Give the root deck a non-empty ordered
+itemTypes list and set defaultType only when one type should be recommended.
+Run:
 
 swift run --package-path NeoAnkiCore neoanki-deck validate <path>.neoanki
 

@@ -150,7 +150,9 @@ public enum AuthoredDeck {
                     decks: package.decks,
                     itemTypes: package.itemTypes,
                     items: package.items,
-                    media: stagedMedia
+                    media: stagedMedia,
+                    usesIncludedItemTypes: package.usesIncludedItemTypes,
+                    itemTypePolicies: package.itemTypePolicies
                 ),
                 directory
             )
@@ -167,6 +169,8 @@ struct AuthoredDeckPackage: Sendable {
     let itemTypes: [ItemType]
     let items: [PortableDeckPersistedItem]
     let media: [PortableDeckMediaRecord]
+    let usesIncludedItemTypes: Bool
+    let itemTypePolicies: [DeckItemTypePolicyEntry]
 }
 
 private struct LoadedAuthoredDeck: Sendable {
@@ -190,6 +194,8 @@ private struct DeckRecord {
     let key: String
     let name: String
     let parent: String?
+    let itemTypes: [String]?
+    let defaultType: String?
     let location: SourceLocation
 }
 
@@ -270,7 +276,7 @@ private struct AuthoredDeckLoader {
 
         var manifest: ManifestRecord?
         var types: [TypeRecord] = []
-        var decks: [DeckRecord] = []
+        var rawDecks: [RawRecord] = []
         for record in manifestRecords {
             do {
                 switch try requiredString(record.object, "kind") {
@@ -282,7 +288,7 @@ private struct AuthoredDeckLoader {
                 case "type":
                     types.append(try decodeType(record.object, location: record.location))
                 case "deck":
-                    decks.append(try decodeDeck(record.object, location: record.location))
+                    rawDecks.append(record)
                 default:
                     break
                 }
@@ -301,6 +307,20 @@ private struct AuthoredDeckLoader {
                 message: "Add one manifest record with kind \"neoanki\"."
             ))
             return .init(package: nil, diagnostics: diagnostics)
+        }
+        var decks: [DeckRecord] = []
+        for record in rawDecks {
+            do {
+                decks.append(try decodeDeck(
+                    record.object,
+                    version: manifest.version,
+                    location: record.location
+                ))
+            } catch let failure as DecodeFailure {
+                diagnostics.append(failure.diagnostic(at: record.location))
+            } catch {
+                diagnostics.append(decodeDiagnostic(error, at: record.location))
+            }
         }
 
         var items: [ItemRecord] = []
@@ -569,8 +589,8 @@ private struct AuthoredDeckLoader {
             throw DecodeFailure("AD110", "Manifest kind must be \"neoanki\".")
         }
         let version = try requiredInteger(object, "version")
-        guard (1...2).contains(version) else {
-            throw DecodeFailure("AD111", "Only authored deck versions 1 and 2 are supported.")
+        guard (1...3).contains(version) else {
+            throw DecodeFailure("AD111", "Only authored deck versions 1 through 3 are supported.")
         }
         return .init(
             version: version,
@@ -582,13 +602,19 @@ private struct AuthoredDeckLoader {
 
     private func decodeDeck(
         _ object: [String: Any],
+        version: Int,
         location: SourceLocation
     ) throws -> DeckRecord {
-        try exactKeys(object, required: ["kind", "id", "name"], optional: ["parent"])
+        let optional = version >= 3
+            ? ["parent", "itemTypes", "defaultType"]
+            : ["parent"]
+        try exactKeys(object, required: ["kind", "id", "name"], optional: Set(optional))
         return .init(
             key: try identifier(object, "id"),
             name: try nonemptyString(object, "name"),
             parent: try optionalIdentifier(object, "parent"),
+            itemTypes: version >= 3 ? try optionalIdentifierArray(object, "itemTypes") : nil,
+            defaultType: version >= 3 ? try optionalIdentifier(object, "defaultType") : nil,
             location: location
         )
     }
@@ -819,6 +845,52 @@ private struct AuthoredDeckCompiler {
         }
         guard diagnostics.isEmpty else { return .init(package: nil, diagnostics: diagnostics) }
 
+        if manifest.version >= 3 {
+            for record in decks {
+                if record.key == manifest.root, record.itemTypes?.isEmpty != false {
+                    diagnostics.append(diag(
+                        "AD213",
+                        "The version 3 root deck needs a non-empty itemTypes policy.",
+                        at: record.location
+                    ))
+                }
+                if let itemTypes = record.itemTypes {
+                    if itemTypes.isEmpty {
+                        diagnostics.append(diag(
+                            "AD214",
+                            "A declared itemTypes policy cannot be empty.",
+                            at: record.location
+                        ))
+                    }
+                    if Set(itemTypes).count != itemTypes.count {
+                        diagnostics.append(diag(
+                            "AD215",
+                            "A deck itemTypes policy cannot contain duplicates.",
+                            at: record.location
+                        ))
+                    }
+                    for key in itemTypes where compiledTypes[key] == nil {
+                        diagnostics.append(diag(
+                            "AD216",
+                            "Deck policy references unknown item type \"\(key)\".",
+                            at: record.location
+                        ))
+                    }
+                }
+                if let defaultType = record.defaultType {
+                    guard let local = record.itemTypes, local.contains(defaultType) else {
+                        diagnostics.append(diag(
+                            "AD217",
+                            "defaultType must appear in the same deck's itemTypes policy.",
+                            at: record.location
+                        ))
+                        continue
+                    }
+                }
+            }
+        }
+        guard diagnostics.isEmpty else { return .init(package: nil, diagnostics: diagnostics) }
+
         let deckIDs = Dictionary(uniqueKeysWithValues: decks.map { ($0.key, UUID()) })
         let compiledDecks = decks.compactMap { record -> Deck? in
             guard let id = deckIDs[record.key] else { return nil }
@@ -828,6 +900,21 @@ private struct AuthoredDeckCompiler {
                 parentID: record.parent.flatMap { deckIDs[$0] }
             )
         }
+        let compiledPolicies: [DeckItemTypePolicyEntry] = manifest.version >= 3
+            ? decks.flatMap { record -> [DeckItemTypePolicyEntry] in
+                guard let deckID = deckIDs[record.key],
+                      let keys = record.itemTypes else { return [] }
+                return keys.enumerated().compactMap { ordinal, key in
+                    guard let itemType = compiledTypes[key] else { return nil }
+                    return DeckItemTypePolicyEntry(
+                        deckID: deckID,
+                        itemTypeID: itemType.id,
+                        ordinal: ordinal,
+                        isDefault: record.defaultType == key
+                    )
+                }
+            }
+            : []
         var compiledItems: [PortableDeckPersistedItem] = []
         var mediaByHash: [String: PortableDeckMediaRecord] = [:]
         var totalMediaBytes: Int64 = 0
@@ -910,7 +997,9 @@ private struct AuthoredDeckCompiler {
             decks: compiledDecks,
             itemTypes: types.compactMap { compiledTypes[$0.key] },
             items: compiledItems,
-            media: mediaByHash.values.sorted { $0.descriptor.hash < $1.descriptor.hash }
+            media: mediaByHash.values.sorted { $0.descriptor.hash < $1.descriptor.hash },
+            usesIncludedItemTypes: manifest.version >= 3,
+            itemTypePolicies: compiledPolicies
         )
         return .init(package: package, diagnostics: [])
     }
@@ -1330,6 +1419,20 @@ private func stringArray(_ object: [String: Any], _ key: String) throws -> [Stri
 private func optionalStringArray(_ object: [String: Any], _ key: String) throws -> [String]? {
     guard object[key] != nil else { return nil }
     return try stringArray(object, key)
+}
+
+private func optionalIdentifierArray(
+    _ object: [String: Any],
+    _ key: String
+) throws -> [String]? {
+    guard let values = try optionalStringArray(object, key) else { return nil }
+    guard values.allSatisfy(isIdentifier) else {
+        throw DecodeFailure(
+            "AD024",
+            "Every value in \"\(key)\" must match [A-Za-z][A-Za-z0-9_-]{0,63}."
+        )
+    }
+    return values
 }
 
 private struct ParsedCloze {

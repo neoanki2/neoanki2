@@ -73,8 +73,8 @@
       "id": "item-create-edit",
       "name": "Create and edit items",
       "article": "user/authoring-items.md",
-      "sources": ["Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"],
+      "sources": ["Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemsModel.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"],
       "screenshot": "assets/screenshots/item-add.png"
     },
     {
@@ -192,10 +192,10 @@
     },
     {
       "id": "item-types",
-      "name": "Create, edit, delete, and repair item types",
+      "name": "Manage normal and deck-included item types",
       "article": "user/item-types-and-templates.md",
-      "sources": ["Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/ItemTypeEditorView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift"],
+      "sources": ["Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/TemplatesModel.swift", "Sources/NeoAnki2/ItemTypeEditorView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/TemplatesModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"],
       "screenshot": "assets/screenshots/item-types.png"
     },
     {
@@ -227,7 +227,7 @@
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
       "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "Sources/NeoAnki2/PortableDeckImportPanel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
-      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/PortableDeckTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
     {

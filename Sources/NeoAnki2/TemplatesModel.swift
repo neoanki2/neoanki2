@@ -309,6 +309,7 @@ struct TemplateDraft: Equatable {
 @Observable
 final class TemplatesModel {
     private(set) var itemTypes: [ItemType] = []
+    private(set) var includedItemTypeGroups: [IncludedItemTypeGroup] = []
     private(set) var corruptedDefinitions: [QuarantinedItemTypeDefinition] = []
     private(set) var isLoading = true
     private(set) var errorMessage: String?
@@ -324,24 +325,39 @@ final class TemplatesModel {
     var selectedItemType: ItemType? {
         guard let selectedItemTypeID else { return nil }
         return itemTypes.first { $0.id == selectedItemTypeID }
+            ?? includedItemTypeGroups.lazy
+                .flatMap(\.itemTypes)
+                .first { $0.id == selectedItemTypeID }
+    }
+
+    var selectedIncludedGroup: IncludedItemTypeGroup? {
+        guard let selectedItemTypeID else { return nil }
+        return includedItemTypeGroups.first {
+            $0.itemTypes.contains { $0.id == selectedItemTypeID }
+        }
+    }
+
+    var isSelectedItemTypeReadOnly: Bool {
+        selectedIncludedGroup != nil
     }
 
     func load() async {
         isLoading = true
         errorMessage = nil
         do {
-            let result = try await store.loadItemTypes()
-            itemTypes = result.itemTypes
-            corruptedDefinitions = result.corruptions
-            if !result.corruptions.isEmpty {
-                let count = result.corruptions.count
+            let catalog = try await store.loadItemTypeCatalog()
+            itemTypes = catalog.itemTypes
+            includedItemTypeGroups = catalog.includedWithDecks
+            corruptedDefinitions = catalog.corruptions
+            if !catalog.corruptions.isEmpty {
+                let count = catalog.corruptions.count
                 errorMessage = count == 1
                     ? "One item type couldn’t be read. Other item types are available; repair the damaged definition when ready."
                     : "\(count) item types couldn’t be read. Other item types are available; repair damaged definitions when ready."
             }
             if selectedItemTypeID == nil {
                 selectedItemTypeID = itemTypes.first?.id
-            } else if !itemTypes.contains(where: { $0.id == selectedItemTypeID }) {
+            } else if selectedItemType == nil {
                 selectedItemTypeID = itemTypes.first?.id
             }
         } catch {
@@ -393,6 +409,10 @@ final class TemplatesModel {
 
     func updateItemType(_ draft: ItemTypeDraft, editingID: UUID) async -> Bool {
         errorMessage = nil
+        guard !isSelectedItemTypeReadOnly else {
+            errorMessage = "Item types included with decks are read-only. Duplicate this definition to edit it."
+            return false
+        }
         guard draft.isValid else {
             errorMessage = "Enter a name and at least two unique field names."
             return false
@@ -425,6 +445,10 @@ final class TemplatesModel {
 
     func deleteSelectedItemType() async -> Bool {
         errorMessage = nil
+        guard !isSelectedItemTypeReadOnly else {
+            errorMessage = "Item types included with decks can’t be deleted here."
+            return false
+        }
         guard let itemType = selectedItemType else {
             errorMessage = "No item type is selected."
             return false
@@ -449,12 +473,40 @@ final class TemplatesModel {
     }
 
     func canDeleteSelectedItemType() async -> Bool {
+        guard !isSelectedItemTypeReadOnly else { return false }
         guard let itemType = selectedItemType else { return false }
         return await itemCount(for: itemType.id) == 0
     }
 
+    func duplicateSelectedItemType(name: String) async -> Bool {
+        errorMessage = nil
+        guard isSelectedItemTypeReadOnly, let selectedItemType else {
+            errorMessage = "Select an item type included with a deck."
+            return false
+        }
+        do {
+            let created = try await store.duplicateItemType(id: selectedItemType.id, name: name)
+            itemTypes.append(created)
+            itemTypes.sort {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            selectedItemTypeID = created.id
+            return true
+        } catch let error as DatabaseError {
+            errorMessage = itemTypeErrorMessage(from: error)
+            return false
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
     func saveTemplate(_ draft: TemplateDraft, editingID: UUID?) async -> Bool {
         errorMessage = nil
+        guard !isSelectedItemTypeReadOnly else {
+            errorMessage = "Item types included with decks are read-only."
+            return false
+        }
         guard var itemType = selectedItemType else {
             errorMessage = "No item type is selected."
             return false
@@ -490,6 +542,10 @@ final class TemplatesModel {
 
     func deleteTemplate(id: UUID) async -> Bool {
         errorMessage = nil
+        guard !isSelectedItemTypeReadOnly else {
+            errorMessage = "Item types included with decks are read-only."
+            return false
+        }
         guard var itemType = selectedItemType else {
             errorMessage = "No item type is selected."
             return false

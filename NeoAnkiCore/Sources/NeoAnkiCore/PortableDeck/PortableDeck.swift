@@ -127,19 +127,24 @@ struct PortableDeckMediaRecord: Sendable {
 }
 
 struct PortableDeckPackage: Sendable {
+    let formatVersion: Int
     let sourceLibraryID: UUID
     let rootDeckID: UUID
     let decks: [Deck]
     let types: [PortableDeckTypeRecord]
     let items: [PortableDeckPersistedItem]
     let media: [PortableDeckMediaRecord]
+    let itemTypePolicies: [DeckItemTypePolicyEntry]
 }
 
 struct PortableDeckImportPlan: Sendable {
     let itemTypes: [ItemType]
+    let libraryItemTypeIDs: Set<UUID>
     let decks: [Deck]
     let items: [PortableDeckPersistedItem]
     let mappings: [PortableDeckTypeMapping]
+    let includedItemTypes: [IncludedItemTypeOwner]
+    let itemTypePolicies: [DeckItemTypePolicyEntry]
 }
 
 struct PortableDeckLibrarySnapshot: Sendable {
@@ -148,6 +153,9 @@ struct PortableDeckLibrarySnapshot: Sendable {
     let items: [PersistedItem]
     let itemTypes: [ItemType]
     let mappings: [PortableDeckTypeMapping]
+    let libraryItemTypeIDs: Set<UUID>
+    let includedItemTypes: [IncludedItemTypeOwner]
+    let itemTypePolicies: [DeckItemTypePolicyEntry]
 }
 
 struct PortableDeckTypeMapping: Sendable {
@@ -160,7 +168,7 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 2
+    public static let version = 3
     fileprivate static let supportedVersions = 1...version
 
     public static func export(
@@ -401,6 +409,20 @@ private final class PortableDeckDatabase {
                     )
                 }
             }
+            for entry in package.itemTypePolicies {
+                try execute(
+                    """
+                    INSERT INTO deck_item_types(deck_id, item_type_id, ordinal, is_default)
+                    VALUES (?, ?, ?, ?);
+                    """,
+                    [
+                        .text(entry.deckID.uuidString.lowercased()),
+                        .text(entry.itemTypeID.uuidString.lowercased()),
+                        .integer(Int64(entry.ordinal)),
+                        .integer(entry.isDefault ? 1 : 0),
+                    ]
+                )
+            }
             for record in package.items {
                 let itemID = record.item.id.uuidString.lowercased()
                 try execute(
@@ -490,10 +512,13 @@ private final class PortableDeckDatabase {
         guard rows.count == 1, rows[0].text(0) == "ok" else {
             throw PortableDeckError.invalidPackage("SQLite integrity check failed.")
         }
-        let required = Set([
+        var required = Set([
             "manifest", "decks", "item_types", "fields", "templates",
             "items", "item_fields", "item_tags", "media_assets",
         ])
+        if version >= 3 {
+            required.insert("deck_item_types")
+        }
         let actual = Set(try query(
             "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%';"
         ).compactMap { $0.text(0) })
@@ -509,7 +534,7 @@ private final class PortableDeckDatabase {
         guard try query("PRAGMA foreign_key_check;").isEmpty else {
             throw PortableDeckError.invalidPackage("Portable deck foreign keys are invalid.")
         }
-        try validateExactColumns()
+        try validateExactColumns(formatVersion: version)
     }
 
     private func configureImportLimits(_ limits: PortableDeckLimits) {
@@ -530,8 +555,8 @@ private final class PortableDeckDatabase {
         _ = limits
     }
 
-    private func validateExactColumns() throws {
-        let expected: [String: [String]] = [
+    private func validateExactColumns(formatVersion: Int) throws {
+        var expected: [String: [String]] = [
             "manifest": [
                 "singleton", "format_name", "format_version", "created_at", "exporter",
                 "source_library_id", "root_deck_id", "content_only",
@@ -550,6 +575,11 @@ private final class PortableDeckDatabase {
                 "digest", "kind", "mime_type", "file_extension", "byte_size", "data",
             ],
         ]
+        if formatVersion >= 3 {
+            expected["deck_item_types"] = [
+                "deck_id", "item_type_id", "ordinal", "is_default",
+            ]
+        }
         for (table, columns) in expected {
             // Table identifiers are compile-time constants above.
             let actual = try query("PRAGMA table_info(\(table));").compactMap { $0.text(1) }
@@ -809,6 +839,47 @@ private final class PortableDeckDatabase {
 
         let deckIDs = Set(decks.map(\.id))
         let typeIDs = Set(types.map(\.itemType.id))
+        let policies: [DeckItemTypePolicyEntry]
+        if formatVersion >= 3 {
+            let policyRows = try query(
+                """
+                SELECT deck_id, item_type_id, ordinal, is_default
+                FROM deck_item_types
+                ORDER BY deck_id, ordinal;
+                """
+            )
+            let byDeck = Dictionary(grouping: policyRows) { $0.text(0) ?? "" }
+            guard byDeck.values.allSatisfy({ rows in
+                rows.enumerated().allSatisfy { index, row in
+                    row.integer(2) == Int64(index)
+                }
+            }) else {
+                throw PortableDeckError.invalidPackage("Deck item-type policy ordinals are invalid.")
+            }
+            policies = try policyRows.map { row in
+                guard let deckID = row.uuid(0), deckIDs.contains(deckID),
+                      let itemTypeID = row.uuid(1), typeIDs.contains(itemTypeID),
+                      let ordinal = row.integer(2), ordinal >= 0,
+                      let isDefault = row.integer(3), isDefault == 0 || isDefault == 1
+                else {
+                    throw PortableDeckError.invalidPackage("Deck item-type policy is invalid.")
+                }
+                return DeckItemTypePolicyEntry(
+                    deckID: deckID,
+                    itemTypeID: itemTypeID,
+                    ordinal: Int(ordinal),
+                    isDefault: isDefault == 1
+                )
+            }
+            guard Dictionary(grouping: policies.filter(\.isDefault), by: \.deckID)
+                .values.allSatisfy({ $0.count == 1 }) else {
+                throw PortableDeckError.invalidPackage(
+                    "A deck item-type policy has more than one default."
+                )
+            }
+        } else {
+            policies = []
+        }
         let allItemFieldRows = try query(
             """
             SELECT item_id, item_type_id, field_ordinal, value_json
@@ -918,8 +989,10 @@ private final class PortableDeckDatabase {
         }
         try validateMediaReferences(items: items, media: media)
         return .init(
+            formatVersion: formatVersion,
             sourceLibraryID: sourceLibraryID, rootDeckID: rootDeckID,
-            decks: decks, types: types, items: items, media: media
+            decks: decks, types: types, items: items, media: media,
+            itemTypePolicies: policies
         )
     }
 
@@ -1521,7 +1594,7 @@ private let schema = [
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 2),
+        format_version INTEGER NOT NULL CHECK (format_version = 3),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),
@@ -1543,6 +1616,16 @@ private let schema = [
         origin_type_id TEXT NOT NULL CHECK(length(origin_type_id) = 36),
         schema_digest BLOB NOT NULL CHECK(length(schema_digest) = 32),
         UNIQUE(origin_library_id, origin_type_id)
+    );
+    """,
+    """
+    CREATE TABLE deck_item_types(
+        deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+        item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+        ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
+        is_default INTEGER NOT NULL CHECK(is_default IN (0,1)),
+        PRIMARY KEY(deck_id, item_type_id),
+        UNIQUE(deck_id, ordinal)
     );
     """,
     """
@@ -1601,6 +1684,10 @@ private let schema = [
     """,
     "CREATE UNIQUE INDEX idx_decks_parent_ordinal ON decks(COALESCE(parent_id, ''), ordinal);",
     "CREATE INDEX idx_item_types_schema_digest ON item_types(schema_digest);",
+    """
+    CREATE UNIQUE INDEX idx_deck_item_types_default
+    ON deck_item_types(deck_id) WHERE is_default = 1;
+    """,
     "CREATE INDEX idx_fields_item_type_ordinal ON fields(item_type_id, ordinal);",
     "CREATE INDEX idx_templates_item_type_ordinal ON templates(item_type_id, ordinal);",
     "CREATE INDEX idx_items_item_type ON items(item_type_id);",

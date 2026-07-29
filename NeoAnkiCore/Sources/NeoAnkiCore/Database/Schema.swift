@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 17
+    static let version = 18
 
     static let createStatements: [String] = [
         """
@@ -185,6 +185,40 @@ enum Schema {
         """
         CREATE INDEX IF NOT EXISTS idx_portable_item_type_mappings_local_type
         ON portable_item_type_mappings(local_type_id);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS library_item_types (
+            item_type_id TEXT PRIMARY KEY NOT NULL
+                REFERENCES item_types(id) ON DELETE CASCADE
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS deck_included_item_types (
+            root_deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
+            PRIMARY KEY (root_deck_id, item_type_id),
+            UNIQUE (root_deck_id, ordinal)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_deck_included_item_types_type
+        ON deck_included_item_types(item_type_id);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS deck_item_type_policy_entries (
+            deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
+            is_default INTEGER NOT NULL CHECK(is_default IN (0, 1)),
+            PRIMARY KEY (deck_id, item_type_id),
+            UNIQUE (deck_id, ordinal)
+        );
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_item_type_policy_default
+        ON deck_item_type_policy_entries(deck_id)
+        WHERE is_default = 1;
         """,
     ] + browseProjectionStatements
 
@@ -443,6 +477,50 @@ enum Schema {
     ]
 
     static let migrationV17Statements = browseProjectionStatements
+
+    /// Separates ordinary reusable item types from definitions included with
+    /// imported decks, and stores contextual authoring policies. Every
+    /// pre-existing type remains a normal library type.
+    static let migrationV18Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS library_item_types (
+            item_type_id TEXT PRIMARY KEY NOT NULL
+                REFERENCES item_types(id) ON DELETE CASCADE
+        );
+        """,
+        """
+        INSERT OR IGNORE INTO library_item_types (item_type_id)
+        SELECT id FROM item_types;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS deck_included_item_types (
+            root_deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
+            PRIMARY KEY (root_deck_id, item_type_id),
+            UNIQUE (root_deck_id, ordinal)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_deck_included_item_types_type
+        ON deck_included_item_types(item_type_id);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS deck_item_type_policy_entries (
+            deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
+            is_default INTEGER NOT NULL CHECK(is_default IN (0, 1)),
+            PRIMARY KEY (deck_id, item_type_id),
+            UNIQUE (deck_id, ordinal)
+        );
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_item_type_policy_default
+        ON deck_item_type_policy_entries(deck_id)
+        WHERE is_default = 1;
+        """,
+    ]
 
     /// Adds learner-local deck introduction limits without changing portable
     /// deck content. A nullable limit preserves the previous unlimited behavior.

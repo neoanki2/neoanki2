@@ -88,7 +88,7 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: rootURL.path))
 }
 
-@Test func poemBuilderImportsPoemRootWithAuthorMetadataAndReusesBasicSchema() async throws {
+@Test func poemBuilderImportsPoemRootWithAuthorMetadataAndIncludedSchema() async throws {
     let destinationDeckID = UUID()
     let generated = try PoemDeckGenerator.generate(
         input: PoemDeckInput(
@@ -117,15 +117,15 @@ import Testing
     let due = try await store.fetchDueCards(asOf: .now)
 
     #expect(result.itemCount == 3)
-    #expect(result.createdItemTypeCount == 0)
-    #expect(result.reusedItemTypeCount == 1)
+    #expect(result.createdItemTypeCount == 1)
+    #expect(result.reusedItemTypeCount == 0)
     #expect(generated.destinationDeckID == destinationDeckID)
     #expect(decks.count == 1)
     let poem = try #require(decks.first)
     #expect(poem.name == "спини мене отямся і отям")
     #expect(poem.parentID == nil)
     #expect(items.count == 3)
-    #expect(items.allSatisfy { $0.itemTypeName == "Basic" && $0.cardCount == 1 })
+    #expect(items.allSatisfy { $0.itemTypeName == "Poem Line" && $0.cardCount == 1 })
     #expect(items.contains {
         $0.title == "така любов буває раз в ніколи\nвона ж промчить над зламаним життям"
             && $0.subtitle == "за нею ж будуть бігти видноколи"
@@ -133,6 +133,9 @@ import Testing
     let loaded = try #require(await store.fetchItem(id: items[0].id))
     #expect(loaded.item.tags == ["author:Ліна"])
     #expect(due.count == 3)
+    let catalog = try await store.loadItemTypeCatalog()
+    #expect(!catalog.itemTypes.contains { $0.name == "Poem Line" })
+    #expect(catalog.includedWithDecks.first?.itemTypes.map(\.name) == ["Poem Line"])
 }
 
 private func jsonLines(at url: URL) throws -> [[String: Any]] {

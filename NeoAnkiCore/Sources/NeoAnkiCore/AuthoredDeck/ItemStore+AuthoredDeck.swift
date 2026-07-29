@@ -124,12 +124,54 @@ extension ItemStore {
                     updatedAt: record.updatedAt
                 )
             }
+            var seenIncludedTypeIDs: Set<UUID> = []
+            let includedItemTypes = package.itemTypes.compactMap { source -> UUID? in
+                guard let localID = typeMap[source.id]?.id,
+                      seenIncludedTypeIDs.insert(localID).inserted else { return nil }
+                return localID
+            }.enumerated().map { ordinal, itemTypeID in
+                IncludedItemTypeOwner(
+                    rootDeckID: package.rootDeckID,
+                    itemTypeID: itemTypeID,
+                    ordinal: ordinal
+                )
+            }
+            let resolvedPolicies = Dictionary(
+                grouping: package.itemTypePolicies,
+                by: \.deckID
+            ).values.flatMap { sourceEntries -> [DeckItemTypePolicyEntry] in
+                var orderedIDs: [UUID] = []
+                var defaultIDs: Set<UUID> = []
+                for entry in sourceEntries.sorted(by: { $0.ordinal < $1.ordinal }) {
+                    guard let localID = typeMap[entry.itemTypeID]?.id else { continue }
+                    if !orderedIDs.contains(localID) {
+                        orderedIDs.append(localID)
+                    }
+                    if entry.isDefault {
+                        defaultIDs.insert(localID)
+                    }
+                }
+                guard let deckID = sourceEntries.first?.deckID else { return [] }
+                return orderedIDs.enumerated().map { ordinal, itemTypeID in
+                    DeckItemTypePolicyEntry(
+                        deckID: deckID,
+                        itemTypeID: itemTypeID,
+                        ordinal: ordinal,
+                        isDefault: defaultIDs.contains(itemTypeID)
+                    )
+                }
+            }
             try await database.importPortableDeck(
                 .init(
                     itemTypes: createdTypes,
+                    libraryItemTypeIDs: package.usesIncludedItemTypes
+                        ? []
+                        : Set(typeMap.values.map(\.id)),
                     decks: package.decks,
                     items: importedItems,
-                    mappings: []
+                    mappings: [],
+                    includedItemTypes: package.usesIncludedItemTypes ? includedItemTypes : [],
+                    itemTypePolicies: package.usesIncludedItemTypes ? resolvedPolicies : []
                 ),
                 now: now
             )

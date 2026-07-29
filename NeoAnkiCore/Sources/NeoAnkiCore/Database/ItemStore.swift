@@ -190,7 +190,7 @@ public actor ItemStore {
     @discardableResult
     public func createItemType(_ itemType: ItemType) async throws -> ItemType {
         try ItemTypeValidation.validate(itemType)
-        try await database.insertItemType(itemType)
+        try await database.insertLibraryItemType(itemType)
         return itemType
     }
 
@@ -203,6 +203,86 @@ public actor ItemStore {
     /// unaffected item types.
     public func loadItemTypes() async throws -> ItemTypeLoadResult {
         try await database.fetchItemTypesWithCorruption()
+    }
+
+    /// Loads normal reusable definitions first and imported definitions grouped
+    /// beneath the deck roots that supplied them.
+    public func loadItemTypeCatalog() async throws -> ItemTypeCatalog {
+        let result = try await database.fetchItemTypesWithCorruption()
+        let libraryIDs = try await database.fetchLibraryItemTypeIDs()
+        let owners = try await database.fetchIncludedItemTypeOwners()
+        let decks = try await database.fetchAllDecks()
+        let typesByID = Dictionary(uniqueKeysWithValues: result.itemTypes.map { ($0.id, $0) })
+        let decksByID = Dictionary(uniqueKeysWithValues: decks.map { ($0.id, $0) })
+
+        let libraryTypes = result.itemTypes
+            .filter { libraryIDs.contains($0.id) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let ownersByRoot = Dictionary(grouping: owners, by: \.rootDeckID)
+        let includedGroups = ownersByRoot.compactMap { rootID, associations -> IncludedItemTypeGroup? in
+            guard let rootDeck = decksByID[rootID] else { return nil }
+            let included = associations
+                .sorted { $0.ordinal < $1.ordinal }
+                .compactMap { association -> ItemType? in
+                    guard !libraryIDs.contains(association.itemTypeID) else { return nil }
+                    return typesByID[association.itemTypeID]
+                }
+            guard !included.isEmpty else { return nil }
+            return IncludedItemTypeGroup(
+                rootDeck: rootDeck,
+                deckPath: deckPath(for: rootDeck.id, decksByID: decksByID),
+                itemTypes: included
+            )
+        }.sorted {
+            $0.rootDeck.name.localizedCaseInsensitiveCompare($1.rootDeck.name) == .orderedAscending
+        }
+
+        return ItemTypeCatalog(
+            itemTypes: libraryTypes,
+            includedWithDecks: includedGroups,
+            corruptions: result.corruptions
+        )
+    }
+
+    /// Returns the nearest explicit policy for `deckID`; a missing policy means
+    /// the normal Item Types catalog applies.
+    public func effectiveItemTypePolicy(for deckID: UUID) async throws -> DeckItemTypePolicy? {
+        let decks = try await database.fetchAllDecks()
+        let decksByID = Dictionary(uniqueKeysWithValues: decks.map { ($0.id, $0) })
+        guard decksByID[deckID] != nil else { throw DatabaseError.deckNotFound(deckID) }
+        let entries = try await database.fetchDeckItemTypePolicyEntries()
+        let byDeck = Dictionary(grouping: entries, by: \.deckID)
+        let typesByID = Dictionary(
+            uniqueKeysWithValues: try await database.fetchAllItemTypes().map { ($0.id, $0) }
+        )
+
+        var currentID: UUID? = deckID
+        var visited: Set<UUID> = []
+        while let candidateID = currentID, visited.insert(candidateID).inserted {
+            if let local = byDeck[candidateID], !local.isEmpty {
+                let sorted = local.sorted { $0.ordinal < $1.ordinal }
+                return DeckItemTypePolicy(
+                    sourceDeckID: candidateID,
+                    itemTypes: sorted.compactMap { typesByID[$0.itemTypeID] },
+                    defaultItemTypeID: sorted.first(where: \.isDefault)?.itemTypeID
+                )
+            }
+            currentID = decksByID[candidateID]?.parentID
+        }
+        return nil
+    }
+
+    /// Creates a normal editable definition without reassigning any existing
+    /// items or changing a deck's imported policy.
+    @discardableResult
+    public func duplicateItemType(id: UUID, name: String) async throws -> ItemType {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw DatabaseError.invalidItemType("Item type name is required.")
+        }
+        let original = try await itemType(id: id)
+        let copy = original.duplicated(name: trimmed)
+        return try await createItemType(copy)
     }
 
     /// Archives the malformed bytes, then replaces that row with a minimal,
@@ -1403,4 +1483,17 @@ public actor ItemStore {
         }
     }
 
+}
+
+private func deckPath(for deckID: UUID, decksByID: [UUID: Deck]) -> String {
+    var names: [String] = []
+    var currentID: UUID? = deckID
+    var visited: Set<UUID> = []
+    while let candidateID = currentID,
+          visited.insert(candidateID).inserted,
+          let deck = decksByID[candidateID] {
+        names.append(deck.name)
+        currentID = deck.parentID
+    }
+    return names.reversed().joined(separator: " / ")
 }

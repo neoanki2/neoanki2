@@ -15,16 +15,19 @@ fields you fill in and the templates that generate study cards.
 1. Select the destination deck if you want the new item preassigned there.
 2. Choose **Add Item** in the empty state or toolbar, choose **File ▸ New Item**,
    or press Command-N.
-3. If more than one item type exists, choose a **Type**.
-4. If decks exist, choose a **Deck** or **Unassigned**.
+3. Choose a **Deck** or **Unassigned**.
+4. Confirm the recommended type under **For This Deck**, or deliberately choose
+   a reusable type under **Item Types**.
 5. Complete the required fields.
 6. Choose **Save** or press Return when Save is enabled.
 
 [![The Add Item form]({{ site.baseurl }}/assets/screenshots/item-add.png)]({{ site.baseurl }}/assets/screenshots/item-add.png)
 
 The first text-capable field receives keyboard focus. Tab and Shift-Tab move
-between controls. Switching item type while adding resets the field values for
-the newly selected type.
+between controls. A manual item-type change that would clear entered content
+asks for confirmation. Changing deck while fields are empty resolves the new
+deck's policy; changing deck after entering content retains the current type
+and values.
 
 The selected item type is fixed when the item is created. The current UI
 cannot change an existing item's type later. To use a different type, create a

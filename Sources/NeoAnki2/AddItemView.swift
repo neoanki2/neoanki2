@@ -18,6 +18,8 @@ struct AddItemView: View {
     @State private var didInitialize = false
     @State private var initialSnapshot: ItemEditorSnapshot?
     @State private var showDiscardConfirmation = false
+    @State private var showTypeChangeConfirmation = false
+    @State private var pendingItemTypeID: UUID?
     @FocusState private var focusedFieldID: UUID?
 
     init(
@@ -39,17 +41,6 @@ struct AddItemView: View {
 
     var body: some View {
         Form {
-            if !isEditing, model.itemTypes.count > 1 {
-                Section("Item Type") {
-                    Picker("Type", selection: addItemTypeBinding) {
-                        ForEach(model.itemTypes) { type in
-                            Text(type.name).tag(type.id)
-                        }
-                    }
-                    .accessibilityIdentifier("addItemTypePicker")
-                }
-            }
-
             if !isEditing, !decksModel.summaries.isEmpty || selectedDeckID != nil {
                 Section("Deck") {
                     Picker("Deck", selection: $selectedDeckID) {
@@ -59,6 +50,52 @@ struct AddItemView: View {
                         }
                     }
                     .accessibilityIdentifier("addItemDeckPicker")
+                }
+            }
+
+            if !isEditing {
+                Section("Item Type") {
+                    Picker("Type", selection: addItemTypeBinding) {
+                        Text("Choose an Item Type")
+                            .tag(ItemType.ID?.none)
+                        if !model.policyItemTypes.isEmpty {
+                            Section("For This Deck") {
+                                ForEach(model.policyItemTypes) { type in
+                                    if model.isRecommendedItemType(type.id) {
+                                        Text("\(type.name) — Recommended")
+                                            .tag(Optional(type.id))
+                                    } else {
+                                        Text(type.name)
+                                            .tag(Optional(type.id))
+                                    }
+                                }
+                            }
+                        }
+                        if let retained = model.retainedItemType {
+                            Section("Current Item Type") {
+                                Text("\(retained.name) — Retained")
+                                    .tag(Optional(retained.id))
+                            }
+                        }
+                        Section("Item Types") {
+                            ForEach(model.normalItemTypes) { type in
+                                Text(type.name).tag(Optional(type.id))
+                            }
+                        }
+                    }
+                    .accessibilityLabel("Item Type")
+                    .accessibilityHint(
+                        "Types included for this deck appear first. Ordinary Item Types are always available."
+                    )
+                    .accessibilityIdentifier("addItemTypePicker")
+
+                    if model.effectiveItemTypePolicy != nil,
+                       model.addItemTypeID == nil {
+                        Text("Choose the item type that matches what you want to add.")
+                            .font(DesignSystem.Typography.uiCaption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("addItemTypeChoiceRequired")
+                    }
                 }
             }
 
@@ -99,6 +136,21 @@ struct AddItemView: View {
         .onAppear {
             initializeIfNeeded()
         }
+        .task {
+            guard !isEditing else { return }
+            await model.configureAddItem(for: selectedDeckID)
+        }
+        .onChange(of: selectedDeckID) { _, deckID in
+            guard didInitialize, !isEditing else { return }
+            model.addItemDeckID = deckID
+            let shouldResolve = !hasEnteredContent
+            Task {
+                await model.configureAddItem(
+                    for: deckID,
+                    resolveSelection: shouldResolve
+                )
+            }
+        }
         .onChange(of: model.addItemTypeID) { _, _ in
             guard !isEditing else { return }
             resetFields()
@@ -115,6 +167,23 @@ struct AddItemView: View {
                 .accessibilityIdentifier("cancelDiscardItem")
         } message: {
             Text("Your unsaved changes will be lost.")
+        }
+        .confirmationDialog(
+            "Change item type and clear entered content?",
+            isPresented: $showTypeChangeConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Change Item Type", role: .destructive) {
+                model.addItemTypeID = pendingItemTypeID
+                pendingItemTypeID = nil
+            }
+            .accessibilityIdentifier("confirmChangeItemType")
+            Button("Keep Current Type", role: .cancel) {
+                pendingItemTypeID = nil
+            }
+            .accessibilityIdentifier("cancelChangeItemType")
+        } message: {
+            Text("Fields differ between item types, so the content already entered will be cleared.")
         }
     }
 
@@ -154,11 +223,35 @@ struct AddItemView: View {
         }
     }
 
-    private var addItemTypeBinding: Binding<ItemType.ID> {
+    private var addItemTypeBinding: Binding<ItemType.ID?> {
         Binding(
-            get: { model.addItemTypeID ?? model.itemTypes.first!.id },
-            set: { model.addItemTypeID = $0 }
+            get: { model.addItemTypeID },
+            set: { newValue in
+                guard newValue != model.addItemTypeID else { return }
+                if hasEnteredContent {
+                    pendingItemTypeID = newValue
+                    showTypeChangeConfirmation = true
+                } else {
+                    model.addItemTypeID = newValue
+                }
+            }
         )
+    }
+
+    private var hasEnteredContent: Bool {
+        fieldSpans.values.contains {
+            !SpanFormatting.plainText(from: $0)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+        }
+            || fieldText.values.contains {
+                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            || !fieldMedia.isEmpty
+            || fieldMediaAltText.values.contains {
+                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            || fieldClozeBlanks.values.contains { !$0.isEmpty }
     }
 
     private var canSave: Bool {

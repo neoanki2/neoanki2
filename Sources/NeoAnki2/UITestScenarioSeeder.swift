@@ -65,9 +65,60 @@ enum UITestScenarioSeeder {
             try await seedAlternateImportType(store: store)
         case "authoring-fields":
             try await seedAuthoringFieldTypes(store: store)
+        case "deck-included-item-types":
+            try await seedDeckIncludedItemTypes(store: store)
         default:
             break
         }
+    }
+
+    private static func seedDeckIncludedItemTypes(store: ItemStore) async throws {
+        try await importIncludedDeck(
+            deckName: "Poetry Lab",
+            typeName: "Poem Line",
+            promptName: "Previous Lines",
+            answerName: "Next Line",
+            store: store
+        )
+        try await importIncludedDeck(
+            deckName: "Language Lab",
+            typeName: "Translation Entry",
+            promptName: "Expression",
+            answerName: "Translation",
+            store: store
+        )
+    }
+
+    private static func importIncludedDeck(
+        deckName: String,
+        typeName: String,
+        promptName: String,
+        answerName: String,
+        store: ItemStore
+    ) async throws {
+        let workspace = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki-ui-included-\(UUID().uuidString)", isDirectory: true)
+        let bundle = workspace.appendingPathComponent("Fixture.neoanki", isDirectory: true)
+        let items = bundle.appendingPathComponent("items", isDirectory: true)
+        try FileManager.default.createDirectory(at: items, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let records = [
+            #"{"kind":"neoanki","version":3,"root":"root","parts":["items/items.jsonl"]}"#,
+            """
+            {"kind":"type","id":"included","name":"\(typeName)","fields":[{"id":"prompt","name":"\(promptName)","type":"text","required":true},{"id":"answer","name":"\(answerName)","type":"text","required":true}],"templates":[{"name":"Recall","prompt":[{"field":"prompt"}],"answer":[{"field":"answer"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}
+            """,
+            """
+            {"kind":"deck","id":"root","name":"\(deckName)","itemTypes":["included"],"defaultType":"included"}
+            """,
+        ]
+        try (records.joined(separator: "\n") + "\n").write(
+            to: bundle.appendingPathComponent(AuthoredDeck.manifestName),
+            atomically: true,
+            encoding: .utf8
+        )
+        try Data().write(to: items.appendingPathComponent("items.jsonl"))
+        _ = try await AuthoredDeck.importDeck(from: bundle, into: store)
     }
 
     private static func seedTextInteraction(

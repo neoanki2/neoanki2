@@ -105,11 +105,21 @@ public enum PoemDeckGenerator {
 
         var manifestData = Data()
         try append(
-            ManifestRecord(kind: "neoanki", version: 1, root: "poem", parts: ["items/poem.jsonl"]),
+            ManifestRecord(kind: "neoanki", version: 3, root: "poem", parts: ["items/poem.jsonl"]),
             to: &manifestData
         )
-        try append(basicTypeRecord, to: &manifestData)
-        try append(DeckRecord(kind: "deck", id: "poem", name: title, parent: nil), to: &manifestData)
+        try append(poemTypeRecord, to: &manifestData)
+        try append(
+            DeckRecord(
+                kind: "deck",
+                id: "poem",
+                name: title,
+                parent: nil,
+                itemTypes: ["poem-line"],
+                defaultType: "poem-line"
+            ),
+            to: &manifestData
+        )
         try manifestData.write(
             to: bundleURL.appendingPathComponent(AuthoredDeck.manifestName),
             options: .atomic
@@ -122,7 +132,7 @@ public enum PoemDeckGenerator {
             let item = ItemRecord(
                 kind: "item",
                 deck: "poem",
-                type: "basic",
+                type: "poem-line",
                 fields: [
                     "front": TextValue(text: prompt),
                     "back": TextValue(text: lines[answerIndex]),
@@ -144,10 +154,10 @@ public enum PoemDeckGenerator {
         data.append(0x0A)
     }
 
-    private static let basicTypeRecord = TypeRecord(
+    private static let poemTypeRecord = TypeRecord(
         kind: "type",
-        id: "basic",
-        name: "Basic",
+        id: "poem-line",
+        name: "Poem Line",
         fields: [
             FieldRecord(id: "front", name: "Front", type: "text", required: true),
             FieldRecord(id: "back", name: "Back", type: "text", required: true),
@@ -176,6 +186,8 @@ private struct DeckRecord: Encodable {
     let id: String
     let name: String
     let parent: String?
+    let itemTypes: [String]?
+    let defaultType: String?
 }
 
 private struct TypeRecord: Encodable {
