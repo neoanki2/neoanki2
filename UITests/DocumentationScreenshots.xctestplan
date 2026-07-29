@@ -1,7 +1,7 @@
 {
   "configurations" : [
     {
-      "id" : "A9000000-0000-0000-0000-000000000001",
+      "id" : "A9000000-0000-0000-0000-000000000003",
       "name" : "Default",
       "options" : {
         "targetApplicationPath" : "${SRCROOT}/../.build/NeoAnki2.app"
@@ -13,6 +13,9 @@
   },
   "testTargets" : [
     {
+      "selectedTests" : [
+        "DocumentationScreenshotTests"
+      ],
       "target" : {
         "containerPath" : "container:NeoAnki2UITests.xcodeproj",
         "identifier" : "A40000000000000000000001",

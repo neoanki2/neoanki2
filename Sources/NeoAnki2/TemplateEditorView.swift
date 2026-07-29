@@ -76,7 +76,9 @@ struct TemplateEditorView: View {
                         Image(systemName: "chevron.right")
                             .rotationEffect(.degrees(showAdvanced ? 90 : 0))
                             .animation(
-                                reduceMotion ? nil : .easeOut(duration: 0.2),
+                                reduceMotion || AppDatabase.isTesting
+                                    ? nil
+                                    : .easeOut(duration: 0.2),
                                 value: showAdvanced
                             )
                             .foregroundStyle(.secondary)

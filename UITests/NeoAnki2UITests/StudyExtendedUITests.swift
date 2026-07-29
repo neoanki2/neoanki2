@@ -1,7 +1,7 @@
 import XCTest
 
-final class StudyExtendedUITests: NeoAnkiUITestCase {
-    func testStartStudyViaMenu() throws {
+extension FastFunctionalJourneyTests {
+    func checkStudyExtendedUITestsStartStudyViaMenu() throws {
         let app = launchApp()
         addBasicItem(front: "Menu Q", back: "Menu A", in: app)
         startStudyViaMenu(in: app)
@@ -9,7 +9,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testEndStudyViaMenuWithConfirmation() throws {
+    func checkStudyExtendedUITestsEndStudyViaMenuWithConfirmation() throws {
         let app = launchApp()
         addBasicItem(front: "End Menu Q1", back: "A1", in: app)
         addBasicItem(front: "End Menu Q2", back: "A2", in: app)
@@ -19,7 +19,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         assertDueCardsAvailable(in: app)
     }
 
-    func testGradeViaKeyboardShortcuts() throws {
+    func checkStudyExtendedUITestsGradeViaKeyboardShortcuts() throws {
         let app = launchApp()
         addBasicItem(front: "Keyboard Q", back: "Keyboard A", in: app)
         startStudy(in: app)
@@ -28,7 +28,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testContinueViaSpace() throws {
+    func checkStudyExtendedUITestsContinueViaSpace() throws {
         let app = launchApp()
         addBasicItem(front: "Space Q", back: "Space A", in: app)
         startStudy(in: app)
@@ -38,7 +38,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testUndoLastGradeViaCommandZ() throws {
+    func checkStudyExtendedUITestsUndoLastGradeViaCommandZ() throws {
         let app = launchApp()
         addBasicItem(front: "CmdZ Q", back: "CmdZ A", in: app)
         startStudy(in: app)
@@ -49,7 +49,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testArrangeReorderToCorrectOrder() throws {
+    func checkStudyExtendedUITestsArrangeReorderToCorrectOrder() throws {
         let app = launchApp(scenario: "study-arrange")
         startStudy(in: app)
 
@@ -68,7 +68,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testArrangeKeyboardReorder() throws {
+    func checkStudyExtendedUITestsArrangeKeyboardReorder() throws {
         let app = launchApp(scenario: "study-arrange")
         startStudy(in: app)
 
@@ -81,7 +81,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         )
     }
 
-    func testRevealAndSelfGradeViaRightArrow() throws {
+    func checkStudyExtendedUITestsRevealAndSelfGradeViaRightArrow() throws {
         let app = launchApp(scenario: "study-record")
         startStudy(in: app)
         app.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
@@ -90,7 +90,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testStudyCaughtUpState() throws {
+    func checkStudyExtendedUITestsStudyCaughtUpState() throws {
         let app = launchApp()
         addBasicItem(front: "Caught Up Q", back: "Caught Up A", in: app)
         startStudy(in: app)
@@ -100,7 +100,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         assertNothingDue(in: app)
     }
 
-    func testEditCardDuringSessionKeepsStudying() throws {
+    func checkStudyExtendedUITestsEditCardDuringSessionKeepsStudying() throws {
         let app = launchApp()
         addBasicItem(front: "Capital of Frnace", back: "Paris", in: app)
         startStudy(in: app)
@@ -118,7 +118,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         assertNoItem(named: "Capital of Frnace", in: app)
     }
 
-    func testEditCardViaCommandEThenCancel() throws {
+    func checkStudyExtendedUITestsEditCardViaCommandEThenCancel() throws {
         let app = launchApp()
         addBasicItem(front: "Shortcut Q", back: "Shortcut A", in: app)
         startStudy(in: app)
@@ -132,7 +132,7 @@ final class StudyExtendedUITests: NeoAnkiUITestCase {
         finishStudySession(in: app)
     }
 
-    func testDismissUndoBanner() throws {
+    func checkStudyExtendedUITestsDismissUndoBanner() throws {
         let app = launchApp()
         addBasicItem(front: "Dismiss Undo Q", back: "Dismiss Undo A", in: app)
         startStudy(in: app)

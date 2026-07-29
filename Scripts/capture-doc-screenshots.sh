@@ -7,13 +7,12 @@ OUTPUT_DIR="${1:-$ROOT/.build/documentation-screenshots}"
 mkdir -p "$OUTPUT_DIR"
 rm -f "$OUTPUT_DIR"/*.png "$OUTPUT_DIR/manifest.json" "$OUTPUT_DIR/.capture-context.json"
 export DOC_SCREENSHOT_DIR="$OUTPUT_DIR"
+export NEOANKI_UI_TEST_PLAN="DocumentationScreenshots"
 DOC_SCREENSHOT_SOURCE_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 DOC_SCREENSHOT_CAPTURED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 printf '{"sourceSHA":"%s","capturedAt":"%s"}\n' \
   "$DOC_SCREENSHOT_SOURCE_SHA" "$DOC_SCREENSHOT_CAPTURED_AT" \
   > "$OUTPUT_DIR/.capture-context.json"
-export NEOANKI_UI_ONLY_TESTING="NeoAnki2UITests/DocumentationScreenshotTests"
-
 "$ROOT/Scripts/run-ui-tests.sh"
 rm -f "$OUTPUT_DIR/.capture-context.json"
 

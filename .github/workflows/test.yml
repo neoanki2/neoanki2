@@ -5,7 +5,6 @@ permissions:
 
 on:
   push:
-    branches: [main, master]
   pull_request:
   schedule:
     - cron: '0 6 * * *'
@@ -35,12 +34,20 @@ jobs:
         run: swift test --filter NeoAnki2Tests --parallel
 
   ui-smoke:
-    name: UI smoke tests
+    name: Fast functional UI journeys
     runs-on: macos-15
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Build app bundle and run UI tests
         run: |
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh
           ./Scripts/run-ui-tests.sh
+      - name: Upload UI diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neoanki2-fast-ui-results
+          path: .build/ui-results
+          if-no-files-found: warn
+          retention-days: 7

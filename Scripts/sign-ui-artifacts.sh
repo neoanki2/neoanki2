@@ -27,7 +27,7 @@ sign_app_bundle() {
 
 sign_app_bundle "$ROOT/.build/NeoAnki2.app"
 
-DERIVED_ROOT="$HOME/Library/Developer/Xcode/DerivedData"
+DERIVED_ROOT="${NEOANKI_UI_DERIVED_DATA:-$HOME/Library/Developer/Xcode/DerivedData}"
 while IFS= read -r products_dir; do
   sign_app_bundle "$products_dir/NeoAnki2.app"
 done < <(find "$DERIVED_ROOT" -maxdepth 4 -type d -name Products 2>/dev/null | sort -u)

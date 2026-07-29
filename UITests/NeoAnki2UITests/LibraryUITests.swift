@@ -1,7 +1,317 @@
 import XCTest
 
-final class LibraryUITests: NeoAnkiUITestCase {
-    func testBootstrapFailureShowsSafeErrorState() throws {
+extension FastFunctionalJourneyTests {
+    func runSharedLibraryAndBrowseJourney() throws {
+        let persistenceLabel = "fast-library-\(UUID().uuidString)"
+        let app = launchApp(databaseLabel: persistenceLabel)
+
+        runJourneyActivity("LibraryUITests.testAppLaunchesWithEmptyLibrary") {
+            assertEmptyLibrary(in: app)
+        }
+
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testAddItemHasAMenuHomeUnderFile") {
+            let cancel = app.buttons.identified("cancelAddItem")
+            for _ in 0..<2 where !cancel.exists {
+                app.menuBarItems["File"].click()
+                let newItem = app.menuItems.identified("New Item")
+                XCTAssertTrue(newItem.waitUntilExists(timeout: 3))
+                XCTAssertTrue(newItem.isEnabled)
+                newItem.click()
+                if cancel.waitUntilExists(timeout: 2) { break }
+                dismissOpenMenus(in: app)
+            }
+            XCTAssertTrue(app.buttons.identified("cancelAddItem").waitUntilExists(timeout: 3))
+            XCTAssertTrue(field(named: "Front", in: app).waitUntilExists(timeout: 3))
+        }
+
+        runJourneyActivity("LibraryUITests.testAddItemValidationDisablesSave") {
+            enterText("Only front", into: field(named: "Front", in: app), app: app)
+            XCTAssertFalse(app.buttons.identified("saveAddItem").isEnabled)
+        }
+
+        runJourneyActivity("LibraryUITests.testWhitespaceOnlyRequiredFieldsCannotBeSaved") {
+            enterText("   ", into: field(named: "Front", in: app), app: app)
+            XCTAssertFalse(app.buttons.identified("saveAddItem").isEnabled)
+        }
+
+        runJourneyActivity("LibraryUITests.testRichTextEditorFormattingButtonsApplyStyles") {
+            assertFormattedStyles(
+                named: "Front",
+                text: "FrontStyles",
+                styles: [
+                    ("formatBold", "bold"),
+                    ("formatItalic", "italic"),
+                    ("formatUnderline", "underline"),
+                ],
+                in: app
+            )
+            assertFormattedStyles(
+                named: "Back",
+                text: "BackStyles",
+                styles: [
+                    ("formatStrikethrough", "strikethrough"),
+                    ("formatHighlight", "highlight"),
+                    ("formatCode", "code"),
+                ],
+                in: app
+            )
+        }
+
+        runJourneyActivity("LibraryUITests.testAddItemCancelReturnsToLibrary") {
+            app.buttons.identified("cancelAddItem").click()
+            if app.buttons.identified("confirmDiscardItem").exists {
+                app.buttons.identified("confirmDiscardItem").click()
+            }
+            assertEmptyLibrary(in: app)
+        }
+
+        runJourneyActivity("LibraryUITests.testAddItemFromEmptyState") {
+            addBasicItem(front: "Alpha", back: "Beta", in: app)
+        }
+
+        runJourneyActivity("LibraryUITests.testAddItemFromToolbar") {
+            returnToLibrary(in: app)
+            openAddItem(in: app)
+            enterText("France", into: field(named: "Front", in: app), app: app)
+            enterText("Paris", into: field(named: "Back", in: app), app: app)
+            saveAddItem(in: app)
+            app.terminate()
+        }
+
+        let relaunched = launchApp(databaseLabel: persistenceLabel)
+        waitForItem(named: "Alpha", in: relaunched)
+        leaveBrowseMode(in: relaunched)
+
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testScopeHomeLeadsWithDueCountAndStudy") {
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["scopeHomeDueHeadline"]
+                    .waitUntilExists(timeout: 5)
+            )
+            XCTAssertTrue(relaunched.descendants(matching: .any)["scopeHomeCardStates"].exists)
+            XCTAssertTrue(relaunched.buttons.identified("studyButton").isEnabled)
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["scopeHomeBrowseLink"]
+                    .waitUntilExists(timeout: 3)
+            )
+        }
+
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testScopeHomeDoesNotRevealAnswers") {
+            XCTAssertFalse(
+                relaunched.staticTexts.matching(
+                    NSPredicate(
+                        format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@",
+                        "Paris",
+                        "Paris"
+                    )
+                ).firstMatch.exists
+            )
+        }
+
+        runJourneyActivity(
+            "ScopeHomeAndBrowseUITests.testBrowseOpensWithKeyboardShortcutAndClosesWithEscape"
+        ) {
+            relaunched.typeKey("b", modifierFlags: [.command, .option])
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["itemBrowserTable"]
+                    .waitUntilExists(timeout: 3)
+            )
+            XCTAssertTrue(relaunched.descendants(matching: .any)["itemRow-Alpha"].exists)
+            relaunched.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["scopeHomeDueHeadline"]
+                    .waitUntilExists(timeout: 3)
+            )
+        }
+
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testBrowseOpensFromTheLibraryMenu") {
+            relaunched.menuBarItems["Library"].click()
+            selectMenuItem("Browse Items", in: relaunched)
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["itemBrowserTable"]
+                    .waitUntilExists(timeout: 3)
+            )
+        }
+
+        let paris = relaunched.staticTexts.matching(
+            NSPredicate(format: "value == %@ OR label == %@", "Paris", "Paris")
+        ).firstMatch
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testBrowseHidesTheAnswerColumnByDefault") {
+            XCTAssertTrue(relaunched.descendants(matching: .any)["itemRow-France"].exists)
+            XCTAssertFalse(paris.exists)
+        }
+
+        runJourneyActivity(
+            "ScopeHomeAndBrowseUITests.testBrowseRevealsTheAnswerColumnFromTheLibraryMenu"
+        ) {
+            relaunched.menuBarItems["Library"].click()
+            selectMenuItem("Show Answer Column", in: relaunched)
+            XCTAssertTrue(paris.waitUntilExists(timeout: 3))
+            relaunched.menuBarItems["Library"].click()
+            selectMenuItem("Hide Answer Column", in: relaunched)
+            XCTAssertTrue(paris.waitUntilGone(timeout: 3))
+        }
+
+        runJourneyActivity(
+            "ScopeHomeAndBrowseUITests.testAnswerColumnChoiceSurvivesLeavingBrowseMode"
+        ) {
+            relaunched.typeKey("a", modifierFlags: [.command, .option])
+            XCTAssertTrue(paris.waitUntilExists(timeout: 3))
+            leaveBrowseMode(in: relaunched)
+            enterBrowseMode(in: relaunched)
+            XCTAssertTrue(paris.exists)
+        }
+
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testBrowseSearchNarrowsRowsAndReportsNoResults") {
+            let search = relaunched.searchFields.firstMatch
+            XCTAssertTrue(search.waitUntilExists(timeout: 3))
+            search.click()
+            search.typeText("France")
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["itemRow-France"]
+                    .waitUntilExists(timeout: 3)
+            )
+            XCTAssertFalse(relaunched.descendants(matching: .any)["itemRow-Alpha"].exists)
+            search.typeKey("a", modifierFlags: [.command])
+            search.typeText("Ukraine")
+            XCTAssertTrue(
+                relaunched.descendants(matching: .any)["browseNoSearchResults"]
+                    .waitUntilExists(timeout: 3)
+            )
+            search.typeKey("a", modifierFlags: [.command])
+            search.typeKey(XCUIKeyboardKey.delete, modifierFlags: [])
+        }
+
+        let seeded = launchApp(scenario: "library-browse")
+        openItemDetail(named: "Original", in: seeded)
+        runJourneyActivity("LibraryUITests.testOpenItemDetail") {
+            XCTAssertTrue(seeded.buttons.identified("deleteItem").exists)
+        }
+
+        runJourneyActivity("LibraryUITests.testDirtyItemEditCanKeepEditingThenDiscard") {
+            openItemEditor(in: seeded)
+            enterText("Changed", into: field(named: "Front", in: seeded), app: seeded)
+            seeded.buttons.identified("cancelEditItem").click()
+            XCTAssertTrue(seeded.buttons.identified("cancelDiscardItem").waitUntilExists(timeout: 3))
+            seeded.buttons.identified("cancelDiscardItem").click()
+            XCTAssertTrue(seeded.buttons.identified("saveEditItem").exists)
+            seeded.buttons.identified("cancelEditItem").click()
+            seeded.buttons.identified("confirmDiscardItem").click()
+            XCTAssertTrue(seeded.buttons.identified("deleteItem").waitUntilExists(timeout: 3))
+        }
+
+        runJourneyActivity("LibraryUITests.testEditItemFromDetailUpdatesLibraryAndPreview") {
+            openItemEditor(in: seeded)
+            enterText("Japan", into: field(named: "Front", in: seeded), app: seeded)
+            enterText("Tokyo", into: field(named: "Back", in: seeded), app: seeded)
+            let save = seeded.buttons.identified("saveEditItem")
+            XCTAssertTrue(save.isEnabled)
+            save.click()
+            XCTAssertTrue(save.waitUntilGone(timeout: 5))
+            XCTAssertTrue(
+                seeded.staticTexts.matching(
+                    NSPredicate(
+                        format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@",
+                        "Japan",
+                        "Japan"
+                    )
+                ).firstMatch.waitUntilExists(timeout: 3)
+            )
+        }
+
+        runJourneyActivity("LibraryUITests.testBackFromItemDetailReturnsToLibrary") {
+            let back = seeded.buttons.identified("itemDetailBack")
+            XCTAssertTrue(back.waitUntilExists(timeout: 3))
+            back.click()
+            waitForItem(named: "Japan", in: seeded)
+            XCTAssertFalse(seeded.buttons.identified("deleteItem").exists)
+            assertNoItem(named: "Original", in: seeded)
+        }
+
+        openItemDetail(named: "Keep Item", in: seeded)
+        runJourneyActivity("LibraryUITests.testDeleteItemCancellationPreservesItem") {
+            seeded.buttons.identified("deleteItem").click()
+            XCTAssertTrue(seeded.buttons.identified("cancelDeleteItem").waitUntilExists(timeout: 3))
+            seeded.buttons.identified("cancelDeleteItem").click()
+            XCTAssertTrue(seeded.buttons.identified("deleteItem").waitUntilExists(timeout: 3))
+            returnToLibrary(in: seeded)
+            waitForItem(named: "Keep Item", in: seeded)
+        }
+
+        openItemDetail(named: "Remove", in: seeded)
+        runJourneyActivity("LibraryUITests.testDeleteItemFromDetail") {
+            seeded.buttons.identified("deleteItem").click()
+            seeded.buttons.identified("confirmDeleteItem").click()
+            assertNoItem(named: "Remove", in: seeded)
+        }
+
+        openItemDetail(named: "Movable", in: seeded)
+        runJourneyActivity("LibraryUITests.testMoveItemToDeckFromDetail") {
+            let picker = seeded.descendants(matching: .any).identified("itemDeckPicker")
+            XCTAssertTrue(picker.waitUntilExists(timeout: 3))
+            selectPopUpOption(named: "Target Deck", picker: picker, in: seeded)
+            returnToLibrary(in: seeded)
+            selectScope("deckRow-Target Deck", in: seeded)
+            waitForItem(named: "Movable", in: seeded)
+        }
+
+        selectScope("scopeRow-AllDecks", in: seeded)
+        enterBrowseMode(in: seeded)
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testBrowseDeletesASelectedItem") {
+            let row = seeded.descendants(matching: .any).identified("itemRow-Browse Delete")
+            XCTAssertTrue(row.waitUntilExists(timeout: 3))
+            row.click()
+            seeded.buttons.identified("browseDeleteSelection").click()
+            seeded.buttons.identified("browseConfirmDelete").click()
+            XCTAssertTrue(row.waitUntilGone(timeout: 5))
+            XCTAssertTrue(seeded.descendants(matching: .any)["itemRow-Keep Item"].exists)
+        }
+
+        runJourneyActivity("ScopeHomeAndBrowseUITests.testBrowseMovesASelectedItemToADeck") {
+            let row = seeded.descendants(matching: .any).identified("itemRow-Browse Move")
+            row.click()
+            let button = seeded.buttons.identified("browseMoveToDeck")
+            let menu = button.exists ? button : seeded.menuButtons.identified("browseMoveToDeck")
+            menu.click()
+            selectMenuItem("Target Deck", in: seeded)
+            selectScope("deckRow-Target Deck", in: seeded)
+            waitForItem(named: "Browse Move", in: seeded)
+        }
+
+        runJourneyActivity("LibraryUITests.testDeleteAllUnassignedFromToolbar") {
+            returnToLibrary(in: seeded)
+            selectScope("scopeRow-Unassigned", in: seeded)
+            let deleteAll = seeded.buttons.identified("deleteAllUnassignedToolbar")
+            XCTAssertTrue(deleteAll.waitUntilExists(timeout: 3))
+            deleteAll.click()
+            seeded.buttons.identified("confirmDeleteAllUnassigned").click()
+            XCTAssertTrue(
+                seeded.descendants(matching: .any)["emptyUnassignedState"]
+                    .waitUntilExists(timeout: 5)
+            )
+            selectScope("scopeRow-AllDecks", in: seeded)
+            waitForItem(named: "Deck Item", in: seeded)
+            assertNoItem(named: "Japan", in: seeded)
+        }
+
+        let sidebarDeleteApp = launchApp(scenario: "library-browse")
+        runJourneyActivity("LibraryUITests.testDeleteAllUnassignedFromSidebarMenu") {
+            showSidebar(in: sidebarDeleteApp)
+            let unassigned = sidebarDeleteApp.descendants(matching: .any)
+                .identified("scopeRow-Unassigned")
+            unassigned.rightClick()
+            selectMenuItem("Delete All", in: sidebarDeleteApp)
+            sidebarDeleteApp.buttons.identified("confirmDeleteAllUnassigned").click()
+            selectScope("scopeRow-Unassigned", in: sidebarDeleteApp)
+            XCTAssertTrue(
+                sidebarDeleteApp.descendants(matching: .any)["emptyUnassignedState"]
+                    .waitUntilExists(timeout: 5)
+            )
+            assertNoItem(named: "Original", in: sidebarDeleteApp)
+        }
+
+    }
+
+    func checkLibraryUITestsBootstrapFailureShowsSafeErrorState() throws {
         let app = launchApp(
             environment: ["NEOANKI_TEST_BOOTSTRAP_FAILURE": "1"],
             waitForLibrary: false
@@ -12,17 +322,17 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertFalse(app.buttons.identified("addItemToolbar").exists)
     }
 
-    func testAppLaunchesWithEmptyLibrary() throws {
+    func checkLibraryUITestsAppLaunchesWithEmptyLibrary() throws {
         let app = launchApp()
         assertEmptyLibrary(in: app)
     }
 
-    func testAddItemFromEmptyState() throws {
+    func checkLibraryUITestsAddItemFromEmptyState() throws {
         let app = launchApp()
         addBasicItem(front: "France", back: "Paris", in: app)
     }
 
-    func testAddItemFromToolbar() throws {
+    func checkLibraryUITestsAddItemFromToolbar() throws {
         let databaseLabel = UUID().uuidString
         let app = launchApp(databaseLabel: databaseLabel)
         addBasicItem(front: "Alpha", back: "Beta", in: app)
@@ -34,7 +344,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         waitForItem(named: "Alpha", in: relaunched)
     }
 
-    func testRichTextEditorFormattingButtonsApplyStyles() throws {
+    func checkLibraryUITestsRichTextEditorFormattingButtonsApplyStyles() throws {
         let app = launchApp()
         openAddItem(in: app)
 
@@ -46,14 +356,14 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertFormattedField(named: "Back", buttonID: "formatCode", style: "code", text: "CodeWord", in: app)
     }
 
-    func testAddItemCancelReturnsToLibrary() throws {
+    func checkLibraryUITestsAddItemCancelReturnsToLibrary() throws {
         let app = launchApp()
         openAddItem(in: app)
         app.buttons.identified("cancelAddItem").click()
         assertEmptyLibrary(in: app)
     }
 
-    func testAddItemValidationDisablesSave() throws {
+    func checkLibraryUITestsAddItemValidationDisablesSave() throws {
         let app = launchApp()
         openAddItem(in: app)
         enterText("Only front", into: field(named: "Front", in: app), app: app)
@@ -63,14 +373,14 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertFalse(save.isEnabled)
     }
 
-    func testOpenItemDetail() throws {
+    func checkLibraryUITestsOpenItemDetail() throws {
         let app = launchApp()
         addBasicItem(front: "Detail", back: "View", in: app)
         openItemDetail(named: "Detail", in: app)
         XCTAssertTrue(app.buttons.identified("deleteItem").exists)
     }
 
-    func testBackFromItemDetailReturnsToLibrary() throws {
+    func checkLibraryUITestsBackFromItemDetailReturnsToLibrary() throws {
         let app = launchApp()
         addBasicItem(front: "Back Test", back: "View", in: app)
         openItemDetail(named: "Back Test", in: app)
@@ -83,7 +393,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertFalse(app.buttons.identified("deleteItem").exists)
     }
 
-    func testDeleteAllUnassignedFromToolbar() throws {
+    func checkLibraryUITestsDeleteAllUnassignedFromToolbar() throws {
         let app = launchApp()
         addBasicItem(front: "Loose Item", back: "A", in: app)
         createDeck(named: "Keep Deck", in: app)
@@ -114,7 +424,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertNoItem(named: "Loose Item", in: app)
     }
 
-    func testDeleteAllUnassignedFromSidebarMenu() throws {
+    func checkLibraryUITestsDeleteAllUnassignedFromSidebarMenu() throws {
         let app = launchApp()
         addBasicItem(front: "Sidebar Delete", back: "A", in: app)
 
@@ -130,12 +440,12 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertNoItem(named: "Sidebar Delete", in: app)
     }
 
-    func testEditItemFromDetailUpdatesLibraryAndPreview() throws {
+    func checkLibraryUITestsEditItemFromDetailUpdatesLibraryAndPreview() throws {
         let app = launchApp()
         addBasicItem(front: "France", back: "Paris", in: app)
         openItemDetail(named: "France", in: app)
 
-        app.buttons.identified("editItem").click()
+        openItemEditor(in: app)
         enterText("Japan", into: field(named: "Front", in: app), app: app)
         enterText("Tokyo", into: field(named: "Back", in: app), app: app)
         let save = app.buttons.identified("saveEditItem")
@@ -151,12 +461,12 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertNoItem(named: "France", in: app)
     }
 
-    func testDirtyItemEditCanKeepEditingThenDiscard() throws {
+    func checkLibraryUITestsDirtyItemEditCanKeepEditingThenDiscard() throws {
         let app = launchApp()
         addBasicItem(front: "Original", back: "Answer", in: app)
         openItemDetail(named: "Original", in: app)
 
-        app.buttons.identified("editItem").click()
+        openItemEditor(in: app)
         enterText("Changed", into: field(named: "Front", in: app), app: app)
         app.buttons.identified("cancelEditItem").click()
         XCTAssertTrue(app.buttons.identified("cancelDiscardItem").waitUntilExists(timeout: 3))
@@ -171,18 +481,18 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertNoItem(named: "Changed", in: app)
     }
 
-    func testImageEditRequiresDescriptionBeforeSaving() throws {
+    func checkLibraryUITestsImageEditRequiresDescriptionBeforeSaving() throws {
         let app = launchApp(scenario: "image-missing-description")
         waitForItem(named: "Image", in: app)
         openItemDetail(named: "Image", in: app)
 
-        app.buttons.identified("editItem").click()
+        openItemEditor(in: app)
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
         XCTAssertFalse(save.isEnabled)
     }
 
-    func testDeleteItemFromDetail() throws {
+    func checkLibraryUITestsDeleteItemFromDetail() throws {
         let app = launchApp()
         addBasicItem(front: "Remove", back: "Me", in: app)
         openItemDetail(named: "Remove", in: app)
@@ -194,7 +504,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         assertNoItem(named: "Remove", in: app)
     }
 
-    func testMoveItemToDeckFromDetail() throws {
+    func checkLibraryUITestsMoveItemToDeckFromDetail() throws {
         let app = launchApp()
         createDeck(named: "Target Deck", in: app)
         addBasicItem(front: "Movable", back: "Item", in: app)
@@ -212,7 +522,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         waitForItem(named: "Movable", in: app, timeout: 15)
     }
 
-    func testAddItemWithDeckPicker() throws {
+    func checkLibraryUITestsAddItemWithDeckPicker() throws {
         let app = launchApp()
         createDeck(named: "History", in: app)
 
@@ -231,7 +541,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         waitForItem(named: "Rome", in: app)
     }
 
-    func testDeleteItemCancellationPreservesItem() throws {
+    func checkLibraryUITestsDeleteItemCancellationPreservesItem() throws {
         let app = launchApp()
         addBasicItem(front: "Keep Item", back: "Still Here", in: app)
         openItemDetail(named: "Keep Item", in: app)
@@ -245,7 +555,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         waitForItem(named: "Keep Item", in: app)
     }
 
-    func testWhitespaceOnlyRequiredFieldsCannotBeSaved() throws {
+    func checkLibraryUITestsWhitespaceOnlyRequiredFieldsCannotBeSaved() throws {
         let app = launchApp()
         openAddItem(in: app)
         enterText("   ", into: field(named: "Front", in: app), app: app)
@@ -253,7 +563,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         XCTAssertFalse(app.buttons.identified("saveAddItem").isEnabled)
     }
 
-    func testJSONImportThroughSystemFilePicker() throws {
+    func checkLibraryUITestsJSONImportThroughSystemFilePicker() throws {
         let file = try makeImportFixture(
             name: "items.json",
             contents: """
@@ -272,7 +582,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         waitForItem(named: "Imported Question", in: app, timeout: 10)
     }
 
-    func testCSVImportSelectsItemTypeAndImportsRows() throws {
+    func checkLibraryUITestsCSVImportSelectsItemTypeAndImportsRows() throws {
         let file = try makeImportFixture(
             name: "items.csv",
             contents: """
@@ -290,7 +600,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
         waitForItem(named: "CSV Question", in: app, timeout: 10)
     }
 
-    func testImportValidationKeepsSheetOpenAndLibraryUnchanged() throws {
+    func checkLibraryUITestsImportValidationKeepsSheetOpenAndLibraryUnchanged() throws {
         let file = try makeImportFixture(
             name: "invalid.json",
             contents: """
@@ -314,7 +624,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
     /// Fitting is automatic, so the Scheduling menu must not offer it — there is
     /// no decision here for the learner to get wrong or forget to make.
-    func testSchedulingMenuOffersOnlySettings() throws {
+    func checkLibraryUITestsSchedulingMenuOffersOnlySettings() throws {
         let app = launchApp()
         app.menuBarItems["Scheduling"].click()
         let settings = app.menuItems.identified("Scheduling Settings…")
@@ -327,7 +637,7 @@ final class LibraryUITests: NeoAnkiUITestCase {
 
     /// Ending a session with enough history to refit must tune the profile
     /// without saying so: the learner asked to study, not to be reported to.
-    func testEndingASessionOptimizesWithoutInterrupting() throws {
+    func checkLibraryUITestsEndingASessionOptimizesWithoutInterrupting() throws {
         let app = launchApp(scenario: "scheduling-history")
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)

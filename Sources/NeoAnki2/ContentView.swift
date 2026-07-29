@@ -40,7 +40,31 @@ struct ContentView: View {
     @State private var portableDeckTransfer: PortableDeckTransferModel
     @State private var isShowingDeckBuilder = false
     private let deckBuilderRegistry: DeckBuilderRegistry
+#if DEBUG
+    private let testingEnvironment: [String: String]
+    private let testingInitialRoute: UITestRoute
+#endif
 
+#if DEBUG
+    init(
+        itemsModel: ItemsModel,
+        decksModel: DecksModel,
+        schedulingModel: SchedulingModel,
+        deckBuilderRegistry: DeckBuilderRegistry,
+        testingEnvironment: [String: String] = [:],
+        testingInitialRoute: UITestRoute = .library
+    ) {
+        self.itemsModel = itemsModel
+        self.decksModel = decksModel
+        self.schedulingModel = schedulingModel
+        _portableDeckTransfer = State(
+            initialValue: PortableDeckTransferModel(store: itemsModel.store)
+        )
+        self.deckBuilderRegistry = deckBuilderRegistry
+        self.testingEnvironment = testingEnvironment
+        self.testingInitialRoute = testingInitialRoute
+    }
+#else
     init(
         itemsModel: ItemsModel,
         decksModel: DecksModel,
@@ -55,6 +79,7 @@ struct ContentView: View {
         )
         self.deckBuilderRegistry = deckBuilderRegistry
     }
+#endif
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -82,7 +107,7 @@ struct ContentView: View {
         .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
-            if portableDeckTransfer.isBusy || portableDeckTransfer.testingForceBusy {
+            if portableDeckTransfer.isBusy || testingForcePortableBusy {
                 ToolbarItem(placement: .status) {
                     ProgressView("Transferring deck…")
                         .controlSize(.small)
@@ -114,7 +139,10 @@ struct ContentView: View {
         }
         .task {
             await refreshLibrary()
+#if DEBUG
             await openTestingTransfersIfRequested()
+            openTestingInitialRouteIfRequested()
+#endif
         }
         .task {
             await trackDueCounts()
@@ -219,6 +247,7 @@ struct ContentView: View {
             openTemplates: { openTemplates() },
             openBrowse: { openBrowse() },
             toggleAnswerColumn: { browseShowsAnswerColumn.toggle() },
+            showSidebar: { columnVisibility = .all },
             isAnswerColumnVisible: browseShowsAnswerColumn,
             canToggleAnswerColumn: isBrowsing,
             canAddItem: !itemsModel.itemTypes.isEmpty
@@ -248,7 +277,7 @@ struct ContentView: View {
 
     private var canTransferPortableDeck: Bool {
         !portableDeckTransfer.isBusy
-            && !portableDeckTransfer.testingForceBusy
+            && !testingForcePortableBusy
             && !itemsModel.isLoading
             && !decksModel.isLoading
             && !isStudying
@@ -256,6 +285,18 @@ struct ContentView: View {
             && !isAddingItem
             && !isShowingImport
             && !isShowingDeckBuilder
+    }
+
+    private var testingForcePortableBusy: Bool {
+#if DEBUG
+        portableDeckTransfer.testingForceBusy
+            || (
+                AppDatabase.isTesting
+                    && testingEnvironment["NEOANKI_TEST_PORTABLE_BUSY"] == "1"
+            )
+#else
+        portableDeckTransfer.testingForceBusy
+#endif
     }
 
     private var deckBuilderContext: DeckBuilderHostContext {
@@ -406,9 +447,12 @@ struct ContentView: View {
         isChoosingImportFile = true
     }
 
+#if DEBUG
     private func openTestingTransfersIfRequested() async {
         guard AppDatabase.isTesting else { return }
-        let environment = ProcessInfo.processInfo.environment
+        let environment = testingEnvironment.isEmpty
+            ? ProcessInfo.processInfo.environment
+            : testingEnvironment
 
         if let importPath = environment["NEOANKI_TEST_IMPORT_PATH"], !importPath.isEmpty {
             let source = URL(fileURLWithPath: importPath)
@@ -427,6 +471,23 @@ struct ContentView: View {
             }
         }
     }
+
+    private func openTestingInitialRouteIfRequested() {
+        guard AppDatabase.isTesting else { return }
+        switch testingInitialRoute {
+        case .library, .importSheet:
+            break
+        case .browse:
+            openBrowse()
+        case .addItem:
+            openAddItem()
+        case .templates:
+            openTemplates()
+        case .study:
+            startStudy()
+        }
+    }
+#endif
 
     private func copyTestingTransferFile(_ source: URL) -> URL? {
         let destination = FileManager.default.temporaryDirectory
@@ -574,6 +635,17 @@ struct ContentView: View {
 
     private func openPortableDeckExport() {
         guard let deckID = decksModel.selectedDeckID else { return }
+#if DEBUG
+        if AppDatabase.isTesting,
+           let exportPath = testingEnvironment["NEOANKI_TEST_PORTABLE_EXPORT_PATH"],
+           !exportPath.isEmpty {
+            let destination = URL(fileURLWithPath: exportPath)
+            Task {
+                await portableDeckTransfer.exportDeck(id: deckID, to: destination)
+            }
+            return
+        }
+#endif
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.neoDeck]
         panel.allowsOtherFileTypes = false
@@ -718,7 +790,7 @@ struct ContentView: View {
         let update = {
             columnVisibility = focused ? .detailOnly : .all
         }
-        if reduceMotion {
+        if reduceMotion || AppDatabase.isTesting {
             update()
         } else {
             withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {
@@ -731,7 +803,7 @@ struct ContentView: View {
         let update = {
             columnVisibility = focused ? .detailOnly : .all
         }
-        if reduceMotion {
+        if reduceMotion || AppDatabase.isTesting {
             update()
         } else {
             withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {
@@ -744,7 +816,7 @@ struct ContentView: View {
         let update = {
             columnVisibility = focused ? .detailOnly : .all
         }
-        if reduceMotion {
+        if reduceMotion || AppDatabase.isTesting {
             update()
         } else {
             withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {

@@ -1,7 +1,7 @@
 import XCTest
 
-final class PortableDeckUITests: NeoAnkiUITestCase {
-    func testImportPortableDeckSucceeds() throws {
+extension FastFunctionalJourneyTests {
+    func checkPortableDeckUITestsImportPortableDeckSucceeds() throws {
         let app = launchAppForPortableImport(file: fixtureURL("minimal.neodeck"))
         finishPortableImport(in: app)
         waitForItem(named: "Imported Front", in: app)
@@ -11,13 +11,13 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         )
     }
 
-    func testImportAuthoredNeoankiBundle() throws {
+    func checkPortableDeckUITestsImportAuthoredNeoankiBundle() throws {
         let app = launchAppForPortableImport(file: fixtureURL("Biology.neoanki"))
         finishPortableImport(in: app)
         waitForItem(named: "What is the primary role of mitochondria?", in: app, timeout: 15)
     }
 
-    func testExportPortableDeckSucceeds() throws {
+    func checkPortableDeckUITestsExportPortableDeckSucceeds() throws {
         let app = launchAppWithFixtures(scenario: "portable-export-source")
         showSidebar(in: app)
         selectScope("deckRow-Export Deck", in: app)
@@ -31,7 +31,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: exportURL.path))
     }
 
-    func testExportDisabledWithoutDeckSelection() throws {
+    func checkPortableDeckUITestsExportDisabledWithoutDeckSelection() throws {
         let app = launchAppWithFixtures(scenario: "portable-export-source")
         selectScope("scopeRow-AllDecks", in: app)
         assertMenuDisabled("Export Deck…", in: app)
@@ -40,7 +40,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         assertMenuDisabled("Export Deck…", in: app)
     }
 
-    func testImportConflictShowsResolutionDialog() throws {
+    func checkPortableDeckUITestsImportConflictShowsResolutionDialog() throws {
         let app = launchAppForPortableImport(
             scenario: "type-conflict-local",
             file: fixtureURL("conflict.neodeck")
@@ -51,7 +51,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.buttons.identified("portableDeckConflictCancel").exists)
     }
 
-    func testImportConflictUseMatchingLocalType() throws {
+    func checkPortableDeckUITestsImportConflictUseMatchingLocalType() throws {
         let app = launchAppForPortableImport(
             scenario: "type-conflict-local",
             file: fixtureURL("conflict.neodeck")
@@ -66,7 +66,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         waitForItem(named: "Conflict Q", in: app, timeout: 15)
     }
 
-    func testImportConflictImportAsNewType() throws {
+    func checkPortableDeckUITestsImportConflictImportAsNewType() throws {
         let app = launchAppForPortableImport(
             scenario: "type-conflict-local",
             file: fixtureURL("conflict.neodeck")
@@ -84,7 +84,7 @@ final class PortableDeckUITests: NeoAnkiUITestCase {
         closeTemplates(in: app)
     }
 
-    func testImportConflictCancel() throws {
+    func checkPortableDeckUITestsImportConflictCancel() throws {
         let app = launchAppWithFixtures(scenario: "type-conflict-local")
         choosePortableDeckImport(fixtureURL("conflict.neodeck"), in: app)
         app.buttons.identified("portableDeckConflictCancel").click()
