@@ -66,7 +66,11 @@ BUILD_SECONDS=$((SECONDS - BUILD_STARTED))
 export NEOANKI_UI_DERIVED_DATA="$DERIVED_DATA_ROOT"
 "$ROOT/Scripts/sign-ui-artifacts.sh"
 
-XCTESTRUN=$(find "$DERIVED_DATA_ROOT/Build/Products" -name '*.xctestrun' | head -1)
+XCTESTRUN=$(
+  find "$DERIVED_DATA_ROOT/Build/Products" \
+    -name "NeoAnki2UITests_${TEST_PLAN}_*.xctestrun" \
+    | head -1
+)
 if [[ -z "$XCTESTRUN" ]]; then
   echo "Could not find xctestrun file." >&2
   exit 1

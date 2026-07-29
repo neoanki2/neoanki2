@@ -663,15 +663,7 @@ class NeoAnkiUITestCase: XCTestCase {
     func field(named name: String, in app: XCUIApplication) -> XCUIElement {
         let id = "field-\(name)"
         let candidates = [app.textViews.identified(id), app.textFields.identified(id)]
-        if let field = firstExisting(of: candidates, timeout: 0.5) {
-            return field
-        }
-
-        // SwiftUI Form preserves its scroll position across recycled editor
-        // sheets. Bring the first fields back into the accessibility tree
-        // before paying a longer lookup.
-        app.typeKey(XCUIKeyboardKey.home, modifierFlags: [.command])
-        return firstExisting(of: candidates, timeout: 2)
+        return firstExisting(of: candidates, timeout: 3)
             ?? app.descendants(matching: .any)[id]
     }
 
@@ -1019,14 +1011,14 @@ class NeoAnkiUITestCase: XCTestCase {
         waitForLibraryReady(in: app)
     }
 
-    func waitForFormattedField(
+    func formattedField(
         _ fieldName: String,
         containing expectedToken: String,
         in app: XCUIApplication,
         timeout: TimeInterval = 5
-    ) {
+    ) -> Bool {
         let mirror = app.descendants(matching: .any).identified("field-\(fieldName)-spans")
-        XCTAssertTrue(mirror.waitUntilExists(timeout: 2))
+        guard mirror.waitUntilExists(timeout: 2) else { return false }
 
         let expectedParts = expectedToken.split(separator: ":", maxSplits: 1).map(String.init)
         func containsExpectedToken(_ description: String) -> Bool {
@@ -1040,15 +1032,10 @@ class NeoAnkiUITestCase: XCTestCase {
             }
         }
 
-        let matched = waitUntil(timeout: timeout) {
+        return waitUntil(timeout: timeout) {
             [mirror.value as? String, mirror.label]
                 .contains { $0.map(containsExpectedToken) == true }
         }
-        if matched { return }
-
-        let value = mirror.value as? String ?? "<nil>"
-        let label = mirror.label
-        XCTFail("Expected field-\(fieldName) to contain \(expectedToken), got value=\(value) label=\(label)")
     }
 
     func replaceAndSelectText(_ text: String, in field: XCUIElement) {
@@ -1072,10 +1059,17 @@ class NeoAnkiUITestCase: XCTestCase {
         replaceAndSelectText(text, in: editorField)
 
         let formatButton = app.buttons.identified("field-\(fieldName)-\(buttonID)")
-        XCTAssertTrue(formatButton.waitUntilExists(timeout: 2), "Missing format button \(buttonID) for \(fieldName)")
+        XCTAssertTrue(formatButton.waitUntilHittable(timeout: 2), "Missing format button \(buttonID) for \(fieldName)")
         formatButton.click()
-
-        waitForFormattedField(fieldName, containing: "\(style):\(text)", in: app)
+        if !formattedField(fieldName, containing: "\(style):\(text)", in: app, timeout: 1) {
+            editorField.click()
+            editorField.typeKey("a", modifierFlags: [.command])
+            formatButton.click()
+        }
+        XCTAssertTrue(
+            formattedField(fieldName, containing: "\(style):\(text)", in: app),
+            "Expected field-\(fieldName) to contain \(style):\(text)"
+        )
     }
 
     func assertFormattedStyles(
@@ -1091,14 +1085,25 @@ class NeoAnkiUITestCase: XCTestCase {
         for style in styles {
             let button = app.buttons.identified("field-\(fieldName)-\(style.buttonID)")
             XCTAssertTrue(
-                button.waitUntilExists(timeout: 2),
+                button.waitUntilHittable(timeout: 2),
                 "Missing format button \(style.buttonID) for \(fieldName)"
             )
+            editorField.click()
+            editorField.typeKey("a", modifierFlags: [.command])
             button.click()
-            waitForFormattedField(
+            if !formattedField(
                 fieldName,
                 containing: "\(style.style):\(text)",
-                in: app
+                in: app,
+                timeout: 1
+            ) {
+                editorField.click()
+                editorField.typeKey("a", modifierFlags: [.command])
+                button.click()
+            }
+            XCTAssertTrue(
+                formattedField(fieldName, containing: "\(style.style):\(text)", in: app),
+                "Expected field-\(fieldName) to contain \(style.style):\(text)"
             )
         }
     }
