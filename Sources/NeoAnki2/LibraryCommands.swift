@@ -77,13 +77,16 @@ struct LibraryCommands: Commands {
         }
 
         CommandMenu("Library") {
-            Button("Show Sidebar") {
-                handlers?.showSidebar?()
+#if DEBUG
+            if AppDatabase.isTesting {
+                Button("Show Sidebar") {
+                    handlers?.showSidebar?()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+
+                Divider()
             }
-            .keyboardShortcut("0", modifiers: .command)
-
-            Divider()
-
+#endif
             Button("Browse Items") {
                 handlers?.openBrowse?()
             }

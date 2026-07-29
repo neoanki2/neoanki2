@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "diffSHA256": "9f733884d955a98d7ccc55524bda3918833e3273f71404b5983230d6c1049b98",
+  "files": [
+    "Sources/NeoAnki2/ClozeFieldEditor.swift",
+    "Sources/NeoAnki2/ContentView.swift",
+    "Sources/NeoAnki2/DesignSystem.swift",
+    "Sources/NeoAnki2/ItemBrowserView.swift",
+    "Sources/NeoAnki2/LibraryCommands.swift",
+    "Sources/NeoAnki2/NeoAnki2App.swift",
+    "Sources/NeoAnki2/ScopeHomeView.swift",
+    "Sources/NeoAnki2/TemplateEditorView.swift"
+  ],
+  "reason": "Debug-only UI-test control, deterministic readiness identifiers, and test animation suppression; release behavior and user workflows are unchanged."
+}

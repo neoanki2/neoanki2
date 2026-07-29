@@ -83,12 +83,20 @@ struct ScreenshotManifest: Decodable {
     let screenshots: [Entry]
 }
 
+struct InfrastructureChangeReview: Decodable {
+    let schemaVersion: Int
+    let diffSHA256: String
+    let files: [String]
+    let reason: String
+}
+
 let fileManager = FileManager.default
 let scriptURL = URL(fileURLWithPath: #filePath).standardizedFileURL
 let root = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
 let docs = root.appendingPathComponent("docs", isDirectory: true)
 let manifestURL = docs.appendingPathComponent("features.json")
 let claimsURL = docs.appendingPathComponent("claims.json")
+let infrastructureReviewURL = docs.appendingPathComponent("infrastructure-change-review.json")
 let generatedURL = docs.appendingPathComponent("features.md")
 let arguments = Set(CommandLine.arguments.dropFirst())
 let writeGenerated = arguments.contains("--write")
@@ -108,6 +116,19 @@ func exitWithFailuresIfNeeded() -> Never {
         fputs("error: \(failure)\n", stderr)
     }
     exit(1)
+}
+
+func gitOutput(arguments: [String]) throws -> (status: Int32, data: Data) {
+    let process = Process()
+    process.currentDirectoryURL = root
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = arguments
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = Pipe()
+    try process.run()
+    process.waitUntilExit()
+    return (process.terminationStatus, pipe.fileHandleForReading.readDataToEndOfFile())
 }
 
 guard
@@ -459,30 +480,83 @@ for file in markdownFiles {
 if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
    CommandLine.arguments.indices.contains(baseIndex + 1) {
     let baseRef = CommandLine.arguments[baseIndex + 1]
-    let process = Process()
-    process.currentDirectoryURL = root
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-    process.arguments = ["diff", "--name-only", "\(baseRef)...HEAD"]
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = Pipe()
     do {
-        try process.run()
-        process.waitUntilExit()
-        if process.terminationStatus == 0 {
-            let changedData = pipe.fileHandleForReading.readDataToEndOfFile()
+        let changedResult = try gitOutput(
+            arguments: ["diff", "--name-only", "\(baseRef)...HEAD"]
+        )
+        if changedResult.status == 0 {
+            let changedData = changedResult.data
             let changed = Set(String(decoding: changedData, as: UTF8.self).split(separator: "\n").map(String.init))
-            for feature in manifest.features where !changed.isDisjoint(with: Set(feature.sources)) {
+            var reviewedInfrastructureFiles = Set<String>()
+            if changed.contains("docs/infrastructure-change-review.json") {
+                guard
+                    let reviewData = try? Data(contentsOf: infrastructureReviewURL),
+                    let review = try? JSONDecoder().decode(
+                        InfrastructureChangeReview.self,
+                        from: reviewData
+                    )
+                else {
+                    fail("Missing or invalid docs/infrastructure-change-review.json")
+                    exitWithFailuresIfNeeded()
+                }
+                if review.schemaVersion != 1 {
+                    fail(
+                        "Unsupported infrastructure change review schema version \(review.schemaVersion)"
+                    )
+                }
+                let reviewFiles = Set(review.files)
+                if reviewFiles.count != review.files.count || review.files != review.files.sorted() {
+                    fail("Infrastructure change review files must be unique and sorted")
+                }
+                if review.reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    fail("Infrastructure change review must explain why user documentation is unchanged")
+                }
+                let mappedChangedSources = changed.intersection(mappedSources)
+                if !reviewFiles.isSubset(of: mappedChangedSources) {
+                    fail(
+                        "Infrastructure change review may contain only changed, mapped source files"
+                    )
+                }
+                let patchResult = try gitOutput(
+                    arguments: [
+                        "diff", "--binary", "\(baseRef)...HEAD", "--",
+                    ] + review.files
+                )
+                if patchResult.status != 0 {
+                    fail("Could not compute the reviewed infrastructure diff")
+                } else {
+                    let digest = SHA256.hash(data: patchResult.data)
+                        .map { String(format: "%02x", $0) }
+                        .joined()
+                    if digest != review.diffSHA256 {
+                        fail(
+                            "Infrastructure change review hash is stale; review the mapped source diff again"
+                        )
+                    } else {
+                        reviewedInfrastructureFiles = reviewFiles
+                    }
+                }
+            }
+            let changedProductSources = changed.subtracting(reviewedInfrastructureFiles)
+            for feature in manifest.features
+                where !changedProductSources.isDisjoint(with: Set(feature.sources)) {
                 let articlePath = "docs/\(feature.article)"
                 if !changed.contains(articlePath) {
-                    fail("Feature '\(feature.id)' changed without reviewing and updating \(articlePath)")
+                    fail(
+                        "Feature '\(feature.id)' changed without reviewing and updating "
+                            + "\(articlePath). This is a good opportunity to make the "
+                            + "relevant documentation slightly better."
+                    )
                 }
                 if let screenshot = feature.screenshot {
                     let screenshotPath = "docs/\(screenshot)"
                     if !changed.contains(screenshotPath)
                         || !changed.contains("docs/assets/screenshots/manifest.json") {
                         fail(
-                            "Feature '\(feature.id)' changed without refreshing \(screenshotPath) and its screenshot manifest"
+                            "Feature '\(feature.id)' changed without refreshing "
+                                + "\(screenshotPath) and its screenshot manifest. This is "
+                                + "a good opportunity to make the relevant documentation "
+                                + "slightly better."
                         )
                     }
                 }
@@ -491,7 +565,9 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
                 let articlePath = "docs/\(claim.article)"
                 if !changed.contains("docs/claims.json") || !changed.contains(articlePath) {
                     fail(
-                        "High-risk claims source \(claim.source) changed; update docs/claims.json and \(articlePath)"
+                        "High-risk claims source \(claim.source) changed; update "
+                            + "docs/claims.json and \(articlePath). This is a good "
+                            + "opportunity to make the relevant documentation slightly better."
                     )
                 }
             }

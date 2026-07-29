@@ -39,6 +39,12 @@ boundary in `docs/features.json` also scans user-facing source and UI-test roots
 for unmapped files with stable UI markers. Add a narrow exclusion only for
 non-product infrastructure such as the screenshot capture suite.
 
+When a mapped source diff is exclusively debug-only test infrastructure and
+does not change production behavior, record the reviewed files, reason, and
+exact patch SHA-256 in `docs/infrastructure-change-review.json`. The validator
+accepts the review only when that file changes in the pull request and its hash
+matches the current diff. Any later source edit invalidates the review.
+
 ## High-risk factual claims
 
 `docs/claims.json` records facts where stale prose could cause failed imports,
