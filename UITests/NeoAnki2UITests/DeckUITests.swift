@@ -170,6 +170,36 @@ final class DeckUITests: NeoAnkiUITestCase {
         XCTAssertTrue(app.staticTexts["Child"].waitUntilExists(timeout: 5))
     }
 
+    func testSelectingParentDoesNotExpandItsSubdecks() throws {
+        let app = launchApp()
+        createDeck(named: "Parent", in: app)
+
+        let parent = app.descendants(matching: .any).identified("deckRow-Parent")
+        parent.rightClick()
+        app.menuItems.identified("New Subdeck").click()
+        guard let container = modalContainer(in: app) else {
+            XCTFail("Subdeck dialog did not appear")
+            return
+        }
+        enterText("Child", into: container.textFields.firstMatch, app: app)
+        app.buttons.identified("confirmCreateDeck").click()
+
+        let child = app.descendants(matching: .any).identified("deckRow-Child")
+        XCTAssertTrue(child.waitUntilExists(timeout: 5))
+        let collapseButton = app.disclosureTriangles.firstMatch
+        XCTAssertTrue(collapseButton.waitUntilExists(timeout: 3))
+        collapseButton.click()
+        XCTAssertTrue(child.waitUntilGone(timeout: 3))
+
+        selectScope("deckRow-Parent", in: app)
+        XCTAssertFalse(child.exists, "Selecting a parent row should leave it collapsed")
+
+        let expandButton = app.disclosureTriangles.firstMatch
+        XCTAssertTrue(expandButton.waitUntilExists(timeout: 3))
+        expandButton.click()
+        XCTAssertTrue(child.waitUntilExists(timeout: 3))
+    }
+
     func testDeleteDeckRemovesSubdecksAndItems() throws {
         let app = launchApp()
         createDeck(named: "Parent", in: app)

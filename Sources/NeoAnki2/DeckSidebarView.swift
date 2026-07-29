@@ -268,15 +268,15 @@ private struct DeckSidebarNode: View {
             }
             .onChange(of: decksModel.selectedScope, initial: true) { _, selection in
                 guard case let .deck(selectedID) = selection else { return }
-                if containsDeck(selectedID) {
+                if containsDescendant(selectedID) {
                     isExpanded = true
                 }
             }
         }
     }
 
-    private func containsDeck(_ id: UUID) -> Bool {
-        node.id == id || node.children.contains { child in
+    private func containsDescendant(_ id: UUID) -> Bool {
+        node.children.contains { child in
             child.id == id || containsDeck(id, in: child)
         }
     }
