@@ -663,7 +663,16 @@ class NeoAnkiUITestCase: XCTestCase {
     func field(named name: String, in app: XCUIApplication) -> XCUIElement {
         let id = "field-\(name)"
         let candidates = [app.textViews.identified(id), app.textFields.identified(id)]
-        return firstExisting(of: candidates, timeout: 3) ?? app.descendants(matching: .any)[id]
+        if let field = firstExisting(of: candidates, timeout: 0.5) {
+            return field
+        }
+
+        // SwiftUI Form preserves its scroll position across recycled editor
+        // sheets. Bring the first fields back into the accessibility tree
+        // before paying a longer lookup.
+        app.typeKey(XCUIKeyboardKey.home, modifierFlags: [.command])
+        return firstExisting(of: candidates, timeout: 2)
+            ?? app.descendants(matching: .any)[id]
     }
 
     func returnToLibrary(in app: XCUIApplication) {
@@ -728,10 +737,13 @@ class NeoAnkiUITestCase: XCTestCase {
     func openItemEditor(in app: XCUIApplication) {
         let edit = app.buttons.identified("editItem")
         let save = app.buttons.identified("saveEditItem")
+        let cancel = app.buttons.identified("cancelEditItem")
         XCTAssertTrue(edit.waitUntilHittable(timeout: 3))
         for _ in 0..<3 {
             edit.click()
-            if save.waitUntilExists(timeout: 1) { return }
+            if waitUntil(timeout: 2) { save.exists && cancel.exists } {
+                return
+            }
         }
         XCTFail("Item editor did not open")
     }

@@ -232,12 +232,12 @@ extension FastFunctionalJourneyTests {
         openItemEditor(in: mediaApp)
         let mediaSave = mediaApp.buttons.identified("saveEditItem")
         try runJourneyActivity("AuthoringUITests.testMediaFieldRequiresDescription") {
-            XCTAssertTrue(mediaSave.waitUntilExists(timeout: 5))
+            XCTAssertTrue(mediaSave.exists)
             XCTAssertFalse(mediaSave.isEnabled)
         }
         try runJourneyActivity("LibraryUITests.testImageEditRequiresDescriptionBeforeSaving") {
             let save = mediaApp.buttons.identified("saveEditItem")
-            XCTAssertTrue(save.waitUntilExists(timeout: 5))
+            XCTAssertTrue(save.exists)
             XCTAssertFalse(save.isEnabled)
         }
         mediaApp.buttons.identified("cancelEditItem").click()
