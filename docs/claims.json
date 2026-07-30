@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "lastReviewedAt": "2026-07-30",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
@@ -102,7 +103,8 @@
       "contains": [
         "5 MB, 10,000 rows, 256 fields per row",
         "32,768 UTF-8 bytes per field value",
-        "JSON and CSV rows are placed in **Unassigned**"
+        "JSON and CSV rows are placed in **Unassigned**",
+        "Unrelated library items are not loaded into the export snapshot"
       ]
     },
     {
@@ -123,13 +125,15 @@
       "contains": [
         "macOS 14 or newer",
         "Swift tools 6.0",
-        "~/Library/Application Support/neoanki2/"
+        "~/Library/Application Support/neoanki2/",
+        "The Home summary is prepared while the app window opens"
       ]
     },
     {
       "article": "user/authoring-items.md",
       "contains": [
-        "Append-only review logs are retained"
+        "Append-only review logs are retained",
+        "Database migrations and performance indexes do not change this retention rule"
       ]
     },
     {
@@ -137,7 +141,8 @@
       "contains": [
         "repair round",
         "due immediately",
-        "built-in 90%"
+        "built-in 90%",
+        "The first card appears as soon as its exact due count and content are ready"
       ]
     }
   ]

@@ -120,8 +120,9 @@ The confirmation states how many generated study cards will also be removed.
 Deleting an item removes the item and its generated cards; it cannot be undone.
 Append-only review logs are retained for history integrity, but no longer belong
 to an active card. Outcomes that were not undone can still contribute to later
-scheduling optimization. Media no longer referenced by any item is eligible
-for cleanup. Choose **Cancel** to keep the item.
+scheduling optimization. Database migrations and performance indexes do not change this retention rule.
+Media no longer referenced by any item is eligible for cleanup. Choose
+**Cancel** to keep the item.
 
 Deleting a deck is broader, not gentler: it deletes the deck's subdecks and every
 item inside them too. See [Delete a

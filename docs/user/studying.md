@@ -36,8 +36,11 @@ A session moves through a small set of states:
 6. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
-The header shows the scope and progress, such as “Biology · Card 2 of 8.” The
-initial queue is assembled when the session starts. Failed cards are due immediately
+The header shows the scope and progress, such as “Biology · Card 2 of 8.”
+The first card appears as soon as its exact due count and content are ready.
+NeoAnki2 validates the rest of the initial queue in the background; you can read,
+answer, and reveal that first card immediately, while grading, editing, and
+skipping become available when queue validation finishes. Failed cards are due immediately
 but move behind cards already waiting. After that queue finishes, each failed
 card appears once per repair round. When no cards are due, the scope home says
 **You’re caught up** and tells you when the next card returns, and a session

@@ -250,10 +250,10 @@ final class ImportModel {
 
         do {
             let data = try await fileInspector.readPayload(at: selectedURL)
-            let count: Int
+            let imported: [SavedItemSummary]
             switch format {
             case .json:
-                count = try await itemsModel.store.importItems(
+                imported = try await itemsModel.store.importItemSummaries(
                     from: data,
                     adapter: JSONImportAdapter(),
                     context: ImportContext(baseDirectory: mediaDirectory ?? selectedURL.deletingLastPathComponent())
@@ -263,7 +263,7 @@ final class ImportModel {
                     errorMessage = "Choose an item type for this CSV file."
                     return false
                 }
-                count = try await itemsModel.store.importItems(
+                imported = try await itemsModel.store.importItemSummaries(
                     from: data,
                     adapter: CSVImportAdapter(itemTypeName: itemType.name),
                     itemTypeID: itemType.id,
@@ -271,9 +271,8 @@ final class ImportModel {
                 )
             }
 
-            importedCount = count
-            itemsModel.invalidateItemTypes()
-            await itemsModel.load(scope: scope)
+            importedCount = imported.count
+            await itemsModel.applyImportedItems(imported, scope: scope)
             return true
         } catch {
             errorMessage = UserFacingError.importMessage(from: error)

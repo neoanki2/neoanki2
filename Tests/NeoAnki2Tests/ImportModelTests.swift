@@ -68,6 +68,19 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(model.errorMessage == nil)
     #expect(itemsModel.items.map(\.title) == ["Question"])
     #expect(itemsModel.dueCount == 1)
+
+    let incrementallyApplied = itemsModel.items
+    await itemsModel.load()
+    let reloaded = try #require(itemsModel.items.first)
+    let incremental = try #require(incrementallyApplied.first)
+    #expect(reloaded.id == incremental.id)
+    #expect(reloaded.title == incremental.title)
+    #expect(reloaded.subtitle == incremental.subtitle)
+    #expect(reloaded.cardCount == incremental.cardCount)
+    #expect(reloaded.deckID == incremental.deckID)
+    #expect(reloaded.createdAt == incremental.createdAt)
+    #expect(reloaded.schedule == incremental.schedule)
+    #expect(itemsModel.items == incrementallyApplied)
 }
 
 @Test @MainActor func importModelFailureLeavesExistingLibraryAndDueCountUnchanged() async throws {
@@ -134,6 +147,75 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(model.importedCount == 1)
     #expect(itemsModel.items.count == 2)
     #expect(itemsModel.dueCount == 2)
+
+    let incrementallyApplied = itemsModel.items
+    await itemsModel.load()
+    #expect(Set(itemsModel.items.map(\.id)) == Set(incrementallyApplied.map(\.id)))
+    let reloadedByID = Dictionary(uniqueKeysWithValues: itemsModel.items.map { ($0.id, $0) })
+    for incremental in incrementallyApplied {
+        let reloaded = try #require(reloadedByID[incremental.id])
+        #expect(reloaded.title == incremental.title)
+        #expect(reloaded.subtitle == incremental.subtitle)
+        #expect(reloaded.cardCount == incremental.cardCount)
+        #expect(reloaded.deckID == incremental.deckID)
+        #expect(reloaded.createdAt == incremental.createdAt)
+        #expect(reloaded.schedule == incremental.schedule)
+    }
+    #expect(itemsModel.items == incrementallyApplied)
+}
+
+@Test @MainActor func importModelKeepsDeckScopedBrowseMembershipStable() async throws {
+    let (model, itemsModel, directory) = try await makeImportModel()
+    let deck = Deck(name: "Selected deck")
+    _ = try await itemsModel.store.createDeck(deck)
+    let scope = StudyScope.deck(deck.id, name: deck.name)
+    await itemsModel.load(scope: scope)
+    let fileURL = directory.appendingPathComponent("unassigned.json")
+    try """
+    {
+      "itemType": "Basic",
+      "rows": [
+        { "Front": "Unassigned", "Back": "Imported" }
+      ]
+    }
+    """.write(to: fileURL, atomically: true, encoding: .utf8)
+
+    #expect(await model.selectFile(fileURL))
+    #expect(await model.importSelected(scope: scope))
+    #expect(model.importedCount == 1)
+    #expect(itemsModel.items.isEmpty)
+    #expect(itemsModel.scopeSummary.itemCount == 0)
+
+    await itemsModel.load(scope: scope)
+    #expect(itemsModel.items.isEmpty)
+    #expect(try await itemsModel.store.listItems().count == 1)
+}
+
+@Test @MainActor func importModelPreservesActiveBrowseSort() async throws {
+    let (model, itemsModel, directory) = try await makeImportModel()
+    #expect(await itemsModel.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("Zulu")],
+        BuiltInItemTypes.backFieldID: [Span("Existing")],
+    ]))
+    itemsModel.tableSort = [KeyPathComparator(\.title, order: .forward)]
+    let fileURL = directory.appendingPathComponent("sorted.json")
+    try """
+    {
+      "itemType": "Basic",
+      "rows": [
+        { "Front": "Alpha", "Back": "Imported" }
+      ]
+    }
+    """.write(to: fileURL, atomically: true, encoding: .utf8)
+
+    #expect(await model.selectFile(fileURL))
+    #expect(await model.importSelected(scope: .allDecks))
+    #expect(itemsModel.items.map(\.title) == ["Alpha", "Zulu"])
+
+    let incrementallyApplied = itemsModel.items
+    await itemsModel.load()
+    #expect(itemsModel.items.map(\.id) == incrementallyApplied.map(\.id))
+    #expect(itemsModel.items.map(\.title) == incrementallyApplied.map(\.title))
 }
 
 @Test @MainActor func importModelHoldsFileAndDirectoryScopesForRelativeMedia() async throws {

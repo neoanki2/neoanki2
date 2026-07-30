@@ -132,7 +132,7 @@ struct PortableDeckPackage: Sendable {
     let rootDeckID: UUID
     let decks: [Deck]
     let types: [PortableDeckTypeRecord]
-    let items: [PortableDeckPersistedItem]
+    var items: [PortableDeckPersistedItem]
     let media: [PortableDeckMediaRecord]
     let itemTypePolicies: [DeckItemTypePolicyEntry]
 }
@@ -153,7 +153,6 @@ struct PortableDeckLibrarySnapshot: Sendable {
     let items: [PersistedItem]
     let itemTypes: [ItemType]
     let mappings: [PortableDeckTypeMapping]
-    let libraryItemTypeIDs: Set<UUID>
     let includedItemTypes: [IncludedItemTypeOwner]
     let itemTypePolicies: [DeckItemTypePolicyEntry]
 }
@@ -880,31 +879,48 @@ private final class PortableDeckDatabase {
         } else {
             policies = []
         }
-        let allItemFieldRows = try query(
+        typealias StoredField = (
+            itemTypeID: UUID?,
+            ordinal: Int64?,
+            valueJSON: String?
+        )
+        var fieldsByItem: [String: [StoredField]] = [:]
+        try forEachRow(
             """
             SELECT item_id, item_type_id, field_ordinal, value_json
             FROM item_fields ORDER BY item_id, field_ordinal;
             """
-        )
-        let fieldsByItem = Dictionary(grouping: allItemFieldRows) { $0.text(0) ?? "" }
-        let allTagRows = try query(
+        ) { row in
+            fieldsByItem[row.text(0) ?? "", default: []].append((
+                itemTypeID: row.uuid(1),
+                ordinal: row.integer(2),
+                valueJSON: row.text(3)
+            ))
+        }
+        typealias StoredTag = (ordinal: Int64?, tag: String?)
+        var tagsByItem: [String: [StoredTag]] = [:]
+        try forEachRow(
             "SELECT item_id, ordinal, tag FROM item_tags ORDER BY item_id, ordinal;"
-        )
-        let tagsByItem = Dictionary(grouping: allTagRows) { $0.text(0) ?? "" }
+        ) { row in
+            tagsByItem[row.text(0) ?? "", default: []].append((
+                ordinal: row.integer(1),
+                tag: row.text(2)
+            ))
+        }
         let itemTypesByID = Dictionary(uniqueKeysWithValues: types.map {
             ($0.itemType.id, $0.itemType)
         })
         var items: [PortableDeckPersistedItem] = []
-        for row in try query(
+        try forEachRow(
             "SELECT id, item_type_id, deck_id, created_at, updated_at FROM items ORDER BY rowid;"
-        ) {
+        ) { row in
             guard let id = row.uuid(0), let typeID = row.uuid(1), typeIDs.contains(typeID),
                   let deckID = row.uuid(2), deckIDs.contains(deckID),
                   let createdText = row.text(3), let created = Self.parseTimestamp(createdText),
                   let updatedText = row.text(4), let updated = Self.parseTimestamp(updatedText)
             else { throw PortableDeckError.invalidPackage("Item row is invalid.") }
             let itemKey = id.uuidString.lowercased()
-            let fieldRows = fieldsByItem[itemKey] ?? []
+            let fieldRows = fieldsByItem.removeValue(forKey: itemKey) ?? []
             guard fieldRows.count <= limits.maximumFieldsPerType else {
                 throw PortableDeckError.limitExceeded("An item has too many field values.")
             }
@@ -914,10 +930,10 @@ private final class PortableDeckDatabase {
                 throw PortableDeckError.invalidPackage("Item type is missing.")
             }
             let fields = try fieldRows.enumerated().map { index, fieldRow -> FieldValue in
-                guard fieldRow.uuid(1) == typeID,
-                      let ordinal = fieldRow.integer(2), ordinal >= 0,
+                guard fieldRow.itemTypeID == typeID,
+                      let ordinal = fieldRow.ordinal, ordinal >= 0,
                       ordinal == Int64(index),
-                      Int(ordinal) < itemType.fields.count, let json = fieldRow.text(3) else {
+                      Int(ordinal) < itemType.fields.count, let json = fieldRow.valueJSON else {
                     throw PortableDeckError.invalidPackage("Item field identifier is invalid.")
                 }
                 return FieldValue(
@@ -925,13 +941,13 @@ private final class PortableDeckDatabase {
                     value: try PortableJSON.decodeContent(json, formatVersion: formatVersion)
                 )
             }
-            let tagRows = tagsByItem[itemKey] ?? []
+            let tagRows = tagsByItem.removeValue(forKey: itemKey) ?? []
             guard tagRows.count <= limits.maximumTagsPerItem else {
                 throw PortableDeckError.limitExceeded("An item has too many tags.")
             }
             let tags = try tagRows.enumerated().map { index, row in
-                guard row.integer(1) == Int64(index),
-                      let tag = row.text(2), tag.utf8.count <= 1_024,
+                guard row.ordinal == Int64(index),
+                      let tag = row.tag, tag.utf8.count <= 1_024,
                       !tag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 else {
                     throw PortableDeckError.invalidPackage("An item tag is invalid.")
@@ -1083,6 +1099,21 @@ private final class PortableDeckDatabase {
             if code == SQLITE_DONE { return rows }
             guard code == SQLITE_ROW else { throw sqliteError() }
             rows.append(Row(statement))
+        }
+    }
+
+    private func forEachRow(
+        _ sql: String,
+        _ bindings: [Value] = [],
+        body: (Row) throws -> Void
+    ) throws {
+        let statement = try prepare(sql, bindings)
+        defer { sqlite3_finalize(statement) }
+        while true {
+            let code = sqlite3_step(statement)
+            if code == SQLITE_DONE { return }
+            guard code == SQLITE_ROW else { throw sqliteError() }
+            try body(Row(statement))
         }
     }
 

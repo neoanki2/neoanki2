@@ -117,6 +117,7 @@ struct StudyView: View {
         guard model.currentCard != nil else { return false }
         return model.isAnswerRevealed
             && !model.isGrading
+            && !model.isPreparingQueue
     }
 
     private var loadingView: some View {
@@ -250,7 +251,7 @@ struct StudyView: View {
                 isEditingCard = true
             }
             .buttonStyle(.borderless)
-            .disabled(model.isGrading)
+            .disabled(model.isGrading || model.isPreparingQueue)
             .help("Fix or extend this card (Command-E)")
             .accessibilityIdentifier("editStudyCard")
 
@@ -539,7 +540,7 @@ struct StudyView: View {
                     modifiers: []
                 )
                 .help(rating.studyTooltip)
-                .disabled(model.isGrading)
+                .disabled(model.isGrading || model.isPreparingQueue)
                 .accessibilityLabel(rating.studyAccessibilityLabel)
                 .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
             }

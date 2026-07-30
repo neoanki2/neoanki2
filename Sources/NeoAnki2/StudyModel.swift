@@ -5,10 +5,27 @@ struct PendingGradeUndo: Equatable, Sendable {
     let reviewLogID: UUID
     let previousIndex: Int
     let previousReviewedCount: Int
-    let previousReviewedCardIDs: Set<UUID>
-    let previousReviewedItemIDs: Set<UUID>
+    let reviewedCardID: UUID
+    let reviewedItemID: UUID
+    let insertedReviewedCardID: Bool
+    let insertedReviewedItemID: Bool
     let rating: ReviewRating
     let requeuedCardID: UUID?
+}
+
+private struct PendingRepeat: Sendable {
+    var card: Card
+}
+
+struct StudyStartTiming: Sendable, Equatable {
+    var dueCountSeconds = 0.0
+    var itemTypeCheckSeconds = 0.0
+    var headFetchSeconds = 0.0
+    var headPublicationSeconds = 0.0
+    var remainingFetchSeconds = 0.0
+    var remainingPublicationSeconds = 0.0
+    var firstReadySeconds = 0.0
+    var totalSeconds = 0.0
 }
 
 @MainActor
@@ -18,6 +35,10 @@ final class StudyModel {
     private(set) var index = 0
     private(set) var isAnswerRevealed = false
     private(set) var isLoading = false
+    /// The first card is readable while the rest of the exact session queue is
+    /// being validated. Persistence and queue mutations remain disabled until
+    /// this becomes false.
+    private(set) var isPreparingQueue = false
     private(set) var isGrading = false
     private(set) var errorMessage: String?
     private(set) var isFinished = false
@@ -37,12 +58,23 @@ final class StudyModel {
     private(set) var reviewedCount = 0
     private(set) var reviewedCardIDs: Set<UUID> = []
     private(set) var reviewedItemIDs: Set<UUID> = []
+    private(set) var lastStartTiming = StudyStartTiming()
 
     let store: ItemStore
-    private var repairQueue: [DueCard] = []
+    /// Repeats only need the newly persisted scheduling state while waiting for
+    /// the current pass to finish. Item/type/template content stays canonical
+    /// in `queue`, avoiding a second hydrated copy of every failed card.
+    private var repairQueue: [PendingRepeat] = []
+    private var expectedQueueCount = 0
+    private var startGeneration: UInt64 = 0
+    private let remainingQueueLoadGate: (@Sendable () async -> Void)?
 
-    init(store: ItemStore) {
+    init(
+        store: ItemStore,
+        remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
+    ) {
         self.store = store
+        self.remainingQueueLoadGate = remainingQueueLoadGate
     }
 
     var currentCard: DueCard? {
@@ -51,8 +83,9 @@ final class StudyModel {
     }
 
     var progressLabel: String {
-        guard !queue.isEmpty else { return "" }
-        return "Card \(min(index + 1, queue.count)) of \(queue.count)"
+        let count = isPreparingQueue ? expectedQueueCount : queue.count
+        guard !queue.isEmpty, count > 0 else { return "" }
+        return "Card \(min(index + 1, count)) of \(count)"
     }
 
     var headerLabel: String {
@@ -77,7 +110,15 @@ final class StudyModel {
     }
 
     func startSession(scope: StudyScope = .allDecks) async {
+        let start = ContinuousClock.now
+        let sessionNow = Date.now
+        var timing = StudyStartTiming()
+        startGeneration &+= 1
+        let generation = startGeneration
+        lastStartTiming = timing
         isLoading = true
+        isPreparingQueue = false
+        expectedQueueCount = 0
         errorMessage = nil
         isFinished = false
         isAnswerRevealed = false
@@ -91,17 +132,110 @@ final class StudyModel {
         didFailToLoad = false
 
         do {
-            queue = try await store.fetchDueCards(scope: scope.filter)
-            isFinished = queue.isEmpty
+            let countStart = ContinuousClock.now
+            let dueCount = try await store.dueCount(
+                scope: scope.filter,
+                asOf: sessionNow
+            )
+            timing.dueCountSeconds = countStart.elapsedSeconds
+            guard startIsCurrent(generation) else { return }
+
+            if dueCount == 0 {
+                let publicationStart = ContinuousClock.now
+                queue = []
+                isFinished = true
+                prepareCurrentInteraction()
+                isLoading = false
+                timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
+                timing.firstReadySeconds = start.elapsedSeconds
+                timing.totalSeconds = timing.firstReadySeconds
+                lastStartTiming = timing
+                return
+            }
+
+            let itemTypeStart = ContinuousClock.now
+            let itemTypes = try await store.loadItemTypes()
+            timing.itemTypeCheckSeconds = itemTypeStart.elapsedSeconds
+            guard startIsCurrent(generation) else { return }
+
+            let headStart = ContinuousClock.now
+            let head = try await store.fetchDueCards(
+                scope: scope.filter,
+                asOf: sessionNow,
+                limit: 1
+            )
+            timing.headFetchSeconds = headStart.elapsedSeconds
+            guard startIsCurrent(generation) else { return }
+
+            // A corrupt definition can make the database's raw due count differ
+            // from the renderable queue. Keep the original all-or-failure load
+            // behavior for those libraries instead of publishing an inexact
+            // progress total.
+            guard itemTypes.corruptions.isEmpty, let firstCard = head.first else {
+                try await loadCompleteQueue(
+                    scope: scope,
+                    asOf: sessionNow,
+                    generation: generation,
+                    start: start,
+                    timing: &timing
+                )
+                return
+            }
+
+            let headPublicationStart = ContinuousClock.now
+            queue = [firstCard]
+            expectedQueueCount = dueCount
+            isFinished = false
+            isPreparingQueue = true
             prepareCurrentInteraction()
+            isLoading = false
+            timing.headPublicationSeconds = headPublicationStart.elapsedSeconds
+            timing.firstReadySeconds = start.elapsedSeconds
+            lastStartTiming = timing
+
+            if let remainingQueueLoadGate {
+                await remainingQueueLoadGate()
+                guard startIsCurrent(generation) else { return }
+            }
+
+            let remainingFetchStart = ContinuousClock.now
+            let completeQueue = try await store.fetchDueCards(
+                scope: scope.filter,
+                asOf: sessionNow
+            )
+            timing.remainingFetchSeconds = remainingFetchStart.elapsedSeconds
+            guard startIsCurrent(generation) else { return }
+
+            let remainingPublicationStart = ContinuousClock.now
+            // Keep the already-rendered copy: it may hold local interaction
+            // state or an edit reload. The complete read supplies every
+            // remaining card in its original database order.
+            queue.reserveCapacity(completeQueue.count)
+            for card in completeQueue where card.id != firstCard.id {
+                queue.append(card)
+            }
+            expectedQueueCount = 0
+            isPreparingQueue = false
+            isLoading = false
+            isFinished = false
+            timing.remainingPublicationSeconds = remainingPublicationStart.elapsedSeconds
+            timing.totalSeconds = start.elapsedSeconds
+            lastStartTiming = timing
         } catch {
+            guard startIsCurrent(generation) else { return }
             errorMessage = userFacingError(from: error)
             queue = []
+            expectedQueueCount = 0
+            isPreparingQueue = false
             isFinished = true
             didFailToLoad = true
+            isLoading = false
+            timing.totalSeconds = start.elapsedSeconds
+            if timing.firstReadySeconds == 0 {
+                timing.firstReadySeconds = timing.totalSeconds
+            }
+            lastStartTiming = timing
         }
-
-        isLoading = false
     }
 
     func revealAnswer() {
@@ -202,7 +336,7 @@ final class StudyModel {
     }
 
     func grade(_ rating: ReviewRating) async {
-        guard !isGrading else { return }
+        guard !isGrading, !isPreparingQueue else { return }
         errorMessage = nil
         guard let card = currentCard else { return }
 
@@ -223,21 +357,23 @@ final class StudyModel {
             let shouldRequeue = submission.memory.phase == .learning
                 || submission.memory.phase == .relearning
             if shouldRequeue {
-                repairQueue.append(repeatedCard)
+                repairQueue.append(PendingRepeat(card: repeatedCard.card))
             }
+            let insertedReviewedCardID = reviewedCardIDs.insert(card.id).inserted
+            let insertedReviewedItemID = reviewedItemIDs.insert(card.item.id).inserted
             pendingGradeUndo = PendingGradeUndo(
                 reviewLogID: submission.reviewLogID,
                 previousIndex: previousIndex,
                 previousReviewedCount: reviewedCount,
-                previousReviewedCardIDs: reviewedCardIDs,
-                previousReviewedItemIDs: reviewedItemIDs,
+                reviewedCardID: card.id,
+                reviewedItemID: card.item.id,
+                insertedReviewedCardID: insertedReviewedCardID,
+                insertedReviewedItemID: insertedReviewedItemID,
                 rating: rating,
                 requeuedCardID: shouldRequeue ? card.id : nil
             )
             index += 1
             reviewedCount += 1
-            reviewedCardIDs.insert(card.id)
-            reviewedItemIDs.insert(card.item.id)
             isAnswerRevealed = false
             advanceSession()
         } catch DatabaseError.cardNotFound(_) {
@@ -257,7 +393,7 @@ final class StudyModel {
         do {
             try await store.revertReview(reviewLogID: undo.reviewLogID)
             if let requeuedCardID = undo.requeuedCardID {
-                repairQueue.removeAll { $0.id == requeuedCardID }
+                repairQueue.removeAll { $0.card.id == requeuedCardID }
                 if let queuedRepeat = queue.indices.last(where: {
                     $0 > undo.previousIndex && queue[$0].id == requeuedCardID
                 }) {
@@ -266,8 +402,12 @@ final class StudyModel {
             }
             index = undo.previousIndex
             reviewedCount = undo.previousReviewedCount
-            reviewedCardIDs = undo.previousReviewedCardIDs
-            reviewedItemIDs = undo.previousReviewedItemIDs
+            if undo.insertedReviewedCardID {
+                reviewedCardIDs.remove(undo.reviewedCardID)
+            }
+            if undo.insertedReviewedItemID {
+                reviewedItemIDs.remove(undo.reviewedItemID)
+            }
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
@@ -287,6 +427,7 @@ final class StudyModel {
     /// queue was built from. Every queued card drawn from that item is refreshed,
     /// because one item can own several cards in the same session.
     func reloadCurrentItem() async {
+        guard !isPreparingQueue else { return }
         guard let itemID = currentCard?.item.id else { return }
 
         do {
@@ -318,12 +459,10 @@ final class StudyModel {
         for index in queue.indices {
             refresh(&queue[index])
         }
-        for index in repairQueue.indices {
-            refresh(&repairQueue[index])
-        }
     }
 
     func skipCurrentCard() {
+        guard !isPreparingQueue else { return }
         errorMessage = nil
         pendingGradeUndo = nil
         guard currentCard != nil else { return }
@@ -371,11 +510,12 @@ final class StudyModel {
         guard queue.indices.contains(index), queue[index].id == cardID else { return }
         queue.remove(at: index)
         isAnswerRevealed = false
-        repairQueue.removeAll { $0.id == cardID }
+        repairQueue.removeAll { $0.card.id == cardID }
         advanceSession()
     }
 
     private func advanceSession() {
+        guard !isPreparingQueue else { return }
         guard index >= queue.count else {
             isFinished = false
             prepareCurrentInteraction()
@@ -383,7 +523,20 @@ final class StudyModel {
         }
 
         if !repairQueue.isEmpty {
-            queue.append(contentsOf: repairQueue)
+            var sourceIndexByCardID: [UUID: Int] = [:]
+            sourceIndexByCardID.reserveCapacity(repairQueue.count)
+            for (sourceIndex, card) in queue.enumerated() {
+                sourceIndexByCardID[card.id] = sourceIndex
+            }
+            queue.reserveCapacity(queue.count + repairQueue.count)
+            for repeatEntry in repairQueue {
+                guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
+                    continue
+                }
+                var repeatedCard = queue[sourceIndex]
+                repeatedCard.card = repeatEntry.card
+                queue.append(repeatedCard)
+            }
             repairQueue = []
             isFinished = false
             prepareCurrentInteraction()
@@ -392,5 +545,43 @@ final class StudyModel {
 
         isFinished = true
         prepareCurrentInteraction()
+    }
+
+    private func loadCompleteQueue(
+        scope: StudyScope,
+        asOf now: Date,
+        generation: UInt64,
+        start: ContinuousClock.Instant,
+        timing: inout StudyStartTiming
+    ) async throws {
+        let fetchStart = ContinuousClock.now
+        let completeQueue = try await store.fetchDueCards(
+            scope: scope.filter,
+            asOf: now
+        )
+        timing.remainingFetchSeconds = fetchStart.elapsedSeconds
+        guard startIsCurrent(generation) else { return }
+
+        let publicationStart = ContinuousClock.now
+        queue = completeQueue
+        isFinished = queue.isEmpty
+        prepareCurrentInteraction()
+        isLoading = false
+        timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
+        timing.firstReadySeconds = start.elapsedSeconds
+        timing.totalSeconds = timing.firstReadySeconds
+        lastStartTiming = timing
+    }
+
+    private func startIsCurrent(_ generation: UInt64) -> Bool {
+        generation == startGeneration && !Task.isCancelled
+    }
+}
+
+private extension ContinuousClock.Instant {
+    var elapsedSeconds: Double {
+        let duration = duration(to: .now)
+        return Double(duration.components.seconds)
+            + Double(duration.components.attoseconds) / 1e18
     }
 }

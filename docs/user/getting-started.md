@@ -129,6 +129,10 @@ Your library lives in `~/Library/Application Support/neoanki2/` either way, so
 the installed app and a build launched from the checkout read the same data.
 Never run both at once.
 
+The Home summary is prepared while the app window opens. The full Browse table
+is loaded only when you open **Browse**, so large libraries do not delay the
+first useful Home screen.
+
 ## Update the development build
 
 Quit NeoAnki2, preserve a current library backup, then run from the checkout:

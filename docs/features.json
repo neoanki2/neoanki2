@@ -27,7 +27,7 @@
       "name": "First launch and local library",
       "article": "user/getting-started.md",
       "sources": ["Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnki2/AppDatabase.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppLaunchSmokeTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppLaunchSmokeTests.swift", "Tests/NeoAnki2Tests/AppStartupPerformanceTests.swift"],
       "screenshot": "assets/screenshots/library-empty.png"
     },
     {
@@ -120,7 +120,7 @@
       "name": "Start a scoped due-card session",
       "article": "user/studying.md",
       "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnki2Tests/StudyStartPerformanceTests.swift"],
       "screenshot": "assets/screenshots/study-prompt.png"
     },
     {

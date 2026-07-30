@@ -110,6 +110,21 @@ final class DecksModel {
         isLoading = false
     }
 
+    func applyColdHomeSnapshot(_ snapshot: ColdLibraryHomeSnapshot) {
+        summaries = snapshot.deckSummaries
+        deckTree = DeckTree.build(from: summaries)
+        allDecksDueCount = snapshot.allDecksSummary.dueNow
+        unassignedDueCount = snapshot.unassignedSummary.dueNow
+        unassignedItemCount = snapshot.unassignedSummary.itemCount
+        if case let .deck(id) = selectedScope,
+           !summaries.contains(where: { $0.id == id }) {
+            selectedScope = .allDecks
+        }
+        errorMessage = nil
+        hasLoaded = true
+        isLoading = false
+    }
+
     /// Revises the counts alone, leaving `isLoading` and the error banner
     /// untouched. What is due changes on a schedule and after every save, so
     /// this runs often; anything that made the sidebar flicker would run often

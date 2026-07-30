@@ -89,7 +89,7 @@ struct ContentView: View {
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await refreshLibrary()
+                        await refreshLibrary(forceRefresh: true)
                     }
                 },
                 onDeckSettingsSaved: {
@@ -137,11 +137,22 @@ struct ContentView: View {
             selectedItemID = nil
             Task { await reloadScope() }
         }
+        .onAppear {
+            AppStartupTrace.mark("content_appeared")
+            if !decksModel.needsInitialLoad, !itemsModel.needsInitialLoad {
+                AppStartupTrace.mark("home_ready")
+            }
+        }
         .task {
             await refreshLibrary()
 #if DEBUG
             await openTestingTransfersIfRequested()
             openTestingInitialRouteIfRequested()
+#else
+            if AppDatabase.isTesting,
+               ProcessInfo.processInfo.environment["NEOANKI_TEST_INITIAL_ROUTE"] == "browse" {
+                openBrowse()
+            }
 #endif
         }
         .task {
@@ -271,7 +282,7 @@ struct ContentView: View {
                 && !isStudying
                 && !isManagingTemplates
                 && !isAddingItem
-                && !itemsModel.items.isEmpty
+                && itemsModel.scopeSummary.itemCount > 0
         )
     }
 
@@ -323,6 +334,7 @@ struct ContentView: View {
                 canEndSession: !isEditingStudyCard,
                 canEditCurrentCard: studyModel.currentCard != nil
                     && !studyModel.isGrading
+                    && !studyModel.isPreparingQueue
                     && !isEditingStudyCard,
                 canGrade: studyModelCanGrade(studyModel),
                 canUndoLastGrade: studyModel.canUndoLastGrade
@@ -349,6 +361,7 @@ struct ContentView: View {
         guard let card = studyModel.currentCard else { return false }
         return studyModel.isAnswerRevealed
             && !studyModel.isGrading
+            && !studyModel.isPreparingQueue
             && !isEditingStudyCard
             && StudySupport.isSupportedInteraction(card.template.interaction)
     }
@@ -419,7 +432,7 @@ struct ContentView: View {
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await refreshLibrary()
+                        await refreshLibrary(forceRefresh: true)
                     }
                 }
             )
@@ -428,7 +441,18 @@ struct ContentView: View {
 
     private func openBrowse() {
         selectedItemID = nil
+        let scope = decksModel.studyScope
+        guard itemsModel.needsBrowseLoad else {
+            isBrowsing = true
+            AppStartupTrace.mark("browse_ready")
+            return
+        }
+        itemsModel.beginBrowseLoad()
         isBrowsing = true
+        Task {
+            await itemsModel.load(scope: scope)
+            AppStartupTrace.mark("browse_ready")
+        }
     }
 
     private func closeBrowse() {
@@ -680,25 +704,36 @@ struct ContentView: View {
         let scope = decksModel.studyScope
         itemsModel.setCachedScope(scope)
         itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
-        await itemsModel.load(scope: scope, asOf: now)
+        if isBrowsing {
+            await itemsModel.load(scope: scope, asOf: now)
+        } else {
+            await itemsModel.loadHome(scope: scope, asOf: now)
+        }
     }
 
     /// Reloads decks and the selected scope against one instant. Two separate
     /// `.now` reads are what let the sidebar total and the detail pane disagree
     /// about how many cards are due.
-    private func refreshLibrary() async {
+    private func refreshLibrary(forceRefresh: Bool = false) async {
+        if !forceRefresh,
+           !decksModel.needsInitialLoad,
+           !itemsModel.needsInitialLoad {
+            AppStartupTrace.mark("home_ready")
+            return
+        }
         let now = Date.now
         if decksModel.needsInitialLoad || itemsModel.needsInitialLoad {
             let scope = decksModel.studyScope
             do {
-                let snapshot = try await itemsModel.store.coldLibrarySnapshot(
+                let snapshot = try await itemsModel.store.coldLibraryHomeSnapshot(
                     scope: scope.filter,
                     asOf: now
                 )
-                decksModel.applyColdSnapshot(snapshot)
+                decksModel.applyColdHomeSnapshot(snapshot)
                 itemsModel.setCachedScope(scope)
                 itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
-                itemsModel.applyColdSnapshot(snapshot, scope: scope)
+                itemsModel.applyColdHomeSnapshot(snapshot, scope: scope)
+                AppStartupTrace.mark("home_ready")
                 return
             } catch {
                 // Preserve the established model-owned error presentation.
@@ -706,6 +741,7 @@ struct ContentView: View {
         }
         await decksModel.loadOrRefresh(asOf: now)
         await reloadScope(asOf: now)
+        AppStartupTrace.mark("home_ready")
     }
 
     private func refreshAfterStudy(studiedItemIDs: Set<UUID>) async {
