@@ -25,6 +25,8 @@ Validation checks the complete bundle without importing it, including:
 - `deck.jsonl`, listed item parts, UTF-8 JSONL syntax, and exact allowed keys;
 - identifiers, references, deck hierarchy, item types, fields, templates, and
   generation conditions;
+- version-3 root and descendant item-type policies, including ordered
+  references and valid defaults;
 - item values, tags, required fields, rich text, and cloze markers;
 - media paths, confinement, signatures, kinds, sizes, and aggregate limits; and
 - source-file, record, part, deck, type, field, template, item, and media
@@ -34,6 +36,11 @@ Rich-text values may use the version 2 span format to preserve supported
 styles, semantic text colors, relative text sizes, and safe HTTP, HTTPS, or
 mailto links. The validator also accepts legacy version 1 rich text; conflicting
 legacy style pairs are normalized during import.
+
+For new bundles, use manifest version 3. The root deck must provide a
+non-empty `itemTypes` array; add `defaultType` when one choice should be
+recommended. Descendants inherit the nearest declaration unless they provide
+their own non-empty array.
 
 A valid bundle prints:
 

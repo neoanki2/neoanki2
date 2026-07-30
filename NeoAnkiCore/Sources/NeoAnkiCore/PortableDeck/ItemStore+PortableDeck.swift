@@ -35,7 +35,52 @@ extension ItemStore {
             throw PortableDeckError.limitExceeded("Selected hierarchy contains too many items.")
         }
 
-        let typeIDs = Set(persisted.map(\.item.itemTypeID))
+        let explicitPoliciesByDeck = Dictionary(
+            grouping: librarySnapshot.itemTypePolicies,
+            by: \.deckID
+        )
+        var rootPolicySourceID: UUID? = rootDeckID
+        var visited: Set<UUID> = []
+        while let candidateID = rootPolicySourceID,
+              visited.insert(candidateID).inserted,
+              explicitPoliciesByDeck[candidateID]?.isEmpty != false {
+            rootPolicySourceID = byID[candidateID]?.parentID
+        }
+        let inheritedRootPolicy = rootPolicySourceID
+            .flatMap { explicitPoliciesByDeck[$0] }?
+            .sorted { $0.ordinal < $1.ordinal } ?? []
+        let directlyUsedTypeIDs = Set(persisted.map(\.item.itemTypeID))
+        let rootPolicy: [DeckItemTypePolicyEntry]
+        if inheritedRootPolicy.isEmpty {
+            let sorted = directlyUsedTypeIDs.sorted { $0.uuidString < $1.uuidString }
+            rootPolicy = sorted.enumerated().map { ordinal, itemTypeID in
+                DeckItemTypePolicyEntry(
+                    deckID: rootDeckID,
+                    itemTypeID: itemTypeID,
+                    ordinal: ordinal,
+                    isDefault: sorted.count == 1
+                )
+            }
+        } else {
+            rootPolicy = inheritedRootPolicy.enumerated().map { ordinal, entry in
+                DeckItemTypePolicyEntry(
+                    deckID: rootDeckID,
+                    itemTypeID: entry.itemTypeID,
+                    ordinal: ordinal,
+                    isDefault: entry.isDefault
+                )
+            }
+        }
+        let descendantPolicies = librarySnapshot.itemTypePolicies.filter {
+            $0.deckID != rootDeckID && selectedIDs.contains($0.deckID)
+        }
+        let exportedPolicies = rootPolicy + descendantPolicies
+        let ownedTypeIDs = Set(librarySnapshot.includedItemTypes.compactMap {
+            selectedIDs.contains($0.rootDeckID) ? $0.itemTypeID : nil
+        })
+        let typeIDs = directlyUsedTypeIDs
+            .union(ownedTypeIDs)
+            .union(exportedPolicies.map(\.itemTypeID))
         guard typeIDs.count <= limits.maximumItemTypes else {
             throw PortableDeckError.limitExceeded("Selected hierarchy references too many item types.")
         }
@@ -106,12 +151,14 @@ extension ItemStore {
             media.append(.init(descriptor: descriptor, fileURL: url))
         }
         return .init(
+            formatVersion: PortableDeck.version,
             sourceLibraryID: sourceLibraryID,
             rootDeckID: rootDeckID,
             decks: selectedDecks,
             types: types,
             items: records,
-            media: media
+            media: media,
+            itemTypePolicies: exportedPolicies
         )
     }
 
@@ -291,9 +338,65 @@ extension ItemStore {
                 )
             }
 
+            guard let importedRootDeckID = deckMap[package.rootDeckID] else {
+                throw PortableDeckError.invalidPackage("Root deck mapping failed.")
+            }
+            let resolvedTypeIDs = Set(typeMap.values.map(\.id))
+            let includedItemTypes: [IncludedItemTypeOwner]
+            let libraryItemTypeIDs: Set<UUID>
+            let itemTypePolicies: [DeckItemTypePolicyEntry]
+            if package.formatVersion >= 3 {
+                libraryItemTypeIDs = []
+                includedItemTypes = resolvedTypeIDs
+                    .sorted { $0.uuidString < $1.uuidString }
+                    .enumerated()
+                    .map { ordinal, itemTypeID in
+                        IncludedItemTypeOwner(
+                            rootDeckID: importedRootDeckID,
+                            itemTypeID: itemTypeID,
+                            ordinal: ordinal
+                        )
+                    }
+                itemTypePolicies = try Dictionary(
+                    grouping: package.itemTypePolicies,
+                    by: \.deckID
+                ).values.flatMap { sourceEntries -> [DeckItemTypePolicyEntry] in
+                    guard let sourceDeckID = sourceEntries.first?.deckID,
+                          let deckID = deckMap[sourceDeckID] else { return [] }
+                    var orderedIDs: [UUID] = []
+                    var defaultIDs: Set<UUID> = []
+                    for entry in sourceEntries.sorted(by: { $0.ordinal < $1.ordinal }) {
+                        guard let itemTypeID = typeMap[entry.itemTypeID]?.id else {
+                            throw PortableDeckError.invalidPackage(
+                                "Deck item-type policy mapping failed."
+                            )
+                        }
+                        if !orderedIDs.contains(itemTypeID) {
+                            orderedIDs.append(itemTypeID)
+                        }
+                        if entry.isDefault {
+                            defaultIDs.insert(itemTypeID)
+                        }
+                    }
+                    return orderedIDs.enumerated().map { ordinal, itemTypeID in
+                        DeckItemTypePolicyEntry(
+                            deckID: deckID,
+                            itemTypeID: itemTypeID,
+                            ordinal: ordinal,
+                            isDefault: defaultIDs.contains(itemTypeID)
+                        )
+                    }
+                }
+            } else {
+                libraryItemTypeIDs = resolvedTypeIDs
+                includedItemTypes = []
+                itemTypePolicies = []
+            }
+
             try await database.importPortableDeck(
                 .init(
                     itemTypes: createdTypes,
+                    libraryItemTypeIDs: libraryItemTypeIDs,
                     decks: importedDecks,
                     items: importedItems,
                     mappings: package.types.compactMap { record in
@@ -304,14 +407,15 @@ extension ItemStore {
                             digest: record.digest,
                             localTypeID: local.id
                         )
-                    }
+                    },
+                    includedItemTypes: includedItemTypes,
+                    itemTypePolicies: itemTypePolicies
                 ),
                 now: now
             )
             try await mediaStore?.releaseReservations(scopeID: reservationScope)
-            let root = deckMap[package.rootDeckID].map { [$0] } ?? []
             return .init(
-                deckIDs: root,
+                deckIDs: [importedRootDeckID],
                 itemCount: importedItems.count,
                 createdItemTypeCount: createdTypes.count,
                 reusedItemTypeCount: reusedCount

@@ -9,12 +9,12 @@ parent: Reference
 ## 1. Status and scope
 
 This document is the normative specification for **NeoAnki Portable Deck
-Format version 2**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
+Format version 3**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
 **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described by
 RFC 2119 and RFC 8174.
 
 A `.neodeck` file is one SQLite database containing deck structure, item-type
-definitions, item content, tags, and media bytes. Version 2 is a
+definitions, deck item-type policies, item content, tags, and media bytes. Version 3 is a
 **content-only** interchange format. It never contains cards, scheduling
 state, review history, statistics, scheduler parameters, suspension state, or
 other learner progress.
@@ -29,7 +29,7 @@ Writers MUST produce a SQLite 3 database with:
 - filename extension `.neodeck`;
 - page-header `application_id` equal to `0x4E44454B` (ASCII `NDEK`,
   decimal `1313097035`);
-- `user_version` equal to `2`;
+- `user_version` equal to `3`;
 - UTF-8 text encoding;
 - foreign-key enforcement enabled while writing; and
 - no attached databases, virtual tables, triggers, views, or executable SQL.
@@ -38,16 +38,16 @@ The required initialization pragmas are:
 
 ```sql
 PRAGMA application_id = 1313097035;
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 PRAGMA encoding = 'UTF-8';
 PRAGMA foreign_keys = ON;
 ```
 
 Readers MUST inspect `application_id` and `user_version` before reading
 application data. A reader MUST reject a file with a different
-`application_id`. A version-2 reader MUST reject `user_version > 2`; it MUST
+`application_id`. A version-3 reader MUST reject `user_version > 3`; it MUST
 NOT guess at a newer schema. A reader MAY support older versions through an
-explicit compatibility path. NeoAnki supports both versions 1 and 2.
+explicit compatibility path. NeoAnki supports versions 1, 2, and 3.
 
 The schema uses only portable SQLite storage classes and features available in
 SQLite 3.24 or later. UUIDs and timestamps are text, JSON is UTF-8 text, and
@@ -92,14 +92,14 @@ Columns ending in `_json` MUST contain one complete UTF-8 JSON value:
 - with absent optional members omitted, not set to `null`; and
 - with arrays retained in their specified semantic order.
 
-Readers MUST accept semantically valid non-canonical JSON in version-2 files,
+Readers MUST accept semantically valid non-canonical JSON in version-3 files,
 but MUST canonicalize it before digest comparison. Writers MUST emit canonical
 JSON. Unknown object members are an error unless a future version of this
 document explicitly makes that object extensible.
 
 ## 4. Required schema
 
-The following DDL is exact. A version-2 file MUST contain these tables,
+The following DDL is exact. A version-3 file MUST contain these tables,
 columns, constraints, foreign keys, and indexes. It MUST NOT contain
 application rows outside these tables. Additional indexes are allowed;
 additional tables, columns, views, triggers, and virtual tables are not.
@@ -108,7 +108,7 @@ additional tables, columns, views, triggers, and virtual tables are not.
 CREATE TABLE manifest (
     singleton          INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
     format_name        TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-    format_version     INTEGER NOT NULL CHECK (format_version = 2),
+    format_version     INTEGER NOT NULL CHECK (format_version = 3),
     created_at         TEXT NOT NULL,
     exporter           TEXT NOT NULL,
     source_library_id  TEXT NOT NULL,
@@ -132,6 +132,15 @@ CREATE TABLE item_types (
     origin_type_id     TEXT NOT NULL CHECK (length(origin_type_id) = 36),
     schema_digest      BLOB NOT NULL CHECK (length(schema_digest) = 32),
     UNIQUE (origin_library_id, origin_type_id)
+);
+
+CREATE TABLE deck_item_types (
+    deck_id       TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    item_type_id  TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
+    ordinal       INTEGER NOT NULL CHECK (ordinal >= 0),
+    is_default    INTEGER NOT NULL CHECK (is_default IN (0, 1)),
+    PRIMARY KEY (deck_id, item_type_id),
+    UNIQUE (deck_id, ordinal)
 );
 
 CREATE TABLE fields (
@@ -206,6 +215,8 @@ CREATE UNIQUE INDEX idx_decks_parent_ordinal
     ON decks(COALESCE(parent_id, ''), ordinal);
 CREATE INDEX idx_item_types_schema_digest
     ON item_types(schema_digest);
+CREATE UNIQUE INDEX idx_deck_item_types_default
+    ON deck_item_types(deck_id) WHERE is_default = 1;
 CREATE INDEX idx_fields_item_type_ordinal
     ON fields(item_type_id, ordinal);
 CREATE INDEX idx_templates_item_type_ordinal
@@ -227,7 +238,9 @@ There MUST be exactly one `manifest` row and its `singleton` MUST be `1`.
 Ordinals are zero-based, contiguous, and unique within their owner. Deck
 ordinals are contiguous among siblings, field and template ordinals are
 contiguous within an item type, and tag ordinals are contiguous within an
-item. A reader MUST NOT infer order from SQLite row order or UUID values.
+item. `deck_item_types.ordinal` is contiguous within a deck, and at most one
+entry per deck has `is_default = 1`. A reader MUST NOT infer order from SQLite
+row order or UUID values.
 
 Names and tags MUST be non-empty after Unicode whitespace trimming. Field names
 MUST be unique after Unicode NFC normalization and locale-independent case
@@ -424,7 +437,7 @@ is never trusted as a lookup key without this check.
 validated file signatures; a filename or declared MIME type is not evidence of
 content type.
 
-Allowed version-1 and version-2 combinations are:
+Allowed version-1 through version-3 combinations are:
 
 - image: `image/jpeg`/`jpg`, `image/png`/`png`, `image/webp`/`webp`;
 - gif: `image/gif`/`gif`;
@@ -449,15 +462,21 @@ all media bytes to be resident in memory.
 ### 8.1 Export
 
 An export consists of the selected deck subtree, its items, all item types
-needed by those items, and all media reachable from those item values. If no
-root deck is selected, `manifest.root_deck_id` is `NULL` and the file may
-contain multiple top-level decks and deckless items.
+needed by those items or policies, and all media reachable from those item
+values. If no root deck is selected, `manifest.root_deck_id` is `NULL` and the
+file may contain multiple top-level decks and deckless items.
 
 When exporting a subtree, the selected deck becomes a root in the portable
 file: its `parent_id` is `NULL`; ancestors and unrelated siblings are omitted.
 Descendant relationships and sibling order are preserved. Item, deck,
 item-type, field, and template transport IDs are preserved from the source
 library. Origin pairs are preserved as specified in section 4.
+
+Version 3 preserves every explicit policy in the exported subtree. If the
+selected root inherited its effective policy from an omitted ancestor, the
+exporter materializes that policy on the portable root. If a local subtree has
+no policy metadata, the exporter synthesizes a root policy from types used by
+items in the subtree and sets a default only when exactly one type is used.
 
 The exporter MUST take a transactionally consistent snapshot. It MUST generate
 canonical JSON, recompute schema and media digests, run
@@ -466,7 +485,7 @@ the file.
 
 No table or JSON value may contain card IDs, review logs, due dates, memory
 state, scheduler parameters, suspension flags, study statistics, or deletion
-tombstones. `content_only` is always `1`; version 2 has no progress-export
+tombstones. `content_only` is always `1`; version 3 has no progress-export
 option.
 
 ### 8.2 Import validation and type resolution
@@ -502,6 +521,12 @@ type, every field, and every template, preserve field/template order, and
 rewrite all ordinal references to those new IDs in the destination model. It
 MUST preserve the incoming origin pair.
 
+All type declarations in a version-3 package are associated with the imported
+root and its `deck_item_types` rows become explicit local policies. Newly
+created types are included-only. Reusing a normal destination type never
+removes its normal status. Versions 1 and 2 retain legacy behavior: their
+types become normal Item Types and create no contextual policy.
+
 ### 8.3 Imported content
 
 The importer MUST allocate fresh random UUIDs for every imported deck and item,
@@ -527,7 +552,7 @@ single import transaction. Media MUST be copied in bounded chunks.
 ## 9. Validation and security limits
 
 An implementation MAY impose lower limits before the user selects a file, but
-a conforming version-2 importer MUST reject a file exceeding any of these hard
+a conforming version-3 importer MUST reject a file exceeding any of these hard
 limits before committing:
 
 - file size: 2 GiB;
@@ -621,7 +646,7 @@ skip-invalid-row, or partial-import mode.
 
 ## 11. Compatibility rules
 
-A version-2 reader MUST validate exact table and column names and MUST tolerate
+A version-3 reader MUST validate exact table and column names and MUST tolerate
 additional indexes only. It MUST reject missing or additional application
 schema objects because those can change semantics or expand the attack surface.
 

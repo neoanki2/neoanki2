@@ -19,9 +19,47 @@ import Testing
     #expect(try tableExists("portable_item_type_mappings", at: url))
     #expect(try tableExists("new_card_introductions", at: url))
     #expect(try columnExists("new_cards_per_day", in: "decks", at: url))
+    #expect(try tableExists("library_item_types", at: url))
+    #expect(try tableExists("deck_included_item_types", at: url))
+    #expect(try tableExists("deck_item_type_policy_entries", at: url))
     let firstLibraryID = try await database.getOrCreateLibraryID()
     let secondLibraryID = try await database.getOrCreateLibraryID()
     #expect(firstLibraryID == secondLibraryID)
+}
+
+@Test func versionEighteenMigrationKeepsEveryExistingTypeNormal() async throws {
+    let url = migrationDatabaseURL()
+    let first = UUID()
+    let second = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (17);
+        CREATE TABLE item_types (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            definition BLOB NOT NULL
+        );
+        CREATE TABLE decks (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT REFERENCES decks(id),
+            new_cards_per_day INTEGER
+        );
+        INSERT INTO item_types VALUES ('\(first.uuidString)', 'First', X'7b7d');
+        INSERT INTO item_types VALUES ('\(second.uuidString)', 'Second', X'7b7d');
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == 18)
+    #expect(try integer("SELECT COUNT(*) FROM item_types;", at: url) == 2)
+    #expect(try integer("SELECT COUNT(*) FROM library_item_types;", at: url) == 2)
+    #expect(try integer("SELECT COUNT(*) FROM deck_included_item_types;", at: url) == 0)
+    #expect(try integer("SELECT COUNT(*) FROM deck_item_type_policy_entries;", at: url) == 0)
 }
 
 @Test func versionFourteenMigrationAddsUnlimitedDeckLimits() async throws {

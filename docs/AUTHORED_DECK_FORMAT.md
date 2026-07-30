@@ -9,7 +9,7 @@ parent: Reference
 ## 1. Status and purpose
 
 This document is the normative specification for NeoAnki Authored Deck Format
-version 2. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
+version 3. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
 **SHOULD NOT**, and **MAY** are interpreted as in RFC 2119 and RFC 8174.
 
 The format is an import-only, text-based source representation for coding
@@ -64,13 +64,13 @@ templates, slots, rich spans, and tags.
 `deck.jsonl` MUST contain exactly one manifest record:
 
 ```json
-{"kind":"neoanki","version":2,"root":"biology","parts":["items/cells-001.jsonl"]}
+{"kind":"neoanki","version":3,"root":"biology","parts":["items/cells-001.jsonl"]}
 ```
 
 Members are exact:
 
 - `kind`: `"neoanki"`;
-- `version`: integer `2`;
+- `version`: integer `3`;
 - `root`: identifier of the root deck; and
 - `parts`: ordered, unique relative paths to `.jsonl` item files.
 
@@ -81,12 +81,23 @@ resolution.
 ## 5. Deck records
 
 ```json
+{"kind":"deck","id":"biology","name":"Biology","itemTypes":["Basic","Cloze"],"defaultType":"Basic"}
 {"kind":"deck","id":"cells","name":"Cells","parent":"biology"}
 ```
 
 `parent` is omitted or `null` only on the manifest root deck. Every other deck
 MUST reference a declared parent. Identifiers are unique and the hierarchy
 MUST be acyclic and connected to the root.
+
+In version 3 the root deck MUST declare a non-empty, ordered `itemTypes` array.
+A descendant MAY declare its own non-empty array; omission inherits the
+nearest ancestor declaration. Optional `defaultType` MUST reference the same
+record's `itemTypes` array. One available type is selected automatically.
+Multiple types without a default deliberately require the user to choose.
+
+Every type record in a version-3 bundle is included with the imported root,
+even when no deck policy offers it for new items. Included definitions stay
+out of the ordinary Item Types list unless the user explicitly duplicates one.
 
 ## 6. Item-type records
 
@@ -254,7 +265,12 @@ the destination's normal `CardGenerator`. Scheduling starts never-reviewed.
 Authored types carry no provenance. An exact canonical schema digest reuses the
 lexicographically first matching local type; otherwise import creates a type.
 Changing a schema creates a distinct type. Re-import creates duplicate content
-but reuses an unchanged schema.
+but reuses an unchanged schema. Digest reuse never removes an existing type's
+ordinary, reusable Item Type status.
+
+Version-3 types and deck policies are imported contextually. Version-1 and
+version-2 bundles keep their historical behavior: imported types become normal
+Item Types and no deck policy is created.
 
 Media is staged through reservation records. Item types, decks, items, cards,
 and media references commit in one database transaction. Any failure rolls
@@ -277,8 +293,10 @@ Biology.neoanki/items/cells-001.jsonl:18: AD222: Item contains unknown field "ba
 
 ## 12. Evolution
 
-Version 2 adds portable inline text color, relative size, links, superscript,
-and subscript. Version 1 remains readable but cannot use those members or
-styles. Writers MUST NOT add members or record kinds not defined here.
+Version 3 adds deck item-type policies and included item types. Version 2 adds
+portable inline text color, relative size, links, superscript, and subscript.
+Versions 1 and 2 remain readable; their imported types retain the legacy global
+behavior. Version 1 cannot use the version-2 text members or styles. Writers
+MUST NOT add members or record kinds not defined here.
 Incompatible changes increment the manifest `version`; importers MUST reject
 unsupported versions rather than guessing.

@@ -27,6 +27,33 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(model.errorMessage == nil)
 }
 
+@Test @MainActor func templatesModelGroupsIncludedTypesAsReadOnlyAndDuplicatesThem() async throws {
+    let (model, store) = try await makeTemplatesModel()
+    _ = try await importContextualDeck(into: store)
+    await model.load()
+    let included = try #require(model.includedItemTypeGroups.first?.itemTypes.first)
+    model.selectedItemTypeID = included.id
+
+    #expect(model.isSelectedItemTypeReadOnly)
+    #expect(model.selectedIncludedGroup?.deckPath == "Context Deck")
+    #expect(await model.canDeleteSelectedItemType() == false)
+    let rejected = await model.saveTemplate(
+        TemplateDraft(
+            name: "Another",
+            promptFieldID: included.fields[0].id,
+            answerFieldID: included.fields[1].id
+        ),
+        editingID: nil
+    )
+    #expect(rejected == false)
+
+    #expect(await model.duplicateSelectedItemType(name: "Editable Special"))
+    #expect(model.isSelectedItemTypeReadOnly == false)
+    #expect(model.selectedItemType?.name == "Editable Special")
+    #expect(model.itemTypes.contains { $0.name == "Editable Special" })
+    #expect(model.includedItemTypeGroups.flatMap(\.itemTypes).contains { $0.id == included.id })
+}
+
 @Test @MainActor func templatesModelSavesNewTemplate() async throws {
     let (model, store) = try await makeTemplatesModel()
     await model.load()

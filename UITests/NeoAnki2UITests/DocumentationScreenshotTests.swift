@@ -11,12 +11,6 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
 
         openAddItem(in: emptyApp)
-        captureDocumentationScreenshot(
-            named: "item-add",
-            of: emptyApp,
-            scenario: "new basic item editor",
-            expectedVisibleIdentifiers: ["cancelAddItem", "field-Front", "field-Back"]
-        )
         assertFormattedField(
             named: "Front",
             buttonID: "formatBold",
@@ -54,6 +48,30 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "basic item detail",
             expectedVisibleIdentifiers: ["deleteItem", "editItem"]
         )
+        emptyApp.terminate()
+
+        let contextualApp = launchApp(
+            databaseLabel: "docs-item-add",
+            scenario: "deck-included-item-types"
+        )
+        showSidebar(in: contextualApp)
+        contextualApp.descendants(matching: .any)
+            .identified("deckRow-Poetry Lab")
+            .click()
+        openAddItem(in: contextualApp, waitForDefaultField: false)
+        captureDocumentationScreenshot(
+            named: "item-add",
+            of: contextualApp,
+            scenario: "new item editor using the deck's recommended included type",
+            expectedVisibleIdentifiers: [
+                "addItemDeckPicker",
+                "addItemTypePicker",
+                "field-Previous Lines",
+                "field-Next Line",
+            ]
+        )
+        appCancelAddItem(in: contextualApp)
+        contextualApp.terminate()
 
         let deckApp = launchApp(databaseLabel: "docs-decks", scenario: "deck-with-due-items")
         showSidebar(in: deckApp)
@@ -148,15 +166,34 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
     }
 
     func testItemTypeAndTemplateScreenshots() throws {
-        let app = launchApp(databaseLabel: "docs-templates")
+        let app = launchApp(
+            databaseLabel: "docs-templates",
+            scenario: "deck-included-item-types"
+        )
         openTemplates(in: app)
+        let disclosure = app.descendants(matching: .any)
+            .identified("includedWithDecksDisclosure")
+        XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
+        let disclosureTriangle = app.disclosureTriangles.firstMatch
+        XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
+        disclosureTriangle.click()
+        let included = app.descendants(matching: .any)
+            .identified("includedItemTypeRow-Poem Line")
+        XCTAssertTrue(included.waitUntilExists(timeout: 5))
+        included.click()
         captureDocumentationScreenshot(
             named: "item-types",
             of: app,
-            scenario: "item types and templates panel",
-            expectedVisibleIdentifiers: ["templatesDone", "addTemplateToolbar"]
+            scenario: "item types manager with an included read-only deck type selected",
+            expectedVisibleIdentifiers: [
+                "templatesDone",
+                "includedWithDecksDisclosure",
+                "includedItemTypeOwner",
+                "duplicateIncludedItemType",
+            ]
         )
 
+        app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
         app.buttons.identified("addTemplateToolbar").click()
         XCTAssertTrue(app.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(

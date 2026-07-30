@@ -16,6 +16,45 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     return (ItemsModel(store: store, mediaStore: mediaStore), store)
 }
 
+func importContextualDeck(
+    into store: ItemStore,
+    typeIDs: [String] = ["Special"],
+    defaultType: String? = "Special"
+) async throws -> UUID {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki2-contextual-model-\(UUID().uuidString)", isDirectory: true)
+    let bundle = root.appendingPathComponent("Context.neoanki", isDirectory: true)
+    let items = bundle.appendingPathComponent("items", isDirectory: true)
+    try FileManager.default.createDirectory(at: items, withIntermediateDirectories: true)
+    let types = typeIDs.map { id in
+        #"{"kind":"type","id":"\#(id)","name":"\#(id) Type","fields":[{"id":"prompt","name":"Prompt","type":"text","required":true},{"id":"answer","name":"Answer","type":"text","required":true}],"templates":[{"name":"Card","prompt":[{"field":"prompt"}],"answer":[{"field":"answer"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}"#
+    }
+    var deckObject: [String: Any] = [
+        "kind": "deck",
+        "id": "root",
+        "name": "Context Deck",
+        "itemTypes": typeIDs,
+    ]
+    if let defaultType {
+        deckObject["defaultType"] = defaultType
+    }
+    let deck = try String(
+        data: JSONSerialization.data(withJSONObject: deckObject, options: [.sortedKeys]),
+        encoding: .utf8
+    )!
+    let records = [
+        #"{"kind":"neoanki","version":3,"root":"root","parts":["items/items.jsonl"]}"#,
+    ] + types + [deck]
+    try (records.joined(separator: "\n") + "\n").write(
+        to: bundle.appendingPathComponent("deck.jsonl"),
+        atomically: true,
+        encoding: .utf8
+    )
+    try Data().write(to: items.appendingPathComponent("items.jsonl"))
+    let result = try await AuthoredDeck.importDeck(from: bundle, into: store)
+    return try #require(result.deckIDs.first)
+}
+
 @Test @MainActor func itemsModelLoadsEmptyLibrary() async throws {
     let (model, _) = try await makeModel()
 
@@ -25,6 +64,50 @@ private func makeModel() async throws -> (ItemsModel, ItemStore) {
     #expect(model.items.isEmpty)
     #expect(model.itemType?.name == "Basic")
     #expect(model.errorMessage == nil)
+}
+
+@Test @MainActor func itemsModelResolvesRecommendedDeckTypeAndKeepsNormalEscapeHatch() async throws {
+    let (model, store) = try await makeModel()
+    let deckID = try await importContextualDeck(into: store)
+    await model.load()
+
+    await model.configureAddItem(for: deckID)
+
+    #expect(model.itemType?.name == "Special Type")
+    #expect(model.policyItemTypes.map(\.name) == ["Special Type"])
+    #expect(model.normalItemTypes.contains { $0.name == "Basic" })
+    #expect(!model.normalItemTypes.contains { $0.name == "Special Type" })
+    #expect(model.isRecommendedItemType(try #require(model.itemType?.id)))
+}
+
+@Test @MainActor func itemsModelLeavesAmbiguousDeckPolicyUnselected() async throws {
+    let (model, store) = try await makeModel()
+    let deckID = try await importContextualDeck(
+        into: store,
+        typeIDs: ["Term", "Example"],
+        defaultType: nil
+    )
+    await model.load()
+
+    await model.configureAddItem(for: deckID)
+
+    #expect(model.policyItemTypes.map(\.name) == ["Term Type", "Example Type"])
+    #expect(model.addItemTypeID == nil)
+    #expect(model.itemType == nil)
+}
+
+@Test @MainActor func itemsModelCanRetainSelectionWhenDeckChangesWithContent() async throws {
+    let (model, store) = try await makeModel()
+    let deckID = try await importContextualDeck(into: store)
+    await model.load()
+    let basicID = try #require(model.normalItemTypes.first { $0.name == "Basic" }?.id)
+    model.addItemTypeID = basicID
+
+    await model.configureAddItem(for: deckID, resolveSelection: false)
+
+    #expect(model.addItemTypeID == basicID)
+    #expect(model.itemType?.name == "Basic")
+    #expect(model.policyItemTypes.map(\.name) == ["Special Type"])
 }
 
 @Test @MainActor func itemsModelAddsItemToList() async throws {

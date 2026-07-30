@@ -17,6 +17,7 @@ Open **Item Types** from the library to manage both. The left column lists types
 **On this page**
 
 - [Starter item types](#starter-item-types)
+- [Included with decks](#included-with-decks)
 - [Create and edit an item type](#create-and-edit-an-item-type)
 - [Repair a damaged definition](#repair-a-damaged-definition)
 - [Create, edit, and delete templates](#create-edit-and-delete-templates)
@@ -33,6 +34,19 @@ NeoAnki2 creates two ordinary starter types on first run:
 - **Cloze** has a required Cloze field named **Text** and an optional Rich Text field named **Context**. Its **Cloze** template shows Text with the current blank concealed plus Context on the prompt, then Text on the answer. Each distinct blank group generates a separate card.
 
 Starter types are not protected system definitions. You may edit or delete them under the same rules as a custom type.
+
+## Included with decks
+
+Imported, deck-specific schemas are collected in the collapsed **Included with
+Decks** disclosure and grouped by the owning deck's current path. They do not
+crowd the main Item Types list.
+
+An included-only definition is read-only. You can inspect its fields,
+templates, and owning deck, but Edit, Delete, and Add Template are unavailable.
+Choose **Duplicate as Item Type…**, enter a name, and NeoAnki2 creates and
+selects an independent editable copy. Existing items and the imported deck
+policy continue using the original. If import reused a type that was already a
+normal Item Type, it remains editable and appears only in the main list.
 
 ## Create and edit an item type
 

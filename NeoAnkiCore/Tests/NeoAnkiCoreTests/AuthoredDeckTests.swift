@@ -37,6 +37,12 @@ private let authoredDeck =
 private let authoredType =
     #"{"kind":"type","id":"Study","name":"Authored Study","fields":[{"id":"front","name":"Front","type":"text","required":true},{"id":"back","name":"Back","type":"richText","required":true},{"id":"cloze","name":"Cloze","type":"cloze"},{"id":"image","name":"Image","type":"image"}],"templates":[{"name":"Forward","prompt":[{"field":"front"}],"answer":[{"field":"back"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}"#
 
+private let authoredV3Manifest =
+    #"{"kind":"neoanki","version":3,"root":"root","parts":["items/items.jsonl"]}"#
+
+private let authoredV3RootDeck =
+    #"{"kind":"deck","id":"root","name":"Authored","itemTypes":["Study"],"defaultType":"Study"}"#
+
 @Test func documentedAuthoredDeckExampleRemainsValid() {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -47,6 +53,132 @@ private let authoredType =
         .appendingPathComponent("docs/examples/Biology.neoanki", isDirectory: true)
 
     #expect(AuthoredDeck.validate(at: example).isEmpty)
+}
+
+@Test func authoredDeckV3KeepsIncludedTypesContextualAndInheritsPolicies() async throws {
+    let directory = try authoredTestDirectory()
+    let child =
+        #"{"kind":"deck","id":"child","name":"Child","parent":"root"}"#
+    let unusedType =
+        #"{"kind":"type","id":"Unused","name":"Imported Helper","fields":[{"id":"front","name":"Front","type":"text","required":true},{"id":"back","name":"Back","type":"text","required":true}],"templates":[{"name":"Card","prompt":[{"field":"front"}],"answer":[{"field":"back"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}"#
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [
+            authoredV3Manifest,
+            authoredType,
+            unusedType,
+            authoredV3RootDeck,
+            child,
+        ],
+        itemRecords: [
+            #"{"kind":"item","deck":"child","type":"Study","fields":{"front":{"text":"Question"},"back":{"rich":[{"text":"Answer"}]}}}"#,
+        ]
+    )
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    _ = try await AuthoredDeck.importDeck(from: bundle, into: store)
+
+    let decks = try await store.listDecks()
+    let root = try #require(decks.first { $0.name == "Authored" })
+    let importedChild = try #require(decks.first { $0.name == "Child" })
+    let catalog = try await store.loadItemTypeCatalog()
+    #expect(catalog.itemTypes.map(\.name) == ["Basic", "Cloze"])
+    let group = try #require(catalog.includedWithDecks.first)
+    #expect(group.rootDeck.id == root.id)
+    #expect(group.deckPath == "Authored")
+    #expect(Set(group.itemTypes.map(\.name)) == ["Authored Study", "Imported Helper"])
+
+    let policy = try #require(try await store.effectiveItemTypePolicy(for: importedChild.id))
+    #expect(policy.sourceDeckID == root.id)
+    #expect(policy.itemTypes.map(\.name) == ["Authored Study"])
+    #expect(policy.automaticItemTypeID == policy.itemTypes.first?.id)
+
+    let included = try #require(group.itemTypes.first { $0.name == "Authored Study" })
+    let copy = try await store.duplicateItemType(id: included.id, name: "My Study Type")
+    #expect(copy.id != included.id)
+    #expect(Set(copy.fields.map(\.id)).isDisjoint(with: included.fields.map(\.id)))
+    #expect(Set(copy.templates.map(\.id)).isDisjoint(with: included.templates.map(\.id)))
+    let afterDuplicate = try await store.loadItemTypeCatalog()
+    #expect(afterDuplicate.itemTypes.contains { $0.id == copy.id })
+    #expect(afterDuplicate.includedWithDecks.flatMap(\.itemTypes).contains { $0.id == included.id })
+}
+
+@Test func authoredDeckV3RequiresAChoiceForAmbiguousPolicy() async throws {
+    let directory = try authoredTestDirectory()
+    let secondType = authoredType
+        .replacingOccurrences(of: #""Study""#, with: #""Second""#)
+        .replacingOccurrences(of: "Authored Study", with: "Second Study")
+    let root =
+        #"{"kind":"deck","id":"root","name":"Authored","itemTypes":["Study","Second"]}"#
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredV3Manifest, authoredType, secondType, root],
+        itemRecords: []
+    )
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let result = try await AuthoredDeck.importDeck(from: bundle, into: store)
+    let rootID = try #require(result.deckIDs.first)
+    let policy = try #require(try await store.effectiveItemTypePolicy(for: rootID))
+
+    #expect(policy.itemTypes.map(\.name) == ["Authored Study", "Second Study"])
+    #expect(policy.defaultItemTypeID == nil)
+    #expect(policy.automaticItemTypeID == nil)
+}
+
+@Test func authoredDeckV3RejectsInvalidDefaultAndV2TypesStayNormal() async throws {
+    let directory = try authoredTestDirectory()
+    let invalidRoot =
+        #"{"kind":"deck","id":"root","name":"Authored","itemTypes":["Study"],"defaultType":"Missing"}"#
+    let invalid = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredV3Manifest, authoredType, invalidRoot],
+        itemRecords: []
+    )
+    #expect(AuthoredDeck.validate(at: invalid).contains { $0.code == "AD217" })
+
+    try FileManager.default.removeItem(at: invalid)
+    let legacy = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredManifest, authoredType, authoredDeck],
+        itemRecords: []
+    )
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let result = try await AuthoredDeck.importDeck(from: legacy, into: store)
+    let rootID = try #require(result.deckIDs.first)
+    let catalog = try await store.loadItemTypeCatalog()
+    #expect(catalog.itemTypes.contains { $0.name == "Authored Study" })
+    #expect(catalog.includedWithDecks.isEmpty)
+    #expect(try await store.effectiveItemTypePolicy(for: rootID) == nil)
+}
+
+@Test func deletingIncludedDeckPromotesTypeStillUsedByMovedItem() async throws {
+    let directory = try authoredTestDirectory()
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredV3Manifest, authoredType, authoredV3RootDeck],
+        itemRecords: [
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question"},"back":{"rich":[{"text":"Answer"}]}}}"#,
+        ]
+    )
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let survivor = try await store.createDeck(Deck(name: "Survivor"))
+    let result = try await AuthoredDeck.importDeck(from: bundle, into: store)
+    let importedRootID = try #require(result.deckIDs.first)
+    let summary = try #require((try await store.listItems()).first)
+    let stored = try #require(await store.fetchItem(id: summary.id))
+    var moved = stored.item
+    moved.deckID = survivor.id
+    _ = try await store.updateItem(moved)
+
+    try await store.deleteDeck(id: importedRootID)
+
+    let catalog = try await store.loadItemTypeCatalog()
+    #expect(catalog.itemTypes.contains { $0.id == stored.itemType.id })
+    #expect(catalog.includedWithDecks.isEmpty)
+    #expect(try await store.fetchItem(id: summary.id) != nil)
 }
 
 @Test func authoredDeckJSONSchemasRemainValidJSON() throws {

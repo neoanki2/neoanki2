@@ -163,7 +163,7 @@ The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
 of the exported tree.
 
-`.neodeck` version 2 is deliberately **content-only**. It does not contain:
+`.neodeck` version 3 is deliberately **content-only**. It does not contain:
 
 - review history, due dates, or scheduler parameters;
 - card or memory state, suspension state, or study statistics; or
@@ -188,6 +188,12 @@ schema, limits, item-type digests, and media—before changing the library.
 Imported decks, items, and cards receive fresh local identifiers. Media and
 exactly matching item-type schemas are reused when safe. Re-importing a
 portable deck creates another copy of its content.
+
+Version-3 packages preserve the ordered item types offered by each deck.
+Newly introduced schemas stay under **Included with Decks**; an exact match
+that is already a normal Item Type remains normal. Older version-1 and
+version-2 packages keep their previous behavior and add their types to the
+normal Item Types list.
 
 If an incoming item type has the same origin as a local type but a different
 schema, no content is imported until you choose:
@@ -223,6 +229,12 @@ item types, templates, items, tags, and local media. Import allocates fresh
 local identifiers and never-reviewed cards. An unchanged item-type schema may
 reuse an exact local match; changing the schema creates a distinct type.
 Re-importing creates duplicate content.
+
+Authored format version 3 requires the root to declare its ordered
+`itemTypes`, supports inherited descendant policies and optional
+`defaultType`, and keeps every declared type included with the imported root.
+Version-1 and version-2 bundles remain compatible and import their types as
+normal Item Types without contextual policy metadata.
 
 Paths must remain inside the bundle. Remote URLs, absolute paths, `..`,
 symlinks, executable includes, HTML/SVG, and embedded base64 media are not

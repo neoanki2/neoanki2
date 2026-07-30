@@ -12,6 +12,9 @@ struct TemplatesView: View {
     @State private var showDeleteItemTypeConfirm = false
     @State private var canDeleteSelectedItemType = false
     @State private var definitionToRepair: QuarantinedItemTypeDefinition?
+    @State private var isIncludedWithDecksExpanded = false
+    @State private var showDuplicatePrompt = false
+    @State private var duplicateName = ""
 
     var body: some View {
         HSplitView {
@@ -78,13 +81,30 @@ struct TemplatesView: View {
         } message: {
             Text("NeoAnki2 will preserve the unreadable definition, then create a minimal editable replacement. Existing items are not deleted.")
         }
+        .alert("Duplicate as Item Type", isPresented: $showDuplicatePrompt) {
+            TextField("Name", text: $duplicateName)
+                .accessibilityLabel("New Item Type Name")
+                .accessibilityIdentifier("duplicateItemTypeName")
+            Button("Cancel", role: .cancel) {}
+            Button("Duplicate") {
+                Task {
+                    if await model.duplicateSelectedItemType(name: duplicateName) {
+                        await onTemplatesChanged()
+                    }
+                }
+            }
+            .disabled(duplicateName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .accessibilityIdentifier("confirmDuplicateItemType")
+        } message: {
+            Text("The copy will be an independent, editable Item Type.")
+        }
     }
 
     @ViewBuilder
     private var itemTypesSidebar: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Types")
+                Text("Item Types")
                     .font(DesignSystem.Typography.uiSection)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("templatesItemTypesHeader")
@@ -121,7 +141,7 @@ struct TemplatesView: View {
                 if model.isLoading {
                     ProgressView("Loading item types…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if model.itemTypes.isEmpty {
+                } else if model.itemTypes.isEmpty && model.includedItemTypeGroups.isEmpty {
                     SidebarEmptyState(
                         title: "No Item Types",
                         message: "Create an item type to define fields and templates.",
@@ -131,20 +151,34 @@ struct TemplatesView: View {
                         actionIdentifier: "addItemTypeEmptyState"
                     )
                 } else {
-                    List(model.itemTypes, selection: $model.selectedItemTypeID) { itemType in
-                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                            Text(itemType.name)
-                                .font(DesignSystem.Typography.uiTitle)
-                            Text("\(itemType.templates.count) templates · \(itemType.fields.count) fields")
-                                .font(DesignSystem.Typography.uiCaption)
-                                .foregroundStyle(.tertiary)
+                    List(selection: $model.selectedItemTypeID) {
+                        ForEach(model.itemTypes) { itemType in
+                            itemTypeRow(itemType, readOnly: false)
+                                .tag(itemType.id)
                         }
-                        .padding(.vertical, 2)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(
-                            "\(itemType.name), \(itemType.templates.count) templates, \(itemType.fields.count) fields"
-                        )
-                        .accessibilityIdentifier("itemTypeRow-\(itemType.name)")
+
+                        if !model.includedItemTypeGroups.isEmpty {
+                            DisclosureGroup(
+                                isExpanded: $isIncludedWithDecksExpanded
+                            ) {
+                                ForEach(model.includedItemTypeGroups) { group in
+                                    Section(group.deckPath) {
+                                        ForEach(group.itemTypes) { itemType in
+                                            itemTypeRow(itemType, readOnly: true)
+                                                .tag(itemType.id)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("Included with Decks", systemImage: "shippingbox")
+                                    .font(DesignSystem.Typography.uiTitle)
+                                    .accessibilityLabel("Included with Decks")
+                                    .accessibilityHint(
+                                        "Shows read-only item types provided by imported decks."
+                                    )
+                                    .accessibilityIdentifier("includedWithDecksDisclosure")
+                            }
+                        }
                     }
                     .listStyle(.plain)
                 }
@@ -152,6 +186,25 @@ struct TemplatesView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(DesignSystem.sidebarBackground)
+    }
+
+    private func itemTypeRow(_ itemType: ItemType, readOnly: Bool) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+            Text(itemType.name)
+                .font(DesignSystem.Typography.uiTitle)
+            Text("\(itemType.templates.count) templates · \(itemType.fields.count) fields")
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(itemType.name), \(itemType.templates.count) templates, \(itemType.fields.count) fields"
+        )
+        .accessibilityValue(readOnly ? "Read-only" : "Editable")
+        .accessibilityIdentifier(
+            readOnly ? "includedItemTypeRow-\(itemType.name)" : "itemTypeRow-\(itemType.name)"
+        )
     }
 
     @ViewBuilder
@@ -215,19 +268,36 @@ struct TemplatesView: View {
     private func itemTypeDetailContent(for itemType: ItemType) -> some View {
         VStack(spacing: 0) {
             HStack {
-                Text(itemType.name)
-                    .font(DesignSystem.Typography.uiSection)
-                    .accessibilityIdentifier("templatesDetailTitle-\(itemType.name)")
-                Spacer()
-                Button("Edit", systemImage: "pencil") {
-                    editingItemType = itemType
-                }
-                .accessibilityIdentifier("editItemType")
-                if canDeleteSelectedItemType {
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        showDeleteItemTypeConfirm = true
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                    Text(itemType.name)
+                        .font(DesignSystem.Typography.uiSection)
+                        .accessibilityIdentifier("templatesDetailTitle-\(itemType.name)")
+                    if let group = model.selectedIncludedGroup {
+                        Text("Included with \(group.deckPath) · Read-only")
+                            .font(DesignSystem.Typography.uiCaption)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("includedItemTypeOwner")
                     }
-                    .accessibilityIdentifier("deleteItemType")
+                }
+                Spacer()
+                if model.isSelectedItemTypeReadOnly {
+                    Button("Duplicate as Item Type…", systemImage: "plus.square.on.square") {
+                        duplicateName = "\(itemType.name) Copy"
+                        showDuplicatePrompt = true
+                    }
+                    .accessibilityLabel("Duplicate \(itemType.name) as Item Type")
+                    .accessibilityIdentifier("duplicateIncludedItemType")
+                } else {
+                    Button("Edit", systemImage: "pencil") {
+                        editingItemType = itemType
+                    }
+                    .accessibilityIdentifier("editItemType")
+                    if canDeleteSelectedItemType {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            showDeleteItemTypeConfirm = true
+                        }
+                        .accessibilityIdentifier("deleteItemType")
+                    }
                 }
             }
             .padding(.horizontal, DesignSystem.Spacing.md)
@@ -238,7 +308,10 @@ struct TemplatesView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
                     fieldsSection(for: itemType)
-                    templatesSection(for: itemType)
+                    templatesSection(
+                        for: itemType,
+                        readOnly: model.isSelectedItemTypeReadOnly
+                    )
                 }
                 .padding(DesignSystem.Spacing.md)
                 .frame(maxWidth: 520, alignment: .leading)
@@ -286,36 +359,42 @@ struct TemplatesView: View {
     }
 
     @ViewBuilder
-    private func templatesSection(for itemType: ItemType) -> some View {
+    private func templatesSection(for itemType: ItemType, readOnly: Bool) -> some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             HStack {
                 Text("Templates")
                     .font(DesignSystem.Typography.uiTitle)
                 Spacer()
-                Button("Add Template", systemImage: "plus") {
-                    isAddingTemplate = true
+                if !readOnly {
+                    Button("Add Template", systemImage: "plus") {
+                        isAddingTemplate = true
+                    }
+                    .accessibilityIdentifier("addTemplateToolbar")
                 }
-                .accessibilityIdentifier("addTemplateToolbar")
             }
 
             if itemType.templates.isEmpty {
                 ContentUnavailableView {
                     Label("No Templates", systemImage: "doc.plaintext")
                 } description: {
-                    Text("Add a template to generate study cards from items.")
+                    Text(
+                        readOnly
+                            ? "This included definition has no templates."
+                            : "Add a template to generate study cards from items."
+                    )
                 } actions: {
-                    Button("Add Template") { isAddingTemplate = true }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("addTemplateEmptyState")
+                    if !readOnly {
+                        Button("Add Template") { isAddingTemplate = true }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("addTemplateEmptyState")
+                    }
                 }
                 .frame(maxWidth: .infinity)
             } else {
                 VStack(spacing: 0) {
                     ForEach(itemType.templates) { template in
                         HStack {
-                            Button {
-                                editingTemplate = template
-                            } label: {
+                            if readOnly {
                                 HStack {
                                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
                                         Text(template.name)
@@ -328,26 +407,50 @@ struct TemplatesView: View {
                                             .foregroundStyle(.tertiary)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(DesignSystem.Typography.uiCaption)
-                                        .foregroundStyle(.tertiary)
                                 }
                                 .padding(.vertical, DesignSystem.Spacing.sm)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel(
-                                "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction))"
-                            )
-                            .accessibilityIdentifier("templateRow-\(template.name)")
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel(
+                                    "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction)), read-only"
+                                )
+                                .accessibilityIdentifier("includedTemplateRow-\(template.name)")
+                            } else {
+                                Button {
+                                    editingTemplate = template
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                                            Text(template.name)
+                                                .font(DesignSystem.Typography.uiBody.weight(.medium))
+                                                .foregroundStyle(.primary)
+                                            Text(model.templateSummary(template, in: itemType))
+                                                .foregroundStyle(.secondary)
+                                            Text(interactionLabel(template.interaction))
+                                                .font(DesignSystem.Typography.uiCaption)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(DesignSystem.Typography.uiCaption)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.vertical, DesignSystem.Spacing.sm)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel(
+                                    "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction))"
+                                )
+                                .accessibilityIdentifier("templateRow-\(template.name)")
 
-                            Button("Edit", systemImage: "pencil") {
-                                editingTemplate = template
+                                Button("Edit", systemImage: "pencil") {
+                                    editingTemplate = template
+                                }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Edit \(template.name)")
+                                .accessibilityIdentifier("editTemplate-\(template.name)")
                             }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Edit \(template.name)")
-                            .accessibilityIdentifier("editTemplate-\(template.name)")
                         }
 
                         if template.id != itemType.templates.last?.id {

@@ -116,6 +116,14 @@ A `Side` is an ordered list of `Slot`s; each `Slot` pairs a `SlotSource`
 (`.field(UUID)` or `.literal(String)`) with a `Presentation` (`RevealMode` +
 `MediaBehavior`).
 
+Item-type visibility is separate from schema identity. `library_item_types`
+marks ordinary reusable Item Types. `deck_included_item_types` associates
+imported definitions with an imported root, while ordered
+`deck_item_type_policy_entries` select the types offered when authoring in a
+deck. Policy lookup walks to the nearest ancestor with entries. Thus digest
+deduplication can reuse one schema without accidentally changing whether it is
+an ordinary type, an included type, or both.
+
 ### Layer 3 — Memory / Scheduling
 
 ```swift

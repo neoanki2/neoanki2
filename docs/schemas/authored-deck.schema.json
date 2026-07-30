@@ -1,15 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://neoanki.app/schemas/authored-deck-v1.json",
+  "$id": "https://neoanki.app/schemas/authored-deck-v3.json",
   "title": "NeoAnki authored deck record",
   "type": "object",
   "additionalProperties": false,
   "required": ["kind", "id", "name"],
+  "dependentRequired": {
+    "defaultType": ["itemTypes"]
+  },
   "properties": {
     "kind": {"const": "deck"},
     "id": {"$ref": "#/$defs/id"},
     "name": {"type": "string", "minLength": 1},
-    "parent": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+    "parent": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+    "itemTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "defaultType": {"$ref": "#/$defs/id"}
   },
   "$defs": {
     "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"}

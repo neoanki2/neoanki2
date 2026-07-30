@@ -114,3 +114,76 @@ extension FastFunctionalJourneyTests {
         closeTemplates(in: app)
     }
 }
+
+final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
+    func testSpecializedDeckRecommendsItsTypeAndKeepsBasicReachable() throws {
+        let app = launchApp(scenario: "deck-included-item-types")
+        showSidebar(in: app)
+        let deck = app.descendants(matching: .any).identified("deckRow-Poetry Lab")
+        XCTAssertTrue(deck.waitUntilExists(timeout: 5))
+        deck.click()
+        openAddItem(in: app, waitForDefaultField: false)
+
+        XCTAssertTrue(field(named: "Previous Lines", in: app).waitUntilExists(timeout: 5))
+        XCTAssertTrue(field(named: "Next Line", in: app).exists)
+        let picker = app.popUpButtons.identified("addItemTypePicker")
+        XCTAssertTrue(picker.exists)
+        XCTAssertTrue((picker.value as? String)?.contains("Poem Line") == true)
+
+        picker.click()
+        XCTAssertTrue(app.menuItems["Basic"].waitUntilExists(timeout: 3))
+        XCTAssertFalse(app.menuItems["Translation Entry"].exists)
+        app.menuItems["Basic"].click()
+        XCTAssertTrue(field(named: "Front", in: app).waitUntilExists(timeout: 3))
+    }
+
+    func testManualTypeChangeConfirmsBeforeClearingContent() throws {
+        let app = launchApp(scenario: "deck-included-item-types")
+        showSidebar(in: app)
+        app.descendants(matching: .any).identified("deckRow-Poetry Lab").click()
+        openAddItem(in: app, waitForDefaultField: false)
+        enterText(
+            "An entered line",
+            into: field(named: "Previous Lines", in: app),
+            app: app
+        )
+
+        let picker = app.popUpButtons.identified("addItemTypePicker")
+        picker.click()
+        app.menuItems["Basic"].click()
+
+        XCTAssertTrue(app.buttons.identified("confirmChangeItemType").waitUntilExists(timeout: 3))
+        app.buttons.identified("cancelChangeItemType").click()
+        XCTAssertTrue(field(named: "Previous Lines", in: app).exists)
+    }
+
+    func testIncludedDefinitionsAreGroupedReadOnlyAndDuplicateAsNormal() throws {
+        let app = launchApp(scenario: "deck-included-item-types")
+        openTemplates(in: app)
+        let disclosure = app.descendants(matching: .any)
+            .identified("includedWithDecksDisclosure")
+        XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
+        let disclosureTriangle = app.disclosureTriangles.firstMatch
+        XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
+        disclosureTriangle.click()
+
+        let included = app.descendants(matching: .any)
+            .identified("includedItemTypeRow-Poem Line")
+        XCTAssertTrue(included.waitUntilExists(timeout: 5))
+        included.click()
+        XCTAssertTrue(app.descendants(matching: .any).identified("includedItemTypeOwner").exists)
+        XCTAssertFalse(app.buttons.identified("editItemType").exists)
+        XCTAssertFalse(app.buttons.identified("deleteItemType").exists)
+        XCTAssertFalse(app.buttons.identified("addTemplateToolbar").exists)
+
+        app.buttons.identified("duplicateIncludedItemType").click()
+        XCTAssertTrue(app.buttons.identified("confirmDuplicateItemType").waitUntilExists(timeout: 3))
+        app.buttons.identified("confirmDuplicateItemType").click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .identified("itemTypeRow-Poem Line Copy")
+                .waitUntilExists(timeout: 5)
+        )
+        XCTAssertTrue(app.buttons.identified("editItemType").exists)
+    }
+}

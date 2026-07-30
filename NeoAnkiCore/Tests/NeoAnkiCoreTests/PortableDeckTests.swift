@@ -72,6 +72,53 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     #expect(items[0].title == "hola")
     #expect(items[0].cardCount == 1)
     #expect(try await destination.dueCount() == 1)
+    let importedRootID = try #require(result.deckIDs.first)
+    let policy = try #require(try await destination.effectiveItemTypePolicy(for: importedRootID))
+    #expect(policy.itemTypes.count == 1)
+    #expect(policy.automaticItemTypeID == policy.itemTypes.first?.id)
+    // Digest reuse must never remove the destination's existing normal status.
+    let catalog = try await destination.loadItemTypeCatalog()
+    #expect(catalog.itemTypes.contains { $0.id == policy.itemTypes[0].id })
+    #expect(catalog.includedWithDecks.isEmpty)
+}
+
+@Test func portableDeckV3WritesExactOrderedPolicyTable() async throws {
+    let directory = try portableTestDirectory()
+    let source = try await portableStore(in: directory, name: "source")
+    let deck = try await source.createDeck(Deck(name: "Deck"))
+    let type = try await source.defaultItemType()
+    _ = try await source.createItem(Item(
+        itemTypeID: type.id,
+        fields: [
+            FieldValue(fieldID: type.fields[0].id, value: .text("Question")),
+            FieldValue(fieldID: type.fields[1].id, value: .text("Answer")),
+        ],
+        deckID: deck.id
+    ))
+    let packageURL = directory.appendingPathComponent("policy.neodeck")
+
+    try await PortableDeck.export(deckID: deck.id, from: source, to: packageURL)
+
+    var handle: OpaquePointer?
+    #expect(sqlite3_open_v2(packageURL.path, &handle, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+    defer { sqlite3_close(handle) }
+    var statement: OpaquePointer?
+    #expect(sqlite3_prepare_v2(
+        handle,
+        """
+        SELECT manifest.format_version, deck_item_types.ordinal, deck_item_types.is_default
+        FROM manifest CROSS JOIN deck_item_types;
+        """,
+        -1,
+        &statement,
+        nil
+    ) == SQLITE_OK)
+    defer { sqlite3_finalize(statement) }
+    #expect(sqlite3_step(statement) == SQLITE_ROW)
+    #expect(sqlite3_column_int(statement, 0) == 3)
+    #expect(sqlite3_column_int(statement, 1) == 0)
+    #expect(sqlite3_column_int(statement, 2) == 1)
+    #expect(sqlite3_step(statement) == SQLITE_DONE)
 }
 
 @Test func portableDeckRejectsWrongApplicationIdentifier() async throws {

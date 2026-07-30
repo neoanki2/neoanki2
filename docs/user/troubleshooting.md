@@ -134,6 +134,14 @@ and retry once.
 - **Unsupported portable version / invalid package:** obtain a valid file from
   a compatible NeoAnki2 build. Renaming another file to `.neodeck` does not
   convert it.
+- **Add Item asks me to choose a type:** the deck offers several included
+  types and its author did not declare a default. Choose the matching type
+  under **For This Deck**; Basic and other reusable types remain under
+  **Item Types**.
+- **An imported type is missing from the main list:** expand **Included with
+  Decks** in Item Types. Included-only schemas are intentionally read-only and
+  grouped by their owning deck. Use **Duplicate as Item Type…** for an editable
+  independent copy.
 - **Disk is full / could not export:** free space and choose a writable
   destination. Failed portable transfers are atomic and should not leave
   imported partial content.

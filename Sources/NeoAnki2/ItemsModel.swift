@@ -13,6 +13,8 @@ final class ItemsModel {
         didSet { refreshVisibleItems() }
     }
     private(set) var itemTypes: [ItemType] = []
+    private(set) var normalItemTypes: [ItemType] = []
+    private(set) var effectiveItemTypePolicy: DeckItemTypePolicy?
     /// The one scheduling snapshot for the selected scope. Everything the app
     /// says about what is due comes from here, so no two surfaces can disagree.
     private(set) var scopeSummary: ScopeSummary = .empty
@@ -64,8 +66,24 @@ final class ItemsModel {
     }
 
     var itemType: ItemType? {
-        guard let addItemTypeID else { return itemTypes.first }
-        return itemTypes.first { $0.id == addItemTypeID } ?? itemTypes.first
+        guard let addItemTypeID else { return nil }
+        return itemTypes.first { $0.id == addItemTypeID }
+    }
+
+    var policyItemTypes: [ItemType] {
+        effectiveItemTypePolicy?.itemTypes ?? []
+    }
+
+    var retainedItemType: ItemType? {
+        guard let itemType,
+              !policyItemTypes.contains(where: { $0.id == itemType.id }),
+              !normalItemTypes.contains(where: { $0.id == itemType.id })
+        else { return nil }
+        return itemType
+    }
+
+    func isRecommendedItemType(_ itemTypeID: UUID) -> Bool {
+        effectiveItemTypePolicy?.defaultItemTypeID == itemTypeID
     }
 
     /// `asOf` is passed in so the sidebar and the detail pane read the same
@@ -80,6 +98,7 @@ final class ItemsModel {
             if !itemTypesLoaded {
                 let loadedItemTypes = try await store.loadItemTypes()
                 itemTypes = loadedItemTypes.itemTypes
+                normalItemTypes = loadedItemTypes.itemTypes
                 if addItemTypeID == nil {
                     addItemTypeID = itemTypes.first?.id
                 } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
@@ -108,6 +127,7 @@ final class ItemsModel {
     func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot, scope: StudyScope) {
         cachedScope = scope
         itemTypes = snapshot.itemTypes.itemTypes
+        normalItemTypes = snapshot.itemTypes.itemTypes
         if addItemTypeID == nil
             || !itemTypes.contains(where: { $0.id == addItemTypeID }) {
             addItemTypeID = itemTypes.first?.id
@@ -132,6 +152,30 @@ final class ItemsModel {
 
     func invalidateItemTypes() {
         itemTypesLoaded = false
+    }
+
+    /// Resolves authoring choices only after the destination deck is known.
+    /// An ambiguous imported policy intentionally leaves the selection empty.
+    func configureAddItem(for deckID: UUID?, resolveSelection: Bool = true) async {
+        errorMessage = nil
+        do {
+            let catalog = try await store.loadItemTypeCatalog()
+            itemTypes = catalog.allItemTypes
+            normalItemTypes = catalog.itemTypes
+            effectiveItemTypePolicy = if let deckID {
+                try await store.effectiveItemTypePolicy(for: deckID)
+            } else {
+                nil
+            }
+            guard resolveSelection else { return }
+            if let policy = effectiveItemTypePolicy {
+                addItemTypeID = policy.automaticItemTypeID
+            } else {
+                addItemTypeID = normalItemTypes.first?.id
+            }
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+        }
     }
 
     func addItem(
