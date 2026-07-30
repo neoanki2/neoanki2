@@ -32,6 +32,30 @@ public struct ColdLibrarySnapshot: Sendable, Equatable {
     public let selectedScopeSummary: ScopeSummary
 }
 
+/// The data needed to render the library home without materializing browse
+/// rows. Browse content is intentionally a separate, on-demand load.
+public struct ColdLibraryHomeSnapshot: Sendable, Equatable {
+    public let itemTypes: ItemTypeLoadResult
+    public let deckSummaries: [DeckSummary]
+    public let allDecksSummary: ScopeSummary
+    public let unassignedSummary: ScopeSummary
+    public let selectedScopeSummary: ScopeSummary
+
+    public init(
+        itemTypes: ItemTypeLoadResult,
+        deckSummaries: [DeckSummary],
+        allDecksSummary: ScopeSummary,
+        unassignedSummary: ScopeSummary,
+        selectedScopeSummary: ScopeSummary
+    ) {
+        self.itemTypes = itemTypes
+        self.deckSummaries = deckSummaries
+        self.allDecksSummary = allDecksSummary
+        self.unassignedSummary = unassignedSummary
+        self.selectedScopeSummary = selectedScopeSummary
+    }
+}
+
 /// An item loaded from persistence with summary fields for list display.
 public struct SavedItemSummary: Sendable, Identifiable, Equatable {
     public let id: UUID
@@ -630,6 +654,35 @@ public actor ItemStore {
         )
     }
 
+    /// Loads only the data visible on the initial home surface. Keeping this
+    /// distinct from `coldLibrarySnapshot` preserves that API's full browse
+    /// semantics for existing callers.
+    public func coldLibraryHomeSnapshot(
+        scope: DeckScope = .allDecks,
+        asOf now: Date = .now
+    ) async throws -> ColdLibraryHomeSnapshot {
+        let itemTypes = try await loadItemTypes()
+        let decks = try await deckSummaries(asOf: now)
+        let allDecks = try await scopeSummary(scope: .allDecks, asOf: now)
+        let unassigned = try await scopeSummary(scope: .unassigned, asOf: now)
+        let selected: ScopeSummary
+        switch scope {
+        case .allDecks:
+            selected = allDecks
+        case .unassigned:
+            selected = unassigned
+        case .deck:
+            selected = try await scopeSummary(scope: scope, asOf: now)
+        }
+        return ColdLibraryHomeSnapshot(
+            itemTypes: itemTypes,
+            deckSummaries: decks,
+            allDecksSummary: allDecks,
+            unassignedSummary: unassigned,
+            selectedScopeSummary: selected
+        )
+    }
+
     /// Returns cards due for review at `now`, hydrated with item and template data.
     public func fetchDueCards(
         scope: DeckScope = .allDecks,
@@ -1140,6 +1193,24 @@ public actor ItemStore {
         context: ImportContext = ImportContext(),
         now: Date = .now
     ) async throws -> Int {
+        try await importItemSummaries(
+            from: data,
+            adapter: adapter,
+            itemTypeID: itemTypeID,
+            context: context,
+            now: now
+        ).count
+    }
+
+    /// Imports rows and returns the exact browse summaries committed by this
+    /// batch, allowing clients to update an existing library view incrementally.
+    public func importItemSummaries(
+        from data: Data,
+        adapter: some ImportAdapter,
+        itemTypeID: UUID? = nil,
+        context: ImportContext = ImportContext(),
+        now: Date = .now
+    ) async throws -> [SavedItemSummary] {
         try ImportLimits.validatePayloadSize(data)
         let payload = try adapter.parse(data)
         try ImportLimits.validateDecodedPayload(payload)
@@ -1183,7 +1254,41 @@ public actor ItemStore {
             // best-effort so callers never receive a failure for an import
             // that is present in the library.
             try? await mediaStore?.releaseReservations(scopeID: importScope)
-            return entries.count
+            // SQLite stores dates as REAL values. Canonicalize the returned
+            // summaries through the same Double representation so an
+            // incremental row is identical to a later database reload.
+            let persistedCreatedAt = Date(timeIntervalSince1970: now.timeIntervalSince1970)
+            return entries.map { entry in
+                let activeCards = entry.cards.filter { !$0.isSuspended }
+                let next = activeCards.min {
+                    if $0.memory.due != $1.memory.due {
+                        return $0.memory.due < $1.memory.due
+                    }
+                    return $0.id.uuidString < $1.id.uuidString
+                }
+                return SavedItemSummary(
+                    id: entry.item.id,
+                    itemTypeID: resolvedType.id,
+                    itemTypeName: resolvedType.name,
+                    title: ItemDisplay.title(for: entry.item, in: resolvedType),
+                    subtitle: ItemDisplay.subtitle(for: entry.item, in: resolvedType),
+                    cardCount: entry.cards.count,
+                    deckID: entry.item.deckID,
+                    createdAt: persistedCreatedAt,
+                    schedule: ItemScheduleSummary(
+                        dueAt: next.map {
+                            Date(timeIntervalSince1970: $0.memory.due.timeIntervalSince1970)
+                        },
+                        phase: next?.memory.phase,
+                        lapses: activeCards.map(\.memory.lapses).max() ?? 0
+                    )
+                )
+            }.sorted {
+                if $0.createdAt != $1.createdAt {
+                    return $0.createdAt < $1.createdAt
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
         } catch {
             try? await mediaStore?.rollbackReservations(scopeID: importScope)
             throw error
@@ -1427,29 +1532,49 @@ public actor ItemStore {
     }
 
     private func hydrateDueCards(_ cards: [Card]) async throws -> [DueCard] {
+        guard !cards.isEmpty else { return [] }
+
+        let loadedItemTypes = try await database.fetchItemTypesWithCorruption()
+        let itemTypesByID = Dictionary(
+            uniqueKeysWithValues: loadedItemTypes.itemTypes.map { ($0.id, $0) }
+        )
         var dueCards: [DueCard] = []
         dueCards.reserveCapacity(cards.count)
 
-        for card in cards {
-            guard let persisted = try await database.fetchItem(id: card.itemID) else {
-                continue
-            }
-            // The linked card remains persisted and becomes available again
-            // after repairItemTypeDefinition archives and repairs its type.
-            guard let itemType = try await database.fetchValidatedItemType(
-                      id: persisted.item.itemTypeID
-                  ),
-                  let template = itemType.templates.first(where: { $0.id == card.templateID })
-            else { continue }
-
-            dueCards.append(
-                DueCard(
-                    card: card,
-                    item: persisted.item,
-                    itemType: itemType,
-                    template: template
-                )
+        // Keep hydration's transient item map bounded as the result grows.
+        // Iterating card slices in order preserves the scheduler's exact queue.
+        let chunkSize = 500
+        var start = 0
+        while start < cards.count {
+            let end = min(start + chunkSize, cards.count)
+            let cardChunk = cards[start..<end]
+            start = end
+            let persisted = try await database.fetchItems(
+                ids: Set(cardChunk.map(\.itemID))
             )
+            let itemsByID = Dictionary(
+                uniqueKeysWithValues: persisted.map { ($0.item.id, $0.item) }
+            )
+
+            for card in cardChunk {
+                guard let item = itemsByID[card.itemID] else { continue }
+                // The linked card remains persisted and becomes available again
+                // after repairItemTypeDefinition archives and repairs its type.
+                guard let itemType = itemTypesByID[item.itemTypeID],
+                      let template = itemType.templates.first(where: {
+                          $0.id == card.templateID
+                      })
+                else { continue }
+
+                dueCards.append(
+                    DueCard(
+                        card: card,
+                        item: item,
+                        itemType: itemType,
+                        template: template
+                    )
+                )
+            }
         }
 
         return dueCards

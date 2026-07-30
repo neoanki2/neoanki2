@@ -26,7 +26,13 @@ final class ItemsModel {
 
     private var hasLoaded = false
     private var itemTypesLoaded = false
+    private var itemTypeWarning: String?
+    private var loadedItemsScope: DeckScope?
+    private var browseDataInvalidated = true
     var needsInitialLoad: Bool { !hasLoaded }
+    var needsBrowseLoad: Bool {
+        browseDataInvalidated || loadedItemsScope != cachedScope.filter
+    }
 
     var addItemTypeID: ItemType.ID?
     var addItemDeckID: UUID?
@@ -42,7 +48,7 @@ final class ItemsModel {
     }
 
     var searchText = "" {
-        didSet { refreshVisibleItems() }
+        didSet { scheduleVisibleItemsRefresh() }
     }
 
     var dueCount: Int { scopeSummary.dueNow }
@@ -52,9 +58,55 @@ final class ItemsModel {
     /// than computed: a table reads it several times per render pass, and each
     /// read would otherwise rescan every item.
     private(set) var visibleItems: [SavedItemSummary] = []
+    private var searchTask: Task<Void, Never>?
+    private var searchGeneration = 0
 
     private func refreshVisibleItems() {
-        visibleItems = ItemBrowsing.filter(items, search: searchText)
+        scheduleVisibleItemsRefresh()
+    }
+
+    /// Search input is published immediately by `searchText`; only the linear
+    /// scan leaves the main actor. Generation checks make rapid typing
+    /// deterministic even when an older scan finishes after a newer one.
+    private func scheduleVisibleItemsRefresh() {
+        searchTask?.cancel()
+        searchGeneration &+= 1
+        let generation = searchGeneration
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !query.isEmpty else {
+            visibleItems = items
+            searchTask = nil
+            return
+        }
+
+        let snapshot = items
+        searchTask = Task.detached(priority: .userInitiated) { [weak self] in
+            var filtered: [SavedItemSummary] = []
+            filtered.reserveCapacity(min(snapshot.count, 256))
+            for (offset, item) in snapshot.enumerated() {
+                if offset.isMultiple(of: 256), Task.isCancelled {
+                    return
+                }
+                if ItemBrowsing.matches(item, query: query) {
+                    filtered.append(item)
+                }
+            }
+            guard !Task.isCancelled else { return }
+            await self?.publishVisibleItems(filtered, generation: generation)
+        }
+    }
+
+    private func publishVisibleItems(_ filtered: [SavedItemSummary], generation: Int) {
+        guard generation == searchGeneration else { return }
+        visibleItems = filtered
+        searchTask = nil
+    }
+
+    /// Lets tests and performance probes include asynchronous filtering without
+    /// introducing a user-visible loading state.
+    func waitForPendingSearch() async {
+        await searchTask?.value
     }
 
     let store: ItemStore
@@ -89,28 +141,16 @@ final class ItemsModel {
     /// `asOf` is passed in so the sidebar and the detail pane read the same
     /// instant. Letting each surface call `.now` is what made them disagree.
     func load(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
-        isLoading = !hasLoaded
-        errorMessage = nil
-        cachedScope = scope
+        // `beginBrowseLoad` opts the home→Browse transition into the existing
+        // loading state. Ordinary reloads keep populated rows visible.
+        isLoading = isLoading || !hasLoaded
+        errorMessage = itemTypeWarning
+        updateCachedScope(scope)
         do {
             // Everything is read before anything is published, so a reload never
             // shows this scope's items beside another scope's counts.
             if !itemTypesLoaded {
-                let loadedItemTypes = try await store.loadItemTypes()
-                itemTypes = loadedItemTypes.itemTypes
-                normalItemTypes = loadedItemTypes.itemTypes
-                if addItemTypeID == nil {
-                    addItemTypeID = itemTypes.first?.id
-                } else if !itemTypes.contains(where: { $0.id == addItemTypeID }) {
-                    addItemTypeID = itemTypes.first?.id
-                }
-                if !loadedItemTypes.corruptions.isEmpty {
-                    let count = loadedItemTypes.corruptions.count
-                    errorMessage = count == 1
-                        ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
-                        : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
-                }
-                itemTypesLoaded = true
+                applyItemTypes(try await store.loadItemTypes())
             }
             let loadedItems = try await store.listItems(scope: scope.filter, sort: .createdAscending)
             let summary = try await store.scopeSummary(scope: scope.filter, asOf: now)
@@ -118,40 +158,140 @@ final class ItemsModel {
             items = loadedItems.sorted(using: tableSort)
             scopeSummary = summary
             hasLoaded = true
+            loadedItemsScope = scope.filter
+            browseDataInvalidated = false
         } catch {
             errorMessage = UserFacingError.message(from: error)
         }
         isLoading = false
     }
 
+    /// Loads only the selected scope's home summary. Item types normally arrive
+    /// from the startup snapshot; the fallback keeps direct model callers and
+    /// snapshot failures behaviorally identical.
+    func loadHome(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
+        isLoading = !hasLoaded
+        errorMessage = itemTypeWarning
+        updateCachedScope(scope)
+        do {
+            if !itemTypesLoaded {
+                applyItemTypes(try await store.loadItemTypes())
+            }
+            scopeSummary = try await store.scopeSummary(scope: scope.filter, asOf: now)
+            hasLoaded = true
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+        }
+        isLoading = false
+    }
+
+    func beginBrowseLoad() {
+        if needsBrowseLoad {
+            isLoading = true
+        }
+    }
+
     func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot, scope: StudyScope) {
-        cachedScope = scope
-        itemTypes = snapshot.itemTypes.itemTypes
-        normalItemTypes = snapshot.itemTypes.itemTypes
-        if addItemTypeID == nil
-            || !itemTypes.contains(where: { $0.id == addItemTypeID }) {
-            addItemTypeID = itemTypes.first?.id
-        }
-        if snapshot.itemTypes.corruptions.isEmpty {
-            errorMessage = nil
-        } else {
-            let count = snapshot.itemTypes.corruptions.count
-            errorMessage = count == 1
-                ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
-                : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
-        }
-        itemTypesLoaded = true
+        updateCachedScope(scope)
+        applyItemTypes(snapshot.itemTypes)
         // The snapshot arrives in creation order. Honor the browse comparator
         // for the same reason `load` does: this path also runs when only the
         // sidebar is uninitialized, and a chosen column order has to survive it.
         items = snapshot.items.sorted(using: tableSort)
         scopeSummary = snapshot.selectedScopeSummary
         hasLoaded = true
+        loadedItemsScope = scope.filter
+        browseDataInvalidated = false
         isLoading = false
+    }
+
+    func applyColdHomeSnapshot(
+        _ snapshot: ColdLibraryHomeSnapshot,
+        scope: StudyScope
+    ) {
+        updateCachedScope(scope)
+        applyItemTypes(snapshot.itemTypes)
+        items = []
+        loadedItemsScope = nil
+        browseDataInvalidated = true
+        scopeSummary = snapshot.selectedScopeSummary
+        hasLoaded = true
+        isLoading = false
+    }
+
+    private func applyItemTypes(_ result: ItemTypeLoadResult) {
+        itemTypes = result.itemTypes
+        normalItemTypes = result.itemTypes
+        if addItemTypeID == nil
+            || !itemTypes.contains(where: { $0.id == addItemTypeID }) {
+            addItemTypeID = itemTypes.first?.id
+        }
+        if result.corruptions.isEmpty {
+            itemTypeWarning = nil
+        } else {
+            let count = result.corruptions.count
+            itemTypeWarning = count == 1
+                ? "One damaged item type and its linked items were skipped. Open Item Types to archive the original and repair it."
+                : "\(count) damaged item types and their linked items were skipped. Open Item Types to archive the originals and repair them."
+        }
+        errorMessage = itemTypeWarning
+        itemTypesLoaded = true
     }
 
     func invalidateItemTypes() {
         itemTypesLoaded = false
+    }
+
+    /// Applies a committed native-import batch without re-reading every browse
+    /// row already held by the model. Native imports are unassigned, so deck
+    /// scopes only need their scheduling snapshot refreshed.
+    func applyImportedItems(
+        _ imported: [SavedItemSummary],
+        scope: StudyScope,
+        asOf now: Date = .now
+    ) async {
+        errorMessage = nil
+        cachedScope = scope
+        switch scope.filter {
+        case .allDecks, .unassigned:
+            let sortedImported = imported.sorted(using: tableSort)
+            var updated = items
+            if let last = updated.last,
+               let first = sortedImported.first,
+               compareUsingTableSort(last, first) == .orderedDescending {
+                updated.append(contentsOf: sortedImported)
+                updated.sort(using: tableSort)
+            } else {
+                // Native imports are normally newer than the loaded library,
+                // so created-ascending order can append without sorting every
+                // existing row again.
+                updated.append(contentsOf: sortedImported)
+            }
+            items = updated
+        case .deck:
+            break
+        }
+        do {
+            scopeSummary = try await store.scopeSummary(
+                scope: currentScopeFilter(),
+                asOf: now
+            )
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+        }
+    }
+
+    private func compareUsingTableSort(
+        _ lhs: SavedItemSummary,
+        _ rhs: SavedItemSummary
+    ) -> ComparisonResult {
+        for comparator in tableSort {
+            let result = comparator.compare(lhs, rhs)
+            if result != .orderedSame {
+                return result
+            }
+        }
+        return .orderedSame
     }
 
     /// Resolves authoring choices only after the destination deck is known.
@@ -451,6 +591,13 @@ final class ItemsModel {
     }
 
     func setCachedScope(_ scope: StudyScope) {
+        updateCachedScope(scope)
+    }
+
+    private func updateCachedScope(_ scope: StudyScope) {
+        if cachedScope.filter != scope.filter {
+            browseDataInvalidated = true
+        }
         cachedScope = scope
     }
 

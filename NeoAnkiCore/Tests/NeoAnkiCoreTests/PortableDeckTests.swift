@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiTestSupport
 import SQLite3
 import Testing
 @testable import NeoAnkiCore
@@ -80,6 +81,74 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     let catalog = try await destination.loadItemTypeCatalog()
     #expect(catalog.itemTypes.contains { $0.id == policy.itemTypes[0].id })
     #expect(catalog.includedWithDecks.isEmpty)
+}
+
+@Test func portableDeckExportScopesItemsToSelectedHierarchyInLargeLibrary() async throws {
+    let directory = try portableTestDirectory()
+    let source = try await portableStore(in: directory, name: "source")
+    let selected = try await source.createDeck(Deck(name: "Selected"))
+    let selectedChild = try await source.createDeck(
+        Deck(name: "Selected child", parentID: selected.id)
+    )
+    let unrelated = try await source.createDeck(Deck(name: "Unrelated"))
+    let type = try await source.defaultItemType()
+
+    _ = try await PerformanceFixtures.seedBasicItems(count: 2_000, in: source)
+    let unrelatedItem = try #require((try await source.listItems()).first)
+    _ = try await source.updateItemDeck(itemID: unrelatedItem.id, deckID: unrelated.id)
+    _ = try await source.createItem(Item(
+        itemTypeID: type.id,
+        fields: [
+            FieldValue(fieldID: type.fields[0].id, value: .text("Selected question")),
+            FieldValue(fieldID: type.fields[1].id, value: .text("Selected answer")),
+        ],
+        tags: ["selected"],
+        deckID: selectedChild.id
+    ))
+
+    let packageURL = directory.appendingPathComponent("selected.neodeck")
+    var limits = PortableDeckLimits.default
+    limits.maximumItems = 1
+    try await PortableDeck.export(
+        deckID: selected.id,
+        from: source,
+        to: packageURL,
+        limits: limits
+    )
+
+    var handle: OpaquePointer?
+    #expect(sqlite3_open_v2(packageURL.path, &handle, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+    defer { sqlite3_close(handle) }
+    var statement: OpaquePointer?
+    #expect(sqlite3_prepare_v2(
+        handle,
+        """
+        SELECT
+            (SELECT COUNT(*) FROM decks),
+            (SELECT COUNT(*) FROM items),
+            (SELECT COUNT(*) FROM item_tags),
+            (SELECT COUNT(*) FROM deck_item_types);
+        """,
+        -1,
+        &statement,
+        nil
+    ) == SQLITE_OK)
+    defer { sqlite3_finalize(statement) }
+    #expect(sqlite3_step(statement) == SQLITE_ROW)
+    #expect(sqlite3_column_int(statement, 0) == 2)
+    #expect(sqlite3_column_int(statement, 1) == 1)
+    #expect(sqlite3_column_int(statement, 2) == 1)
+    #expect(sqlite3_column_int(statement, 3) == 1)
+
+    let destination = try await portableStore(in: directory, name: "destination")
+    let result = try await PortableDeck.importDeck(from: packageURL, into: destination)
+    #expect(result.itemCount == 1)
+    #expect(try await destination.listDecks().map(\.name).sorted() == [
+        "Selected",
+        "Selected child",
+    ])
+    let imported = try #require((try await destination.listItems()).first)
+    #expect(imported.title == "Selected question")
 }
 
 @Test func portableDeckV3WritesExactOrderedPolicyTable() async throws {

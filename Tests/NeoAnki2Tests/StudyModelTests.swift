@@ -51,6 +51,64 @@ private func makeInteractionModel(
     return model
 }
 
+private actor StudyQueueLoadGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func open() {
+        isOpen = true
+        let pending = waiters
+        waiters = []
+        for continuation in pending {
+            continuation.resume()
+        }
+    }
+}
+
+private actor StudyQueueGateProbe {
+    private(set) var invocationCount = 0
+
+    func record() {
+        invocationCount += 1
+    }
+}
+
+private actor FirstStudyQueueLoadGate {
+    private var invocationCount = 0
+    private var firstWaiter: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        invocationCount += 1
+        guard invocationCount == 1 else { return }
+        await withCheckedContinuation { continuation in
+            firstWaiter = continuation
+        }
+    }
+
+    func releaseFirst() {
+        firstWaiter?.resume()
+        firstWaiter = nil
+    }
+}
+
+@MainActor
+private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
+    for _ in 0..<10_000 {
+        if model.isPreparingQueue, model.currentCard != nil, !model.isLoading {
+            return
+        }
+        await Task.yield()
+    }
+    throw DatabaseError.queryFailed("Timed out waiting for the progressive study head.")
+}
+
 @Test @MainActor func studyModelStartsScopedSession() async throws {
     let (model, store) = try await makeStudyModel()
     let deck = Deck(name: "Geography")
@@ -80,6 +138,145 @@ private func makeInteractionModel(
 
     #expect(model.queue.count == 1)
     #expect(model.scopeLabel == "Geography")
+}
+
+@Test @MainActor func studyModelPublishesExactHeadBeforeCompletingQueue() async throws {
+    let (_, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    for index in 1...2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Q\(index)")
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("A\(index)")
+                    ),
+                ]
+            )
+        )
+    }
+    let expected = try await store.fetchDueCards()
+    let gate = StudyQueueLoadGate()
+    let model = StudyModel(
+        store: store,
+        remainingQueueLoadGate: { await gate.wait() }
+    )
+
+    let startTask = Task { await model.startSession() }
+    try await waitForProgressiveStudyHead(model)
+
+    #expect(model.queue.map(\.id) == [expected[0].id])
+    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.isFinished == false)
+    model.revealAnswer()
+    #expect(model.isAnswerRevealed)
+
+    await model.grade(.good)
+    model.skipCurrentCard()
+    #expect(model.index == 0)
+    #expect(model.cardsReviewed == 0)
+    #expect(try await store.reviewLogCount(for: expected[0].id) == 0)
+
+    await gate.open()
+    await startTask.value
+
+    #expect(model.isPreparingQueue == false)
+    #expect(model.queue.map(\.id) == expected.map(\.id))
+    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.isAnswerRevealed)
+}
+
+@Test @MainActor func corruptItemTypeUsesAtomicQueueFallback() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki2-study-corrupt-type-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let databaseURL = directory.appendingPathComponent("test.sqlite")
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+            ]
+        )
+    )
+    var handle: OpaquePointer?
+    #expect(sqlite3_open(databaseURL.path(percentEncoded: false), &handle) == SQLITE_OK)
+    let corruptTypeSQL = """
+        UPDATE item_types
+        SET definition = X'7b2262726f6b656e223a747275657d'
+        WHERE id = '\(itemType.id.uuidString)';
+        """
+    #expect(sqlite3_exec(handle, corruptTypeSQL, nil, nil, nil) == SQLITE_OK)
+    sqlite3_close(handle)
+    let probe = StudyQueueGateProbe()
+    let model = StudyModel(
+        store: store,
+        remainingQueueLoadGate: { await probe.record() }
+    )
+
+    await model.startSession()
+
+    #expect(await probe.invocationCount == 0)
+    #expect(model.isPreparingQueue == false)
+    #expect(model.queue.isEmpty)
+    #expect(model.isFinished)
+    #expect(model.didFailToLoad == false)
+}
+
+@Test @MainActor func newerStudyStartSupersedesPendingProgressiveLoad() async throws {
+    let (_, store) = try await makeStudyModel()
+    let firstDeck = Deck(name: "First")
+    let secondDeck = Deck(name: "Second")
+    _ = try await store.createDeck(firstDeck)
+    _ = try await store.createDeck(secondDeck)
+    let itemType = try await store.defaultItemType()
+    for (prompt, deckID) in [("First card", firstDeck.id), ("Second card", secondDeck.id)] {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text(prompt)
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("Answer")
+                    ),
+                ],
+                deckID: deckID
+            )
+        )
+    }
+    let gate = FirstStudyQueueLoadGate()
+    let model = StudyModel(
+        store: store,
+        remainingQueueLoadGate: { await gate.wait() }
+    )
+    let firstStart = Task { await model.startSession() }
+    try await waitForProgressiveStudyHead(model)
+
+    let secondScope = StudyScope.deck(secondDeck.id, name: secondDeck.name)
+    await model.startSession(scope: secondScope)
+    let secondQueue = model.queue
+    await gate.releaseFirst()
+    await firstStart.value
+
+    #expect(model.scopeLabel == secondDeck.name)
+    #expect(model.queue == secondQueue)
+    #expect(model.queue.count == 1)
+    #expect(model.queue.first?.item.deckID == secondDeck.id)
+    #expect(model.isPreparingQueue == false)
 }
 
 @Test @MainActor func studyModelRespectsDeckDailyNewLimit() async throws {
@@ -418,6 +615,38 @@ private func makeInteractionModel(
     #expect(model.currentCard != nil)
     #expect(model.cardsReviewed == 0)
     #expect(try await store.dueCount() == 1)
+}
+
+@Test @MainActor func undoRepeatedGradeKeepsEarlierReviewedMembership() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+        ]
+    )
+    _ = try await store.createItem(item)
+
+    await model.startSession()
+    let cardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
+    await model.grade(.again)
+    model.revealAnswer()
+    await model.grade(.again)
+
+    #expect(model.cardsReviewed == 2)
+    #expect(model.reviewedCardIDs == [cardID])
+    #expect(model.reviewedItemIDs == [item.id])
+
+    await model.undoLastGrade()
+
+    #expect(model.cardsReviewed == 1)
+    #expect(model.reviewedCardIDs == [cardID])
+    #expect(model.reviewedItemIDs == [item.id])
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.isAnswerRevealed)
 }
 
 @Test @MainActor func failedCardRepeatsAcrossRepairRoundsUntilRemembered() async throws {
@@ -767,4 +996,63 @@ private func makeInteractionModel(
     #expect(model.didFailToLoad)
     #expect(model.errorMessage != nil)
     #expect(model.currentCard == nil)
+}
+
+@Test @MainActor func progressiveRemainderFailureRestoresAtomicFailureScreen() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki2-study-remainder-failure-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let databaseURL = directory.appendingPathComponent("test.sqlite")
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
+    for index in 1...2 {
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.frontFieldID,
+                        value: .text("Q\(index)")
+                    ),
+                    FieldValue(
+                        fieldID: BuiltInItemTypes.backFieldID,
+                        value: .text("A\(index)")
+                    ),
+                ]
+            )
+        )
+    }
+    let ordered = try await store.fetchDueCards()
+    let corruptCardID = try #require(ordered.last?.id)
+    var handle: OpaquePointer?
+    #expect(sqlite3_open(databaseURL.path(percentEncoded: false), &handle) == SQLITE_OK)
+    let corruptCardSQL = """
+        UPDATE cards
+        SET memory = X'6e6f74206a736f6e'
+        WHERE id = '\(corruptCardID.uuidString)';
+        """
+    #expect(sqlite3_exec(handle, corruptCardSQL, nil, nil, nil) == SQLITE_OK)
+    sqlite3_close(handle)
+    let gate = StudyQueueLoadGate()
+    let model = StudyModel(
+        store: store,
+        remainingQueueLoadGate: { await gate.wait() }
+    )
+
+    let startTask = Task { await model.startSession() }
+    try await waitForProgressiveStudyHead(model)
+    #expect(model.currentCard?.id == ordered[0].id)
+    #expect(model.progressLabel == "Card 1 of 2")
+
+    await gate.open()
+    await startTask.value
+
+    #expect(model.didFailToLoad)
+    #expect(model.errorMessage != nil)
+    #expect(model.queue.isEmpty)
+    #expect(model.currentCard == nil)
+    #expect(model.isPreparingQueue == false)
+    #expect(model.isLoading == false)
 }

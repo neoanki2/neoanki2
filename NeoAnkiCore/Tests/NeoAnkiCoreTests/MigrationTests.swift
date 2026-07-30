@@ -18,6 +18,8 @@ import Testing
     #expect(try tableExists("media_reservations", at: url))
     #expect(try tableExists("portable_item_type_mappings", at: url))
     #expect(try tableExists("new_card_introductions", at: url))
+    #expect(try indexExists("idx_new_card_introductions_day_deck_log", at: url))
+    #expect(try indexExists("idx_cards_active_new_due", at: url))
     #expect(try columnExists("new_cards_per_day", in: "decks", at: url))
     #expect(try tableExists("library_item_types", at: url))
     #expect(try tableExists("deck_included_item_types", at: url))
@@ -25,6 +27,124 @@ import Testing
     let firstLibraryID = try await database.getOrCreateLibraryID()
     let secondLibraryID = try await database.getOrCreateLibraryID()
     #expect(firstLibraryID == secondLibraryID)
+}
+
+@Test func versionNineteenMigrationAddsBoundedNewCardIndexWithoutChangingRows() async throws {
+    let url = migrationDatabaseURL()
+    let cardID = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (19);
+        CREATE TABLE app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY NOT NULL,
+            due_at REAL NOT NULL,
+            phase TEXT NOT NULL,
+            is_suspended INTEGER NOT NULL
+        );
+        INSERT INTO cards VALUES ('\(cardID.uuidString)', 100, 'new', 0);
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try indexExists("idx_cards_active_new_due", at: url))
+    #expect(try integer("SELECT COUNT(*) FROM cards;", at: url) == 1)
+}
+
+@Test func versionTwentyMigrationFailureRollsBackVersionAndIndex() async throws {
+    let url = migrationDatabaseURL()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (19);
+        CREATE TABLE app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY NOT NULL,
+            due_at REAL NOT NULL,
+            phase TEXT NOT NULL,
+            is_suspended INTEGER NOT NULL
+        );
+        CREATE TABLE idx_cards_active_new_due (collision INTEGER);
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    await #expect(throws: DatabaseError.self) {
+        try await database.migrate()
+    }
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == 19)
+    #expect(try !indexExists("idx_cards_active_new_due", at: url))
+}
+
+@Test func versionEighteenMigrationAddsStudyDayIntroductionIndexWithoutChangingRows() async throws {
+    let url = migrationDatabaseURL()
+    let reviewLogID = UUID()
+    let deckID = UUID()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (18);
+        CREATE TABLE app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE new_card_introductions (
+            review_log_id TEXT PRIMARY KEY NOT NULL,
+            deck_id TEXT NOT NULL,
+            study_day TEXT NOT NULL
+        );
+        INSERT INTO new_card_introductions
+        VALUES ('\(reviewLogID.uuidString)', '\(deckID.uuidString)', '2027-01-15');
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try indexExists("idx_new_card_introductions_day_deck_log", at: url))
+    #expect(try integer("SELECT COUNT(*) FROM new_card_introductions;", at: url) == 1)
+}
+
+@Test func versionNineteenMigrationFailureRollsBackVersionAndIndex() async throws {
+    let url = migrationDatabaseURL()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (18);
+        CREATE TABLE app_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE new_card_introductions (
+            review_log_id TEXT PRIMARY KEY NOT NULL,
+            deck_id TEXT NOT NULL
+        );
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    await #expect(throws: DatabaseError.self) {
+        try await database.migrate()
+    }
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == 18)
+    #expect(try !indexExists("idx_new_card_introductions_day_deck_log", at: url))
 }
 
 @Test func versionEighteenMigrationKeepsEveryExistingTypeNormal() async throws {
@@ -55,7 +175,7 @@ import Testing
 
     try await database.migrate()
 
-    #expect(try integer("SELECT version FROM schema_version;", at: url) == 18)
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
     #expect(try integer("SELECT COUNT(*) FROM item_types;", at: url) == 2)
     #expect(try integer("SELECT COUNT(*) FROM library_item_types;", at: url) == 2)
     #expect(try integer("SELECT COUNT(*) FROM deck_included_item_types;", at: url) == 0)
@@ -473,6 +593,13 @@ private func executeMigrationSQL(_ sql: String, at url: URL) throws {
 private func tableExists(_ name: String, at url: URL) throws -> Bool {
     try integer(
         "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '\(name)';",
+        at: url
+    ) == 1
+}
+
+private func indexExists(_ name: String, at url: URL) throws -> Bool {
+    try integer(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '\(name)';",
         at: url
     ) == 1
 }

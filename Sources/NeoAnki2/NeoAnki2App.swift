@@ -3,6 +3,12 @@ import NeoAnkiDeckBuilderKit
 import PoemDeckBuilder
 import SwiftUI
 
+private struct InitialLibraryPayload: Sendable {
+    let store: ItemStore
+    let mediaStore: MediaStore?
+    let snapshot: ColdLibraryHomeSnapshot?
+}
+
 @main
 struct NeoAnki2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -18,10 +24,43 @@ struct NeoAnki2App: App {
 #if DEBUG
     @State private var testControlMonitor = UITestControlMonitor()
 #endif
+    private let initialLibraryTask: Task<InitialLibraryPayload, Error>?
 
     init() {
+        AppStartupTrace.mark("app_init")
         if AppDatabase.isTesting {
             AppPreferences.resetForTesting()
+        }
+        let shouldFail = AppDatabase.isTesting
+            && ProcessInfo.processInfo.environment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] == "1"
+            || ProcessInfo.processInfo.arguments.contains("-NeoAnkiBootstrapFailure")
+        if shouldFail {
+            initialLibraryTask = nil
+        } else {
+            let databaseURL = AppDatabase.defaultURL
+            initialLibraryTask = Task.detached(priority: .userInitiated) {
+                AppStartupTrace.mark("bootstrap_begin")
+                try FileManager.default.createDirectory(
+                    at: databaseURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                let store = try ItemStore(databaseURL: databaseURL)
+                AppStartupTrace.mark("store_opened")
+                try await store.bootstrap()
+                AppStartupTrace.mark("store_bootstrapped")
+                try await UITestScenarioSeeder.seedIfRequested(store: store)
+                AppStartupTrace.mark("scenario_ready")
+                let snapshot = try? await store.coldLibraryHomeSnapshot(
+                    scope: .allDecks,
+                    asOf: .now
+                )
+                AppStartupTrace.mark("snapshot_ready")
+                return InitialLibraryPayload(
+                    store: store,
+                    mediaStore: await store.media,
+                    snapshot: snapshot
+                )
+            }
         }
     }
 
@@ -36,7 +75,8 @@ struct NeoAnki2App: App {
                         schedulingModel: schedulingModel,
                         deckBuilderRegistry: .production,
                         testingEnvironment: activeTestingEnvironment,
-                        testingInitialRoute: testConfiguration?.initialRoute ?? .library
+                        testingInitialRoute: testConfiguration?.initialRoute
+                            ?? initialTestingRoute
                     )
                     .id(testGeneration)
 #else
@@ -84,40 +124,86 @@ struct NeoAnki2App: App {
             return
         }
         do {
-#if DEBUG
-            let databaseURL = testConfiguration.map {
-                URL(fileURLWithPath: $0.databaseDirectory, isDirectory: true)
-                    .appendingPathComponent("test.sqlite")
-            } ?? AppDatabase.defaultURL
-#else
-            let databaseURL = AppDatabase.defaultURL
-#endif
-            try FileManager.default.createDirectory(
-                at: databaseURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let store = try ItemStore(databaseURL: databaseURL)
-            try await store.bootstrap()
+            let payload: InitialLibraryPayload
 #if DEBUG
             if let testConfiguration {
-                try await UITestScenarioSeeder.seed(
+                AppStartupTrace.mark("bootstrap_begin")
+                let databaseURL = URL(
+                    fileURLWithPath: testConfiguration.databaseDirectory,
+                    isDirectory: true
+                ).appendingPathComponent("test.sqlite")
+                payload = try await prepareLibrary(
+                    at: databaseURL,
                     scenario: testConfiguration.scenario,
-                    environment: testConfiguration.environment,
-                    store: store
+                    environment: testConfiguration.environment
                 )
+            } else if let initialLibraryTask {
+                payload = try await initialLibraryTask.value
             } else {
-                try await UITestScenarioSeeder.seedIfRequested(store: store)
+                AppStartupTrace.mark("bootstrap_begin")
+                payload = try await prepareLibrary(at: AppDatabase.defaultURL)
             }
 #else
-            try await UITestScenarioSeeder.seedIfRequested(store: store)
+            if let initialLibraryTask {
+                payload = try await initialLibraryTask.value
+            } else {
+                AppStartupTrace.mark("bootstrap_begin")
+                payload = try await prepareLibrary(at: AppDatabase.defaultURL)
+            }
 #endif
-            let mediaStore = await store.media
-            itemsModel = ItemsModel(store: store, mediaStore: mediaStore)
-            decksModel = DecksModel(store: store)
-            schedulingModel = SchedulingModel(store: store)
+            let newItemsModel = ItemsModel(
+                store: payload.store,
+                mediaStore: payload.mediaStore
+            )
+            let newDecksModel = DecksModel(store: payload.store)
+            if let snapshot = payload.snapshot {
+                newDecksModel.applyColdHomeSnapshot(snapshot)
+                newItemsModel.setCachedScope(.allDecks)
+                newItemsModel.addItemDeckID = newDecksModel.defaultDeckIDForNewItem
+                newItemsModel.applyColdHomeSnapshot(snapshot, scope: .allDecks)
+            }
+            itemsModel = newItemsModel
+            decksModel = newDecksModel
+            schedulingModel = SchedulingModel(store: payload.store)
+            AppStartupTrace.mark("models_ready")
         } catch {
             bootstrapError = UserFacingError.message(from: error)
         }
+    }
+
+    private func prepareLibrary(
+        at databaseURL: URL,
+        scenario: String? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) async throws -> InitialLibraryPayload {
+        try FileManager.default.createDirectory(
+            at: databaseURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let store = try ItemStore(databaseURL: databaseURL)
+        AppStartupTrace.mark("store_opened")
+        try await store.bootstrap()
+        AppStartupTrace.mark("store_bootstrapped")
+        if scenario == nil {
+            try await UITestScenarioSeeder.seedIfRequested(store: store)
+        } else {
+            try await UITestScenarioSeeder.seed(
+                scenario: scenario,
+                environment: environment,
+                store: store
+            )
+        }
+        AppStartupTrace.mark("scenario_ready")
+        let snapshot = try? await store.coldLibraryHomeSnapshot(
+            scope: .allDecks,
+            asOf: .now
+        )
+        AppStartupTrace.mark("snapshot_ready")
+        return InitialLibraryPayload(
+            store: store,
+            mediaStore: await store.media,
+            snapshot: snapshot
+        )
     }
 
     private var activeTestingEnvironment: [String: String] {
@@ -127,6 +213,13 @@ struct NeoAnki2App: App {
         ProcessInfo.processInfo.environment
 #endif
     }
+
+#if DEBUG
+    private var initialTestingRoute: UITestRoute {
+        ProcessInfo.processInfo.environment["NEOANKI_TEST_INITIAL_ROUTE"]
+            .flatMap(UITestRoute.init(rawValue:)) ?? .library
+    }
+#endif
 
     @MainActor
     private func installUITestControlIfNeeded() {

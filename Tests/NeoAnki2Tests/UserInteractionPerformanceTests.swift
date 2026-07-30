@@ -145,6 +145,7 @@ private struct InteractionFixture {
         metadata: meta
     ) {
         fixture.itemsModel.searchText = "Question 42"
+        await fixture.itemsModel.waitForPendingSearch()
         _ = fixture.itemsModel.visibleItems
         fixture.itemsModel.searchText = ""
         _ = fixture.itemsModel.visibleItems

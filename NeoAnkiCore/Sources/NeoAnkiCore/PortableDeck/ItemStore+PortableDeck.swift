@@ -6,7 +6,9 @@ extension ItemStore {
         limits: PortableDeckLimits,
         resolver: any PortableDeckTypeResolver
     ) async throws -> PortableDeckPackage {
-        let librarySnapshot = try await database.portableDeckLibrarySnapshot()
+        let librarySnapshot = try await database.portableDeckLibrarySnapshot(
+            rootDeckID: rootDeckID
+        )
         let allDecks = librarySnapshot.decks
         guard allDecks.contains(where: { $0.id == rootDeckID }) else {
             throw DatabaseError.deckNotFound(rootDeckID)
@@ -28,9 +30,7 @@ extension ItemStore {
             .map { deck in
                 Deck(id: deck.id, name: deck.name, parentID: deck.id == rootDeckID ? nil : deck.parentID)
             }
-        let persisted = librarySnapshot.items.filter {
-            $0.item.deckID.map(selectedIDs.contains) == true
-        }
+        let persisted = librarySnapshot.items
         guard persisted.count <= limits.maximumItems else {
             throw PortableDeckError.limitExceeded("Selected hierarchy contains too many items.")
         }
@@ -163,12 +163,13 @@ extension ItemStore {
     }
 
     func importPortableDeck(
-        _ package: PortableDeckPackage,
+        _ incomingPackage: consuming PortableDeckPackage,
         limits: PortableDeckLimits,
         resolver: any PortableDeckTypeResolver,
         conflictResolution: PortableDeckTypeConflictResolution,
         now: Date
     ) async throws -> PortableDeckImportResult {
+        var package = incomingPackage
         let existingTypes = try await database.fetchAllItemTypes()
         let existingDigests = try Dictionary(
             uniqueKeysWithValues: existingTypes.map { ($0.id, try resolver.digest(for: $0)) }
@@ -279,9 +280,8 @@ extension ItemStore {
                 )
             }
         )
-        var importedItems: [PortableDeckPersistedItem] = []
-        importedItems.reserveCapacity(package.items.count)
-        for record in package.items {
+        for index in package.items.indices {
+            let record = package.items[index]
             guard let type = typeMap[record.item.itemTypeID],
                   let oldDeckID = record.item.deckID,
                   let deckID = deckMap[oldDeckID]
@@ -298,7 +298,7 @@ extension ItemStore {
                 return FieldValue(fieldID: type.fields[ordinal].id, value: field.value)
             }
             try validatePortableFields(mappedFields, against: type)
-            importedItems.append(.init(
+            package.items[index] = .init(
                 item: Item(
                     id: UUID(),
                     itemTypeID: type.id,
@@ -308,7 +308,7 @@ extension ItemStore {
                 ),
                 createdAt: record.createdAt,
                 updatedAt: record.updatedAt
-            ))
+            )
         }
 
         let reservationScope = UUID()
@@ -330,8 +330,9 @@ extension ItemStore {
                 }
                 reservationIDs[ref.assetHash] = reservationID
             }
-            importedItems = importedItems.map { record in
-                .init(
+            for index in package.items.indices {
+                let record = package.items[index]
+                package.items[index] = .init(
                     item: itemByApplyingReservations(record.item, reservationIDs: reservationIDs),
                     createdAt: record.createdAt,
                     updatedAt: record.updatedAt
@@ -398,7 +399,7 @@ extension ItemStore {
                     itemTypes: createdTypes,
                     libraryItemTypeIDs: libraryItemTypeIDs,
                     decks: importedDecks,
-                    items: importedItems,
+                    items: package.items,
                     mappings: package.types.compactMap { record in
                         guard let local = typeMap[record.itemType.id] else { return nil }
                         return .init(
@@ -416,7 +417,7 @@ extension ItemStore {
             try await mediaStore?.releaseReservations(scopeID: reservationScope)
             return .init(
                 deckIDs: [importedRootDeckID],
-                itemCount: importedItems.count,
+                itemCount: package.items.count,
                 createdItemTypeCount: createdTypes.count,
                 reusedItemTypeCount: reusedCount
             )

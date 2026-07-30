@@ -166,17 +166,35 @@ private func addItem(
     _ = await addItem(model, front: "Japan", back: "Tokyo")
 
     model.searchText = "fra"
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["France"])
     #expect(model.items.count == 2)
 
     model.searchText = "tokyo"
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["Japan"])
 
     model.searchText = "Ukraine"
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.isEmpty)
 
     model.searchText = ""
     #expect(model.visibleItems.count == 2)
+}
+
+@Test @MainActor func browseSearchPublishesOnlyTheLatestRapidQuery() async throws {
+    let (model, _, _) = try await makeModels()
+    await model.load()
+    _ = await addItem(model, front: "France", back: "Paris")
+    _ = await addItem(model, front: "Japan", back: "Tokyo")
+
+    model.searchText = "france"
+    model.searchText = "tokyo"
+    await model.waitForPendingSearch()
+
+    #expect(model.searchText == "tokyo")
+    #expect(model.visibleItems.map(\.title) == ["Japan"])
+    #expect(model.items.count == 2)
 }
 
 /// `visibleItems` is cached rather than recomputed on read, so anything that
@@ -187,16 +205,20 @@ private func addItem(
     _ = await addItem(model, front: "France", back: "Paris")
     _ = await addItem(model, front: "Francium", back: "Element 87")
     model.searchText = "fran"
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.count == 2)
 
     let doomed = try #require(model.items.first { $0.title == "Francium" }?.id)
     #expect(await model.deleteItem(id: doomed))
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["France"])
 
     _ = await addItem(model, front: "Frankfurt", back: "Germany")
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["France", "Frankfurt"])
 
     model.tableSort = [KeyPathComparator(\.title, order: .reverse)]
+    await model.waitForPendingSearch()
     #expect(model.visibleItems.map(\.title) == ["Frankfurt", "France"])
 }
 
@@ -318,6 +340,85 @@ private func addItem(
     #expect(coldDecks.unassignedItemCount == decksModel.unassignedItemCount)
     #expect(coldItems.errorMessage == nil)
     #expect(coldDecks.errorMessage == nil)
+}
+
+@Test @MainActor func coldHomeSnapshotDefersBrowseRowsWithoutChangingHomeState() async throws {
+    let (model, decksModel, store) = try await makeModels()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    await model.load()
+    #expect(await addItem(model, front: "France", back: "Paris", deckID: deck.id))
+    #expect(await addItem(model, front: "Japan", back: "Tokyo"))
+    await decksModel.load()
+
+    let snapshot = try await store.coldLibraryHomeSnapshot(scope: .allDecks)
+    let coldItems = ItemsModel(store: store, mediaStore: await store.media)
+    let coldDecks = DecksModel(store: store)
+    coldDecks.applyColdHomeSnapshot(snapshot)
+    coldItems.applyColdHomeSnapshot(snapshot, scope: .allDecks)
+
+    #expect(!coldItems.needsInitialLoad)
+    #expect(coldItems.needsBrowseLoad)
+    #expect(coldItems.items.isEmpty)
+    #expect(coldItems.scopeSummary == model.scopeSummary)
+    #expect(coldItems.itemTypes.map(\.id) == model.itemTypes.map(\.id))
+    #expect(coldDecks.summaries == decksModel.summaries)
+    #expect(coldDecks.allDecksDueCount == decksModel.allDecksDueCount)
+    #expect(coldDecks.unassignedDueCount == decksModel.unassignedDueCount)
+    #expect(coldDecks.unassignedItemCount == decksModel.unassignedItemCount)
+
+    coldItems.beginBrowseLoad()
+    #expect(coldItems.isLoading)
+    await coldItems.load(scope: .allDecks)
+    #expect(!coldItems.needsBrowseLoad)
+    #expect(coldItems.items.map(\.title) == model.items.map(\.title))
+    #expect(coldItems.scopeSummary == model.scopeSummary)
+}
+
+@Test @MainActor func coldHomeSnapshotPreservesCorruptItemTypeWarning() async throws {
+    let (model, _, _) = try await makeModels()
+    let snapshot = ColdLibraryHomeSnapshot(
+        itemTypes: ItemTypeLoadResult(
+            itemTypes: BuiltInItemTypes.all,
+            corruptions: [
+                QuarantinedItemTypeDefinition(
+                    persistedID: UUID().uuidString,
+                    name: "Damaged"
+                ),
+            ]
+        ),
+        deckSummaries: [],
+        allDecksSummary: .empty,
+        unassignedSummary: .empty,
+        selectedScopeSummary: .empty
+    )
+
+    model.applyColdHomeSnapshot(snapshot, scope: .allDecks)
+
+    #expect(model.errorMessage?.hasPrefix("One damaged item type") == true)
+    #expect(!model.needsInitialLoad)
+    #expect(model.needsBrowseLoad)
+    await model.load(scope: .allDecks)
+    #expect(model.errorMessage?.hasPrefix("One damaged item type") == true)
+}
+
+@Test @MainActor func populatedBrowseReloadDoesNotReturnToLoadingState() async throws {
+    let (model, _, store) = try await makeModels()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    await model.load()
+    #expect(await addItem(model, front: "France", back: "Paris"))
+    #expect(!model.items.isEmpty)
+    #expect(!model.isLoading)
+
+    let reload = Task { @MainActor in
+        await model.load(scope: .deck(deck.id, name: deck.name))
+    }
+    await Task.yield()
+
+    #expect(!model.isLoading)
+    await reload.value
+    #expect(!model.isLoading)
 }
 
 /// The browse list is projected per item now, so a scoped cold start has to

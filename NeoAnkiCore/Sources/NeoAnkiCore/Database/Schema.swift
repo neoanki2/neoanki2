@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 18
+    static let version = 20
 
     static let createStatements: [String] = [
         """
@@ -124,6 +124,16 @@ enum Schema {
         ON cards(deck_id, due_at, id);
         """,
         """
+        CREATE INDEX IF NOT EXISTS idx_cards_active_new_due
+        ON cards(due_at, id)
+        WHERE is_suspended = 0 AND phase = 'new';
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_decks_with_new_card_limit
+        ON decks(id)
+        WHERE new_cards_per_day IS NOT NULL;
+        """,
+        """
         CREATE INDEX IF NOT EXISTS idx_review_logs_card_id ON review_logs(card_id);
         """,
         """
@@ -132,6 +142,10 @@ enum Schema {
         """
         CREATE INDEX IF NOT EXISTS idx_new_card_introductions_deck_day
         ON new_card_introductions(deck_id, study_day);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_new_card_introductions_day_deck_log
+        ON new_card_introductions(study_day, deck_id, review_log_id);
         """,
         """
         CREATE TABLE IF NOT EXISTS media_assets (
@@ -519,6 +533,30 @@ enum Schema {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_deck_item_type_policy_default
         ON deck_item_type_policy_entries(deck_id)
         WHERE is_default = 1;
+        """,
+    ]
+
+    /// Lets daily-limit reads seek directly to one study day. The existing
+    /// deck-leading index remains useful for deck-specific maintenance.
+    static let migrationV19Statements: [String] = [
+        """
+        CREATE INDEX IF NOT EXISTS idx_new_card_introductions_day_deck_log
+        ON new_card_introductions(study_day, deck_id, review_log_id);
+        """,
+    ]
+
+    /// Supports bounded top-K selection when one daily limiter applies without
+    /// ranking the entire due-new population.
+    static let migrationV20Statements: [String] = [
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_active_new_due
+        ON cards(due_at, id)
+        WHERE is_suspended = 0 AND phase = 'new';
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_decks_with_new_card_limit
+        ON decks(id)
+        WHERE new_cards_per_day IS NOT NULL;
         """,
     ]
 

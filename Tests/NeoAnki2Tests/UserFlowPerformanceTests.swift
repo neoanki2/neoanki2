@@ -59,11 +59,20 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     await model.load()
 
     _ = try await PerformanceHarness.measure(
-        flow: "items-model-search",
+        flow: "items-model-search-dispatch",
         layer: "app",
         metadata: ["item_count": "\(itemCount)"]
     ) {
         model.searchText = "Question 42"
+        return [:]
+    }
+
+    _ = try await PerformanceHarness.measure(
+        flow: "items-model-search-results",
+        layer: "app",
+        metadata: ["item_count": "\(itemCount)"]
+    ) {
+        await model.waitForPendingSearch()
         #expect(!model.visibleItems.isEmpty)
         model.searchText = ""
         #expect(model.visibleItems.count == itemCount)
@@ -238,6 +247,50 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
         }
         #expect(itemsModel.items.count == itemCount)
         return ["loaded_items": "\(itemsModel.items.count)"]
+    }
+}
+
+@Test @MainActor func perfImportModelRepeatedSmallFiles() async throws {
+    guard let scale = requirePerformanceScale() else { return }
+    let itemCount = scale.itemCount
+    let fileCount = 8
+    let rowsPerFile = min(100, max(1, itemCount))
+
+    let (store, directory) = try await makeAppStore(label: "repeated-native-import")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    _ = try await PerformanceFixtures.seedBasicItems(count: itemCount, in: store)
+
+    let itemsModel = ItemsModel(store: store, mediaStore: await store.media)
+    await itemsModel.load()
+    let model = ImportModel(itemsModel: itemsModel)
+    var fileURLs: [URL] = []
+    for index in 0..<fileCount {
+        let url = directory.appendingPathComponent("items-\(index).json")
+        try PerformanceFixtures.makeJSONImportPayload(
+            rowCount: rowsPerFile,
+            startIndex: itemCount + index * rowsPerFile
+        ).write(to: url)
+        fileURLs.append(url)
+    }
+
+    _ = try await PerformanceHarness.measure(
+        flow: "import-model-repeated-small-files",
+        layer: "app",
+        metadata: [
+            "item_count": "\(itemCount)",
+            "file_count": "\(fileCount)",
+            "rows_per_file": "\(rowsPerFile)",
+        ]
+    ) {
+        var imported = 0
+        for url in fileURLs {
+            #expect(await model.selectFile(url))
+            #expect(await model.importSelected(scope: .allDecks))
+            imported += model.importedCount ?? 0
+        }
+        #expect(imported == fileCount * rowsPerFile)
+        #expect(itemsModel.items.count == itemCount + imported)
+        return ["imported_items": "\(imported)"]
     }
 }
 
