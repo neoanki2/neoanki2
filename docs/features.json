@@ -65,8 +65,8 @@
       "id": "library-items",
       "name": "Scope home, browse mode, and empty states",
       "article": "user/library-and-decks.md",
-      "sources": ["Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemBrowserView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/ScopeHomeAndBrowseUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ScopeHomeAndBrowseTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceCompleteTests.swift", "Tests/NeoAnki2Tests/UserInteractionPerformanceTests.swift"],
+      "sources": ["Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemBrowserView.swift", "Sources/NeoAnki2/ItemBrowserPagination.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/ScopeHomeAndBrowseUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ItemBrowserPaginationTests.swift", "Tests/NeoAnki2Tests/ScopeHomeAndBrowseTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceTests.swift", "Tests/NeoAnki2Tests/UserFlowPerformanceCompleteTests.swift", "Tests/NeoAnki2Tests/UserInteractionPerformanceTests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
     },
     {

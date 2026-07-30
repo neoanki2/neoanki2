@@ -92,6 +92,8 @@ history warrants it, so there is no menu item to find, enable, or wait on.
 - **Command-Option-B:** open browse mode for the selected scope.
 - **Command-Option-A:** show or hide the Answer column while browsing.
 - **Command-Shift-T:** open Item Types.
+- **Previous Page / Next Page:** move through Browse results when more than 500
+  items match. The footer also exposes the visible item range and page number.
 - **Return:** activate the default save, create, import, check, or reveal action
   in the current sheet or editor.
 - **Escape:** cancel a sheet/editor, leave browse mode, or close Item Types with
