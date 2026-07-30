@@ -1203,7 +1203,11 @@ actor SQLiteDatabase {
     /// Commits a validated portable-deck plan as one database transaction.
     /// Cards are deliberately generated here rather than accepted from the
     /// package, so imported scheduling state always starts fresh.
-    func importPortableDeck(_ plan: PortableDeckImportPlan, now: Date) throws {
+    func importPortableDeck(
+        _ plan: PortableDeckImportPlan,
+        now: Date,
+        initialDueDates: [UUID: Date] = [:]
+    ) throws {
         try inTransaction {
             for itemType in plan.itemTypes {
                 try insertItemType(itemType)
@@ -1324,7 +1328,11 @@ actor SQLiteDatabase {
                         .double(entry.updatedAt.timeIntervalSince1970),
                     ]
                 )
-                let cards = CardGenerator.cards(for: entry.item, type: itemType, now: now)
+                let cards = CardGenerator.cards(
+                    for: entry.item,
+                    type: itemType,
+                    now: initialDueDates[entry.item.id] ?? now
+                )
                 var earliestActiveCard: Card?
                 var maximumActiveLapses = 0
                 for card in cards {
