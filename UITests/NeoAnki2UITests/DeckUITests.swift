@@ -232,12 +232,12 @@ extension FastFunctionalJourneyTests {
         openItemEditor(in: mediaApp)
         let mediaSave = mediaApp.buttons.identified("saveEditItem")
         try runJourneyActivity("AuthoringUITests.testMediaFieldRequiresDescription") {
-            XCTAssertTrue(mediaSave.exists)
+            XCTAssertTrue(mediaSave.waitUntilExists(timeout: 5))
             XCTAssertFalse(mediaSave.isEnabled)
         }
         try runJourneyActivity("LibraryUITests.testImageEditRequiresDescriptionBeforeSaving") {
             let save = mediaApp.buttons.identified("saveEditItem")
-            XCTAssertTrue(save.exists)
+            XCTAssertTrue(save.waitUntilExists(timeout: 5))
             XCTAssertFalse(save.isEnabled)
         }
         mediaApp.buttons.identified("cancelEditItem").click()
@@ -246,7 +246,9 @@ extension FastFunctionalJourneyTests {
         try runJourneyActivity("AuthoringUITests.testEditItemChangeItemType") {
             openItemDetail(named: "Image", in: mediaApp)
             openItemEditor(in: mediaApp)
-            XCTAssertTrue(mediaApp.buttons.identified("saveEditItem").exists)
+            XCTAssertTrue(
+                mediaApp.buttons.identified("saveEditItem").waitUntilExists(timeout: 5)
+            )
             XCTAssertFalse(
                 mediaApp.popUpButtons.identified("addItemTypePicker").exists,
                 "Changing item type after creation is intentionally unavailable"
