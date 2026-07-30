@@ -129,9 +129,10 @@ Your library lives in `~/Library/Application Support/neoanki2/` either way, so
 the installed app and a build launched from the checkout read the same data.
 Never run both at once.
 
-The Home summary is prepared while the app window opens. The full Browse table
-is loaded only when you open **Browse**, so large libraries do not delay the
-first useful Home screen.
+The Home summary is prepared while the app window opens. Browse rows are loaded
+only when you open **Browse**, so large libraries do not delay the first useful
+Home screen. Browse presents at most 500 matching items at a time and provides
+page controls for the rest, keeping the table responsive as the library grows.
 
 ## Update the development build
 

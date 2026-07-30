@@ -159,6 +159,11 @@ Browse mode is a sortable table, one row per item:
 Click a column header to sort by it; click again to reverse. Items with no
 scheduled card group together at one end.
 
+Browse displays up to 500 matching items at a time. The footer reports the
+visible item range and current page; use its Previous Page and Next Page buttons
+to move through larger result sets. Search and sorting still apply to the whole
+scope, then return to the first page of the newly ordered or filtered results.
+
 **The Answer column is hidden on purpose.** Reading an answer before you have
 been asked the question spends the review. When you do need to verify content —
 proofreading an import, hunting a typo — choose **Library ▸ Show Answer Column**
