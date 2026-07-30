@@ -125,10 +125,11 @@ func gitOutput(arguments: [String]) throws -> (status: Int32, data: Data) {
     process.arguments = arguments
     let pipe = Pipe()
     process.standardOutput = pipe
-    process.standardError = Pipe()
+    process.standardError = FileHandle.nullDevice
     try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()
-    return (process.terminationStatus, pipe.fileHandleForReading.readDataToEndOfFile())
+    return (process.terminationStatus, data)
 }
 
 guard

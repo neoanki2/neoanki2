@@ -1,15 +1,18 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "313eea328ddbc105e798ba80d09ba8e9ff1da99390b00fd76a0813ae06617d2f",
+  "diffSHA256": "76fc7b7824e45e67e1af90ce77780732544ce1d346d5d8b11609bfe7c886a54d",
   "files": [
-    "Sources/NeoAnki2/ClozeFieldEditor.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
+    "Sources/NeoAnki2/AppDatabase.swift",
     "Sources/NeoAnki2/ContentView.swift",
-    "Sources/NeoAnki2/DesignSystem.swift",
-    "Sources/NeoAnki2/ItemBrowserView.swift",
-    "Sources/NeoAnki2/LibraryCommands.swift",
+    "Sources/NeoAnki2/DecksModel.swift",
+    "Sources/NeoAnki2/ImportModel.swift",
+    "Sources/NeoAnki2/ItemsModel.swift",
     "Sources/NeoAnki2/NeoAnki2App.swift",
-    "Sources/NeoAnki2/ScopeHomeView.swift",
-    "Sources/NeoAnki2/TemplateEditorView.swift"
+    "Sources/NeoAnki2/StudyModel.swift",
+    "Sources/NeoAnki2/StudyView.swift"
   ],
-  "reason": "Debug-only UI-test control, deterministic readiness identifiers, and test animation suppression; release behavior and user workflows are unchanged."
+  "reason": "Internal startup, query, hydration, and transfer performance paths changed; user workflows, visual layout, accessibility identifiers, and documented data semantics remain unchanged. The timing behavior is documented separately in the affected guides."
 }

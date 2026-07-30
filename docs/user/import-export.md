@@ -161,7 +161,7 @@ or transfer is active.
 
 The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
-of the exported tree.
+of the exported tree. Unrelated library items are not loaded into the export snapshot.
 
 `.neodeck` version 3 is deliberately **content-only**. It does not contain:
 
