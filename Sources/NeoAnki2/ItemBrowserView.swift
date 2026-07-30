@@ -16,11 +16,13 @@ struct ItemBrowserView: View {
     let onAddItem: () -> Void
     let onStudy: () -> Void
     let onDone: () -> Void
+    let onReady: () -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selection: Set<SavedItemSummary.ID> = []
     @State private var columnCustomization = TableColumnCustomization<SavedItemSummary>()
     @State private var pendingDeleteIDs: Set<SavedItemSummary.ID>?
+    @State private var pageIndex = 0
 
     /// Reads the table's own state, so revealing the column through the header
     /// context menu and revealing it through the Library menu stay in agreement.
@@ -54,7 +56,7 @@ struct ItemBrowserView: View {
                     ContentUnavailableView.search(text: itemsModel.searchText)
                         .accessibilityIdentifier("browseNoSearchResults")
                 } else {
-                    table
+                    paginatedTable
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -69,6 +71,22 @@ struct ItemBrowserView: View {
         }
         .onChange(of: answerColumnIsVisible) { _, visible in
             showsAnswerColumn = visible
+        }
+        .onChange(of: scope.filter) { _, _ in
+            resetPagination()
+        }
+        .onChange(of: itemsModel.searchText) { _, _ in
+            resetPagination()
+        }
+        .onChange(of: itemsModel.visibleItems.count, initial: true) { _, count in
+            let pagination = ItemBrowserPagination(
+                itemCount: count,
+                requestedPageIndex: pageIndex
+            )
+            if pageIndex != pagination.pageIndex {
+                pageIndex = pagination.pageIndex
+                selection = []
+            }
         }
         .toolbar {
             if !selection.isEmpty {
@@ -155,11 +173,41 @@ struct ItemBrowserView: View {
 
     // MARK: - Table
 
+    private var pagination: ItemBrowserPagination {
+        ItemBrowserPagination(
+            itemCount: itemsModel.visibleItems.count,
+            requestedPageIndex: pageIndex
+        )
+    }
+
+    private var pageItems: ArraySlice<SavedItemSummary> {
+        itemsModel.visibleItems[pagination.itemRange]
+    }
+
+    private var tableSort: Binding<[KeyPathComparator<SavedItemSummary>]> {
+        Binding(
+            get: { itemsModel.tableSort },
+            set: { newSort in
+                resetPagination()
+                itemsModel.tableSort = newSort
+            }
+        )
+    }
+
+    private var paginatedTable: some View {
+        VStack(spacing: 0) {
+            table
+            if pagination.hasMultiplePages {
+                paginationBar
+            }
+        }
+    }
+
     private var table: some View {
         Table(
             of: SavedItemSummary.self,
             selection: $selection,
-            sortOrder: $itemsModel.tableSort,
+            sortOrder: tableSort,
             columnCustomization: $columnCustomization
         ) {
             TableColumn("Prompt", value: \.title) { item in
@@ -216,7 +264,7 @@ struct ItemBrowserView: View {
             }
             .customizationID("answer")
         } rows: {
-            ForEach(itemsModel.visibleItems) { item in
+            ForEach(pageItems) { item in
                 TableRow(item)
             }
         }
@@ -241,6 +289,71 @@ struct ItemBrowserView: View {
             onOpenItem(id)
         }
         .accessibilityIdentifier("itemBrowserTable")
+        .task {
+            // Let the native table commit its first bounded update before the
+            // startup benchmark calls Browse ready.
+            await Task.yield()
+            onReady()
+        }
+    }
+
+    private var paginationBar: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Text(
+                "Items \(pagination.firstItemNumber.formatted())–"
+                    + "\(pagination.lastItemNumber.formatted()) of "
+                    + "\(pagination.itemCount.formatted())"
+            )
+            .font(DesignSystem.Typography.uiCaption)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+            .accessibilityIdentifier("browsePageRange")
+
+            Spacer()
+
+            Button("Previous Page", systemImage: "chevron.left") {
+                showPage(pagination.previousPageIndex)
+            }
+            .labelStyle(.iconOnly)
+            .disabled(!pagination.canGoBackward)
+            .help("Previous Page")
+            .accessibilityIdentifier("browsePreviousPage")
+
+            Text(
+                "Page \((pagination.pageIndex + 1).formatted()) of "
+                    + pagination.pageCount.formatted()
+            )
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .accessibilityIdentifier("browsePageNumber")
+
+            Button("Next Page", systemImage: "chevron.right") {
+                showPage(pagination.nextPageIndex)
+            }
+            .labelStyle(.iconOnly)
+            .disabled(!pagination.canGoForward)
+            .help("Next Page")
+            .accessibilityIdentifier("browseNextPage")
+        }
+        .controlSize(.small)
+        .padding(.horizontal, DesignSystem.Spacing.sm)
+        .frame(minHeight: 36)
+        .background(DesignSystem.sidebarBackground)
+        .overlay(alignment: .top) {
+            Divider()
+        }
+    }
+
+    private func showPage(_ index: Int) {
+        guard index != pageIndex else { return }
+        pageIndex = index
+        selection = []
+    }
+
+    private func resetPagination() {
+        pageIndex = 0
+        selection = []
     }
 
     private func moveMenu(for ids: Set<SavedItemSummary.ID>) -> some View {

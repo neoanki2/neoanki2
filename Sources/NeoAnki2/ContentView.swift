@@ -420,7 +420,8 @@ struct ContentView: View {
                 onOpenItem: { selectedItemID = $0 },
                 onAddItem: { openAddItem() },
                 onStudy: { startStudy() },
-                onDone: { closeBrowse() }
+                onDone: { closeBrowse() },
+                onReady: { AppStartupTrace.mark("browse_ready") }
             )
         } else {
             ScopeHomeView(
@@ -444,14 +445,12 @@ struct ContentView: View {
         let scope = decksModel.studyScope
         guard itemsModel.needsBrowseLoad else {
             isBrowsing = true
-            AppStartupTrace.mark("browse_ready")
             return
         }
         itemsModel.beginBrowseLoad()
         isBrowsing = true
         Task {
             await itemsModel.load(scope: scope)
-            AppStartupTrace.mark("browse_ready")
         }
     }
 
