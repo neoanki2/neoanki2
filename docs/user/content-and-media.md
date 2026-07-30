@@ -52,6 +52,10 @@ NeoAnki2 stores the numeric value, not its original spelling, and formats it
 for the current locale when displaying it. Non-numeric text cannot satisfy a
 required Number field.
 
+Number fields behave identically in ordinary Item Types and types included with
+an imported deck. Selecting a deck can recommend its included type, but it does
+not change numeric parsing, validation, storage, or display.
+
 Use a Text field instead when leading zeroes or exact source formatting are
 meaningful.
 

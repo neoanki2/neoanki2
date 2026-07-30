@@ -36,6 +36,11 @@ own; cards in that subdeck must fit both allowances. Unassigned cards remain
 unlimited. The scope home keeps **New** as the full backlog while explaining
 how many due new cards are available today and how many are deferred.
 
+Deck-included item types affect which fields and templates are offered while
+authoring; they do not create a separate allowance. New cards generated from
+those types consume the destination deck's existing daily allowance in the
+same way as cards from ordinary Item Types.
+
 A new card consumes one slot when you grade it for the first time, including
 **Again**. Ending a session before grading does not consume a slot. Undoing that
 first grade restores the slot. Learning, relearning, and review cards never
