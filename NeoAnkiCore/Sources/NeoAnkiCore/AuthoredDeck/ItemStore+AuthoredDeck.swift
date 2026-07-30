@@ -40,7 +40,14 @@ extension ItemStore {
         let sourceTypes = Dictionary(uniqueKeysWithValues: package.itemTypes.map { ($0.id, $0) })
         var importedItems: [PortableDeckPersistedItem] = []
         importedItems.reserveCapacity(package.items.count)
-        for record in package.items {
+        // Authored item declaration order is the only sequence available to
+        // builders. Give each item a distinct, already-due timestamp so browse
+        // and first-study ordering survive UUID-backed persistence.
+        let orderingStep: TimeInterval = 0.000_001
+        let firstCreatedAt = now.addingTimeInterval(
+            -Double(max(package.items.count - 1, 0)) * orderingStep
+        )
+        for (ordinal, record) in package.items.enumerated() {
             guard let sourceType = sourceTypes[record.item.itemTypeID],
                   let destinationType = typeMap[record.item.itemTypeID],
                   sourceType.fields.count == destinationType.fields.count else {
@@ -73,6 +80,7 @@ extension ItemStore {
                     value: field.value
                 )
             }
+            let orderedAt = firstCreatedAt.addingTimeInterval(Double(ordinal) * orderingStep)
             importedItems.append(.init(
                 item: Item(
                     id: UUID(),
@@ -81,7 +89,7 @@ extension ItemStore {
                     tags: record.item.tags,
                     deckID: record.item.deckID
                 ),
-                createdAt: now,
+                createdAt: orderedAt,
                 updatedAt: now
             ))
         }
@@ -173,7 +181,10 @@ extension ItemStore {
                     includedItemTypes: package.usesIncludedItemTypes ? includedItemTypes : [],
                     itemTypePolicies: package.usesIncludedItemTypes ? resolvedPolicies : []
                 ),
-                now: now
+                now: now,
+                initialDueDates: Dictionary(
+                    uniqueKeysWithValues: importedItems.map { ($0.item.id, $0.createdAt) }
+                )
             )
             // The database transaction consumes committed reservations. Any
             // residual scope cleanup is best-effort after commit: reporting

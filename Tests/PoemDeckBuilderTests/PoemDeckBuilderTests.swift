@@ -126,6 +126,11 @@ import Testing
     #expect(poem.parentID == nil)
     #expect(items.count == 3)
     #expect(items.allSatisfy { $0.itemTypeName == "Poem Line" && $0.cardCount == 1 })
+    #expect(items.map(\.subtitle) == [
+        "така любов буває раз в ніколи",
+        "вона ж промчить над зламаним життям",
+        "за нею ж будуть бігти видноколи",
+    ])
     #expect(items.contains {
         $0.title == "така любов буває раз в ніколи\nвона ж промчить над зламаним життям"
             && $0.subtitle == "за нею ж будуть бігти видноколи"
@@ -133,6 +138,11 @@ import Testing
     let loaded = try #require(await store.fetchItem(id: items[0].id))
     #expect(loaded.item.tags == ["author:Ліна"])
     #expect(due.count == 3)
+    #expect(due.map { ItemDisplay.subtitle(for: $0.item, in: $0.itemType) } == [
+        "така любов буває раз в ніколи",
+        "вона ж промчить над зламаним життям",
+        "за нею ж будуть бігти видноколи",
+    ])
     let catalog = try await store.loadItemTypeCatalog()
     #expect(!catalog.itemTypes.contains { $0.name == "Poem Line" })
     #expect(catalog.includedWithDecks.first?.itemTypes.map(\.name) == ["Poem Line"])
