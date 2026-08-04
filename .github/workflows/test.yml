@@ -3,6 +3,9 @@ name: Test
 permissions:
   contents: read
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
 on:
   push:
   pull_request:
@@ -17,7 +20,7 @@ concurrency:
 jobs:
   core-fast:
     name: Core unit + flow tests
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Run NeoAnkiCore tests
@@ -27,7 +30,7 @@ jobs:
 
   app-models:
     name: App ViewModel tests
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Run NeoAnki2Tests
@@ -35,7 +38,7 @@ jobs:
 
   ui-smoke:
     name: Fast functional UI journeys
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
