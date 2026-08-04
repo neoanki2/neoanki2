@@ -50,6 +50,8 @@ struct ItemTypeEditorView: View {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                         HStack(spacing: DesignSystem.Spacing.xs) {
                             TextField("Field name", text: $draft.fields[index].name)
+                                .labelsHidden()
+                                .accessibilityLabel("Field name")
                                 .accessibilityIdentifier("itemTypeField-\(field.id.uuidString)")
 
                             Picker("Type", selection: $draft.fields[index].type) {

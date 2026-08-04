@@ -196,7 +196,7 @@ extension FastFunctionalJourneyTests {
                 into: app.textFields.identified("itemTypeNameField"),
                 app: app
             )
-            app.buttons.identified("saveItemType").click()
+            saveItemType(in: app)
             XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Capitals"].waitUntilExists(timeout: 5))
         }
 
@@ -207,7 +207,7 @@ extension FastFunctionalJourneyTests {
                 into: app.textFields.identified("itemTypeNameField"),
                 app: app
             )
-            app.buttons.identified("saveItemType").click()
+            saveItemType(in: app)
             XCTAssertTrue(
                 app.descendants(matching: .any)["itemTypeRow-Renamed Type"]
                     .waitUntilExists(timeout: 5)
@@ -370,7 +370,7 @@ extension FastFunctionalJourneyTests {
         app.textFields.identified("itemTypeNameField").click()
         app.textFields.identified("itemTypeNameField").typeText("Capitals")
 
-        app.buttons.identified("saveItemType").click()
+        saveItemType(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Capitals"].waitUntilExists(timeout: 5))
         closeTemplates(in: app)
     }
@@ -382,14 +382,14 @@ extension FastFunctionalJourneyTests {
         clickAddItemType(in: app)
         app.textFields.identified("itemTypeNameField").click()
         app.textFields.identified("itemTypeNameField").typeText("Editable")
-        app.buttons.identified("saveItemType").click()
+        saveItemType(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Editable"].waitUntilExists(timeout: 5))
 
         app.buttons.identified("editItemType").click()
         app.textFields.identified("itemTypeNameField").click()
         app.textFields.identified("itemTypeNameField").typeKey("a", modifierFlags: [.command])
         app.textFields.identified("itemTypeNameField").typeText("Renamed Type")
-        app.buttons.identified("saveItemType").click()
+        saveItemType(in: app)
 
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Renamed Type"].waitUntilExists(timeout: 5))
         closeTemplates(in: app)
@@ -413,7 +413,7 @@ extension FastFunctionalJourneyTests {
         clickAddItemType(in: app)
         app.textFields.identified("itemTypeNameField").click()
         app.textFields.identified("itemTypeNameField").typeText("Disposable")
-        app.buttons.identified("saveItemType").click()
+        saveItemType(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Disposable"].waitUntilExists(timeout: 5))
 
         app.buttons.identified("deleteItemType").click()

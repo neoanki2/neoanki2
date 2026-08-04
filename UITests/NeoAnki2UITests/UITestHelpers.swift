@@ -793,17 +793,12 @@ class NeoAnkiUITestCase: XCTestCase {
         let save = app.buttons.identified("saveItemType")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
         XCTAssertTrue(save.isEnabled)
-        save.click()
-        XCTAssertNotNil(
-            firstExisting(
-                of: [
-                    app.buttons.identified("templatesDone"),
-                    app.descendants(matching: .any)["templatesItemTypesHeader"],
-                ],
-                timeout: 10
-            ),
-            "Item type editor did not close after saving"
-        )
+        if save.waitUntilHittable(timeout: 2) {
+            save.click()
+        } else {
+            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+        }
+        XCTAssertTrue(save.waitUntilGone(timeout: 10), "Item type editor did not close after saving")
     }
 
     /// Asserting absence immediately races the animation that removes the
