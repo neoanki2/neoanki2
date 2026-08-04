@@ -716,6 +716,21 @@ class NeoAnkiUITestCase: XCTestCase {
             ?? app.descendants(matching: .any)[id]
     }
 
+    func closeItemDetail(in app: XCUIApplication) {
+        let deleteButton = app.buttons.identified("deleteItem")
+        guard deleteButton.exists else { return }
+
+        for _ in 0..<2 {
+            let back = app.buttons.identified("itemDetailBack")
+            XCTAssertTrue(back.waitUntilExists(timeout: 3), "Item detail Back button did not appear")
+            guard back.exists else { return }
+            back.click()
+            if deleteButton.waitUntilGone(timeout: 3) { return }
+        }
+
+        XCTFail("Item detail did not close after two Back attempts")
+    }
+
     func returnToLibrary(in app: XCUIApplication) {
         if app.buttons.identified("studySessionDone").exists {
             app.buttons.identified("studySessionDone").click()
@@ -737,7 +752,7 @@ class NeoAnkiUITestCase: XCTestCase {
         }
         if app.buttons["deleteItem"].exists {
             if app.buttons.identified("itemDetailBack").exists {
-                app.buttons.identified("itemDetailBack").click()
+                closeItemDetail(in: app)
             } else {
                 showSidebar(in: app)
                 let unassigned = app.descendants(matching: .any).identified("scopeRow-Unassigned")
