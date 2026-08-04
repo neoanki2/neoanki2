@@ -46,8 +46,12 @@ The app adds these commands to the standard macOS menu bar.
 ### File
 
 - **New Item** — **Command-N** — adds an item to the selected scope.
+- **Add from Vocabulary…** searches an installed offline vocabulary pack and
+  adds generated items to the selected deck.
 - **Import…** opens a JSON or CSV file.
 - **Import Deck…** opens a `.neodeck` file or `.neoanki` bundle.
+- **Import Vocabulary Pack…** validates and installs a local `.neovocab`
+  directory.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
 
 There is no **New Window** or **New Tab**; NeoAnki2 has one library. Create decks
@@ -57,6 +61,7 @@ with the controls in the sidebar.
 
 - **Browse Items** — **Command-Option-B**
 - **Show / Hide Answer Column** — **Command-Option-A** (browse mode only)
+- **Vocabulary Packs…** lists the packs installed in the current library.
 - **Item Types…** — **Command-Shift-T**
 
 ### Study

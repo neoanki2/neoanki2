@@ -60,6 +60,10 @@ description. Fix every diagnostic, rerun validation, and import only after the
 command succeeds. Validation does not modify the bundle or your NeoAnki2
 library.
 
+NeoAnki2 also reuses this authored-bundle validation and atomic import boundary
+when an installed offline vocabulary pack generates items for an existing
+deck. That app workflow does not change the CLI command or its diagnostics.
+
 If the invocation itself is wrong, the tool prints:
 
 ```text

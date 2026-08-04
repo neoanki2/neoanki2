@@ -22,6 +22,10 @@ You need:
 The package itself declares macOS 14 and Swift tools 6.0. There is no end-user
 Xcode project; the included scripts build the Swift package.
 
+The same package also builds the loopback automation API and offline vocabulary
+tools. The local API is disabled by default, and vocabulary packs are installed
+only when you explicitly import a local `.neovocab` directory.
+
 In Terminal, verify the prerequisites:
 
 ```bash

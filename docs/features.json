@@ -282,6 +282,13 @@
       "tests": ["Tests/NeoAnki2Tests/APIControlModelTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
     },
     {
+      "id": "offline-vocabulary",
+      "name": "Install and use offline vocabulary packs",
+      "article": "user/import-export.md",
+      "sources": ["Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnki2/VocabularyLibraryModel.swift", "Sources/VocabularyDeckBuilder/VocabularyDeckBuilderView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/VocabularyUITests.swift", "Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift", "Tests/VocabularyDeckBuilderTests/VocabularyDeckBuilderTests.swift"]
+    },
+    {
       "id": "deck-cli",
       "name": "Validate authored decks from the command line",
       "article": "user/cli.md",
