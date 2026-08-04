@@ -46,6 +46,8 @@ Additional content rules are checked when needed:
 - Every attached image or GIF needs a non-empty image description, even when
   the media field itself is optional.
 - A required media field needs an attached file of its declared kind.
+- Tags are trimmed, normalized, deduplicated in their original order, and
+  limited to 256 non-empty values of at most 1,024 UTF-8 bytes each.
 
 If saving fails, the form remains open and displays an error. Correct the
 field and save again.
@@ -118,9 +120,12 @@ update.
 
 The confirmation states how many generated study cards will also be removed.
 Deleting an item removes the item and its generated cards; it cannot be undone.
-Append-only review logs are retained for history integrity, but no longer belong
-to an active card. Outcomes that were not undone can still contribute to later
-scheduling optimization. Database migrations and performance indexes do not change this retention rule.
+Append-only review logs are retained when items or cards are deleted, for
+history integrity, but no longer belong to an active card. Outcomes that were
+not undone can still contribute to later scheduling optimization.
+Database migrations and performance indexes do not change this retention rule. An
+explicit **Reset All Progress** action in Deck Settings is the exception: it
+permanently removes review history for the selected deck subtree.
 Media no longer referenced by any item is eligible for cleanup. Choose
 **Cancel** to keep the item.
 

@@ -219,9 +219,7 @@ extension FastFunctionalJourneyTests {
         }
 
         runJourneyActivity("LibraryUITests.testBackFromItemDetailReturnsToLibrary") {
-            let back = seeded.buttons.identified("itemDetailBack")
-            XCTAssertTrue(back.waitUntilExists(timeout: 3))
-            back.click()
+            closeItemDetail(in: seeded)
             waitForItem(named: "Japan", in: seeded)
             XCTAssertFalse(seeded.buttons.identified("deleteItem").exists)
             assertNoItem(named: "Original", in: seeded)
@@ -385,9 +383,7 @@ extension FastFunctionalJourneyTests {
         addBasicItem(front: "Back Test", back: "View", in: app)
         openItemDetail(named: "Back Test", in: app)
 
-        let back = app.buttons.identified("itemDetailBack")
-        XCTAssertTrue(back.waitUntilExists(timeout: 5))
-        back.click()
+        closeItemDetail(in: app)
 
         waitForItem(named: "Back Test", in: app)
         XCTAssertFalse(app.buttons.identified("deleteItem").exists)

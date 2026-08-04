@@ -21,6 +21,7 @@ Anki template markup are not supported.
 **On this page**
 
 - [Build a poem deck](#build-a-poem-deck)
+- [Import and use a vocabulary pack](#import-and-use-a-vocabulary-pack)
 - [Import JSON or CSV](#import-json-or-csv)
 - [Export a portable deck](#export-a-portable-deck)
 - [Import `.neodeck` or `.neoanki`](#import-neodeck-or-neoanki)
@@ -43,6 +44,23 @@ poem's line order in both Browse and their initial Study queue.
 The builder first writes a temporary `.neoanki` bundle, validates the complete
 bundle with the same rules as an imported authored deck, imports it atomically,
 and removes the temporary files. It does not write directly to the library.
+
+## Import and use a vocabulary pack
+
+Choose **File → Import Vocabulary Pack…** and select a local `.neovocab`
+directory. NeoAnki validates it and copies it into the library's managed
+Vocabulary Packs directory. The source can then be moved or deleted. Use
+**Library → Vocabulary Packs…** to see the packs installed in this library.
+
+Select the deck that should receive the cards, then choose **File → Add from
+Vocabulary…** or use **Add from Vocabulary** in the deck toolbar. Choose an
+installed pack, search its local index, review the forms, pronunciations,
+meanings, examples, and card paradigms, then choose **Add Cards**. The generated
+items are validated and appended atomically to the selected deck; no new deck is
+created. The window stays open so another word can be added immediately.
+
+Both operations are offline-only. Import reads and copies the selected local
+package; lookup reads only the installed SQLite index and local media.
 
 ## Import JSON or CSV
 

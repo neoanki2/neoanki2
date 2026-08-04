@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 20
+    static let version = 21
 
     static let createStatements: [String] = [
         """
@@ -234,7 +234,297 @@ enum Schema {
         ON deck_item_type_policy_entries(deck_id)
         WHERE is_default = 1;
         """,
-    ] + browseProjectionStatements
+    ] + browseProjectionStatements + apiStateStatements + apiChangeTrackingStatements
+
+    /// Durable application-service state shared by the native UI and local API.
+    /// These tables contain no bearer credentials; client secrets remain in
+    /// Keychain. Keeping revisions and events beside domain writes lets SQLite
+    /// commit them atomically.
+    static let apiStateStatements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS resource_revisions (
+            resource_type TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK(revision >= 1),
+            updated_at REAL NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0 CHECK(is_deleted IN (0, 1)),
+            PRIMARY KEY (resource_type, resource_id)
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS api_changes (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            transaction_id TEXT NOT NULL,
+            sequence INTEGER NOT NULL CHECK(sequence >= 0),
+            event_type TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK(revision >= 1),
+            is_tombstone INTEGER NOT NULL DEFAULT 0 CHECK(is_tombstone IN (0, 1)),
+            occurred_at REAL NOT NULL,
+            UNIQUE (transaction_id, sequence)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_api_changes_transaction
+        ON api_changes(transaction_id, sequence);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_api_changes_occurred_at
+        ON api_changes(occurred_at, cursor);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS api_transaction_context (
+            singleton INTEGER PRIMARY KEY NOT NULL CHECK(singleton = 1),
+            transaction_id TEXT NOT NULL,
+            occurred_at REAL NOT NULL,
+            is_implicit INTEGER NOT NULL CHECK(is_implicit IN (0, 1))
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS api_idempotency (
+            client_id TEXT NOT NULL,
+            route TEXT NOT NULL,
+            idempotency_key TEXT NOT NULL,
+            request_hash TEXT NOT NULL CHECK(length(request_hash) = 64),
+            state TEXT NOT NULL CHECK(state IN ('pending', 'completed')),
+            result_resource_id TEXT,
+            response_status INTEGER,
+            response_body BLOB,
+            created_at REAL NOT NULL,
+            completed_at REAL,
+            CHECK(
+                (state = 'pending' AND response_status IS NULL AND response_body IS NULL)
+                OR
+                (state = 'completed' AND response_status IS NOT NULL AND response_body IS NOT NULL)
+            ),
+            PRIMARY KEY (client_id, route, idempotency_key)
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_api_idempotency_created_at
+        ON api_idempotency(created_at);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS api_study_sessions (
+            id TEXT PRIMARY KEY NOT NULL,
+            client_id TEXT NOT NULL,
+            scope BLOB NOT NULL,
+            state TEXT NOT NULL CHECK(state IN ('active', 'ended')),
+            revision INTEGER NOT NULL DEFAULT 1 CHECK(revision >= 1),
+            created_at REAL NOT NULL,
+            last_activity_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_api_study_sessions_client_state
+        ON api_study_sessions(client_id, state, last_activity_at);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS api_card_reservations (
+            card_id TEXT PRIMARY KEY NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            session_id TEXT NOT NULL UNIQUE
+                REFERENCES api_study_sessions(id) ON DELETE CASCADE,
+            expires_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_api_card_reservations_expiry
+        ON api_card_reservations(expires_at);
+        """,
+    ]
+
+    /// Installed after all tracked tables exist. A trigger creates a short-lived
+    /// implicit transaction context for legacy single-statement writes. Normal
+    /// multi-statement writes install an explicit context in `inTransaction`,
+    /// causing every member event to share one transaction identifier.
+    static let apiChangeTrackingStatements: [String] =
+        trackedTableStatements(table: "decks", resourceType: "deck", eventStem: "deck")
+        + trackedTableStatements(
+            table: "item_types",
+            resourceType: "itemType",
+            eventStem: "itemType"
+        )
+        + trackedTableStatements(table: "items", resourceType: "item", eventStem: "item")
+        + trackedTableStatements(table: "cards", resourceType: "card", eventStem: "card")
+        + trackedTableStatements(
+            table: "review_logs",
+            resourceType: "review",
+            eventStem: "review"
+        )
+        + trackedTableStatements(
+            table: "review_reverts",
+            resourceType: "reviewRevert",
+            eventStem: "reviewRevert"
+        )
+        + trackedTableStatements(
+            table: "media_assets",
+            resourceType: "media",
+            eventStem: "media",
+            idColumn: "hash"
+        )
+
+    /// Applied when upgrading from schema version 20. Backfill is performed by
+    /// SQLiteDatabase before these triggers are installed, so an existing
+    /// library begins at revision 1 without fabricating historical events.
+    static let migrationV21StateStatements = apiStateStatements
+
+    static func apiChangeTrackingStatements(forExistingTable table: String) -> [String] {
+        switch table {
+        case "decks":
+            trackedTableStatements(table: table, resourceType: "deck", eventStem: "deck")
+        case "item_types":
+            trackedTableStatements(table: table, resourceType: "itemType", eventStem: "itemType")
+        case "items":
+            trackedTableStatements(table: table, resourceType: "item", eventStem: "item")
+        case "cards":
+            trackedTableStatements(table: table, resourceType: "card", eventStem: "card")
+        case "review_logs":
+            trackedTableStatements(table: table, resourceType: "review", eventStem: "review")
+        case "review_reverts":
+            trackedTableStatements(
+                table: table,
+                resourceType: "reviewRevert",
+                eventStem: "reviewRevert"
+            )
+        case "media_assets":
+            trackedTableStatements(
+                table: table,
+                resourceType: "media",
+                eventStem: "media",
+                idColumn: "hash"
+            )
+        default:
+            []
+        }
+    }
+
+    private static let sqliteUUIDExpression = """
+    lower(
+        hex(randomblob(4)) || '-' ||
+        hex(randomblob(2)) || '-' ||
+        '4' || substr(hex(randomblob(2)), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) ||
+        substr(hex(randomblob(2)), 2) || '-' ||
+        hex(randomblob(6))
+    )
+    """
+
+    private static func trackedTableStatements(
+        table: String,
+        resourceType: String,
+        eventStem: String,
+        idColumn: String = "id"
+    ) -> [String] {
+        [
+            trackedTriggerStatement(
+                table: table,
+                operation: "INSERT",
+                timingSuffix: "insert",
+                resourceType: resourceType,
+                eventType: "\(eventStem).created",
+                idExpression: "NEW.\(idColumn)",
+                isTombstone: false
+            ),
+            trackedTriggerStatement(
+                table: table,
+                operation: "UPDATE",
+                timingSuffix: "update",
+                resourceType: resourceType,
+                eventType: "\(eventStem).updated",
+                idExpression: "NEW.\(idColumn)",
+                isTombstone: false
+            ),
+            trackedTriggerStatement(
+                table: table,
+                operation: "DELETE",
+                timingSuffix: "delete",
+                resourceType: resourceType,
+                eventType: "\(eventStem).deleted",
+                idExpression: "OLD.\(idColumn)",
+                isTombstone: true
+            ),
+        ]
+    }
+
+    private static func trackedTriggerStatement(
+        table: String,
+        operation: String,
+        timingSuffix: String,
+        resourceType: String,
+        eventType: String,
+        idExpression: String,
+        isTombstone: Bool
+    ) -> String {
+        let tombstone = isTombstone ? 1 : 0
+        return """
+        CREATE TRIGGER IF NOT EXISTS api_track_\(table)_\(timingSuffix)
+        AFTER \(operation) ON \(table)
+        BEGIN
+            INSERT INTO api_transaction_context (
+                singleton, transaction_id, occurred_at, is_implicit
+            )
+            SELECT
+                1,
+                \(sqliteUUIDExpression),
+                CAST(strftime('%s', 'now') AS REAL),
+                1
+            WHERE NOT EXISTS (
+                SELECT 1 FROM api_transaction_context WHERE singleton = 1
+            );
+
+            INSERT INTO resource_revisions (
+                resource_type, resource_id, revision, updated_at, is_deleted
+            ) VALUES (
+                '\(resourceType)',
+                \(idExpression),
+                1,
+                (SELECT occurred_at FROM api_transaction_context WHERE singleton = 1),
+                \(tombstone)
+            )
+            ON CONFLICT(resource_type, resource_id) DO UPDATE SET
+                revision = resource_revisions.revision + 1,
+                updated_at = excluded.updated_at,
+                is_deleted = excluded.is_deleted;
+
+            INSERT INTO api_changes (
+                transaction_id,
+                sequence,
+                event_type,
+                resource_type,
+                resource_id,
+                revision,
+                is_tombstone,
+                occurred_at
+            ) VALUES (
+                (SELECT transaction_id FROM api_transaction_context WHERE singleton = 1),
+                COALESCE((
+                    SELECT MAX(sequence) + 1
+                    FROM api_changes
+                    WHERE transaction_id = (
+                        SELECT transaction_id
+                        FROM api_transaction_context
+                        WHERE singleton = 1
+                    )
+                ), 0),
+                '\(eventType)',
+                '\(resourceType)',
+                \(idExpression),
+                (
+                    SELECT revision
+                    FROM resource_revisions
+                    WHERE resource_type = '\(resourceType)'
+                      AND resource_id = \(idExpression)
+                ),
+                \(tombstone),
+                (SELECT occurred_at FROM api_transaction_context WHERE singleton = 1)
+            );
+
+            DELETE FROM api_transaction_context
+            WHERE singleton = 1 AND is_implicit = 1;
+        END;
+        """
+    }
 
     static let browseProjectionStatements: [String] = [
         """

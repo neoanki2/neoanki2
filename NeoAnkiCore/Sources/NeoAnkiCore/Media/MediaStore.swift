@@ -248,12 +248,31 @@ public actor MediaStore {
         )
     }
 
+    func ingest(
+        data: Data,
+        kind: MediaKind,
+        altText: String?,
+        reservationID: UUID,
+        reservationScope: UUID
+    ) async throws -> MediaRef {
+        let ext = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
+        return try await store(
+            data,
+            kind: kind,
+            fileExtension: ext,
+            altText: altText,
+            reservationScope: reservationScope,
+            reservationID: reservationID
+        )
+    }
+
     private func store(
         _ data: Data,
         kind: MediaKind,
         fileExtension: String,
         altText: String?,
-        reservationScope: UUID?
+        reservationScope: UUID?,
+        reservationID: UUID = UUID()
     ) async throws -> MediaRef {
         let hash = Self.sha256Hex(data)
         var storedExtension = fileExtension
@@ -271,7 +290,6 @@ public actor MediaStore {
             byteSize: data.count,
             fileExtension: storedExtension
         )
-        let reservationID = UUID()
         let createdAsset: Bool
         if let metadataDatabase {
             let now = Date.now

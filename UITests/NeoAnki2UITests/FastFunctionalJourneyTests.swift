@@ -1,9 +1,13 @@
 import XCTest
 
-/// The functional UI suite has six process-level journeys. Each legacy check
+/// The functional UI suite has seven process-level journeys. Each legacy check
 /// remains a named activity so failures preserve their original identity while
 /// compatible checks share the same app process.
 final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
+    func testVocabularyJourney() throws {
+        try runSharedVocabularyJourney()
+    }
+
     func testLibraryAndBrowseJourney() throws {
         if !hasActivityFilters {
             try runSharedLibraryAndBrowseJourney()

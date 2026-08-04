@@ -517,7 +517,7 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     let summary = try #require(summaries.first)
     let imported = try #require(await destination.fetchItem(id: summary.id))
     #expect(imported.item.fields.map(\.value) == expected)
-    #expect(imported.item.tags == ["unicode-✓", "repeated", "repeated"])
+    #expect(imported.item.tags == ["unicode-✓", "repeated"])
     #expect(imported.itemType.templates[0].generateWhen != nil)
 }
 

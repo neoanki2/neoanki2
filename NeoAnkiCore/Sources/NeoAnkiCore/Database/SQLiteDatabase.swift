@@ -12,14 +12,21 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case executeFailed(String)
     case queryFailed(String)
     case itemTypeNotFound(UUID)
+    case itemNotFound(UUID)
     case cardNotFound(UUID)
     case reviewLogNotFound(UUID)
     case templateNotFound(UUID)
     case deckNotFound(UUID)
     case requiredFieldEmpty(String)
     case invalidItemType(String)
+    case invalidItem(String)
     case invalidDeck(String)
+    case resourceInUse(String)
     case invalidMediaAsset(String)
+    case idempotencyConflict
+    case idempotencyRecordNotFound
+    case studySessionNotFound(UUID)
+    case studyConflict(String)
     case encodingFailed
     case decodingFailed
     case unsupportedSchemaVersion(Int)
@@ -35,6 +42,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "Database read failed: \(message)"
         case let .itemTypeNotFound(id):
             return "Item type not found: \(id.uuidString)"
+        case let .itemNotFound(id):
+            return "Item not found: \(id.uuidString)"
         case let .cardNotFound(id):
             return "Card not found: \(id.uuidString)"
         case let .reviewLogNotFound(id):
@@ -47,9 +56,21 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "\(name) is required."
         case let .invalidItemType(message):
             return message
+        case let .invalidItem(message):
+            return message
         case let .invalidDeck(message):
             return message
+        case let .resourceInUse(message):
+            return message
         case let .invalidMediaAsset(message):
+            return message
+        case .idempotencyConflict:
+            return "The idempotency key was already used for different input."
+        case .idempotencyRecordNotFound:
+            return "The idempotency record no longer exists."
+        case let .studySessionNotFound(id):
+            return "Study session not found: \(id.uuidString)"
+        case let .studyConflict(message):
             return message
         case .encodingFailed:
             return "Could not encode data for storage."
@@ -92,6 +113,7 @@ actor SQLiteDatabase {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private var localRevision: UInt64 = 0
+    private var changeTrackingReady = false
 
     init(path: URL) throws {
         databaseURL = path.standardizedFileURL
@@ -124,6 +146,34 @@ actor SQLiteDatabase {
         )
     }
 
+    /// Writes a transactionally consistent SQLite snapshot without exposing
+    /// the live database path or relying on a WAL file copy.
+    func backup(to destination: URL) throws {
+        guard let source = handle else {
+            throw DatabaseError.executeFailed("The database connection is closed.")
+        }
+        var destinationHandle: OpaquePointer?
+        let openCode = sqlite3_open_v2(
+            destination.path(percentEncoded: false),
+            &destinationHandle,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
+            nil
+        )
+        guard openCode == SQLITE_OK, let destinationHandle else {
+            if let destinationHandle { sqlite3_close(destinationHandle) }
+            throw DatabaseError.openFailed(String(cString: sqlite3_errstr(openCode)))
+        }
+        defer { sqlite3_close(destinationHandle) }
+        guard let backup = sqlite3_backup_init(destinationHandle, "main", source, "main") else {
+            throw DatabaseError.executeFailed("Could not initialize a database snapshot.")
+        }
+        let stepCode = sqlite3_backup_step(backup, -1)
+        let finishCode = sqlite3_backup_finish(backup)
+        guard stepCode == SQLITE_DONE, finishCode == SQLITE_OK else {
+            throw DatabaseError.executeFailed("Could not complete a database snapshot.")
+        }
+    }
+
     func migrate() throws {
         let current = try schemaVersion()
 
@@ -142,11 +192,13 @@ actor SQLiteDatabase {
                 )
                 _ = try getOrCreateLibraryID()
             }
+            changeTrackingReady = true
             return
         }
 
         guard current < Schema.version else {
             _ = try getOrCreateLibraryID()
+            changeTrackingReady = try tableExists("api_transaction_context")
             return
         }
 
@@ -281,9 +333,57 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 21 {
+                for sql in Schema.migrationV21StateStatements {
+                    try execute(sql)
+                }
+                try backfillResourceRevisions()
+                for table in [
+                    "decks",
+                    "item_types",
+                    "items",
+                    "cards",
+                    "review_logs",
+                    "review_reverts",
+                    "media_assets",
+                ] where try tableExists(table) {
+                    for sql in Schema.apiChangeTrackingStatements(forExistingTable: table) {
+                        try execute(sql)
+                    }
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
+            )
+        }
+        changeTrackingReady = true
+    }
+
+    /// Existing resources begin at revision one without manufacturing change
+    /// history that predates the local API. Tables absent from deliberately
+    /// minimal migration fixtures are skipped.
+    private func backfillResourceRevisions() throws {
+        let tracked: [(table: String, resourceType: String, idColumn: String)] = [
+            ("decks", "deck", "id"),
+            ("item_types", "itemType", "id"),
+            ("items", "item", "id"),
+            ("cards", "card", "id"),
+            ("review_logs", "review", "id"),
+            ("review_reverts", "reviewRevert", "id"),
+            ("media_assets", "media", "hash"),
+        ]
+        let now = Date.now.timeIntervalSince1970
+        for entry in tracked where try tableExists(entry.table) {
+            try execute(
+                """
+                INSERT OR IGNORE INTO resource_revisions (
+                    resource_type, resource_id, revision, updated_at, is_deleted
+                )
+                SELECT ?, \(entry.idColumn), 1, ?, 0 FROM \(entry.table);
+                """,
+                bindings: [.text(entry.resourceType), .double(now)]
             )
         }
     }
@@ -343,6 +443,263 @@ actor SQLiteDatabase {
             """,
             bindings: [.text(key), .text(value)]
         )
+    }
+
+    func currentChangeCursor() throws -> Int64 {
+        try query("SELECT COALESCE(MAX(cursor), 0) AS cursor FROM api_changes;")
+            .first?["cursor"] as? Int64 ?? 0
+    }
+
+    func oldestChangeCursor() throws -> Int64? {
+        try query("SELECT MIN(cursor) AS cursor FROM api_changes;")
+            .first?["cursor"] as? Int64
+    }
+
+    func fetchLibraryChanges(after cursor: Int64, limit: Int) throws -> [LibraryChange] {
+        try query(
+            """
+            SELECT cursor, transaction_id, sequence, event_type, resource_type,
+                   resource_id, revision, is_tombstone, occurred_at
+            FROM api_changes
+            WHERE cursor > ?
+            ORDER BY cursor ASC
+            LIMIT ?;
+            """,
+            bindings: [.int(cursor), .int(Int64(limit))]
+        ).map { row in
+            guard
+                let cursor = row["cursor"] as? Int64,
+                let transactionText = row["transaction_id"] as? String,
+                let transactionID = UUID(uuidString: transactionText),
+                let sequence = row["sequence"] as? Int64,
+                let eventType = row["event_type"] as? String,
+                let resourceType = row["resource_type"] as? String,
+                let resourceID = row["resource_id"] as? String,
+                let revision = row["revision"] as? Int64,
+                let isTombstone = row["is_tombstone"] as? Int64,
+                let occurredAt = row["occurred_at"] as? Double
+            else {
+                throw DatabaseError.decodingFailed
+            }
+            return LibraryChange(
+                cursor: cursor,
+                transactionID: transactionID,
+                sequence: Int(sequence),
+                eventType: eventType,
+                resourceType: resourceType,
+                resourceID: resourceID,
+                revision: Int(revision),
+                isTombstone: isTombstone != 0,
+                occurredAt: Date(timeIntervalSince1970: occurredAt)
+            )
+        }
+    }
+
+    func fetchResourceRevision(
+        resourceType: String,
+        resourceID: String
+    ) throws -> LibraryResourceRevision? {
+        guard let row = try query(
+            """
+            SELECT revision, updated_at, is_deleted
+            FROM resource_revisions
+            WHERE resource_type = ? AND resource_id = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(resourceType), .text(resourceID)]
+        ).first else {
+            return nil
+        }
+        guard
+            let revision = row["revision"] as? Int64,
+            let updatedAt = row["updated_at"] as? Double,
+            let isDeleted = row["is_deleted"] as? Int64
+        else {
+            throw DatabaseError.decodingFailed
+        }
+        return LibraryResourceRevision(
+            resourceType: resourceType,
+            resourceID: resourceID,
+            revision: Int(revision),
+            updatedAt: Date(timeIntervalSince1970: updatedAt),
+            isDeleted: isDeleted != 0
+        )
+    }
+
+    func pruneLibraryChanges(before cutoff: Date, minimumRetained: Int) throws -> Int {
+        let boundary = try query(
+            """
+            SELECT cursor FROM api_changes
+            ORDER BY cursor DESC
+            LIMIT 1 OFFSET ?;
+            """,
+            bindings: [.int(Int64(minimumRetained - 1))]
+        ).first?["cursor"] as? Int64
+        guard let boundary else { return 0 }
+        try execute(
+            """
+            DELETE FROM api_changes
+            WHERE occurred_at < ? AND cursor < ?;
+            """,
+            bindings: [.double(cutoff.timeIntervalSince1970), .int(boundary)]
+        )
+        return Int(sqlite3_changes(handle))
+    }
+
+    func claimIdempotency(
+        clientID: UUID,
+        route: String,
+        key: String,
+        requestHash: String,
+        resultResourceID: String?,
+        now: Date
+    ) throws -> IdempotencyClaim {
+        try inTransaction {
+            let bindings: [Binding] = [
+                .text(clientID.uuidString.lowercased()),
+                .text(route),
+                .text(key),
+            ]
+            if let row = try query(
+                """
+                SELECT request_hash, state, result_resource_id,
+                       response_status, response_body
+                FROM api_idempotency
+                WHERE client_id = ? AND route = ? AND idempotency_key = ?
+                LIMIT 1;
+                """,
+                bindings: bindings
+            ).first {
+                guard row["request_hash"] as? String == requestHash else {
+                    throw DatabaseError.idempotencyConflict
+                }
+                let resourceID = row["result_resource_id"] as? String
+                if row["state"] as? String == "completed" {
+                    guard
+                        let status = row["response_status"] as? Int64,
+                        let response = row["response_body"] as? Data
+                    else {
+                        throw DatabaseError.decodingFailed
+                    }
+                    return .completed(
+                        resultResourceID: resourceID,
+                        status: Int(status),
+                        responseBody: response
+                    )
+                }
+                return .pending(resultResourceID: resourceID)
+            }
+
+            try execute(
+                """
+                INSERT INTO api_idempotency (
+                    client_id, route, idempotency_key, request_hash, state,
+                    result_resource_id, created_at
+                ) VALUES (?, ?, ?, ?, 'pending', ?, ?);
+                """,
+                bindings: bindings + [
+                    .text(requestHash),
+                    resultResourceID.map(Binding.text) ?? .null,
+                    .double(now.timeIntervalSince1970),
+                ]
+            )
+            return .claimed(resultResourceID: resultResourceID)
+        }
+    }
+
+    func idempotencyClaim(
+        clientID: UUID,
+        route: String,
+        key: String,
+        requestHash: String
+    ) throws -> IdempotencyClaim? {
+        guard let row = try query(
+            """
+            SELECT request_hash, state, result_resource_id,
+                   response_status, response_body
+            FROM api_idempotency
+            WHERE client_id = ? AND route = ? AND idempotency_key = ?
+            LIMIT 1;
+            """,
+            bindings: [
+                .text(clientID.uuidString.lowercased()),
+                .text(route),
+                .text(key),
+            ]
+        ).first else { return nil }
+        guard row["request_hash"] as? String == requestHash else {
+            throw DatabaseError.idempotencyConflict
+        }
+        let resourceID = row["result_resource_id"] as? String
+        guard row["state"] as? String == "completed" else {
+            return .pending(resultResourceID: resourceID)
+        }
+        guard let status = row["response_status"] as? Int64,
+              let response = row["response_body"] as? Data
+        else {
+            throw DatabaseError.decodingFailed
+        }
+        return .completed(
+            resultResourceID: resourceID,
+            status: Int(status),
+            responseBody: response
+        )
+    }
+
+    func completeIdempotency(
+        clientID: UUID,
+        route: String,
+        key: String,
+        requestHash: String,
+        status: Int,
+        responseBody: Data,
+        now: Date
+    ) throws {
+        try inTransaction {
+            guard let row = try query(
+                """
+                SELECT request_hash, state
+                FROM api_idempotency
+                WHERE client_id = ? AND route = ? AND idempotency_key = ?
+                LIMIT 1;
+                """,
+                bindings: [
+                    .text(clientID.uuidString.lowercased()),
+                    .text(route),
+                    .text(key),
+                ]
+            ).first else {
+                throw DatabaseError.idempotencyRecordNotFound
+            }
+            guard row["request_hash"] as? String == requestHash else {
+                throw DatabaseError.idempotencyConflict
+            }
+            if row["state"] as? String == "completed" { return }
+
+            try execute(
+                """
+                UPDATE api_idempotency
+                SET state = 'completed', response_status = ?, response_body = ?, completed_at = ?
+                WHERE client_id = ? AND route = ? AND idempotency_key = ?;
+                """,
+                bindings: [
+                    .int(Int64(status)),
+                    .blob(responseBody),
+                    .double(now.timeIntervalSince1970),
+                    .text(clientID.uuidString.lowercased()),
+                    .text(route),
+                    .text(key),
+                ]
+            )
+        }
+    }
+
+    func pruneIdempotencyRecords(before cutoff: Date) throws -> Int {
+        try execute(
+            "DELETE FROM api_idempotency WHERE created_at < ?;",
+            bindings: [.double(cutoff.timeIntervalSince1970)]
+        )
+        return Int(sqlite3_changes(handle))
     }
 
     func portableDeckLibrarySnapshot(rootDeckID: UUID) throws -> PortableDeckLibrarySnapshot {
@@ -1019,6 +1376,22 @@ actor SQLiteDatabase {
         )
     }
 
+    func updateItemTags(_ updates: [(UUID, [String])], now: Date) throws {
+        guard !updates.isEmpty else { return }
+        try inTransaction {
+            for (id, tags) in updates {
+                try execute(
+                    "UPDATE items SET tags = ?, updated_at = ? WHERE id = ?;",
+                    bindings: [
+                        .blob(try encode(tags)),
+                        .double(now.timeIntervalSince1970),
+                        .text(id.uuidString),
+                    ]
+                )
+            }
+        }
+    }
+
     func updateCardsDeck(itemID: UUID, deckID: UUID?) throws {
         try execute(
             """
@@ -1160,20 +1533,37 @@ actor SQLiteDatabase {
         mediaDescriptors: [String: MediaAssetDescriptor] = [:]
     ) throws {
         try inTransaction {
-            try applyMediaReferenceDeltas(
-                from: [:],
-                to: mediaReferenceCounts(in: item),
-                descriptors: mediaDescriptors,
-                now: createdAt
+            try insertItemWithCardsWithoutTransaction(
+                item,
+                cards: cards,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                mediaDescriptors: mediaDescriptors
             )
-            try insertItem(item, createdAt: createdAt, updatedAt: updatedAt)
-            try insertCards(cards)
-            guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
-                throw DatabaseError.itemTypeNotFound(item.itemTypeID)
-            }
-            try upsertBrowseProjection(item, itemType: itemType, createdAt: createdAt)
-            try consumeMediaReservations(ids: mediaReservationIDs(in: item))
         }
+    }
+
+    private func insertItemWithCardsWithoutTransaction(
+        _ item: Item,
+        cards: [Card],
+        createdAt: Date,
+        updatedAt: Date,
+        mediaDescriptors: [String: MediaAssetDescriptor]
+    ) throws {
+        try validateMediaAdoption(in: item, comparedTo: nil, now: createdAt)
+        try applyMediaReferenceDeltas(
+            from: [:],
+            to: mediaReferenceCounts(in: item),
+            descriptors: mediaDescriptors,
+            now: createdAt
+        )
+        try insertItem(item, createdAt: createdAt, updatedAt: updatedAt)
+        try insertCards(cards)
+        guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
+            throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+        try upsertBrowseProjection(item, itemType: itemType, createdAt: createdAt)
+        try consumeMediaReservations(ids: mediaReservationIDs(in: item))
     }
 
     func insertItemsWithCards(
@@ -1394,38 +1784,81 @@ actor SQLiteDatabase {
         mediaDescriptors: [String: MediaAssetDescriptor]
     ) throws {
         try inTransaction {
-            guard let previous = try fetchItem(id: item.id) else {
-                throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
-            }
-            try applyMediaReferenceDeltas(
-                from: mediaReferenceCounts(in: previous.item),
-                to: mediaReferenceCounts(in: item),
-                descriptors: mediaDescriptors,
-                now: updatedAt
+            try updateItemWithMediaWithoutTransaction(
+                item,
+                desiredCards: desiredCards,
+                updatedAt: updatedAt,
+                mediaDescriptors: mediaDescriptors
             )
-            let fields = try encode(item.fields)
-            let tags = try encode(item.tags)
-            try execute(
-                """
-                UPDATE items
-                SET item_type_id = ?, fields = ?, tags = ?, deck_id = ?, updated_at = ?
-                WHERE id = ?;
-                """,
-                bindings: [
-                    .text(item.itemTypeID.uuidString),
-                    .blob(fields),
-                    .blob(tags),
-                    item.deckID.map { .text($0.uuidString) } ?? .null,
-                    .double(updatedAt.timeIntervalSince1970),
-                    .text(item.id.uuidString),
-                ]
-            )
-            try reconcileCards(for: item.id, desired: desiredCards)
-            guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
-                throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+    }
+
+    private func updateItemWithMediaWithoutTransaction(
+        _ item: Item,
+        desiredCards: [Card],
+        updatedAt: Date,
+        mediaDescriptors: [String: MediaAssetDescriptor]
+    ) throws {
+        guard let previous = try fetchItem(id: item.id) else {
+            throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
+        }
+        try validateMediaAdoption(in: item, comparedTo: previous.item, now: updatedAt)
+        try applyMediaReferenceDeltas(
+            from: mediaReferenceCounts(in: previous.item),
+            to: mediaReferenceCounts(in: item),
+            descriptors: mediaDescriptors,
+            now: updatedAt
+        )
+        let fields = try encode(item.fields)
+        let tags = try encode(item.tags)
+        try execute(
+            """
+            UPDATE items
+            SET item_type_id = ?, fields = ?, tags = ?, deck_id = ?, updated_at = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .text(item.itemTypeID.uuidString),
+                .blob(fields),
+                .blob(tags),
+                item.deckID.map { .text($0.uuidString) } ?? .null,
+                .double(updatedAt.timeIntervalSince1970),
+                .text(item.id.uuidString),
+            ]
+        )
+        try reconcileCards(for: item.id, desired: desiredCards)
+        guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
+            throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+        try upsertBrowseProjection(item, itemType: itemType, createdAt: previous.createdAt)
+        try consumeMediaReservations(ids: mediaReservationIDs(in: item))
+    }
+
+    func applyItemBulk(_ mutations: [ItemBulkDatabaseMutation]) throws {
+        try inTransaction {
+            for mutation in mutations {
+                switch mutation {
+                case let .create(item, cards, descriptors, createdAt):
+                    try insertItemWithCardsWithoutTransaction(
+                        item,
+                        cards: cards,
+                        createdAt: createdAt,
+                        updatedAt: createdAt,
+                        mediaDescriptors: descriptors
+                    )
+                case let .replace(item, cards, descriptors, updatedAt):
+                    try updateItemWithMediaWithoutTransaction(
+                        item,
+                        desiredCards: cards,
+                        updatedAt: updatedAt,
+                        mediaDescriptors: descriptors
+                    )
+                case let .delete(id, deletedAt):
+                    guard try deleteItemWithMediaWithoutTransaction(id: id, deletedAt: deletedAt) else {
+                        throw DatabaseError.itemNotFound(id)
+                    }
+                }
             }
-            try upsertBrowseProjection(item, itemType: itemType, createdAt: previous.createdAt)
-            try consumeMediaReservations(ids: mediaReservationIDs(in: item))
         }
     }
 
@@ -1437,6 +1870,10 @@ actor SQLiteDatabase {
 
     func deleteItemWithMediaWithoutTransaction(id: UUID, deletedAt: Date) throws -> Bool {
         guard let persisted = try fetchItem(id: id) else { return false }
+        try deactivateReviewHistory(
+            cardIDs: try fetchCards(for: id).map(\.id),
+            revertedAt: deletedAt
+        )
         try applyMediaReferenceDeltas(
             from: mediaReferenceCounts(in: persisted.item),
             to: [:],
@@ -1445,6 +1882,64 @@ actor SQLiteDatabase {
         )
         try deleteItem(id: id)
         return true
+    }
+
+    private func deactivateReviewHistory(cardIDs: [UUID], revertedAt: Date) throws {
+        guard !cardIDs.isEmpty else { return }
+        let placeholders = Array(repeating: "?", count: cardIDs.count).joined(separator: ", ")
+        let bindings = cardIDs.map { Binding.text($0.uuidString) }
+        let activeLogIDs = try query(
+            """
+            SELECT review_logs.id
+            FROM review_logs
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_logs.card_id IN (\(placeholders))
+              AND review_reverts.id IS NULL;
+            """,
+            bindings: bindings
+        ).compactMap { $0["id"] as? String }
+        for logID in activeLogIDs {
+            try execute(
+                """
+                INSERT INTO review_reverts (id, review_log_id, reverted_at)
+                VALUES (?, ?, ?);
+                """,
+                bindings: [
+                    .text(UUID().uuidString),
+                    .text(logID),
+                    .double(revertedAt.timeIntervalSince1970),
+                ]
+            )
+        }
+    }
+
+    private func deleteReviewHistory(cardIDs: [UUID]) throws {
+        guard !cardIDs.isEmpty else { return }
+        let placeholders = Array(repeating: "?", count: cardIDs.count).joined(separator: ", ")
+        let bindings = cardIDs.map { Binding.text($0.uuidString) }
+        try execute(
+            """
+            DELETE FROM new_card_introductions
+            WHERE review_log_id IN (
+                SELECT id FROM review_logs WHERE card_id IN (\(placeholders))
+            );
+            """,
+            bindings: bindings
+        )
+        try execute(
+            """
+            DELETE FROM review_reverts
+            WHERE review_log_id IN (
+                SELECT id FROM review_logs WHERE card_id IN (\(placeholders))
+            );
+            """,
+            bindings: bindings
+        )
+        try execute(
+            "DELETE FROM review_logs WHERE card_id IN (\(placeholders));",
+            bindings: bindings
+        )
     }
 
     func insertItem(_ item: Item, createdAt: Date, updatedAt: Date) throws {
@@ -1508,6 +2003,40 @@ actor SQLiteDatabase {
         )
         guard let row = rows.first else { return nil }
         return try decodeCard(from: row)
+    }
+
+    func fetchAllCards() throws -> [Card] {
+        let rows = try query(
+            """
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
+            FROM cards
+            ORDER BY id ASC;
+            """
+        )
+        return try rows.map { try decodeCard(from: $0) }
+    }
+
+    func setCardSuspended(id: UUID, isSuspended: Bool) throws {
+        try inTransaction {
+            guard try fetchCard(id: id) != nil else { throw DatabaseError.cardNotFound(id) }
+            try execute(
+                "UPDATE cards SET is_suspended = ? WHERE id = ?;",
+                bindings: [.int(isSuspended ? 1 : 0), .text(id.uuidString)]
+            )
+        }
+    }
+
+    func resetCardProgress(id: UUID, now: Date) throws {
+        try inTransaction {
+            guard var card = try fetchCard(id: id) else { throw DatabaseError.cardNotFound(id) }
+            try deleteReviewHistory(cardIDs: [id])
+            card.memory = .new(due: now)
+            try updateCardMemory(id, memory: card.memory)
+            try execute(
+                "DELETE FROM api_card_reservations WHERE card_id = ?;",
+                bindings: [.text(id.uuidString)]
+            )
+        }
     }
 
     func fetchDueCards(asOf now: Date, studyDay: String, limit: Int? = nil) throws -> [Card] {
@@ -2171,6 +2700,23 @@ actor SQLiteDatabase {
         }
     }
 
+    func fetchReviewLog(id: UUID) throws -> ReviewLog? {
+        let rows = try query(
+            """
+            SELECT log, sequence
+            FROM review_logs
+            WHERE id = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first,
+              let data = payload(row, "log"),
+              let sequence = row["sequence"] as? Int64
+        else { return nil }
+        return try decode(ReviewLog.self, from: data).withSequence(sequence)
+    }
+
     func fetchSchedulerParameters(profileID: String) throws -> FSRSScheduler.Parameters? {
         let rows = try query(
             """
@@ -2252,6 +2798,286 @@ actor SQLiteDatabase {
                 )
             }
         }
+    }
+
+    // MARK: - API study sessions
+
+    func insertStudySession(
+        id: UUID,
+        clientID: UUID,
+        scope: StoredStudyScope,
+        now: Date
+    ) throws {
+        try execute(
+            """
+            INSERT INTO api_study_sessions (
+                id, client_id, scope, state, created_at, last_activity_at
+            ) VALUES (?, ?, ?, 'active', ?, ?);
+            """,
+            bindings: [
+                .text(id.uuidString),
+                .text(clientID.uuidString),
+                .blob(try encode(scope)),
+                .double(now.timeIntervalSince1970),
+                .double(now.timeIntervalSince1970),
+            ]
+        )
+    }
+
+    func fetchStudySession(id: UUID) throws -> StudySessionRecord? {
+        let rows = try query(
+            """
+            SELECT sessions.id, sessions.client_id, sessions.scope, sessions.state,
+                   sessions.revision,
+                   sessions.created_at, sessions.last_activity_at,
+                   reservations.card_id AS current_card_id
+            FROM api_study_sessions AS sessions
+            LEFT JOIN api_card_reservations AS reservations
+                ON reservations.session_id = sessions.id
+            WHERE sessions.id = ?
+            LIMIT 1;
+            """,
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first else { return nil }
+        return try decodeStudySession(from: row)
+    }
+
+    /// Selects and reserves one card within the same write transaction. The
+    /// session's extant reservation wins, which makes retried `next` requests
+    /// deterministic until the client grades or skips that card.
+    func reserveNextStudyCard(
+        sessionID: UUID,
+        scope: CardScope,
+        asOf now: Date,
+        studyDay: String,
+        expiresAt: Date
+    ) throws -> Card? {
+        try inTransaction {
+            try execute(
+                "DELETE FROM api_card_reservations WHERE expires_at <= ?;",
+                bindings: [.double(now.timeIntervalSince1970)]
+            )
+            let sessionRows = try query(
+                "SELECT state FROM api_study_sessions WHERE id = ? LIMIT 1;",
+                bindings: [.text(sessionID.uuidString)]
+            )
+            guard let state = sessionRows.first?["state"] as? String else {
+                throw DatabaseError.studySessionNotFound(sessionID)
+            }
+            guard state == StudySessionState.active.rawValue else {
+                throw DatabaseError.studyConflict("The study session has ended.")
+            }
+
+            let existing = try query(
+                """
+                SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
+                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                FROM api_card_reservations AS reservations
+                JOIN cards ON cards.id = reservations.card_id
+                WHERE reservations.session_id = ?
+                LIMIT 1;
+                """,
+                bindings: [.text(sessionID.uuidString)]
+            )
+            if let row = existing.first {
+                try touchStudySession(id: sessionID, now: now)
+                return try decodeCard(from: row)
+            }
+
+            let eligible = try eligibleDueCardsCTE(
+                scope: scope,
+                asOf: now,
+                studyDay: studyDay
+            )
+            let rows = try query(
+                eligible.sql + """
+
+                SELECT eligible_due.id, eligible_due.item_id, eligible_due.template_id,
+                       eligible_due.skill, eligible_due.memory, eligible_due.is_suspended,
+                       eligible_due.deck_id, eligible_due.cloze_group
+                FROM eligible_due
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM api_card_reservations AS reservations
+                    WHERE reservations.card_id = eligible_due.id
+                      AND reservations.expires_at > ?
+                )
+                ORDER BY eligible_due.due_at ASC, eligible_due.id ASC
+                LIMIT 1;
+                """,
+                bindings: eligible.bindings + [.double(now.timeIntervalSince1970)]
+            )
+            guard let row = rows.first else {
+                try touchStudySession(id: sessionID, now: now)
+                return nil
+            }
+            let card = try decodeCard(from: row)
+            try execute(
+                """
+                INSERT INTO api_card_reservations (card_id, session_id, expires_at)
+                VALUES (?, ?, ?);
+                """,
+                bindings: [
+                    .text(card.id.uuidString),
+                    .text(sessionID.uuidString),
+                    .double(expiresAt.timeIntervalSince1970),
+                ]
+            )
+            try touchStudySession(id: sessionID, now: now)
+            return card
+        }
+    }
+
+    func releaseStudyCard(sessionID: UUID, cardID: UUID, now: Date) throws -> Bool {
+        try inTransaction {
+            let sessions = try query(
+                "SELECT state FROM api_study_sessions WHERE id = ? LIMIT 1;",
+                bindings: [.text(sessionID.uuidString)]
+            )
+            guard let state = sessions.first?["state"] as? String else {
+                throw DatabaseError.studySessionNotFound(sessionID)
+            }
+            guard state == StudySessionState.active.rawValue else {
+                throw DatabaseError.studyConflict("The study session has ended.")
+            }
+            let reservation = try query(
+                """
+                SELECT card_id FROM api_card_reservations
+                WHERE session_id = ? AND card_id = ? LIMIT 1;
+                """,
+                bindings: [.text(sessionID.uuidString), .text(cardID.uuidString)]
+            )
+            guard !reservation.isEmpty else { return false }
+            try execute(
+                "DELETE FROM api_card_reservations WHERE session_id = ? AND card_id = ?;",
+                bindings: [.text(sessionID.uuidString), .text(cardID.uuidString)]
+            )
+            try touchStudySession(id: sessionID, now: now)
+            return true
+        }
+    }
+
+    func endStudySession(id: UUID, now: Date) throws {
+        try inTransaction {
+            guard try fetchStudySession(id: id) != nil else {
+                throw DatabaseError.studySessionNotFound(id)
+            }
+            try execute(
+                """
+                UPDATE api_study_sessions
+                SET state = 'ended', revision = revision + 1, last_activity_at = ?
+                WHERE id = ?;
+                """,
+                bindings: [.double(now.timeIntervalSince1970), .text(id.uuidString)]
+            )
+            try execute(
+                "DELETE FROM api_card_reservations WHERE session_id = ?;",
+                bindings: [.text(id.uuidString)]
+            )
+        }
+    }
+
+    func persistReservedReview(
+        sessionID: UUID,
+        cardID: UUID,
+        memoryBefore: MemoryState,
+        memoryAfter: MemoryState,
+        log: ReviewLog,
+        introducedDeckID: UUID?,
+        introductionStudyDay: String?,
+        now: Date
+    ) throws {
+        try inTransaction {
+            let rows = try query(
+                """
+                SELECT sessions.state, sessions.revision, reservations.expires_at,
+                       cards.is_suspended
+                FROM api_study_sessions AS sessions
+                LEFT JOIN api_card_reservations AS reservations
+                    ON reservations.session_id = sessions.id
+                   AND reservations.card_id = ?
+                LEFT JOIN cards ON cards.id = reservations.card_id
+                WHERE sessions.id = ?
+                LIMIT 1;
+                """,
+                bindings: [.text(cardID.uuidString), .text(sessionID.uuidString)]
+            )
+            guard let row = rows.first else {
+                throw DatabaseError.studySessionNotFound(sessionID)
+            }
+            guard row["state"] as? String == StudySessionState.active.rawValue else {
+                throw DatabaseError.studyConflict("The study session has ended.")
+            }
+            guard let expiry = row["expires_at"] as? Double,
+                  expiry > now.timeIntervalSince1970,
+                  row["is_suspended"] as? Int64 == 0
+            else {
+                throw DatabaseError.studyConflict(
+                    "The card is not reserved by this active study session."
+                )
+            }
+
+            try updateCardMemory(cardID, memory: memoryAfter)
+            try insertReviewLog(log, memoryBefore: memoryBefore)
+            if let introducedDeckID, let introductionStudyDay {
+                try execute(
+                    """
+                    INSERT INTO new_card_introductions (review_log_id, deck_id, study_day)
+                    VALUES (?, ?, ?);
+                    """,
+                    bindings: [
+                        .text(log.id.uuidString),
+                        .text(introducedDeckID.uuidString),
+                        .text(introductionStudyDay),
+                    ]
+                )
+            }
+            try execute(
+                "DELETE FROM api_card_reservations WHERE session_id = ? AND card_id = ?;",
+                bindings: [.text(sessionID.uuidString), .text(cardID.uuidString)]
+            )
+            try touchStudySession(id: sessionID, now: now)
+        }
+    }
+
+    private func touchStudySession(id: UUID, now: Date) throws {
+        try execute(
+            """
+            UPDATE api_study_sessions
+            SET revision = revision + 1, last_activity_at = ?
+            WHERE id = ?;
+            """,
+            bindings: [.double(now.timeIntervalSince1970), .text(id.uuidString)]
+        )
+    }
+
+    private func decodeStudySession(from row: [String: Any?]) throws -> StudySessionRecord {
+        guard let idText = row["id"] as? String,
+              let id = UUID(uuidString: idText),
+              let clientText = row["client_id"] as? String,
+              let clientID = UUID(uuidString: clientText),
+              let scopeData = payload(row, "scope"),
+              let stateText = row["state"] as? String,
+              let state = StudySessionState(rawValue: stateText),
+              let revision = row["revision"] as? Int64,
+              let createdAt = row["created_at"] as? Double,
+              let lastActivityAt = row["last_activity_at"] as? Double
+        else {
+            throw DatabaseError.decodingFailed
+        }
+        let storedScope = try decode(StoredStudyScope.self, from: scopeData)
+        guard let scope = storedScope.scope else { throw DatabaseError.decodingFailed }
+        return StudySessionRecord(
+            id: id,
+            clientID: clientID,
+            scope: scope,
+            state: state,
+            revision: Int(revision),
+            currentCardID: (row["current_card_id"] as? String).flatMap(UUID.init(uuidString:)),
+            createdAt: Date(timeIntervalSince1970: createdAt),
+            lastActivityAt: Date(timeIntervalSince1970: lastActivityAt)
+        )
     }
 
     func revertReview(reviewLogID: UUID, revertedAt: Date) throws {
@@ -2411,6 +3237,19 @@ actor SQLiteDatabase {
             FROM items
             ORDER BY created_at DESC;
             """
+        )
+        return try rows.map { try decodePersistedItem(from: $0) }
+    }
+
+    func fetchItemsPage(offset: Int, limit: Int) throws -> [PersistedItem] {
+        let rows = try query(
+            """
+            SELECT id, item_type_id, fields, tags, deck_id, created_at, updated_at
+            FROM items
+            ORDER BY created_at ASC, id ASC
+            LIMIT ? OFFSET ?;
+            """,
+            bindings: [.int(Int64(limit)), .int(Int64(offset))]
         )
         return try rows.map { try decodePersistedItem(from: $0) }
     }
@@ -2612,6 +3451,17 @@ actor SQLiteDatabase {
         expiresAt: Date
     ) throws -> Bool {
         try inTransaction {
+            if let reservation = try query(
+                "SELECT hash FROM media_reservations WHERE id = ? LIMIT 1;",
+                bindings: [.text(reservationID.uuidString)]
+            ).first {
+                guard reservation["hash"] as? String == descriptor.hash else {
+                    throw DatabaseError.invalidMediaAsset(
+                        "A media reservation identifier was reused for different bytes."
+                    )
+                }
+                return false
+            }
             let existing = try fetchMediaAsset(hash: descriptor.hash)
             if let existing {
                 guard existing.kind == descriptor.kind,
@@ -2638,6 +3488,15 @@ actor SQLiteDatabase {
             )
             return existing == nil
         }
+    }
+
+    func mediaReservationExpiresAt(id: UUID) throws -> Date? {
+        let rows = try query(
+            "SELECT expires_at FROM media_reservations WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let value = rows.first?["expires_at"] as? Double else { return nil }
+        return Date(timeIntervalSince1970: value)
     }
 
     func cancelMediaReservation(id: UUID, deleteNewAsset: Bool) throws -> MediaAsset? {
@@ -2931,6 +3790,41 @@ actor SQLiteDatabase {
                 "DELETE FROM media_reservations WHERE id = ?;",
                 bindings: [.text(id.uuidString)]
             )
+        }
+    }
+
+    private func validateMediaAdoption(
+        in item: Item,
+        comparedTo previous: Item?,
+        now: Date
+    ) throws {
+        var existingCounts = previous.map(mediaReferenceCounts(in:)) ?? [:]
+        for field in item.fields {
+            guard case let .media(ref) = field.value else { continue }
+            if existingCounts[ref.assetHash, default: 0] > 0 {
+                existingCounts[ref.assetHash, default: 0] -= 1
+                continue
+            }
+            if let reservationID = ref.reservationID {
+                let row = try query(
+                    "SELECT hash, expires_at FROM media_reservations WHERE id = ? LIMIT 1;",
+                    bindings: [.text(reservationID.uuidString)]
+                ).first
+                guard row?["hash"] as? String == ref.assetHash,
+                      let expiresAt = row?["expires_at"] as? Double,
+                      expiresAt > now.timeIntervalSince1970
+                else {
+                    throw DatabaseError.invalidMediaAsset(
+                        "The media reservation is missing, expired, or belongs to another asset."
+                    )
+                }
+            } else {
+                guard let asset = try fetchMediaAsset(hash: ref.assetHash), asset.refCount > 0 else {
+                    throw DatabaseError.invalidMediaAsset(
+                        "A live reservation is required to adopt an unreferenced media asset."
+                    )
+                }
+            }
         }
     }
 
@@ -3445,6 +4339,137 @@ actor SQLiteDatabase {
         }
     }
 
+    func applyDeckDeletion(
+        rootID: UUID,
+        descendantIDs: Set<UUID>,
+        parentID: UUID?,
+        policy: DeckDeletionPolicy,
+        deletedAt: Date
+    ) throws {
+        try inTransaction {
+            guard try fetchDeck(id: rootID) != nil else {
+                throw DatabaseError.deckNotFound(rootID)
+            }
+            switch policy {
+            case .rejectIfNonempty:
+                guard descendantIDs == [rootID], try fetchItems(deckID: rootID).isEmpty else {
+                    throw DatabaseError.resourceInUse(
+                        "The deck has child decks or assigned items."
+                    )
+                }
+
+            case .unassignItems, .moveItemsToParent:
+                let destination = policy == .moveItemsToParent ? parentID : nil
+                for deckID in descendantIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+                    for entry in try fetchItems(deckID: deckID) {
+                        try updateItemDeck(itemID: entry.item.id, deckID: destination)
+                        try updateCardsDeck(itemID: entry.item.id, deckID: destination)
+                        try execute(
+                            "UPDATE item_browse_rows SET deck_id = ? WHERE item_id = ?;",
+                            bindings: [
+                                destination.map { .text($0.uuidString) } ?? .null,
+                                .text(entry.item.id.uuidString),
+                            ]
+                        )
+                    }
+                }
+
+            case .deleteSubtreeAndItems:
+                for deckID in descendantIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+                    for entry in try fetchItems(deckID: deckID) {
+                        _ = try deleteItemWithMediaWithoutTransaction(
+                            id: entry.item.id,
+                            deletedAt: deletedAt
+                        )
+                    }
+                }
+            }
+
+            for deckID in try deckDeletionOrder(ids: descendantIDs) {
+                try deleteDeck(id: deckID)
+            }
+            try reconcileOrphanedIncludedItemTypes()
+        }
+    }
+
+    func resetDeckProgress(deckIDs: Set<UUID>, now: Date) throws -> Int {
+        guard !deckIDs.isEmpty else { return 0 }
+
+        let orderedDeckIDs = deckIDs.sorted { $0.uuidString < $1.uuidString }
+        let placeholders = Array(repeating: "?", count: orderedDeckIDs.count)
+            .joined(separator: ", ")
+        let deckBindings = orderedDeckIDs.map { Binding.text($0.uuidString) }
+        let cardLogIDs = """
+            SELECT review_logs.id
+            FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
+            WHERE cards.deck_id IN (\(placeholders))
+            """
+
+        return try inTransaction {
+            let rows = try query(
+                """
+                SELECT cards.id
+                FROM cards
+                JOIN items ON items.id = cards.item_id
+                WHERE cards.deck_id IN (\(placeholders))
+                ORDER BY items.created_at ASC, items.rowid ASC, cards.rowid ASC;
+                """,
+                bindings: deckBindings
+            )
+            let orderedCardIDs = try rows.map { row -> UUID in
+                guard let idText = row["id"] as? String,
+                      let id = UUID(uuidString: idText)
+                else { throw DatabaseError.decodingFailed }
+                return id
+            }
+
+            // These child records reference review_logs without cascade rules,
+            // so remove them before their parent history rows.
+            try execute(
+                "DELETE FROM new_card_introductions WHERE review_log_id IN (\(cardLogIDs));",
+                bindings: deckBindings
+            )
+            try execute(
+                "DELETE FROM review_reverts WHERE review_log_id IN (\(cardLogIDs));",
+                bindings: deckBindings
+            )
+            try execute(
+                "DELETE FROM review_logs WHERE id IN (\(cardLogIDs));",
+                bindings: deckBindings
+            )
+
+            // Cards created in one import often share a timestamp. Give each a
+            // tiny, already-due offset in insertion order so a reset restores
+            // authored order instead of falling back to random UUID order.
+            let updateStatement = try prepareStatement(
+                """
+                UPDATE cards
+                SET memory = ?, due_at = ?, phase = ?, lapses = ?
+                WHERE id = ?;
+                """
+            )
+            defer { sqlite3_finalize(updateStatement) }
+            for (index, cardID) in orderedCardIDs.enumerated() {
+                let millisecondsBeforeReset = orderedCardIDs.count - index
+                let due = now.addingTimeInterval(-Double(millisecondsBeforeReset) / 1_000)
+                let memory = MemoryState.new(due: due)
+                try executePrepared(
+                    updateStatement,
+                    bindings: [
+                        .blob(try encode(memory)),
+                        .double(memory.due.timeIntervalSince1970),
+                        .text(memory.phase.rawValue),
+                        .int(Int64(memory.lapses)),
+                        .text(cardID.uuidString),
+                    ]
+                )
+            }
+
+            return orderedCardIDs.count
+        }
+    }
+
     private func reconcileOrphanedIncludedItemTypes() throws {
         let rows = try query(
             """
@@ -3634,7 +4659,23 @@ actor SQLiteDatabase {
     private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {
         try execute("BEGIN IMMEDIATE TRANSACTION;")
         do {
+            if changeTrackingReady {
+                try execute(
+                    """
+                    INSERT OR REPLACE INTO api_transaction_context (
+                        singleton, transaction_id, occurred_at, is_implicit
+                    ) VALUES (1, ?, ?, 0);
+                    """,
+                    bindings: [
+                        .text(UUID().uuidString.lowercased()),
+                        .double(Date.now.timeIntervalSince1970),
+                    ]
+                )
+            }
             let result = try body()
+            if changeTrackingReady {
+                try execute("DELETE FROM api_transaction_context WHERE singleton = 1;")
+            }
             try execute("COMMIT;")
             return result
         } catch {

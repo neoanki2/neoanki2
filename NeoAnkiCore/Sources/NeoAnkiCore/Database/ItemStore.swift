@@ -151,14 +151,39 @@ public actor ItemStore {
     }
 
     let database: SQLiteDatabase
-    private let schedulerOverride: (any Scheduler)?
+    let schedulerOverride: (any Scheduler)?
     private let profileID: String
-    private var fsrsParameters = FSRSScheduler.Parameters()
+    var fsrsParameters = FSRSScheduler.Parameters()
     let mediaStore: MediaStore?
+    private let localAPITransferStateFile: URL
     private var itemListCache: [DeckScope: CachedItemList] = [:]
     private var scopeSummaryCache: [DeckScope: CachedScopeSummary] = [:]
     private var deckSummariesCache: CachedDeckSummaries?
     private let starterItemTypes: [ItemType]
+    private var externalMutationInProgress = false
+    private var externalMutationWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Serializes adapter-level read/check/write mutation sequences over this
+    /// library. The database commands remain the source of validation and
+    /// transactionality; this lease prevents two adapters from both passing
+    /// the same optimistic-revision check before either command commits.
+    public func acquireExternalMutationSlot() async {
+        if !externalMutationInProgress {
+            externalMutationInProgress = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            externalMutationWaiters.append(continuation)
+        }
+    }
+
+    public func releaseExternalMutationSlot() {
+        if externalMutationWaiters.isEmpty {
+            externalMutationInProgress = false
+        } else {
+            externalMutationWaiters.removeFirst().resume()
+        }
+    }
 
     public init(
         databaseURL: URL,
@@ -169,6 +194,9 @@ public actor ItemStore {
     ) throws {
         let directory = databaseURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        localAPITransferStateFile = directory
+            .appendingPathComponent(".neoanki-api", isDirectory: true)
+            .appendingPathComponent("transfers.plist", isDirectory: false)
         database = try SQLiteDatabase(path: databaseURL)
         schedulerOverride = scheduler
         self.profileID = profileID.isEmpty ? "default" : profileID
@@ -182,6 +210,22 @@ public actor ItemStore {
 
     public var media: MediaStore? {
         mediaStore
+    }
+
+    /// Private library-local storage used by the loopback API for resumable
+    /// import and export jobs. It is intentionally not part of any HTTP model.
+    public func localAPITransferStateURL() -> URL {
+        localAPITransferStateFile
+    }
+
+    /// Creates a consistent private snapshot for non-mutating validation.
+    /// Callers own and must remove the destination when finished.
+    public func createValidationDatabaseSnapshot(at destination: URL) async throws {
+        try await database.backup(to: destination)
+    }
+
+    public func libraryID() async throws -> UUID {
+        try await database.libraryID()
     }
 
     /// Opens the database, runs migrations, and applies the configured
@@ -389,7 +433,7 @@ public actor ItemStore {
         )
     }
 
-    private func studyDayKey(asOf now: Date) async throws -> String {
+    func studyDayKey(asOf now: Date) async throws -> String {
         let rollover = try await studyDayRolloverMinutes()
         return StudyDay.key(for: now, rolloverMinutes: rollover)
     }
@@ -460,7 +504,7 @@ public actor ItemStore {
         }
     }
 
-    private func deckTreeSummaries() async throws -> [DeckSummary] {
+    func deckTreeSummaries() async throws -> [DeckSummary] {
         deckTreeSummaries(from: try await database.fetchAllDecks())
     }
 
@@ -508,6 +552,20 @@ public actor ItemStore {
         return true
     }
 
+    /// Returns every card in a deck subtree to its never-reviewed state and
+    /// removes the review history that produced its schedule. Items, deck
+    /// settings, and card suspension state are preserved.
+    @discardableResult
+    public func resetDeckProgress(id: UUID, now: Date = .now) async throws -> Int {
+        guard try await database.fetchDeck(id: id) != nil else {
+            throw DatabaseError.deckNotFound(id)
+        }
+
+        let summaries = try await deckSummaries(asOf: now)
+        let descendantIDs = DeckTree.descendantIDs(of: id, in: summaries)
+        return try await database.resetDeckProgress(deckIDs: descendantIDs, now: now)
+    }
+
     /// Deletes every unassigned item and its generated cards.
     @discardableResult
     public func deleteAllUnassignedItems(now: Date = .now) async throws -> Int {
@@ -537,6 +595,8 @@ public actor ItemStore {
     /// Saves an item and the cards generated from its item type templates.
     @discardableResult
     public func createItem(_ item: Item, now: Date = .now) async throws -> SavedItemSummary {
+        var item = item
+        item.tags = try normalizedTags(item.tags)
         guard let itemType = try await database.fetchItemType(id: item.itemTypeID) else {
             throw DatabaseError.itemTypeNotFound(item.itemTypeID)
         }
@@ -734,9 +794,51 @@ public actor ItemStore {
         return (persisted.item, itemType)
     }
 
+    public func validateItem(_ item: Item) async throws {
+        guard let itemType = try await database.fetchItemType(id: item.itemTypeID) else {
+            throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        }
+        if let deckID = item.deckID,
+           try await database.fetchDeck(id: deckID) == nil {
+            throw DatabaseError.deckNotFound(deckID)
+        }
+        _ = try normalizedTags(item.tags)
+        try validate(item, against: itemType)
+    }
+
+    @discardableResult
+    public func renameTag(from source: String, to destination: String, now: Date = .now) async throws -> Int {
+        let source = try normalizedTag(source)
+        let destination = try normalizedTag(destination)
+        let records = try await database.fetchItems()
+        let updates: [(UUID, [String])] = records.compactMap { record in
+            guard record.item.tags.contains(source) else { return nil }
+            var seen: Set<String> = []
+            let tags = record.item.tags.map { $0 == source ? destination : $0 }
+                .filter { seen.insert($0).inserted }
+            return (record.item.id, tags)
+        }
+        try await database.updateItemTags(updates, now: now)
+        return updates.count
+    }
+
+    @discardableResult
+    public func removeTag(_ value: String, now: Date = .now) async throws -> Int {
+        let tag = try normalizedTag(value)
+        let records = try await database.fetchItems()
+        let updates: [(UUID, [String])] = records.compactMap { record in
+            guard record.item.tags.contains(tag) else { return nil }
+            return (record.item.id, record.item.tags.filter { $0 != tag })
+        }
+        try await database.updateItemTags(updates, now: now)
+        return updates.count
+    }
+
     /// Updates item content and applies media reference deltas atomically.
     @discardableResult
     public func updateItem(_ item: Item, now: Date = .now) async throws -> SavedItemSummary {
+        var item = item
+        item.tags = try normalizedTags(item.tags)
         guard let previous = try await database.fetchItem(id: item.id) else {
             throw DatabaseError.invalidMediaAsset("The item being edited no longer exists.")
         }
@@ -1055,6 +1157,20 @@ public actor ItemStore {
         try await database.countActiveReviewLogs(for: cardID)
     }
 
+    public func card(id: UUID) async throws -> Card {
+        guard let card = try await database.fetchCard(id: id) else {
+            throw DatabaseError.cardNotFound(id)
+        }
+        return card
+    }
+
+    public func reviewLog(id: UUID) async throws -> ReviewLog {
+        guard let log = try await database.fetchReviewLog(id: id) else {
+            throw DatabaseError.reviewLogNotFound(id)
+        }
+        return log
+    }
+
     public func schedulingParameters() -> FSRSScheduler.Parameters {
         fsrsParameters
     }
@@ -1295,7 +1411,7 @@ public actor ItemStore {
         }
     }
 
-    private func newMediaDescriptors(
+    func newMediaDescriptors(
         in item: Item,
         comparedTo previous: Item?
     ) async throws -> [String: MediaAssetDescriptor] {
@@ -1531,7 +1647,7 @@ public actor ItemStore {
         return summaries
     }
 
-    private func hydrateDueCards(_ cards: [Card]) async throws -> [DueCard] {
+    func hydrateDueCards(_ cards: [Card]) async throws -> [DueCard] {
         guard !cards.isEmpty else { return [] }
 
         let loadedItemTypes = try await database.fetchItemTypesWithCorruption()
@@ -1580,14 +1696,35 @@ public actor ItemStore {
         return dueCards
     }
 
-    private func validate(_ item: Item, against itemType: ItemType) throws {
+    func validate(_ item: Item, against itemType: ItemType) throws {
+        let definitions = Dictionary(uniqueKeysWithValues: itemType.fields.map { ($0.id, $0) })
+        var seen: Set<UUID> = []
         for fieldValue in item.fields {
+            guard seen.insert(fieldValue.fieldID).inserted else {
+                throw DatabaseError.invalidItem("An item cannot contain the same field twice.")
+            }
+            guard let definition = definitions[fieldValue.fieldID] else {
+                throw DatabaseError.invalidItem("The item contains an unknown field.")
+            }
+            guard value(fieldValue.value, matches: definition.type) else {
+                throw DatabaseError.invalidItem(
+                    "The value for \(definition.name) does not match its field type."
+                )
+            }
             switch fieldValue.value {
             case let .cloze(text, blanks):
                 try ClozeValidation.validate(text: text, blanks: blanks)
             case let .media(ref):
                 guard ref.isValidStoredReference else {
                     throw MediaError.sandboxViolation
+                }
+            case let .number(number):
+                guard number.isFinite else {
+                    throw DatabaseError.invalidItem("Number fields must be finite.")
+                }
+            case let .rich(spans):
+                guard spans.allSatisfy({ $0.link.map(RichTextValidation.isValidLink) ?? true }) else {
+                    throw DatabaseError.invalidItem("Rich-text links must use a safe portable URL.")
                 }
             default:
                 break
@@ -1606,6 +1743,50 @@ public actor ItemStore {
                 throw MediaError.unsupportedFormat(ref.kind)
             }
         }
+    }
+
+    private func value(_ value: ContentValue, matches type: FieldType) -> Bool {
+        if case .empty = value { return true }
+        return switch (type, value) {
+        case (.text, .text), (.text, .rich), (.richText, .text), (.richText, .rich),
+             (.audio, .media),
+             (.image, .media), (.gif, .media), (.video, .media),
+             (.number, .number), (.cloze, .cloze):
+            true
+        default:
+            false
+        }
+    }
+
+    func normalizedTags(_ tags: [String]) throws -> [String] {
+        guard tags.count <= 256 else {
+            throw DatabaseError.invalidItem("An item may contain at most 256 tags.")
+        }
+        var seen: Set<String> = []
+        var result: [String] = []
+        for raw in tags {
+            let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                .precomposedStringWithCanonicalMapping
+            guard !tag.isEmpty, tag.utf8.count <= 1_024 else {
+                throw DatabaseError.invalidItem("Tags must be 1 to 1024 UTF-8 bytes.")
+            }
+            if seen.insert(tag).inserted { result.append(tag) }
+        }
+        return result
+    }
+
+    /// Applies the same identity rules used by item writes to a lookup key.
+    public func normalizedTagForLookup(_ raw: String) throws -> String {
+        try normalizedTag(raw)
+    }
+
+    private func normalizedTag(_ raw: String) throws -> String {
+        let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .precomposedStringWithCanonicalMapping
+        guard !tag.isEmpty, tag.utf8.count <= 1_024 else {
+            throw DatabaseError.invalidItem("Tags must be 1 to 1024 UTF-8 bytes.")
+        }
+        return tag
     }
 
 }

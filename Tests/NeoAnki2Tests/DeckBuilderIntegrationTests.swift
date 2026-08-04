@@ -3,17 +3,52 @@ import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import PoemDeckBuilder
 import Testing
+import VocabularyDeckBuilder
 
 @testable import NeoAnki2
 
-@Test @MainActor func productionStyleRegistryExposesPoemBuilder() {
+@Test @MainActor func productionStyleRegistryKeepsIncrementalVocabularyOutOfDeckBuilders() {
     let registry = DeckBuilderRegistry([
         PoemDeckBuilderFeature.makeFeature(),
     ])
 
     #expect(registry.features.map(\.id) == ["poem"])
     #expect(registry.feature(id: "poem")?.descriptor.title == "Poem Deck")
+    #expect(registry.feature(id: "vocabulary") == nil)
     #expect(registry.feature(id: "missing") == nil)
+}
+
+@Test @MainActor func generatedVocabularyItemsAppendToSelectedDeckWithoutCreatingADeck() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki2-vocabulary-append-tests-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let destination = try await store.createDeck(Deck(name: "Ukrainian"))
+    let generated = try VocabularyDeckGenerator.generate(
+        input: VocabularyDeckInput(
+            destinationDeckID: destination.id,
+            deckName: destination.name,
+            language: "uk",
+            form: "слово",
+            senses: [.init(id: "sense", definition: "Одиниця мови.")],
+            paradigms: [.formToMeaning, .meaningToForm]
+        )
+    )
+    defer { generated.cleanup() }
+
+    let result = try await AuthoredDeck.importItems(
+        from: generated.bundleURL,
+        into: store,
+        deckID: destination.id
+    )
+
+    #expect(result.itemCount == 1)
+    #expect(try await store.listDecks().map(\.name) == ["Ukrainian"])
+    let items = try await store.listItems(scope: .deck(destination.id, includeDescendants: false))
+    #expect(items.count == 1)
+    #expect(items.first?.deckID == destination.id)
+    #expect(items.first?.cardCount == 2)
 }
 
 @Test @MainActor func generatedPoemImportsThroughAppTransferAndRefreshesModels() async throws {

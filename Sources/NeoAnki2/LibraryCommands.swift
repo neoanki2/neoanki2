@@ -5,6 +5,9 @@ struct LibraryCommandHandlers {
     var openImport: (() -> Void)?
     var openPortableDeckImport: (() -> Void)?
     var openPortableDeckExport: (() -> Void)?
+    var openVocabularyPackImport: (() -> Void)?
+    var openVocabularyPacks: (() -> Void)?
+    var openAddFromVocabulary: (() -> Void)?
     var openDeckBuilder: (() -> Void)?
     var openTemplates: (() -> Void)?
     var openBrowse: (() -> Void)?
@@ -16,6 +19,9 @@ struct LibraryCommandHandlers {
     var canImport = false
     var canImportPortableDeck = false
     var canExportPortableDeck = false
+    var canImportVocabularyPack = false
+    var canOpenVocabularyPacks = false
+    var canAddFromVocabulary = false
     var canOpenDeckBuilder = false
     var canOpenTemplates = false
     var canBrowse = false
@@ -47,6 +53,11 @@ struct LibraryCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: .command)
             .disabled(!(handlers?.canAddItem ?? false))
+
+            Button("Add from Vocabulary…") {
+                handlers?.openAddFromVocabulary?()
+            }
+            .disabled(!(handlers?.canAddFromVocabulary ?? false))
         }
 
         CommandGroup(after: .importExport) {
@@ -61,6 +72,11 @@ struct LibraryCommands: Commands {
                 handlers?.openPortableDeckImport?()
             }
             .disabled(!(handlers?.canImportPortableDeck ?? false))
+
+            Button("Import Vocabulary Pack…") {
+                handlers?.openVocabularyPackImport?()
+            }
+            .disabled(!(handlers?.canImportVocabularyPack ?? false))
 
             Button("Export Deck…") {
                 handlers?.openPortableDeckExport?()
@@ -102,6 +118,13 @@ struct LibraryCommands: Commands {
             }
             .keyboardShortcut("a", modifiers: [.command, .option])
             .disabled(!(handlers?.canToggleAnswerColumn ?? false))
+
+            Divider()
+
+            Button("Vocabulary Packs…") {
+                handlers?.openVocabularyPacks?()
+            }
+            .disabled(!(handlers?.canOpenVocabularyPacks ?? false))
 
             Divider()
 

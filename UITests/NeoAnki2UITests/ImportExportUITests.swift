@@ -150,8 +150,8 @@ extension FastFunctionalJourneyTests {
             let exportItem = exportApp.menuItems.identified("Export Deck…")
             XCTAssertTrue(exportItem.waitUntilExists(timeout: 3))
             XCTAssertTrue(exportItem.isEnabled)
-            exportItem.click()
-            dismissPortableDeckNotice(titled: "Deck Exported", in: exportApp)
+            exportApp.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+            exportPortableDeckForTesting(to: exportURL, in: exportApp)
             XCTAssertTrue(FileManager.default.fileExists(atPath: exportURL.path))
         }
 

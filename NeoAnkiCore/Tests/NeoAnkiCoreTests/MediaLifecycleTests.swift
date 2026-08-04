@@ -116,20 +116,25 @@ private func item(
 
 @Test func sharedAssetSurvivesUntilLastItemIsDeleted() async throws {
     let context = try await makeMediaStore()
-    let ref = try await context.media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
-    let first = item(type: context.type, mediaFields: [(context.firstImage, ref)])
-    let second = item(type: context.type, mediaFields: [(context.firstImage, ref)])
+    let firstRef = try await context.media.ingest(
+        data: pngBytes, kind: .image, fileExtension: "png"
+    )
+    let secondRef = try await context.media.ingest(
+        data: pngBytes, kind: .image, fileExtension: "png"
+    )
+    let first = item(type: context.type, mediaFields: [(context.firstImage, firstRef)])
+    let second = item(type: context.type, mediaFields: [(context.firstImage, secondRef)])
     _ = try await context.store.createItem(first)
     _ = try await context.store.createItem(second)
 
     #expect(try await context.store.deleteItem(id: first.id))
-    #expect(try await context.store.mediaAsset(hash: ref.assetHash)?.refCount == 1)
-    _ = try await context.media.resolve(ref)
+    #expect(try await context.store.mediaAsset(hash: firstRef.assetHash)?.refCount == 1)
+    _ = try await context.media.resolve(firstRef)
 
     #expect(try await context.store.deleteItem(id: second.id))
-    #expect(try await context.store.mediaAsset(hash: ref.assetHash) == nil)
+    #expect(try await context.store.mediaAsset(hash: firstRef.assetHash) == nil)
     await #expect(throws: MediaError.readFailed) {
-        _ = try await context.media.resolve(ref)
+        _ = try await context.media.resolve(firstRef)
     }
 }
 

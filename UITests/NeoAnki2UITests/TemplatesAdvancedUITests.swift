@@ -7,7 +7,7 @@ extension FastFunctionalJourneyTests {
         clickAddItemType(in: app)
         app.textFields.identified("itemTypeNameField").click()
         app.textFields.identified("itemTypeNameField").typeText("Interactions")
-        app.buttons.identified("saveItemType").click()
+        saveItemType(in: app)
 
         let interactions = ["Reveal", "Cloze", "Type answer", "Choose", "Arrange", "Record"]
         for interaction in interactions {

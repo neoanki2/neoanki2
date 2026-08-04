@@ -1,18 +1,15 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "76fc7b7824e45e67e1af90ce77780732544ce1d346d5d8b11609bfe7c886a54d",
+  "diffSHA256": "d92f289110c0bc41666b73d4fe2411599981156bc24ee90014b2b18fab98a0d1",
   "files": [
     "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
-    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift",
-    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
-    "Sources/NeoAnki2/AppDatabase.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift",
     "Sources/NeoAnki2/ContentView.swift",
+    "Sources/NeoAnki2/DeckSidebarView.swift",
     "Sources/NeoAnki2/DecksModel.swift",
-    "Sources/NeoAnki2/ImportModel.swift",
-    "Sources/NeoAnki2/ItemsModel.swift",
     "Sources/NeoAnki2/NeoAnki2App.swift",
-    "Sources/NeoAnki2/StudyModel.swift",
-    "Sources/NeoAnki2/StudyView.swift"
+    "Sources/NeoAnki2/ScopeHomeView.swift",
+    "Sources/NeoAnki2/UserFacingError.swift"
   ],
-  "reason": "Internal startup, query, hydration, and transfer performance paths changed; user workflows, visual layout, accessibility identifiers, and documented data semantics remain unchanged. The timing behavior is documented separately in the affected guides."
+  "reason": "Shared library, navigation, error, and media adapters gained local API, offline vocabulary, and deck-reset wiring. The new workflows are documented in the dedicated API, import/export, scheduling, and shortcuts guides; the existing first-launch, library, media, import, and error screenshot scenarios remain visually accurate."
 }

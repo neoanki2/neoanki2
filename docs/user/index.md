@@ -23,6 +23,7 @@ goal or explanation you need.
 - [Add text, cloze, and media](content-and-media/)
 - [Study and grade cards](studying/)
 - [Import or export](import-export/)
+- [Configure the local automation API](local-api/)
 
 ## Understand
 

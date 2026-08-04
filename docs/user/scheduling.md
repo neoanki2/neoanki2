@@ -50,6 +50,16 @@ Choose **Scheduling → Scheduling Settings…** to set when a new study day beg
 in local time. The default is **4:00 AM**. The app follows the Mac's current
 time zone, and deferred new cards become available at the next rollover.
 
+## Reset a deck's progress
+
+Control-click a deck, choose **Deck Settings…**, then choose **Reset All Progress…**
+to return every card in that deck and its subdecks to New. NeoAnki2
+shows a destructive confirmation before committing the reset. Items, deck
+settings, and suspended-card state are preserved; review history and the
+schedule derived from it are permanently removed for the affected cards. The
+operation cannot be undone, so back up the library first when that history
+matters.
+
 Learning and relearning use criterion-based **repair rounds**, not fixed minute
 intervals. NeoAnki2 finishes the current queue, then shows every failed card
 again. Again moves that card to the end of the next repair round; Hard, Good,

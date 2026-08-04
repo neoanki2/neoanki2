@@ -414,7 +414,7 @@ extension FastFunctionalJourneyTests {
         app.menuItems.identified("Back").click()
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Front").click()
-        app.buttons.identified("saveTemplate").click()
+        saveTemplateEditor(in: app)
         closeTemplates(in: app)
 
         addBasicItem(front: "Reverse Q", back: "Reverse A", in: app)

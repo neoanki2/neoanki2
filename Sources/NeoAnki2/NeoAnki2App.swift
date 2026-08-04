@@ -1,12 +1,14 @@
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import PoemDeckBuilder
+import VocabularyDeckBuilder
 import SwiftUI
 
 private struct InitialLibraryPayload: Sendable {
     let store: ItemStore
     let mediaStore: MediaStore?
     let snapshot: ColdLibraryHomeSnapshot?
+    let vocabularyRootURL: URL
 }
 
 @main
@@ -15,6 +17,8 @@ struct NeoAnki2App: App {
     @State private var itemsModel: ItemsModel?
     @State private var decksModel: DecksModel?
     @State private var schedulingModel: SchedulingModel?
+    @State private var vocabularyLibraryModel: VocabularyLibraryModel?
+    @State private var apiControlModel: APIControlModel?
     @State private var bootstrapError: String?
 #if DEBUG
     @State private var testConfiguration: UITestRuntimeConfiguration?
@@ -58,7 +62,9 @@ struct NeoAnki2App: App {
                 return InitialLibraryPayload(
                     store: store,
                     mediaStore: await store.media,
-                    snapshot: snapshot
+                    snapshot: snapshot,
+                    vocabularyRootURL: databaseURL.deletingLastPathComponent()
+                        .appendingPathComponent("Vocabulary Packs", isDirectory: true)
                 )
             }
         }
@@ -67,12 +73,13 @@ struct NeoAnki2App: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let itemsModel, let decksModel, let schedulingModel {
+                if let itemsModel, let decksModel, let schedulingModel, let vocabularyLibraryModel {
 #if DEBUG
                     ContentView(
                         itemsModel: itemsModel,
                         decksModel: decksModel,
                         schedulingModel: schedulingModel,
+                        vocabularyLibraryModel: vocabularyLibraryModel,
                         deckBuilderRegistry: .production,
                         testingEnvironment: activeTestingEnvironment,
                         testingInitialRoute: testConfiguration?.initialRoute
@@ -84,6 +91,7 @@ struct NeoAnki2App: App {
                         itemsModel: itemsModel,
                         decksModel: decksModel,
                         schedulingModel: schedulingModel,
+                        vocabularyLibraryModel: vocabularyLibraryModel,
                         deckBuilderRegistry: .production
                     )
 #endif
@@ -102,12 +110,43 @@ struct NeoAnki2App: App {
             .task {
                 installUITestControlIfNeeded()
             }
+            .alert(
+                "Approve Local API Client?",
+                isPresented: Binding(
+                    get: { apiControlModel?.pendingPairing != nil },
+                    set: { visible in
+                        if !visible { apiControlModel?.resolvePairing(approved: false) }
+                    }
+                ),
+                presenting: apiControlModel?.pendingPairing
+            ) { _ in
+                Button("Deny", role: .cancel) {
+                    apiControlModel?.resolvePairing(approved: false)
+                }
+                Button("Approve") {
+                    apiControlModel?.resolvePairing(approved: true)
+                }
+            } message: { prompt in
+                let origin = prompt.request.origin.map { "\nOrigin: \($0)" } ?? ""
+                let scopes = prompt.request.requestedScopes.map(\.rawValue).sorted()
+                    .joined(separator: ", ")
+                Text("\(prompt.request.displayName) requests access.\(origin)\nScopes: \(scopes)")
+            }
         }
         .defaultSize(width: 960, height: 640)
         .commands {
             LibraryCommands()
             StudyCommands()
             SchedulingCommands(model: schedulingModel)
+        }
+
+        Settings {
+            if let apiControlModel {
+                APISettingsView(model: apiControlModel)
+            } else {
+                ProgressView("Opening library…")
+                    .frame(width: 420, height: 240)
+            }
         }
     }
 
@@ -165,6 +204,10 @@ struct NeoAnki2App: App {
             itemsModel = newItemsModel
             decksModel = newDecksModel
             schedulingModel = SchedulingModel(store: payload.store)
+            vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL)
+            let apiModel = APIControlModel(store: payload.store)
+            apiControlModel = apiModel
+            await apiModel.restore()
             AppStartupTrace.mark("models_ready")
         } catch {
             bootstrapError = UserFacingError.message(from: error)
@@ -202,7 +245,9 @@ struct NeoAnki2App: App {
         return InitialLibraryPayload(
             store: store,
             mediaStore: await store.media,
-            snapshot: snapshot
+            snapshot: snapshot,
+            vocabularyRootURL: databaseURL.deletingLastPathComponent()
+                .appendingPathComponent("Vocabulary Packs", isDirectory: true)
         )
     }
 
@@ -244,9 +289,39 @@ struct NeoAnki2App: App {
             )
         }
 
+        if command.action == .exportPortable {
+            guard let itemsModel,
+                  let deckID = decksModel?.selectedDeckID,
+                  let path = command.path,
+                  !path.isEmpty else {
+                return UITestAcknowledgement(
+                    sessionID: command.sessionID,
+                    sequence: command.sequence,
+                    state: .failed,
+                    scenario: command.scenario,
+                    route: command.initialRoute,
+                    message: "Portable export requires an open library, selected deck, and destination"
+                )
+            }
+            let transfer = PortableDeckTransferModel(store: itemsModel.store)
+            let succeeded = await transfer.exportDeck(
+                id: deckID,
+                to: URL(fileURLWithPath: path)
+            )
+            return UITestAcknowledgement(
+                sessionID: command.sessionID,
+                sequence: command.sequence,
+                state: succeeded ? .ready : .failed,
+                scenario: command.scenario,
+                route: command.initialRoute,
+                message: succeeded ? nil : transfer.notice?.message
+            )
+        }
+
         itemsModel = nil
         decksModel = nil
         schedulingModel = nil
+        vocabularyLibraryModel = nil
         bootstrapError = nil
         var environment = command.environment
         switch command.action {
@@ -256,6 +331,8 @@ struct NeoAnki2App: App {
             environment["NEOANKI_TEST_IMPORT_PATH"] = command.path
         case .openPortableImport:
             environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"] = command.path
+        case .exportPortable:
+            break
         case .setPortableBusy:
             environment["NEOANKI_TEST_PORTABLE_BUSY"] = command.enabled == true ? "1" : "0"
         }

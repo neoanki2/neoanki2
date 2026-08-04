@@ -48,8 +48,10 @@ struct ItemTypeEditorView: View {
             Section("Fields") {
                 ForEach(Array(draft.fields.enumerated()), id: \.element.id) { index, field in
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                        HStack(spacing: DesignSystem.Spacing.sm) {
+                        HStack(spacing: DesignSystem.Spacing.xs) {
                             TextField("Field name", text: $draft.fields[index].name)
+                                .labelsHidden()
+                                .accessibilityLabel("Field name")
                                 .accessibilityIdentifier("itemTypeField-\(field.id.uuidString)")
 
                             Picker("Type", selection: $draft.fields[index].type) {
@@ -67,39 +69,47 @@ struct ItemTypeEditorView: View {
                                 .accessibilityLabel("Required")
                                 .accessibilityIdentifier("itemTypeFieldRequired-\(field.id.uuidString)")
 
-                            // Per-row move buttons stay keyboard-reachable via Tab
-                            // + Space. They intentionally carry no keyboard
-                            // shortcut: a single shortcut repeated on every row
-                            // would be ambiguous about which field it moves.
-                            Button {
-                                moveField(from: index, by: -1)
-                            } label: {
-                                Image(systemName: "arrow.up")
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(index == 0)
-                            .accessibilityLabel("Move field \(field.name) up")
-                            .accessibilityIdentifier("moveFieldUp-\(field.id.uuidString)")
-
-                            Button {
-                                moveField(from: index, by: 1)
-                            } label: {
-                                Image(systemName: "arrow.down")
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(index == draft.fields.count - 1)
-                            .accessibilityLabel("Move field \(field.name) down")
-                            .accessibilityIdentifier("moveFieldDown-\(field.id.uuidString)")
-
-                            if draft.fields.count > 2 {
-                                Button(role: .destructive) {
-                                    draft.fields.removeAll { $0.id == field.id }
+                            HStack(spacing: DesignSystem.Spacing.rowTight) {
+                                // Per-row move buttons stay keyboard-reachable via Tab
+                                // + Space. They intentionally carry no keyboard
+                                // shortcut: a single shortcut repeated on every row
+                                // would be ambiguous about which field it moves.
+                                Button {
+                                    moveField(from: index, by: -1)
                                 } label: {
-                                    Image(systemName: "minus.circle.fill")
+                                    Image(systemName: "arrow.up")
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("Remove field \(field.name)")
-                                .accessibilityIdentifier("removeItemTypeField-\(field.id.uuidString)")
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
+                                .disabled(index == 0)
+                                .accessibilityLabel("Move field \(field.name) up")
+                                .accessibilityIdentifier("moveFieldUp-\(field.id.uuidString)")
+
+                                Button {
+                                    moveField(from: index, by: 1)
+                                } label: {
+                                    Image(systemName: "arrow.down")
+                                }
+                                .buttonStyle(.plain)
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
+                                .disabled(index == draft.fields.count - 1)
+                                .accessibilityLabel("Move field \(field.name) down")
+                                .accessibilityIdentifier("moveFieldDown-\(field.id.uuidString)")
+
+                                if draft.fields.count > 2 {
+                                    Button(role: .destructive) {
+                                        draft.fields.removeAll { $0.id == field.id }
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(width: 24, height: 24)
+                                    .contentShape(Rectangle())
+                                    .accessibilityLabel("Remove field \(field.name)")
+                                    .accessibilityIdentifier("removeItemTypeField-\(field.id.uuidString)")
+                                }
                             }
                         }
                     }

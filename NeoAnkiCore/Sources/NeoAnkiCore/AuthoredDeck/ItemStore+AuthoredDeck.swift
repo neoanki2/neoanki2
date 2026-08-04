@@ -4,8 +4,13 @@ extension ItemStore {
     func importAuthoredDeck(
         _ package: AuthoredDeckPackage,
         limits: PortableDeckLimits,
-        now: Date
+        now: Date,
+        destinationDeckID: UUID?
     ) async throws -> PortableDeckImportResult {
+        if let destinationDeckID,
+           try await database.fetchDeck(id: destinationDeckID) == nil {
+            throw DatabaseError.deckNotFound(destinationDeckID)
+        }
         let existingTypes = try await database.fetchAllItemTypes()
         let existingDigests = try Dictionary(
             uniqueKeysWithValues: existingTypes.map { ($0.id, try $0.portableSchemaDigest()) }
@@ -87,7 +92,7 @@ extension ItemStore {
                     itemTypeID: destinationType.id,
                     fields: mappedFields,
                     tags: record.item.tags,
-                    deckID: record.item.deckID
+                    deckID: destinationDeckID ?? record.item.deckID
                 ),
                 createdAt: orderedAt,
                 updatedAt: now
@@ -133,13 +138,14 @@ extension ItemStore {
                 )
             }
             var seenIncludedTypeIDs: Set<UUID> = []
+            let includedItemTypeRootID = destinationDeckID ?? package.rootDeckID
             let includedItemTypes = package.itemTypes.compactMap { source -> UUID? in
                 guard let localID = typeMap[source.id]?.id,
                       seenIncludedTypeIDs.insert(localID).inserted else { return nil }
                 return localID
             }.enumerated().map { ordinal, itemTypeID in
                 IncludedItemTypeOwner(
-                    rootDeckID: package.rootDeckID,
+                    rootDeckID: includedItemTypeRootID,
                     itemTypeID: itemTypeID,
                     ordinal: ordinal
                 )
@@ -175,11 +181,16 @@ extension ItemStore {
                     libraryItemTypeIDs: package.usesIncludedItemTypes
                         ? []
                         : Set(typeMap.values.map(\.id)),
-                    decks: package.decks,
+                    decks: destinationDeckID == nil ? package.decks : [],
                     items: importedItems,
                     mappings: [],
                     includedItemTypes: package.usesIncludedItemTypes ? includedItemTypes : [],
-                    itemTypePolicies: package.usesIncludedItemTypes ? resolvedPolicies : []
+                    // A generated item batch must not replace or conflict with
+                    // the existing deck's authoring policy. Its types remain
+                    // owned by that deck and can still be reused by later batches.
+                    itemTypePolicies: destinationDeckID == nil && package.usesIncludedItemTypes
+                        ? resolvedPolicies
+                        : []
                 ),
                 now: now,
                 initialDueDates: Dictionary(
@@ -191,7 +202,7 @@ extension ItemStore {
             // failure here would invite a retry that duplicates imported data.
             try? await mediaStore?.releaseReservations(scopeID: reservationScope)
             return .init(
-                deckIDs: [package.rootDeckID],
+                deckIDs: [destinationDeckID ?? package.rootDeckID],
                 itemCount: importedItems.count,
                 createdItemTypeCount: createdTypes.count,
                 reusedItemTypeCount: reusedTypeIDs.count

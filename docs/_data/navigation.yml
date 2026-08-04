@@ -23,6 +23,8 @@ primary:
         url: /user/import-export/
       - title: Scheduling
         url: /user/scheduling/
+      - title: Local automation API
+        url: /user/local-api/
   - title: Understand
     url: /user/concepts/
     children:
@@ -54,12 +56,16 @@ primary:
         url: /PRODUCT/
       - title: Architecture
         url: /ARCHITECTURE/
+      - title: Local API requirements
+        url: /LOCAL_API/
       - title: Design system
         url: /DESIGN/
       - title: Authored deck format
         url: /AUTHORED_DECK_FORMAT/
       - title: Portable deck format
         url: /PORTABLE_DECK_FORMAT/
+      - title: Offline vocabulary packs
+        url: /OFFLINE_VOCABULARY/
       - title: LLM deck authoring
         url: /LLM_DECK_AUTHORING/
       - title: JSON Schemas
