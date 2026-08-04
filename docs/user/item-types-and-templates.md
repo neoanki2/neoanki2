@@ -56,7 +56,7 @@ Choose **Add** above the type list. A new draft starts with required **Front** a
 - **Type:** Text, Rich Text, Number, Audio, Image, GIF, Video, or Cloze.
 - **Required:** controls whether an item must supply a value for that field.
 
-Use **Add Field** to append another field. Use each row’s arrows to move it up or down; field order affects item editing, display, and automatic skill derivation. A type edited in the app must retain at least two fields, so remove controls disappear at two.
+Use **Add Field** to append another field. Use each row’s arrows to move it up or down, and use the remove control to delete an unreferenced field. These compact row controls provide a consistent click target and remain keyboard reachable. Field order affects item editing, display, and automatic skill derivation. A type edited in the app must retain at least two fields, so remove controls disappear at two.
 
 Save is available only when the type has a nonblank name, at least two fields, and complete, unique field names. A newly created type must also have at least two text-like fields so NeoAnki2 can create its initial **Card** template from the first two of them.
 
