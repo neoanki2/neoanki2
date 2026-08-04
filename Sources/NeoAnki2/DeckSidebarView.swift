@@ -6,6 +6,7 @@ struct DeckSidebarView: View {
     @Binding var selection: SidebarSelection
     var onDeleteAllUnassigned: () -> Void = {}
     var onDeckSettingsSaved: () async -> Void = {}
+    var onDeckProgressReset: () async -> Void = {}
     @State private var deckToRename: DeckSummary?
     @State private var deckToConfigure: DeckSummary?
     @State private var renameText = ""
@@ -81,7 +82,8 @@ struct DeckSidebarView: View {
             DeckSettingsView(
                 decksModel: decksModel,
                 deck: deck,
-                onSaved: onDeckSettingsSaved
+                onSaved: onDeckSettingsSaved,
+                onProgressReset: onDeckProgressReset
             )
         }
         .toolbar {

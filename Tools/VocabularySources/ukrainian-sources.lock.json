@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "retrievalDate": "2026-07-31",
+  "maximumLockedBytes": 5000000000,
+  "files": [
+    {
+      "path": "archives/ukwiktionary-latest-pages-articles.xml.bz2",
+      "kind": "http",
+      "url": "https://dumps.wikimedia.org/ukwiktionary/20260701/ukwiktionary-20260701-pages-articles.xml.bz2",
+      "refreshURL": "https://dumps.wikimedia.org/ukwiktionary/latest/ukwiktionary-latest-pages-articles.xml.bz2",
+      "bytes": 16524566,
+      "sha256": "9dacc408065a68ee7c013f891120b3149a122c7b0dd49d03e731e5121d655afa",
+      "validation": "bzip2"
+    },
+    {
+      "path": "metadata/ukwiktionary-latest-sha1sums.txt",
+      "kind": "http",
+      "url": "https://dumps.wikimedia.org/ukwiktionary/20260701/ukwiktionary-20260701-sha1sums.txt",
+      "refreshURL": "https://dumps.wikimedia.org/ukwiktionary/latest/ukwiktionary-latest-sha1sums.txt",
+      "bytes": 3680,
+      "sha256": "67006a1799e1f4781896c82fb96ba7530c73fe284519ab2bbff0e5975f20b268",
+      "validation": "sha1-manifest"
+    },
+    {
+      "path": "archives/kaikki.org-dictionary-Ukrainian.jsonl.gz",
+      "kind": "http",
+      "url": "https://kaikki.org/dictionary/Ukrainian/kaikki.org-dictionary-Ukrainian.jsonl.gz",
+      "refreshURL": "https://kaikki.org/dictionary/Ukrainian/kaikki.org-dictionary-Ukrainian.jsonl.gz",
+      "bytes": 28005792,
+      "sha256": "bfd9f0fa6e33eed01d260027ff3df08635f65ac59202f24ce7ee8c8e1c524c1f",
+      "validation": "gzip"
+    },
+    {
+      "path": "archives/tatoeba-ukr-sentences.tsv.bz2",
+      "kind": "http",
+      "url": "https://downloads.tatoeba.org/exports/per_language/ukr/ukr_sentences.tsv.bz2",
+      "refreshURL": "https://downloads.tatoeba.org/exports/per_language/ukr/ukr_sentences.tsv.bz2",
+      "bytes": 1993125,
+      "sha256": "c9c469b4bef33475526c76e9693a846fb83a498d48d8eb31005a5f924ae90e53",
+      "validation": "bzip2"
+    },
+    {
+      "path": "archives/tatoeba-ukr-sentences-CC0.tsv.bz2",
+      "kind": "http",
+      "url": "https://downloads.tatoeba.org/exports/per_language/ukr/ukr_sentences_CC0.tsv.bz2",
+      "refreshURL": "https://downloads.tatoeba.org/exports/per_language/ukr/ukr_sentences_CC0.tsv.bz2",
+      "bytes": 7887,
+      "sha256": "194ae135aafe303a2350909455b909d8e31341170e9d2b7f9a6956f0a1d4e267",
+      "validation": "bzip2"
+    },
+    {
+      "path": "archives/leipzig-ukr-news-2020-1M.tar.gz",
+      "kind": "http",
+      "url": "https://downloads.wortschatz-leipzig.de/corpora/ukr_news_2020_1M.tar.gz",
+      "refreshURL": "https://downloads.wortschatz-leipzig.de/corpora/ukr_news_2020_1M.tar.gz",
+      "bytes": 197202391,
+      "sha256": "d384692acbd7fe72409d53b92f1dd00feb48447c0a61158b560e6613079e6b5a",
+      "validation": "tar-gzip"
+    },
+    {
+      "path": "archives/ubertext-2-frequency.csv.xz",
+      "kind": "http",
+      "url": "https://lang.org.ua/static/downloads/ubertext2.0/dicts/ubertext_freq.csv.xz",
+      "refreshURL": "https://lang.org.ua/static/downloads/ubertext2.0/dicts/ubertext_freq.csv.xz",
+      "bytes": 89035796,
+      "sha256": "407f0c0babbea71f6910dc31fee67bd2dfc9644d4278322acd834322d73536c3",
+      "validation": "xz"
+    },
+    {
+      "path": "metadata/freedict-database.json",
+      "kind": "http",
+      "url": "https://freedict.org/freedict-database.json",
+      "refreshURL": "https://freedict.org/freedict-database.json",
+      "bytes": 568521,
+      "sha256": "08078a2c28bb06dac716ca4b0e785621ed8bfde7c0a4aac15236c3279e2ca060",
+      "validation": "json"
+    },
+    {
+      "path": "archives/Stardict.Ukr.zip",
+      "kind": "github-release",
+      "url": "https://github.com/bakustarver/ukr-dictionaries-list-opensource/releases/download/0.1/Stardict.Ukr.zip",
+      "repository": "bakustarver/ukr-dictionaries-list-opensource",
+      "tag": "0.1",
+      "asset": "Stardict.Ukr.zip",
+      "bytes": 56417949,
+      "sha256": "3e2fb0b5a8da41efcaaf2cf60c8e13f02b1150b3232acd29dff7cecdedba15f3",
+      "validation": "zip"
+    },
+    {
+      "path": "archives/ABBYY.Lingvo.DSL.Ukr.zip",
+      "kind": "github-release",
+      "url": "https://github.com/bakustarver/ukr-dictionaries-list-opensource/releases/download/0.1/ABBYY.Lingvo.DSL.Ukr.zip",
+      "repository": "bakustarver/ukr-dictionaries-list-opensource",
+      "tag": "0.1",
+      "asset": "ABBYY.Lingvo.DSL.Ukr.zip",
+      "bytes": 93437034,
+      "sha256": "0c63dad301370853e4ade8710935cfd0074da744b7b9f55cbf2013b2a06902bb",
+      "validation": "zip"
+    },
+    {
+      "path": "archives/ukrainian_mfa.dict",
+      "kind": "github-release",
+      "url": "https://github.com/MontrealCorpusTools/mfa-models/releases/download/dictionary-ukrainian_mfa-v3.0.0/ukrainian_mfa.dict",
+      "repository": "MontrealCorpusTools/mfa-models",
+      "tag": "dictionary-ukrainian_mfa-v3.0.0",
+      "asset": "ukrainian_mfa.dict",
+      "bytes": 3267130,
+      "sha256": "1e50679f37d3ed96c1e574fa6fce4c68cba00a9d91541306c32185a1f523e272",
+      "validation": "mfa-dictionary"
+    },
+    {
+      "path": "archives/ukrainian_mfa-g2p-v3.0.0.zip",
+      "kind": "github-release",
+      "url": "https://github.com/MontrealCorpusTools/mfa-models/releases/download/g2p-ukrainian_mfa-v3.0.0/ukrainian_mfa.zip",
+      "repository": "MontrealCorpusTools/mfa-models",
+      "tag": "g2p-ukrainian_mfa-v3.0.0",
+      "asset": "ukrainian_mfa.zip",
+      "bytes": 6556256,
+      "sha256": "f5371a905e4eae3bab1593994efbe8ec30a9e9dd530d38a6a0dc52c0318502c1",
+      "validation": "zip"
+    },
+    {
+      "path": "archives/frequencywords-uk-50k.txt",
+      "kind": "github-api",
+      "url": "https://api.github.com/repos/hermitdave/FrequencyWords/contents/content/2018/uk/uk_50k.txt?ref=525f9b560de45753a5ea01069454e72e9aa541c6",
+      "repository": "hermitdave/FrequencyWords",
+      "apiPath": "content/2018/uk/uk_50k.txt",
+      "ref": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "refreshRef": "master",
+      "bytes": 887259,
+      "sha256": "881686fe66a168b79f6a9ee2f6cbbf944cfb12bfb7040913ef535cb29bd86ec9",
+      "validation": "word-count"
+    },
+    {
+      "path": "archives/frequencywords-uk-full.txt",
+      "kind": "github-api",
+      "url": "https://api.github.com/repos/hermitdave/FrequencyWords/contents/content/2018/uk/uk_full.txt?ref=525f9b560de45753a5ea01069454e72e9aa541c6",
+      "repository": "hermitdave/FrequencyWords",
+      "apiPath": "content/2018/uk/uk_full.txt",
+      "ref": "525f9b560de45753a5ea01069454e72e9aa541c6",
+      "refreshRef": "master",
+      "bytes": 5560013,
+      "sha256": "bfa15b3512a41771ac8ecf47f5ef8314badb76f867fb9a6afbb409265b41709f",
+      "validation": "word-count"
+    }
+  ],
+  "repositories": [
+    {"path":"github/brown-uk-corpus","repository":"brown-uk/corpus","commit":"0665e895834c6a20acb1b48e58ba07e149c31f32","logicalBytes":76330480,"contentSHA256":"5840e11d8996af6107a644ca85f5444f70532aef3e95e54b687a8b102e9b57d9","expectedLFSPointers":[]},
+    {"path":"github/ipa-uk","repository":"lang-uk/ipa-uk","commit":"e7fc944faca090ca985d5ca09a24c59154d9dea1","logicalBytes":2013266,"contentSHA256":"13df5f6d1639cadc01f85cb7c1ad4ca2f8749624cfce298274e598b51413f1e4","expectedLFSPointers":[]},
+    {"path":"github/lang-uk-wordnet","repository":"lang-uk/wordnet","commit":"22faf275aeebfcb07b760350f22e1ba90d930728","logicalBytes":22396769,"contentSHA256":"7917cd91fd003db3868aa3e7e09a00ac13e351939c52a9cf97132aac80a82976","expectedLFSPointers":[]},
+    {"path":"github/ud-ukrainian-iu","repository":"UniversalDependencies/UD_Ukrainian-IU","commit":"21f641ba6109044ce9aafd4b2cbfa20a4ac6e479","logicalBytes":17524942,"contentSHA256":"82d42ad0f73084bce48cb2c13cc5c8ead929061db158741801ef8bab137a013a","expectedLFSPointers":[]},
+    {"path":"github/ud-ukrainian-parlamint","repository":"UniversalDependencies/UD_Ukrainian-ParlaMint","commit":"7d3fcb7e207e3d36fec4d5f27070a23db2b9a996","logicalBytes":10456570,"contentSHA256":"3902f154e8aa71cb1a670742af24c371aa7393b1b84e503baf66b17f054fe88e","expectedLFSPointers":[]},
+    {"path":"github/ukrainian-heteronyms-dictionary","repository":"lang-uk/ukrainian-heteronyms-dictionary","commit":"88f6a917a989b140332b8a573443de1918499acd","logicalBytes":2267526,"contentSHA256":"220d3417224feafc76082aa33ccade38d4b1a0cc9a08fdc890baa1f3f333b0ca","expectedLFSPointers":[]},
+    {"path":"github/ukrainian-tts-preprocessing","repository":"lang-uk/ukrainian-tts-preprocessing","commit":"f090a78a2a03fe94840013baafd6073a25dffa47","logicalBytes":12907787,"contentSHA256":"eff0cb7a4821688fc61daeebbab64435fbf4f5f6bfd0670fe2b541059fdbb7c4","expectedLFSPointers":["training/accentor_byt5_g2p/data/voa_stressed_cleaned_data.csv"]},
+    {"path":"github/ukrainian-word-stress","repository":"lang-uk/ukrainian-word-stress","commit":"541d33edf89042913006c50968f91fd48a2b71db","logicalBytes":12644613,"contentSHA256":"97110007c4528de5b0378906dfaf8f3b5e8ed5dc58d3dcbec5f1d88b2080e71e","expectedLFSPointers":[]},
+    {"path":"github/ukrainian-word-stress-dictionary","repository":"lang-uk/ukrainian-word-stress-dictionary","commit":"92544220a49018dc560d13c82cb8088f511f720b","logicalBytes":72013594,"contentSHA256":"2093f88cae04dd8d23006eeae76923c060c700ef934368070803a30f3b7fa040","expectedLFSPointers":[]},
+    {"path":"github/ukrajinet","repository":"hdaSprachtechnologie/ukrajinet","commit":"a0d5437bb2d9438093756f85f3c1439be12c3692","logicalBytes":175925301,"contentSHA256":"95cd8e52c9f1c9697fca63e3b5beb1f40a789f1b67bab93ed0abc26b4cfff91e","expectedLFSPointers":[]},
+    {"path":"github/unimorph-ukr","repository":"unimorph/ukr","commit":"d7d0284e926b7d4947c52aaafd1d7f8a40a2dec0","logicalBytes":25242369,"contentSHA256":"fc658910b3c949af675b357dc21d7bb32c73040c77bec6009867042d5edfd103","expectedLFSPointers":[]},
+    {"path":"github/vesum-dict_uk","repository":"brown-uk/dict_uk","commit":"5bb6e49693c55b7634e430fae14720aebe5a33d3","logicalBytes":26494175,"contentSHA256":"0d24cefa114dab3ba70954a1cafd4095d92d2f460528193b5baabc248c9d63b6","expectedLFSPointers":[]}
+  ]
+}

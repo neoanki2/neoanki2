@@ -3,6 +3,7 @@ import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import SwiftUI
 import UniformTypeIdentifiers
+import VocabularyDeckBuilder
 
 private struct ImportNotice: Identifiable {
     let id = UUID()
@@ -16,6 +17,7 @@ struct ContentView: View {
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
     @Bindable var schedulingModel: SchedulingModel
+    @Bindable var vocabularyLibraryModel: VocabularyLibraryModel
     @State private var isAddingItem = false
     @State private var isManagingTemplates = false
     @State private var isStudying = false
@@ -39,6 +41,8 @@ struct ContentView: View {
     @State private var importNotice: ImportNotice?
     @State private var portableDeckTransfer: PortableDeckTransferModel
     @State private var isShowingDeckBuilder = false
+    @State private var isShowingVocabularyPacks = false
+    @State private var isAddingFromVocabulary = false
     private let deckBuilderRegistry: DeckBuilderRegistry
 #if DEBUG
     private let testingEnvironment: [String: String]
@@ -50,6 +54,7 @@ struct ContentView: View {
         itemsModel: ItemsModel,
         decksModel: DecksModel,
         schedulingModel: SchedulingModel,
+        vocabularyLibraryModel: VocabularyLibraryModel,
         deckBuilderRegistry: DeckBuilderRegistry,
         testingEnvironment: [String: String] = [:],
         testingInitialRoute: UITestRoute = .library
@@ -57,6 +62,7 @@ struct ContentView: View {
         self.itemsModel = itemsModel
         self.decksModel = decksModel
         self.schedulingModel = schedulingModel
+        self.vocabularyLibraryModel = vocabularyLibraryModel
         _portableDeckTransfer = State(
             initialValue: PortableDeckTransferModel(store: itemsModel.store)
         )
@@ -69,11 +75,13 @@ struct ContentView: View {
         itemsModel: ItemsModel,
         decksModel: DecksModel,
         schedulingModel: SchedulingModel,
+        vocabularyLibraryModel: VocabularyLibraryModel,
         deckBuilderRegistry: DeckBuilderRegistry
     ) {
         self.itemsModel = itemsModel
         self.decksModel = decksModel
         self.schedulingModel = schedulingModel
+        self.vocabularyLibraryModel = vocabularyLibraryModel
         _portableDeckTransfer = State(
             initialValue: PortableDeckTransferModel(store: itemsModel.store)
         )
@@ -94,6 +102,9 @@ struct ContentView: View {
                 },
                 onDeckSettingsSaved: {
                     await refreshCounts()
+                },
+                onDeckProgressReset: {
+                    await refreshLibrary(forceRefresh: true)
                 }
             )
             .navigationSplitViewColumnWidth(
@@ -112,6 +123,13 @@ struct ContentView: View {
                     ProgressView("Transferring deck…")
                         .controlSize(.small)
                         .accessibilityIdentifier("portableDeckTransferBusy")
+                }
+            }
+            if vocabularyLibraryModel.isImporting {
+                ToolbarItem(placement: .status) {
+                    ProgressView("Importing vocabulary pack…")
+                        .controlSize(.small)
+                        .accessibilityIdentifier("vocabularyPackImportBusy")
                 }
             }
             if isManagingTemplates {
@@ -156,6 +174,9 @@ struct ContentView: View {
 #endif
         }
         .task {
+            await vocabularyLibraryModel.load()
+        }
+        .task {
             await trackDueCounts()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -190,6 +211,24 @@ struct ContentView: View {
                 onCancel: { isShowingDeckBuilder = false }
             )
         }
+        .sheet(isPresented: $isShowingVocabularyPacks) {
+            VocabularyPacksView(
+                model: vocabularyLibraryModel,
+                onImport: openVocabularyPackImport,
+                onDone: { isShowingVocabularyPacks = false }
+            )
+        }
+        .sheet(isPresented: $isAddingFromVocabulary) {
+            if let destination = selectedVocabularyDestination {
+                VocabularyDeckBuilderView(
+                    installedPacks: vocabularyLibraryModel.installedPacks,
+                    destinationDeck: destination,
+                    onImported: importGeneratedVocabulary,
+                    onCancel: { isAddingFromVocabulary = false }
+                )
+                .frame(minWidth: 640, minHeight: 620)
+            }
+        }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
             SchedulingSettingsView(model: schedulingModel) {
                 // A new rollover redraws the day's budget, which is a count
@@ -205,6 +244,13 @@ struct ContentView: View {
             )
         }
         .alert(item: $portableDeckTransfer.notice) { notice in
+            Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .alert(item: $vocabularyLibraryModel.notice) { notice in
             Alert(
                 title: Text(notice.title),
                 message: Text(notice.message),
@@ -254,6 +300,9 @@ struct ContentView: View {
             openImport: { openImport() },
             openPortableDeckImport: openPortableDeckImport,
             openPortableDeckExport: { openPortableDeckExport() },
+            openVocabularyPackImport: openVocabularyPackImport,
+            openVocabularyPacks: { isShowingVocabularyPacks = true },
+            openAddFromVocabulary: { isAddingFromVocabulary = true },
             openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
             openBrowse: { openBrowse() },
@@ -266,16 +315,25 @@ struct ContentView: View {
                 && !isManagingTemplates
                 && !isAddingItem
                 && !isShowingImport
-                && !isShowingDeckBuilder,
+                && !isShowingDeckBuilder
+                && !isShowingVocabularyPacks
+                && !isAddingFromVocabulary,
             canImport: !itemsModel.isLoading
                 && !itemsModel.itemTypes.isEmpty
                 && !isStudying
                 && !isManagingTemplates
                 && !isAddingItem
                 && !isShowingImport
-                && !isShowingDeckBuilder,
+                && !isShowingDeckBuilder
+                && !isShowingVocabularyPacks
+                && !isAddingFromVocabulary,
             canImportPortableDeck: canTransferPortableDeck,
             canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
+            canImportVocabularyPack: canUseVocabularyUI,
+            canOpenVocabularyPacks: canUseVocabularyUI,
+            canAddFromVocabulary: canUseVocabularyUI
+                && decksModel.selectedDeckID != nil
+                && !vocabularyLibraryModel.installedPacks.isEmpty,
             canOpenDeckBuilder: canTransferPortableDeck && !deckBuilderRegistry.features.isEmpty,
             canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem,
             canBrowse: !isBrowsing
@@ -296,6 +354,28 @@ struct ContentView: View {
             && !isAddingItem
             && !isShowingImport
             && !isShowingDeckBuilder
+            && !isShowingVocabularyPacks
+            && !isAddingFromVocabulary
+    }
+
+    private var canUseVocabularyUI: Bool {
+        !vocabularyLibraryModel.isImporting
+            && !itemsModel.isLoading
+            && !decksModel.isLoading
+            && !isStudying
+            && !isManagingTemplates
+            && !isAddingItem
+            && !isShowingImport
+            && !isShowingDeckBuilder
+            && !isShowingVocabularyPacks
+            && !isAddingFromVocabulary
+    }
+
+    private var selectedVocabularyDestination: DeckBuilderDeckOption? {
+        guard let deckID = decksModel.selectedDeckID,
+              let summary = decksModel.summaries.first(where: { $0.id == deckID })
+        else { return nil }
+        return DeckBuilderDeckOption(id: deckID, name: summary.name)
     }
 
     private var testingForcePortableBusy: Bool {
@@ -430,6 +510,10 @@ struct ContentView: View {
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onAddItem: { openAddItem() },
+                onAddFromVocabulary: selectedVocabularyDestination != nil
+                    && !vocabularyLibraryModel.installedPacks.isEmpty
+                    ? { isAddingFromVocabulary = true }
+                    : nil,
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
@@ -468,6 +552,39 @@ struct ContentView: View {
     private func openImport() {
         importModel = ImportModel(itemsModel: itemsModel)
         isChoosingImportFile = true
+    }
+
+    private func openVocabularyPackImport() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Offline Vocabulary Pack"
+        panel.prompt = "Import Pack"
+        panel.message = "Select a local .neovocab directory. NeoAnki will validate and copy it."
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.resolvesAliases = false
+        guard panel.runModal() == .OK, let source = panel.url else { return }
+        Task { _ = await vocabularyLibraryModel.importPack(from: source) }
+    }
+
+    @MainActor
+    private func importGeneratedVocabulary(_ generated: GeneratedDeckBundle) async throws -> Int {
+        defer { generated.cleanup() }
+        guard let destinationDeckID = generated.destinationDeckID else {
+            throw VocabularyDeckBuilderError.missingDestinationDeck
+        }
+        let result = try await AuthoredDeck.importItems(
+            from: generated.bundleURL,
+            into: itemsModel.store,
+            deckID: destinationDeckID
+        )
+        let now = Date.now
+        await decksModel.load(asOf: now)
+        decksModel.selectedScope = .deck(destinationDeckID)
+        itemsModel.invalidateItemTypes()
+        await reloadScope(asOf: now)
+        await templatesModel?.load()
+        return result.itemCount
     }
 
 #if DEBUG

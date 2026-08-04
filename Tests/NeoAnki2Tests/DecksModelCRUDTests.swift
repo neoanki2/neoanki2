@@ -109,6 +109,36 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.deckTree.isEmpty)
 }
 
+@Test @MainActor func decksModelResetsProgressAndRefreshesCounts() async throws {
+    let (model, store) = try await makeDecksModel()
+    let deck = Deck(name: "Geography")
+    _ = try await store.createDeck(deck)
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let item = Item(
+        itemTypeID: BuiltInItemTypes.basicID,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("France")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Paris")),
+        ],
+        deckID: deck.id
+    )
+    _ = try await store.createItem(item, now: now)
+    let card = try #require(
+        try await store.fetchDueCards(
+            scope: .deck(deck.id, includeDescendants: false),
+            asOf: now
+        ).first
+    )
+    _ = try await store.submitReview(cardID: card.id, rating: .good, now: now)
+    await model.load(asOf: now.addingTimeInterval(1))
+    #expect(model.summaries.first?.dueCount == 0)
+
+    let resetAt = now.addingTimeInterval(2)
+    #expect(await model.resetProgress(id: deck.id, now: resetAt) == 1)
+    #expect(model.summaries.first?.dueCount == 1)
+    #expect(try await store.rawReviewLogCount(for: card.id) == 0)
+}
+
 @Test @MainActor func decksModelClearsSelectionWhenDeckRemovedExternally() async throws {
     let (model, store) = try await makeDecksModel()
     let deck = Deck(name: "Gone")

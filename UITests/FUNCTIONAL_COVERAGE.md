@@ -12,6 +12,7 @@ test identifier and invokes its preserved assertion body.
 | Study and Scheduling | `StudyUITests`, `StudyExtendedUITests`, scheduling completion checks | 31 |
 | Import and Portable Transfer | `ImportExportUITests`, `PortableDeckUITests`, import checks from `LibraryUITests` | 15 |
 | Launch, Gating, and Accessibility | `NavigationGatingUITests`, import gating, bootstrap check from `LibraryUITests` | 9 |
+| Offline Vocabulary | Separate pack import, repeated additions to an existing deck | — |
 | **Total** |  | **126** |
 
 `FunctionalUICoverageManifestTests` derives the legacy identifiers from the

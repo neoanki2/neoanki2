@@ -6,8 +6,10 @@ import Foundation
 /// because they live in the shared user defaults domain.
 enum AppPreferences {
     static let browseShowsAnswerColumn = "browseShowsAnswerColumn"
+    static let localAPIEnabled = "localAPIEnabled"
+    static let localAPIPort = "localAPIPort"
 
-    private static let all = [browseShowsAnswerColumn]
+    private static let all = [browseShowsAnswerColumn, localAPIEnabled, localAPIPort]
 
     static func resetForTesting() {
         for key in all {

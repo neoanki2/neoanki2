@@ -109,7 +109,50 @@ public enum AuthoredDeck {
         return try await store.importAuthoredDeck(
             staged.package,
             limits: limits.portable,
-            now: now
+            now: now,
+            destinationDeckID: nil
+        )
+    }
+
+    /// Imports the authored items atomically into an existing deck without
+    /// creating the deck hierarchy declared by the source bundle.
+    ///
+    /// This is the app-extension boundary for generators that add material to
+    /// a user's deck. The authored bundle is still fully validated and its
+    /// item types and media are resolved through the normal import pipeline.
+    public static func importItems(
+        from bundleURL: URL,
+        into store: ItemStore,
+        deckID: UUID,
+        limits: AuthoredDeckLimits = .default,
+        now: Date = .now
+    ) async throws -> PortableDeckImportResult {
+        let loaded = try await Task.detached(priority: .userInitiated) {
+            try AuthoredDeckLoader(bundleURL: bundleURL, limits: limits).load()
+        }.value
+        guard loaded.diagnostics.isEmpty, let package = loaded.package else {
+            throw AuthoredDeckError.invalid(loaded.diagnostics)
+        }
+        let staged: (package: AuthoredDeckPackage, directory: URL?)
+        do {
+            staged = try await Task.detached(priority: .userInitiated) {
+                try stageMedia(package, from: bundleURL)
+            }.value
+        } catch let failure as DecodeFailure {
+            throw AuthoredDeckError.invalid([
+                failure.diagnostic(at: .init(file: "media", line: 1)),
+            ])
+        }
+        defer {
+            if let directory = staged.directory {
+                try? FileManager.default.removeItem(at: directory)
+            }
+        }
+        return try await store.importAuthoredDeck(
+            staged.package,
+            limits: limits.portable,
+            now: now,
+            destinationDeckID: deckID
         )
     }
 

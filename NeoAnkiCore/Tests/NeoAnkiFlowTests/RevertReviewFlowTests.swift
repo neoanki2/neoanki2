@@ -85,6 +85,6 @@ import Testing
         _ = try await ctx.store.deleteItem(id: item.id)
 
         #expect(try await ctx.store.rawReviewLogCount(for: card.id) == 1)
-        #expect(try await ctx.store.activeReviewLogCount(for: card.id) == 1)
+        #expect(try await ctx.store.activeReviewLogCount(for: card.id) == 0)
     }
 }

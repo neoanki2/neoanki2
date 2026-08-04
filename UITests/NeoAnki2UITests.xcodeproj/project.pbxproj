@@ -21,6 +21,7 @@
 		A1000000000000000000000C /* DocumentationScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* DocumentationScreenshotTests.swift */; };
 		A1000000000000000000000D /* FastFunctionalJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* FastFunctionalJourneyTests.swift */; };
 		A1000000000000000000000E /* ScopeHomeAndBrowseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ScopeHomeAndBrowseUITests.swift */; };
+		A1000000000000000000000F /* VocabularyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* VocabularyUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A20000000000000000000011 /* FastFunctional.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = FastFunctional.xctestplan; sourceTree = "<group>"; };
 		A20000000000000000000012 /* DocumentationScreenshots.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = DocumentationScreenshots.xctestplan; sourceTree = "<group>"; };
 		A20000000000000000000013 /* ScopeHomeAndBrowseUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeHomeAndBrowseUITests.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* VocabularyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocabularyUITests.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* NeoAnki2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NeoAnki2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000004 /* NeoAnki2UITests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = NeoAnki2UITests.xctestplan; sourceTree = "<group>"; };
@@ -62,6 +64,7 @@
 				A20000000000000000000001 /* UITestHelpers.swift */,
 				A20000000000000000000010 /* FastFunctionalJourneyTests.swift */,
 				A20000000000000000000013 /* ScopeHomeAndBrowseUITests.swift */,
+				A20000000000000000000014 /* VocabularyUITests.swift */,
 				A20000000000000000000005 /* LibraryUITests.swift */,
 				A20000000000000000000006 /* DeckUITests.swift */,
 				A20000000000000000000007 /* StudyUITests.swift */,
@@ -183,6 +186,7 @@
 				A1000000000000000000000C /* DocumentationScreenshotTests.swift in Sources */,
 				A1000000000000000000000D /* FastFunctionalJourneyTests.swift in Sources */,
 				A1000000000000000000000E /* ScopeHomeAndBrowseUITests.swift in Sources */,
+				A1000000000000000000000F /* VocabularyUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

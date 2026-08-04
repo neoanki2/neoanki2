@@ -394,6 +394,34 @@ private let authoredV3RootDeck =
     #expect(try await store.listItems().count == 2)
 }
 
+@Test func authoredItemsAppendAtomicallyToExistingDeckWithoutCreatingSourceDeck() async throws {
+    let directory = try authoredTestDirectory()
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredV3Manifest, authoredType, authoredV3RootDeck],
+        itemRecords: [
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Word"},"back":{"rich":[{"text":"Meaning"}]}}}"#,
+        ]
+    )
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let destination = try await store.createDeck(Deck(name: "My Vocabulary"))
+
+    let result = try await AuthoredDeck.importItems(
+        from: bundle,
+        into: store,
+        deckID: destination.id
+    )
+
+    #expect(result.deckIDs == [destination.id])
+    #expect(result.itemCount == 1)
+    #expect(try await store.listDecks().map(\.name) == ["My Vocabulary"])
+    let items = try await store.listItems(scope: .deck(destination.id, includeDescendants: false))
+    #expect(items.count == 1)
+    #expect(items.first?.deckID == destination.id)
+    #expect(items.first?.title == "Word")
+}
+
 @Test func authoredDeckReportsIndependentMalformedLines() throws {
     let directory = try authoredTestDirectory()
     let bundle = try authoredBundle(

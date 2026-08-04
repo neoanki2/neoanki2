@@ -269,6 +269,18 @@ final class DecksModel {
         }
     }
 
+    func resetProgress(id: UUID, now: Date = .now) async -> Int? {
+        errorMessage = nil
+        do {
+            let resetCount = try await store.resetDeckProgress(id: id, now: now)
+            await refreshCounts(asOf: now)
+            return resetCount
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return nil
+        }
+    }
+
     func deckName(for id: UUID) -> String? {
         summaries.first(where: { $0.id == id })?.name
     }

@@ -9,6 +9,7 @@ struct ScopeHomeView: View {
     let onStudy: () -> Void
     let onBrowse: () -> Void
     let onAddItem: () -> Void
+    var onAddFromVocabulary: (() -> Void)?
     let onDeleteAllUnassigned: () -> Void
 
     @State private var showDeleteAllUnassignedConfirm = false
@@ -61,6 +62,15 @@ struct ScopeHomeView: View {
                     onAddItem()
                 }
                 .accessibilityIdentifier("addItemToolbar")
+            }
+            if let onAddFromVocabulary {
+                ToolbarItem(placement: .automatic) {
+                    Button("Add from Vocabulary", systemImage: "character.book.closed") {
+                        onAddFromVocabulary()
+                    }
+                    .help("Find an entry in an installed offline vocabulary pack")
+                    .accessibilityIdentifier("addFromVocabularyToolbar")
+                }
             }
             if case .unassigned = scope.filter, summary.itemCount > 0 {
                 ToolbarItem(placement: .destructiveAction) {

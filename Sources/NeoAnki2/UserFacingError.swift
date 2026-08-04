@@ -50,6 +50,8 @@ enum UserFacingError {
             "Your library couldn't be loaded. Try again."
         case .itemTypeNotFound:
             "This item type could not be found."
+        case .itemNotFound:
+            "This item could not be found."
         case .cardNotFound:
             "This card could not be found."
         case .reviewLogNotFound:
@@ -62,10 +64,20 @@ enum UserFacingError {
             "\(field) is required."
         case .invalidItemType:
             "This item type isn't valid. Check its fields and templates."
+        case .invalidItem:
+            "This item isn't valid. Check its fields and tags."
         case .invalidDeck:
             "This deck isn't valid. Check its name and parent deck."
+        case .resourceInUse:
+            "This deck still contains items or subdecks. Move or delete them, then try again."
         case .invalidMediaAsset:
             "That media asset isn't valid."
+        case .idempotencyConflict, .idempotencyRecordNotFound:
+            "That request couldn't be safely retried. Try the action again."
+        case .studySessionNotFound:
+            "That study session no longer exists."
+        case let .studyConflict(message):
+            message
         case .decodingFailed:
             "Some library data couldn't be read. Restore a backup or contact support."
         case .unsupportedSchemaVersion:

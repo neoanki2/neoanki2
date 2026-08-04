@@ -9,11 +9,19 @@ permalink: /reference/
 
 - [Product model](../PRODUCT.md) — terminology, users, constraints, and scope
 - [Architecture](../ARCHITECTURE.md) — domain model and scheduling rationale
+- [Local API requirements](../LOCAL_API.md) — normative operations, security,
+  transactions, and version-1 acceptance criteria
+- [Local API acceptance evidence](local-api-acceptance.md) — reproducible test
+  commands and criterion-to-suite traceability
+- [Local automation API guide](../user/local-api.md) — enablement, client
+  approval, least-privilege scopes, revocation, and safe troubleshooting
 - [Design system](../DESIGN.md) — visual and interaction principles
 - [Authored deck format](../AUTHORED_DECK_FORMAT.md) — normative `.neoanki`
   JSONL source format
 - [Portable deck format](../PORTABLE_DECK_FORMAT.md) — normative `.neodeck`
   interchange format
+- [Offline vocabulary packs](../OFFLINE_VOCABULARY.md) — local normalization,
+  `.neovocab` compilation, validation, and search
 - [LLM deck authoring](../LLM_DECK_AUTHORING.md) — validator-driven authoring
   workflow
 - [JSON Schemas](../schemas/) — machine-readable authored-deck schemas

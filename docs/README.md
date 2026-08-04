@@ -17,7 +17,10 @@ folder is both the Jekyll site source and the project reference library.
 | [`AUTHORED_DECK_FORMAT.md`](AUTHORED_DECK_FORMAT.md) | Normative import-only JSONL deck source format |
 | [`DESIGN.md`](DESIGN.md) | Visual design system — tokens, typography, layout, “The Quiet Desk” north star |
 | [`LLM_DECK_AUTHORING.md`](LLM_DECK_AUTHORING.md) | Validator-driven deck authoring workflow for coding agents |
+| [`LOCAL_API.md`](LOCAL_API.md) | Normative local automation API requirements and version-1 acceptance criteria |
+| [`user/local-api.md`](user/local-api.md) | Enable, authorize, troubleshoot, and report security issues for the local API |
 | [`PORTABLE_DECK_FORMAT.md`](PORTABLE_DECK_FORMAT.md) | Normative SQLite portable deck interchange format |
+| [`OFFLINE_VOCABULARY.md`](OFFLINE_VOCABULARY.md) | Local dataset normalization, `.neovocab` compilation, validation, and search |
 | [`PRODUCT.md`](PRODUCT.md) | Product context — users, constraints, terminology, brand (Impeccable / UX work) |
 
 ## For agents and tooling

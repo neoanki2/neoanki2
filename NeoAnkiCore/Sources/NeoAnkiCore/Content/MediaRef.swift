@@ -33,6 +33,12 @@ public struct MediaRef: Codable, Equatable, Sendable, Identifiable {
         reservationID = nil
     }
 
+    public func attachingReservation(_ id: UUID) -> MediaRef {
+        var copy = self
+        copy.reservationID = id
+        return copy
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, kind, assetHash, fileExtension, durationMs, altText, url
     }

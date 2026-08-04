@@ -54,8 +54,8 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             pattern: #"func (test[A-Za-z0-9_]+Journey)\(\) throws"#,
             in: journeySource
         )
-        XCTAssertEqual(journeys.count, 6)
-        XCTAssertEqual(Set(journeys).count, 6)
+        XCTAssertEqual(journeys.count, 7)
+        XCTAssertEqual(Set(journeys).count, 7)
     }
 
     private func captures(pattern: String, in source: String) -> [String] {

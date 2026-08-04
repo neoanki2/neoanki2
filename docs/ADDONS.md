@@ -51,6 +51,16 @@ builder stores the author as an `author:<name>` item tag and creates one Basic
 card for each line after the first. Each prompt contains the preceding one or
 two nonblank lines.
 
+`VocabularyDeckBuilder` supplies a domain-neutral generated-item editor rather
+than a registered deck builder. NeoAnki imports `.neovocab` packages into
+managed offline storage in a separate flow. With an existing deck selected, the
+editor searches an installed index, lets the user review forms, pronunciations,
+senses, and examples, then emits form/pronunciation, form/meaning,
+meaning/form, and example-cloze items through the validated `.neoanki` boundary.
+Core flattens that generated item batch into the selected deck atomically, so
+one lookup does not create one deck. Language and pronunciation schemes remain
+pack data; the editor contains no language-specific rules.
+
 ### External builders
 
 A CLI, website, agent, or companion app can generate the same `.neoanki` format.

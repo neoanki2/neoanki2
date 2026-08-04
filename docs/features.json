@@ -275,6 +275,13 @@
       "screenshot": "assets/screenshots/error-startup.png"
     },
     {
+      "id": "local-automation-api",
+      "name": "Configure and authorize the local automation API",
+      "article": "user/local-api.md",
+      "sources": ["Sources/NeoAnki2/APISettingsView.swift", "Sources/NeoAnki2/APIControlModel.swift"],
+      "tests": ["Tests/NeoAnki2Tests/APIControlModelTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
+    },
+    {
       "id": "deck-cli",
       "name": "Validate authored decks from the command line",
       "article": "user/cli.md",
