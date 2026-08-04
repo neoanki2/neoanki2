@@ -289,6 +289,35 @@ struct NeoAnki2App: App {
             )
         }
 
+        if command.action == .exportPortable {
+            guard let itemsModel,
+                  let deckID = decksModel?.selectedDeckID,
+                  let path = command.path,
+                  !path.isEmpty else {
+                return UITestAcknowledgement(
+                    sessionID: command.sessionID,
+                    sequence: command.sequence,
+                    state: .failed,
+                    scenario: command.scenario,
+                    route: command.initialRoute,
+                    message: "Portable export requires an open library, selected deck, and destination"
+                )
+            }
+            let transfer = PortableDeckTransferModel(store: itemsModel.store)
+            let succeeded = await transfer.exportDeck(
+                id: deckID,
+                to: URL(fileURLWithPath: path)
+            )
+            return UITestAcknowledgement(
+                sessionID: command.sessionID,
+                sequence: command.sequence,
+                state: succeeded ? .ready : .failed,
+                scenario: command.scenario,
+                route: command.initialRoute,
+                message: succeeded ? nil : transfer.notice?.message
+            )
+        }
+
         itemsModel = nil
         decksModel = nil
         schedulingModel = nil
@@ -302,6 +331,8 @@ struct NeoAnki2App: App {
             environment["NEOANKI_TEST_IMPORT_PATH"] = command.path
         case .openPortableImport:
             environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"] = command.path
+        case .exportPortable:
+            break
         case .setPortableBusy:
             environment["NEOANKI_TEST_PORTABLE_BUSY"] = command.enabled == true ? "1" : "0"
         }

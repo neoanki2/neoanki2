@@ -43,6 +43,7 @@ struct UITestCommand: Codable, Sendable {
         case reset
         case openImport
         case openPortableImport
+        case exportPortable
         case setPortableBusy
     }
 

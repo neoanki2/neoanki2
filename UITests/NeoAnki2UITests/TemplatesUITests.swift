@@ -106,7 +106,7 @@ extension FastFunctionalJourneyTests {
                 picker: app.popUpButtons.identified("templateAnswerField"),
                 in: app
             )
-            app.buttons.identified("saveTemplate").click()
+            saveTemplateEditor(in: app)
             XCTAssertTrue(app.buttons.identified("templateRow-Reverse").waitUntilExists(timeout: 5))
         }
 
@@ -117,7 +117,7 @@ extension FastFunctionalJourneyTests {
                 into: app.textFields.identified("templateNameField"),
                 app: app
             )
-            app.buttons.identified("saveTemplate").click()
+            saveTemplateEditor(in: app)
             XCTAssertTrue(app.buttons.identified("templateRow-Renamed").waitUntilExists(timeout: 5))
         }
 
@@ -344,7 +344,7 @@ extension FastFunctionalJourneyTests {
         app.menuItems.identified("Back").click()
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Front").click()
-        app.buttons.identified("saveTemplate").click()
+        saveTemplateEditor(in: app)
 
         XCTAssertTrue(app.buttons.identified("templateRow-Reverse").waitUntilExists(timeout: 5))
         closeTemplates(in: app)
@@ -435,8 +435,7 @@ extension FastFunctionalJourneyTests {
         app.menuItems.identified("Front").click()
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Back").click()
-        app.buttons.identified("saveTemplate").click()
-        XCTAssertTrue(app.buttons.identified("saveTemplate").waitUntilGone(timeout: 10))
+        saveTemplateEditor(in: app)
         XCTAssertTrue(app.buttons.identified("templateRow-Original").waitUntilExists(timeout: 5))
 
         openTemplateEditor(named: "Original", in: app)
@@ -444,7 +443,7 @@ extension FastFunctionalJourneyTests {
         editNameField.click()
         editNameField.typeKey("a", modifierFlags: [.command])
         editNameField.typeText("Renamed")
-        app.buttons.identified("saveTemplate").click()
+        saveTemplateEditor(in: app)
 
         XCTAssertTrue(app.buttons.identified("templateRow-Renamed").waitUntilExists(timeout: 5))
         closeTemplates(in: app)
@@ -462,8 +461,7 @@ extension FastFunctionalJourneyTests {
         app.menuItems.identified("Front").click()
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Back").click()
-        app.buttons.identified("saveTemplate").click()
-        XCTAssertTrue(app.buttons.identified("saveTemplate").waitUntilGone(timeout: 10))
+        saveTemplateEditor(in: app)
         XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitUntilExists(timeout: 5))
 
         openTemplateEditor(named: "To Delete", in: app)

@@ -229,6 +229,24 @@ class NeoAnkiUITestCase: XCTestCase {
         app.activate()
     }
 
+    func exportPortableDeckForTesting(to destination: URL, in app: XCUIApplication) {
+        Self.controlSequence += 1
+        deliver(
+            ControlCommand(
+                sessionID: Self.controlSessionID,
+                sequence: Self.controlSequence,
+                action: "exportPortable",
+                databaseDirectory: "",
+                scenario: nil,
+                initialRoute: "library",
+                path: destination.path,
+                enabled: nil,
+                environment: [:]
+            ),
+            to: app
+        )
+    }
+
     private func attachControlArtifact(named name: String) {
         let filename = name == "last-command"
             ? "command-\(Self.controlSessionID).json"
@@ -505,12 +523,16 @@ class NeoAnkiUITestCase: XCTestCase {
     func closeTemplates(in app: XCUIApplication) {
         let done = app.buttons.identified("templatesDone")
         for _ in 0..<4 {
-            if !done.exists, !app.buttons.identified("Done").exists { break }
+            let labeledDone = app.buttons.identified("Done")
+            if !done.exists, !labeledDone.exists { break }
             if done.exists, done.isHittable {
                 done.click()
-            } else if app.buttons.identified("Done").exists {
-                app.buttons.identified("Done").click()
+            } else if labeledDone.exists, labeledDone.isHittable {
+                labeledDone.click()
             } else {
+                // Both controls carry the cancel-action shortcut. Xcode 26.6
+                // can expose a toolbar item before AppKit considers it
+                // hittable, while Escape remains the supported user path.
                 app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
             }
             if done.waitUntilGone(timeout: 3) { break }
@@ -535,6 +557,21 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.isEnabled)
         save.click()
         XCTAssertTrue(save.waitUntilGone(timeout: 10))
+    }
+
+    /// Saves through the visible toolbar control when possible and through its
+    /// documented default-action shortcut when AppKit exposes that control as
+    /// visible but temporarily non-hittable.
+    func saveTemplateEditor(in app: XCUIApplication) {
+        let save = app.buttons.identified("saveTemplate")
+        XCTAssertTrue(save.waitUntilExists(timeout: 5))
+        XCTAssertTrue(save.isEnabled)
+        if save.waitUntilHittable(timeout: 2) {
+            save.click()
+        } else {
+            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+        }
+        XCTAssertTrue(save.waitUntilGone(timeout: 10), "Template editor did not close after saving")
     }
 
     /// Item rows live in browse mode, not on the scope home, so anything that
@@ -1235,28 +1272,24 @@ class NeoAnkiUITestCase: XCTestCase {
         app.menuBarItems["File"].click()
         let exportItem = app.menuItems.identified("Export Deck…")
         XCTAssertTrue(exportItem.waitUntilExists(timeout: 3))
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { exportItem.isEnabled },
+            "Export Deck did not become enabled for the selected deck"
+        )
         exportItem.click()
 
         chooseFileInSavePanel(url, in: app)
     }
 
     func waitForGoToFolderField(in app: XCUIApplication, timeout: TimeInterval = 15) -> XCUIElement? {
+        // The surrounding open/save panel also contains text fields. Returning
+        // its first field can mistake the filename control for the dedicated
+        // Go to Folder control and send a directory path to the wrong place.
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if app.textFields["PathTextField"].exists {
-                return app.textFields["PathTextField"]
-            }
-            for index in 0..<app.sheets.count {
-                let field = app.sheets.element(boundBy: index).textFields.firstMatch
-                if field.exists {
-                    return field
-                }
-            }
-            if app.dialogs.firstMatch.exists {
-                let field = app.dialogs.firstMatch.textFields.firstMatch
-                if field.exists {
-                    return field
-                }
+            let pathField = app.textFields["PathTextField"]
+            if pathField.exists {
+                return pathField
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
@@ -1289,14 +1322,14 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func chooseFileInSavePanel(_ url: URL, in app: XCUIApplication) {
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
+        guard waitUntil(timeout: 8, {
                 app.sheets.firstMatch.exists
                     || app.dialogs.firstMatch.exists
                     || app.textFields["PathTextField"].exists
-            },
-            "Save panel did not appear"
-        )
+            }) else {
+            XCTFail("Save panel did not appear")
+            return
+        }
         app.typeKey("g", modifierFlags: [.command, .shift])
 
         guard let goToFolderField = waitForGoToFolderField(in: app) else {

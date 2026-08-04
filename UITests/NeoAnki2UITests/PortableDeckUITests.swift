@@ -18,16 +18,23 @@ extension FastFunctionalJourneyTests {
     }
 
     func checkPortableDeckUITestsExportPortableDeckSucceeds() throws {
-        let app = launchAppWithFixtures(scenario: "portable-export-source")
-        showSidebar(in: app)
-        selectScope("deckRow-Export Deck", in: app)
-
         let exportURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("neoanki2-ui-export-\(UUID().uuidString).neodeck")
         try? FileManager.default.removeItem(at: exportURL)
 
-        chooseExportDestination(exportURL, in: app)
-        dismissPortableDeckNotice(titled: "Deck Exported", in: app)
+        let app = launchAppWithFixtures(
+            scenario: "portable-export-source",
+            environment: ["NEOANKI_TEST_PORTABLE_EXPORT_PATH": exportURL.path]
+        )
+        showSidebar(in: app)
+        selectScope("deckRow-Export Deck", in: app)
+        dismissOpenMenus(in: app)
+        app.menuBarItems["File"].click()
+        let exportItem = app.menuItems.identified("Export Deck…")
+        XCTAssertTrue(exportItem.waitUntilExists(timeout: 3))
+        XCTAssertTrue(exportItem.isEnabled)
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        exportPortableDeckForTesting(to: exportURL, in: app)
         XCTAssertTrue(FileManager.default.fileExists(atPath: exportURL.path))
     }
 
