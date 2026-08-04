@@ -181,7 +181,7 @@ extension FastFunctionalJourneyTests {
                 NSPredicate(format: "identifier BEGINSWITH %@", "removeItemTypeField-")
             )
             XCTAssertEqual(remove.count, 3)
-            remove.element(boundBy: 2).click()
+            activateCompactButton(remove.element(boundBy: 2))
             XCTAssertEqual(
                 app.buttons.matching(
                     NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
@@ -538,7 +538,7 @@ extension FastFunctionalJourneyTests {
             NSPredicate(format: "identifier BEGINSWITH %@", "removeItemTypeField-")
         )
         XCTAssertEqual(remove.count, 3)
-        remove.element(boundBy: 2).click()
+        activateCompactButton(remove.element(boundBy: 2))
         XCTAssertEqual(
             app.buttons.matching(
                 NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")

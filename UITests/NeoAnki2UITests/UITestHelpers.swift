@@ -574,6 +574,18 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.waitUntilGone(timeout: 10), "Template editor did not close after saving")
     }
 
+    /// Activates a visible compact icon control even when XCTest's AppKit
+    /// bridge declines to mark its small accessibility frame as hittable.
+    func activateCompactButton(_ button: XCUIElement) {
+        XCTAssertTrue(button.waitUntilExists(timeout: 3))
+        XCTAssertTrue(button.isEnabled)
+        if button.waitUntilHittable(timeout: 1) {
+            button.click()
+        } else {
+            button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        }
+    }
+
     /// Item rows live in browse mode, not on the scope home, so anything that
     /// asserts on a row has to get there first.
     func isBrowsing(in app: XCUIApplication) -> Bool {
