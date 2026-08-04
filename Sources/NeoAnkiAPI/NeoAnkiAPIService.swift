@@ -3486,7 +3486,7 @@ public actor NeoAnkiAPIService {
         )
     }
 
-    private func withStagedImport<Result>(
+    private func withStagedImport<Result: Sendable>(
         _ job: ImportJobRecord,
         primaryExtension: String? = nil,
         _ body: (URL) throws -> Result
