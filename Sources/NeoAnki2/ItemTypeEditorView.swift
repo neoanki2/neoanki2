@@ -77,6 +77,8 @@ struct ItemTypeEditorView: View {
                                 Image(systemName: "arrow.up")
                             }
                             .buttonStyle(.plain)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                             .disabled(index == 0)
                             .accessibilityLabel("Move field \(field.name) up")
                             .accessibilityIdentifier("moveFieldUp-\(field.id.uuidString)")
@@ -87,6 +89,8 @@ struct ItemTypeEditorView: View {
                                 Image(systemName: "arrow.down")
                             }
                             .buttonStyle(.plain)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                             .disabled(index == draft.fields.count - 1)
                             .accessibilityLabel("Move field \(field.name) down")
                             .accessibilityIdentifier("moveFieldDown-\(field.id.uuidString)")
@@ -98,6 +102,8 @@ struct ItemTypeEditorView: View {
                                     Image(systemName: "minus.circle.fill")
                                 }
                                 .buttonStyle(.plain)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
                                 .accessibilityLabel("Remove field \(field.name)")
                                 .accessibilityIdentifier("removeItemTypeField-\(field.id.uuidString)")
                             }
