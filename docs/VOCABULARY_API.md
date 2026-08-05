@@ -100,8 +100,18 @@ rejected.
 
 Search returns complete language-neutral `LexicalEntry` values in the exact
 deterministic order produced by the pack index. No network lookup or fallback
-is permitted. Exact entry lookup returns `404 resource_not_found` when the pack
-or entry is absent.
+is permitted, including fallback to authored-deck sources. Exact entry lookup
+returns `404 resource_not_found` when the pack or entry is absent.
+
+The first access to an installed pack during an API service lifetime MUST
+perform complete package, schema, database-digest, and media validation. The
+server MAY reuse that open, read-only pack for later operations only while a
+fresh filesystem fingerprint is identical. The fingerprint MUST cover the
+complete relative package tree and each entry's file type, device, inode, size,
+modification time, metadata-change time, and permissions. A missing, added,
+renamed, replaced, resized, rewritten, linked, or permission-changed entry MUST
+invalidate the cache and require complete validation before any lookup result
+is returned. Cache reuse MUST NOT weaken per-request media verification.
 
 Media lookup accepts the safe relative path already present in an entry's audio
 reference. The path MUST name a file declared by the manifest and still match
@@ -120,6 +130,10 @@ body. Range requests return `416 range_not_supported`.
 - **VOC-LOOKUP-003:** Entry retrieval round-trips every lexical field,
   pronunciation, sense, example, scalar range, frequency, and provenance value
   from the pack database.
+- **VOC-LOOKUP-004:** Repeated list, search, and entry operations against one
+  unchanged installed pack perform exactly one complete pack open per API
+  service lifetime; changing any package-tree signature forces another complete
+  validation, and tampered bytes fail closed without an authored fallback.
 - **VOC-MEDIA-001:** Declared media round-trips byte-for-byte through GET; HEAD
   returns the same length and digest with an empty body.
 - **VOC-MEDIA-002:** Traversal paths, undeclared files, symlinks, changed bytes,
@@ -198,4 +212,3 @@ and are ignored by installed-pack enumeration.
 - **VOC-REL-004:** The app and local API receive the same managed vocabulary
   root during bootstrap, so a pack imported by either surface is visible to the
   other without restart.
-

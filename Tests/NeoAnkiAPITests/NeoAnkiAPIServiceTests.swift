@@ -483,6 +483,60 @@ private func vocabularyRequest(
     #expect(absent.status == 404)
 }
 
+private actor VocabularyPackOpenCounter {
+    private(set) var count = 0
+
+    func open(_ url: URL) async throws -> VocabularyPack {
+        count += 1
+        return try await VocabularyPack.open(at: url)
+    }
+}
+
+@Test func validatedVocabularyPackCacheAvoidsRepeatedFullHashingAndInvalidatesOnChange() async throws {
+    let workspace = try vocabularyTestDirectory("validation-cache")
+    defer { try? FileManager.default.removeItem(at: workspace) }
+    let root = workspace.appendingPathComponent("Vocabulary Packs", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let fixture = try compileVocabularyAPIFixture(
+        in: root, name: "Cached", packID: "cache.fixture"
+    )
+    let counter = VocabularyPackOpenCounter()
+    let library = APIVocabularyLibrary(
+        rootURL: root,
+        openPack: { url in try await counter.open(url) }
+    )
+
+    #expect(try await library.listPacks().map(\.id) == ["cache.fixture"])
+    #expect(try await library.search(
+        packID: "cache.fixture", query: "заст", mode: .prefix, limit: 50, language: "uk"
+    ).count == 2)
+    #expect(try await library.entry(
+        packID: "cache.fixture", entryID: fixture.entries[0].id
+    ) == fixture.entries[0])
+    #expect(try await library.listPacks().count == 1)
+    #expect(await counter.count == 1)
+
+    let manifestURL = fixture.url.appendingPathComponent("manifest.json")
+    let unchangedManifest = try Data(contentsOf: manifestURL)
+    try unchangedManifest.write(to: manifestURL, options: .atomic)
+    #expect(try await library.search(
+        packID: "cache.fixture", query: "застосувати", mode: .exact, limit: 50, language: nil
+    ).map(\.id) == [fixture.entries[0].id])
+    #expect(await counter.count == 2)
+
+    let databaseURL = fixture.url.appendingPathComponent("lexicon.sqlite")
+    let handle = try FileHandle(forWritingTo: databaseURL)
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data([0]))
+    try handle.close()
+    await #expect(throws: APIServiceError.self) {
+        try await library.search(
+            packID: "cache.fixture", query: "заст", mode: .prefix, limit: 50, language: nil
+        )
+    }
+    #expect(await counter.count == 3)
+}
+
 private actor BlockingPairingApprover: APIPairingApprover {
     private var continuation: CheckedContinuation<Bool, Never>?
     private(set) var started = false

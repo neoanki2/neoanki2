@@ -85,6 +85,11 @@ download media declared by that pack. These operations are fully offline and
 require `vocabulary.read`; they neither create NeoAnki items nor grant access to
 the rest of the library.
 
+The API fully validates a pack before its first lookup. Later lookups reuse the
+same read-only validated pack while its complete filesystem signature remains
+unchanged; any detected change forces full validation again. There is no
+authored-deck or network fallback when an installed pack is missing or invalid.
+
 To turn a vocabulary result into a study item, request `items.write` separately
 and submit the selected lexical fields through the item endpoints. To install
 or remove whole immutable `.neovocab` packs, use `vocabulary.write` and the
