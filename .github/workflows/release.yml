@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish app release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the tested main revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+
+      - name: Derive immutable release identifiers
+        id: release
+        run: |
+          build_number=$(git rev-list --count HEAD)
+          version="1.0.$build_number"
+          artifact="NeoAnki2-$version-mac-universal.dmg"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Build universal release artifact
+        env:
+          NEOANKI_RELEASE_BUILD_NUMBER: ${{ steps.release.outputs.build_number }}
+          NEOANKI_RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          chmod +x Scripts/install-app.sh Scripts/build-release-artifact.sh
+          ./Scripts/build-release-artifact.sh "$RUNNER_TEMP/release"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neoanki2-${{ steps.release.outputs.version }}-mac-universal
+          path: |
+            ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
+            ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attest release provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
+        with:
+          subject-path: ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
+
+      - name: Publish GitHub release
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          ARTIFACT: ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ARTIFACT" "$ARTIFACT.sha256" --clobber
+          else
+            gh release create "$TAG" "$ARTIFACT" "$ARTIFACT.sha256" \
+              --target "$RELEASE_SHA" \
+              --title "NeoAnki2 $VERSION" \
+              --generate-notes
+          fi

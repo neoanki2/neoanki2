@@ -7,15 +7,27 @@ NeoAnki2 is a rewrite of the Anki idea, not a port. It deliberately drops all
 legacy Anki compatibility (no HTML/CSS cards, no `.apkg`, no shared-deck import,
 no SM-2) in favor of a clean, native, and scientifically grounded model.
 
-NeoAnki2 does not currently publish releases, installers, or a signed download.
-On macOS 14+ with a Swift 6 Xcode toolchain, clone the repository and run:
+Official macOS releases are published after every tested change to `main`.
+Install or upgrade them through the official Homebrew tap:
+
+```bash
+brew install --cask neoanki2/tap/neoanki2
+brew upgrade --cask neoanki2
+```
+
+Release artifacts are universal, checksummed, provenance-attested, and ad-hoc
+signed. They are not yet Apple-notarized, so the first launch may require
+Control-clicking NeoAnki2 in Applications and choosing **Open**.
+
+For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the
+repository and run:
 
 ```bash
 ./Scripts/run-app.sh
 ```
 
-That builds and launches a debug bundle from the checkout. To install a release
-build into `/Applications` and launch it like any other Mac app:
+That builds and launches a debug bundle from the checkout. Maintainers can also
+install the current source revision into `/Applications` for pre-release testing:
 
 ```bash
 ./Scripts/install-app.sh --restart
