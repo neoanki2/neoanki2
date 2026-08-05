@@ -12,6 +12,11 @@ storage, then queries its read-only SQLite index. It has no vocabulary download
 client. Source acquisition is an explicit deck-author or developer operation
 performed before import.
 
+Authorized local automation clients use the same managed library through the
+[Vocabulary API](VOCABULARY_API.md). The HTTP surface preserves the offline
+boundary: clients upload declared bytes into private staging and cannot submit
+a filesystem path or remote URL.
+
 ## Pipeline
 
 ```text

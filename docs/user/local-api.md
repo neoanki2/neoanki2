@@ -69,10 +69,29 @@ Scopes are independent permissions:
 | `media.write` | Upload and reserve validated media bytes |
 | `library.import` | Stage, validate, and commit imports |
 | `library.export` | Create and download portable-deck exports |
+| `vocabulary.read` | List installed vocabulary packs and read entries and declared media |
+| `vocabulary.write` | Stage, validate, install, and remove vocabulary packs |
 
 `settings.write` and `ui.control` are reserved and provide no version-1
 operations. Use the smallest set of scopes that completes the integration's
 job. A read-only tool normally needs only `library.read`.
+
+## Use installed vocabulary packs
+
+A vocabulary client can discover installed packs with
+`GET /v1/vocabulary-packs`, search a selected pack with
+`GET /v1/vocabulary-packs/{id}/entries`, retrieve a complete entry by ID, and
+download media declared by that pack. These operations are fully offline and
+require `vocabulary.read`; they neither create NeoAnki items nor grant access to
+the rest of the library.
+
+To turn a vocabulary result into a study item, request `items.write` separately
+and submit the selected lexical fields through the item endpoints. To install
+or remove whole immutable `.neovocab` packs, use `vocabulary.write` and the
+staged `/v1/vocabulary-pack-imports` lifecycle. The API accepts declared bytes,
+not local paths or remote URLs. See the
+[normative vocabulary API contract](../VOCABULARY_API.md) for routes, limits,
+preconditions, and job states.
 
 ## Use and protect a token
 

@@ -26,6 +26,7 @@ private struct AppPairingApprover: APIPairingApprover {
 @Observable
 final class APIControlModel {
     private let store: ItemStore
+    private let vocabularyRootURL: URL
     private let authorization = APIAuthorizationStore(
         persistence: KeychainAPICredentialPersistence()
     )
@@ -40,8 +41,9 @@ final class APIControlModel {
     private(set) var clients: [APIClientGrant] = []
     var pendingPairing: APIPairingPrompt?
 
-    init(store: ItemStore) {
+    init(store: ItemStore, vocabularyRootURL: URL) {
         self.store = store
+        self.vocabularyRootURL = vocabularyRootURL
         port = UserDefaults.standard.object(forKey: AppPreferences.localAPIPort) as? Int
             ?? 8_766
         isEnabled = UserDefaults.standard.bool(forKey: AppPreferences.localAPIEnabled)
@@ -112,7 +114,8 @@ final class APIControlModel {
             authorization: authorization,
             pairingApprover: approver,
             applicationVersion: version,
-            authority: "127.0.0.1:\(port)"
+            authority: "127.0.0.1:\(port)",
+            vocabularyRootURL: vocabularyRootURL
         )
         let candidate = NeoAnkiLocalAPIServer(
             service: service,

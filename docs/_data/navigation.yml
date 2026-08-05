@@ -58,6 +58,8 @@ primary:
         url: /ARCHITECTURE/
       - title: Local API requirements
         url: /LOCAL_API/
+      - title: Vocabulary API requirements
+        url: /VOCABULARY_API/
       - title: Design system
         url: /DESIGN/
       - title: Authored deck format

@@ -15,7 +15,9 @@ enum APIOpenAPI {
             response: String? = "Resource",
             requestContentType: String = "application/json",
             responseContentType: String = "application/json",
-            query: [String] = []
+            query: [String] = [],
+            requiredQuery: Set<String> = [],
+            successHeaders: [String: Any] = [:]
         ) {
             let isProtectedMutation = scope != nil
                 && ["post", "put", "patch", "delete"].contains(method)
@@ -24,16 +26,18 @@ enum APIOpenAPI {
                 schema: response,
                 contentType: responseContentType
             )
-            if isProtectedMutation,
+            var responseHeaders = successHeaders
+            if isProtectedMutation {
+                responseHeaders["X-NeoAnki-Change-Cursor"] = [
+                    "description": "Last durable cursor when the operation committed library changes.",
+                    "required": false,
+                    "schema": ["type": "integer", "minimum": 1],
+                ]
+            }
+            if !responseHeaders.isEmpty,
                var successResponse = operationResponses[String(success)] as? [String: Any]
             {
-                successResponse["headers"] = [
-                    "X-NeoAnki-Change-Cursor": [
-                        "description": "Last durable cursor when the operation committed library changes.",
-                        "required": false,
-                        "schema": ["type": "integer", "minimum": 1],
-                    ],
-                ]
+                successResponse["headers"] = responseHeaders
                 operationResponses[String(success)] = successResponse
             }
             var operation: [String: Any] = [
@@ -54,6 +58,10 @@ enum APIOpenAPI {
             var parameters: [[String: Any]] = names.map { name in
                     let schema: [String: Any]
                     switch name {
+                    case "id" where path.contains("/vocabulary-packs/"):
+                        schema = ["type": "string", "minLength": 1, "maxLength": 65_536]
+                    case "entryId":
+                        schema = ["type": "string", "minLength": 1, "maxLength": 65_536]
                     case "id", "fileId", "reviewLogId":
                         schema = [
                             "type": "string", "format": "uuid",
@@ -74,13 +82,24 @@ enum APIOpenAPI {
                 if name == "limit" {
                     schema = [
                         "type": "integer", "minimum": 1,
-                        "maximum": path == "/v1/changes" ? 1_000 : 200,
+                        "maximum": path == "/v1/changes" ? 1_000
+                            : path.contains("/vocabulary-packs/{id}/entries") ? 500 : 200,
                     ]
+                }
+                if name == "mode" {
+                    schema = ["type": "string", "enum": ["exact", "prefix"]]
+                }
+                if ["query", "language", "path"].contains(name) {
+                    schema["minLength"] = 1
+                    schema["maxLength"] = 65_536
                 }
                 if ["includeDescendants", "isSuspended"].contains(name) {
                     schema = ["type": "boolean"]
                 }
-                return ["name": name, "in": "query", "required": false, "schema": schema]
+                return [
+                    "name": name, "in": "query",
+                    "required": requiredQuery.contains(name), "schema": schema,
+                ]
             }
             if isProtectedMutation {
                 let required = [
@@ -89,6 +108,7 @@ enum APIOpenAPI {
                     "POST /v1/deck-deletion-plans/{id}/commits",
                     "POST /v1/deck-reset-plans/{id}/commits",
                     "POST /v1/imports/{id}/commits",
+                    "POST /v1/vocabulary-pack-imports/{id}/commits",
                 ].contains("\(method.uppercased()) \(path)")
                 parameters.append([
                     "name": "Idempotency-Key", "in": "header", "required": required,
@@ -135,6 +155,31 @@ enum APIOpenAPI {
             pathItem[method] = operation
             paths[path] = pathItem
         }
+
+        let vocabularyETagHeader: [String: Any] = [
+            "description": "Current immutable pack or import-job revision.",
+            "required": true,
+            "schema": ["type": "string", "pattern": "^\\\"revision-[0-9]+\\\"$"],
+        ]
+        let vocabularyLocationHeader: [String: Any] = [
+            "description": "Canonical relative URL of the created job or installed pack.",
+            "required": true,
+            "schema": ["type": "string"],
+        ]
+        let vocabularyMediaHeaders: [String: Any] = [
+            "Content-Length": [
+                "description": "Validated media byte count.", "required": true,
+                "schema": ["type": "integer", "minimum": 0],
+            ],
+            "Digest": [
+                "description": "Validated vocabulary manifest SHA-256 digest.", "required": true,
+                "schema": ["type": "string", "pattern": "^sha-256=[0-9a-f]{64}$"],
+            ],
+            "Accept-Ranges": [
+                "description": "Vocabulary media is not range-addressable.", "required": true,
+                "schema": ["type": "string", "const": "none"],
+            ],
+        ]
 
         add("/health", "get", "health", success: 200, response: "Health")
         add("/v1/meta", "get", "meta", response: "Meta")
@@ -192,6 +237,21 @@ enum APIOpenAPI {
         add("/v1/media/{sha256}", "head", "headMedia", scope: "library.read", response: nil, responseContentType: "application/octet-stream")
         add("/v1/media/{sha256}", "get", "downloadMedia", scope: "library.read", response: "Binary", responseContentType: "application/octet-stream")
         add("/v1/media/{sha256}/metadata", "get", "mediaMetadata", scope: "library.read", response: "MediaMetadata")
+
+        add("/v1/vocabulary-packs", "get", "listVocabularyPacks", scope: "vocabulary.read", response: "VocabularyPackCollection")
+        add("/v1/vocabulary-packs/{id}", "get", "getVocabularyPack", scope: "vocabulary.read", response: "VocabularyPack", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-packs/{id}", "delete", "deleteVocabularyPack", scope: "vocabulary.write", success: 204, response: nil)
+        add("/v1/vocabulary-packs/{id}/entries", "get", "searchVocabularyEntries", scope: "vocabulary.read", response: "LexicalEntryCollection", query: ["query", "mode", "limit", "language"], requiredQuery: ["query"])
+        add("/v1/vocabulary-packs/{id}/entries/{entryId}", "get", "getVocabularyEntry", scope: "vocabulary.read", response: "LexicalEntry")
+        add("/v1/vocabulary-packs/{id}/media", "get", "downloadVocabularyMedia", scope: "vocabulary.read", response: "Binary", responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
+        add("/v1/vocabulary-packs/{id}/media", "head", "headVocabularyMedia", scope: "vocabulary.read", response: nil, responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
+
+        add("/v1/vocabulary-pack-imports", "post", "createVocabularyPackImport", scope: "vocabulary.write", success: 201, request: "CreateVocabularyPackImportInput", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader, "Location": vocabularyLocationHeader])
+        add("/v1/vocabulary-pack-imports/{id}", "get", "getVocabularyPackImport", scope: "vocabulary.write", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-pack-imports/{id}", "delete", "deleteVocabularyPackImport", scope: "vocabulary.write", success: 204, response: nil)
+        add("/v1/vocabulary-pack-imports/{id}/files/{fileId}", "put", "uploadVocabularyPackFile", scope: "vocabulary.write", request: "Binary", response: "VocabularyPackImport", requestContentType: "application/octet-stream", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-pack-imports/{id}/validations", "post", "validateVocabularyPackImport", scope: "vocabulary.write", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-pack-imports/{id}/commits", "post", "commitVocabularyPackImport", scope: "vocabulary.write", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader, "Location": vocabularyLocationHeader])
 
         add("/v1/imports", "post", "createImport", scope: "library.import", success: 201, request: "CreateImportInput", response: "ImportJob")
         add("/v1/imports/{id}", "get", "getImport", scope: "library.import", response: "ImportJob")
@@ -355,6 +415,7 @@ enum APIOpenAPI {
             "enum": [
                 "library.read", "items.write", "decks.write", "schemas.write",
                 "study.review", "media.write", "library.import", "library.export",
+                "vocabulary.read", "vocabulary.write",
                 "settings.write", "ui.control",
             ],
         ] as [String: Any]
@@ -431,6 +492,72 @@ enum APIOpenAPI {
                 "id": uuid, "displayName": ["type": "string"],
                 "origin": ["type": ["string", "null"]], "scopes": array(scope, min: 1),
                 "createdAt": timestamp, "revision": revision,
+            ]),
+            "VocabularyProvenance": object(["sourceId"], [
+                "sourceId": ["type": "string"],
+                "sourceName": ["type": ["string", "null"]],
+                "recordId": ["type": ["string", "null"]],
+                "attribution": ["type": ["string", "null"]],
+                "license": ["type": ["string", "null"]],
+                "sourceUrl": ["type": ["string", "null"]],
+            ]),
+            "VocabularyPack": object([
+                "id", "revision", "title", "languages", "capabilities", "entryCount",
+                "databaseSha256", "mediaFileCount", "mediaByteCount",
+            ], [
+                "id": ["type": "string", "minLength": 1, "maxLength": 65_536],
+                "revision": ["type": "integer", "const": 1],
+                "title": ["type": "string"], "summary": ["type": ["string", "null"]],
+                "languages": array(["type": "string"]),
+                "capabilities": array(["type": "string", "enum": [
+                    "lexicon", "pronunciation", "morphology", "corpus", "frequency",
+                ]]),
+                "provenance": ["oneOf": [reference("VocabularyProvenance"), ["type": "null"]]],
+                "entryCount": nonnegative, "databaseSha256": sha256,
+                "mediaFileCount": nonnegative, "mediaByteCount": nonnegative,
+            ]),
+            "VocabularyPackCollection": object(["data"], [
+                "data": array(reference("VocabularyPack"), max: 1_000),
+            ]),
+            "LocalizedVocabularyText": object(["value"], [
+                "value": ["type": "string"], "language": ["type": ["string", "null"]],
+            ]),
+            "LexicalEntry": [
+                "type": "object", "additionalProperties": false,
+                "required": ["id", "language", "canonicalForm", "forms", "pronunciations", "senses"],
+                "properties": [
+                    "id": ["type": "string"], "language": ["type": "string"],
+                    "canonicalForm": ["type": "object", "additionalProperties": true],
+                    "forms": array(["type": "object", "additionalProperties": true]),
+                    "pronunciations": array(["type": "object", "additionalProperties": true]),
+                    "senses": array(["type": "object", "additionalProperties": true]),
+                    "frequency": ["type": ["number", "null"]],
+                    "provenance": ["oneOf": [reference("VocabularyProvenance"), ["type": "null"]]],
+                ],
+            ],
+            "LexicalEntryCollection": object(["data"], [
+                "data": array(reference("LexicalEntry"), max: 500),
+            ]),
+            "VocabularyPackImportFileInput": object(["id", "path", "byteSize", "sha256"], [
+                "id": uuid, "path": ["type": "string", "minLength": 1, "maxLength": 65_536],
+                "byteSize": ["type": "integer", "minimum": 0, "maximum": 1_000_000_000],
+                "sha256": sha256,
+            ]),
+            "CreateVocabularyPackImportInput": object(["files"], [
+                "files": array(reference("VocabularyPackImportFileInput"), min: 2, max: 100_002),
+            ]),
+            "VocabularyPackImportFile": object(["id", "path", "byteSize", "sha256", "uploaded"], [
+                "id": uuid, "path": ["type": "string"], "byteSize": nonnegative,
+                "sha256": sha256, "uploaded": ["type": "boolean"],
+            ]),
+            "VocabularyPackImport": object([
+                "id", "revision", "state", "files", "createdAt", "updatedAt",
+            ], [
+                "id": uuid, "revision": revision,
+                "state": ["type": "string", "enum": ["awaitingFiles", "ready", "validated", "completed"]],
+                "files": array(reference("VocabularyPackImportFile"), min: 2, max: 100_002),
+                "pack": ["oneOf": [reference("VocabularyPack"), ["type": "null"]]],
+                "createdAt": timestamp, "updatedAt": timestamp,
             ]),
             "CreateDeckInput": object(["name"], [
                 "id": uuid, "name": ["type": "string", "minLength": 1],

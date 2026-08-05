@@ -36,11 +36,16 @@ The normal library is local to your macOS user account:
 ~/Library/Application Support/neoanki2/
   neoanki2.sqlite
   media/
+  Vocabulary Packs/
 ```
 
 The SQLite file contains decks, item types, items, generated cards, review
 history, and scheduling state. Imported media is copied into the adjacent
 managed `media` directory with content-addressed filenames.
+Validated offline dictionaries are immutable `.neovocab` directories under
+`Vocabulary Packs`; both the app and the local API read that same managed
+location. Do not rename, edit, or partially copy an installed pack while
+NeoAnki2 is running.
 
 For a safe manual backup:
 

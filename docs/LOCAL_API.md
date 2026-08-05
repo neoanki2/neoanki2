@@ -132,6 +132,8 @@ scopes:
 - `media.write`;
 - `library.import`;
 - `library.export`;
+- `vocabulary.read`;
+- `vocabulary.write`;
 - `settings.write`; and
 - `ui.control`.
 
@@ -600,7 +602,19 @@ and filename derive from validated stored metadata, never request input.
   byte ranges; otherwise every range request fails consistently rather than
   returning a misleading partial response.
 
-## 13. Bulk and transaction operations
+## 13. Vocabulary pack operations
+
+The local API exposes installed offline vocabulary packs through independent
+`vocabulary.read` and `vocabulary.write` scopes. Clients can list packs, search
+or retrieve complete lexical entries, download declared local media, stage and
+validate pack installation, commit an installation atomically, and remove an
+installed pack. It never accepts a client filesystem path or performs a network
+dictionary lookup.
+
+The complete normative route, lifecycle, validation, security, and acceptance
+contract is defined in [Vocabulary API requirements](VOCABULARY_API.md).
+
+## 14. Bulk and transaction operations
 
 `POST /v1/items/bulk` with `items.write` creates, replaces, or deletes up to 500
 items in one request. The request declares `atomic: true`; version 1 rejects
@@ -632,7 +646,7 @@ different order.
 - **BATCH-005:** Replaying a committed batch returns the original logical
   results and does not regenerate cards or increment revisions.
 
-## 14. Import and export operations
+## 15. Import and export operations
 
 Imports and exports are asynchronous job resources. Jobs have `pending`,
 `uploading`, `validating`, `ready`, `committing`, `completed`, `failed`, or
@@ -684,7 +698,7 @@ source. Export reads a transactionally consistent snapshot.
 - **TRANSFER-006:** A completed portable export passes the portable format's
   integrity, foreign-key, digest, media, limit, and round-trip acceptance suite.
 
-## 15. Changes and event delivery
+## 16. Changes and event delivery
 
 Every resource event committed by a successful mutating transaction receives a
 unique, monotonically increasing `changeCursor`. A transaction that changes
@@ -730,7 +744,7 @@ the stream URL are forbidden. Revocation and server shutdown close streams.
 - **EVENT-006:** Event serialization and application logs contain no item field
   content, resolved answer, token, or media bytes.
 
-## 16. Deferred operations
+## 17. Deferred operations
 
 The following are intentionally deferred and do not gate version 1:
 
@@ -747,7 +761,7 @@ The following are intentionally deferred and do not gate version 1:
 Adding one of these capabilities requires its own normative operations,
 permission analysis, resource limits, failure semantics, and acceptance tests.
 
-## 17. Version-1 release gate
+## 18. Version-1 release gate
 
 A version-1 implementation is ready to ship only when all of the following are
 true:

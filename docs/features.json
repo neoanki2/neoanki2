@@ -279,7 +279,7 @@
       "name": "Configure and authorize the local automation API",
       "article": "user/local-api.md",
       "sources": ["Sources/NeoAnki2/APISettingsView.swift", "Sources/NeoAnki2/APIControlModel.swift"],
-      "tests": ["Tests/NeoAnki2Tests/APIControlModelTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
+      "tests": ["Tests/NeoAnki2Tests/APIControlModelTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift", "Tests/NeoAnkiVocabularyKitTests/NeoAnkiVocabularyKitTests.swift"]
     },
     {
       "id": "offline-vocabulary",

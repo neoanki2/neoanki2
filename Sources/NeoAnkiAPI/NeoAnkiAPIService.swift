@@ -31,6 +31,7 @@ public actor NeoAnkiAPIService {
     private let pairingApprover: any APIPairingApprover
     private let applicationVersion: String
     private let authority: String
+    let vocabularyLibrary: APIVocabularyLibrary
     private let pairingRequestLifetime: TimeInterval
     private let transferJobLifetime: TimeInterval
     private let faultInjector: any APIFaultInjector
@@ -103,6 +104,8 @@ public actor NeoAnkiAPIService {
         pairingApprover: any APIPairingApprover = DenyAPIPairingApprover(),
         applicationVersion: String,
         authority: String = "127.0.0.1:8766",
+        vocabularyRootURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki-api-vocabulary-\(UUID().uuidString)", isDirectory: true),
         pairingRequestLifetime: TimeInterval = 5 * 60,
         transferJobLifetime: TimeInterval = 24 * 60 * 60,
         faultInjector: any APIFaultInjector = NoAPIFaultInjector()
@@ -112,6 +115,10 @@ public actor NeoAnkiAPIService {
         self.pairingApprover = pairingApprover
         self.applicationVersion = applicationVersion
         self.authority = authority.lowercased()
+        vocabularyLibrary = APIVocabularyLibrary(
+            rootURL: vocabularyRootURL,
+            jobLifetime: transferJobLifetime
+        )
         self.pairingRequestLifetime = pairingRequestLifetime
         self.transferJobLifetime = transferJobLifetime
         self.faultInjector = faultInjector
@@ -176,7 +183,7 @@ public actor NeoAnkiAPIService {
             || request.method == .put
                 && pathComponents.count == 5
                 && pathComponents[0] == "v1"
-                && pathComponents[1] == "imports"
+                && ["imports", "vocabulary-pack-imports"].contains(String(pathComponents[1]))
                 && pathComponents[3] == "files"
         guard usesLargeByteBody || request.body.count <= Self.maximumJSONBodyBytes else {
             throw APIServiceError.problem(
@@ -225,6 +232,8 @@ public actor NeoAnkiAPIService {
                         "idempotency.durable",
                         "study.reservations",
                         "study.reviews",
+                        "vocabulary.lookup",
+                        "vocabulary.pack-lifecycle",
                     ]
                 )
             )
@@ -335,11 +344,78 @@ public actor NeoAnkiAPIService {
         case (.post, "/v1/exports"):
             try require(grant, scope: .libraryExport)
             return try await createExportJob(request, grant: grant)
+        case (.get, "/v1/vocabulary-packs"):
+            try require(grant, scope: .vocabularyRead)
+            return try await listVocabularyPacks(request)
+        case (.post, "/v1/vocabulary-pack-imports"):
+            try require(grant, scope: .vocabularyWrite)
+            return try await createVocabularyImport(request)
         default:
             break
         }
 
         let components = request.path.split(separator: "/").map(String.init)
+        if components.count >= 3, components[0] == "v1", components[1] == "vocabulary-packs" {
+            let packID = try decodeVocabularyPathSegment(components[2], pointer: "/id")
+            if components.count == 3 {
+                switch request.method {
+                case .get:
+                    try require(grant, scope: .vocabularyRead)
+                    return try await getVocabularyPack(packID)
+                case .delete:
+                    try require(grant, scope: .vocabularyWrite)
+                    return try await deleteVocabularyPack(packID, request: request)
+                default: break
+                }
+            } else if components.count == 4, components[3] == "entries", request.method == .get {
+                try require(grant, scope: .vocabularyRead)
+                return try await searchVocabularyEntries(packID: packID, request: request)
+            } else if components.count == 4, components[3] == "media",
+                      request.method == .get || request.method == .head {
+                try require(grant, scope: .vocabularyRead)
+                return try await vocabularyMedia(
+                    packID: packID, request: request, headOnly: request.method == .head
+                )
+            } else if components.count == 5, components[3] == "entries", request.method == .get {
+                try require(grant, scope: .vocabularyRead)
+                return try await getVocabularyEntry(
+                    packID: packID,
+                    entryID: try decodeVocabularyPathSegment(components[4], pointer: "/entryId")
+                )
+            }
+        }
+        if components.count >= 3, components[0] == "v1",
+           components[1] == "vocabulary-pack-imports"
+        {
+            let jobID = try parseUUID(components[2], pointer: "/id")
+            if components.count == 3 {
+                switch request.method {
+                case .get:
+                    try require(grant, scope: .vocabularyWrite)
+                    return try await getVocabularyImport(jobID)
+                case .delete:
+                    try require(grant, scope: .vocabularyWrite)
+                    return try await deleteVocabularyImport(jobID, request: request)
+                default: break
+                }
+            } else if components.count == 4, request.method == .post {
+                try require(grant, scope: .vocabularyWrite)
+                switch components[3] {
+                case "validations":
+                    return try await validateVocabularyImport(jobID)
+                case "commits":
+                    return try await commitVocabularyImport(jobID, request: request)
+                default: break
+                }
+            } else if components.count == 5, components[3] == "files", request.method == .put {
+                try require(grant, scope: .vocabularyWrite)
+                return try await uploadVocabularyImportFile(
+                    jobID: jobID,
+                    fileID: try parseUUID(components[4], pointer: "/fileId"),
+                    request: request
+                )
+            }
+        }
         if components.count >= 3, components[0] == "v1", components[1] == "imports" {
             let jobID = try parseUUID(components[2], pointer: "/id")
             if components.count == 3 {
@@ -2424,7 +2500,7 @@ public actor NeoAnkiAPIService {
         )
     }
 
-    private func requiredIdempotencyKey(_ request: APIRequest) throws -> String {
+    func requiredIdempotencyKey(_ request: APIRequest) throws -> String {
         guard let key = request.header("idempotency-key"),
               !key.isEmpty, key.utf8.count <= 256
         else {
@@ -3768,7 +3844,7 @@ public actor NeoAnkiAPIService {
         }
     }
 
-    private func requireIfMatch(_ request: APIRequest, revision: Int) throws {
+    func requireIfMatch(_ request: APIRequest, revision: Int) throws {
         guard let value = request.header("if-match") else {
             throw APIServiceError.problem(
                 status: 428,
@@ -3806,7 +3882,7 @@ public actor NeoAnkiAPIService {
         }
     }
 
-    private func etag(_ revision: Int) -> String { "\"revision-\(revision)\"" }
+    func etag(_ revision: Int) -> String { "\"revision-\(revision)\"" }
     private func etag(_ revision: Int64) -> String { "\"revision-\(revision)\"" }
 
     private func pageLimit(_ query: [String: [String]]) throws -> Int {
@@ -3867,7 +3943,7 @@ public actor NeoAnkiAPIService {
         return name
     }
 
-    private func parseUUID(_ value: String, pointer: String) throws -> UUID {
+    func parseUUID(_ value: String, pointer: String) throws -> UUID {
         guard value == value.lowercased(), let id = UUID(uuidString: value),
               id.uuidString.lowercased() == value
         else {
