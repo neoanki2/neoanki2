@@ -12,7 +12,7 @@ instead of HTML card templates.
 
 ## Start
 
-- [Build and launch](user/getting-started/)
+- [Install or build and launch](user/getting-started/)
 - [Complete your first study session](user/first-study-session/)
 
 ## Tasks
@@ -52,12 +52,14 @@ tests, and screenshot associated with every documented capability.
 
 ## Current availability
 
-NeoAnki2 does not yet publish signed application releases. The current app is
-built from source and targets macOS 14 or newer. It intentionally does not
-support Anki `.apkg` packages or HTML/CSS card templates.
+NeoAnki2 publishes universal, checksummed, provenance-attested macOS releases
+through its official Homebrew tap after every tested update to `main`. Releases
+are ad-hoc signed but are not yet Apple-notarized. The app targets macOS 14 or
+newer and intentionally does not support Anki `.apkg` packages or HTML/CSS card
+templates.
 
 ---
 
-**Next:** [Build and launch NeoAnki2](user/getting-started/)
+**Next:** [Install or build NeoAnki2](user/getting-started/)
 
 **Related:** [Choose a task](user/tasks/) · [Understand the learning model](user/concepts/)

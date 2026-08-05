@@ -1,17 +1,49 @@
 ---
 title: Getting started
-description: Verify the macOS toolchain, clone NeoAnki2, and launch its development app bundle.
+description: Install the official NeoAnki2 release with Homebrew or build a development app from source.
 nav_order: 1
 parent: User Guide
 ---
 
 # Getting started
 
-NeoAnki2 is a native, local-first macOS spaced-repetition app. The project does
-not currently publish releases, installers, or a signed application download.
-To use it today, build it from source.
+NeoAnki2 is a native, local-first macOS spaced-repetition app. The supported
+end-user installation is the official Homebrew cask. Maintainers and
+contributors can also build the current source checkout.
 
-## Before you start
+## Install the official release
+
+On macOS 14 or newer with Homebrew installed, run:
+
+```bash
+brew install --cask neoanki2/tap/neoanki2
+```
+
+Homebrew downloads the universal DMG from the matching GitHub release, verifies
+its cask checksum, and installs `NeoAnki2.app` in `/Applications`. Every tested
+update merged to `main` publishes a new release and updates the cask.
+
+Release artifacts are ad-hoc signed and provenance-attested, but are not yet
+Apple-notarized. If macOS blocks the first launch, Control-click **NeoAnki2** in
+Applications, choose **Open**, then confirm **Open**. Do not disable Gatekeeper
+globally.
+
+To update later, run:
+
+```bash
+brew update
+brew upgrade --cask neoanki2
+```
+
+Your library is not replaced by installation or upgrade; it remains in
+`~/Library/Application Support/neoanki2/`.
+
+## Build from source
+
+The remaining sections are for development builds. They require a Swift 6
+toolchain and are not necessary for a Homebrew installation.
+
+### Development prerequisites
 
 You need:
 
@@ -48,7 +80,7 @@ If a command is missing or Swift is older than 6, install or update Xcode,
 select its developer tools, and repeat these checks. See [build and launch
 support](../support/) before trying workarounds.
 
-## Clone the source
+### Clone the source
 
 Choose a parent directory, then run these exact commands:
 
@@ -61,7 +93,7 @@ Expected result: Git prints that it cloned into `neoanki2`, and the second
 command leaves Terminal at the repository root. If you already have this
 checkout, do not clone it again; open Terminal at its root instead.
 
-## Build and launch
+### Build and launch
 
 From the repository root, run:
 
@@ -92,11 +124,9 @@ Expected result: Terminal prints **Building NeoAnki2...** and **Running
 NeoAnki2...**, then the app window appears. Keep that Terminal window open
 while this mode is running.
 
-## Install to /Applications
+### Install an unreleased source build
 
-Running from the checkout means launching through a script every time. To use
-NeoAnki2 the way you use any other Mac app — Spotlight, Launchpad, the Dock —
-install it:
+For maintainer testing before a release exists, install the current checkout:
 
 ```bash
 ./Scripts/install-app.sh --restart
@@ -111,11 +141,12 @@ Installing to /Applications/NeoAnki2.app...
 Installed NeoAnki2 (abc1234, build 90) at /Applications/NeoAnki2.app
 ```
 
-This is a release build, not the debug build `run-app.sh` produces, and it is
-signed with no entitlements — the test bundle grants itself debugger attachment
-and Apple Events so automated tests can drive it, and the copy you study with
-does not need either. The commit it came from is recorded in the bundle, so you
-can always tell which build you are running:
+This is a local release-configuration build, not an official published release
+and not the debug build `run-app.sh` produces. It is signed with no entitlements
+— the test bundle grants itself debugger attachment and Apple Events so
+automated tests can drive it, and the copy you study with does not need either.
+The commit it came from is recorded in the bundle, so you can always tell which
+build you are running:
 
 ```bash
 /usr/libexec/PlistBuddy -c 'Print :NeoAnkiGitRevision' \
@@ -143,9 +174,17 @@ only when you open **Browse**, so large libraries do not delay the first useful
 Home screen. Browse presents at most 500 matching items at a time and provides
 page controls for the rest, keeping the table responsive as the library grows.
 
-## Update the development build
+## Update
 
-Quit NeoAnki2, preserve a current library backup, then run from the checkout:
+For an official Homebrew installation, use:
+
+```bash
+brew update
+brew upgrade --cask neoanki2
+```
+
+For a development checkout, quit NeoAnki2, preserve a current library backup,
+then run from the checkout:
 
 ```bash
 git status --short
@@ -159,17 +198,19 @@ shows local source changes, do not discard them blindly; commit, move, or review
 them before pulling. If the updated build reports that an older build cannot
 read the library, return to the updated build or restore a compatible backup.
 
-If you installed to `/Applications`, substitute `./Scripts/install-app.sh
---restart` for `./Scripts/run-app.sh` in that sequence. Pulling new source does
-not change the installed app until you install again.
+If you installed an unreleased source build, substitute
+`./Scripts/install-app.sh --restart` for `./Scripts/run-app.sh` in that
+sequence. Pulling new source does not change that installed app until you
+install again.
 
 ## Uninstall or remove the checkout
 
 1. Quit NeoAnki2.
-2. Delete the source checkout to remove source code, `.build/NeoAnki2.app`, and
-   build artifacts.
-3. If you installed to `/Applications`, drag `NeoAnki2.app` to the Trash as well.
-4. To keep your study data for a future checkout, stop here.
+2. For a Homebrew installation, run `brew uninstall --cask neoanki2`.
+3. For a development build, delete the source checkout to remove source code,
+   `.build/NeoAnki2.app`, and build artifacts. If you used the source install
+   script, also remove `/Applications/NeoAnki2.app`.
+4. To keep your study data for a future installation, stop here.
 5. To remove all NeoAnki2 data too, first make any backup you intend to keep,
    then delete `~/Library/Application Support/neoanki2/`.
 
