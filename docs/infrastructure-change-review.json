@@ -1,15 +1,8 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "d92f289110c0bc41666b73d4fe2411599981156bc24ee90014b2b18fab98a0d1",
+  "diffSHA256": "78dd95457b3b78c611743efe0eb4099f345141c51e8e0a92f833a4aa13ccfa1e",
   "files": [
-    "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
-    "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift",
-    "Sources/NeoAnki2/ContentView.swift",
-    "Sources/NeoAnki2/DeckSidebarView.swift",
-    "Sources/NeoAnki2/DecksModel.swift",
-    "Sources/NeoAnki2/NeoAnki2App.swift",
-    "Sources/NeoAnki2/ScopeHomeView.swift",
-    "Sources/NeoAnki2/UserFacingError.swift"
+    "NeoAnkiCore/Sources/NeoAnkiCore/Database/Schema.swift"
   ],
-  "reason": "Shared library, navigation, error, and media adapters gained local API, offline vocabulary, and deck-reset wiring. The new workflows are documented in the dedicated API, import/export, scheduling, and shortcuts guides; the existing first-launch, library, media, import, and error screenshot scenarios remain visually accurate."
+  "reason": "The schema comment now records that local API token verifiers remain outside library database snapshots. The authorization behavior and migration are documented in the dedicated local API guide; item-authoring history retention is unchanged."
 }
