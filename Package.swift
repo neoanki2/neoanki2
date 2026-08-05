@@ -40,6 +40,7 @@ let package = Package(
             name: "NeoAnkiAPI",
             dependencies: [
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+                "NeoAnkiVocabularyKit",
             ],
             path: "Sources/NeoAnkiAPI",
             linkerSettings: [
@@ -98,6 +99,7 @@ let package = Package(
             name: "NeoAnkiAPITests",
             dependencies: [
                 "NeoAnkiAPI",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
             ],

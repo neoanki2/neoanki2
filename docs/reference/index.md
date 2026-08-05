@@ -13,6 +13,8 @@ permalink: /reference/
   transactions, and version-1 acceptance criteria
 - [Local API acceptance evidence](local-api-acceptance.md) — reproducible test
   commands and criterion-to-suite traceability
+- [Vocabulary API requirements](../VOCABULARY_API.md) — normative installed-pack
+  lookup, media, authorization, and staged lifecycle contract
 - [Local automation API guide](../user/local-api.md) — enablement, client
   approval, least-privilege scopes, revocation, and safe troubleshooting
 - [Design system](../DESIGN.md) — visual and interaction principles

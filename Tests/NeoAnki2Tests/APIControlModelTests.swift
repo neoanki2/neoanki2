@@ -14,7 +14,12 @@ import Testing
     defer { try? FileManager.default.removeItem(at: directory) }
     let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
     try await store.bootstrap()
-    let model = APIControlModel(store: store)
+    let model = APIControlModel(
+        store: store,
+        vocabularyRootURL: directory.appendingPathComponent(
+            "Vocabulary Packs", isDirectory: true
+        )
+    )
     await model.restore()
     #expect(!model.isEnabled)
     #expect(!model.isRunning)

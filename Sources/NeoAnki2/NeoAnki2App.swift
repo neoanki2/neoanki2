@@ -205,7 +205,10 @@ struct NeoAnki2App: App {
             decksModel = newDecksModel
             schedulingModel = SchedulingModel(store: payload.store)
             vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL)
-            let apiModel = APIControlModel(store: payload.store)
+            let apiModel = APIControlModel(
+                store: payload.store,
+                vocabularyRootURL: payload.vocabularyRootURL
+            )
             apiControlModel = apiModel
             await apiModel.restore()
             AppStartupTrace.mark("models_ready")

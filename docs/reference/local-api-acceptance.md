@@ -17,12 +17,12 @@ Verified on 2026-08-05 on macOS arm64 with the Swift 6 package toolchain.
 
 | Verification command | Result |
 | --- | --- |
-| `swift test --filter NeoAnkiAPITests` | Pass: 35 tests |
-| `swift test` | Pass: 340 tests |
-| `cd NeoAnkiCore && swift test` | Pass: 358 tests |
+| `swift test --filter NeoAnkiAPITests` | Pass: 37 tests |
+| `swift test --parallel` | Pass: 342 tests |
+| `cd NeoAnkiCore && swift test --parallel` | Pass: 358 tests |
 | `NEOANKI_RUN_API_PERFORMANCE_TEST=1 swift test --filter referenceScaleAPILatencyMeetsVersionOneReleaseBudgets` | Pass: 100,000-item fixture and all four p95 budgets; 53.898 seconds including fixture creation |
 | `git diff --check` | Pass |
-| `swift Scripts/validate-docs.swift` | Local API validation passes; the repository-wide command remains blocked by two unrelated vocabulary feature-manifest entries |
+| `swift Scripts/validate-docs.swift` | Pass: documentation and 36-feature evidence manifest |
 
 The performance test is opt-in because it creates 100,000 items. The ordinary
 suite still compiles and discovers the test, but a release run MUST set
@@ -45,6 +45,11 @@ suite still compiles and discovers the test, but a release run MUST set
 | `MEDIA-001`–`MEDIA-006` | Complete supported-signature matrix, hostile/over-limit uploads, content-addressed deduplication, independent reservations, reference counting, sandbox tests, and consistent range rejection |
 | `BATCH-001`–`BATCH-005` | 500-item commit, 501-item rejection, invalid-operation rollback, dry-run identity, replay, and single-transaction event tests |
 | `TRANSFER-001`–`TRANSFER-006` | Four-format validation/commit tests, staging/expiry tests, portable round trip, and import/export process-exit recovery at every declared boundary |
+| `VOC-SEC-001`–`VOC-SEC-003` | Exact vocabulary-scope pairing/current-client assertions and cross-scope denial tests in `NeoAnkiAPIServiceTests` |
+| `VOC-PACK-001`–`VOC-PACK-004` | Installed-pack list/read/delete precondition tests plus vocabulary-kit integrity, checksum, symlink, containment, and limit tests |
+| `VOC-LOOKUP-001`–`VOC-OFFLINE-001` | Complete-entry round trip, exact/prefix/language/limit search, hostile-query/media checks, and offline vocabulary-kit lookup tests |
+| `VOC-IMPORT-001`–`VOC-IMPORT-007` | Staged declaration/upload/validation/commit, digest rejection, restart, idempotency, duplicate-ID, private staging, and atomic lifecycle tests |
+| `VOC-REL-001`–`VOC-REL-004` | OpenAPI inventory/schema assertions, root and vocabulary suites, path-redaction assertions, and shared app/API managed-root wiring |
 | `EVENT-001`–`EVENT-006` | Durable changes, mutation/no-op event sets, reconnect/expiry behavior, SSE parity, ordering, revocation, and content-redaction assertions |
 | `V1-001`–`V1-006` | The API, root-package, and Core suites above, including fault, concurrency, security, restart, OpenAPI, and transaction coverage |
 | `V1-007` | `referenceScaleAPILatencyMeetsVersionOneReleaseBudgets` with the required environment variable |
@@ -64,15 +69,8 @@ persistence, and after review commit but before response persistence. Retries
 must return the same logical resource and must not duplicate bytes, items,
 review logs, events, or scheduling transitions.
 
-## Repository-wide documentation exception
+## Documentation evidence status
 
-`Scripts/validate-docs.swift` currently reports only these unrelated omissions:
-
-- `Sources/NeoAnki2/VocabularyPacksView.swift` is not mapped in
-  `docs/features.json`.
-- `Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift` is not mapped in
-  `docs/features.json`.
-
-Neither file is part of the local API implementation. They remain visible here
-so a repository-wide release cannot mistake the local API evidence for a clean
-global documentation result.
+The repository-wide documentation validator passes. Vocabulary UI, model,
+kit, and API coverage are mapped in the generated feature index; there are no
+known documentation-manifest exceptions for this release.

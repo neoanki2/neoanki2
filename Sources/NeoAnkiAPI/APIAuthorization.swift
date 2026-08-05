@@ -11,6 +11,8 @@ public enum APIScope: String, Codable, CaseIterable, Hashable, Sendable {
     case mediaWrite = "media.write"
     case libraryImport = "library.import"
     case libraryExport = "library.export"
+    case vocabularyRead = "vocabulary.read"
+    case vocabularyWrite = "vocabulary.write"
     case settingsWrite = "settings.write"
     case uiControl = "ui.control"
 }
