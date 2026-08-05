@@ -45,7 +45,6 @@ let package = Package(
             path: "Sources/NeoAnkiAPI",
             linkerSettings: [
                 .linkedFramework("Network"),
-                .linkedFramework("Security"),
             ]
         ),
         .target(

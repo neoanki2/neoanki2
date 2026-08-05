@@ -1,6 +1,6 @@
 import CryptoKit
+import Darwin
 import Foundation
-import Security
 
 public enum APIScope: String, Codable, CaseIterable, Hashable, Sendable {
     case libraryRead = "library.read"
@@ -45,62 +45,120 @@ public actor InMemoryAPICredentialPersistence: APICredentialPersistence {
     public func save(_ data: Data) { self.data = data }
 }
 
-public actor KeychainAPICredentialPersistence: APICredentialPersistence {
-    private let service: String
-    private let account: String
+/// Persists only one-way bearer-token verifiers and their grant metadata.
+/// The bearer tokens themselves are returned once at pairing and never reach
+/// this file.
+public actor VerifierFileAPICredentialPersistence: APICredentialPersistence {
+    public static let fileName = "client-grants-v1.json"
 
-    public init(
-        service: String = "org.neoanki.neoanki2.local-api",
-        account: String = "client-grants"
-    ) {
-        self.service = service
-        self.account = account
+    private static let maximumByteCount = 1_048_576
+    private let fileURL: URL
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL.standardizedFileURL
     }
 
     public func load() throws -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data else {
-            throw APIAuthorizationError.credentialPersistence(status)
+        let descriptor = Darwin.open(fileURL.path, O_RDONLY | O_NOFOLLOW)
+        guard descriptor >= 0 else {
+            if errno == ENOENT { return nil }
+            if errno == ELOOP { throw APIAuthorizationError.insecureCredentialStorage }
+            throw APIAuthorizationError.credentialPersistence
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var fileStatus = stat()
+        guard Darwin.fstat(descriptor, &fileStatus) == 0 else {
+            try? handle.close()
+            throw APIAuthorizationError.credentialPersistence
+        }
+        guard fileStatus.st_mode & S_IFMT == S_IFREG,
+              fileStatus.st_uid == geteuid(),
+              fileStatus.st_mode & 0o077 == 0
+        else {
+            try? handle.close()
+            throw APIAuthorizationError.insecureCredentialStorage
+        }
+        guard fileStatus.st_size <= Self.maximumByteCount else {
+            try? handle.close()
+            throw APIAuthorizationError.credentialDataTooLarge
+        }
+        let data = try handle.readToEnd() ?? Data()
+        try handle.close()
+        guard data.count <= Self.maximumByteCount else {
+            throw APIAuthorizationError.credentialDataTooLarge
         }
         return data
     }
 
     public func save(_ data: Data) throws {
-        let identity: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        let attributes: [String: Any] = [kSecValueData as String: data]
-        let update = SecItemUpdate(identity as CFDictionary, attributes as CFDictionary)
-        if update == errSecItemNotFound {
-            var insertion = identity
-            insertion[kSecValueData as String] = data
-            let status = SecItemAdd(insertion as CFDictionary, nil)
-            guard status == errSecSuccess else {
-                throw APIAuthorizationError.credentialPersistence(status)
+        guard data.count <= Self.maximumByteCount else {
+            throw APIAuthorizationError.credentialDataTooLarge
+        }
+        let directoryURL = fileURL.deletingLastPathComponent()
+        try preparePrivateDirectory(directoryURL)
+
+        let temporaryURL = directoryURL.appendingPathComponent(
+            ".\(Self.fileName).\(UUID().uuidString).tmp",
+            isDirectory: false
+        )
+        let descriptor = Darwin.open(
+            temporaryURL.path,
+            O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW,
+            S_IRUSR | S_IWUSR
+        )
+        guard descriptor >= 0 else {
+            throw APIAuthorizationError.credentialPersistence
+        }
+
+        do {
+            let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+            try handle.write(contentsOf: data)
+            try handle.synchronize()
+            try handle.close()
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            var preparedURL = temporaryURL
+            try preparedURL.setResourceValues(resourceValues)
+            guard Darwin.rename(temporaryURL.path, fileURL.path) == 0 else {
+                throw APIAuthorizationError.credentialPersistence
             }
-            return
+        } catch {
+            _ = Darwin.unlink(temporaryURL.path)
+            throw error
         }
-        guard update == errSecSuccess else {
-            throw APIAuthorizationError.credentialPersistence(update)
+    }
+
+    private func preparePrivateDirectory(_ directoryURL: URL) throws {
+        let fileManager = FileManager.default
+        var directoryStatus = stat()
+        if Darwin.lstat(directoryURL.path, &directoryStatus) == 0 {
+            guard directoryStatus.st_mode & S_IFMT == S_IFDIR,
+                  directoryStatus.st_uid == geteuid()
+            else {
+                throw APIAuthorizationError.insecureCredentialStorage
+            }
+        } else {
+            guard errno == ENOENT else {
+                throw APIAuthorizationError.credentialPersistence
+            }
+            try fileManager.createDirectory(
+                at: directoryURL,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
         }
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: directoryURL.path
+        )
     }
 }
 
 enum APIAuthorizationError: Error, Sendable {
-    case credentialPersistence(OSStatus)
+    case credentialPersistence
+    case credentialDataTooLarge
+    case insecureCredentialStorage
     case invalidCredentialData
-    case randomGeneration
 }
 
 enum APICrypto {
@@ -116,13 +174,7 @@ enum APICrypto {
     }
 
     static func randomToken() throws -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        let status = bytes.withUnsafeMutableBytes { buffer in
-            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
-        }
-        guard status == errSecSuccess else {
-            throw APIAuthorizationError.randomGeneration
-        }
+        let bytes = SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) }
         return Data(bytes)
             .base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")

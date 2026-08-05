@@ -138,10 +138,10 @@ scopes:
 - `ui.control`.
 
 The last two scopes are reserved for post-v1 operations. A token MUST contain
-at least 256 bits of cryptographically random entropy. The server stores tokens
-in Keychain or stores only a cryptographic verifier. Tokens MUST NOT appear in a
-URL, response body after initial issuance, normal log, event, crash annotation,
-or analytics record.
+at least 256 bits of cryptographically random entropy. The server stores only a
+cryptographic verifier in private application-support storage; it never stores
+the bearer token. Tokens MUST NOT appear in a URL, response body after initial
+issuance, normal log, event, crash annotation, or analytics record.
 
 `POST /v1/pairings` begins pairing without authorization. It accepts a client
 display name of 1 to 256 UTF-8 bytes after Unicode whitespace trimming,
@@ -787,8 +787,8 @@ true:
   a 200-item collection page, and 500 ms for review submission over 100 warm
   sequential requests. Import and export job duration is excluded.
 - **V1-008:** Disabling the API, revoking all clients, and uninstalling NeoAnki
-  leave no listener, bearer token outside Keychain, staged upload, staged
-  export, or world-readable discovery artifact.
+  leave no listener, bearer token at rest, usable token verifier, staged upload,
+  staged export, or world-readable discovery artifact.
 - **V1-009:** User documentation identifies how to enable the API, approve and
   revoke clients, inspect scopes, change the port, diagnose connection errors,
   and report a security issue without disclosing a token.

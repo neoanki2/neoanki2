@@ -237,9 +237,10 @@ enum Schema {
     ] + browseProjectionStatements + apiStateStatements + apiChangeTrackingStatements
 
     /// Durable application-service state shared by the native UI and local API.
-    /// These tables contain no bearer credentials; client secrets remain in
-    /// Keychain. Keeping revisions and events beside domain writes lets SQLite
-    /// commit them atomically.
+    /// These tables contain no bearer credentials or token verifiers. Keeping
+    /// revisions and events beside domain writes lets SQLite commit them
+    /// atomically, while local API authorization remains separate from library
+    /// database snapshots.
     static let apiStateStatements: [String] = [
         """
         CREATE TABLE IF NOT EXISTS resource_revisions (

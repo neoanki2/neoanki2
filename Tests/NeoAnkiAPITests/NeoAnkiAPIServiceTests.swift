@@ -1313,6 +1313,87 @@ private func pairWithAuthority(
     #expect(startedAt.duration(to: .now) < .seconds(1))
 }
 
+@Test func verifierFilePersistsOnlyTokenHashesWithPrivatePermissions() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "neoanki-api-verifiers-\(UUID().uuidString)", isDirectory: true
+    )
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let fileURL = directory
+        .appendingPathComponent(".neoanki-api", isDirectory: true)
+        .appendingPathComponent(VerifierFileAPICredentialPersistence.fileName)
+    let authorization = APIAuthorizationStore(
+        persistence: VerifierFileAPICredentialPersistence(fileURL: fileURL)
+    )
+
+    let issued = try await authorization.issueGrant(
+        displayName: "Durable client",
+        origin: "https://approved.example",
+        scopes: [.libraryRead, .itemsWrite]
+    )
+    let persisted = try Data(contentsOf: fileURL)
+    let persistedText = String(decoding: persisted, as: UTF8.self)
+    #expect(!persistedText.contains(issued.token))
+    #expect(persistedText.contains(APICrypto.sha256Hex(Data(issued.token.utf8))))
+
+    let fileAttributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+    #expect((fileAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+    let directoryAttributes = try FileManager.default.attributesOfItem(
+        atPath: fileURL.deletingLastPathComponent().path
+    )
+    #expect((directoryAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o700)
+    #expect(try fileURL.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+
+    let reopened = APIAuthorizationStore(
+        persistence: VerifierFileAPICredentialPersistence(fileURL: fileURL)
+    )
+    let restoredGrant = try #require(try await reopened.authenticate(token: issued.token))
+    #expect(restoredGrant.id == issued.grant.id)
+    #expect(restoredGrant.displayName == issued.grant.displayName)
+    #expect(restoredGrant.origin == issued.grant.origin)
+    #expect(restoredGrant.scopes == issued.grant.scopes)
+    #expect(try await reopened.revoke(clientID: issued.grant.id))
+
+    let afterRevocation = APIAuthorizationStore(
+        persistence: VerifierFileAPICredentialPersistence(fileURL: fileURL)
+    )
+    #expect(try await afterRevocation.authenticate(token: issued.token) == nil)
+}
+
+@Test func verifierFileRejectsInsecureOrUnexpectedFiles() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "neoanki-api-verifier-security-\(UUID().uuidString)", isDirectory: true
+    )
+    let directory = root.appendingPathComponent(".neoanki-api", isDirectory: true)
+    let fileURL = directory.appendingPathComponent(
+        VerifierFileAPICredentialPersistence.fileName,
+        isDirectory: false
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(
+        at: directory,
+        withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700]
+    )
+    try Data("[]".utf8).write(to: fileURL)
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o644],
+        ofItemAtPath: fileURL.path
+    )
+    let insecure = VerifierFileAPICredentialPersistence(fileURL: fileURL)
+    await #expect(throws: APIAuthorizationError.self) {
+        try await insecure.load()
+    }
+
+    try FileManager.default.removeItem(at: fileURL)
+    let targetURL = root.appendingPathComponent("target.json")
+    try Data("[]".utf8).write(to: targetURL)
+    try FileManager.default.createSymbolicLink(at: fileURL, withDestinationURL: targetURL)
+    let symbolicLink = VerifierFileAPICredentialPersistence(fileURL: fileURL)
+    await #expect(throws: APIAuthorizationError.self) {
+        try await symbolicLink.load()
+    }
+}
+
 @Test func deckCreateReplayPaginationAndOptimisticUpdateAreStable() async throws {
     let api = try await makeAPI()
     let token = try await pair(api, scopes: ["library.read", "decks.write"])
