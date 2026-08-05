@@ -123,6 +123,12 @@ history warrants it, so there is no menu item to find, enable, or wait on.
   arrange card.
 - **Command-Up Arrow / Command-Down Arrow:** move the selected arrange item.
 
+On a record card, stop the recording before **Reveal & Compare** becomes
+available. After reveal, **Play My Recording** remains available beside the
+written answer. A separate reference-audio control appears only when the card
+contains real answer audio. If it does not, NeoAnki2 says that no reference
+audio is available; it does not synthesize a voice from the answer text.
+
 ## VoiceOver and focus
 
 Rows combine their important text into one useful VoiceOver label: deck rows

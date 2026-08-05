@@ -999,8 +999,11 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(studyButton.waitUntilExists(timeout: 5))
         XCTAssertTrue(studyButton.isEnabled)
         studyButton.click()
-        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitUntilExists(timeout: 5)
-            || app.buttons.identified("studySessionDone").waitUntilExists(timeout: 2))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            app.buttons.identified("primaryStudyAction").exists
+                || app.buttons.identified("startRecording").exists
+                || app.buttons.identified("studySessionDone").exists
+        })
     }
 
     /// Clicks a control, falling back to its keyboard shortcut when a tall

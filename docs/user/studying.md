@@ -78,7 +78,7 @@ For keyboard-only ordering, press Command-1 through Command-9 to select one of t
 
 ### Record
 
-Choose **Start Recording**, speak, and choose **Stop Recording**. You may play the temporary recording, record again, or choose **Compare Recording** to reveal the reference answer and self-grade. Compare Recording remains disabled until a recording exists; **Reveal & Self-Grade** remains available as a fallback.
+Choose **Start Recording**, speak, and choose **Stop Recording**. You may play the temporary recording or record again. Once the recording is ready, choose **Reveal & Compare** to reveal the answer while keeping **Play My Recording** available. If the answer contains reference audio, play that real recording from the answer; otherwise, NeoAnki2 states that reference audio is unavailable and you compare your recording with the written answer. NeoAnki2 never synthesizes a reference voice. **Reveal & Self-Grade** remains available as a fallback when you do not want to record.
 
 The first recording attempt may trigger the macOS microphone permission prompt. If access is denied or restricted, enable NeoAnki2 in **System Settings → Privacy & Security → Microphone**. Recordings are temporary: NeoAnki2 removes them when the card changes, the study view closes, or a new recording replaces the old one.
 

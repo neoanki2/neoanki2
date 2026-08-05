@@ -281,7 +281,7 @@ extension FastFunctionalJourneyTests {
         startStudy(in: recordApp)
         runJourneyActivity("StudyUITests.testRecordRequiresRecordingButAllowsSelfGradeFallback") {
             XCTAssertTrue(recordApp.buttons.identified("startRecording").waitUntilExists(timeout: 3))
-            XCTAssertFalse(recordApp.buttons.identified("primaryStudyAction").isEnabled)
+            XCTAssertFalse(recordApp.buttons.identified("primaryStudyAction").exists)
         }
         runJourneyActivity("StudyExtendedUITests.testRevealAndSelfGradeViaRightArrow") {
             recordApp.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
@@ -508,7 +508,7 @@ extension FastFunctionalJourneyTests {
         startStudy(in: app)
 
         XCTAssertTrue(app.buttons.identified("startRecording").waitUntilExists(timeout: 3))
-        XCTAssertFalse(app.buttons.identified("primaryStudyAction").isEnabled)
+        XCTAssertFalse(app.buttons.identified("primaryStudyAction").exists)
         app.buttons.identified("revealAndSelfGrade").click()
         XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 3))
     }

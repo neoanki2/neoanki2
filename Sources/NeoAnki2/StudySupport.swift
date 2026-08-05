@@ -22,6 +22,13 @@ enum StudySupport {
         return answers.contains { normalized($0) == normalizedResponse } ? .correct : .incorrect
     }
 
+    static func hasReferenceAudio(for card: DueCard) -> Bool {
+        SideContent.values(for: card.template.answer, from: card.item).contains { value in
+            guard case let .media(reference) = value else { return false }
+            return reference.kind == .audio
+        }
+    }
+
     static func choiceOptions(for card: DueCard, maximum: Int = 4) -> [String] {
         guard let correct = acceptedAnswers(for: card).first else { return [] }
 
