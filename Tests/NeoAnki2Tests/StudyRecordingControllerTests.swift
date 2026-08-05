@@ -81,6 +81,7 @@ private final class AudioFactoryStub: StudyAudioFactory {
     await controller.start()
 
     #expect(controller.hasRecording == false)
+    #expect(controller.isReadyForComparison == false)
     guard case .failed = controller.state else {
         Issue.record("Expected recording failure.")
         return
@@ -94,9 +95,12 @@ private final class AudioFactoryStub: StudyAudioFactory {
         audioFactory: factory
     )
     await controller.start()
+    #expect(controller.isReadyForComparison == false)
     controller.stop()
+    #expect(controller.isReadyForComparison)
     controller.togglePlayback()
     #expect(controller.state == .playing)
+    #expect(controller.isReadyForComparison)
 
     factory.onFinish?(true)
 

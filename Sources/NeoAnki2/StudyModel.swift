@@ -314,8 +314,12 @@ final class StudyModel {
     }
 
     func completeRecording() {
-        guard currentCard?.template.interaction == .record else { return }
-        interactionMessage = "Play your recording and the reference, then grade your recall."
+        guard let card = currentCard, card.template.interaction == .record else { return }
+        interactionMessage = if StudySupport.hasReferenceAudio(for: card) {
+            "Replay your recording, then play the reference audio below."
+        } else {
+            "No reference audio is available for this card. Replay your recording and compare it with the written answer."
+        }
         isAnswerRevealed = true
     }
 

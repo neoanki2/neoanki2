@@ -375,6 +375,18 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     }
 }
 
+@Test @MainActor func textOnlyRecordingCardStatesThatReferenceAudioIsUnavailable() async throws {
+    let model = try await makeInteractionModel(.record)
+
+    model.performPrimaryAction()
+
+    #expect(model.isAnswerRevealed)
+    #expect(
+        model.interactionMessage
+            == "No reference audio is available for this card. Replay your recording and compare it with the written answer."
+    )
+}
+
 @Test @MainActor func interactionInputValidationDoesNotSoftLock() async throws {
     let typeModel = try await makeInteractionModel(.type)
     typeModel.performPrimaryAction()

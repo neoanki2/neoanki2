@@ -95,7 +95,8 @@ struct StudyView: View {
     }
 
     private var primaryActionHandler: StudyPrimaryActionHandler {
-        let recordingIsReady = model.currentCard?.template.interaction != .record || recording.hasRecording
+        let recordingIsReady = model.currentCard?.template.interaction != .record
+            || recording.isReadyForComparison
         return StudyPrimaryActionHandler(
             action: {
                 StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
@@ -310,6 +311,11 @@ struct StudyView: View {
         if model.isAnswerRevealed {
             Divider()
             evaluationFeedback
+
+            if card.template.interaction == .record, recording.hasRecording {
+                revealedRecordingPlayback
+            }
+
             SideContentView(
                 side: card.template.answer,
                 item: card.item,
@@ -419,12 +425,25 @@ struct StudyView: View {
                     Button("Stop Recording") {
                         recording.stop()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .keyboardShortcut("r", modifiers: [.command])
                     .accessibilityIdentifier("stopRecording")
-                } else {
-                    Button(recording.hasRecording ? "Record Again" : "Start Recording") {
+                } else if recording.hasRecording {
+                    Button("Record Again") {
                         Task { await recording.start() }
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .disabled(recording.state == .requestingPermission)
+                    .accessibilityIdentifier("startRecording")
+                } else {
+                    Button("Start Recording") {
+                        Task { await recording.start() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .keyboardShortcut("r", modifiers: [.command])
                     .disabled(recording.state == .requestingPermission)
                     .accessibilityIdentifier("startRecording")
@@ -438,6 +457,23 @@ struct StudyView: View {
                     .accessibilityIdentifier("playRecording")
                 }
             }
+        }
+    }
+
+    private var revealedRecordingPlayback: some View {
+        VStack(spacing: DesignSystem.Spacing.sm) {
+            Label(revealedRecordingStatusText, systemImage: recordingStatusIcon)
+                .font(DesignSystem.Typography.uiSecondary)
+                .foregroundStyle(recordingHasError ? .red : .secondary)
+                .multilineTextAlignment(.center)
+                .accessibilityFocused($recordingErrorAccessibilityFocused)
+
+            Button(recording.state == .playing ? "Stop My Recording" : "Play My Recording") {
+                recording.togglePlayback()
+            }
+            .controlSize(.large)
+            .keyboardShortcut("p", modifiers: [.command])
+            .accessibilityIdentifier("playRecording")
         }
     }
 
@@ -498,16 +534,17 @@ struct StudyView: View {
                 gradeButtons
             } else {
                 HStack(spacing: DesignSystem.Spacing.sm) {
-                    Button(primaryActionTitle(for: card.template.interaction)) {
-                        StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                            model.performPrimaryAction()
+                    if card.template.interaction != .record || recording.isReadyForComparison {
+                        Button(primaryActionTitle(for: card.template.interaction)) {
+                            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                                model.performPrimaryAction()
+                            }
                         }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("primaryStudyAction")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(card.template.interaction == .record && !recording.hasRecording)
-                    .accessibilityIdentifier("primaryStudyAction")
 
                     if card.template.interaction != .reveal, card.template.interaction != .cloze {
                         Button("Reveal & Self-Grade") {
@@ -518,6 +555,11 @@ struct StudyView: View {
                         .controlSize(.large)
                         .keyboardShortcut(.rightArrow, modifiers: [])
                         .help("Reveal without checking (Right Arrow)")
+                        .disabled(
+                            card.template.interaction == .record
+                                && (recording.state == .recording
+                                    || recording.state == .requestingPermission)
+                        )
                         .accessibilityIdentifier("revealAndSelfGrade")
                     }
                 }
@@ -590,7 +632,7 @@ struct StudyView: View {
         case .reveal, .cloze: "Show Answer"
         case .type: "Check Answer"
         case .choose: "Check Choice"
-        case .record: "Compare Recording"
+        case .record: "Reveal & Compare"
         case .arrange: "Check Order"
         }
     }
@@ -617,6 +659,17 @@ struct StudyView: View {
         case .recorded, .playing: "checkmark.circle"
         case .failed: "exclamationmark.triangle"
         case .idle, .requestingPermission: "mic"
+        }
+    }
+
+    private var revealedRecordingStatusText: String {
+        switch recording.state {
+        case .playing:
+            "Playing your recording…"
+        case let .failed(message):
+            message
+        case .idle, .requestingPermission, .recording, .recorded:
+            "Your recording"
         }
     }
 }

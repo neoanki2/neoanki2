@@ -101,3 +101,17 @@ private func supportCard(
     #expect(StudySupport.choiceOptions(for: emptyCard).isEmpty)
     #expect(StudySupport.arrangement(for: singleUnit) == nil)
 }
+
+@Test func referenceAudioDetectionDoesNotInventAudioForTextAnswers() {
+    let textCard = supportCard(interaction: .record, answer: .text("кача́лка", lang: "uk"))
+    let audioReference = MediaRef(
+        kind: .audio,
+        assetHash: String(repeating: "a", count: 64),
+        fileExtension: "m4a",
+        altText: "Ukrainian pronunciation"
+    )
+    let audioCard = supportCard(interaction: .record, answer: .media(audioReference))
+
+    #expect(StudySupport.hasReferenceAudio(for: textCard) == false)
+    #expect(StudySupport.hasReferenceAudio(for: audioCard))
+}

@@ -132,6 +132,16 @@ final class StudyRecordingController {
         recordingURL != nil
     }
 
+    var isReadyForComparison: Bool {
+        guard hasRecording else { return false }
+        return switch state {
+        case .recording, .requestingPermission, .idle:
+            false
+        case .recorded, .playing, .failed:
+            true
+        }
+    }
+
     func start() async {
         stopPlayback()
         recorder?.stop()
