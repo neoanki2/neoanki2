@@ -133,6 +133,11 @@ Your library lives in `~/Library/Application Support/neoanki2/` either way, so
 the installed app and a build launched from the checkout read the same data.
 Never run both at once.
 
+Installed offline vocabulary packs live beside that library in the managed
+`Vocabulary Packs` directory. The app and its loopback API use that same
+directory, so a validated pack installed through either surface is available
+to the other immediately.
+
 The Home summary is prepared while the app window opens. Browse rows are loaded
 only when you open **Browse**, so large libraries do not delay the first useful
 Home screen. Browse presents at most 500 matching items at a time and provides

@@ -1,5 +1,5 @@
 {
-  "capturedAt" : "2026-08-04T22:28:49Z",
+  "capturedAt" : "2026-08-05T05:31:37Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -20,7 +20,7 @@
       "filename" : "error-startup.png",
       "height" : 716,
       "scenario" : "database bootstrap failure",
-      "sha256" : "6353b1e1d78338254beb1788de36eeb988c3f66227f3ca6942363ef9872def77",
+      "sha256" : "f11e5594df4a9570c4756e0ce0c4ea899e5d5ddba0d66a820c1ad59a0b641afb",
       "width" : 960
     },
     {
@@ -101,7 +101,7 @@
       "filename" : "library-empty.png",
       "height" : 716,
       "scenario" : "empty library",
-      "sha256" : "1210f20c47f2e893208815b25e239b10df3ddf49ca33645be717c9c11f474cfd",
+      "sha256" : "b39cfd9a6db611c3520840518f117f6df1f08da451a01515226ac50d87dcaf40",
       "width" : 960
     },
     {
@@ -218,5 +218,5 @@
       "width" : 960
     }
   ],
-  "sourceSHA" : "70d70596812954f81dfe2e3028c59efbed0de430"
+  "sourceSHA" : "3b0a48c83e02749671a8fc6933691bd0030b9aab"
 }
