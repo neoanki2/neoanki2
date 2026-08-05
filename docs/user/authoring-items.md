@@ -126,6 +126,8 @@ not undone can still contribute to later scheduling optimization.
 Database migrations and performance indexes do not change this retention rule. An
 explicit **Reset All Progress** action in Deck Settings is the exception: it
 permanently removes review history for the selected deck subtree.
+Local API token verifiers are stored outside the library database and its
+snapshots, so restoring library content does not authorize an API client.
 Media no longer referenced by any item is eligible for cleanup. Choose
 **Cancel** to keep the item.
 

@@ -135,7 +135,8 @@
       "contains": [
         "Append-only review logs are retained",
         "Database migrations and performance indexes do not change this retention rule",
-        "explicit **Reset All Progress** action"
+        "explicit **Reset All Progress** action",
+        "Local API token verifiers are stored outside the library database and its snapshots"
       ]
     },
     {
