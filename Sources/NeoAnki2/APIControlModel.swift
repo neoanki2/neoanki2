@@ -27,9 +27,7 @@ private struct AppPairingApprover: APIPairingApprover {
 final class APIControlModel {
     private let store: ItemStore
     private let vocabularyRootURL: URL
-    private let authorization = APIAuthorizationStore(
-        persistence: KeychainAPICredentialPersistence()
-    )
+    private let authorization: APIAuthorizationStore
     private var server: NeoAnkiLocalAPIServer?
     private var pairingContinuation: CheckedContinuation<Bool, Never>?
 
@@ -44,6 +42,17 @@ final class APIControlModel {
     init(store: ItemStore, vocabularyRootURL: URL) {
         self.store = store
         self.vocabularyRootURL = vocabularyRootURL
+        authorization = APIAuthorizationStore(
+            persistence: VerifierFileAPICredentialPersistence(
+                fileURL: vocabularyRootURL
+                    .deletingLastPathComponent()
+                    .appendingPathComponent(".neoanki-api", isDirectory: true)
+                    .appendingPathComponent(
+                        VerifierFileAPICredentialPersistence.fileName,
+                        isDirectory: false
+                    )
+            )
+        )
         port = UserDefaults.standard.object(forKey: AppPreferences.localAPIPort) as? Int
             ?? 8_766
         isEnabled = UserDefaults.standard.bool(forKey: AppPreferences.localAPIEnabled)

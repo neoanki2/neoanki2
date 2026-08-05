@@ -57,6 +57,12 @@ Approval returns an opaque bearer token to that client once. NeoAnki does not
 show the token later. A pairing request expires after five minutes, and NeoAnki
 shows at most one approval prompt at a time.
 
+NeoAnki stores only a one-way verifier for each token in its private application
+support directory. It does not store bearer tokens or request macOS Keychain
+access. After updating from an older build that used Keychain storage, pair each
+client again; NeoAnki intentionally does not read the legacy entry so the update
+cannot trigger a Keychain permission prompt.
+
 Scopes are independent permissions:
 
 | Scope | Allows |
@@ -156,9 +162,10 @@ Include the NeoAnki version, macOS version, affected route, response status and
 `requestId`, and minimal reproduction steps.
 
 Never include a live bearer token, full `Authorization` header, private item or
-answer content, imported deck, media bytes, Keychain export, or library
-database. Revoke the affected client before collecting diagnostics. If a token
-must be represented, use a fixed placeholder such as `<redacted-token>`.
+answer content, imported deck, media bytes, local API authorization file, or
+library database. Revoke the affected client before collecting diagnostics. If
+a token must be represented, use a fixed placeholder such as
+`<redacted-token>`.
 
 ---
 

@@ -53,7 +53,7 @@ suite still compiles and discovers the test, but a release run MUST set
 | `EVENT-001`–`EVENT-006` | Durable changes, mutation/no-op event sets, reconnect/expiry behavior, SSE parity, ordering, revocation, and content-redaction assertions |
 | `V1-001`–`V1-006` | The API, root-package, and Core suites above, including fault, concurrency, security, restart, OpenAPI, and transaction coverage |
 | `V1-007` | `referenceScaleAPILatencyMeetsVersionOneReleaseBudgets` with the required environment variable |
-| `V1-008` | API lifecycle/port tests, Keychain-or-verifier credential tests, private staging permissions, cancellation/expiry cleanup, and stream shutdown tests |
+| `V1-008` | API lifecycle/port tests, `verifierFilePersistsOnlyTokenHashesWithPrivatePermissions`, `verifierFileRejectsInsecureOrUnexpectedFiles`, private staging permissions, cancellation/expiry cleanup, and stream shutdown tests |
 | `V1-009`–`V1-012` | [Local automation API guide](../user/local-api.md), documentation assertions, clean-launch lifecycle test, and exact port-conflict test |
 
 Criteria `POST-001` through `POST-008` are deferred and are not counted as
