@@ -1,3 +1,5 @@
+import Darwin
+import CryptoKit
 import Foundation
 import NeoAnkiVocabularyKit
 
@@ -99,6 +101,8 @@ struct VocabularyMediaPayload: Sendable {
 }
 
 actor APIVocabularyLibrary {
+    typealias PackOpener = @Sendable (URL) async throws -> VocabularyPack
+
     static let maximumInstalledPacks = 1_000
     static let maximumDeclaredFiles = 100_002
     static let maximumFileBytes: Int64 = 1_000_000_000
@@ -109,19 +113,32 @@ actor APIVocabularyLibrary {
         let packageURL: URL
         let pack: VocabularyPack
         let representation: APIVocabularyPack
+        let fingerprint: PackTreeFingerprint
+    }
+
+    private struct PackTreeFingerprint: Equatable, Sendable {
+        let entryCount: Int
+        let metadataDigest: Data
     }
 
     private let rootURL: URL
     private let stagingRootURL: URL
     private let jobLifetime: TimeInterval
+    private let openPack: PackOpener
     private var jobs: [UUID: APIVocabularyImportJob] = [:]
     private var jobsLoaded = false
+    private var installedPackCache: [URL: InstalledPack] = [:]
 
-    init(rootURL: URL, jobLifetime: TimeInterval = 24 * 60 * 60) {
+    init(
+        rootURL: URL,
+        jobLifetime: TimeInterval = 24 * 60 * 60,
+        openPack: @escaping PackOpener = { try await VocabularyPack.open(at: $0) }
+    ) {
         self.rootURL = rootURL.standardizedFileURL
         stagingRootURL = rootURL.standardizedFileURL
             .appendingPathComponent(".api-imports", isDirectory: true)
         self.jobLifetime = jobLifetime
+        self.openPack = openPack
     }
 
     func listPacks() async throws -> [APIVocabularyPack] {
@@ -146,6 +163,7 @@ actor APIVocabularyLibrary {
             throw APIServiceError.notFound("The requested vocabulary pack does not exist.")
         }
         try FileManager.default.removeItem(at: installed.packageURL)
+        installedPackCache.removeValue(forKey: installed.packageURL)
     }
 
     func search(
@@ -343,7 +361,10 @@ actor APIVocabularyLibrary {
     }
 
     private func installedPacks() async throws -> [InstalledPack] {
-        guard FileManager.default.fileExists(atPath: rootURL.path) else { return [] }
+        guard FileManager.default.fileExists(atPath: rootURL.path) else {
+            installedPackCache.removeAll()
+            return []
+        }
         let values = try rootURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
         guard values.isDirectory == true, values.isSymbolicLink != true else {
             throw installedLibraryInvalid()
@@ -355,24 +376,27 @@ actor APIVocabularyLibrary {
         ).filter { $0.pathExtension.lowercased() == "neovocab" }
         guard urls.count <= Self.maximumInstalledPacks else { throw installedLibraryInvalid() }
 
+        let installedURLs = Set(urls.map(\.standardizedFileURL))
+        installedPackCache = installedPackCache.filter { installedURLs.contains($0.key) }
+
         var result: [InstalledPack] = []
         var ids = Set<String>()
-        for url in urls {
+        for candidate in urls {
+            let url = candidate.standardizedFileURL
             let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             guard values.isDirectory == true, values.isSymbolicLink != true else {
                 throw installedLibraryInvalid()
             }
             do {
-                let pack = try await VocabularyPack.open(at: url)
-                guard ids.insert(pack.manifest.id).inserted else { throw installedLibraryInvalid() }
-                result.append(InstalledPack(
-                    packageURL: url,
-                    pack: pack,
-                    representation: try APIVocabularyPack(pack.manifest)
-                ))
+                let installed = try await validatedInstalledPack(at: url)
+                guard ids.insert(installed.pack.manifest.id).inserted else {
+                    throw installedLibraryInvalid()
+                }
+                result.append(installed)
             } catch let error as APIServiceError {
                 throw error
             } catch {
+                installedPackCache.removeValue(forKey: url)
                 throw installedLibraryInvalid()
             }
         }
@@ -382,6 +406,87 @@ actor APIVocabularyLibrary {
             return lhs == rhs
                 ? $0.representation.id < $1.representation.id
                 : lhs < rhs
+        }
+    }
+
+    private func validatedInstalledPack(at url: URL) async throws -> InstalledPack {
+        let currentFingerprint = try packTreeFingerprint(at: url)
+        if let cached = installedPackCache[url], cached.fingerprint == currentFingerprint {
+            return cached
+        }
+
+        installedPackCache.removeValue(forKey: url)
+        let opened = try await openPack(url)
+        let verifiedFingerprint = try packTreeFingerprint(at: url)
+        guard currentFingerprint == verifiedFingerprint else {
+            throw installedLibraryInvalid()
+        }
+        let installed = InstalledPack(
+            packageURL: url,
+            pack: opened,
+            representation: try APIVocabularyPack(opened.manifest),
+            fingerprint: verifiedFingerprint
+        )
+        installedPackCache[url] = installed
+        return installed
+    }
+
+    private func packTreeFingerprint(at root: URL) throws -> PackTreeFingerprint {
+        let maximumEntries = VocabularyPackLimits.default.maximumMediaTreeEntries + 3
+        var entryCount = 0
+        var hasher = SHA256()
+
+        func appendInteger<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+            var encoded = value.littleEndian
+            withUnsafeBytes(of: &encoded) { data.append(contentsOf: $0) }
+        }
+
+        func append(_ url: URL, relativePath: String) throws {
+            guard entryCount < maximumEntries else {
+                throw installedLibraryInvalid()
+            }
+            var value = Darwin.stat()
+            guard lstat(url.path, &value) == 0 else { throw installedLibraryInvalid() }
+            entryCount += 1
+
+            let pathBytes = Data(relativePath.utf8)
+            var record = Data(capacity: pathBytes.count + 80)
+            appendInteger(UInt64(pathBytes.count), to: &record)
+            record.append(pathBytes)
+            appendInteger(UInt64(value.st_dev), to: &record)
+            appendInteger(UInt64(value.st_ino), to: &record)
+            appendInteger(UInt16(value.st_mode), to: &record)
+            appendInteger(Int64(value.st_size), to: &record)
+            appendInteger(Int64(value.st_mtimespec.tv_sec), to: &record)
+            appendInteger(Int64(value.st_mtimespec.tv_nsec), to: &record)
+            appendInteger(Int64(value.st_ctimespec.tv_sec), to: &record)
+            appendInteger(Int64(value.st_ctimespec.tv_nsec), to: &record)
+            hasher.update(data: record)
+
+            guard value.st_mode & S_IFMT == S_IFDIR else { return }
+            let children = try FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: nil,
+                options: []
+            ).sorted { $0.lastPathComponent < $1.lastPathComponent }
+            for child in children {
+                let childPath = relativePath == "."
+                    ? child.lastPathComponent
+                    : "\(relativePath)/\(child.lastPathComponent)"
+                try append(child, relativePath: childPath)
+            }
+        }
+
+        do {
+            try append(root, relativePath: ".")
+            return PackTreeFingerprint(
+                entryCount: entryCount,
+                metadataDigest: Data(hasher.finalize())
+            )
+        } catch let error as APIServiceError {
+            throw error
+        } catch {
+            throw installedLibraryInvalid()
         }
     }
 

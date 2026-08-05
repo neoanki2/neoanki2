@@ -718,7 +718,7 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func closeItemDetail(in app: XCUIApplication) {
         let deleteButton = app.buttons.identified("deleteItem")
-        guard deleteButton.exists else { return }
+        guard deleteButton.waitUntilExists(timeout: 3) else { return }
 
         for _ in 0..<2 {
             let back = app.buttons.identified("itemDetailBack")

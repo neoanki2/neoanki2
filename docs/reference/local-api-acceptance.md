@@ -17,8 +17,8 @@ Verified on 2026-08-05 on macOS arm64 with the Swift 6 package toolchain.
 
 | Verification command | Result |
 | --- | --- |
-| `swift test --filter NeoAnkiAPITests` | Pass: 37 tests |
-| `swift test --parallel` | Pass: 342 tests |
+| `swift test --filter NeoAnkiAPITests` | Pass: 38 tests |
+| `swift test --parallel` | Pass: 343 tests |
 | `cd NeoAnkiCore && swift test --parallel` | Pass: 358 tests |
 | `NEOANKI_RUN_API_PERFORMANCE_TEST=1 swift test --filter referenceScaleAPILatencyMeetsVersionOneReleaseBudgets` | Pass: 100,000-item fixture and all four p95 budgets; 53.898 seconds including fixture creation |
 | `git diff --check` | Pass |
@@ -47,7 +47,7 @@ suite still compiles and discovers the test, but a release run MUST set
 | `TRANSFER-001`–`TRANSFER-006` | Four-format validation/commit tests, staging/expiry tests, portable round trip, and import/export process-exit recovery at every declared boundary |
 | `VOC-SEC-001`–`VOC-SEC-003` | Exact vocabulary-scope pairing/current-client assertions and cross-scope denial tests in `NeoAnkiAPIServiceTests` |
 | `VOC-PACK-001`–`VOC-PACK-004` | Installed-pack list/read/delete precondition tests plus vocabulary-kit integrity, checksum, symlink, containment, and limit tests |
-| `VOC-LOOKUP-001`–`VOC-OFFLINE-001` | Complete-entry round trip, exact/prefix/language/limit search, hostile-query/media checks, and offline vocabulary-kit lookup tests |
+| `VOC-LOOKUP-001`–`VOC-OFFLINE-001` | Complete-entry round trip, exact/prefix/language/limit search, validated-pack cache reuse/invalidation, hostile-query/media checks, and offline vocabulary-kit lookup tests |
 | `VOC-IMPORT-001`–`VOC-IMPORT-007` | Staged declaration/upload/validation/commit, digest rejection, restart, idempotency, duplicate-ID, private staging, and atomic lifecycle tests |
 | `VOC-REL-001`–`VOC-REL-004` | OpenAPI inventory/schema assertions, root and vocabulary suites, path-redaction assertions, and shared app/API managed-root wiring |
 | `EVENT-001`–`EVENT-006` | Durable changes, mutation/no-op event sets, reconnect/expiry behavior, SSE parity, ordering, revocation, and content-redaction assertions |
