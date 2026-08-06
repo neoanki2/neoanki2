@@ -169,7 +169,10 @@ MERGED_AT="$(date +%s)"
 
 RELEASE_ID="$(jq -r .databaseId <<<"$RELEASE_JSON")"
 gh api --method PATCH "repos/$REPOSITORY/releases/$RELEASE_ID" \
-  -F draft=false -f make_latest=true >/dev/null
+  -f tag_name="$TAG" \
+  -f target_commitish="$HEAD_SHA" \
+  -F draft=false \
+  -f make_latest=true >/dev/null
 PUBLISHED_AT="$(date +%s)"
 
 ENCODED_CASK="$(base64 < "$CASK_FILE" | tr -d '\n')"
