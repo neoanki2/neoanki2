@@ -33,7 +33,7 @@ install the current source revision into `/Applications` for pre-release testing
 ./Scripts/install-app.sh --restart
 ```
 
-See [Getting started](https://neoanki2.github.io/neoanki2/user/getting-started/)
+See [Getting started](https://neoanki2.github.io/user/getting-started/)
 for prerequisite checks, expected output, updates, and removal.
 
 ## Principles
@@ -64,11 +64,11 @@ NeoAnkiCore/Sources/NeoAnkiCore/
 ## Documentation
 
 The published manual is available at
-**[neoanki2.github.io/neoanki2/user](https://neoanki2.github.io/neoanki2/user/)**.
+**[neoanki2.github.io/user](https://neoanki2.github.io/user/)**.
 Documentation is versioned with the source in [`docs/`](docs/):
 
-- [User guide](https://neoanki2.github.io/neoanki2/user/) — every app feature, workflow, shortcut, and limitation
-- [Feature index](https://neoanki2.github.io/neoanki2/features/) — source- and test-backed coverage map
+- [User guide](https://neoanki2.github.io/user/) — every app feature, workflow, shortcut, and limitation
+- [Feature index](https://neoanki2.github.io/features/) — source- and test-backed coverage map
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — domain model, learning-science mapping, FSRS rationale
 - [`docs/AUTHORED_DECK_FORMAT.md`](docs/AUTHORED_DECK_FORMAT.md) — import-only JSONL deck source format
 - [`docs/PORTABLE_DECK_FORMAT.md`](docs/PORTABLE_DECK_FORMAT.md) — portable SQLite deck interchange format
