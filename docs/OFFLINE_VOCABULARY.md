@@ -13,7 +13,7 @@ client. Source acquisition is an explicit deck-author or developer operation
 performed before import.
 
 Authorized local automation clients use the same managed library through the
-[Vocabulary API](VOCABULARY_API.md). The HTTP surface preserves the offline
+[Vocabulary API]({{ '/VOCABULARY_API/' | relative_url }}). The HTTP surface preserves the offline
 boundary: clients upload declared bytes into private staging and cannot submit
 a filesystem path or remote URL.
 

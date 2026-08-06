@@ -7,9 +7,11 @@ parent: User Guide
 
 # Getting started
 
-NeoAnki2 is a native, local-first macOS spaced-repetition app. The supported
-end-user installation is the official Homebrew cask. Maintainers and
-contributors can also build the current source checkout.
+NeoAnki2 is a native, local-first macOS spaced-repetition app. Homebrew is the
+recommended installation because it verifies the release and simplifies
+updates. The same official build is also available as a direct DMG from the
+[download page]({{ site.baseurl }}/download/). Maintainers and contributors can
+build the current source checkout.
 
 ## Install the official release
 
@@ -22,6 +24,10 @@ brew install --cask neoanki2/tap/neoanki2
 Homebrew downloads the universal DMG from the matching GitHub release, verifies
 its cask checksum, and installs `NeoAnki2.app` in `/Applications`. Every tested
 update merged to `main` publishes a new release and updates the cask.
+
+If you do not use Homebrew, open the [download page]({{ site.baseurl }}/download/)
+and choose **Download DMG**. Open the disk image, then move `NeoAnki2.app` to
+Applications. The Homebrew and direct-download options contain the same app.
 
 Release artifacts are ad-hoc signed and provenance-attested, but are not yet
 Apple-notarized. If macOS blocks the first launch, Control-click **NeoAnki2** in

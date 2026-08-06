@@ -5,7 +5,31 @@
 
   var navToggle = document.querySelector(".nav-toggle");
   var navigation = document.getElementById("site-navigation");
+  var navClose = document.querySelector(".sidebar-close");
   var narrowViewport = window.matchMedia("(max-width: 820px)");
+  var backgroundRegions = [
+    document.querySelector(".site-header"),
+    document.querySelector(".page-shell main"),
+    document.querySelector(".site-footer")
+  ].filter(Boolean);
+
+  function setNavigationModal(open) {
+    var modalOpen = open && narrowViewport.matches;
+    document.body.classList.toggle("nav-open", modalOpen);
+    backgroundRegions.forEach(function (region) {
+      region.inert = modalOpen;
+    });
+
+    if (modalOpen) {
+      navigation.setAttribute("role", "dialog");
+      navigation.setAttribute("aria-modal", "true");
+      navigation.setAttribute("aria-labelledby", "sidebar-title");
+    } else {
+      navigation.removeAttribute("role");
+      navigation.removeAttribute("aria-modal");
+      navigation.removeAttribute("aria-labelledby");
+    }
+  }
 
   function syncNavigation() {
     if (!navToggle || !navigation) {
@@ -13,35 +37,83 @@
     }
 
     if (narrowViewport.matches) {
-      navigation.hidden = navToggle.getAttribute("aria-expanded") !== "true";
+      var expanded = navToggle.getAttribute("aria-expanded") === "true";
+      navigation.hidden = !expanded;
+      setNavigationModal(expanded);
     } else {
       navigation.hidden = false;
       navToggle.setAttribute("aria-expanded", "false");
+      setNavigationModal(false);
     }
   }
 
   if (navToggle && navigation) {
+    function closeNavigation() {
+      navigation.hidden = true;
+      navToggle.setAttribute("aria-expanded", "false");
+      setNavigationModal(false);
+      navToggle.focus();
+    }
+
     navToggle.addEventListener("click", function () {
       var expanded = navToggle.getAttribute("aria-expanded") === "true";
       navToggle.setAttribute("aria-expanded", String(!expanded));
       navigation.hidden = expanded;
+      setNavigationModal(!expanded);
       if (!expanded) {
-        var currentLink = navigation.querySelector('[aria-current="page"]');
-        var firstLink = navigation.querySelector("a");
-        (currentLink || firstLink || navigation).focus();
+        (navClose || navigation.querySelector("a") || navigation).focus();
       }
     });
 
     navigation.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && narrowViewport.matches && !navigation.hidden) {
-        navigation.hidden = true;
-        navToggle.setAttribute("aria-expanded", "false");
-        navToggle.focus();
+        closeNavigation();
+      }
+
+      if (event.key === "Tab" && narrowViewport.matches && !navigation.hidden) {
+        var focusable = Array.from(navigation.querySelectorAll("a[href], button:not([disabled])"));
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     });
 
+    if (navClose) {
+      navClose.addEventListener("click", closeNavigation);
+    }
+
     narrowViewport.addEventListener("change", syncNavigation);
     syncNavigation();
+  }
+
+  var article = document.getElementById("content");
+  if (article && !article.querySelector(".local-toc")) {
+    var sectionHeadings = Array.from(article.querySelectorAll("h2[id]"));
+    var articleHeading = article.querySelector("h1");
+    if (sectionHeadings.length >= 4 && articleHeading) {
+      var toc = document.createElement("details");
+      var tocSummary = document.createElement("summary");
+      var tocList = document.createElement("ul");
+
+      toc.className = "local-toc generated-toc";
+      tocSummary.textContent = "On this page";
+      sectionHeadings.forEach(function (heading) {
+        var item = document.createElement("li");
+        var link = document.createElement("a");
+        link.href = "#" + heading.id;
+        link.textContent = heading.textContent;
+        item.append(link);
+        tocList.append(item);
+      });
+      toc.append(tocSummary, tocList);
+      articleHeading.insertAdjacentElement("afterend", toc);
+    }
   }
 
   var skipLink = document.querySelector(".skip-link");
@@ -155,7 +227,7 @@
     firstLink.textContent = "Getting started";
     recovery.append(firstLink, separator);
     secondLink.href = form.dataset.featuresUrl;
-    secondLink.textContent = "feature index";
+    secondLink.textContent = "task guide";
     recovery.append(secondLink, document.createTextNode("."));
     panel.append(recovery);
   }

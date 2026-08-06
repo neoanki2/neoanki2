@@ -7,7 +7,7 @@ parent: Reference
 # Local API acceptance evidence
 
 This record identifies the automated evidence used to evaluate the normative
-criteria in [Local API requirements](../LOCAL_API.md). It does not replace or
+criteria in [Local API requirements]({{ '/LOCAL_API/' | relative_url }}). It does not replace or
 relax those requirements. A failed command, an untested normative change, or a
 missing evidence row invalidates the corresponding result.
 
@@ -54,7 +54,7 @@ suite still compiles and discovers the test, but a release run MUST set
 | `V1-001`–`V1-006` | The API, root-package, and Core suites above, including fault, concurrency, security, restart, OpenAPI, and transaction coverage |
 | `V1-007` | `referenceScaleAPILatencyMeetsVersionOneReleaseBudgets` with the required environment variable |
 | `V1-008` | API lifecycle/port tests, `verifierFilePersistsOnlyTokenHashesWithPrivatePermissions`, `verifierFileRejectsInsecureOrUnexpectedFiles`, private staging permissions, cancellation/expiry cleanup, and stream shutdown tests |
-| `V1-009`–`V1-012` | [Local automation API guide](../user/local-api.md), documentation assertions, clean-launch lifecycle test, and exact port-conflict test |
+| `V1-009`–`V1-012` | [Local automation API guide]({{ '/user/local-api/' | relative_url }}), documentation assertions, clean-launch lifecycle test, and exact port-conflict test |
 
 Criteria `POST-001` through `POST-008` are deferred and are not counted as
 version-1 acceptance requirements.

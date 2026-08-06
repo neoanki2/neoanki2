@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   id-token: write
   attestations: write
@@ -41,10 +42,12 @@ jobs:
           build_number=$(git rev-list --count HEAD)
           version="1.0.$build_number"
           artifact="NeoAnki2-$version-mac-universal.dmg"
-          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
-          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          {
+            echo "build_number=$build_number"
+            echo "version=$version"
+            echo "tag=v$version"
+            echo "artifact=$artifact"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build universal release artifact
         env:
@@ -54,6 +57,15 @@ jobs:
           chmod +x Scripts/install-app.sh Scripts/build-release-artifact.sh
           ./Scripts/build-release-artifact.sh "$RUNNER_TEMP/release"
 
+      - name: Add stable latest-release assets
+        env:
+          VERSIONED_ARTIFACT: ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
+          LATEST_ARTIFACT: ${{ runner.temp }}/release/NeoAnki2-latest-mac-universal.dmg
+        run: |
+          cp "$VERSIONED_ARTIFACT" "$LATEST_ARTIFACT"
+          cd "$(dirname "$LATEST_ARTIFACT")"
+          shasum -a 256 "$(basename "$LATEST_ARTIFACT")" > "$(basename "$LATEST_ARTIFACT").sha256"
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -61,26 +73,46 @@ jobs:
           path: |
             ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
             ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}.sha256
+            ${{ runner.temp }}/release/NeoAnki2-latest-mac-universal.dmg
+            ${{ runner.temp }}/release/NeoAnki2-latest-mac-universal.dmg.sha256
           if-no-files-found: error
           retention-days: 90
 
       - name: Attest release provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
         with:
-          subject-path: ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
+          subject-path: ${{ runner.temp }}/release/*.dmg
 
       - name: Publish GitHub release
         env:
           VERSION: ${{ steps.release.outputs.version }}
           TAG: ${{ steps.release.outputs.tag }}
           ARTIFACT: ${{ runner.temp }}/release/${{ steps.release.outputs.artifact }}
+          LATEST_ARTIFACT: ${{ runner.temp }}/release/NeoAnki2-latest-mac-universal.dmg
           GH_REPO: ${{ github.repository }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ARTIFACT" "$ARTIFACT.sha256" --clobber
+            gh release upload "$TAG" \
+              "$ARTIFACT" "$ARTIFACT.sha256" \
+              "$LATEST_ARTIFACT" "$LATEST_ARTIFACT.sha256" \
+              --clobber
           else
-            gh release create "$TAG" "$ARTIFACT" "$ARTIFACT.sha256" \
+            gh release create "$TAG" \
+              "$ARTIFACT" "$ARTIFACT.sha256" \
+              "$LATEST_ARTIFACT" "$LATEST_ARTIFACT.sha256" \
               --target "$RELEASE_SHA" \
               --title "NeoAnki2 $VERSION" \
               --generate-notes
           fi
+
+      - name: Verify published download assets
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSIONED_NAME: ${{ steps.release.outputs.artifact }}
+        run: |
+          assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          grep -Fxq "$VERSIONED_NAME" <<< "$assets"
+          grep -Fxq "NeoAnki2-latest-mac-universal.dmg" <<< "$assets"
+
+      - name: Refresh the published website
+        run: gh workflow run docs-pages.yml --ref main

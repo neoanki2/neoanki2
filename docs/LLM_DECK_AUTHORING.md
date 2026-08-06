@@ -50,7 +50,7 @@ semantic paths:
 
 Give the agent a content goal and point it to:
 
-1. [`AUTHORED_DECK_FORMAT.md`](AUTHORED_DECK_FORMAT.md)
+1. [`AUTHORED_DECK_FORMAT.md`]({{ '/AUTHORED_DECK_FORMAT/' | relative_url }})
 2. the [Biology authored-deck example]({{ site.baseurl }}/examples/)
 3. the validator command below
 

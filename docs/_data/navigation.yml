@@ -1,3 +1,14 @@
+header:
+  - title: Guides
+    url: /user/
+  - title: Reference
+    url: /reference/
+  - title: Download
+    url: /download/
+  - title: GitHub
+    url: https://github.com/neoanki2/neoanki2
+    external: true
+
 primary:
   - title: Home
     url: /

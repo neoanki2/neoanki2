@@ -1,7 +1,7 @@
 # NeoAnki2 documentation source
 
 The user manual is published at
-[neoanki2.github.io/neoanki2](https://neoanki2.github.io/neoanki2/). This
+[neoanki2.github.io/neoanki2/user](https://neoanki2.github.io/neoanki2/user/). This
 folder is both the Jekyll site source and the project reference library.
 
 | Guide | Purpose |

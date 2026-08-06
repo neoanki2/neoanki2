@@ -64,7 +64,7 @@ NeoAnkiCore/Sources/NeoAnkiCore/
 ## Documentation
 
 The published manual is available at
-**[neoanki2.github.io/neoanki2](https://neoanki2.github.io/neoanki2/)**.
+**[neoanki2.github.io/neoanki2/user](https://neoanki2.github.io/neoanki2/user/)**.
 Documentation is versioned with the source in [`docs/`](docs/):
 
 - [User guide](https://neoanki2.github.io/neoanki2/user/) — every app feature, workflow, shortcut, and limitation
