@@ -1,0 +1,113 @@
+name: Release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to validate and package
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+  id-token: write
+  attestations: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  GH_TOKEN: ${{ github.token }}
+
+concurrency:
+  group: release-candidate-pr-${{ inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate source and documentation
+    runs-on: macos-26
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: refs/pull/${{ inputs.pr }}/head
+          fetch-depth: 0
+      - name: Run unit and flow tests
+        run: |
+          swift test --parallel
+          (cd NeoAnkiCore && swift test --parallel)
+      - name: Validate documentation
+        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref origin/main
+
+  ui:
+    name: Validate functional UI journeys
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: refs/pull/${{ inputs.pr }}/head
+          fetch-depth: 0
+      - name: Run UI tests
+        run: |
+          chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh
+          ./Scripts/run-ui-tests.sh
+      - name: Upload UI diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neoanki2-release-candidate-ui-results
+          path: .build/ui-results
+          if-no-files-found: warn
+          retention-days: 7
+
+  package:
+    name: Build and attest candidate
+    runs-on: macos-26
+    outputs:
+      tag: ${{ steps.manifest.outputs.tag }}
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: refs/pull/${{ inputs.pr }}/head
+          fetch-depth: 0
+      - name: Build release candidate
+        run: |
+          chmod +x Scripts/install-app.sh Scripts/build-release-artifact.sh \
+            Scripts/build-release-candidate.sh
+          ./Scripts/build-release-candidate.sh --pr "${{ inputs.pr }}"
+      - name: Read candidate tag
+        id: manifest
+        run: echo "tag=$(jq -r .tag .build/release-candidate/release-candidate.json)" >> "$GITHUB_OUTPUT"
+      - name: Attest candidate provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
+        with:
+          subject-path: .build/release-candidate/*.dmg
+      - name: Upload candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neoanki2-release-candidate-${{ steps.manifest.outputs.tag }}
+          path: .build/release-candidate/
+          if-no-files-found: error
+          retention-days: 14
+
+  finalize:
+    name: Publish tested draft release
+    needs: [validate, ui, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: refs/pull/${{ inputs.pr }}/head
+      - name: Download candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: neoanki2-release-candidate-${{ needs.package.outputs.tag }}
+          path: .build/release-candidate
+      - name: Publish draft release
+        run: |
+          chmod +x Scripts/publish-release-candidate.sh
+          ./Scripts/publish-release-candidate.sh .build/release-candidate
