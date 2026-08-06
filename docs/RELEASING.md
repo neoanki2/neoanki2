@@ -67,6 +67,9 @@ The command refuses to proceed if NeoAnki2 is running, the candidate is stale,
 the PR is not cleanly mergeable, or any revision, version, asset, or checksum
 does not match. It never quits or opens a graphical application.
 
+Promotion explicitly replaces GitHub's temporary `untagged-*` draft name with
+the final version tag before the Homebrew cask becomes visible.
+
 The legacy **Release** workflow is retained as a manually dispatched recovery
 path. The tap's scheduled updater remains a repair mechanism, not part of the
 normal release path.
