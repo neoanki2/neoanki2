@@ -40,10 +40,6 @@ enum AppStartupTrace {
 }
 
 enum AppDatabase {
-    static var isDocumentationScreenshotCapture: Bool {
-        ProcessInfo.processInfo.environment["NEOANKI_DOC_SCREENSHOTS"] == "1"
-    }
-
     static var isTesting: Bool {
         ProcessInfo.processInfo.arguments.contains("-NeoAnkiTesting")
             || ProcessInfo.processInfo.environment["NEOANKI_TESTING"] == "1"

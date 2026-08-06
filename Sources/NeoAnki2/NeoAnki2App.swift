@@ -11,6 +11,9 @@ private struct InitialLibraryPayload: Sendable {
     let vocabularyRootURL: URL
 }
 
+private let isDocumentationScreenshotCapture =
+    ProcessInfo.processInfo.environment["NEOANKI_DOC_SCREENSHOTS"] == "1"
+
 @main
 struct NeoAnki2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -110,7 +113,7 @@ struct NeoAnki2App: App {
             .task {
                 installUITestControlIfNeeded()
             }
-            .preferredColorScheme(AppDatabase.isDocumentationScreenshotCapture ? .dark : nil)
+            .preferredColorScheme(isDocumentationScreenshotCapture ? .dark : nil)
             .alert(
                 "Approve Local API Client?",
                 isPresented: Binding(
@@ -135,8 +138,8 @@ struct NeoAnki2App: App {
             }
         }
         .defaultSize(
-            width: AppDatabase.isDocumentationScreenshotCapture ? 1_024 : 960,
-            height: AppDatabase.isDocumentationScreenshotCapture ? 680 : 640
+            width: isDocumentationScreenshotCapture ? 1_024 : 960,
+            height: isDocumentationScreenshotCapture ? 680 : 640
         )
         .commands {
             LibraryCommands()
