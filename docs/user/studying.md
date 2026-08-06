@@ -36,7 +36,9 @@ A session moves through a small set of states:
 6. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
-The header shows the scope and progress, such as “Biology · Card 2 of 8.”
+The header shows the scope and the number of unresolved cards, such as
+“Biology · 7 cards remaining.” Remembering a card reduces the count; grading
+Again keeps it unchanged because that card moves to a repair round.
 The first card appears as soon as its exact due count and content are ready.
 NeoAnki2 validates the rest of the initial queue in the background; you can read,
 answer, and reveal that first card immediately, while grading, editing, and
