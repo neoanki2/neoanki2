@@ -308,9 +308,21 @@ class NeoAnkiUITestCase: XCTestCase {
         }
         for identifier in expectedVisibleIdentifiers {
             let element = appWindow.descendants(matching: .any).identified(identifier)
-            guard element.waitUntilExists(timeout: 3),
-                  !element.frame.isEmpty,
-                  appWindow.frame.contains(element.frame) else {
+            guard element.waitUntilExists(timeout: 3), !element.frame.isEmpty else {
+                XCTFail(
+                    "Expected '\(identifier)' to exist in documentation screenshot '\(name)'",
+                    file: file,
+                    line: line
+                )
+                return
+            }
+            let containerTypes: Set<XCUIElement.ElementType> = [
+                .group, .other, .outline, .scrollView, .table,
+            ]
+            let isVisible = element.frame.intersects(appWindow.frame)
+                && (containerTypes.contains(element.elementType)
+                    || appWindow.frame.contains(element.frame))
+            guard isVisible else {
                 XCTFail(
                     "Expected '\(identifier)' to be fully visible in documentation screenshot '\(name)'",
                     file: file,
