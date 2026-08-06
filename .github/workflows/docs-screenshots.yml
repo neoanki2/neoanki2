@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Pin macOS appearance
         run: |
-          defaults delete -g AppleInterfaceStyle 2>/dev/null || true
+          defaults write -g AppleInterfaceStyle -string Dark
           defaults write -g AppleAccentColor -int 1
           defaults write -g AppleLanguages -array en
           defaults write -g AppleLocale -string en_US

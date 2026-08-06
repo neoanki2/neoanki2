@@ -74,6 +74,10 @@ class NeoAnkiUITestCase: XCTestCase {
             app.launchEnvironment["NEOANKI_TEST_DB_DIR"] = databaseDirectory
             app.launchEnvironment["NEOANKI_TEST_CONTROL_DIR"] = Self.controlDirectory.path
             app.launchEnvironment["NEOANKI_TEST_SESSION_ID"] = Self.controlSessionID
+            if ProcessInfo.processInfo.environment["DOC_SCREENSHOT_DIR"] != nil {
+                app.launchEnvironment["NEOANKI_DOC_SCREENSHOTS"] = "1"
+                app.launchArguments.append(contentsOf: ["-AppleInterfaceStyle", "Dark"])
+            }
             if let scenario {
                 app.launchEnvironment["NEOANKI_TEST_SCENARIO"] = scenario
             }
@@ -295,13 +299,21 @@ class NeoAnkiUITestCase: XCTestCase {
             XCTFail("No app window available for documentation screenshot '\(name)'", file: file, line: line)
             return
         }
+        guard appWindow.frame.width >= 1_200, appWindow.frame.height >= 760 else {
+            XCTFail(
+                "Documentation screenshot window is too small: \(appWindow.frame)",
+                file: file,
+                line: line
+            )
+            return
+        }
         for identifier in expectedVisibleIdentifiers {
             let element = appWindow.descendants(matching: .any).identified(identifier)
             guard element.waitUntilExists(timeout: 3),
                   !element.frame.isEmpty,
-                  element.frame.intersects(appWindow.frame) else {
+                  appWindow.frame.contains(element.frame) else {
                 XCTFail(
-                    "Expected '\(identifier)' to be visible in documentation screenshot '\(name)'",
+                    "Expected '\(identifier)' to be fully visible in documentation screenshot '\(name)'",
                     file: file,
                     line: line
                 )
@@ -334,7 +346,8 @@ class NeoAnkiUITestCase: XCTestCase {
                     expectedVisibleIdentifiers: expectedVisibleIdentifiers
                 ),
                 sourceSHA: captureContext.sourceSHA,
-                capturedAt: captureContext.capturedAt
+                capturedAt: captureContext.capturedAt,
+                appearance: captureContext.appearance
             )
             let attachment = XCTAttachment(screenshot: screenshot)
             attachment.name = name
@@ -358,12 +371,14 @@ class NeoAnkiUITestCase: XCTestCase {
         let schemaVersion: Int
         let sourceSHA: String
         let capturedAt: String
+        let appearance: String
         var screenshots: [Entry]
     }
 
     private struct DocumentationScreenshotCaptureContext: Codable {
         let sourceSHA: String
         let capturedAt: String
+        let appearance: String
     }
 
     private func pngDimensions(_ data: Data) throws -> (width: Int, height: Int) {
@@ -385,13 +400,15 @@ class NeoAnkiUITestCase: XCTestCase {
         in directory: URL,
         entry: DocumentationScreenshotManifest.Entry,
         sourceSHA: String,
-        capturedAt: String
+        capturedAt: String,
+        appearance: String
     ) throws {
         let manifestURL = directory.appendingPathComponent("manifest.json")
         var manifest = DocumentationScreenshotManifest(
             schemaVersion: 1,
             sourceSHA: sourceSHA,
             capturedAt: capturedAt,
+            appearance: appearance,
             screenshots: []
         )
         if FileManager.default.fileExists(atPath: manifestURL.path) {
@@ -399,7 +416,9 @@ class NeoAnkiUITestCase: XCTestCase {
                 DocumentationScreenshotManifest.self,
                 from: Data(contentsOf: manifestURL)
             )
-            guard manifest.sourceSHA == sourceSHA, manifest.capturedAt == capturedAt else {
+            guard manifest.sourceSHA == sourceSHA,
+                  manifest.capturedAt == capturedAt,
+                  manifest.appearance == appearance else {
                 throw NSError(
                     domain: "DocumentationScreenshot",
                     code: 2,

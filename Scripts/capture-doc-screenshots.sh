@@ -10,7 +10,7 @@ export DOC_SCREENSHOT_DIR="$OUTPUT_DIR"
 export NEOANKI_UI_TEST_PLAN="DocumentationScreenshots"
 DOC_SCREENSHOT_SOURCE_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 DOC_SCREENSHOT_CAPTURED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-printf '{"sourceSHA":"%s","capturedAt":"%s"}\n' \
+printf '{"sourceSHA":"%s","capturedAt":"%s","appearance":"dark"}\n' \
   "$DOC_SCREENSHOT_SOURCE_SHA" "$DOC_SCREENSHOT_CAPTURED_AT" \
   > "$OUTPUT_DIR/.capture-context.json"
 "$ROOT/Scripts/run-ui-tests.sh"
@@ -51,6 +51,8 @@ except (OSError, json.JSONDecodeError) as error:
 
 if manifest.get("schemaVersion") != 1:
     raise SystemExit("Screenshot manifest must use schemaVersion 1")
+if manifest.get("appearance") != "dark":
+    raise SystemExit("Screenshot manifest appearance must be dark")
 source_sha = manifest.get("sourceSHA")
 if source_sha != expected_sha or re.fullmatch(r"[0-9a-f]{40}", source_sha or "") is None:
     raise SystemExit("Screenshot manifest sourceSHA is missing or does not match the captured commit")
@@ -75,7 +77,7 @@ for filename in sorted(expected_files):
     if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
         raise SystemExit(f"{filename} is not a valid PNG")
     width, height = struct.unpack(">II", header[16:24])
-    if entry.get("width") != width or entry.get("height") != height or width <= 0 or height <= 0:
+    if entry.get("width") != width or entry.get("height") != height or width < 1200 or height < 760:
         raise SystemExit(f"Manifest dimensions do not match {filename}")
     if not isinstance(entry.get("scenario"), str) or not entry["scenario"].strip():
         raise SystemExit(f"Manifest scenario is missing for {filename}")
