@@ -165,10 +165,12 @@ if [ "$(jq -r .state <<<"$MERGED_JSON")" != "MERGED" ]; then
   echo "Pull request #$PR_NUMBER did not reach the merged state." >&2
   exit 1
 fi
+MERGED_AT="$(date +%s)"
 
 RELEASE_ID="$(jq -r .databaseId <<<"$RELEASE_JSON")"
 gh api --method PATCH "repos/$REPOSITORY/releases/$RELEASE_ID" \
   -F draft=false -f make_latest=true >/dev/null
+PUBLISHED_AT="$(date +%s)"
 
 ENCODED_CASK="$(base64 < "$CASK_FILE" | tr -d '\n')"
 UPDATED_TAP=0
@@ -194,9 +196,12 @@ if [ "$UPDATED_TAP" -ne 1 ]; then
   echo "Unable to publish the Homebrew cask update." >&2
   exit 1
 fi
+TAP_UPDATED_AT="$(date +%s)"
+BREW_UPDATED_AT="$TAP_UPDATED_AT"
 
 if [ "$INSTALL" -eq 1 ]; then
   brew update --quiet
+  BREW_UPDATED_AT="$(date +%s)"
   TAP_VERSION="$(brew info --cask neoanki2/tap/neoanki2 --json=v2 | \
     jq -r '.casks[0].version')"
   if [ "$TAP_VERSION" != "$VERSION" ]; then
@@ -224,6 +229,11 @@ FINISHED_AT="$(date +%s)"
 ELAPSED_SECONDS="$((FINISHED_AT - STARTED_AT))"
 echo "SHIP_RELEASE=$TAG"
 echo "SHIP_REVISION=$HEAD_SHA"
+echo "SHIP_MERGE_SECONDS=$((MERGED_AT - STARTED_AT))"
+echo "SHIP_PUBLISH_SECONDS=$((PUBLISHED_AT - MERGED_AT))"
+echo "SHIP_TAP_SECONDS=$((TAP_UPDATED_AT - PUBLISHED_AT))"
+echo "SHIP_BREW_REFRESH_SECONDS=$((BREW_UPDATED_AT - TAP_UPDATED_AT))"
+echo "SHIP_INSTALL_SECONDS=$((FINISHED_AT - BREW_UPDATED_AT))"
 echo "SHIP_ELAPSED_SECONDS=$ELAPSED_SECONDS"
 
 if [ "$ELAPSED_SECONDS" -ge "$MAX_SECONDS" ]; then

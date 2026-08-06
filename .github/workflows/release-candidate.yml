@@ -38,6 +38,8 @@ jobs:
           (cd NeoAnkiCore && swift test --parallel)
       - name: Validate documentation
         run: swift Scripts/validate-docs.swift --require-screenshots --base-ref origin/main
+      - name: Validate release scripts
+        run: bash -n Scripts/build-release-candidate.sh Scripts/publish-release-candidate.sh Scripts/ship-release.sh
 
   ui:
     name: Validate functional UI journeys

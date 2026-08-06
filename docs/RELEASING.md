@@ -31,6 +31,9 @@ The command performs all validation before starting its timer. It then:
 4. refreshes Homebrew and upgrades the cask without launching the app; and
 5. verifies the installed version and code signature.
 
+It prints the elapsed time for merge, publication, tap update, Homebrew refresh,
+installation, and the complete measured path so regressions are visible.
+
 The command refuses to proceed if NeoAnki2 is running, the candidate is stale,
 the PR is not cleanly mergeable, or any revision, version, asset, or checksum
 does not match. It never quits or opens a graphical application.
