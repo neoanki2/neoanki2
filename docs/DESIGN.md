@@ -105,7 +105,7 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 - **Sidebar Surface** (`controlBackgroundColor`): Item list column; slightly recessed from detail.
 - **Detail Surface** (`windowBackgroundColor`): Study and item preview — the “desk page.”
 - **Primary Text** (`labelColor`): Card content, titles, button labels.
-- **Secondary Text** (`secondaryLabelColor`): Subtitles, progress (“Card 3 of 12”), metadata.
+- **Secondary Text** (`secondaryLabelColor`): Subtitles, progress (“8 cards remaining”), metadata.
 - **Tertiary Text** (`tertiaryLabelColor`): Hints, optional field labels, helper copy.
 - **Separator** (`separatorColor`): Dividers between prompt and answer, header/footer rules.
 
@@ -118,7 +118,7 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 **The One Accent Rule.** The system accent appears only on primary forward actions (Study, Show Answer, Done on completion, and an empty state's single call to action). Grade buttons, list rows, browse chrome, and toolbars stay neutral bordered styles.
 
-**The No Gamification Palette Rule.** Do not introduce streak orange, achievement gold, or chart rainbow colors. Progress is text (“Card 3 of 12”), not rings or bars.
+**The No Gamification Palette Rule.** Do not introduce streak orange, achievement gold, or chart rainbow colors. Progress is text (“8 cards remaining”), not rings or bars. The count includes each unresolved card once, so grading Again keeps it stable instead of moving a denominator.
 
 ## Typography
 

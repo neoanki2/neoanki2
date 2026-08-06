@@ -82,16 +82,30 @@ final class StudyModel {
         return queue[index]
     }
 
-    var progressLabel: String {
-        let count = isPreparingQueue ? expectedQueueCount : queue.count
-        guard !queue.isEmpty, count > 0 else { return "" }
-        return "Card \(min(index + 1, count)) of \(count)"
+    var remainingCardCount: Int {
+        guard !isFinished else { return 0 }
+        if isPreparingQueue {
+            return expectedQueueCount
+        }
+        guard queue.indices.contains(index) else { return 0 }
+
+        // A failed card waits once in the next repair round while untouched
+        // cards remain once in the current queue. Counting both pending groups
+        // keeps Again stable without rescanning a potentially large session.
+        return queue.count - index + repairQueue.count
+    }
+
+    var remainingLabel: String {
+        let count = remainingCardCount
+        guard count > 0 else { return "" }
+        let noun = count == 1 ? "card" : "cards"
+        return "\(count) \(noun) remaining"
     }
 
     var headerLabel: String {
-        guard !scopeLabel.isEmpty else { return progressLabel }
-        guard !progressLabel.isEmpty else { return scopeLabel }
-        return "\(scopeLabel) · \(progressLabel)"
+        guard !scopeLabel.isEmpty else { return remainingLabel }
+        guard !remainingLabel.isEmpty else { return scopeLabel }
+        return "\(scopeLabel) · \(remainingLabel)"
     }
 
     var cardsReviewed: Int {

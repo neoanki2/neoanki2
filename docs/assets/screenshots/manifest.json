@@ -1,5 +1,5 @@
 {
-  "capturedAt" : "2026-08-05T13:45:33Z",
+  "capturedAt" : "2026-08-06T20:37:00Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -66,7 +66,7 @@
       "filename" : "item-media.png",
       "height" : 716,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "e46e90cde8ac2bde2f684bb334da9bdd12f55bdc4b000003f6069ce4f7e2530a",
+      "sha256" : "be953239ac1f33c59a412086a42a214caa57aa5dd7bcc1489971746c6bcdade2",
       "width" : 1024
     },
     {
@@ -91,8 +91,8 @@
       "filename" : "item-types.png",
       "height" : 640,
       "scenario" : "item types manager with an included read-only deck type selected",
-      "sha256" : "215a36dcf59b70f292d3a492874a8713a52171deef16fd3539c6ad7f8875fafb",
-      "width" : 992
+      "sha256" : "9e472ff572a49af981bdd50fed37f397aefa60de4a407e330c55e98450a74665",
+      "width" : 960
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -147,7 +147,7 @@
       "filename" : "study-answer.png",
       "height" : 716,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "ebd6385ad030f3f76a2e374ef2b600343054b7e1094d3d2e3792fa3af1876b53",
+      "sha256" : "f85413e6c3b990618d2577bb889cad46a6ba658ab2ab7e413104cf221f5fb36b",
       "width" : 1024
     },
     {
@@ -168,7 +168,7 @@
       "filename" : "study-grade-help.png",
       "height" : 716,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "0403ec7fc7320f084819a2f3cf9099058f84e15ff9d11d9b546f5ec00d569e36",
+      "sha256" : "60c0966340d0dbbd381d05305d52b5fba58bfb315ee27cf82773ad677c4c5969",
       "width" : 1024
     },
     {
@@ -179,7 +179,7 @@
       "filename" : "study-prompt.png",
       "height" : 716,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "8b8c6a94011eb4b60f9241db20b87c965d4a71c93ef10deca6ac3a8d5a90ff65",
+      "sha256" : "624226da1a615e0e52d7db8287d6b45a4cb48106238dc220cdce82d7083c2e78",
       "width" : 1024
     },
     {
@@ -190,7 +190,7 @@
       "filename" : "study-type.png",
       "height" : 716,
       "scenario" : "typed-answer study result",
-      "sha256" : "898e8131c97b6e15712eb2869f8da63809b47f0f76c1cd828e54dc7f4c61e568",
+      "sha256" : "6db6d8c4351809db8f28fb9065d4a54bb0e3976070f0a4a4829737e8ce5bcf13",
       "width" : 1024
     },
     {
@@ -214,9 +214,9 @@
       "filename" : "template-editor.png",
       "height" : 688,
       "scenario" : "new template editor",
-      "sha256" : "9cff09680213930e910bbf283d46aa932e9cd9e8948ac6a3900bcaec5019bd8e",
-      "width" : 992
+      "sha256" : "1a8ce3fa310e02e0d79e8ee3817784c4c4bd2a2e44f53213b039f2aad5945582",
+      "width" : 960
     }
   ],
-  "sourceSHA" : "cd23dbd96687fb02a0880431ca1c8e01a9ce6837"
+  "sourceSHA" : "85e4d7a1758d0b41282f6b72b8e5efa3418f77bf"
 }

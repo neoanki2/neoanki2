@@ -171,7 +171,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     try await waitForProgressiveStudyHead(model)
 
     #expect(model.queue.map(\.id) == [expected[0].id])
-    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.remainingLabel == "2 cards remaining")
     #expect(model.isFinished == false)
     model.revealAnswer()
     #expect(model.isAnswerRevealed)
@@ -187,7 +187,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
 
     #expect(model.isPreparingQueue == false)
     #expect(model.queue.map(\.id) == expected.map(\.id))
-    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.remainingLabel == "2 cards remaining")
     #expect(model.isAnswerRevealed)
 }
 
@@ -523,7 +523,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     #expect(model.currentCard == nil)
 }
 
-@Test @MainActor func studyModelProgressLabelUpdates() async throws {
+@Test @MainActor func studyModelRemainingLabelUpdates() async throws {
     let (model, store) = try await makeStudyModel()
     let itemType = try await store.defaultItemType()
     for i in 1...2 {
@@ -539,11 +539,12 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     }
 
     await model.startSession()
-    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.remainingLabel == "2 cards remaining")
+    #expect(model.headerLabel == "All Decks · 2 cards remaining")
 
     model.revealAnswer()
     await model.grade(.good)
-    #expect(model.progressLabel == "Card 2 of 2")
+    #expect(model.remainingLabel == "1 card remaining")
 }
 
 @Test @MainActor func studyModelAgainRatingSchedulesRelearning() async throws {
@@ -566,7 +567,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     #expect(model.isFinished == false)
     #expect(model.currentCard?.id == model.queue[0].id)
     #expect(model.queue.count == 2)
-    #expect(model.progressLabel == "Card 2 of 2")
+    #expect(model.remainingLabel == "1 card remaining")
     #expect(try await store.dueCount() == 1)
 }
 
@@ -594,12 +595,14 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     await model.grade(.again)
 
     #expect(model.currentCard?.id != failedCardID)
+    #expect(model.remainingLabel == "2 cards remaining")
 
     model.revealAnswer()
     await model.grade(.good)
 
     #expect(model.currentCard?.id == failedCardID)
     #expect(model.queue.count == 3)
+    #expect(model.remainingLabel == "1 card remaining")
 }
 
 @Test @MainActor func undoAgainRemovesPendingLearningRepeat() async throws {
@@ -620,11 +623,13 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     await model.grade(.again)
     #expect(model.queue.count == 2)
     #expect(model.currentCard != nil)
+    #expect(model.remainingLabel == "1 card remaining")
 
     await model.undoLastGrade()
 
     #expect(model.queue.count == 1)
     #expect(model.currentCard != nil)
+    #expect(model.remainingLabel == "1 card remaining")
     #expect(model.cardsReviewed == 0)
     #expect(try await store.dueCount() == 1)
 }
@@ -680,16 +685,19 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     await model.grade(.again)
     #expect(model.currentCard?.id == cardID)
     #expect(model.currentCard?.card.memory.stepIndex == 0)
+    #expect(model.remainingLabel == "1 card remaining")
 
     model.revealAnswer()
     await model.grade(.again)
     #expect(model.currentCard?.id == cardID)
     #expect(model.currentCard?.card.memory.stepIndex == 1)
+    #expect(model.remainingLabel == "1 card remaining")
 
     model.revealAnswer()
     await model.grade(.good)
 
     #expect(model.isFinished)
+    #expect(model.remainingLabel.isEmpty)
     #expect(model.cardsReviewed == 3)
     #expect(model.reviewedCardIDs == [cardID])
     #expect(try await store.reviewLogCount(for: cardID) == 3)
@@ -715,13 +723,13 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     await model.grade(.good)
 
     #expect(model.canUndoLastGrade)
-    #expect(model.progressLabel == "Card 2 of 2")
+    #expect(model.remainingLabel == "1 card remaining")
 
     await model.undoLastGrade()
 
     #expect(model.canUndoLastGrade == false)
     #expect(model.isAnswerRevealed)
-    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.remainingLabel == "2 cards remaining")
     #expect(try await store.rawReviewLogCount(for: model.queue[0].id) == 1)
     #expect(try await store.activeReviewLogCount(for: model.queue[0].id) == 0)
 }
@@ -1056,7 +1064,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     let startTask = Task { await model.startSession() }
     try await waitForProgressiveStudyHead(model)
     #expect(model.currentCard?.id == ordered[0].id)
-    #expect(model.progressLabel == "Card 1 of 2")
+    #expect(model.remainingLabel == "2 cards remaining")
 
     await gate.open()
     await startTask.value
