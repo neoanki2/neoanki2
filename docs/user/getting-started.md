@@ -235,6 +235,9 @@ items or decks, so a new library opens to **All Decks** with an empty state.
 
 [![An empty library with the Add Item action]({{ site.baseurl }}/assets/screenshots/library-empty.png)]({{ site.baseurl }}/assets/screenshots/library-empty.png)
 
+Documentation screenshots use dark appearance for consistency. NeoAnki2
+normally follows your current macOS appearance setting.
+
 Do not stop at the empty screen: the [five-minute first study
 session](../first-study-session/) creates one Basic item, reviews its generated
 card, and confirms the scheduler recorded the result.

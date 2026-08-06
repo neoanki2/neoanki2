@@ -82,6 +82,9 @@ library could not be opened or bootstrapped.
 
 [![Could Not Start state with a local-library error]({{ site.baseurl }}/assets/screenshots/error-startup.png)]({{ site.baseurl }}/assets/screenshots/error-startup.png)
 
+The documentation shows this state in dark appearance; the same recovery text
+and icon appear when macOS uses light appearance.
+
 - **Couldn't open your library:** confirm the Application Support folder is
   available and writable. If it is on redirected or managed storage, restore
   normal access, then relaunch.

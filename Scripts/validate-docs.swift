@@ -80,6 +80,7 @@ struct ScreenshotManifest: Decodable {
     let schemaVersion: Int
     let sourceSHA: String
     let capturedAt: String
+    let appearance: String
     let screenshots: [Entry]
 }
 
@@ -244,6 +245,9 @@ if requireScreenshots {
     if screenshotManifest.schemaVersion != 1 {
         fail("Unsupported screenshot manifest schema version \(screenshotManifest.schemaVersion)")
     }
+    if screenshotManifest.appearance != "dark" {
+        fail("Documentation screenshots must use dark appearance")
+    }
     if screenshotManifest.sourceSHA.range(
         of: #"^[0-9a-f]{40}$"#,
         options: .regularExpression
@@ -296,7 +300,7 @@ if requireScreenshots {
             png[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
         }
         if entry.width != pngInteger(at: 16) || entry.height != pngInteger(at: 20)
-            || entry.width <= 0 || entry.height <= 0 {
+            || entry.width < 1_024 || entry.height < 680 {
             fail("Screenshot \(entry.filename) dimensions do not match its manifest")
         }
         let digest = SHA256.hash(data: png)

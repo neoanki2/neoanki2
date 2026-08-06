@@ -231,6 +231,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 "answerSlotSource",
                 "answerSlotReveal",
                 "templateAdvancedSettings",
+                "saveTemplate",
             ]
         )
     }

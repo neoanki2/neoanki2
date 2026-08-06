@@ -72,10 +72,11 @@ rendered site, source revision label, screenshot provenance, and support path.
 
 ## Refresh screenshots
 
-Documentation screenshots use isolated databases and deterministic test
-scenarios. Each image is cropped to the focused NeoAnki2 app window, so the
-desktop, Dock, and menu bar are not published. They are not captured during
-normal local testing.
+Documentation screenshots use isolated databases, deterministic test
+scenarios, a 1024 × 680 minimum window, and dark appearance. Each image is
+cropped to the focused NeoAnki2 app window, so the desktop, Dock, and menu bar
+are not published. Capture rejects partially clipped expected controls. Images
+are not captured during normal local testing.
 
 1. Run the **Documentation screenshots** workflow manually, or wait for its
    weekly run.

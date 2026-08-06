@@ -45,6 +45,8 @@ except (OSError, json.JSONDecodeError) as error:
 
 if manifest.get("schemaVersion") != 1:
     raise SystemExit("Reviewed screenshot manifest must use schemaVersion 1")
+if manifest.get("appearance") != "dark":
+    raise SystemExit("Reviewed screenshot manifest appearance must be dark")
 if re.fullmatch(r"[0-9a-f]{40}", manifest.get("sourceSHA") or "") is None:
     raise SystemExit("Reviewed screenshot manifest has an invalid sourceSHA")
 try:
@@ -67,8 +69,10 @@ for filename in sorted(expected_files):
     if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
         raise SystemExit(f"{filename} is not a valid PNG")
     width, height = struct.unpack(">II", header[16:24])
-    if entry.get("width") != width or entry.get("height") != height or width <= 0 or height <= 0:
+    if entry.get("width") != width or entry.get("height") != height:
         raise SystemExit(f"Manifest dimensions do not match {filename}")
+    if width < 1024 or height < 680:
+        raise SystemExit(f"Reviewed screenshot is too small: {filename} is {width}x{height}")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if entry.get("sha256") != digest:
         raise SystemExit(f"Manifest SHA-256 does not match {filename}")
