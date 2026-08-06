@@ -15,12 +15,13 @@ brew install --cask neoanki2/tap/neoanki2
 brew upgrade --cask neoanki2
 ```
 
-Release artifacts are universal, checksummed, provenance-attested, and ad-hoc
-signed. They are not yet Apple-notarized, so the first launch may require
-Control-clicking NeoAnki2 in Applications and choosing **Open**.
+Release artifacts are universal, checksummed, and ad-hoc signed. Candidates
+prepared in GitHub Actions are also provenance-attested. Releases are not yet
+Apple-notarized, so the first launch may require Control-clicking NeoAnki2 in
+Applications and choosing **Open**.
 
-Maintainers prepare an immutable, tested draft before merge and promote it with
-`Scripts/ship-release.sh`; see [the release procedure](docs/RELEASING.md).
+Maintainers can prepare locally before the first push or use an attested CI
+candidate; see [the release procedure](docs/RELEASING.md).
 
 For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the
 repository and run:
