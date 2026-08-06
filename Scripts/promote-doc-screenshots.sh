@@ -69,7 +69,7 @@ for filename in sorted(expected_files):
     if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
         raise SystemExit(f"{filename} is not a valid PNG")
     width, height = struct.unpack(">II", header[16:24])
-    if entry.get("width") != width or entry.get("height") != height or width < 1200 or height < 760:
+    if entry.get("width") != width or entry.get("height") != height or width < 1024 or height < 680:
         raise SystemExit(f"Manifest dimensions do not match {filename}")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if entry.get("sha256") != digest:

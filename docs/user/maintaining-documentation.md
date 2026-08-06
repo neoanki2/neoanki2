@@ -73,7 +73,7 @@ rendered site, source revision label, screenshot provenance, and support path.
 ## Refresh screenshots
 
 Documentation screenshots use isolated databases, deterministic test
-scenarios, a 1200 × 760 minimum window, and dark appearance. Each image is
+scenarios, a 1024 × 680 minimum window, and dark appearance. Each image is
 cropped to the focused NeoAnki2 app window, so the desktop, Dock, and menu bar
 are not published. Capture rejects partially clipped expected controls. Images
 are not captured during normal local testing.

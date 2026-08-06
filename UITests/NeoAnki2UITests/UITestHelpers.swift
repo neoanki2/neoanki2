@@ -76,7 +76,6 @@ class NeoAnkiUITestCase: XCTestCase {
             app.launchEnvironment["NEOANKI_TEST_SESSION_ID"] = Self.controlSessionID
             if ProcessInfo.processInfo.environment["DOC_SCREENSHOT_DIR"] != nil {
                 app.launchEnvironment["NEOANKI_DOC_SCREENSHOTS"] = "1"
-                app.launchArguments.append(contentsOf: ["-AppleInterfaceStyle", "Dark"])
             }
             if let scenario {
                 app.launchEnvironment["NEOANKI_TEST_SCENARIO"] = scenario
@@ -299,7 +298,7 @@ class NeoAnkiUITestCase: XCTestCase {
             XCTFail("No app window available for documentation screenshot '\(name)'", file: file, line: line)
             return
         }
-        guard appWindow.frame.width >= 1_200, appWindow.frame.height >= 760 else {
+        guard appWindow.frame.width >= 1_024, appWindow.frame.height >= 680 else {
             XCTFail(
                 "Documentation screenshot window is too small: \(appWindow.frame)",
                 file: file,

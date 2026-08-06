@@ -135,8 +135,8 @@ struct NeoAnki2App: App {
             }
         }
         .defaultSize(
-            width: AppDatabase.isDocumentationScreenshotCapture ? 1_200 : 960,
-            height: AppDatabase.isDocumentationScreenshotCapture ? 760 : 640
+            width: AppDatabase.isDocumentationScreenshotCapture ? 1_024 : 960,
+            height: AppDatabase.isDocumentationScreenshotCapture ? 680 : 640
         )
         .commands {
             LibraryCommands()
