@@ -72,7 +72,8 @@ bash -n "$ROOT/Scripts/build-release-candidate.sh" \
   "$ROOT/Scripts/publish-release-candidate.sh" \
   "$ROOT/Scripts/ship-release.sh" \
   "$ROOT/Scripts/prepare-local-release.sh" \
-  "$ROOT/Scripts/push-ship-release.sh"
+  "$ROOT/Scripts/push-ship-release.sh" \
+  "$ROOT/Scripts/release-local.sh"
 
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"

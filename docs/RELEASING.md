@@ -6,6 +6,18 @@ merge-to-install hot path only promotes an immutable candidate.
 
 ## Fast local path: push to installed
 
+To run and time the complete path—including validation, packaging, draft
+upload, push, merge, publication, tap update, and installation—use:
+
+```bash
+./Scripts/release-local.sh \
+  --title "Release change" \
+  --body-file .build/release-pr.md \
+  --install
+```
+
+The command reports preparation, promotion, and total release durations.
+
 For the shortest maintainer feedback loop, prepare everything before the
 branch's first push:
 
