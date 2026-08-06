@@ -30,7 +30,8 @@ The timer starts immediately before `git push` and covers push, PR creation,
 merge, publication, direct tap update, Homebrew refresh, installation, and
 verification. Local candidates are checksummed and ad-hoc signed but are not
 GitHub provenance-attested; use the CI path below when that attestation is
-required.
+required. The command refreshes only `neoanki2/tap`, so an unavailable unrelated
+tap cannot block or distort the release timing.
 
 ## Attested CI path
 

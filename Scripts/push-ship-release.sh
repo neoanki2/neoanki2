@@ -143,8 +143,9 @@ EOF
 ruby -c "$CASK_FILE" >/dev/null
 
 if [ "$INSTALL" -eq 1 ]; then
-  echo "Refreshing Homebrew before the measured push..."
-  brew update --quiet
+  TAP_DIRECTORY="$(brew --repository neoanki2/tap)"
+  echo "Refreshing only neoanki2/tap before the measured push..."
+  (cd "$TAP_DIRECTORY" && gh repo sync --branch main)
 fi
 
 echo "Preflight passed. Starting push-to-installed timer for $TAG."
@@ -196,7 +197,7 @@ TAP_UPDATED_AT="$(date +%s)"
 BREW_UPDATED_AT="$TAP_UPDATED_AT"
 
 if [ "$INSTALL" -eq 1 ]; then
-  brew update --quiet
+  (cd "$TAP_DIRECTORY" && gh repo sync --branch main)
   BREW_UPDATED_AT="$(date +%s)"
   if [ "$(brew info --cask neoanki2/tap/neoanki2 --json=v2 | jq -r '.casks[0].version')" != "$VERSION" ]; then
     echo "Homebrew did not resolve the newly committed tap version." >&2
