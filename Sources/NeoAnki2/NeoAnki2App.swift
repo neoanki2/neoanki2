@@ -2,7 +2,6 @@ import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import PoemDeckBuilder
 import VocabularyDeckBuilder
-import AppKit
 import SwiftUI
 
 private struct InitialLibraryPayload: Sendable {
@@ -111,7 +110,6 @@ struct NeoAnki2App: App {
             .task {
                 installUITestControlIfNeeded()
             }
-            .background(DocumentationCaptureWindowConfigurator())
             .preferredColorScheme(AppDatabase.isDocumentationScreenshotCapture ? .dark : nil)
             .alert(
                 "Approve Local API Client?",
@@ -367,24 +365,6 @@ struct NeoAnki2App: App {
         )
     }
 #endif
-}
-
-private struct DocumentationCaptureWindowConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        DocumentationCaptureConfigurationView()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
-private final class DocumentationCaptureConfigurationView: NSView {
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        guard AppDatabase.isDocumentationScreenshotCapture, let window else { return }
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.setContentSize(NSSize(width: 1_200, height: 760))
-        window.center()
-    }
 }
 
 private extension DeckBuilderRegistry {
