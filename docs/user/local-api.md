@@ -101,7 +101,7 @@ and submit the selected lexical fields through the item endpoints. To install
 or remove whole immutable `.neovocab` packs, use `vocabulary.write` and the
 staged `/v1/vocabulary-pack-imports` lifecycle. The API accepts declared bytes,
 not local paths or remote URLs. See the
-[normative vocabulary API contract](../VOCABULARY_API.md) for routes, limits,
+[normative vocabulary API contract]({{ '/VOCABULARY_API/' | relative_url }}) for routes, limits,
 preconditions, and job states.
 
 ## Use and protect a token
@@ -169,4 +169,4 @@ a token must be represented, use a fixed placeholder such as
 
 ---
 
-**Reference:** [Normative local API requirements](../LOCAL_API.md)
+**Reference:** [Normative local API requirements]({{ '/LOCAL_API/' | relative_url }})

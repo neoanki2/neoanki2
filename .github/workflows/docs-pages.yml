@@ -87,6 +87,48 @@ jobs:
               encoding="utf-8",
           )
           PY
+      - name: Add current release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view --repo "$GITHUB_REPOSITORY" \
+            --json tagName,name,publishedAt,url,assets > "$RUNNER_TEMP/latest-release.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path(os.environ["RUNNER_TEMP"]) / "latest-release.json"
+          release = json.loads(source.read_text(encoding="utf-8"))
+          versioned = [
+              asset for asset in release["assets"]
+              if asset["name"].startswith("NeoAnki2-")
+              and asset["name"].endswith("-mac-universal.dmg")
+              and "-latest-" not in asset["name"]
+          ]
+          if len(versioned) != 1:
+              raise SystemExit("Expected exactly one versioned universal DMG")
+          artifact = versioned[0]
+          checksum_name = artifact["name"] + ".sha256"
+          checksum = next(
+              asset for asset in release["assets"]
+              if asset["name"] == checksum_name
+          )
+          metadata = {
+              "version": release["tagName"].removeprefix("v"),
+              "tag": release["tagName"],
+              "name": release["name"],
+              "published_at": release["publishedAt"],
+              "download_url": artifact["url"],
+              "checksum_url": checksum["url"],
+              "release_url": release["url"],
+              "size": f'{artifact["size"] / 1_000_000:.1f} MB',
+          }
+          Path("docs/_data/release.json").write_text(
+              json.dumps(metadata, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
       - name: Configure Pages
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         id: pages

@@ -14,7 +14,7 @@ The vocabulary API exposes NeoAnki's managed, offline `.neovocab` library. It
 does not download dictionaries, resolve remote URLs, expose arbitrary local
 paths, or allow a client to modify entries inside an installed pack. General
 transport, authentication, problem responses, idempotency, and precondition
-rules remain those of [Local API requirements](LOCAL_API.md).
+rules remain those of [Local API requirements]({{ '/LOCAL_API/' | relative_url }}).
 
 ## 1. Authorization model
 

@@ -612,7 +612,7 @@ installed pack. It never accepts a client filesystem path or performs a network
 dictionary lookup.
 
 The complete normative route, lifecycle, validation, security, and acceptance
-contract is defined in [Vocabulary API requirements](VOCABULARY_API.md).
+contract is defined in [Vocabulary API requirements]({{ '/VOCABULARY_API/' | relative_url }}).
 
 ## 14. Bulk and transaction operations
 
@@ -805,5 +805,5 @@ Passing only unit tests, returning syntactically valid JSON, or exposing the
 underlying `ItemStore` methods does not satisfy this release gate.
 
 Reproducible commands and criterion-to-suite traceability are maintained in
-[Local API acceptance evidence](reference/local-api-acceptance.md). That record
+[Local API acceptance evidence]({{ '/reference/local-api-acceptance/' | relative_url }}). That record
 is evidence only; it does not amend the normative requirements above.

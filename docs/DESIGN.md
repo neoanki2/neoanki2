@@ -71,7 +71,7 @@ components:
 
 <!-- SEED+SCAN: Visual strategy established from product research and incumbent SwiftUI; re-run $impeccable document after major UI passes to refresh extracted tokens. -->
 
-> **Note:** Domain architecture and learning-science rationale live in [`ARCHITECTURE.md`](ARCHITECTURE.md). This file is the **visual design system** for the SwiftUI shell.
+> **Note:** Domain architecture and learning-science rationale live in [`ARCHITECTURE.md`]({{ '/ARCHITECTURE/' | relative_url }}). This file is the **visual design system** for the SwiftUI shell.
 
 ## Overview
 

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; script-src 'self'; style-src 'self'; upgrade-insecure-requests">
+    {% assign page_title = page.title | default: site.title %}
+    {% assign page_description = page.description | default: site.description %}
+    {% assign canonical_url = page.url | absolute_url %}
+    <title>{{ site.title }} · {{ page.title }}</title>
+    <meta name="description" content="{{ page_description | escape }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta property="og:site_name" content="{{ site.title | escape }}">
+    <meta property="og:title" content="{{ page_title | escape }}">
+    <meta property="og:description" content="{{ page_description | escape }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:type" content="website">
+    {% if page.image %}<meta property="og:image" content="{{ site.url }}{{ site.baseurl }}{{ page.image }}">{% endif %}
+    <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}?v=5">
+  </head>
+  <body class="page-landing{% if page.url == '/download/' %} page-download{% endif %}">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="landing-header">
+      <a class="landing-brand" href="{{ '/' | relative_url }}" aria-label="NeoAnki2 home">NeoAnki2</a>
+      <nav class="landing-nav" aria-label="Primary">
+        <a href="{{ '/user/' | relative_url }}">Guides</a>
+        <a href="{{ '/download/' | relative_url }}">Download</a>
+        <a href="{{ site.source_url }}" rel="noopener noreferrer">GitHub<span class="external-mark" aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+    <main id="content" tabindex="-1" class="landing-main">
+      {{ content }}
+    </main>
+    <footer class="landing-footer">
+      <a class="landing-brand landing-footer-brand" href="{{ '/' | relative_url }}" aria-label="NeoAnki2 home">NeoAnki2</a>
+      <p>Native, local-first spaced repetition for macOS.</p>
+      <nav aria-label="Footer">
+        <a href="{{ '/user/' | relative_url }}">Guides</a>
+        <a href="{{ '/download/' | relative_url }}">Download</a>
+        <a href="{{ '/user/support/' | relative_url }}">Support</a>
+        <a href="{{ site.source_url }}" rel="noopener noreferrer">Source</a>
+      </nav>
+    </footer>
+  </body>
+</html>

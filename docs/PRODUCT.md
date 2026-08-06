@@ -69,7 +69,7 @@ can choose an empty starter set.
      needs fixing or moving
   4. Manage item types/templates and import JSON or CSV from the native shell
 - **Architecture split:** `NeoAnkiCore` (domain, scheduling, persistence);
-  `NeoAnki2` (SwiftUI shell). See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the three-layer model.
+  `NeoAnki2` (SwiftUI shell). See [`ARCHITECTURE.md`]({{ '/ARCHITECTURE/' | relative_url }}) for the three-layer model.
 - **Dev verification:** `./Scripts/test-fast.sh` for unit/flow tests; UI tests
   are CI/manual unless explicitly requested.
 
@@ -93,7 +93,7 @@ can choose an empty starter set.
 | Multiple item types / template authoring UI | Implemented |
 | Native JSON/CSV import (core) | Implemented — text fields; media paths + cloze objects in JSON |
 | Import UI | Implemented — File menu/import sheet with JSON and CSV file selection |
-| Anki import (`.apkg`, shared decks) | **Non-goal** per [`ARCHITECTURE.md`](ARCHITECTURE.md) — clean schema over migration |
+| Anki import (`.apkg`, shared decks) | **Non-goal** per [`ARCHITECTURE.md`]({{ '/ARCHITECTURE/' | relative_url }}) — clean schema over migration |
 
 ### Terminology (product-facing)
 
@@ -120,9 +120,9 @@ can choose an empty starter set.
 
 | Asset | Location |
 | --- | --- |
-| Architecture & philosophy | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| Visual design system | [`DESIGN.md`](DESIGN.md) |
-| Product context | [`PRODUCT.md`](PRODUCT.md) |
+| Architecture & philosophy | [`ARCHITECTURE.md`]({{ '/ARCHITECTURE/' | relative_url }}) |
+| Visual design system | [`DESIGN.md`]({{ '/DESIGN/' | relative_url }}) |
+| Product context | [`PRODUCT.md`]({{ '/PRODUCT/' | relative_url }}) |
 | Documentation index | [Documentation home]({{ site.baseurl }}/) |
 | Project overview | [Repository README](https://github.com/neoanki2/neoanki2#readme) |
 | Runnable macOS app | `Sources/NeoAnki2/` |

@@ -210,8 +210,8 @@ reservations, and commit item types, decks, items, cards, and references in one
 database transaction. Authored source intentionally carries no scheduling or
 portable provenance.
 
-See [`AUTHORED_DECK_FORMAT.md`](AUTHORED_DECK_FORMAT.md) and
-[`PORTABLE_DECK_FORMAT.md`](PORTABLE_DECK_FORMAT.md).
+See [`AUTHORED_DECK_FORMAT.md`]({{ '/AUTHORED_DECK_FORMAT/' | relative_url }}) and
+[`PORTABLE_DECK_FORMAT.md`]({{ '/PORTABLE_DECK_FORMAT/' | relative_url }}).
 
 ### Study resolution
 
