@@ -31,13 +31,20 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$PAYLOAD_DIR"
-NEOANKI_INSTALL_CONFIG=release \
-NEOANKI_INSTALL_DIR="$PAYLOAD_DIR" \
-NEOANKI_INSTALL_VERSION="$VERSION" \
-NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
-NEOANKI_INSTALL_UNIVERSAL=1 \
-NEOANKI_INSTALL_ALLOW_RUNNING=1 \
-  "$ROOT/Scripts/install-app.sh"
+if [ "${NEOANKI_RELEASE_SIGNED:-0}" = "1" ]; then
+  NEOANKI_INSTALL_VERSION="$VERSION" \
+  NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
+    "$ROOT/Scripts/archive-macos-release.sh" "$WORK_DIR/signed"
+  ditto "$WORK_DIR/signed/export/NeoAnki2.app" "$APP_PATH"
+else
+  NEOANKI_INSTALL_CONFIG=release \
+  NEOANKI_INSTALL_DIR="$PAYLOAD_DIR" \
+  NEOANKI_INSTALL_VERSION="$VERSION" \
+  NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
+  NEOANKI_INSTALL_UNIVERSAL=1 \
+  NEOANKI_INSTALL_ALLOW_RUNNING=1 \
+    "$ROOT/Scripts/install-app.sh"
+fi
 
 installed_version=$(
   /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
@@ -50,6 +57,10 @@ fi
 
 codesign --verify --deep --strict "$APP_PATH"
 lipo "$APP_PATH/Contents/MacOS/NeoAnki2" -verify_arch arm64 x86_64
+if [ "${NEOANKI_RELEASE_SIGNED:-0}" = "1" ]; then
+  xcrun stapler validate "$APP_PATH"
+  spctl --assess --type execute --verbose=2 "$APP_PATH"
+fi
 ln -s /Applications "$PAYLOAD_DIR/Applications"
 
 rm -f "$ARTIFACT_PATH" "$CHECKSUM_PATH"

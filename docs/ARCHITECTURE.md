@@ -10,9 +10,100 @@ A native macOS spaced-repetition app (Swift 6 / SwiftUI) with its domain logic i
 a standalone package, `NeoAnkiCore`. A ground-up rewrite of the Anki idea, not a
 port.
 
+## System overview and migration status
+
+NeoAnki is becoming a universal Apple-platform product. The domain remains one
+package while platform-neutral workflows and feature content move behind explicit
+boundaries. The macOS application is the first client; an iPhone/iPad shell starts
+only after the shared targets pass their iOS build gates.
+
+```mermaid
+flowchart LR
+    Mac["macOS shell<br/>commands, panels, local API"] --> SharedUI[NeoAnkiSharedUI]
+    iOS["Future iPhone/iPad shell<br/>native navigation and pickers"] --> SharedUI
+    SharedUI --> Application[NeoAnkiApplication]
+    Application --> Repository[LibraryRepository]
+    Repository --> Core[NeoAnkiCore / ItemStore]
+    Mac --> CloudSync[NeoAnkiCloudSync]
+    iOS --> CloudSync
+    CloudSync --> Repository
+    CloudSync --> CloudKit["CKSyncEngine<br/>private custom zone"]
+```
+
+The dependency rule is inward-only. `NeoAnkiApplication` cannot import SwiftUI,
+AppKit, UIKit, or CloudKit. `NeoAnkiSharedUI` cannot import AppKit, UIKit, or
+CloudKit. `NeoAnkiCloudSync` cannot import UI frameworks. The executable target
+is the composition root and the only place where Mac commands, AppKit adapters,
+and the local HTTP server are assembled.
+
+| Target | Owns now | Must not own |
+| --- | --- | --- |
+| `NeoAnkiCore` | Domain values, schema validation, persistence, scheduling, study-response and content-visibility semantics | UI copy, navigation, pickers, CloudKit |
+| `NeoAnkiApplication` | Repository capabilities, `AppSession`, routes, presentations, editor/draft state, service protocols, sync-facing types | SwiftUI/AppKit/UIKit/CloudKit |
+| `NeoAnkiSharedUI` | Adaptive reading layout, semantic tokens, common status/empty/error content | File panels, Mac tables, menu commands, database access |
+| `NeoAnkiCloudSync` | CKSyncEngine transport, separate engine metadata, merge/conflict policy | Domain-table ownership, blocking startup, UI |
+| `NeoAnkiDeckBuilderCore` | Generator descriptors, workspaces, generated bundles | SwiftUI type erasure |
+| `NeoAnkiDeckBuilderKit` | `AnyView` feature registry | Generator or persistence rules |
+| `NeoAnki2` | macOS composition, AppKit adapters, commands, local API, remaining feature views/models during migration | New reusable business rules |
+
+### Extraction matrix
+
+| Area | Shared | Platform adapted | macOS only |
+| --- | --- | --- | --- |
+| Home, study, item detail, common forms | Feature content and state | Compact/regular containers and safe-area footers | Window composition |
+| Browse | Query, filtering, selection | iPhone `List`; iPad adaptive table/list | Mac `Table` pagination |
+| Library navigation | Deck tree and rows | stack vs split navigation | menu/keyboard routing |
+| Editors and media | Drafts, validation, semantic rendering | rich text, cloze, image/GIF, audio adapters | AppKit text editors and panels |
+| Import/export | transfer state and validated workflows | document-picker/security-scope adapter | `NSOpenPanel`/`NSSavePanel`, local API |
+
+The current migration is intentionally staged. `ContentView` now stores its
+mutually exclusive route and modal state in `AppSession`; existing model and
+workflow extraction continues feature by feature. New code must enter through
+the target boundaries above rather than increasing the executable's surface.
+
+### Offline-first synchronization
+
+SQLite remains authoritative and fully usable offline or when the iCloud account
+is unavailable. `NeoAnkiCloudSync` uses the private database, container
+`iCloud.com.neoanki2.app`, and fixed zone `NeoAnkiLibrary`. Engine state, device
+identity, outbound cursor, inbound staging, and issues are stored in a separate
+metadata file, not in domain tables.
+
+Review events and reverts are immutable union members. Mutable conflicts accept
+the server record while preserving the local version as a `SyncConflictCopy`;
+delete-versus-edit follows the same preservation rule. A non-blocking Sync Issues
+screen surfaces those copies. Remote domain application must run through validated
+repository transactions with echo suppression; transport code never mutates
+SQLite directly.
+
+The first merge backs up SQLite, unions local and cloud records, adopts the cloud
+library identity while recording the local identity as an alias, deduplicates item
+types by canonical schema digest, remaps true identifier/schema collisions, and
+uploads the preserved result. Failure rolls back to the verified backup.
+
+See [ADR 0001](adr/0001-shared-application-and-ui-layers.md) and
+[ADR 0002](adr/0002-cloudkit-offline-first-sync.md).
+
+### iOS prerequisite gates
+
+- Complete: package floors, shared target products, forbidden-import validation,
+  `AppSession` route/presentation state, repository capability interfaces, shared
+  semantic UI primitives, Core study/reveal/draft rules, CKSyncEngine transport,
+  separate sync metadata, backup/staging coordinator, deterministic conflict-copy
+  policy, and the Xcode-managed universal Mac archive target.
+- In migration: move the remaining concrete feature models out of the executable,
+  finish reducing `ContentView` to composition only, remove cross-model `ItemStore`
+  access, and continue the resource-focused `ItemStore`/`SQLiteDatabase` file split.
+- Required before starting the iOS shell: implement and test full resource envelope
+  serialization/validated remote apply for every synchronized record, two-replica
+  restart/echo/first-merge integration tests, a successful generic iOS Simulator
+  CI build, and a signed two-device CloudKit test using the provisioned container.
+- External Apple prerequisite: provision both app IDs, the CloudKit container and
+  environments, push, Developer ID certificate, and CloudKit provisioning profiles.
+
 ---
 
-## 1. Principles
+## 1. Domain principles
 
 - **Native-only.** Card content is data, not documents: every renderable value is
   a `ContentValue` case drawn by SwiftUI. No HTML, no CSS, no template language,

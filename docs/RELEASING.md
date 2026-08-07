@@ -45,6 +45,29 @@ GitHub provenance-attested; use the CI path below when that attestation is
 required. The command refreshes only `neoanki2/tap`, so an unavailable unrelated
 tap cannot block or distort the release timing.
 
+## Developer ID and CloudKit archive path
+
+Official CloudKit-capable artifacts are produced by the headless
+`Xcode/NeoAnkiMac.xcodeproj` target. It owns the stable bundle identifier
+`com.neoanki2.app`, hardened runtime, production push entitlement, and container
+`iCloud.com.neoanki2.app`; Swift package targets remain the source implementation.
+
+The Apple Developer team must provision a Developer ID application certificate
+and a Developer ID CloudKit provisioning profile before dispatching Release. Set
+`NEOANKI_DEVELOPMENT_TEAM`, `NEOANKI_PROVISIONING_PROFILE_SPECIFIER`, and
+`NEOANKI_NOTARY_PROFILE` (a `notarytool` keychain profile), then run
+`Scripts/archive-macos-release.sh`. It archives and exports with `xcodebuild`,
+verifies the signature and universal architectures, submits the app for
+notarization, staples the ticket, and verifies Gatekeeper acceptance.
+
+`Scripts/build-release-artifact.sh` selects this path when
+`NEOANKI_RELEASE_SIGNED=1`; its default remains the unsigned/mock-sync contributor
+path so signing credentials are never required for local development. CI also
+needs `APPLE_DEVELOPMENT_TEAM` and `APPLE_DEVELOPER_ID_PROFILE_NAME` secrets after
+the certificate, profile, and `neoanki-ci-notary` credential are installed in the
+runner keychain. Those are external provisioning prerequisites and are not stored
+in this repository.
+
 ## Attested CI path
 
 The pull request must be current with `main`. Dispatch **Release candidate**
