@@ -1,5 +1,30 @@
 import Foundation
 
+/// Stable resource names used by persistence, the local API, and sync. Unknown
+/// values remain representable by the legacy string properties for API
+/// compatibility during schema evolution.
+public enum LibraryResourceKind: String, Codable, CaseIterable, Sendable {
+    case library
+    case deck
+    case itemType
+    case item
+    case card
+    case review
+    case reviewRevert
+    case media
+    case itemTypeMembership
+    case schedulingSettings
+    case portableTypeMapping
+}
+
+public enum LibraryChangeOrigin: String, Codable, Sendable {
+    case local
+    case cloud
+    case initialMerge
+    case localAPI
+    case importTransfer
+}
+
 /// One durable notification emitted after a library resource mutation.
 /// Payloads intentionally identify resources without copying user content;
 /// consumers load the current representation after receiving the event.
@@ -14,6 +39,10 @@ public struct LibraryChange: Sendable, Equatable, Identifiable {
     public let revision: Int
     public let isTombstone: Bool
     public let occurredAt: Date
+
+    public var resourceKind: LibraryResourceKind? {
+        LibraryResourceKind(rawValue: resourceType)
+    }
 
     public init(
         cursor: Int64,

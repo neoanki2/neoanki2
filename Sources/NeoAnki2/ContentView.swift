@@ -1,6 +1,8 @@
 import AppKit
+import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
+import NeoAnkiSharedUI
 import SwiftUI
 import UniformTypeIdentifiers
 import VocabularyDeckBuilder
@@ -18,17 +20,13 @@ struct ContentView: View {
     @Bindable var decksModel: DecksModel
     @Bindable var schedulingModel: SchedulingModel
     @Bindable var vocabularyLibraryModel: VocabularyLibraryModel
-    @State private var isAddingItem = false
-    @State private var isManagingTemplates = false
-    @State private var isStudying = false
-    @State private var isBrowsing = false
+    @State private var appSession = AppSession()
     /// Persisted per user, not per browse session: whether you want to see
     /// answers is a standing preference, not something to rediscover.
     @AppStorage(AppPreferences.browseShowsAnswerColumn) private var browseShowsAnswerColumn = false
     @State private var studyModel: StudyModel?
     @State private var studyScope: StudyScope = .allDecks
     @State private var templatesModel: TemplatesModel?
-    @State private var selectedItemID: SavedItemSummary.ID?
     @State private var endSessionTrigger = false
     /// Lives here rather than in `StudyView` because the Study menu opens the
     /// card editor, and every study command has to stand down while it is open:
@@ -37,13 +35,100 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var importModel: ImportModel?
     @State private var isChoosingImportFile = false
-    @State private var isShowingImport = false
     @State private var importNotice: ImportNotice?
     @State private var portableDeckTransfer: PortableDeckTransferModel
-    @State private var isShowingDeckBuilder = false
-    @State private var isShowingVocabularyPacks = false
-    @State private var isAddingFromVocabulary = false
     private let deckBuilderRegistry: DeckBuilderRegistry
+
+    private var isAddingItem: Bool {
+        get { appSession.route == .addItem }
+        nonmutating set { updateRoute(active: newValue, route: .addItem) }
+    }
+
+    private var isManagingTemplates: Bool {
+        get { appSession.route == .itemTypes }
+        nonmutating set { updateRoute(active: newValue, route: .itemTypes) }
+    }
+
+    private var isStudying: Bool {
+        get {
+            if case .study = appSession.route { return true }
+            return false
+        }
+        nonmutating set {
+            updateRoute(active: newValue, route: .study(studyScope.filter), matchingStudy: true)
+        }
+    }
+
+    private var isBrowsing: Bool {
+        get { appSession.route == .browse }
+        nonmutating set { updateRoute(active: newValue, route: .browse) }
+    }
+
+    private var selectedItemID: SavedItemSummary.ID? {
+        get {
+            if case let .itemDetail(id) = appSession.route { return id }
+            return nil
+        }
+        nonmutating set {
+            if let newValue {
+                appSession.route = .itemDetail(newValue)
+            } else if case .itemDetail = appSession.route {
+                appSession.route = .scopeHome
+            }
+        }
+    }
+
+    private var isShowingImport: Bool {
+        get { appSession.presentation == .importItems }
+        nonmutating set { updatePresentation(active: newValue, presentation: .importItems) }
+    }
+
+    private var isShowingDeckBuilder: Bool {
+        get { appSession.presentation == .deckBuilder }
+        nonmutating set { updatePresentation(active: newValue, presentation: .deckBuilder) }
+    }
+
+    private var isShowingVocabularyPacks: Bool {
+        get { appSession.presentation == .vocabularyPacks }
+        nonmutating set { updatePresentation(active: newValue, presentation: .vocabularyPacks) }
+    }
+
+    private var isAddingFromVocabulary: Bool {
+        get {
+            if case .vocabularyBuilder = appSession.presentation { return true }
+            return false
+        }
+        nonmutating set {
+            if newValue, let deckID = decksModel.selectedDeckID {
+                appSession.show(.vocabularyBuilder(deckID: deckID))
+            } else if case .vocabularyBuilder = appSession.presentation {
+                appSession.dismissPresentation()
+            }
+        }
+    }
+
+    private var importPresentation: Binding<Bool> {
+        Binding(get: { isShowingImport }, set: { isShowingImport = $0 })
+    }
+
+    private var deckBuilderPresentation: Binding<Bool> {
+        Binding(get: { isShowingDeckBuilder }, set: { isShowingDeckBuilder = $0 })
+    }
+
+    private var vocabularyPacksPresentation: Binding<Bool> {
+        Binding(get: { isShowingVocabularyPacks }, set: { isShowingVocabularyPacks = $0 })
+    }
+
+    private var vocabularyBuilderPresentation: Binding<Bool> {
+        Binding(get: { isAddingFromVocabulary }, set: { isAddingFromVocabulary = $0 })
+    }
+
+    private var syncIssuesPresentation: Binding<Bool> {
+        Binding(
+            get: { appSession.presentation == .syncIssues },
+            set: { updatePresentation(active: $0, presentation: .syncIssues) }
+        )
+    }
 #if DEBUG
     private let testingEnvironment: [String: String]
     private let testingInitialRoute: UITestRoute
@@ -118,6 +203,11 @@ struct ContentView: View {
         .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
+            ToolbarItem(placement: .status) {
+                SyncStatusView(status: appSession.syncStatus) {
+                    appSession.show(.syncIssues)
+                }
+            }
             if portableDeckTransfer.isBusy || testingForcePortableBusy {
                 ToolbarItem(placement: .status) {
                     ProgressView("Transferring deck…")
@@ -191,7 +281,7 @@ struct ContentView: View {
             allowsMultipleSelection: false,
             onCompletion: handleImportFile
         )
-        .sheet(isPresented: $isShowingImport) {
+        .sheet(isPresented: importPresentation) {
             if let importModel {
                 ImportView(
                     model: importModel,
@@ -202,7 +292,7 @@ struct ContentView: View {
                 )
             }
         }
-        .sheet(isPresented: $isShowingDeckBuilder) {
+        .sheet(isPresented: deckBuilderPresentation) {
             DeckBuilderSheet(
                 registry: deckBuilderRegistry,
                 context: deckBuilderContext,
@@ -211,14 +301,14 @@ struct ContentView: View {
                 onCancel: { isShowingDeckBuilder = false }
             )
         }
-        .sheet(isPresented: $isShowingVocabularyPacks) {
+        .sheet(isPresented: vocabularyPacksPresentation) {
             VocabularyPacksView(
                 model: vocabularyLibraryModel,
                 onImport: openVocabularyPackImport,
                 onDone: { isShowingVocabularyPacks = false }
             )
         }
-        .sheet(isPresented: $isAddingFromVocabulary) {
+        .sheet(isPresented: vocabularyBuilderPresentation) {
             if let destination = selectedVocabularyDestination {
                 VocabularyDeckBuilderView(
                     installedPacks: vocabularyLibraryModel.installedPacks,
@@ -235,6 +325,17 @@ struct ContentView: View {
                 // change across every scope and nothing more.
                 await refreshCounts()
             }
+        }
+        .sheet(isPresented: syncIssuesPresentation) {
+            NavigationStack {
+                SyncIssuesView(issues: appSession.syncIssues)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { appSession.dismissPresentation(ifMatching: .syncIssues) }
+                        }
+                    }
+            }
+            .frame(minWidth: 480, minHeight: 360)
         }
         .alert(item: $importNotice) { notice in
             Alert(
@@ -292,6 +393,30 @@ struct ContentView: View {
         if isManagingTemplates { return "Item Types" }
         if isAddingItem { return "Add Item" }
         return "NeoAnki2"
+    }
+
+    private func updateRoute(
+        active: Bool,
+        route: AppRoute,
+        matchingStudy: Bool = false
+    ) {
+        if active {
+            appSession.route = route
+            return
+        }
+        if matchingStudy {
+            if case .study = appSession.route { appSession.route = .scopeHome }
+        } else if appSession.route == route {
+            appSession.route = .scopeHome
+        }
+    }
+
+    private func updatePresentation(active: Bool, presentation: AppPresentation) {
+        if active {
+            appSession.show(presentation)
+        } else {
+            appSession.dismissPresentation(ifMatching: presentation)
+        }
     }
 
     private var libraryCommandHandlers: LibraryCommandHandlers {

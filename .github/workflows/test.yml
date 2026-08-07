@@ -36,6 +36,45 @@ jobs:
       - name: Run NeoAnki2Tests
         run: swift test --filter NeoAnki2Tests --parallel
 
+  shared-platforms:
+    name: Shared targets (${{ matrix.platform }})
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macOS, iOS Simulator]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Validate module boundaries
+        run: bash Scripts/validate-architecture.sh
+      - name: Build shared package schemes
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          destination="generic/platform=$PLATFORM"
+          for scheme in NeoAnkiApplication NeoAnkiSharedUI NeoAnkiCloudSync NeoAnkiDeckBuilderCore; do
+            xcodebuild build \
+              -scheme "$scheme" \
+              -destination "$destination" \
+              CODE_SIGNING_ALLOWED=NO
+          done
+      - name: Build Core for the same platform
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          cd NeoAnkiCore
+          xcodebuild build \
+            -scheme NeoAnkiCore \
+            -destination "generic/platform=$PLATFORM" \
+            CODE_SIGNING_ALLOWED=NO
+
+  application-tests:
+    name: Application and sync policy tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: swift test --filter NeoAnkiApplicationTests --parallel
+
   ui-smoke:
     name: Fast functional UI journeys
     runs-on: macos-26
