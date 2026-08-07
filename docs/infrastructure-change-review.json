@@ -1,15 +1,11 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "d92f289110c0bc41666b73d4fe2411599981156bc24ee90014b2b18fab98a0d1",
+  "diffSHA256": "83d2a80d396944ec87566d2adb0aed6f140cb8a6408f59e8d1a3e522c8a6c107",
   "files": [
     "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
-    "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift",
     "Sources/NeoAnki2/ContentView.swift",
-    "Sources/NeoAnki2/DeckSidebarView.swift",
-    "Sources/NeoAnki2/DecksModel.swift",
-    "Sources/NeoAnki2/NeoAnki2App.swift",
-    "Sources/NeoAnki2/ScopeHomeView.swift",
-    "Sources/NeoAnki2/UserFacingError.swift"
+    "Sources/NeoAnki2/ItemEditorState.swift",
+    "Sources/NeoAnki2/StudySupport.swift"
   ],
-  "reason": "Shared library, navigation, error, and media adapters gained local API, offline vocabulary, and deck-reset wiring. The new workflows are documented in the dedicated API, import/export, scheduling, and shortcuts guides; the existing first-launch, library, media, import, and error screenshot scenarios remain visually accurate."
+  "reason": "These mapped files were reduced to compatibility adapters while their platform-neutral state, validation, and study rules moved into the new Application and Core boundaries. Existing macOS workflows and rendered states are unchanged, so the current user guides and screenshots remain accurate."
 }

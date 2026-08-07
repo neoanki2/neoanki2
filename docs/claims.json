@@ -86,6 +86,7 @@
     "article": "user/getting-started.md",
     "source": "Package.swift",
     "minimumMacOS": 14,
+    "minimumIOS": 17,
     "swiftToolsVersion": "6.0"
   },
   "articleAssertions": [
@@ -125,6 +126,7 @@
       "article": "user/getting-started.md",
       "contains": [
         "macOS 14 or newer",
+        "iOS 17",
         "Swift tools 6.0",
         "~/Library/Application Support/neoanki2/",
         "The Home summary is prepared while the app window opens"
