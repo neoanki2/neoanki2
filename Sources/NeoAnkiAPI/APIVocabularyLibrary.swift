@@ -105,7 +105,7 @@ actor APIVocabularyLibrary {
 
     static let maximumInstalledPacks = 1_000
     static let maximumDeclaredFiles = 100_002
-    static let maximumFileBytes: Int64 = 1_000_000_000
+    static let maximumFileBytes: Int64 = 4_000_000_000
     static let maximumTotalBytes: Int64 = 4_000_000_000
     static let maximumIdentifierBytes = 65_536
 
@@ -801,7 +801,7 @@ extension NeoAnkiAPIService {
                 status: 413,
                 code: "payload_too_large",
                 title: "Payload too large",
-                detail: "A staged vocabulary file may not exceed 1000000000 bytes."
+                detail: "A staged vocabulary file may not exceed \(APIVocabularyLibrary.maximumFileBytes) bytes."
             )
         }
         let current = try await vocabularyLibrary.importJob(id: jobID)
