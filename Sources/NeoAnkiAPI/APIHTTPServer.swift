@@ -5,12 +5,14 @@ public actor NeoAnkiLocalAPIServer {
     public struct Configuration: Sendable, Equatable {
         public var host: NWEndpoint.Host
         public var port: NWEndpoint.Port
+        /// An embedding-level transport guard. The default leaves
+        /// endpoint-specific body limits to `NeoAnkiAPIService`.
         public var maximumRequestBytes: Int
 
         public init(
             host: NWEndpoint.Host = "127.0.0.1",
             port: NWEndpoint.Port = 8766,
-            maximumRequestBytes: Int = 513_000_000
+            maximumRequestBytes: Int = .max
         ) {
             self.host = host
             self.port = port

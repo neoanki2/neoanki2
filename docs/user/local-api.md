@@ -100,7 +100,9 @@ To turn a vocabulary result into a study item, request `items.write` separately
 and submit the selected lexical fields through the item endpoints. To install
 or remove whole immutable `.neovocab` packs, use `vocabulary.write` and the
 staged `/v1/vocabulary-pack-imports` lifecycle. The API accepts declared bytes,
-not local paths or remote URLs. See the
+not local paths or remote URLs. An individual staged vocabulary file and its
+complete declared pack may each be up to 4 GB. The loopback HTTP listener does
+not impose a smaller default request ceiling. See the
 [normative vocabulary API contract]({{ '/VOCABULARY_API/' | relative_url }}) for routes, limits,
 preconditions, and job states.
 

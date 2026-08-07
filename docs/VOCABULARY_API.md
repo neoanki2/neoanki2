@@ -159,7 +159,7 @@ Creation accepts 2 through 100,002 unique file declarations. Each declaration
 contains a lowercase UUID `id`, safe relative `path`, nonnegative `byteSize`,
 and lowercase SHA-256. Exactly one `manifest.json` is required. The total
 declared size MUST NOT exceed 4,000,000,000 bytes, a file MUST NOT exceed
-1,000,000,000 bytes, and paths MUST be unique, Unicode NFC, non-hidden, and
+4,000,000,000 bytes, and paths MUST be unique, Unicode NFC, non-hidden, and
 limited to `manifest.json`, one top-level database file, or descendants of
 `media/`. Absolute paths, empty components, `.`, `..`, backslashes, control
 characters, and symbolic links are forbidden.

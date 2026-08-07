@@ -99,7 +99,9 @@ user identifier.
 JSON bodies MUST be UTF-8. Timestamps MUST be RFC 3339 UTC with millisecond
 precision. UUIDs MUST use the lowercase hyphenated representation. JSON numbers
 MUST be finite. A normal JSON request body is limited to 5,000,000 bytes;
-endpoint-specific media and transfer limits apply instead to byte uploads.
+endpoint-specific media and transfer limits apply instead to byte uploads. The
+bundled loopback listener does not impose a lower whole-request ceiling; an
+embedding application MAY configure an additional transport guard.
 
 **Acceptance criteria**
 
@@ -670,7 +672,8 @@ Supported import formats are `json`, `csv`, `authoredDeck`, and `portableDeck`.
 An authored-deck manifest declares every relative bundle file and its expected
 byte size and SHA-256. The server allocates opaque file IDs; upload routes never
 contain caller-supplied paths. The authored-deck rules and portable-deck rules
-remain normative for their respective content.
+remain normative for their respective content. A staged import may declare up
+to 4,000,000,000 bytes across its files.
 
 Validation is complete and non-mutating. It returns exact planned counts,
 warnings, conflicts, and a plan token bound to uploaded digests and destination

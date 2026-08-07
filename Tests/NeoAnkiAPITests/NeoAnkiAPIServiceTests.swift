@@ -664,6 +664,25 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
     #expect(HTTP1ParseError.unexpectedTrailingBytes.status == 400)
 }
 
+@Test func bulkTransferLimitsDoNotReintroduceTheOldTransportCeiling() throws {
+    let configuration = NeoAnkiLocalAPIServer.Configuration()
+    #expect(configuration.maximumRequestBytes == .max)
+
+    let sum11ByteCount = 627_000_000
+    let requestHead = Data(
+        "PUT /v1/vocabulary-pack-imports/job/files/file HTTP/1.1\r\n"
+            .appending("Host: 127.0.0.1:8766\r\n")
+            .appending("Content-Length: \(sum11ByteCount)\r\n\r\n")
+            .utf8
+    )
+    #expect(
+        try HTTP1RequestParser.expectedTotalBytes(in: requestHead)
+            == requestHead.count + sum11ByteCount
+    )
+    #expect(NeoAnkiAPIService.maximumStagedImportBytes == 4_000_000_000)
+    #expect(APIVocabularyLibrary.maximumFileBytes == VocabularyPackLimits.default.maximumPackBytes)
+}
+
 @Test func loopbackServerServesHTTPAndStopsCleanly() async throws {
     let portValue = UInt16.random(in: 30_000 ... 50_000)
     let port = try #require(NWEndpoint.Port(rawValue: portValue))

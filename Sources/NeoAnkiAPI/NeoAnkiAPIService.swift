@@ -24,7 +24,7 @@ private struct SimulatedAPIProcessExit: Error {}
 
 public actor NeoAnkiAPIService {
     public static let maximumJSONBodyBytes = 5_000_000
-    public static let maximumStagedImportBytes = 1_000_000_000
+    public static let maximumStagedImportBytes = 4_000_000_000
 
     private let store: ItemStore
     private let authorization: APIAuthorizationStore
@@ -2810,7 +2810,7 @@ public actor NeoAnkiAPIService {
                 status: 413,
                 code: "payload_too_large",
                 title: "Payload too large",
-                detail: "Declared import files may not exceed 1000000000 bytes in total."
+                detail: "Declared import files may not exceed \(Self.maximumStagedImportBytes) bytes in total."
             )
         }
         var paths: Set<String> = []

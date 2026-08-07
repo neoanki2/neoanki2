@@ -540,7 +540,10 @@ enum APIOpenAPI {
             ]),
             "VocabularyPackImportFileInput": object(["id", "path", "byteSize", "sha256"], [
                 "id": uuid, "path": ["type": "string", "minLength": 1, "maxLength": 65_536],
-                "byteSize": ["type": "integer", "minimum": 0, "maximum": 1_000_000_000],
+                "byteSize": [
+                    "type": "integer", "minimum": 0,
+                    "maximum": APIVocabularyLibrary.maximumFileBytes,
+                ],
                 "sha256": sha256,
             ]),
             "CreateVocabularyPackImportInput": object(["files"], [
