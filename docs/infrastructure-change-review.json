@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "83d2a80d396944ec87566d2adb0aed6f140cb8a6408f59e8d1a3e522c8a6c107",
+  "diffSHA256": "a52654ea5ec3af37a6cf060e8e84e3de2925529b960f5749a508eb6a4bb32b83",
   "files": [
     "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
     "Sources/NeoAnki2/ContentView.swift",
     "Sources/NeoAnki2/ItemEditorState.swift",
-    "Sources/NeoAnki2/StudySupport.swift"
+    "Sources/NeoAnki2/StudySupport.swift",
+    "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift"
   ],
   "reason": "These mapped files were reduced to compatibility adapters while their platform-neutral state, validation, and study rules moved into the new Application and Core boundaries. Existing macOS workflows and rendered states are unchanged, so the current user guides and screenshots remain accurate."
 }
