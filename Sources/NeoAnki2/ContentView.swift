@@ -203,11 +203,6 @@ struct ContentView: View {
         .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
-            ToolbarItem(placement: .status) {
-                SyncStatusView(status: appSession.syncStatus) {
-                    appSession.show(.syncIssues)
-                }
-            }
             if portableDeckTransfer.isBusy || testingForcePortableBusy {
                 ToolbarItem(placement: .status) {
                     ProgressView("Transferring deck…")
