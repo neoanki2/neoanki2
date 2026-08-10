@@ -35,8 +35,25 @@ if rg -n "@State private var is(AddingItem|ManagingTemplates|Studying|Browsing|S
 fi
 
 if rg -n "ItemStore" "$ROOT/Sources/NeoAnkiApplication" \
-  --glob '!LibraryRepository.swift' >/dev/null; then
-  echo "Architecture violation: only SQLiteLibraryRepository may mention ItemStore in Application." >&2
+  --glob '!LibraryRepository.swift' \
+  --glob '!LocalAPILibrary.swift' >/dev/null; then
+  echo "Architecture violation: only SQLite repository adapters may mention ItemStore in Application." >&2
+  FAILURES=1
+fi
+
+if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnkiAPI" >/dev/null; then
+  echo "Architecture violation: the HTTP adapter must depend on LocalAPILibrary, not SQLite persistence." >&2
+  FAILURES=1
+fi
+
+if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnki2" \
+  --glob '!NeoAnki2App.swift' >/dev/null; then
+  echo "Architecture violation: UI features must receive application capabilities, not persistence." >&2
+  FAILURES=1
+fi
+
+if rg -n "ItemStore" "$ROOT/Sources/NeoAnki2/NeoAnki2App.swift" >/dev/null; then
+  echo "Architecture violation: the composition root must construct SQLiteLibraryRepository, not ItemStore." >&2
   FAILURES=1
 fi
 

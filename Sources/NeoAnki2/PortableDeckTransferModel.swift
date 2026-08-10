@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 import UniformTypeIdentifiers
 
@@ -56,21 +57,20 @@ final class PortableDeckTransferModel {
     private let scopedAccess: any SecurityScopedResourceAccessing
 
     init(
-        store: ItemStore,
+        library: any LibraryTransferring,
         scopedAccess: any SecurityScopedResourceAccessing = SystemSecurityScopedResourceAccess()
     ) {
         importOperation = { source, resolution in
-            try await PortableDeck.importDeck(
+            try await library.importPortableDeck(
                 from: source,
-                into: store,
                 conflictResolution: resolution
             )
         }
         authoredImportOperation = { source in
-            try await AuthoredDeck.importDeck(from: source, into: store)
+            try await library.importAuthoredDeck(from: source)
         }
         exportOperation = { deckID, destination in
-            try await PortableDeck.export(deckID: deckID, from: store, to: destination)
+            try await library.exportPortableDeck(id: deckID, to: destination)
         }
         self.scopedAccess = scopedAccess
     }

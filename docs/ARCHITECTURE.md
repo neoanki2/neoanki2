@@ -81,8 +81,9 @@ library identity while recording the local identity as an alias, deduplicates it
 types by canonical schema digest, remaps true identifier/schema collisions, and
 uploads the preserved result. Failure rolls back to the verified backup.
 
-See [ADR 0001](adr/0001-shared-application-and-ui-layers.md) and
-[ADR 0002](adr/0002-cloudkit-offline-first-sync.md).
+See [ADR 0001](adr/0001-shared-application-and-ui-layers.md),
+[ADR 0002](adr/0002-cloudkit-offline-first-sync.md), and
+[ADR 0003](adr/0003-application-library-boundary.md).
 
 ### iOS prerequisite gates
 
@@ -90,10 +91,12 @@ See [ADR 0001](adr/0001-shared-application-and-ui-layers.md) and
   `AppSession` route/presentation state, repository capability interfaces, shared
   semantic UI primitives, Core study/reveal/draft rules, CKSyncEngine transport,
   separate sync metadata, backup/staging coordinator, deterministic conflict-copy
-  policy, and the Xcode-managed universal Mac archive target.
+  policy, enforced repository-only persistence access from feature models and the
+  local API, and the Xcode-managed universal Mac archive target.
 - In migration: move the remaining concrete feature models out of the executable,
-  finish reducing `ContentView` to composition only, remove cross-model `ItemStore`
-  access, and continue the resource-focused `ItemStore`/`SQLiteDatabase` file split.
+  finish reducing `ContentView` to composition only, and continue the
+  resource-focused internal `ItemStore`/`SQLiteDatabase` file split. Those internal
+  persistence types no longer form a client-facing boundary.
 - Required before starting the iOS shell: implement and test full resource envelope
   serialization/validated remote apply for every synchronized record, two-replica
   restart/echo/first-merge integration tests, a successful generic iOS Simulator

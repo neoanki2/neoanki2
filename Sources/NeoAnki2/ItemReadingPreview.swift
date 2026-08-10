@@ -205,7 +205,7 @@ struct ItemDetailView: View {
         errorMessage = nil
 
         do {
-            if let loaded = try await model.store.fetchItem(id: summary.id) {
+            if let loaded = try await model.library.item(id: summary.id) {
                 item = loaded.item
                 itemType = loaded.itemType
                 selectedDeckID = loaded.item.deckID

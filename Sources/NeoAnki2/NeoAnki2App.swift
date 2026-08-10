@@ -1,11 +1,12 @@
 import NeoAnkiCore
+import NeoAnkiApplication
 import NeoAnkiDeckBuilderKit
 import PoemDeckBuilder
 import VocabularyDeckBuilder
 import SwiftUI
 
 private struct InitialLibraryPayload: Sendable {
-    let store: ItemStore
+    let library: SQLiteLibraryRepository
     let mediaStore: MediaStore?
     let snapshot: ColdLibraryHomeSnapshot?
     let vocabularyRootURL: URL
@@ -20,6 +21,7 @@ struct NeoAnki2App: App {
     @State private var itemsModel: ItemsModel?
     @State private var decksModel: DecksModel?
     @State private var schedulingModel: SchedulingModel?
+    @State private var library: SQLiteLibraryRepository?
     @State private var vocabularyLibraryModel: VocabularyLibraryModel?
     @State private var apiControlModel: APIControlModel?
     @State private var bootstrapError: String?
@@ -51,20 +53,20 @@ struct NeoAnki2App: App {
                     at: databaseURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true
                 )
-                let store = try ItemStore(databaseURL: databaseURL)
+                let library = try SQLiteLibraryRepository(databaseURL: databaseURL)
                 AppStartupTrace.mark("store_opened")
-                try await store.bootstrap()
+                try await library.bootstrap()
                 AppStartupTrace.mark("store_bootstrapped")
-                try await UITestScenarioSeeder.seedIfRequested(store: store)
+                try await UITestScenarioSeeder.seedIfRequested(store: library)
                 AppStartupTrace.mark("scenario_ready")
-                let snapshot = try? await store.coldLibraryHomeSnapshot(
+                let snapshot = try? await library.coldHomeSnapshot(
                     scope: .allDecks,
                     asOf: .now
                 )
                 AppStartupTrace.mark("snapshot_ready")
                 return InitialLibraryPayload(
-                    store: store,
-                    mediaStore: await store.media,
+                    library: library,
+                    mediaStore: await library.mediaStore(),
                     snapshot: snapshot,
                     vocabularyRootURL: databaseURL.deletingLastPathComponent()
                         .appendingPathComponent("Vocabulary Packs", isDirectory: true)
@@ -76,13 +78,15 @@ struct NeoAnki2App: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let itemsModel, let decksModel, let schedulingModel, let vocabularyLibraryModel {
+                if let itemsModel, let decksModel, let schedulingModel, let vocabularyLibraryModel,
+                   let library {
 #if DEBUG
                     ContentView(
                         itemsModel: itemsModel,
                         decksModel: decksModel,
                         schedulingModel: schedulingModel,
                         vocabularyLibraryModel: vocabularyLibraryModel,
+                        library: library,
                         deckBuilderRegistry: .production,
                         testingEnvironment: activeTestingEnvironment,
                         testingInitialRoute: testConfiguration?.initialRoute
@@ -95,6 +99,7 @@ struct NeoAnki2App: App {
                         decksModel: decksModel,
                         schedulingModel: schedulingModel,
                         vocabularyLibraryModel: vocabularyLibraryModel,
+                        library: library,
                         deckBuilderRegistry: .production
                     )
 #endif
@@ -198,10 +203,10 @@ struct NeoAnki2App: App {
             }
 #endif
             let newItemsModel = ItemsModel(
-                store: payload.store,
+                library: payload.library,
                 mediaStore: payload.mediaStore
             )
-            let newDecksModel = DecksModel(store: payload.store)
+            let newDecksModel = DecksModel(library: payload.library)
             if let snapshot = payload.snapshot {
                 newDecksModel.applyColdHomeSnapshot(snapshot)
                 newItemsModel.setCachedScope(.allDecks)
@@ -210,10 +215,11 @@ struct NeoAnki2App: App {
             }
             itemsModel = newItemsModel
             decksModel = newDecksModel
-            schedulingModel = SchedulingModel(store: payload.store)
+            library = payload.library
+            schedulingModel = SchedulingModel(library: payload.library)
             vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL)
             let apiModel = APIControlModel(
-                store: payload.store,
+                library: payload.library,
                 vocabularyRootURL: payload.vocabularyRootURL
             )
             apiControlModel = apiModel
@@ -233,28 +239,28 @@ struct NeoAnki2App: App {
             at: databaseURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let store = try ItemStore(databaseURL: databaseURL)
+        let library = try SQLiteLibraryRepository(databaseURL: databaseURL)
         AppStartupTrace.mark("store_opened")
-        try await store.bootstrap()
+        try await library.bootstrap()
         AppStartupTrace.mark("store_bootstrapped")
         if scenario == nil {
-            try await UITestScenarioSeeder.seedIfRequested(store: store)
+            try await UITestScenarioSeeder.seedIfRequested(store: library)
         } else {
             try await UITestScenarioSeeder.seed(
                 scenario: scenario,
                 environment: environment,
-                store: store
+                store: library
             )
         }
         AppStartupTrace.mark("scenario_ready")
-        let snapshot = try? await store.coldLibraryHomeSnapshot(
+        let snapshot = try? await library.coldHomeSnapshot(
             scope: .allDecks,
             asOf: .now
         )
         AppStartupTrace.mark("snapshot_ready")
         return InitialLibraryPayload(
-            store: store,
-            mediaStore: await store.media,
+            library: library,
+            mediaStore: await library.mediaStore(),
             snapshot: snapshot,
             vocabularyRootURL: databaseURL.deletingLastPathComponent()
                 .appendingPathComponent("Vocabulary Packs", isDirectory: true)
@@ -300,7 +306,7 @@ struct NeoAnki2App: App {
         }
 
         if command.action == .exportPortable {
-            guard let itemsModel,
+            guard let library,
                   let deckID = decksModel?.selectedDeckID,
                   let path = command.path,
                   !path.isEmpty else {
@@ -313,7 +319,7 @@ struct NeoAnki2App: App {
                     message: "Portable export requires an open library, selected deck, and destination"
                 )
             }
-            let transfer = PortableDeckTransferModel(store: itemsModel.store)
+            let transfer = PortableDeckTransferModel(library: library)
             let succeeded = await transfer.exportDeck(
                 id: deckID,
                 to: URL(fileURLWithPath: path)

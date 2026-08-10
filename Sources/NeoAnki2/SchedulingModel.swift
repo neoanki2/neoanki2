@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 @MainActor
@@ -11,10 +12,10 @@ final class SchedulingModel {
     var isShowingSettings = false
     var settingsError: String?
 
-    private let store: ItemStore
+    private let library: any LibraryScheduling
 
-    init(store: ItemStore) {
-        self.store = store
+    init(library: any LibraryScheduling) {
+        self.library = library
     }
 
     func openSettings() {
@@ -27,7 +28,7 @@ final class SchedulingModel {
         settingsError = nil
         defer { isLoadingSettings = false }
         do {
-            rolloverMinutes = try await store.studyDayRolloverMinutes()
+            rolloverMinutes = try await library.studyDayRolloverMinutes()
         } catch {
             settingsError = UserFacingError.message(from: error)
         }
@@ -39,7 +40,7 @@ final class SchedulingModel {
         settingsError = nil
         defer { isSavingSettings = false }
         do {
-            try await store.setStudyDayRolloverMinutes(minutes)
+            try await library.setStudyDayRolloverMinutes(minutes)
             rolloverMinutes = minutes
             return true
         } catch {
@@ -58,6 +59,6 @@ final class SchedulingModel {
         guard !isOptimizing else { return }
         isOptimizing = true
         defer { isOptimizing = false }
-        _ = try? await store.optimizeSchedulingIfNeeded()
+        _ = try? await library.optimizeSchedulingIfNeeded()
     }
 }

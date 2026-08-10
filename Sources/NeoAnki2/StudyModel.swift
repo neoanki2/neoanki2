@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 struct PendingGradeUndo: Equatable, Sendable {
@@ -60,7 +61,7 @@ final class StudyModel {
     private(set) var reviewedItemIDs: Set<UUID> = []
     private(set) var lastStartTiming = StudyStartTiming()
 
-    let store: ItemStore
+    let library: any LibraryBrowsing & LibraryStudying
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
@@ -70,10 +71,10 @@ final class StudyModel {
     private let remainingQueueLoadGate: (@Sendable () async -> Void)?
 
     init(
-        store: ItemStore,
+        library: any LibraryBrowsing & LibraryStudying,
         remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
     ) {
-        self.store = store
+        self.library = library
         self.remainingQueueLoadGate = remainingQueueLoadGate
     }
 
@@ -147,7 +148,7 @@ final class StudyModel {
 
         do {
             let countStart = ContinuousClock.now
-            let dueCount = try await store.dueCount(
+            let dueCount = try await library.dueCount(
                 scope: scope.filter,
                 asOf: sessionNow
             )
@@ -168,12 +169,12 @@ final class StudyModel {
             }
 
             let itemTypeStart = ContinuousClock.now
-            let itemTypes = try await store.loadItemTypes()
+            let itemTypes = try await library.loadItemTypes()
             timing.itemTypeCheckSeconds = itemTypeStart.elapsedSeconds
             guard startIsCurrent(generation) else { return }
 
             let headStart = ContinuousClock.now
-            let head = try await store.fetchDueCards(
+            let head = try await library.dueCards(
                 scope: scope.filter,
                 asOf: sessionNow,
                 limit: 1
@@ -213,7 +214,7 @@ final class StudyModel {
             }
 
             let remainingFetchStart = ContinuousClock.now
-            let completeQueue = try await store.fetchDueCards(
+            let completeQueue = try await library.dueCards(
                 scope: scope.filter,
                 asOf: sessionNow
             )
@@ -365,10 +366,11 @@ final class StudyModel {
         let now = Date.now
 
         do {
-            let submission = try await store.submitReviewWithReceipt(
+            let submission = try await library.submitReview(
                 cardID: card.id,
                 rating: rating,
-                now: now
+                asOf: now,
+                durationMilliseconds: 0
             )
             var repeatedCard = card
             repeatedCard.card.memory = submission.memory
@@ -409,7 +411,7 @@ final class StudyModel {
         defer { isGrading = false }
 
         do {
-            try await store.revertReview(reviewLogID: undo.reviewLogID)
+            try await library.revertReview(id: undo.reviewLogID, asOf: .now)
             if let requeuedCardID = undo.requeuedCardID {
                 repairQueue.removeAll { $0.card.id == requeuedCardID }
                 if let queuedRepeat = queue.indices.last(where: {
@@ -449,7 +451,7 @@ final class StudyModel {
         guard let itemID = currentCard?.item.id else { return }
 
         do {
-            guard let reloaded = try await store.fetchItem(id: itemID) else { return }
+            guard let reloaded = try await library.item(id: itemID) else { return }
             refreshQueuedCards(for: reloaded.item, itemType: reloaded.itemType)
             // An answer already on screen keeps its feedback: re-deriving the
             // interaction here would clear the message the learner is reading,
@@ -573,7 +575,7 @@ final class StudyModel {
         timing: inout StudyStartTiming
     ) async throws {
         let fetchStart = ContinuousClock.now
-        let completeQueue = try await store.fetchDueCards(
+        let completeQueue = try await library.dueCards(
             scope: scope.filter,
             asOf: now
         )

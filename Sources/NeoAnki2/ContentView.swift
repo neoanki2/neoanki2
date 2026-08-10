@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var isChoosingImportFile = false
     @State private var importNotice: ImportNotice?
     @State private var portableDeckTransfer: PortableDeckTransferModel
+    private let library: any LibraryRepository
     private let deckBuilderRegistry: DeckBuilderRegistry
 
     private var isAddingItem: Bool {
@@ -140,6 +141,7 @@ struct ContentView: View {
         decksModel: DecksModel,
         schedulingModel: SchedulingModel,
         vocabularyLibraryModel: VocabularyLibraryModel,
+        library: any LibraryRepository,
         deckBuilderRegistry: DeckBuilderRegistry,
         testingEnvironment: [String: String] = [:],
         testingInitialRoute: UITestRoute = .library
@@ -148,8 +150,9 @@ struct ContentView: View {
         self.decksModel = decksModel
         self.schedulingModel = schedulingModel
         self.vocabularyLibraryModel = vocabularyLibraryModel
+        self.library = library
         _portableDeckTransfer = State(
-            initialValue: PortableDeckTransferModel(store: itemsModel.store)
+            initialValue: PortableDeckTransferModel(library: library)
         )
         self.deckBuilderRegistry = deckBuilderRegistry
         self.testingEnvironment = testingEnvironment
@@ -161,14 +164,16 @@ struct ContentView: View {
         decksModel: DecksModel,
         schedulingModel: SchedulingModel,
         vocabularyLibraryModel: VocabularyLibraryModel,
+        library: any LibraryRepository,
         deckBuilderRegistry: DeckBuilderRegistry
     ) {
         self.itemsModel = itemsModel
         self.decksModel = decksModel
         self.schedulingModel = schedulingModel
         self.vocabularyLibraryModel = vocabularyLibraryModel
+        self.library = library
         _portableDeckTransfer = State(
-            initialValue: PortableDeckTransferModel(store: itemsModel.store)
+            initialValue: PortableDeckTransferModel(library: library)
         )
         self.deckBuilderRegistry = deckBuilderRegistry
     }
@@ -670,7 +675,7 @@ struct ContentView: View {
     }
 
     private func openImport() {
-        importModel = ImportModel(itemsModel: itemsModel)
+        importModel = ImportModel(itemsModel: itemsModel, library: library)
         isChoosingImportFile = true
     }
 
@@ -693,10 +698,9 @@ struct ContentView: View {
         guard let destinationDeckID = generated.destinationDeckID else {
             throw VocabularyDeckBuilderError.missingDestinationDeck
         }
-        let result = try await AuthoredDeck.importItems(
+        let result = try await library.importAuthoredItems(
             from: generated.bundleURL,
-            into: itemsModel.store,
-            deckID: destinationDeckID
+            into: destinationDeckID
         )
         let now = Date.now
         await decksModel.load(asOf: now)
@@ -717,7 +721,7 @@ struct ContentView: View {
         if let importPath = environment["NEOANKI_TEST_IMPORT_PATH"], !importPath.isEmpty {
             let source = URL(fileURLWithPath: importPath)
             guard let accessible = copyTestingTransferFile(source) else { return }
-            importModel = ImportModel(itemsModel: itemsModel)
+            importModel = ImportModel(itemsModel: itemsModel, library: library)
             guard let importModel, await importModel.selectFile(accessible) else { return }
             isShowingImport = true
             return
@@ -855,9 +859,9 @@ struct ContentView: View {
             if let destinationDeckID = generated.destinationDeckID,
                let importedRootID = imported.deckIDs.first {
                 do {
-                    var importedRoot = try await itemsModel.store.deck(id: importedRootID)
+                    var importedRoot = try await library.deck(id: importedRootID)
                     importedRoot.parentID = destinationDeckID
-                    try await itemsModel.store.updateDeck(importedRoot)
+                    _ = try await library.updateDeck(importedRoot)
                 } catch {
                     portableDeckTransfer.notice = PortableDeckTransferNotice(
                         title: "Deck Imported at Top Level",
@@ -961,7 +965,7 @@ struct ContentView: View {
         if decksModel.needsInitialLoad || itemsModel.needsInitialLoad {
             let scope = decksModel.studyScope
             do {
-                let snapshot = try await itemsModel.store.coldLibraryHomeSnapshot(
+                let snapshot = try await library.coldHomeSnapshot(
                     scope: scope.filter,
                     asOf: now
                 )
@@ -1026,7 +1030,7 @@ struct ContentView: View {
 
     private func startStudy() {
         studyScope = decksModel.studyScope
-        studyModel = StudyModel(store: itemsModel.store)
+        studyModel = StudyModel(library: library)
         isStudying = true
     }
 
@@ -1051,7 +1055,7 @@ struct ContentView: View {
 
     private func openTemplates() {
         if templatesModel == nil {
-            templatesModel = TemplatesModel(store: itemsModel.store)
+            templatesModel = TemplatesModel(library: library)
         }
         selectedItemID = nil
         isManagingTemplates = true
