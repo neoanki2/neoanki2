@@ -74,6 +74,7 @@ let package = Package(
         .target(
             name: "NeoAnkiAPI",
             dependencies: [
+                "NeoAnkiApplication",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 "NeoAnkiVocabularyKit",
             ],
@@ -131,6 +132,7 @@ let package = Package(
             name: "NeoAnki2Tests",
             dependencies: [
                 "NeoAnki2",
+                "NeoAnkiApplication",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
                 "NeoAnkiDeckBuilderKit",
@@ -144,6 +146,7 @@ let package = Package(
             name: "NeoAnkiAPITests",
             dependencies: [
                 "NeoAnkiAPI",
+                "NeoAnkiApplication",
                 "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),

@@ -1,8 +1,9 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 enum UITestScenarioSeeder {
-    static func seedIfRequested(store: ItemStore) async throws {
+    static func seedIfRequested(store: any LibraryScenarioSeeding) async throws {
         guard AppDatabase.isTesting,
               let scenario = ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"],
               !scenario.isEmpty
@@ -20,7 +21,7 @@ enum UITestScenarioSeeder {
     static func seed(
         scenario: String?,
         environment: [String: String],
-        store: ItemStore
+        store: any LibraryScenarioSeeding
     ) async throws {
         guard let scenario, !scenario.isEmpty else { return }
 
@@ -72,7 +73,7 @@ enum UITestScenarioSeeder {
         }
     }
 
-    private static func seedDeckIncludedItemTypes(store: ItemStore) async throws {
+    private static func seedDeckIncludedItemTypes(store: any LibraryScenarioSeeding) async throws {
         try await importIncludedDeck(
             deckName: "Poetry Lab",
             typeName: "Poem Line",
@@ -94,7 +95,7 @@ enum UITestScenarioSeeder {
         typeName: String,
         promptName: String,
         answerName: String,
-        store: ItemStore
+        store: any LibraryScenarioSeeding
     ) async throws {
         let workspace = FileManager.default.temporaryDirectory
             .appendingPathComponent("neoanki-ui-included-\(UUID().uuidString)", isDirectory: true)
@@ -118,12 +119,12 @@ enum UITestScenarioSeeder {
             encoding: .utf8
         )
         try Data().write(to: items.appendingPathComponent("items.jsonl"))
-        _ = try await AuthoredDeck.importDeck(from: bundle, into: store)
+        _ = try await store.importAuthoredDeck(from: bundle)
     }
 
     private static func seedTextInteraction(
         _ interaction: Interaction,
-        store: ItemStore,
+        store: any LibraryScenarioSeeding,
         answer: String
     ) async throws {
         let prompt = FieldDef(name: "Prompt", type: .text, isRequired: true)
@@ -156,7 +157,7 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedCloze(store: ItemStore) async throws {
+    private static func seedCloze(store: any LibraryScenarioSeeding) async throws {
         _ = try await store.createItem(
             Item(
                 itemTypeID: BuiltInItemTypes.clozeID,
@@ -177,7 +178,7 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedReverseStudy(store: ItemStore) async throws {
+    private static func seedReverseStudy(store: any LibraryScenarioSeeding) async throws {
         let front = FieldDef(name: "Front", type: .text, isRequired: true)
         let back = FieldDef(name: "Back", type: .text, isRequired: true)
         let forward = Template(
@@ -214,7 +215,7 @@ enum UITestScenarioSeeder {
     private static func seedBasicItem(
         front: String,
         back: String,
-        store: ItemStore
+        store: any LibraryScenarioSeeding
     ) async throws {
         _ = try await store.createItem(
             Item(
@@ -227,7 +228,7 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedLibraryBrowse(store: ItemStore) async throws {
+    private static func seedLibraryBrowse(store: any LibraryScenarioSeeding) async throws {
         let target = try await store.createDeck(Deck(name: "Target Deck"))
         let history = try await store.createDeck(Deck(name: "History"))
         let keep = try await store.createDeck(Deck(name: "Keep Deck"))
@@ -266,7 +267,7 @@ enum UITestScenarioSeeder {
         }
     }
 
-    private static func seedSchedulingHistory(store: ItemStore) async throws {
+    private static func seedSchedulingHistory(store: any LibraryScenarioSeeding) async throws {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         _ = try await store.createItem(
             Item(
@@ -276,16 +277,20 @@ enum UITestScenarioSeeder {
                     FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Seed")),
                 ]
             ),
-            now: start
+            asOf: start
         )
-        guard let card = try await store.fetchDueCards(asOf: start).first else { return }
+        guard let card = try await store.dueCards(
+            scope: .allDecks,
+            asOf: start,
+            limit: nil
+        ).first else { return }
         for index in 0..<130 {
             let rating: ReviewRating = index == 0 || index % 5 != 0 ? .good : .again
-            _ = try await store.submitReviewWithReceipt(
+            _ = try await store.submitReview(
                 cardID: card.id,
                 rating: rating,
-                now: start.addingTimeInterval(Double(index * 12) * 86_400),
-                durationMs: 1_000
+                asOf: start.addingTimeInterval(Double(index * 12) * 86_400),
+                durationMilliseconds: 1_000
             )
         }
         // The reviewed card is now scheduled years out. Two fresh cards let the
@@ -317,7 +322,7 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedImageMissingDescription(store: ItemStore) async throws {
+    private static func seedImageMissingDescription(store: any LibraryScenarioSeeding) async throws {
         let image = FieldDef(name: "Image", type: .image, isRequired: true)
         let caption = FieldDef(name: "Caption", type: .text, isRequired: true)
         let template = Template(
@@ -333,7 +338,7 @@ enum UITestScenarioSeeder {
             templates: [template]
         )
         _ = try await store.createItemType(itemType)
-        guard let mediaStore = await store.media,
+        guard let mediaStore = await store.mediaStore(),
               let bytes = Data(base64Encoded:
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
               )
@@ -352,7 +357,7 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedDeckWithDueItems(store: ItemStore) async throws {
+    private static func seedDeckWithDueItems(store: any LibraryScenarioSeeding) async throws {
         let deck = try await store.createDeck(Deck(name: "Due Deck"))
         for index in 1...3 {
             _ = try await store.createItem(
@@ -368,7 +373,7 @@ enum UITestScenarioSeeder {
         }
     }
 
-    private static func seedDeckScoping(store: ItemStore) async throws {
+    private static func seedDeckScoping(store: any LibraryScenarioSeeding) async throws {
         let deck = try await store.createDeck(Deck(name: "Scoped"))
         try await seedBasicItem(
             front: "Unassigned Item",
@@ -393,7 +398,7 @@ enum UITestScenarioSeeder {
         )
     }
 
-    private static func seedPortableExportSource(store: ItemStore) async throws {
+    private static func seedPortableExportSource(store: any LibraryScenarioSeeding) async throws {
         let deck = try await store.createDeck(Deck(name: "Export Deck"))
         _ = try await store.createItem(
             Item(
@@ -409,7 +414,7 @@ enum UITestScenarioSeeder {
 
     private static func seedTypeConflictLocal(
         environment: [String: String],
-        store: ItemStore
+        store: any LibraryScenarioSeeding
     ) async throws {
         guard let fixtureDirectory = environment["NEOANKI_TEST_FIXTURE_DIR"],
               !fixtureDirectory.isEmpty
@@ -419,7 +424,7 @@ enum UITestScenarioSeeder {
         let firstURL = URL(fileURLWithPath: fixtureDirectory, isDirectory: true)
             .appendingPathComponent("conflict-first.neodeck")
         guard FileManager.default.fileExists(atPath: firstURL.path) else { return }
-        _ = try await PortableDeck.importDeck(from: firstURL, into: store)
+        _ = try await store.importPortableDeck(from: firstURL, conflictResolution: .reject)
 
         let loaded = try await store.loadItemTypes()
         if let customType = loaded.itemTypes.first(where: { $0.name == "Portable Custom" }) {
@@ -429,7 +434,7 @@ enum UITestScenarioSeeder {
         }
     }
 
-    private static func seedCorruptedItemType(store: ItemStore) async throws {
+    private static func seedCorruptedItemType(store: any LibraryScenarioSeeding) async throws {
         let good = try ItemTypeBuilder.makeItemType(
             name: "Good",
             fields: [
@@ -455,13 +460,13 @@ enum UITestScenarioSeeder {
                 ]
             )
         )
-        try await store.testingCorruptItemTypeDefinition(id: damaged.id)
+        try await store.corruptItemTypeDefinitionForTesting(id: damaged.id)
         _ = try await store.loadItemTypes()
     }
 
     private static func seedImportWithMedia(
         environment: [String: String],
-        store: ItemStore
+        store: any LibraryScenarioSeeding
     ) async throws {
         guard let fixtureDirectory = environment["NEOANKI_TEST_FIXTURE_DIR"],
               !fixtureDirectory.isEmpty
@@ -477,7 +482,7 @@ enum UITestScenarioSeeder {
         try pngBytes.write(to: mediaDirectory.appendingPathComponent("cover.png"))
     }
 
-    private static func seedAlternateImportType(store: ItemStore) async throws {
+    private static func seedAlternateImportType(store: any LibraryScenarioSeeding) async throws {
         let front = FieldDef(name: "Front", type: .text, isRequired: true)
         let back = FieldDef(name: "Back", type: .text, isRequired: true)
         let template = Template(
@@ -491,7 +496,7 @@ enum UITestScenarioSeeder {
         _ = try await store.createItemType(itemType)
     }
 
-    private static func seedAuthoringFieldTypes(store: ItemStore) async throws {
+    private static func seedAuthoringFieldTypes(store: any LibraryScenarioSeeding) async throws {
         _ = try await store.createDeck(Deck(name: "Empty Deck"))
         try await createAuthoringItemType(
             name: "Numeric",
@@ -517,7 +522,7 @@ enum UITestScenarioSeeder {
         name: String,
         frontType: FieldType,
         backType: FieldType,
-        store: ItemStore
+        store: any LibraryScenarioSeeding
     ) async throws {
         let front = FieldDef(name: "Front", type: frontType, isRequired: true)
         let back = FieldDef(name: "Back", type: backType, isRequired: true)

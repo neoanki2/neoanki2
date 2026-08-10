@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 public enum APIFaultPoint: Sendable {
@@ -26,7 +27,7 @@ public actor NeoAnkiAPIService {
     public static let maximumJSONBodyBytes = 5_000_000
     public static let maximumStagedImportBytes = 4_000_000_000
 
-    private let store: ItemStore
+    private let store: any LocalAPILibrary
     private let authorization: APIAuthorizationStore
     private let pairingApprover: any APIPairingApprover
     private let applicationVersion: String
@@ -99,7 +100,7 @@ public actor NeoAnkiAPIService {
     }
 
     public init(
-        store: ItemStore,
+        library: any LocalAPILibrary,
         authorization: APIAuthorizationStore,
         pairingApprover: any APIPairingApprover = DenyAPIPairingApprover(),
         applicationVersion: String,
@@ -110,7 +111,7 @@ public actor NeoAnkiAPIService {
         transferJobLifetime: TimeInterval = 24 * 60 * 60,
         faultInjector: any APIFaultInjector = NoAPIFaultInjector()
     ) {
-        self.store = store
+        store = library
         self.authorization = authorization
         self.pairingApprover = pairingApprover
         self.applicationVersion = applicationVersion
@@ -127,7 +128,18 @@ public actor NeoAnkiAPIService {
     public func handle(_ request: APIRequest) async -> APIResponse {
         let serializedMutation = request.path != "/v1/pairings"
             && [.delete, .patch, .post, .put].contains(request.method)
-        if serializedMutation { await store.acquireExternalMutationSlot() }
+        if serializedMutation {
+            return await store.withAPIMutation { [self] in
+                await handle(request, serializedMutation: true)
+            }
+        }
+        return await handle(request, serializedMutation: false)
+    }
+
+    private func handle(
+        _ request: APIRequest,
+        serializedMutation: Bool
+    ) async -> APIResponse {
         let requestID = UUID().uuidString.lowercased()
         let cursorBefore = serializedMutation ? try? await store.currentChangeCursor() : nil
         let finalResponse: APIResponse
@@ -154,7 +166,6 @@ public actor NeoAnkiAPIService {
                 response, request: request, requestID: requestID
             )
         }
-        if serializedMutation { await store.releaseExternalMutationSlot() }
         return finalResponse
     }
 
@@ -1163,7 +1174,8 @@ public actor NeoAnkiAPIService {
         }
         try await store.commitDeckDeletion(
             id: plan.deckID,
-            policy: plan.representation.policy
+            policy: plan.representation.policy,
+            asOf: .now
         )
         let result = APIPlanCommitResult(
             planId: plan.representation.id,
@@ -1327,7 +1339,7 @@ public actor NeoAnkiAPIService {
         }
         try await validateRetainedCursor(after)
         let limit = try changeLimit(request.query)
-        let changes = try await store.libraryChanges(after: after, limit: limit)
+        let changes = try await store.changes(after: after, limit: limit)
         let data = changes.map(APIChange.init)
         let next = changes.count == limit ? changes.last.map { String($0.cursor) } : nil
         return try .json(
@@ -1352,7 +1364,7 @@ public actor NeoAnkiAPIService {
         }
         let after = headerCursor ?? queryCursor ?? 0
         try await validateRetainedCursor(after)
-        let changes = try await store.libraryChanges(after: after, limit: 1_000)
+        let changes = try await store.changes(after: after, limit: 1_000)
         var body = Data()
         if changes.isEmpty {
             body.append(Data(": keep-alive\n\n".utf8))
@@ -1560,7 +1572,7 @@ public actor NeoAnkiAPIService {
                 cardID: cardID,
                 rating: input.rating.domain,
                 reviewLogID: reviewLogID,
-                durationMs: input.durationMs
+                durationMilliseconds: input.durationMs
             )
             response = APIReviewResult(
                 reviewLogId: result.reviewLogID.uuidString.lowercased(),
@@ -1625,7 +1637,7 @@ public actor NeoAnkiAPIService {
         }
         let revision = try await revision(resourceType: "review", resourceID: id.uuidString)
         try requireIfMatch(request, revision: revision)
-        try await store.revertReview(reviewLogID: id)
+        try await store.revertReview(id: id, asOf: .now)
         return APIResponse(status: 204)
     }
 
@@ -1931,7 +1943,7 @@ public actor NeoAnkiAPIService {
         if let text = request.query["text"]?.first {
             let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !query.isEmpty {
-                let matchingIDs = Set(try await store.listItems().compactMap {
+                let matchingIDs = Set(try await store.items().compactMap {
                     ItemBrowsing.matches($0, query: query) ? $0.id : nil
                 })
                 records.removeAll { !matchingIDs.contains($0.id) }
@@ -2978,13 +2990,12 @@ public actor NeoAnkiAPIService {
                 try await withTransferValidationStore { validationStore in
                     let result: PortableDeckImportResult
                     if let deckID = job.destinationDeckID {
-                        result = try await AuthoredDeck.importItems(
-                            from: directory, into: validationStore, deckID: deckID
+                        result = try await validationStore.importAuthoredItems(
+                            from: directory,
+                            into: deckID
                         )
                     } else {
-                        result = try await AuthoredDeck.importDeck(
-                            from: directory, into: validationStore
-                        )
+                        result = try await validationStore.importAuthoredDeck(from: directory)
                     }
                     return transferReport(result)
                 }
@@ -2994,7 +3005,10 @@ public actor NeoAnkiAPIService {
                 source async throws in
                 try await withTransferValidationStore { validationStore in
                     transferReport(
-                        try await PortableDeck.importDeck(from: source, into: validationStore)
+                        try await validationStore.importPortableDeck(
+                            from: source,
+                            conflictResolution: .reject
+                        )
                     )
                 }
             }
@@ -3153,42 +3167,48 @@ public actor NeoAnkiAPIService {
         }
         switch job.format {
         case .json:
-            let count = try await store.importItems(
-                from: primary, adapter: JSONImportAdapter(), itemTypeID: job.itemTypeID
+            let imported = try await store.importJSONItems(
+                from: primary,
+                itemTypeID: job.itemTypeID,
+                context: ImportContext(),
+                asOf: .now
             )
             return .init(
-                itemCount: count, deckCount: 0, createdItemTypeCount: 0,
+                itemCount: imported.count, deckCount: 0, createdItemTypeCount: 0,
                 reusedItemTypeCount: 1, warnings: []
             )
         case .csv:
             guard let name = job.csvItemTypeName else {
                 throw APIServiceError.validation("csvItemTypeName is required for CSV imports.")
             }
-            let count = try await store.importItems(
+            let imported = try await store.importCSVItems(
                 from: primary,
-                adapter: CSVImportAdapter(itemTypeName: name),
-                itemTypeID: job.itemTypeID
+                itemTypeID: job.itemTypeID,
+                itemTypeName: name,
+                context: ImportContext(),
+                asOf: .now
             )
             return .init(
-                itemCount: count, deckCount: 0, createdItemTypeCount: 0,
+                itemCount: imported.count, deckCount: 0, createdItemTypeCount: 0,
                 reusedItemTypeCount: 1, warnings: []
             )
         case .authoredDeck:
             return try await withStagedImport(job) { directory async throws in
                 let result: PortableDeckImportResult
                 if let deckID = job.destinationDeckID {
-                    result = try await AuthoredDeck.importItems(
-                        from: directory, into: store, deckID: deckID
-                    )
+                    result = try await store.importAuthoredItems(from: directory, into: deckID)
                 } else {
-                    result = try await AuthoredDeck.importDeck(from: directory, into: store)
+                    result = try await store.importAuthoredDeck(from: directory)
                 }
                 return transferReport(result)
             }
         case .portableDeck:
             return try await withStagedImport(job, primaryExtension: "neodeck") {
                 source async throws in
-                transferReport(try await PortableDeck.importDeck(from: source, into: store))
+                transferReport(try await store.importPortableDeck(
+                    from: source,
+                    conflictResolution: .reject
+                ))
             }
         }
     }
@@ -3316,7 +3336,7 @@ public actor NeoAnkiAPIService {
             }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
             defer { try? FileManager.default.removeItem(at: directory) }
-            try await PortableDeck.export(deckID: job.deckID, from: store, to: destination)
+            try await store.exportPortableDeck(id: job.deckID, to: destination)
             job.bytes = try Data(contentsOf: destination)
             if faultInjector.simulatesProcessExit(at: .exportAfterOutputGenerated) {
                 throw SimulatedAPIProcessExit()
@@ -3438,7 +3458,7 @@ public actor NeoAnkiAPIService {
 
     private func ensureTransferStateLoaded() async throws {
         if !transferStateLoaded {
-            let stateURL = await store.localAPITransferStateURL()
+            let stateURL = await store.apiTransferStateURL()
             if FileManager.default.fileExists(atPath: stateURL.path) {
                 let data = try Data(contentsOf: stateURL, options: [.mappedIfSafe])
                 let decoded = try PropertyListDecoder().decode(TransferState.self, from: data)
@@ -3457,7 +3477,7 @@ public actor NeoAnkiAPIService {
     }
 
     private func persistTransferState() async throws {
-        let stateURL = await store.localAPITransferStateURL()
+        let stateURL = await store.apiTransferStateURL()
         let directory = stateURL.deletingLastPathComponent()
         let fileManager = FileManager.default
         try fileManager.createDirectory(
@@ -3478,21 +3498,10 @@ public actor NeoAnkiAPIService {
     }
 
     private func withTransferValidationStore<T: Sendable>(
-        _ operation: (ItemStore) async throws -> T
+        _ operation: (any LocalAPILibrary) async throws -> T
     ) async throws -> T {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neoanki-api-validation-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: false,
-            attributes: [.posixPermissions: 0o700]
-        )
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let databaseURL = directory.appendingPathComponent("library.sqlite")
-        try await store.createValidationDatabaseSnapshot(at: databaseURL)
-        let validationStore = try ItemStore(databaseURL: databaseURL, starterItemTypes: [])
-        try await validationStore.bootstrap()
-        return try await operation(validationStore)
+        let temporary = try await store.makeValidationLibrary()
+        return try await operation(temporary.library)
     }
 
     private func importRepresentation(_ job: ImportJobRecord) -> APIImportJob {
@@ -3783,7 +3792,7 @@ public actor NeoAnkiAPIService {
         let summaries = try await store.deckSummaries()
         let summariesByID = Dictionary(uniqueKeysWithValues: summaries.map { ($0.id, $0) })
         let directCounts = Dictionary(
-            grouping: try await store.listItems(),
+            grouping: try await store.items(),
             by: \.deckID
         ).mapValues(\.count)
         let children = Dictionary(grouping: decks, by: \.parentID)

@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiAPI
+import NeoAnkiApplication
 import NeoAnkiCore
 import Network
 import Observation
@@ -25,7 +26,7 @@ private struct AppPairingApprover: APIPairingApprover {
 @MainActor
 @Observable
 final class APIControlModel {
-    private let store: ItemStore
+    private let library: any LocalAPILibrary
     private let vocabularyRootURL: URL
     private let authorization: APIAuthorizationStore
     private var server: NeoAnkiLocalAPIServer?
@@ -39,8 +40,8 @@ final class APIControlModel {
     private(set) var clients: [APIClientGrant] = []
     var pendingPairing: APIPairingPrompt?
 
-    init(store: ItemStore, vocabularyRootURL: URL) {
-        self.store = store
+    init(library: any LocalAPILibrary, vocabularyRootURL: URL) {
+        self.library = library
         self.vocabularyRootURL = vocabularyRootURL
         authorization = APIAuthorizationStore(
             persistence: VerifierFileAPICredentialPersistence(
@@ -119,7 +120,7 @@ final class APIControlModel {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
             as? String ?? "development"
         let service = NeoAnkiAPIService(
-            store: store,
+            library: library,
             authorization: authorization,
             pairingApprover: approver,
             applicationVersion: version,

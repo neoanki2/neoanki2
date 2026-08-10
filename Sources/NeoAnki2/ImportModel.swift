@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 @MainActor
@@ -121,15 +122,18 @@ final class ImportModel {
     var selectedItemTypeID: ItemType.ID?
 
     private let itemsModel: ItemsModel
+    private let library: any LibraryImporting
     private let scopedAccess: any SecurityScopedResourceAccessing
     private let fileInspector: any ImportFileInspecting
 
     init(
         itemsModel: ItemsModel,
+        library: any LibraryImporting,
         scopedAccess: any SecurityScopedResourceAccessing = SystemSecurityScopedResourceAccess(),
         fileInspector: any ImportFileInspecting = SystemImportFileInspector()
     ) {
         self.itemsModel = itemsModel
+        self.library = library
         self.scopedAccess = scopedAccess
         self.fileInspector = fileInspector
     }
@@ -253,21 +257,23 @@ final class ImportModel {
             let imported: [SavedItemSummary]
             switch format {
             case .json:
-                imported = try await itemsModel.store.importItemSummaries(
+                imported = try await library.importJSONItems(
                     from: data,
-                    adapter: JSONImportAdapter(),
-                    context: ImportContext(baseDirectory: mediaDirectory ?? selectedURL.deletingLastPathComponent())
+                    itemTypeID: nil,
+                    context: ImportContext(baseDirectory: mediaDirectory ?? selectedURL.deletingLastPathComponent()),
+                    asOf: .now
                 )
             case .csv:
                 guard let itemType = itemsModel.itemTypes.first(where: { $0.id == selectedItemTypeID }) else {
                     errorMessage = "Choose an item type for this CSV file."
                     return false
                 }
-                imported = try await itemsModel.store.importItemSummaries(
+                imported = try await library.importCSVItems(
                     from: data,
-                    adapter: CSVImportAdapter(itemTypeName: itemType.name),
                     itemTypeID: itemType.id,
-                    context: ImportContext(baseDirectory: selectedURL.deletingLastPathComponent())
+                    itemTypeName: itemType.name,
+                    context: ImportContext(baseDirectory: selectedURL.deletingLastPathComponent()),
+                    asOf: .now
                 )
             }
 

@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 private enum ItemEditingError: Error {
@@ -109,11 +110,14 @@ final class ItemsModel {
         await searchTask?.value
     }
 
-    let store: ItemStore
+    let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
     let mediaStore: MediaStore?
 
-    init(store: ItemStore, mediaStore: MediaStore?) {
-        self.store = store
+    init(
+        library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging,
+        mediaStore: MediaStore?
+    ) {
+        self.library = library
         self.mediaStore = mediaStore
     }
 
@@ -150,10 +154,10 @@ final class ItemsModel {
             // Everything is read before anything is published, so a reload never
             // shows this scope's items beside another scope's counts.
             if !itemTypesLoaded {
-                applyItemTypes(try await store.loadItemTypes())
+                applyItemTypes(try await library.loadItemTypes())
             }
-            let loadedItems = try await store.listItems(scope: scope.filter, sort: .createdAscending)
-            let summary = try await store.scopeSummary(scope: scope.filter, asOf: now)
+            let loadedItems = try await library.items(scope: scope.filter, sort: .createdAscending)
+            let summary = try await library.scopeSummary(scope: scope.filter, asOf: now)
 
             items = loadedItems.sorted(using: tableSort)
             scopeSummary = summary
@@ -175,9 +179,9 @@ final class ItemsModel {
         updateCachedScope(scope)
         do {
             if !itemTypesLoaded {
-                applyItemTypes(try await store.loadItemTypes())
+                applyItemTypes(try await library.loadItemTypes())
             }
-            scopeSummary = try await store.scopeSummary(scope: scope.filter, asOf: now)
+            scopeSummary = try await library.scopeSummary(scope: scope.filter, asOf: now)
             hasLoaded = true
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -272,7 +276,7 @@ final class ItemsModel {
             break
         }
         do {
-            scopeSummary = try await store.scopeSummary(
+            scopeSummary = try await library.scopeSummary(
                 scope: currentScopeFilter(),
                 asOf: now
             )
@@ -299,11 +303,11 @@ final class ItemsModel {
     func configureAddItem(for deckID: UUID?, resolveSelection: Bool = true) async {
         errorMessage = nil
         do {
-            let catalog = try await store.loadItemTypeCatalog()
+            let catalog = try await library.loadItemTypeCatalog()
             itemTypes = catalog.allItemTypes
             normalItemTypes = catalog.itemTypes
             effectiveItemTypePolicy = if let deckID {
-                try await store.effectiveItemTypePolicy(for: deckID)
+                try await library.effectiveItemTypePolicy(for: deckID)
             } else {
                 nil
             }
@@ -345,10 +349,10 @@ final class ItemsModel {
             )
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
-            let saved = try await store.createItem(item)
+            let saved = try await library.createItem(item)
             items.append(saved)
             items.sort(using: tableSort)
-            scopeSummary = try await store.scopeSummary(scope: currentScopeFilter())
+            scopeSummary = try await library.scopeSummary(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -373,7 +377,7 @@ final class ItemsModel {
         errorMessage = nil
 
         do {
-            guard let stored = try await store.fetchItem(id: id) else {
+            guard let stored = try await library.item(id: id) else {
                 throw ItemEditingError.missingItem
             }
 
@@ -394,11 +398,11 @@ final class ItemsModel {
                 tags: stored.item.tags,
                 deckID: stored.item.deckID
             )
-            let saved = try await store.updateItem(item)
+            let saved = try await library.updateItem(item)
             if let index = items.firstIndex(where: { $0.id == saved.id }) {
                 items[index] = saved
             }
-            scopeSummary = try await store.scopeSummary(scope: currentScopeFilter())
+            scopeSummary = try await library.scopeSummary(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -492,9 +496,9 @@ final class ItemsModel {
     func deleteItem(id: UUID, scope: StudyScope = .allDecks) async -> Bool {
         errorMessage = nil
         do {
-            guard try await store.deleteItem(id: id) else { return false }
+            guard try await library.deleteItem(id: id) else { return false }
             items.removeAll { $0.id == id }
-            scopeSummary = try await store.scopeSummary(scope: scope.filter)
+            scopeSummary = try await library.scopeSummary(scope: scope.filter)
             return true
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -505,9 +509,9 @@ final class ItemsModel {
     func deleteAllUnassigned(scope: StudyScope = .unassigned) async -> Int {
         errorMessage = nil
         do {
-            let deleted = try await store.deleteAllUnassignedItems()
+            let deleted = try await library.deleteAllUnassignedItems()
             items.removeAll()
-            scopeSummary = try await store.scopeSummary(scope: scope.filter)
+            scopeSummary = try await library.scopeSummary(scope: scope.filter)
             return deleted
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -523,7 +527,7 @@ final class ItemsModel {
     ) async -> Bool {
         errorMessage = nil
         do {
-            guard try await store.updateItemDeck(itemID: id, deckID: deckID) else { return false }
+            guard try await library.moveItem(id: id, to: deckID) else { return false }
             await load(scope: scope, asOf: now)
             return true
         } catch {
@@ -546,7 +550,7 @@ final class ItemsModel {
         var moved = 0
         do {
             for id in orderedSelection(ids) {
-                if try await store.updateItemDeck(itemID: id, deckID: deckID) {
+                if try await library.moveItem(id: id, to: deckID) {
                     moved += 1
                 }
             }
@@ -567,7 +571,7 @@ final class ItemsModel {
         var deleted = 0
         do {
             for id in orderedSelection(ids) {
-                if try await store.deleteItem(id: id) {
+                if try await library.deleteItem(id: id) {
                     deleted += 1
                 }
             }
@@ -606,7 +610,7 @@ final class ItemsModel {
     /// so this is the path that keeps the headline honest between reloads.
     func refreshCounts(asOf now: Date = .now) async {
         guard hasLoaded,
-              let summary = try? await store.scopeSummary(
+              let summary = try? await library.scopeSummary(
                   scope: currentScopeFilter(),
                   asOf: now
               )
@@ -621,7 +625,7 @@ final class ItemsModel {
     /// whole list. Used after study when titles and membership are unchanged.
     func refreshSchedules(for itemIDs: Set<UUID>, asOf now: Date = .now) async {
         guard hasLoaded, !itemIDs.isEmpty else { return }
-        guard let schedules = try? await store.fetchItemBrowseSchedules(itemIDs: Array(itemIDs)) else {
+        guard let schedules = try? await library.itemBrowseSchedules(itemIDs: Array(itemIDs)) else {
             return
         }
 

@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 struct FieldDraft: Identifiable, Equatable {
@@ -316,10 +317,10 @@ final class TemplatesModel {
 
     var selectedItemTypeID: ItemType.ID?
 
-    let store: ItemStore
+    let library: any LibraryBrowsing & LibraryItemTypeManaging
 
-    init(store: ItemStore) {
-        self.store = store
+    init(library: any LibraryBrowsing & LibraryItemTypeManaging) {
+        self.library = library
     }
 
     var selectedItemType: ItemType? {
@@ -345,7 +346,7 @@ final class TemplatesModel {
         isLoading = true
         errorMessage = nil
         do {
-            let catalog = try await store.loadItemTypeCatalog()
+            let catalog = try await library.loadItemTypeCatalog()
             itemTypes = catalog.itemTypes
             includedItemTypeGroups = catalog.includedWithDecks
             corruptedDefinitions = catalog.corruptions
@@ -372,7 +373,7 @@ final class TemplatesModel {
             return false
         }
         do {
-            _ = try await store.repairItemTypeDefinition(id: id)
+            _ = try await library.repairItemTypeDefinition(id: id)
             await load()
             return !corruptedDefinitions.contains(where: { $0.persistedID == corruption.persistedID })
         } catch {
@@ -393,7 +394,7 @@ final class TemplatesModel {
                 name: draft.name,
                 fields: draft.fieldDefs()
             )
-            let created = try await store.createItemType(itemType)
+            let created = try await library.createItemType(itemType)
             itemTypes.append(created)
             itemTypes.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             selectedItemTypeID = created.id
@@ -428,7 +429,7 @@ final class TemplatesModel {
                 name: draft.name,
                 fields: draft.fieldDefs()
             )
-            let saved = try await store.updateItemType(updated)
+            let saved = try await library.updateItemType(updated)
             if let index = itemTypes.firstIndex(where: { $0.id == saved.id }) {
                 itemTypes[index] = saved
             }
@@ -455,7 +456,7 @@ final class TemplatesModel {
         }
 
         do {
-            guard try await store.deleteItemType(id: itemType.id) else { return false }
+            guard try await library.deleteItemType(id: itemType.id) else { return false }
             itemTypes.removeAll { $0.id == itemType.id }
             selectedItemTypeID = itemTypes.first?.id
             return true
@@ -469,7 +470,7 @@ final class TemplatesModel {
     }
 
     func itemCount(for itemTypeID: UUID) async -> Int {
-        (try? await store.countItems(itemTypeID: itemTypeID)) ?? 0
+        (try? await library.countItems(itemTypeID: itemTypeID)) ?? 0
     }
 
     func canDeleteSelectedItemType() async -> Bool {
@@ -485,7 +486,7 @@ final class TemplatesModel {
             return false
         }
         do {
-            let created = try await store.duplicateItemType(id: selectedItemType.id, name: name)
+            let created = try await library.duplicateItemType(id: selectedItemType.id, name: name)
             itemTypes.append(created)
             itemTypes.sort {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
@@ -526,7 +527,7 @@ final class TemplatesModel {
                 itemType.templates.append(template)
             }
 
-            let updated = try await store.updateItemType(itemType)
+            let updated = try await library.updateItemType(itemType)
             if let index = itemTypes.firstIndex(where: { $0.id == updated.id }) {
                 itemTypes[index] = updated
             }
@@ -562,7 +563,7 @@ final class TemplatesModel {
 
         do {
             itemType.templates.removeAll { $0.id == id }
-            let updated = try await store.updateItemType(itemType)
+            let updated = try await library.updateItemType(itemType)
             if let index = itemTypes.firstIndex(where: { $0.id == updated.id }) {
                 itemTypes[index] = updated
             }

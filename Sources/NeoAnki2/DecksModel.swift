@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 /// Identifies a sidebar row in the deck navigator.
@@ -43,10 +44,10 @@ final class DecksModel {
 
     var selectedScope: SidebarSelection = .allDecks
 
-    let store: ItemStore
+    let library: any LibraryBrowsing & LibraryDeckManaging
 
-    init(store: ItemStore) {
-        self.store = store
+    init(library: any LibraryBrowsing & LibraryDeckManaging) {
+        self.library = library
     }
 
     var studyScope: StudyScope {
@@ -148,12 +149,12 @@ final class DecksModel {
     /// half-updated set, and assigns only what changed, so an unchanged library
     /// costs no view updates.
     private func applyCounts(asOf now: Date) async throws {
-        let loadedSummaries = try await store.deckSummaries(asOf: now)
-        let allDecksSummary = try await store.scopeSummary(
+        let loadedSummaries = try await library.deckSummaries(asOf: now)
+        let allDecksSummary = try await library.scopeSummary(
             scope: .allDecks,
             asOf: now
         )
-        let unassignedSummary = try await store.scopeSummary(
+        let unassignedSummary = try await library.scopeSummary(
             scope: .unassigned,
             asOf: now
         )
@@ -192,7 +193,7 @@ final class DecksModel {
         do {
             if let parentID {
                 do {
-                    _ = try await store.deck(id: parentID)
+                    _ = try await library.deck(id: parentID)
                 } catch {
                     errorMessage = "Parent deck could not be found."
                     return nil
@@ -200,7 +201,7 @@ final class DecksModel {
             }
 
             let deck = Deck(name: trimmed, parentID: parentID)
-            let created = try await store.createDeck(deck)
+            let created = try await library.createDeck(deck)
             await load()
             selectedScope = .deck(created.id)
             return created
@@ -219,9 +220,9 @@ final class DecksModel {
         }
 
         do {
-            var deck = try await store.deck(id: id)
+            var deck = try await library.deck(id: id)
             deck.name = trimmed
-            _ = try await store.updateDeck(deck)
+            _ = try await library.updateDeck(deck)
             await load()
             return true
         } catch {
@@ -238,9 +239,9 @@ final class DecksModel {
         }
 
         do {
-            var deck = try await store.deck(id: id)
+            var deck = try await library.deck(id: id)
             deck.newCardsPerDay = limit
-            _ = try await store.updateDeck(deck)
+            _ = try await library.updateDeck(deck)
             // The tree is unchanged; only the limit and the due counts it gates
             // moved, so there is nothing here worth a reload.
             await refreshCounts()
@@ -254,7 +255,7 @@ final class DecksModel {
     func deleteDeck(id: UUID) async -> Bool {
         errorMessage = nil
         do {
-            guard try await store.deleteDeck(id: id) else { return false }
+            guard try await library.deleteDeck(id: id) else { return false }
             if case let .deck(selectedID) = selectedScope {
                 let deletedIDs = DeckTree.descendantIDs(of: id, in: summaries)
                 if deletedIDs.contains(selectedID) {
@@ -272,7 +273,7 @@ final class DecksModel {
     func resetProgress(id: UUID, now: Date = .now) async -> Int? {
         errorMessage = nil
         do {
-            let resetCount = try await store.resetDeckProgress(id: id, now: now)
+            let resetCount = try await library.resetDeckProgress(id: id, asOf: now)
             await refreshCounts(asOf: now)
             return resetCount
         } catch {
