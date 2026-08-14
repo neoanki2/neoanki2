@@ -419,7 +419,7 @@ final class TemplatesModel {
     func updateItemType(_ draft: ItemTypeDraft, editingID: UUID) async -> Bool {
         errorMessage = nil
         guard !isSelectedItemTypeReadOnly else {
-            errorMessage = "Item types included with decks are read-only. Duplicate this definition to edit it."
+            errorMessage = "Deck-provided item types are read-only. Duplicate this definition to edit it."
             return false
         }
         guard draft.isValid else {
@@ -455,7 +455,7 @@ final class TemplatesModel {
     func deleteSelectedItemType() async -> Bool {
         errorMessage = nil
         guard !isSelectedItemTypeReadOnly else {
-            errorMessage = "Item types included with decks can’t be deleted here."
+            errorMessage = "Deck-provided item types can’t be deleted here."
             return false
         }
         guard let itemType = selectedItemType else {
@@ -490,7 +490,7 @@ final class TemplatesModel {
     func duplicateSelectedItemType(name: String) async -> Bool {
         errorMessage = nil
         guard isSelectedItemTypeReadOnly, let selectedItemType else {
-            errorMessage = "Select an item type included with a deck."
+            errorMessage = "Select an item type provided by a deck."
             return false
         }
         do {
@@ -513,7 +513,7 @@ final class TemplatesModel {
     func saveTemplate(_ draft: TemplateDraft, editingID: UUID?) async -> Bool {
         errorMessage = nil
         guard !isSelectedItemTypeReadOnly else {
-            errorMessage = "Item types included with decks are read-only."
+            errorMessage = "Deck-provided item types are read-only."
             return false
         }
         guard var itemType = selectedItemType else {
@@ -552,7 +552,7 @@ final class TemplatesModel {
     func deleteTemplate(id: UUID) async -> Bool {
         errorMessage = nil
         guard !isSelectedItemTypeReadOnly else {
-            errorMessage = "Item types included with decks are read-only."
+            errorMessage = "Deck-provided item types are read-only."
             return false
         }
         guard var itemType = selectedItemType else {

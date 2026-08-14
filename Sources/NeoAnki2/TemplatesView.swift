@@ -12,7 +12,7 @@ struct TemplatesView: View {
     @State private var showDeleteItemTypeConfirm = false
     @State private var canDeleteSelectedItemType = false
     @State private var definitionToRepair: QuarantinedItemTypeDefinition?
-    @State private var isIncludedWithDecksExpanded = false
+    @State private var expandedIncludedGroupIDs: Set<UUID> = []
     @State private var showDuplicatePrompt = false
     @State private var duplicateName = ""
 
@@ -35,10 +35,13 @@ struct TemplatesView: View {
         .task {
             await model.load()
         }
-        .onChange(of: model.selectedItemTypeID) { _, _ in
+        .onChange(of: model.selectedItemTypeID, initial: true) { _, _ in
             editingItemType = nil
             editingTemplate = nil
             isAddingTemplate = false
+            if let group = model.selectedIncludedGroup {
+                expandedIncludedGroupIDs.insert(group.id)
+            }
             Task { await refreshDeleteAvailability() }
         }
         .confirmationDialog(
@@ -152,35 +155,31 @@ struct TemplatesView: View {
                     )
                 } else {
                     List(selection: $model.selectedItemTypeID) {
-                        ForEach(model.itemTypes) { itemType in
-                            itemTypeRow(itemType, readOnly: false)
-                                .tag(itemType.id)
+                        Section {
+                            ForEach(model.itemTypes) { itemType in
+                                itemTypeRow(itemType, readOnly: false)
+                                    .tag(itemType.id)
+                            }
                         }
 
                         if !model.includedItemTypeGroups.isEmpty {
-                            DisclosureGroup(
-                                isExpanded: $isIncludedWithDecksExpanded
-                            ) {
+                            Section("From Decks") {
                                 ForEach(model.includedItemTypeGroups) { group in
-                                    Section(group.deckPath) {
+                                    DisclosureGroup(
+                                        isExpanded: includedGroupExpansion(group.id)
+                                    ) {
                                         ForEach(group.itemTypes) { itemType in
                                             itemTypeRow(itemType, readOnly: true)
                                                 .tag(itemType.id)
                                         }
+                                    } label: {
+                                        includedGroupLabel(group)
                                     }
                                 }
-                            } label: {
-                                Label("Included with Decks", systemImage: "shippingbox")
-                                    .font(DesignSystem.Typography.uiTitle)
-                                    .accessibilityLabel("Included with Decks")
-                                    .accessibilityHint(
-                                        "Shows read-only item types provided by imported decks."
-                                    )
-                                    .accessibilityIdentifier("includedWithDecksDisclosure")
                             }
                         }
                     }
-                    .listStyle(.plain)
+                    .listStyle(.sidebar)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -189,14 +188,27 @@ struct TemplatesView: View {
     }
 
     private func itemTypeRow(_ itemType: ItemType, readOnly: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-            Text(itemType.name)
-                .font(DesignSystem.Typography.uiTitle)
-            Text("\(itemType.templates.count) templates · \(itemType.fields.count) fields")
-                .font(DesignSystem.Typography.uiCaption)
-                .foregroundStyle(.tertiary)
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                Text(itemType.name)
+                    .font(DesignSystem.Typography.uiRowTitle)
+                    .lineLimit(1)
+                Text(itemTypeSummary(itemType))
+                    .font(DesignSystem.Typography.uiRowMeta)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: DesignSystem.Spacing.xs)
+
+            if readOnly {
+                Image(systemName: "lock")
+                    .font(DesignSystem.Typography.uiRowMeta)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DesignSystem.Spacing.rowTight)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(itemType.name), \(itemType.templates.count) templates, \(itemType.fields.count) fields"
@@ -205,6 +217,54 @@ struct TemplatesView: View {
         .accessibilityIdentifier(
             readOnly ? "includedItemTypeRow-\(itemType.name)" : "itemTypeRow-\(itemType.name)"
         )
+    }
+
+    private func itemTypeSummary(_ itemType: ItemType) -> String {
+        let templateNoun = itemType.templates.count == 1 ? "template" : "templates"
+        let fieldNoun = itemType.fields.count == 1 ? "field" : "fields"
+        return "\(itemType.templates.count) \(templateNoun) · \(itemType.fields.count) \(fieldNoun)"
+    }
+
+    private func includedGroupExpansion(_ id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { expandedIncludedGroupIDs.contains(id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedIncludedGroupIDs.insert(id)
+                } else {
+                    expandedIncludedGroupIDs.remove(id)
+                }
+            }
+        )
+    }
+
+    private func includedGroupLabel(_ group: IncludedItemTypeGroup) -> some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: "folder")
+                .imageScale(.medium)
+                .accessibilityHidden(true)
+
+            Text(group.deckPath)
+                .font(DesignSystem.Typography.sidebarRowTitle)
+                .lineLimit(1)
+
+            Spacer(minLength: DesignSystem.Spacing.xs)
+
+            Text(includedTypeCount(group.itemTypes.count))
+                .font(DesignSystem.Typography.sidebarRowMeta)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(group.deckPath), \(includedTypeCount(group.itemTypes.count))")
+        .accessibilityHint("Shows read-only item types provided by this deck")
+        .accessibilityIdentifier("includedDeckGroup-\(group.rootDeck.id.uuidString)")
+    }
+
+    private func includedTypeCount(_ count: Int) -> String {
+        count == 1 ? "1 type" : "\(count) types"
     }
 
     @ViewBuilder
@@ -273,7 +333,7 @@ struct TemplatesView: View {
                         .font(DesignSystem.Typography.uiSection)
                         .accessibilityIdentifier("templatesDetailTitle-\(itemType.name)")
                     if let group = model.selectedIncludedGroup {
-                        Text("Included with \(group.deckPath) · Read-only")
+                        Text("From \(group.deckPath) · Read-only")
                             .font(DesignSystem.Typography.uiCaption)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("includedItemTypeOwner")
@@ -379,7 +439,7 @@ struct TemplatesView: View {
                 } description: {
                     Text(
                         readOnly
-                            ? "This included definition has no templates."
+                            ? "This deck-provided definition has no templates."
                             : "Add a template to generate study cards from items."
                     )
                 } actions: {
