@@ -49,7 +49,9 @@ public enum SyncMergePolicy {
                         originalResourceID: local.id,
                         sourceDeviceID: local.deviceID,
                         payload: local.payload,
-                        preservedAt: preservedAt
+                        preservedAt: preservedAt,
+                        wasTombstone: local.isTombstone,
+                        acceptedWasTombstone: server.isTombstone
                     ))
                 }
             case let (local?, nil): acceptedByKey[key] = local
@@ -66,7 +68,7 @@ public enum SyncMergePolicy {
     }
 
     private static func immutableKey(_ value: SyncRecordEnvelope) -> String {
-        "\(value.resourceKind):\(value.id):\(value.deviceID):\(value.order)"
+        "\(value.resourceKind):\(value.id)"
     }
 
     private static func mutableKey(_ value: SyncRecordEnvelope) -> String {

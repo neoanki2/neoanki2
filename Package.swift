@@ -9,6 +9,8 @@ let package = Package(
     ],
     products: [
         .executable(name: "NeoAnki2", targets: ["NeoAnki2"]),
+        .library(name: "NeoAnkiFeatures", targets: ["NeoAnkiFeatures"]),
+        .library(name: "NeoAnkiMobile", targets: ["NeoAnkiMobile"]),
         .library(name: "NeoAnkiAPI", targets: ["NeoAnkiAPI"]),
         .library(name: "NeoAnkiApplication", targets: ["NeoAnkiApplication"]),
         .library(name: "NeoAnkiSharedUI", targets: ["NeoAnkiSharedUI"]),
@@ -25,12 +27,36 @@ let package = Package(
         .package(path: "NeoAnkiCore"),
     ],
     targets: [
+        .target(
+            name: "NeoAnkiFeatures",
+            dependencies: [
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+                "NeoAnkiApplication",
+            ],
+            path: "Sources/NeoAnkiFeatures"
+        ),
+        .target(
+            name: "NeoAnkiMobile",
+            dependencies: [
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+                "NeoAnkiApplication",
+                "NeoAnkiFeatures",
+                "NeoAnkiSharedUI",
+                "NeoAnkiDeckBuilderKit",
+                "NeoAnkiVocabularyKit",
+                "PoemDeckBuilder",
+                "VocabularyDeckBuilder",
+            ],
+            path: "Sources/NeoAnkiIOS"
+        ),
         .executableTarget(
             name: "NeoAnki2",
             dependencies: [
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 "NeoAnkiApplication",
+                "NeoAnkiFeatures",
                 "NeoAnkiSharedUI",
+                "NeoAnkiCloudSync",
                 "NeoAnkiAPI",
                 "NeoAnkiDeckBuilderKit",
                 "NeoAnkiVocabularyKit",
@@ -117,6 +143,16 @@ let package = Package(
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
             path: "Sources/VocabularyDeckBuilder"
+        ),
+        .testTarget(
+            name: "NeoAnkiFeaturesTests",
+            dependencies: [
+                "NeoAnkiFeatures",
+                "NeoAnkiApplication",
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+                .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
+            ],
+            path: "Tests/NeoAnkiFeaturesTests"
         ),
         .testTarget(
             name: "NeoAnkiApplicationTests",

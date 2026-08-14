@@ -561,6 +561,31 @@ import Testing
     #expect(try integer("SELECT version FROM schema_version;", at: url) == newerVersion)
 }
 
+@Test func versionTwentyTwoMigratesPersistentStudyResponses() async throws {
+    let url = migrationDatabaseURL()
+    do {
+        let current = try SQLiteDatabase(path: url)
+        try await current.migrate()
+    }
+    try executeMigrationSQL(
+        """
+        DROP TABLE study_responses;
+        DROP TABLE study_response_media_privacy;
+        UPDATE schema_version SET version = 22;
+        PRAGMA user_version = 22;
+        """,
+        at: url
+    )
+
+    let migrated = try SQLiteDatabase(path: url)
+    try await migrated.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == 23)
+    #expect(try tableExists("study_responses", at: url))
+    #expect(try tableExists("study_response_media_privacy", at: url))
+    #expect(try indexExists("idx_study_responses_submitted", at: url))
+}
+
 @Test func corruptSchemaVersionReadDoesNotRecreateDatabase() async throws {
     let url = migrationDatabaseURL()
     try executeMigrationSQL(

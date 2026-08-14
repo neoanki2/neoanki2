@@ -62,6 +62,28 @@ swift run neoanki-vocab validate \
   --pack .local/vocab-packs/Kaikki-Ukrainian.neovocab
 ```
 
+## Build the supplemental Ukrainian source stack
+
+The locked StarDict bundle can also produce two compact local packs: exact
+Ukrainian SUM-11 definitions/stressed headwords and Russian headwords indexed by
+their exact Ukrainian translation spans. The same build creates an
+automation-owned read-only cache for the full stress/heteronym dictionaries and
+UberText frequency data:
+
+```sh
+Tools/VocabularySources/build-ukrainian-offline-packs.sh
+```
+
+The StarDict adapter deliberately keeps short source spans instead of copying
+whole articles into every pack entry. Entry provenance stores the exact
+StarDict byte offset and length; the pack manifest stores the locked source URL,
+terms, and database digest. Russian lookup results are candidates, not automatic
+sense decisions: a consumer must defer multiple plausible headwords.
+
+The stress/frequency cache is not a NeoAnki library database and must never be
+placed inside NeoAnki's managed pack directory. It is a reproducible local index
+of the locked source snapshot.
+
 Kaikki's Ukrainian extract comes from English Wiktionary, so its glosses are
 English. The normalizer preserves this as definition language `en`; it does not
 pretend they are Ukrainian definitions. Tatoeba enrichment is token-based rather

@@ -58,6 +58,7 @@ xcodebuild build-for-testing \
   -testPlan "$TEST_PLAN" \
   -destination 'platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_ROOT" \
+  SYMROOT="$DERIVED_DATA_ROOT/Build/Products" \
   CODE_SIGN_IDENTITY=- \
   CODE_SIGNING_ALLOWED=YES \
   CODE_SIGNING_REQUIRED=YES
@@ -140,6 +141,7 @@ TEST_COMMAND=(
   -xctestrun "$XCTESTRUN"
   -destination 'platform=macOS'
   -derivedDataPath "$DERIVED_DATA_ROOT"
+  "SYMROOT=$DERIVED_DATA_ROOT/Build/Products"
   -resultBundlePath "$RESULT_BUNDLE"
   -parallel-testing-enabled NO
 )

@@ -224,9 +224,12 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
 
         let template = try draft.template(id: UUID(), in: itemType)
         #expect(template.interaction == interaction)
-        #expect(template.skill == Skill(input: .diagram, output: .spatial, operation: .apply))
+        let expectedSkill = interaction == .audioSubmission
+            ? Skill(input: .diagram, output: .audio, operation: .apply)
+            : Skill(input: .diagram, output: .spatial, operation: .apply)
+        #expect(template.skill == expectedSkill)
         #expect(template.prompt.slots.count == 2)
-        #expect(template.answer.slots.count == 2)
+        #expect(template.answer.slots.count == (interaction == .audioSubmission ? 0 : 2))
         #expect(template.prompt.slots[0].source == .literal("Study:"))
         #expect(
             template.prompt.slots[1].presentation.media

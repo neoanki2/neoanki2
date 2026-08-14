@@ -217,6 +217,7 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SYMROOT = "$(SRCROOT)/../.build/xcode-products/$(PROJECT_NAME)";
 			};
 			name = Debug;
 		};
@@ -230,6 +231,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "$(SRCROOT)/../.build/xcode-products/$(PROJECT_NAME)";
 			};
 			name = Release;
 		};

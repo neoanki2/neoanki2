@@ -782,6 +782,7 @@ struct DuplicateItemTypeInput: Decodable {
 public struct APIImpactSummary: Codable, Sendable, Equatable {
     public let affectedItemCount: Int
     public let affectedCardCount: Int
+    public let affectedStudyResponseCount: Int
 }
 
 public struct APIItemTypePolicy: Codable, Sendable, Equatable {
@@ -847,6 +848,36 @@ public struct APIChange: Codable, Sendable, Equatable, Identifiable {
         revision = change.revision
         tombstone = change.isTombstone
         occurredAt = change.occurredAt
+    }
+}
+
+public struct APIStudyResponse: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let revision: Int
+    public let cardId: String
+    public let itemId: String
+    public let assetHash: String
+    public let contentType: String
+    public let fileExtension: String
+    public let byteSize: Int
+    public let durationMs: Int
+    public let capturedAt: Date
+    public let submittedAt: Date
+    public let sourceTitle: String
+
+    init(_ response: StudyResponse, revision: Int) {
+        id = response.id.uuidString.lowercased()
+        self.revision = revision
+        cardId = response.cardID.uuidString.lowercased()
+        itemId = response.itemID.uuidString.lowercased()
+        assetHash = response.mediaHash
+        contentType = "audio/mp4"
+        fileExtension = response.fileExtension
+        byteSize = response.byteSize
+        durationMs = response.durationMilliseconds
+        capturedAt = response.capturedAt
+        submittedAt = response.submittedAt
+        sourceTitle = response.sourceTitle
     }
 }
 
@@ -965,7 +996,61 @@ struct APICursor: Codable, Sendable, Equatable {
     }
 }
 
+struct APIStudyResponseCursor: Codable, Sendable, Equatable {
+    let route: String
+    let submittedBefore: Date
+    let submittedBeforeId: String
+    let libraryId: String
+
+    func encoded(secret: String) throws -> String {
+        let payload = try APIJSON.encoder.encode(self)
+        let envelope = SignedStudyResponseCursor(
+            payload: payload,
+            signature: APICrypto.hmacSHA256Hex(key: Data(secret.utf8), data: payload)
+        )
+        return try APIJSON.encoder.encode(envelope)
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    static func decode(
+        _ value: String,
+        route: String,
+        libraryId: String,
+        secret: String
+    ) throws -> APIStudyResponseCursor {
+        var base64 = value.replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        guard
+            let data = Data(base64Encoded: base64),
+            let envelope = try? APIJSON.decoder.decode(SignedStudyResponseCursor.self, from: data),
+            APICrypto.hmacSHA256Hex(key: Data(secret.utf8), data: envelope.payload)
+                == envelope.signature,
+            let cursor = try? APIJSON.decoder.decode(APIStudyResponseCursor.self, from: envelope.payload),
+            cursor.route == route,
+            cursor.libraryId == libraryId,
+            UUID(uuidString: cursor.submittedBeforeId) != nil
+        else {
+            throw APIServiceError.problem(
+                status: 400,
+                code: "invalid_cursor",
+                title: "Invalid cursor",
+                detail: "The cursor does not match this collection request."
+            )
+        }
+        return cursor
+    }
+}
+
 private struct SignedAPICursor: Codable {
+    let payload: Data
+    let signature: String
+}
+
+private struct SignedStudyResponseCursor: Codable {
     let payload: Data
     let signature: String
 }

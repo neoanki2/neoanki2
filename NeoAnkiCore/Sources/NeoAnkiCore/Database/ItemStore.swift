@@ -119,6 +119,7 @@ private extension FieldType {
 /// Persistence for items and generated cards.
 public actor ItemStore {
     private static let studyDayRolloverMetadataKey = "study_day_rollover_minutes"
+    static let studyDayRolloverMetadataKeyForSync = studyDayRolloverMetadataKey
     private static let optimizationAttemptMetadataPrefix = "fsrs_optimization_attempt."
 
     private struct CachedItemList {
@@ -152,7 +153,7 @@ public actor ItemStore {
 
     let database: SQLiteDatabase
     let schedulerOverride: (any Scheduler)?
-    private let profileID: String
+    let profileID: String
     var fsrsParameters = FSRSScheduler.Parameters()
     let mediaStore: MediaStore?
     private let localAPITransferStateFile: URL
@@ -1022,6 +1023,14 @@ public actor ItemStore {
             throw DatabaseError.reviewLogNotFound(id)
         }
         return log
+    }
+
+    public func applySynchronizedCard(_ card: Card) async throws {
+        try await database.upsertSynchronizedCard(card)
+    }
+
+    public func applySynchronizedReview(_ log: ReviewLog) async throws {
+        try await database.insertSynchronizedReviewIfMissing(log)
     }
 
     public func schedulingParameters() -> FSRSScheduler.Parameters {

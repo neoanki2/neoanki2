@@ -24,9 +24,31 @@ public enum ItemTypeValidation {
             }
             try validateMediaBehaviors(template, in: itemType)
 
+            if template.interaction == .audioSubmission {
+                try validateAudioSubmissionTemplate(template)
+            }
+
             if template.interaction == .cloze {
                 try validateClozeTemplate(template, in: itemType)
             }
+        }
+    }
+
+    private static func validateAudioSubmissionTemplate(_ template: Template) throws {
+        guard !template.prompt.slots.isEmpty else {
+            throw DatabaseError.invalidItemType(
+                "Audio Submission templates need at least one prompt slot."
+            )
+        }
+        guard template.answer.slots.isEmpty else {
+            throw DatabaseError.invalidItemType(
+                "Audio Submission templates cannot have an answer side."
+            )
+        }
+        guard template.skill.output == .audio else {
+            throw DatabaseError.invalidItemType(
+                "Audio Submission templates must use audio as their output modality."
+            )
         }
     }
 

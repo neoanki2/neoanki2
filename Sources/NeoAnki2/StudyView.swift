@@ -16,6 +16,7 @@ struct StudyView: View {
 
     @State private var showGradeGuide = false
     @State private var showEndSessionConfirm = false
+    @State private var showDeleteDraftConfirm = false
     @State private var recording = StudyRecordingController()
     @AccessibilityFocusState private var answerAccessibilityFocused: Bool
     @AccessibilityFocusState private var recordingErrorAccessibilityFocused: Bool
@@ -50,17 +51,30 @@ struct StudyView: View {
             titleVisibility: .visible
         ) {
             Button("End Session", role: .destructive) {
+                recording.reset()
                 onEndSession()
             }
             .accessibilityIdentifier("confirmEndStudySession")
             Button("Continue Studying", role: .cancel) {}
                 .accessibilityIdentifier("cancelEndStudySession")
         } message: {
-            if model.cardsReviewed > 0 {
+            if model.currentCard?.template.interaction == .audioSubmission, recording.hasRecording {
+                Text("The unsaved audio draft will be permanently discarded.")
+            } else if model.cardsReviewed > 0 {
                 Text("You've completed \(model.cardsReviewed) reviews. The current card won't be saved.")
             } else {
                 Text("The current card won't be saved.")
             }
+        }
+        .confirmationDialog(
+            "Delete this audio draft?",
+            isPresented: $showDeleteDraftConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Draft", role: .destructive) { recording.reset() }
+            Button("Keep Draft", role: .cancel) {}
+        } message: {
+            Text("This recording has not been saved and cannot be recovered.")
         }
         .onChange(of: model.isAnswerRevealed) { _, revealed in
             guard revealed, let cardID = model.currentCard?.id else { return }
@@ -95,15 +109,18 @@ struct StudyView: View {
     }
 
     private var primaryActionHandler: StudyPrimaryActionHandler {
-        let recordingIsReady = model.currentCard?.template.interaction != .record
-            || recording.isReadyForComparison
+        let interaction = model.currentCard?.template.interaction
+        let recordingIsReady = interaction != .record || recording.isReadyForComparison
         return StudyPrimaryActionHandler(
             action: {
                 StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
                     model.performPrimaryAction()
                 }
             },
-            isEnabled: canShowAnswer && recordingIsReady && !isEditingCard
+            isEnabled: canShowAnswer
+                && recordingIsReady
+                && interaction != .audioSubmission
+                && !isEditingCard
         )
     }
 
@@ -387,9 +404,70 @@ struct StudyView: View {
             .frame(maxWidth: .infinity)
         case .record:
             recordingResponse
+        case .audioSubmission:
+            audioSubmissionResponse
         case .arrange:
             arrangementResponse
         }
+    }
+
+    private var audioSubmissionResponse: some View {
+        VStack(spacing: DesignSystem.Spacing.sm) {
+            Label("Saved response", systemImage: "lock.fill")
+                .font(DesignSystem.Typography.uiSecondary)
+                .foregroundStyle(.secondary)
+            Text("This recording stays in your local library and is not synced to the cloud.")
+                .font(DesignSystem.Typography.uiHint)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Text(recordingDurationText)
+                .font(.system(.title2, design: .monospaced).monospacedDigit())
+                .accessibilityLabel("Recording duration \(recordingDurationText)")
+
+            if recording.state == .recording {
+                Button("Stop Recording", systemImage: "stop.circle.fill") { recording.stop() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .accessibilityHint("Stops the current audio submission recording")
+            } else if recording.hasRecording {
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Button(recording.state == .playing ? "Stop Playback" : "Play Recording", systemImage: recording.state == .playing ? "stop.fill" : "play.fill") {
+                        recording.togglePlayback()
+                    }
+                    .controlSize(.large)
+                    .keyboardShortcut("p", modifiers: [.command])
+
+                    Button("Record Again", systemImage: "arrow.counterclockwise") {
+                        Task { await recording.start(persistentSubmission: true) }
+                    }
+                    .controlSize(.large)
+                    .keyboardShortcut("r", modifiers: [.command])
+
+                    Button("Delete Draft", systemImage: "trash", role: .destructive) {
+                        showDeleteDraftConfirm = true
+                    }
+                    .controlSize(.large)
+                }
+            } else {
+                Button("Start Recording", systemImage: "mic.fill") {
+                    Task { await recording.start(persistentSubmission: true) }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut("r", modifiers: [.command])
+                .disabled(recording.state == .requestingPermission)
+            }
+
+            if case let .failed(message) = recording.state {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(DesignSystem.Typography.uiHint)
+                    .foregroundStyle(.red)
+                    .accessibilityFocused($recordingErrorAccessibilityFocused)
+            }
+        }
+        .frame(maxWidth: 620)
     }
 
     @ViewBuilder
@@ -530,7 +608,25 @@ struct StudyView: View {
     @ViewBuilder
     private func studyFooter(for card: DueCard) -> some View {
         HStack {
-            if model.isAnswerRevealed {
+            if card.template.interaction == .audioSubmission {
+                if model.isCompletingSubmission {
+                    ProgressView("Saving response…")
+                        .frame(minHeight: 44)
+                } else {
+                    Button("Save & Complete", systemImage: "checkmark.circle.fill") {
+                        guard let draft = recording.submissionDraft(cardID: card.id) else { return }
+                        Task {
+                            if await model.completeAudioSubmission(draft) { recording.reset() }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(recording.submissionDraft(cardID: card.id) == nil || model.isPreparingQueue)
+                    .accessibilityHint("Saves this recording locally and completes the card without grading it")
+                    .accessibilityIdentifier("saveAudioSubmission")
+                }
+            } else if model.isAnswerRevealed {
                 gradeButtons
             } else {
                 HStack(spacing: DesignSystem.Spacing.sm) {
@@ -620,9 +716,13 @@ struct StudyView: View {
     }
 
     private func requestEndSession() {
-        if model.cardsReviewed > 0, !model.isFinished {
+        if !model.isFinished,
+           (model.cardsReviewed > 0
+               || (model.currentCard?.template.interaction == .audioSubmission
+                   && recording.hasRecording)) {
             showEndSessionConfirm = true
         } else {
+            recording.reset()
             onEndSession()
         }
     }
@@ -633,8 +733,14 @@ struct StudyView: View {
         case .type: "Check Answer"
         case .choose: "Check Choice"
         case .record: "Reveal & Compare"
+        case .audioSubmission: "Save & Complete"
         case .arrange: "Check Order"
         }
+    }
+
+    private var recordingDurationText: String {
+        let total = max(0, Int(recording.elapsedSeconds.rounded(.down)))
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
     private var recordingHasError: Bool {

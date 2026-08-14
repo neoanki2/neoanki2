@@ -1,6 +1,6 @@
 ---
 title: Studying
-description: Complete due-card sessions using reveal, type, choose, arrange, cloze, and record interactions.
+description: Complete due-card sessions, including persistent prompt-only spoken submissions.
 nav_order: 3
 parent: User Guide
 ---
@@ -52,7 +52,9 @@ opened on an empty queue shows **Nothing Due Right Now**.
 
 ## Card interactions
 
-Every interaction ends with self-grading. Automatic feedback is guidance, not a grade: you still choose Again, Hard, Good, or Easy.
+Every ordinary review interaction ends with self-grading. Automatic feedback is
+guidance, not a grade: you still choose Again, Hard, Good, or Easy. Audio
+Submission is the exception: it completes by persisting the response instead.
 
 ### Reveal
 
@@ -85,6 +87,21 @@ Choose **Start Recording**, speak, and choose **Stop Recording**. You may play t
 The first recording attempt may trigger the macOS microphone permission prompt. If access is denied or restricted, enable NeoAnki2 in **System Settings → Privacy & Security → Microphone**. Recordings are temporary: NeoAnki2 removes them when the card changes, the study view closes, or a new recording replaces the old one.
 
 Use Command-R to start or stop recording and Command-P to play or stop playback.
+
+### Audio Submission
+
+Audio Submission cards show only their prompt. Choose **Start Recording**, then
+**Stop**. A ready draft can be played, replaced with **Record Again**, or
+discarded. Choose **Save & Complete** to persist the validated M4A and advance.
+There is no answer reveal and no grading control; completion creates no review
+log and does not update FSRS. The card is suspended only after persistence
+succeeds, so an abandoned or failed submission remains due.
+
+The recording is persistent and local-only. It appears under **Library → Saved
+Responses** with its source, time, duration, playback, and deletion controls,
+and it is excluded from Cloud sync and deck exports. Leaving with a draft asks
+for confirmation. A save error keeps the draft available for retry. Recordings
+stop automatically at 30 minutes and remain subject to the 20 MB audio limit.
 
 ### Cloze
 

@@ -58,11 +58,10 @@ You need:
 - Xcode or Xcode Command Line Tools with a Swift 6 toolchain.
 
 The package declares macOS 14, iOS 17, and Swift tools 6.0. The shipped product
-is still the macOS app; iOS 17 is the deployment floor for the shared Core,
-Application, UI, and sync modules that are compiled in CI ahead of a future
-iPhone and iPad shell. Maintainers can build the Mac app through the managed
-Xcode project, while the included scripts continue to support unsigned local
-Swift package builds.
+includes the macOS app and the full iPhone/iPad app; iOS 17 is the mobile deployment floor,
+with shared Application, Features, and sync modules compiled in CI. Maintainers
+can build both apps through their managed Xcode projects, while the included
+scripts continue to support unsigned local builds.
 
 The same package also builds the loopback automation API and offline vocabulary
 tools. The local API is disabled by default, and vocabulary packs are installed

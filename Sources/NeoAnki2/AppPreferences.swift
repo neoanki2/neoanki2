@@ -8,8 +8,9 @@ enum AppPreferences {
     static let browseShowsAnswerColumn = "browseShowsAnswerColumn"
     static let localAPIEnabled = "localAPIEnabled"
     static let localAPIPort = "localAPIPort"
+    static let cloudSyncEnabled = "cloudSyncEnabled"
 
-    private static let all = [browseShowsAnswerColumn, localAPIEnabled, localAPIPort]
+    private static let all = [browseShowsAnswerColumn, localAPIEnabled, localAPIPort, cloudSyncEnabled]
 
     static func resetForTesting() {
         for key in all {

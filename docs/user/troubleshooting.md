@@ -194,6 +194,11 @@ temporary directory and removed when replaced, when the card changes, or when
 the study view closes. They are not attached to the item or retained as review
 history.
 
+Audio Submission cards are different: the draft stays temporary until you
+choose **Save & Complete**, then it appears under **Library → Saved Responses**.
+If saving fails, use the inline retry while the draft is retained. Submitted
+responses are persistent on this device but are not uploaded through Cloud sync.
+
 ## Study and scheduling messages
 
 - **Enter an answer, or reveal it to self-grade:** type a nonblank response, or
@@ -212,7 +217,7 @@ later reviews in card histories, not simply every button press. When a fit
 cannot be made or saved, the parameters already in use continue to schedule
 normally and a later session tries again.
 
-All current interaction types—reveal, type, choose, record, cloze, and
+All current interaction types—reveal, type, choose, record, audio submission, cloze, and
 arrange—are supported. Automatic correctness checking can still be unavailable
 when a card lacks suitable answer content; grading remains self-assessed.
 

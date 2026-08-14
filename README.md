@@ -1,6 +1,6 @@
 # NeoAnki2
 
-A native macOS spaced-repetition app, built ground-up in Swift 6 and SwiftUI,
+A native macOS and iOS spaced-repetition app, built ground-up in Swift 6 and SwiftUI,
 with its domain logic in a standalone Swift package, `NeoAnkiCore`.
 
 NeoAnki2 is a rewrite of the Anki idea, not a port. It deliberately drops all
@@ -30,12 +30,26 @@ repository and run:
 ./Scripts/run-app.sh
 ```
 
-That builds and launches a debug bundle from the checkout. Maintainers can also
-install the current source revision into `/Applications` for pre-release testing:
+That builds and launches a debug macOS bundle from the checkout. Maintainers can
+also install the current source revision into `/Applications` for pre-release
+testing:
 
 ```bash
 ./Scripts/install-app.sh --restart
 ```
+
+The full iPhone and iPad app requires iOS/iPadOS 17 or newer. Build the app and
+WidgetKit extension headlessly with:
+
+```bash
+./Scripts/build-ios.sh
+```
+
+The mobile product includes adaptive iPhone/iPad navigation, complete study and
+authoring workflows, native media, import/export, optional offline-first private
+CloudKit sync, reminders, and due-count widgets. See the
+[iOS release checklist](docs/IOS_RELEASE.md) for unsigned archive validation and
+the two provisioning-dependent TestFlight gates.
 
 See [Getting started](https://neoanki2.github.io/user/getting-started/)
 for prerequisite checks, expected output, updates, and removal.

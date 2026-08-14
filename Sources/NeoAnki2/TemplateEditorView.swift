@@ -14,6 +14,9 @@ struct TemplateEditorView: View {
     @State private var isSaving = false
     @State private var showDiscardConfirmation = false
     @State private var showDeleteConfirmation = false
+    @State private var affectedResponseCount = 0
+    @State private var showClearAnswerConfirmation = false
+    @State private var pendingInteraction: Interaction?
     @State private var showAdvanced: Bool
 
     init(
@@ -38,14 +41,23 @@ struct TemplateEditorView: View {
                 TextField("Name", text: $draft.name)
                     .accessibilityIdentifier("templateNameField")
 
-                Picker("Interaction", selection: $draft.interaction) {
+                Picker("Interaction", selection: interactionBinding) {
                     ForEach(Interaction.allCases, id: \.self) { interaction in
                         Text(interaction.label).tag(interaction)
                     }
                 }
                 .accessibilityIdentifier("templateInteractionPicker")
-                .onChange(of: draft.interaction) { _, interaction in
-                    applyInteractionDefaults(interaction)
+
+                if draft.interaction == .audioSubmission {
+                    Label(
+                        "Spoken responses are saved persistently on this device and are not included in cloud sync.",
+                        systemImage: "lock.fill"
+                    )
+                    .font(DesignSystem.Typography.uiHint)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(
+                        "Privacy. Spoken responses are saved persistently on this device and are not included in cloud sync."
+                    )
                 }
             }
 
@@ -59,13 +71,15 @@ struct TemplateEditorView: View {
                 )
             }
 
-            Section("Answer") {
-                SlotListEditor(
-                    slots: $draft.answerSlots,
-                    fields: itemType.fields,
-                    sideName: "Answer",
-                    showAdvanced: showAdvanced
-                )
+            if draft.interaction != .audioSubmission {
+                Section("Answer") {
+                    SlotListEditor(
+                        slots: $draft.answerSlots,
+                        fields: itemType.fields,
+                        sideName: "Answer",
+                        showAdvanced: showAdvanced
+                    )
+                }
             }
 
             Section {
@@ -102,21 +116,28 @@ struct TemplateEditorView: View {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                         Text("Practice skill")
                             .font(DesignSystem.Typography.uiSecondary.weight(.semibold))
-                        Toggle("Derive from the first prompt and answer fields", isOn: $draft.usesAutomaticSkill)
-                            .accessibilityIdentifier("templateAutomaticSkill")
-                        if !draft.usesAutomaticSkill {
+                        if draft.interaction != .audioSubmission {
+                            Toggle("Derive from the first prompt and answer fields", isOn: $draft.usesAutomaticSkill)
+                                .accessibilityIdentifier("templateAutomaticSkill")
+                        }
+                        if !draft.usesAutomaticSkill || draft.interaction == .audioSubmission {
                             Picker("Input", selection: $draft.skill.input) {
                                 ForEach(Modality.allCases, id: \.self) { modality in
                                     Text(modality.label).tag(modality)
                                 }
                             }
                             .accessibilityIdentifier("templateSkillInput")
-                            Picker("Output", selection: $draft.skill.output) {
-                                ForEach(Modality.allCases, id: \.self) { modality in
-                                    Text(modality.label).tag(modality)
+                            if draft.interaction == .audioSubmission {
+                                LabeledContent("Output", value: "Audio")
+                                    .accessibilityIdentifier("templateSkillOutput")
+                            } else {
+                                Picker("Output", selection: $draft.skill.output) {
+                                    ForEach(Modality.allCases, id: \.self) { modality in
+                                        Text(modality.label).tag(modality)
+                                    }
                                 }
+                                .accessibilityIdentifier("templateSkillOutput")
                             }
-                            .accessibilityIdentifier("templateSkillOutput")
                             Picker("Operation", selection: $draft.skill.operation) {
                                 ForEach(NeoAnkiCore.Operation.allCases, id: \.self) { operation in
                                     Text(operation.label).tag(operation)
@@ -167,8 +188,7 @@ struct TemplateEditorView: View {
             if editingTemplate != nil {
                 ToolbarItem(placement: .destructiveAction) {
                     Button("Delete", role: .destructive) {
-                        showDeleteConfirmation = EditorDecisionState
-                            .requiresTemplateDeletionConfirmation(templateExists: editingTemplate != nil)
+                        prepareTemplateDeletion()
                     }
                     .accessibilityIdentifier("deleteTemplate")
                 }
@@ -208,8 +228,39 @@ struct TemplateEditorView: View {
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("cancelDeleteTemplate")
         } message: {
-            Text("Cards generated by this template may be removed. This action cannot be undone.")
+            if affectedResponseCount > 0 {
+                Text("Cards generated by this template and \(affectedResponseCount) saved spoken \(affectedResponseCount == 1 ? "response" : "responses") will be permanently deleted.")
+            } else {
+                Text("Cards generated by this template may be removed. This action cannot be undone.")
+            }
         }
+        .confirmationDialog(
+            "Clear the answer side?",
+            isPresented: $showClearAnswerConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear Answer and Continue", role: .destructive) {
+                commitPendingAudioSubmission()
+            }
+            Button("Cancel", role: .cancel) { pendingInteraction = nil }
+        } message: {
+            Text("Audio Submission cards are prompt-only. Changing this template will permanently clear its answer side when you save.")
+        }
+    }
+
+    private var interactionBinding: Binding<Interaction> {
+        Binding(
+            get: { draft.interaction },
+            set: { requested in
+                guard requested != draft.interaction else { return }
+                if requested == .audioSubmission, !draft.answerSlots.isEmpty {
+                    pendingInteraction = requested
+                    showClearAnswerConfirmation = true
+                } else {
+                    setInteraction(requested)
+                }
+            }
+        )
     }
 
     private var generateWhenBinding: Binding<ConditionDraft> {
@@ -220,12 +271,32 @@ struct TemplateEditorView: View {
     }
 
     private func applyInteractionDefaults(_ interaction: Interaction) {
+        if interaction == .audioSubmission {
+            draft.answerSlots = []
+            draft.usesAutomaticSkill = false
+            draft.skill.output = .audio
+            return
+        }
+        if draft.answerSlots.isEmpty {
+            draft.answerSlots = [SlotDraft(fieldID: itemType.fields.dropFirst().first?.id)]
+        }
         guard interaction == .cloze else { return }
         for index in draft.promptSlots.indices
             where draft.promptSlots[index].reveal == .always
                 && draft.promptSlots[index].fieldID.flatMap(itemType.field)?.type == .cloze {
             draft.promptSlots[index].reveal = .hiddenUntilAnswer
         }
+    }
+
+    private func setInteraction(_ interaction: Interaction) {
+        draft.interaction = interaction
+        applyInteractionDefaults(interaction)
+    }
+
+    private func commitPendingAudioSubmission() {
+        guard pendingInteraction == .audioSubmission else { return }
+        pendingInteraction = nil
+        setInteraction(.audioSubmission)
     }
 
     private func save() async {
@@ -241,6 +312,18 @@ struct TemplateEditorView: View {
         guard let editingTemplate else { return }
         if await model.deleteTemplate(id: editingTemplate.id) {
             onDismiss()
+        }
+    }
+
+    private func prepareTemplateDeletion() {
+        guard let editingTemplate,
+              EditorDecisionState.requiresTemplateDeletionConfirmation(templateExists: true)
+        else { return }
+        Task {
+            affectedResponseCount = (try? await model.studyResponseCount(
+                templateID: editingTemplate.id
+            )) ?? 0
+            showDeleteConfirmation = true
         }
     }
 
@@ -521,6 +604,7 @@ private extension Interaction {
         case .type: "Type answer"
         case .choose: "Choose"
         case .record: "Record"
+        case .audioSubmission: "Audio Submission"
         case .cloze: "Cloze"
         case .arrange: "Arrange"
         }

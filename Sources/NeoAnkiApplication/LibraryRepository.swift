@@ -24,6 +24,7 @@ public protocol LibraryBrowsing: Sendable {
     func item(id: UUID) async throws -> (item: Item, itemType: ItemType)?
     func itemBrowseSchedules(itemIDs: [UUID]) async throws -> [UUID: ItemBrowseSchedule]
     func scopeSummary(scope: DeckScope, asOf: Date) async throws -> ScopeSummary
+    func itemRecordsPage(offset: Int, limit: Int) async throws -> [LibraryItemRecord]
 }
 
 /// Item commands exposed as application operations, not persistence primitives.
@@ -33,6 +34,8 @@ public protocol LibraryItemMutating: Sendable {
     func deleteItem(id: UUID, asOf: Date) async throws -> Bool
     func deleteAllUnassignedItems(asOf: Date) async throws -> Int
     func moveItem(id: UUID, to deckID: UUID?) async throws -> Bool
+    func performBulkItemOperations(_ operations: [ItemBulkOperation], asOf: Date) async throws -> [ItemBulkOperationResult]
+    func reserveMedia(data: Data, kind: MediaKind, altText: String, asOf: Date) async throws -> ReservedMediaAsset
 }
 
 public protocol LibraryDeckManaging: Sendable {
@@ -42,6 +45,9 @@ public protocol LibraryDeckManaging: Sendable {
     func updateDeck(_ deck: Deck) async throws -> Deck
     func deleteDeck(id: UUID) async throws -> Bool
     func resetDeckProgress(id: UUID, asOf: Date) async throws -> Int
+    func deckDeletionImpact(id: UUID, policy: DeckDeletionPolicy) async throws -> DeckDeletionImpact
+    func commitDeckDeletion(id: UUID, policy: DeckDeletionPolicy, asOf: Date) async throws
+    func deckResetImpact(id: UUID) async throws -> DeckResetImpact
 }
 
 public protocol LibraryItemTypeManaging: Sendable {
@@ -63,6 +69,24 @@ public protocol LibraryStudying: Sendable {
         durationMilliseconds: Int
     ) async throws -> ReviewSubmission
     func revertReview(id: UUID, asOf: Date) async throws
+}
+
+/// Persistent, local-only learner audio responses. Kept separate from graded
+/// study operations so feature code cannot accidentally manufacture reviews.
+public protocol LibraryStudyResponses: Sendable {
+    func completeAudioSubmission(
+        _ draft: StudyResponseDraft,
+        submittedAt: Date
+    ) async throws -> StudyResponse
+    func studyResponses(matching query: StudyResponseQuery) async throws -> [StudyResponse]
+    func studyResponse(id: UUID) async throws -> StudyResponse
+    func studyResponseMediaBytes(id: UUID) async throws -> (StudyResponse, MediaAsset, Data)
+    func deleteStudyResponse(id: UUID, asOf: Date) async throws -> Bool
+    func ordinaryMediaReferenceCount(hash: String) async throws -> Int
+    func isStudyResponseMediaHash(_ hash: String) async throws -> Bool
+    func studyResponseCount(cardIDs: Set<UUID>) async throws -> Int
+    func studyResponseCount(itemIDs: Set<UUID>) async throws -> Int
+    func studyResponseCount(templateIDs: Set<UUID>) async throws -> Int
 }
 
 public protocol LibraryScheduling: Sendable {
@@ -103,6 +127,16 @@ public protocol LibraryChangePersisting: Sendable {
     func currentChangeCursor() async throws -> Int64
     func changes(after cursor: Int64, limit: Int) async throws -> [LibraryChange]
     func createBackup(at destination: URL) async throws
+    func verifyBackup(at destination: URL) async throws
+}
+
+public extension LibraryChangePersisting {
+    func verifyBackup(at destination: URL) async throws {
+        let values = try destination.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true, (values.fileSize ?? 0) > 0 else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+    }
 }
 
 /// Complete native-client boundary. Feature models should request the smallest
@@ -114,6 +148,7 @@ public protocol LibraryRepository:
     LibraryDeckManaging,
     LibraryItemTypeManaging,
     LibraryStudying,
+    LibraryStudyResponses,
     LibraryScheduling,
     LibraryImporting,
     LibraryTransferring,
@@ -205,6 +240,25 @@ public extension LibraryStudying {
     }
 }
 
+public extension LibraryStudyResponses {
+    func completeAudioSubmission(
+        _ draft: StudyResponseDraft,
+        submittedAt: Date = .now
+    ) async throws -> StudyResponse {
+        try await completeAudioSubmission(draft, submittedAt: submittedAt)
+    }
+
+    func studyResponses(
+        matching query: StudyResponseQuery = StudyResponseQuery()
+    ) async throws -> [StudyResponse] {
+        try await studyResponses(matching: query)
+    }
+
+    func deleteStudyResponse(id: UUID, asOf: Date = .now) async throws -> Bool {
+        try await deleteStudyResponse(id: id, asOf: asOf)
+    }
+}
+
 public extension LibraryScheduling {
     func optimizeSchedulingIfNeeded(asOf: Date = .now) async throws -> FSRSOptimizationResult? {
         try await optimizeSchedulingIfNeeded(asOf: asOf)
@@ -278,6 +332,20 @@ public actor SQLiteLibraryRepository: LibraryRepository {
     public func moveItem(id: UUID, to deckID: UUID?) async throws -> Bool {
         try await store.updateItemDeck(itemID: id, deckID: deckID)
     }
+    public func performBulkItemOperations(
+        _ operations: [ItemBulkOperation],
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        try await store.executeItemBulk(operations, dryRun: false, now: asOf)
+    }
+    public func reserveMedia(
+        data: Data,
+        kind: MediaKind,
+        altText: String,
+        asOf: Date
+    ) async throws -> ReservedMediaAsset {
+        try await store.reserveMedia(data: data, kind: kind, altText: altText, now: asOf)
+    }
 
     public func deck(id: UUID) async throws -> Deck { try await store.deck(id: id) }
     public func deckSummaries(asOf: Date) async throws -> [DeckSummary] {
@@ -331,6 +399,49 @@ public actor SQLiteLibraryRepository: LibraryRepository {
             now: asOf,
             durationMs: durationMilliseconds
         )
+    }
+
+    public func completeAudioSubmission(
+        _ draft: StudyResponseDraft,
+        submittedAt: Date
+    ) async throws -> StudyResponse {
+        try await store.completeAudioSubmission(draft, submittedAt: submittedAt)
+    }
+
+    public func studyResponses(matching query: StudyResponseQuery) async throws -> [StudyResponse] {
+        try await store.studyResponses(matching: query)
+    }
+
+    public func studyResponse(id: UUID) async throws -> StudyResponse {
+        try await store.studyResponse(id: id)
+    }
+
+    public func studyResponseMediaBytes(id: UUID) async throws -> (StudyResponse, MediaAsset, Data) {
+        try await store.studyResponseMediaBytes(id: id)
+    }
+
+    public func deleteStudyResponse(id: UUID, asOf: Date) async throws -> Bool {
+        try await store.deleteStudyResponse(id: id, asOf: asOf)
+    }
+
+    public func ordinaryMediaReferenceCount(hash: String) async throws -> Int {
+        try await store.ordinaryMediaReferenceCount(hash: hash)
+    }
+
+    public func isStudyResponseMediaHash(_ hash: String) async throws -> Bool {
+        try await store.isStudyResponseMediaHash(hash)
+    }
+
+    public func studyResponseCount(cardIDs: Set<UUID>) async throws -> Int {
+        try await store.studyResponseCount(cardIDs: cardIDs)
+    }
+
+    public func studyResponseCount(itemIDs: Set<UUID>) async throws -> Int {
+        try await store.studyResponseCount(itemIDs: itemIDs)
+    }
+
+    public func studyResponseCount(templateIDs: Set<UUID>) async throws -> Int {
+        try await store.studyResponseCount(templateIDs: templateIDs)
     }
     public func revertReview(id: UUID, asOf: Date) async throws {
         try await store.revertReview(reviewLogID: id, now: asOf)
@@ -402,11 +513,57 @@ public actor SQLiteLibraryRepository: LibraryRepository {
     public func currentChangeCursor() async throws -> Int64 {
         try await store.currentChangeCursor()
     }
+    public func recordLibraryAlias(_ aliasID: UUID, canonicalID: UUID) async throws {
+        try await store.recordLibraryAlias(aliasID, canonicalID: canonicalID)
+    }
+    public func libraryAliases(canonicalID: UUID) async throws -> Set<UUID> {
+        try await store.libraryAliases(canonicalID: canonicalID)
+    }
     public func changes(after cursor: Int64, limit: Int) async throws -> [LibraryChange] {
         try await store.libraryChanges(after: cursor, limit: limit)
     }
     public func createBackup(at destination: URL) async throws {
         try await store.createValidationDatabaseSnapshot(at: destination)
+    }
+
+    public func applySynchronizedCard(_ card: Card) async throws { try await store.applySynchronizedCard(card) }
+    public func applySynchronizedReview(_ log: ReviewLog) async throws { try await store.applySynchronizedReview(log) }
+    public func synchronizedReviewRecord(id: UUID) async throws -> SynchronizedReviewRecord {
+        try await store.synchronizedReviewRecord(id: id)
+    }
+    public func synchronizedItemRecord(id: UUID) async throws -> SynchronizedItemRecord {
+        try await store.synchronizedItemRecord(id: id)
+    }
+    public func reviewRevertRecord(id: UUID) async throws -> ReviewRevertRecord {
+        try await store.reviewRevertRecord(id: id)
+    }
+    public func itemTypeMembershipRecord(id: String) async throws -> ItemTypeMembershipRecord {
+        try await store.itemTypeMembershipRecord(id: id)
+    }
+    public func schedulingSettingsRecord(id: String) async throws -> SchedulingSettingsRecord {
+        try await store.schedulingSettingsRecord(id: id)
+    }
+    public func portableItemTypeMappingRecord(id: String) async throws -> PortableItemTypeMappingRecord {
+        try await store.portableItemTypeMappingRecord(id: id)
+    }
+    public func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) async throws {
+        for mutation in mutations {
+            switch mutation {
+            case let .itemType(type): try ItemTypeValidation.validate(type)
+            case let .deck(deck):
+                guard deck.newCardsPerDay.map({ $0 >= 0 }) ?? true else {
+                    throw DatabaseError.invalidDeck("Daily new-card limit cannot be negative.")
+                }
+            default: break
+            }
+        }
+        try await store.applySynchronizedBatch(mutations)
+    }
+
+    public func verifyBackup(at destination: URL) async throws {
+        let verification = try SQLiteLibraryRepository(databaseURL: destination)
+        try await verification.bootstrap()
+        _ = try await verification.libraryID()
     }
 }
 

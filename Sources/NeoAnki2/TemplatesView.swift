@@ -497,6 +497,8 @@ struct TemplatesView: View {
             "Choose"
         case .record:
             "Record"
+        case .audioSubmission:
+            "Audio Submission"
         case .cloze:
             "Cloze"
         case .arrange:

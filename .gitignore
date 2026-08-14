@@ -1,6 +1,9 @@
 .DS_Store
 .cursor/
 .build/
+build/
+NeoAnkiCore/build/
+Xcode/build/
 .swiftpm/
 xcuserdata/
 DerivedData/
@@ -10,6 +13,8 @@ DerivedData/
 !UITests/NeoAnki2UITests.xcodeproj/**
 !Xcode/NeoAnkiMac.xcodeproj/
 !Xcode/NeoAnkiMac.xcodeproj/**
+!Xcode/NeoAnkiiOS.xcodeproj/
+!Xcode/NeoAnkiiOS.xcodeproj/**
 *.xcworkspace/
 !UITests/NeoAnki2UITests.xcodeproj/project.xcworkspace/
 !UITests/NeoAnki2UITests.xcodeproj/project.xcworkspace/**

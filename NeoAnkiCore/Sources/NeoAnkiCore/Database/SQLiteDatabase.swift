@@ -15,6 +15,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case itemNotFound(UUID)
     case cardNotFound(UUID)
     case reviewLogNotFound(UUID)
+    case studyResponseNotFound(UUID)
     case templateNotFound(UUID)
     case deckNotFound(UUID)
     case requiredFieldEmpty(String)
@@ -48,6 +49,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "Card not found: \(id.uuidString)"
         case let .reviewLogNotFound(id):
             return "Review log not found: \(id.uuidString)"
+        case let .studyResponseNotFound(id):
+            return "Study response not found: \(id.uuidString)"
         case let .templateNotFound(id):
             return "Template not found: \(id.uuidString)"
         case let .deckNotFound(id):
@@ -100,10 +103,16 @@ private struct SingleNewCardLimiter {
     let remainingCapacity: Int
 }
 
+private struct MultipleNewCardLimiters {
+    /// Absolute deck depths, deepest first. Applying child limits before their
+    /// ancestors lets a rejected child candidate be backfilled by a sibling.
+    let depths: [Int]
+}
+
 private enum NewCardLimitShape {
     case none
     case single(SingleNewCardLimiter)
-    case multiple
+    case multiple(MultipleNewCardLimiters)
 }
 
 /// Low-level SQLite connection. An actor so callers serialize access.
@@ -353,6 +362,31 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 22 {
+                try execute(
+                    "CREATE TABLE IF NOT EXISTS library_aliases (alias_id TEXT PRIMARY KEY NOT NULL, canonical_id TEXT NOT NULL);"
+                )
+                for table in [
+                    "library_item_types", "deck_included_item_types",
+                    "deck_item_type_policy_entries", "scheduler_params",
+                    "portable_item_type_mappings", "app_metadata",
+                ] where try tableExists(table) {
+                    for sql in Schema.syncChangeTrackingStatements(forExistingTable: table) {
+                        try execute(sql)
+                    }
+                }
+                try backfillExtendedSyncResourceRevisions()
+            }
+
+            if current < 23 {
+                for sql in Schema.migrationV23Statements {
+                    try execute(sql)
+                }
+                for sql in Schema.apiChangeTrackingStatements(forExistingTable: "study_responses") {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -384,6 +418,25 @@ actor SQLiteDatabase {
                 SELECT ?, \(entry.idColumn), 1, ?, 0 FROM \(entry.table);
                 """,
                 bindings: [.text(entry.resourceType), .double(now)]
+            )
+        }
+    }
+
+    private func backfillExtendedSyncResourceRevisions() throws {
+        let now = Date.now.timeIntervalSince1970
+        let rows: [(table: String, kind: String, sql: String)] = [
+            ("library_item_types", "itemTypeMembership", "SELECT 'library:' || item_type_id AS id FROM library_item_types"),
+            ("deck_included_item_types", "itemTypeMembership", "SELECT 'included:' || root_deck_id || ':' || item_type_id AS id FROM deck_included_item_types"),
+            ("deck_item_type_policy_entries", "itemTypeMembership", "SELECT 'policy:' || deck_id || ':' || item_type_id AS id FROM deck_item_type_policy_entries"),
+            ("scheduler_params", "schedulingSettings", "SELECT 'profile:' || profile_id AS id FROM scheduler_params"),
+            ("app_metadata", "schedulingSettings", "SELECT 'rollover' AS id FROM app_metadata WHERE key = 'study_day_rollover_minutes'"),
+            ("portable_item_type_mappings", "portableTypeMapping", "SELECT origin_library_id || ':' || origin_type_id || ':' || schema_digest AS id FROM portable_item_type_mappings"),
+            ("app_metadata", "library", "SELECT value AS id FROM app_metadata WHERE key = 'library_id'"),
+        ]
+        for row in rows where try tableExists(row.table) {
+            try execute(
+                "INSERT OR IGNORE INTO resource_revisions (resource_type, resource_id, revision, updated_at, is_deleted) SELECT ?, id, 1, ?, 0 FROM (\(row.sql));",
+                bindings: [.text(row.kind), .double(now)]
             )
         }
     }
@@ -421,6 +474,21 @@ actor SQLiteDatabase {
             throw DatabaseError.decodingFailed
         }
         return persistedID
+    }
+
+    func recordLibraryAlias(_ aliasID: UUID, canonicalID: UUID) throws {
+        guard aliasID != canonicalID else { return }
+        try execute(
+            "INSERT INTO library_aliases (alias_id, canonical_id) VALUES (?, ?) ON CONFLICT(alias_id) DO UPDATE SET canonical_id = excluded.canonical_id;",
+            bindings: [.text(aliasID.uuidString), .text(canonicalID.uuidString)]
+        )
+    }
+
+    func fetchLibraryAliases(canonicalID: UUID) throws -> Set<UUID> {
+        Set(try query(
+            "SELECT alias_id FROM library_aliases WHERE canonical_id = ? ORDER BY alias_id;",
+            bindings: [.text(canonicalID.uuidString)]
+        ).compactMap { ($0["alias_id"] as? String).flatMap(UUID.init(uuidString:)) })
     }
 
     func libraryID() throws -> UUID {
@@ -1991,6 +2059,41 @@ actor SQLiteDatabase {
         }
     }
 
+    /// Applies card state received from another replica without regenerating
+    /// its scheduling fields. Item/template foreign keys are still enforced by
+    /// SQLite, so callers must dependency-order their batch.
+    func upsertSynchronizedCard(_ card: Card) throws {
+        let skill = try encode(card.skill)
+        let memory = try encode(card.memory)
+        try execute(
+            """
+            INSERT INTO cards (
+                id, item_id, template_id, skill, memory, due_at, phase, lapses,
+                is_suspended, deck_id, cloze_group
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                item_id = excluded.item_id,
+                template_id = excluded.template_id,
+                skill = excluded.skill,
+                memory = excluded.memory,
+                due_at = excluded.due_at,
+                phase = excluded.phase,
+                lapses = excluded.lapses,
+                is_suspended = excluded.is_suspended,
+                deck_id = excluded.deck_id,
+                cloze_group = excluded.cloze_group;
+            """,
+            bindings: [
+                .text(card.id.uuidString), .text(card.itemID.uuidString), .text(card.templateID.uuidString),
+                .blob(skill), .blob(memory), .double(card.memory.due.timeIntervalSince1970),
+                .text(card.memory.phase.rawValue), .int(Int64(card.memory.lapses)),
+                .int(card.isSuspended ? 1 : 0),
+                card.deckID.map { .text($0.uuidString) } ?? .null,
+                card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+            ]
+        )
+    }
+
     func fetchCard(id: UUID) throws -> Card? {
         let rows = try query(
             """
@@ -2315,80 +2418,14 @@ actor SQLiteDatabase {
                 asOf: now,
                 limiter: limiter
             )
-        case .multiple:
-            break
-        }
-
-        let sql = """
-            WITH RECURSIVE deck_ancestry(descendant_id, ancestor_id) AS (
-                SELECT id, id FROM decks
-                UNION
-                SELECT ancestry.descendant_id, decks.parent_id
-                FROM deck_ancestry AS ancestry
-                JOIN decks ON decks.id = ancestry.ancestor_id
-                WHERE decks.parent_id IS NOT NULL
-            ),
-            active_introductions AS (
-                SELECT ancestry.ancestor_id AS limiter_id, COUNT(*) AS introduced_count
-                FROM new_card_introductions AS introductions
-                JOIN deck_ancestry AS ancestry
-                    ON ancestry.descendant_id = introductions.deck_id
-                LEFT JOIN review_reverts
-                    ON review_reverts.review_log_id = introductions.review_log_id
-                WHERE introductions.study_day = ?
-                  AND review_reverts.id IS NULL
-                GROUP BY ancestry.ancestor_id
-            ),
-            due_cards AS (
-                SELECT cards.*
-                FROM cards
-                WHERE cards.is_suspended = 0
-                  AND cards.due_at <= ?
-                  AND \(scopeFilter.sql)
-            ),
-            new_positions AS (
-                SELECT
-                    due_cards.id AS card_id,
-                    limiter.id AS limiter_id,
-                    limiter.new_cards_per_day,
-                    COALESCE(active_introductions.introduced_count, 0) AS introduced_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY limiter.id
-                        ORDER BY due_cards.due_at ASC, due_cards.id ASC
-                    ) AS new_rank
-                FROM due_cards
-                JOIN deck_ancestry AS ancestry
-                    ON ancestry.descendant_id = due_cards.deck_id
-                JOIN decks AS limiter
-                    ON limiter.id = ancestry.ancestor_id
-                   AND limiter.new_cards_per_day IS NOT NULL
-                LEFT JOIN active_introductions
-                    ON active_introductions.limiter_id = limiter.id
-                WHERE due_cards.phase = 'new'
-            ),
-            blocked_new AS (
-                SELECT DISTINCT card_id
-                FROM new_positions
-                WHERE new_rank > MAX(new_cards_per_day - introduced_count, 0)
-            ),
-            eligible_due AS (
-                SELECT due_cards.*
-                FROM due_cards
-                WHERE (
-                      due_cards.phase != 'new'
-                      OR due_cards.deck_id IS NULL
-                      OR NOT EXISTS (
-                          SELECT 1
-                          FROM blocked_new
-                          WHERE blocked_new.card_id = due_cards.id
-                      )
-                  )
+        case let .multiple(limiters):
+            return multipleLimiterEligibleDueCardsCTE(
+                scopeFilter: scopeFilter,
+                asOf: now,
+                studyDay: studyDay,
+                limiters: limiters
             )
-            """
-        return (
-            sql,
-            [.text(studyDay), .double(now.timeIntervalSince1970)] + scopeFilter.bindings
-        )
+        }
     }
 
     /// Test and profiling diagnostic for keeping startup-sensitive eligibility
@@ -2428,8 +2465,9 @@ actor SQLiteDatabase {
     }
 
     /// Classifies configured limiters before composing the due query. The
-    /// single-limiter shape can select only its remaining top-K cards; multiple
-    /// limiters retain the general intersection-by-rank query below.
+    /// single-limiter shape can select only its remaining top-K cards. Multiple
+    /// limiters are applied from the deepest deck level toward the roots so a
+    /// child rejection does not strand capacity in an ancestor.
     private func newCardLimitShape(
         scope: CardScope,
         studyDay: String
@@ -2438,17 +2476,23 @@ actor SQLiteDatabase {
             return .none
         }
 
-        let limiterRows: [[String: Any?]]
+        // Preserve the direct unlimited fast path: most libraries have no
+        // limiter, and discovering that should not require materializing the
+        // whole deck topology on every due read.
+        let preliminaryLimiters: [[String: Any?]]?
         switch scope {
         case .unassigned:
             return .none
-        case let .decks(deckIDs):
+        case .all:
+            preliminaryLimiters = try query(
+                "SELECT id FROM decks WHERE new_cards_per_day IS NOT NULL LIMIT 2;"
+            )
+        case let .decks(deckIDs) where deckIDs.count <= 800:
             guard !deckIDs.isEmpty else { return .none }
-            guard deckIDs.count <= 800 else { return .multiple }
             let ordered = deckIDs.sorted { $0.uuidString < $1.uuidString }
             let values = Array(repeating: "(?)", count: ordered.count)
                 .joined(separator: ", ")
-            limiterRows = try query(
+            preliminaryLimiters = try query(
                 """
                 WITH RECURSIVE selected_decks(id) AS (
                     VALUES \(values)
@@ -2458,51 +2502,82 @@ actor SQLiteDatabase {
                     UNION
                     SELECT decks.parent_id
                     FROM decks
-                    JOIN relevant_decks
-                        ON decks.id = relevant_decks.id
+                    JOIN relevant_decks ON decks.id = relevant_decks.id
                     WHERE decks.parent_id IS NOT NULL
                 )
-                SELECT DISTINCT decks.id, decks.new_cards_per_day
+                SELECT decks.id
                 FROM decks
-                JOIN relevant_decks
-                    ON relevant_decks.id = decks.id
+                JOIN relevant_decks ON relevant_decks.id = decks.id
                 WHERE decks.new_cards_per_day IS NOT NULL
-                ORDER BY decks.id
                 LIMIT 2;
                 """,
                 bindings: ordered.map { .text($0.uuidString) }
             )
-        case .all:
-            limiterRows = try query(
-                """
-                SELECT id, new_cards_per_day
-                FROM decks
-                WHERE new_cards_per_day IS NOT NULL
-                ORDER BY id
-                LIMIT 2;
-                """
-            )
+        case .decks:
+            preliminaryLimiters = nil
+        }
+        if preliminaryLimiters?.isEmpty == true {
+            return .none
         }
 
-        guard let firstLimiter = limiterRows.first else { return .none }
-        guard
-            limiterRows.count == 1,
-            let limiterID = firstLimiter["id"] as? String,
-            let dailyLimitValue = firstLimiter["new_cards_per_day"] as? Int64
-        else {
-            return .multiple
-        }
-        let dailyLimit = Int(dailyLimitValue)
-
-        let topologyRows = try query("SELECT id, parent_id FROM decks;")
+        let topologyRows = try query(
+            "SELECT id, parent_id, new_cards_per_day FROM decks;"
+        )
+        var parentByDeck: [String: String] = [:]
         var childrenByParent: [String: [String]] = [:]
+        var limitsByDeck: [String: Int] = [:]
         for row in topologyRows {
-            guard
-                let id = row["id"] as? String,
-                let parentID = row["parent_id"] as? String
-            else { continue }
-            childrenByParent[parentID, default: []].append(id)
+            guard let id = row["id"] as? String else { continue }
+            if let parentID = row["parent_id"] as? String {
+                parentByDeck[id] = parentID
+                childrenByParent[parentID, default: []].append(id)
+            }
+            if let limit = row["new_cards_per_day"] as? Int64 {
+                limitsByDeck[id] = Int(limit)
+            }
         }
+
+        let relevantLimiterIDs: Set<String>
+        switch scope {
+        case .unassigned:
+            return .none
+        case .all:
+            relevantLimiterIDs = Set(limitsByDeck.keys)
+        case let .decks(deckIDs):
+            guard !deckIDs.isEmpty else { return .none }
+            var relevant: Set<String> = []
+            for selectedID in deckIDs.map(\.uuidString) {
+                var current: String? = selectedID
+                var visited: Set<String> = []
+                while let deckID = current, visited.insert(deckID).inserted {
+                    if limitsByDeck[deckID] != nil {
+                        relevant.insert(deckID)
+                    }
+                    current = parentByDeck[deckID]
+                }
+            }
+            relevantLimiterIDs = relevant
+        }
+
+        guard let limiterID = relevantLimiterIDs.first else { return .none }
+        guard relevantLimiterIDs.count == 1,
+              let dailyLimit = limitsByDeck[limiterID]
+        else {
+            func depth(of deckID: String) -> Int {
+                var result = 0
+                var current = deckID
+                var visited: Set<String> = [deckID]
+                while let parent = parentByDeck[current], visited.insert(parent).inserted {
+                    result += 1
+                    current = parent
+                }
+                return result
+            }
+            let depths = Set(relevantLimiterIDs.map(depth))
+                .sorted(by: >)
+            return .multiple(MultipleNewCardLimiters(depths: depths))
+        }
+
         var descendants: Set<String> = [limiterID]
         var frontier = [limiterID]
         while let parentID = frontier.popLast() {
@@ -2533,7 +2608,14 @@ actor SQLiteDatabase {
             scopeBindingCount = 0
         }
         guard selectedDeckIDs.count + scopeBindingCount + 3 <= 900 else {
-            return .multiple
+            var limiterDepth = 0
+            var current = limiterID
+            var visited: Set<String> = [limiterID]
+            while let parent = parentByDeck[current], visited.insert(parent).inserted {
+                limiterDepth += 1
+                current = parent
+            }
+            return .multiple(MultipleNewCardLimiters(depths: [limiterDepth]))
         }
 
         let introductionRows = try query(
@@ -2564,6 +2646,147 @@ actor SQLiteDatabase {
             deckIDs: selectedDeckIDs.sorted(),
             remainingCapacity: max(dailyLimit - introduced, 0)
         ))
+    }
+
+    /// Applies a laminar family of deck limits bottom-up. At each depth the
+    /// earliest surviving cards in every limited subtree consume that subtree's
+    /// remaining slots. Ancestors then rank only those survivors, so capacity
+    /// rejected by a stricter child is available to a sibling candidate.
+    private func multipleLimiterEligibleDueCardsCTE(
+        scopeFilter: (sql: String, bindings: [Binding]),
+        asOf now: Date,
+        studyDay: String,
+        limiters: MultipleNewCardLimiters
+    ) -> (sql: String, bindings: [Binding]) {
+        let cardColumns = [
+            "id", "item_id", "template_id", "skill", "memory", "is_suspended",
+            "deck_id", "due_at", "cloze_group", "phase", "lapses",
+        ].joined(separator: ", ")
+        var commonTableExpressions = [
+            """
+            deck_ancestry(descendant_id, ancestor_id) AS (
+                SELECT id, id FROM decks
+                UNION
+                SELECT ancestry.descendant_id, decks.parent_id
+                FROM deck_ancestry AS ancestry
+                JOIN decks ON decks.id = ancestry.ancestor_id
+                WHERE decks.parent_id IS NOT NULL
+            )
+            """,
+            """
+            deck_depth(id, depth) AS (
+                SELECT id, 0 FROM decks WHERE parent_id IS NULL
+                UNION ALL
+                SELECT decks.id, deck_depth.depth + 1
+                FROM decks
+                JOIN deck_depth ON decks.parent_id = deck_depth.id
+            )
+            """,
+            """
+            active_introductions AS (
+                SELECT ancestry.ancestor_id AS limiter_id, COUNT(*) AS introduced_count
+                FROM new_card_introductions AS introductions
+                JOIN deck_ancestry AS ancestry
+                    ON ancestry.descendant_id = introductions.deck_id
+                LEFT JOIN review_reverts
+                    ON review_reverts.review_log_id = introductions.review_log_id
+                WHERE introductions.study_day = ?
+                  AND review_reverts.id IS NULL
+                GROUP BY ancestry.ancestor_id
+            )
+            """,
+            """
+            card_limiters AS (
+                SELECT
+                    ancestry.descendant_id AS deck_id,
+                    limiter.id AS limiter_id,
+                    deck_depth.depth,
+                    MAX(
+                        limiter.new_cards_per_day
+                            - COALESCE(active_introductions.introduced_count, 0),
+                        0
+                    ) AS remaining_capacity
+                FROM decks AS limiter
+                JOIN deck_depth ON deck_depth.id = limiter.id
+                JOIN deck_ancestry AS ancestry ON ancestry.ancestor_id = limiter.id
+                LEFT JOIN active_introductions
+                    ON active_introductions.limiter_id = limiter.id
+                WHERE limiter.new_cards_per_day IS NOT NULL
+            )
+            """,
+            """
+            due_cards AS (
+                SELECT cards.*
+                FROM cards
+                WHERE cards.is_suspended = 0
+                  AND cards.due_at <= ?
+                  AND \(scopeFilter.sql)
+            )
+            """,
+            """
+            limited_new_0 AS (
+                SELECT \(cardColumns)
+                FROM due_cards
+                WHERE phase = 'new'
+            )
+            """,
+        ]
+
+        var previousStage = "limited_new_0"
+        for (offset, depth) in limiters.depths.enumerated() {
+            let stage = offset + 1
+            let rankedStage = "ranked_new_\(stage)"
+            let limitedStage = "limited_new_\(stage)"
+            commonTableExpressions.append(
+                """
+                \(rankedStage) AS (
+                    SELECT
+                        candidates.*,
+                        limiter.limiter_id AS active_limiter_id,
+                        limiter.remaining_capacity,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY limiter.limiter_id
+                            ORDER BY candidates.due_at ASC, candidates.id ASC
+                        ) AS limiter_rank
+                    FROM \(previousStage) AS candidates
+                    LEFT JOIN card_limiters AS limiter
+                        ON limiter.deck_id = candidates.deck_id
+                       AND limiter.depth = \(depth)
+                )
+                """
+            )
+            commonTableExpressions.append(
+                """
+                \(limitedStage) AS (
+                    SELECT \(cardColumns)
+                    FROM \(rankedStage)
+                    WHERE active_limiter_id IS NULL
+                       OR limiter_rank <= remaining_capacity
+                )
+                """
+            )
+            previousStage = limitedStage
+        }
+
+        commonTableExpressions.append(
+            """
+            eligible_due AS (
+                SELECT due_cards.*
+                FROM due_cards
+                WHERE due_cards.phase != 'new'
+                UNION ALL
+                SELECT due_cards.*
+                FROM due_cards
+                JOIN \(previousStage) AS allowed_new
+                    ON allowed_new.id = due_cards.id
+            )
+            """
+        )
+
+        return (
+            "WITH RECURSIVE " + commonTableExpressions.joined(separator: ",\n"),
+            [.text(studyDay), .double(now.timeIntervalSince1970)] + scopeFilter.bindings
+        )
     }
 
     private func singleLimiterEligibleDueCardsCTE(
@@ -2678,6 +2901,12 @@ actor SQLiteDatabase {
                 .int(nextSequence),
             ]
         )
+    }
+
+    func insertSynchronizedReviewIfMissing(_ log: ReviewLog) throws {
+        guard try fetchReviewLog(id: log.id) == nil else { return }
+        guard let card = try fetchCard(id: log.cardID) else { throw DatabaseError.cardNotFound(log.cardID) }
+        try insertReviewLog(log, memoryBefore: card.memory)
     }
 
     func fetchActiveReviewLogs() throws -> [ReviewLog] {
@@ -3438,6 +3667,254 @@ actor SQLiteDatabase {
                 .text(descriptor.fileExtension),
                 .double(createdAt.timeIntervalSince1970),
             ]
+        )
+    }
+
+    func completeStudyResponse(
+        id: UUID,
+        cardID: UUID,
+        media: MediaRef,
+        reservationID: UUID,
+        durationMilliseconds: Int,
+        capturedAt: Date,
+        submittedAt: Date
+    ) throws -> StudyResponse {
+        if let existing = try fetchStudyResponse(id: id) {
+            guard existing.cardID == cardID,
+                  existing.mediaHash == media.assetHash,
+                  existing.durationMilliseconds == durationMilliseconds,
+                  existing.capturedAt == capturedAt
+            else { throw DatabaseError.studyConflict("The response identifier was reused.") }
+            return existing
+        }
+        guard (1 ... 1_800_000).contains(durationMilliseconds) else {
+            throw DatabaseError.studyConflict("Audio submissions must be between one millisecond and 30 minutes.")
+        }
+        guard media.kind == .audio, media.fileExtension.lowercased() == "m4a" else {
+            throw DatabaseError.invalidMediaAsset("Audio submissions must use validated M4A audio.")
+        }
+
+        try inTransaction {
+            guard let card = try fetchCard(id: cardID) else {
+                throw DatabaseError.cardNotFound(cardID)
+            }
+            guard !card.isSuspended else {
+                throw DatabaseError.studyConflict("This Audio Submission card is already complete.")
+            }
+            guard card.isDue(asOf: submittedAt) else {
+                throw DatabaseError.studyConflict("This Audio Submission card is not currently due.")
+            }
+            guard let item = try fetchItem(id: card.itemID)?.item,
+                  let itemType = try fetchItemType(id: item.itemTypeID),
+                  let template = itemType.templates.first(where: { $0.id == card.templateID }),
+                  template.interaction == .audioSubmission
+            else {
+                throw DatabaseError.studyConflict("This card is not an Audio Submission card.")
+            }
+            if let existing = try fetchStudyResponse(cardID: cardID) {
+                throw DatabaseError.studyConflict(
+                    "This card already has response \(existing.id.uuidString)."
+                )
+            }
+            guard let asset = try fetchMediaAsset(hash: media.assetHash),
+                  asset.kind == .audio,
+                  asset.fileExtension == media.fileExtension.lowercased()
+            else { throw DatabaseError.invalidMediaAsset("The reserved audio asset is unavailable.") }
+            let reservation = try query(
+                "SELECT hash FROM media_reservations WHERE id = ? LIMIT 1;",
+                bindings: [.text(reservationID.uuidString)]
+            ).first
+            guard reservation?["hash"] as? String == media.assetHash else {
+                throw DatabaseError.invalidMediaAsset("The audio reservation is unavailable or mismatched.")
+            }
+            try execute(
+                """
+                INSERT INTO study_responses (
+                    id, card_id, media_hash, kind, duration_ms, captured_at, submitted_at
+                ) VALUES (?, ?, ?, 'audio', ?, ?, ?);
+                """,
+                bindings: [
+                    .text(id.uuidString), .text(cardID.uuidString), .text(media.assetHash),
+                    .int(Int64(durationMilliseconds)), .double(capturedAt.timeIntervalSince1970),
+                    .double(submittedAt.timeIntervalSince1970),
+                ]
+            )
+            try consumeMediaReservations(ids: [reservationID])
+            try execute(
+                "UPDATE cards SET is_suspended = 1 WHERE id = ?;",
+                bindings: [.text(cardID.uuidString)]
+            )
+        }
+        guard let response = try fetchStudyResponse(id: id) else {
+            throw DatabaseError.studyResponseNotFound(id)
+        }
+        return response
+    }
+
+    func fetchStudyResponse(id: UUID) throws -> StudyResponse? {
+        try fetchStudyResponse(where: "study_responses.id = ?", bindings: [.text(id.uuidString)])
+    }
+
+    func fetchStudyResponse(cardID: UUID) throws -> StudyResponse? {
+        try fetchStudyResponse(where: "study_responses.card_id = ?", bindings: [.text(cardID.uuidString)])
+    }
+
+    func fetchStudyResponses(
+        cardID: UUID? = nil,
+        itemID: UUID? = nil,
+        createdAfter: Date? = nil,
+        submittedBefore: Date? = nil,
+        submittedBeforeID: UUID? = nil,
+        limit: Int = 100
+    ) throws -> [StudyResponse] {
+        guard (1 ... 1_000).contains(limit) else {
+            throw DatabaseError.queryFailed("Study response limit must be between 1 and 1000.")
+        }
+        var clauses: [String] = []
+        var bindings: [Binding] = []
+        if let cardID {
+            clauses.append("study_responses.card_id = ?")
+            bindings.append(.text(cardID.uuidString))
+        }
+        if let itemID {
+            clauses.append("cards.item_id = ?")
+            bindings.append(.text(itemID.uuidString))
+        }
+        if let createdAfter {
+            clauses.append("study_responses.submitted_at > ?")
+            bindings.append(.double(createdAfter.timeIntervalSince1970))
+        }
+        if let submittedBefore {
+            if let submittedBeforeID {
+                clauses.append("(study_responses.submitted_at < ? OR (study_responses.submitted_at = ? AND study_responses.id < ?))")
+                bindings.append(.double(submittedBefore.timeIntervalSince1970))
+                bindings.append(.double(submittedBefore.timeIntervalSince1970))
+                bindings.append(.text(submittedBeforeID.uuidString))
+            } else {
+                clauses.append("study_responses.submitted_at < ?")
+                bindings.append(.double(submittedBefore.timeIntervalSince1970))
+            }
+        }
+        let filter = clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND ")
+        bindings.append(.int(Int64(limit)))
+        return try query(
+            studyResponseSelectSQL + " \(filter) ORDER BY study_responses.submitted_at DESC, study_responses.id DESC LIMIT ?;",
+            bindings: bindings
+        ).map(decodeStudyResponse(from:))
+    }
+
+    @discardableResult
+    func deleteStudyResponse(id: UUID) throws -> Bool {
+        try inTransaction {
+            guard try fetchStudyResponse(id: id) != nil else { return false }
+            try execute(
+                "DELETE FROM study_responses WHERE id = ?;",
+                bindings: [.text(id.uuidString)]
+            )
+            return true
+        }
+    }
+
+    func countStudyResponses(cardIDs: Set<UUID>) throws -> Int {
+        guard !cardIDs.isEmpty else { return 0 }
+        let ordered = cardIDs.sorted { $0.uuidString < $1.uuidString }
+        let placeholders = Array(repeating: "?", count: ordered.count).joined(separator: ",")
+        let rows = try query(
+            "SELECT COUNT(*) AS count FROM study_responses WHERE card_id IN (\(placeholders));",
+            bindings: ordered.map { .text($0.uuidString) }
+        )
+        return Int(rows.first?["count"] as? Int64 ?? 0)
+    }
+
+    func countStudyResponses(itemIDs: Set<UUID>) throws -> Int {
+        try countStudyResponses(joinColumn: "cards.item_id", ids: itemIDs)
+    }
+
+    func countStudyResponses(templateIDs: Set<UUID>) throws -> Int {
+        try countStudyResponses(joinColumn: "cards.template_id", ids: templateIDs)
+    }
+
+    private func countStudyResponses(joinColumn: String, ids: Set<UUID>) throws -> Int {
+        guard !ids.isEmpty else { return 0 }
+        let ordered = ids.sorted { $0.uuidString < $1.uuidString }
+        let placeholders = Array(repeating: "?", count: ordered.count).joined(separator: ",")
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS count
+            FROM study_responses
+            JOIN cards ON cards.id = study_responses.card_id
+            WHERE \(joinColumn) IN (\(placeholders));
+            """,
+            bindings: ordered.map { .text($0.uuidString) }
+        )
+        return Int(rows.first?["count"] as? Int64 ?? 0)
+    }
+
+    func ordinaryMediaReferenceCount(hash: String) throws -> Int {
+        let rows = try query(
+            """
+            SELECT media_assets.ref_count - COUNT(study_responses.id) AS ordinary_count
+            FROM media_assets
+            LEFT JOIN study_responses ON study_responses.media_hash = media_assets.hash
+            WHERE media_assets.hash = ?
+            GROUP BY media_assets.hash, media_assets.ref_count;
+            """,
+            bindings: [.text(hash)]
+        )
+        return max(0, Int(rows.first?["ordinary_count"] as? Int64 ?? 0))
+    }
+
+    func isStudyResponseMediaHash(_ hash: String) throws -> Bool {
+        try query(
+            "SELECT 1 AS present FROM study_response_media_privacy WHERE media_hash = ? LIMIT 1;",
+            bindings: [.text(hash)]
+        ).first != nil
+    }
+
+    private var studyResponseSelectSQL: String {
+        """
+        SELECT study_responses.id, study_responses.card_id, cards.item_id,
+               study_responses.media_hash, media_assets.file_extension,
+               media_assets.byte_size, study_responses.duration_ms,
+               study_responses.captured_at, study_responses.submitted_at,
+               COALESCE(item_browse_rows.title, 'Audio response') AS source_title
+        FROM study_responses
+        JOIN cards ON cards.id = study_responses.card_id
+        JOIN media_assets ON media_assets.hash = study_responses.media_hash
+        LEFT JOIN item_browse_rows ON item_browse_rows.item_id = cards.item_id
+        """
+    }
+
+    private func fetchStudyResponse(
+        where clause: String,
+        bindings: [Binding]
+    ) throws -> StudyResponse? {
+        try query(studyResponseSelectSQL + " WHERE \(clause) LIMIT 1;", bindings: bindings)
+            .first.map(decodeStudyResponse(from:))
+    }
+
+    private func decodeStudyResponse(from row: [String: Any?]) throws -> StudyResponse {
+        guard let idText = row["id"] as? String, let id = UUID(uuidString: idText),
+              let cardText = row["card_id"] as? String, let cardID = UUID(uuidString: cardText),
+              let itemText = row["item_id"] as? String, let itemID = UUID(uuidString: itemText),
+              let hash = row["media_hash"] as? String,
+              let fileExtension = row["file_extension"] as? String,
+              let byteSize = row["byte_size"] as? Int64,
+              let duration = row["duration_ms"] as? Int64,
+              let captured = row["captured_at"] as? Double,
+              let submitted = row["submitted_at"] as? Double
+        else { throw DatabaseError.decodingFailed }
+        return StudyResponse(
+            id: id,
+            cardID: cardID,
+            itemID: itemID,
+            mediaHash: hash,
+            fileExtension: fileExtension,
+            byteSize: Int(byteSize),
+            durationMilliseconds: Int(duration),
+            capturedAt: Date(timeIntervalSince1970: captured),
+            submittedAt: Date(timeIntervalSince1970: submitted),
+            sourceTitle: row["source_title"] as? String ?? "Audio response"
         )
     }
 
@@ -4656,6 +5133,240 @@ actor SQLiteDatabase {
         )
     }
 
+    func fetchSynchronizedReviewRecord(id: UUID) throws -> SynchronizedReviewRecord? {
+        let rows = try query(
+            "SELECT log, memory_before, sequence FROM review_logs WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first,
+              let logData = payload(row, "log"),
+              let memoryData = payload(row, "memory_before"),
+              let sequence = row["sequence"] as? Int64 else { return nil }
+        return SynchronizedReviewRecord(
+            log: try decode(ReviewLog.self, from: logData).withSequence(sequence),
+            memoryBefore: try decode(MemoryState.self, from: memoryData)
+        )
+    }
+
+    func fetchReviewRevertRecord(id: UUID) throws -> ReviewRevertRecord? {
+        let rows = try query(
+            "SELECT review_log_id, reverted_at FROM review_reverts WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        guard let row = rows.first,
+              let logText = row["review_log_id"] as? String,
+              let logID = UUID(uuidString: logText),
+              let revertedAt = row["reverted_at"] as? Double else { return nil }
+        return ReviewRevertRecord(
+            id: id,
+            reviewLogID: logID,
+            revertedAt: Date(timeIntervalSince1970: revertedAt)
+        )
+    }
+
+    func fetchItemTypeMembershipRecord(id: String) throws -> ItemTypeMembershipRecord? {
+        let parts = id.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+        switch parts.first {
+        case "library" where parts.count == 2:
+            guard let typeID = UUID(uuidString: parts[1]) else { return nil }
+            let found = try query(
+                "SELECT 1 AS found FROM library_item_types WHERE item_type_id = ? LIMIT 1;",
+                bindings: [.text(typeID.uuidString)]
+            )
+            return found.isEmpty ? nil : .library(itemTypeID: typeID)
+        case "included" where parts.count == 3:
+            guard let rootID = UUID(uuidString: parts[1]), let typeID = UUID(uuidString: parts[2]) else { return nil }
+            let rows = try query(
+                "SELECT ordinal FROM deck_included_item_types WHERE root_deck_id = ? AND item_type_id = ? LIMIT 1;",
+                bindings: [.text(rootID.uuidString), .text(typeID.uuidString)]
+            )
+            guard let ordinal = rows.first?["ordinal"] as? Int64 else { return nil }
+            return .included(rootDeckID: rootID, itemTypeID: typeID, ordinal: Int(ordinal))
+        case "policy" where parts.count == 3:
+            guard let deckID = UUID(uuidString: parts[1]), let typeID = UUID(uuidString: parts[2]) else { return nil }
+            let rows = try query(
+                "SELECT ordinal, is_default FROM deck_item_type_policy_entries WHERE deck_id = ? AND item_type_id = ? LIMIT 1;",
+                bindings: [.text(deckID.uuidString), .text(typeID.uuidString)]
+            )
+            guard let row = rows.first,
+                  let ordinal = row["ordinal"] as? Int64,
+                  let isDefault = row["is_default"] as? Int64 else { return nil }
+            return .policy(deckID: deckID, itemTypeID: typeID, ordinal: Int(ordinal), isDefault: isDefault != 0)
+        default:
+            return nil
+        }
+    }
+
+    func fetchSchedulingSettingsRecord(id: String) throws -> SchedulingSettingsRecord? {
+        if id == "rollover" {
+            guard let value = try metadataValue(forKey: ItemStore.studyDayRolloverMetadataKeyForSync),
+                  let minutes = Int(value) else { return nil }
+            return .studyDayRollover(minutes: minutes)
+        }
+        guard id.hasPrefix("profile:") else { return nil }
+        let profileID = String(id.dropFirst("profile:".count))
+        let rows = try query(
+            "SELECT parameters, optimized_at, sample_count, log_loss FROM scheduler_params WHERE profile_id = ? LIMIT 1;",
+            bindings: [.text(profileID)]
+        )
+        guard let row = rows.first,
+              let data = payload(row, "parameters"),
+              let optimizedAt = row["optimized_at"] as? Double,
+              let sampleCount = row["sample_count"] as? Int64,
+              let logLoss = row["log_loss"] as? Double else { return nil }
+        return .scheduler(
+            profileID: profileID,
+            parameters: try decode(FSRSScheduler.Parameters.self, from: data),
+            optimizedAt: Date(timeIntervalSince1970: optimizedAt),
+            sampleCount: Int(sampleCount),
+            logLoss: logLoss
+        )
+    }
+
+    func fetchPortableItemTypeMappingRecord(id: String) throws -> PortableItemTypeMappingRecord? {
+        let parts = id.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 3,
+              let libraryID = UUID(uuidString: parts[0]),
+              let typeID = UUID(uuidString: parts[1]) else { return nil }
+        let rows = try query(
+            "SELECT local_type_id FROM portable_item_type_mappings WHERE origin_library_id = ? AND origin_type_id = ? AND schema_digest = ? LIMIT 1;",
+            bindings: [.text(libraryID.uuidString), .text(typeID.uuidString), .text(parts[2])]
+        )
+        guard let localText = rows.first?["local_type_id"] as? String,
+              let localID = UUID(uuidString: localText) else { return nil }
+        return PortableItemTypeMappingRecord(
+            originLibraryID: libraryID,
+            originTypeID: typeID,
+            schemaDigest: parts[2],
+            localTypeID: localID
+        )
+    }
+
+    func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) throws {
+        try inTransaction {
+            for mutation in mutations {
+                switch mutation {
+                case let .deck(deck):
+                    try execute(
+                        """
+                        INSERT INTO decks (id, name, parent_id, new_cards_per_day) VALUES (?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET name = excluded.name, parent_id = excluded.parent_id,
+                            new_cards_per_day = excluded.new_cards_per_day;
+                        """,
+                        bindings: [.text(deck.id.uuidString), .text(deck.name), deck.parentID.map { .text($0.uuidString) } ?? .null, deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null]
+                    )
+                case let .itemType(type):
+                    try updateItemType(type)
+                case let .item(item, createdAt, updatedAt):
+                    guard let itemType = try fetchValidatedItemType(id: item.itemTypeID) else {
+                        throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+                    }
+                    try validateSynchronizedItem(item, against: itemType)
+                    try execute(
+                        """
+                        INSERT INTO items (id, item_type_id, fields, tags, deck_id, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET item_type_id = excluded.item_type_id,
+                            fields = excluded.fields, tags = excluded.tags, deck_id = excluded.deck_id,
+                            updated_at = excluded.updated_at;
+                        """,
+                        bindings: [.text(item.id.uuidString), .text(item.itemTypeID.uuidString), .blob(try encode(item.fields)), .blob(try encode(item.tags)), item.deckID.map { .text($0.uuidString) } ?? .null, .double(createdAt.timeIntervalSince1970), .double(updatedAt.timeIntervalSince1970)]
+                    )
+                    try upsertBrowseProjection(item, itemType: itemType, createdAt: createdAt)
+                case let .card(card):
+                    try upsertSynchronizedCard(card)
+                case let .review(record):
+                    if try fetchReviewLog(id: record.log.id) == nil {
+                        try insertReviewLog(record.log, memoryBefore: record.memoryBefore)
+                    }
+                case let .reviewRevert(record):
+                    try execute(
+                        "INSERT OR IGNORE INTO review_reverts (id, review_log_id, reverted_at) VALUES (?, ?, ?);",
+                        bindings: [.text(record.id.uuidString), .text(record.reviewLogID.uuidString), .double(record.revertedAt.timeIntervalSince1970)]
+                    )
+                case let .itemTypeMembership(record):
+                    switch record {
+                    case let .library(itemTypeID):
+                        try execute("INSERT OR IGNORE INTO library_item_types (item_type_id) VALUES (?);", bindings: [.text(itemTypeID.uuidString)])
+                    case let .included(rootDeckID, itemTypeID, ordinal):
+                        try execute(
+                            "INSERT INTO deck_included_item_types (root_deck_id, item_type_id, ordinal) VALUES (?, ?, ?) ON CONFLICT(root_deck_id, item_type_id) DO UPDATE SET ordinal = excluded.ordinal;",
+                            bindings: [.text(rootDeckID.uuidString), .text(itemTypeID.uuidString), .int(Int64(ordinal))]
+                        )
+                    case let .policy(deckID, itemTypeID, ordinal, isDefault):
+                        if isDefault { try execute("UPDATE deck_item_type_policy_entries SET is_default = 0 WHERE deck_id = ?;", bindings: [.text(deckID.uuidString)]) }
+                        try execute(
+                            "INSERT INTO deck_item_type_policy_entries (deck_id, item_type_id, ordinal, is_default) VALUES (?, ?, ?, ?) ON CONFLICT(deck_id, item_type_id) DO UPDATE SET ordinal = excluded.ordinal, is_default = excluded.is_default;",
+                            bindings: [.text(deckID.uuidString), .text(itemTypeID.uuidString), .int(Int64(ordinal)), .int(isDefault ? 1 : 0)]
+                        )
+                    }
+                case let .schedulingSettings(record):
+                    switch record {
+                    case let .studyDayRollover(minutes):
+                        guard StudyDay.validRolloverMinutes.contains(minutes) else { throw DatabaseError.invalidDeck("Study day rollover must be a valid local time.") }
+                        try setMetadataValue(String(minutes), forKey: ItemStore.studyDayRolloverMetadataKeyForSync)
+                    case let .scheduler(profileID, parameters, optimizedAt, sampleCount, logLoss):
+                        try saveSchedulerParameters(parameters, profileID: profileID, optimizedAt: optimizedAt, sampleCount: sampleCount, logLoss: logLoss)
+                    }
+                case let .portableTypeMapping(record):
+                    try persistPortableItemTypeMapping(originLibraryID: record.originLibraryID, originTypeID: record.originTypeID, schemaDigest: record.schemaDigest, localTypeID: record.localTypeID)
+                case let .tombstone(kind, id):
+                    try applySynchronizedTombstone(kind: kind, id: id)
+                }
+            }
+        }
+    }
+
+    private func applySynchronizedTombstone(kind: LibraryResourceKind, id: String) throws {
+        switch kind {
+        case .deck:
+            guard let uuid = UUID(uuidString: id) else { return }
+            try execute("UPDATE decks SET parent_id = NULL WHERE parent_id = ?;", bindings: [.text(uuid.uuidString)])
+            try execute("UPDATE items SET deck_id = NULL WHERE deck_id = ?;", bindings: [.text(uuid.uuidString)])
+            try execute("UPDATE cards SET deck_id = NULL WHERE deck_id = ?;", bindings: [.text(uuid.uuidString)])
+            try deleteDeck(id: uuid)
+        case .item:
+            if let uuid = UUID(uuidString: id) { try deleteItem(id: uuid) }
+        case .itemType:
+            if let uuid = UUID(uuidString: id), try countItems(itemTypeID: uuid) == 0 { try deleteItemType(id: uuid) }
+        case .card:
+            if let uuid = UUID(uuidString: id) { try deleteCard(id: uuid) }
+        case .reviewRevert:
+            if let uuid = UUID(uuidString: id) { try execute("DELETE FROM review_reverts WHERE id = ?;", bindings: [.text(uuid.uuidString)]) }
+        case .itemTypeMembership:
+            let parts = id.split(separator: ":").map(String.init)
+            if parts.count == 2, parts[0] == "library" { try execute("DELETE FROM library_item_types WHERE item_type_id = ?;", bindings: [.text(parts[1])]) }
+            if parts.count == 3, parts[0] == "included" { try execute("DELETE FROM deck_included_item_types WHERE root_deck_id = ? AND item_type_id = ?;", bindings: [.text(parts[1]), .text(parts[2])]) }
+            if parts.count == 3, parts[0] == "policy" { try execute("DELETE FROM deck_item_type_policy_entries WHERE deck_id = ? AND item_type_id = ?;", bindings: [.text(parts[1]), .text(parts[2])]) }
+        case .schedulingSettings:
+            if id == "rollover" { try execute("DELETE FROM app_metadata WHERE key = ?;", bindings: [.text(ItemStore.studyDayRolloverMetadataKeyForSync)]) }
+            else if id.hasPrefix("profile:") { try execute("DELETE FROM scheduler_params WHERE profile_id = ?;", bindings: [.text(String(id.dropFirst("profile:".count)))]) }
+        case .portableTypeMapping:
+            let parts = id.split(separator: ":", maxSplits: 2).map(String.init)
+            if parts.count == 3 { try execute("DELETE FROM portable_item_type_mappings WHERE origin_library_id = ? AND origin_type_id = ? AND schema_digest = ?;", bindings: [.text(parts[0]), .text(parts[1]), .text(parts[2])]) }
+        case .library, .review, .studyResponse, .media:
+            break
+        }
+    }
+
+    private func validateSynchronizedItem(_ item: Item, against itemType: ItemType) throws {
+        let definitions = Dictionary(uniqueKeysWithValues: itemType.fields.map { ($0.id, $0) })
+        var seen: Set<UUID> = []
+        for value in item.fields {
+            guard seen.insert(value.fieldID).inserted, definitions[value.fieldID] != nil else {
+                throw DatabaseError.invalidItem("The synchronized item has invalid fields.")
+            }
+        }
+        for field in itemType.fields where field.isRequired {
+            guard let value = item.value(for: field.id), !value.isEmpty else {
+                throw DatabaseError.requiredFieldEmpty(field.name)
+            }
+        }
+        if let deckID = item.deckID, try fetchDeck(id: deckID) == nil {
+            throw DatabaseError.deckNotFound(deckID)
+        }
+    }
+
     private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {
         try execute("BEGIN IMMEDIATE TRANSACTION;")
         do {
@@ -4802,14 +5513,18 @@ actor SQLiteDatabase {
             case let .text(value):
                 code = sqlite3_bind_text(statement, position, value, -1, SQLITE_TRANSIENT)
             case let .blob(value):
-                code = value.withUnsafeBytes { buffer in
-                    sqlite3_bind_blob(
-                        statement,
-                        position,
-                        buffer.baseAddress,
-                        Int32(buffer.count),
-                        SQLITE_TRANSIENT
-                    )
+                if value.isEmpty {
+                    code = sqlite3_bind_zeroblob(statement, position, 0)
+                } else {
+                    code = value.withUnsafeBytes { buffer in
+                        sqlite3_bind_blob(
+                            statement,
+                            position,
+                            buffer.baseAddress,
+                            Int32(buffer.count),
+                            SQLITE_TRANSIENT
+                        )
+                    }
                 }
             case let .double(value):
                 code = sqlite3_bind_double(statement, position, value)
@@ -4839,8 +5554,10 @@ actor SQLiteDatabase {
             case SQLITE_TEXT:
                 row[name] = String(cString: sqlite3_column_text(statement, index))
             case SQLITE_BLOB:
-                if let bytes = sqlite3_column_blob(statement, index) {
-                    let length = Int(sqlite3_column_bytes(statement, index))
+                let length = Int(sqlite3_column_bytes(statement, index))
+                if length == 0 {
+                    row[name] = Data()
+                } else if let bytes = sqlite3_column_blob(statement, index) {
                     row[name] = Data(bytes: bytes, count: length)
                 } else {
                     row[name] = nil

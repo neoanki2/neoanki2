@@ -37,7 +37,7 @@ styles, semantic text colors, relative text sizes, and safe HTTP, HTTPS, or
 mailto links. The validator also accepts legacy version 1 rich text; conflicting
 legacy style pairs are normalized during import.
 
-For new bundles, use manifest version 3. The root deck must provide a
+For new bundles, use manifest version 4. The root deck must provide a
 non-empty `itemTypes` array; add `defaultType` when one choice should be
 recommended. Descendants inherit the nearest declaration unless they provide
 their own non-empty array.

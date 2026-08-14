@@ -72,6 +72,8 @@ Scopes are independent permissions:
 | `decks.write` | Create, update, and delete decks through guarded plans |
 | `schemas.write` | Create and reconcile item types and templates |
 | `study.review` | Create study sessions, reserve cards, review, revert, suspend, and reset |
+| `study.responses.read` | List persistent spoken responses and download their audio |
+| `study.responses.delete` | Permanently delete persistent spoken responses |
 | `media.write` | Upload and reserve validated media bytes |
 | `library.import` | Stage, validate, and commit imports |
 | `library.export` | Create and download portable-deck exports |
@@ -80,7 +82,20 @@ Scopes are independent permissions:
 
 `settings.write` and `ui.control` are reserved and provide no version-1
 operations. Use the smallest set of scopes that completes the integration's
-job. A read-only tool normally needs only `library.read`.
+job. A read-only tool normally needs only `library.read`. Existing approvals do
+not gain either study-response scope automatically.
+
+## Retrieve saved spoken responses
+
+An explicitly approved client can list `/v1/study-responses`, filter by card,
+item, tag, or submission time, and follow its signed cursor. Metadata and exact
+validated bytes are available at `/v1/study-responses/{id}` and its `/content`
+endpoint. Verify the returned SHA-256 digest before processing the recording.
+
+Personal response audio is intentionally absent from generic media routes and
+ordinary `library.read` changes. Deletion requires `study.responses.delete`,
+the response `ETag`, and an idempotency key. It never unsuspends the completed
+card. Treat downloaded recordings as sensitive personal data.
 
 ## Use installed vocabulary packs
 

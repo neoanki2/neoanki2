@@ -12,7 +12,7 @@ parent: Reference
 
 adaptive
 
-macOS is the primary shipping target today (Swift 6 / SwiftUI). iOS and iPadOS
+macOS, iPhone, and iPad are first-class shipping targets (Swift 6 / SwiftUI). iOS and iPadOS
 are planned later, sharing `NeoAnkiCore`. UI work should follow Apple HIG per
 platform; Mac conventions (split navigation, menus, keyboard study flow) take
 priority until a mobile shell exists.
@@ -23,13 +23,13 @@ priority until a mobile shell exists.
 repetition to feel approachable, not intimidating. Clarity, calm layout, and
 plain language matter more than power-user density or feature sprawl.
 
-**Secondary (future):** SRS-literate learners who outgrow Anki's legacy model
+**Secondary:** SRS-literate learners who outgrow Anki's legacy model
 and want a native alternative; they will tolerate more density once core flows
 are obvious.
 
-**Situation:** Solo study at a desk on Mac — short daily review sessions,
+**Situation:** Solo study on Mac, iPhone, or iPad — short daily review sessions,
 occasionally adding new items. Success means finishing due cards without
-confusion and trusting that scheduling "just works."
+confusion and trusting that scheduling and optional sync “just work.”
 
 ## Product Purpose
 
@@ -59,15 +59,18 @@ can choose an empty starter set.
 
 ## Operating Context
 
-- **Environment:** macOS desktop, single-user, local SQLite store
-  (`AppDatabase.defaultURL`).
+- **Environment:** macOS, iPhone, and iPad; single-user local SQLite libraries
+  with optional private CloudKit synchronization.
+- **Personal recordings:** Audio Submission responses persist only in the local
+  library. They are excluded from CloudKit, authored bundles, and portable deck
+  exports, and local API access requires explicit response-specific scopes.
 - **Core workflows today**, in the order they matter:
   1. Open a scope and see what is due, then study it in the main detail pane
      (reveal → Again/Hard/Good/Easy)
   2. Add an item via form (fields from a selected item type)
   3. Browse, search, and triage items in a dedicated browse mode when something
      needs fixing or moving
-  4. Manage item types/templates and import JSON or CSV from the native shell
+  4. Manage item types/templates and import or export portable content
 - **Architecture split:** `NeoAnkiCore` (domain, scheduling, persistence);
   `NeoAnki2` (SwiftUI shell). See [`ARCHITECTURE.md`]({{ '/ARCHITECTURE/' | relative_url }}) for the three-layer model.
 - **Dev verification:** `./Scripts/test-fast.sh` for unit/flow tests; UI tests
@@ -84,8 +87,8 @@ can choose an empty starter set.
 | FSRS scheduling | Required — no SM-2 / ease hell |
 | Keyboard study flow on Mac | Required — grade and navigate without mouse-only dependency |
 | Minimal system-native UI | Required — semantic SwiftUI, no heavy custom chrome |
-| macOS first | Current focus; shared core for future iOS/iPad |
-| Item list + add + study session | Implemented (early) |
+| Universal Apple product | Shared workflows with native macOS and adaptive iPhone/iPad shells |
+| Item list + add + study session | Implemented on Mac, iPhone, and iPad |
 | Text/rich/number content display | Implemented |
 | Media display (audio/image/gif/video) | Implemented — sandbox `MediaStore`, study + preview |
 | Cloze display + authoring | Implemented — `FieldType.cloze`, structured blanks (no markup) |
@@ -105,9 +108,9 @@ can choose an empty starter set.
 | Study session | Reviewing due cards sequentially |
 | Again / Hard / Good / Easy | FSRS review grades (1–4) |
 
-### Open decisions
+### External release gates
 
-- iOS/iPad interaction model (touch targets, navigation) — deferred until Mac shell is coherent
+- Signed two-device CloudKit acceptance and TestFlight upload require an Apple Developer team.
 
 ## Brand Commitments
 

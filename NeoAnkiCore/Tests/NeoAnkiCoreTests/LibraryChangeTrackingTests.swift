@@ -149,13 +149,14 @@ private func trackedBasicItem(deckID: UUID? = nil) -> Item {
     #expect(combined.count == 5)
     #expect(Set(combined.map(\.cursor)).count == 5)
     #expect(combined.map(\.cursor) == combined.map(\.cursor).sorted())
+    let totalBeforePrune = try await store.libraryChanges(after: 0).count
 
     #expect(
         try await store.pruneLibraryChanges(
             asOf: .distantFuture,
             retentionInterval: 0,
             minimumRetained: 3
-        ) == 2
+        ) == totalBeforePrune - 3
     )
     let retained = try await store.libraryChanges(after: baseline)
     #expect(retained.map(\.cursor) == Array(combined.suffix(3)).map(\.cursor))
