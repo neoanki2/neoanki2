@@ -290,6 +290,38 @@ for feature in manifest.features
 }
 
 if requireScreenshots {
+    let screenshotStylesURL = docs.appendingPathComponent("assets/css/site.css")
+    guard let screenshotStyles = try? String(contentsOf: screenshotStylesURL, encoding: .utf8)
+    else {
+        fail("Could not read documentation screenshot presentation styles")
+        exitWithFailuresIfNeeded()
+    }
+    func screenshotPixelCap(named name: String) -> Int? {
+        let escapedName = NSRegularExpression.escapedPattern(for: name)
+        let pattern = #"--"# + escapedName + #"\s*:\s*([0-9]+)px\s*;"#
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(
+                  in: screenshotStyles,
+                  range: NSRange(screenshotStyles.startIndex..., in: screenshotStyles)
+              ),
+              let range = Range(match.range(at: 1), in: screenshotStyles) else {
+            return nil
+        }
+        return Int(screenshotStyles[range])
+    }
+    let screenshotDensityCaps = [
+        (name: "documentation-screenshot-2x-max-width", density: 2),
+        (name: "documentation-screenshot-3x-max-width", density: 3),
+    ]
+    let resolvedScreenshotDensityCaps = screenshotDensityCaps.compactMap { cap in
+        screenshotPixelCap(named: cap.name).map { (width: $0, density: cap.density) }
+    }
+    if resolvedScreenshotDensityCaps.count != screenshotDensityCaps.count
+        || !screenshotStyles.contains("@media (min-resolution: 2dppx)")
+        || !screenshotStyles.contains("@media (min-resolution: 3dppx)")
+        || !screenshotStyles.contains(#"a[href*="assets/screenshots/"] > img"#) {
+        fail("Documentation screenshots must define enforced 2x and 3x display caps")
+    }
     let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/manifest.json")
     guard
         let screenshotData = try? Data(contentsOf: screenshotManifestURL),
@@ -387,6 +419,13 @@ if requireScreenshots {
         if entry.width != pngInteger(at: 16) || entry.height != pngInteger(at: 20)
             || entry.width < 1_024 || entry.height < 680 {
             fail("Screenshot \(entry.filename) dimensions do not match its manifest")
+        }
+        for cap in resolvedScreenshotDensityCaps
+            where entry.width < cap.width * cap.density {
+            fail(
+                "Screenshot \(entry.filename) is too narrow for the \(cap.density)x "
+                    + "display cap (\(entry.width)px source for \(cap.width)px CSS)"
+            )
         }
         let digest = SHA256.hash(data: png)
             .map { String(format: "%02x", $0) }

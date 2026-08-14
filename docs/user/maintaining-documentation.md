@@ -117,6 +117,11 @@ The workflow never commits or promotes images automatically. This review step
 prevents a UI failure, permission dialog, or runner-specific content from
 silently replacing published documentation.
 
+Published captures are 1024 physical pixels wide. The site caps their rendered
+width to 512 CSS pixels on 2x displays and 341 CSS pixels on 3x displays, so a
+browser never has to enlarge screenshot pixels on Retina screens. The required
+documentation gate verifies those density caps against every manifest entry.
+
 ## What is generated
 
 Only `docs/features.md` is generated. User instructions, format specifications,
