@@ -175,9 +175,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             NSPredicate(format: "identifier BEGINSWITH %@", "includedDeckGroup-")
         ).firstMatch
         XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
-        let disclosureTriangle = app.disclosureTriangles.firstMatch
-        XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
-        disclosureTriangle.click()
+        includedDeckGroup.click()
         let included = app.descendants(matching: .any)
             .identified("includedItemTypeRow-Poem Line")
         XCTAssertTrue(included.waitUntilExists(timeout: 5))
