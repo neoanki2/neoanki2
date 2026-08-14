@@ -261,6 +261,9 @@ struct TemplatesView: View {
         .accessibilityLabel("\(group.deckPath), \(includedTypeCount(group.itemTypes.count))")
         .accessibilityHint("Shows read-only item types provided by this deck")
         .accessibilityIdentifier("includedDeckGroup-\(group.rootDeck.id.uuidString)")
+        .onTapGesture {
+            includedGroupExpansion(group.id).wrappedValue.toggle()
+        }
     }
 
     private func includedTypeCount(_ count: Int) -> String {
