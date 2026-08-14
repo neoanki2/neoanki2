@@ -165,15 +165,13 @@ struct TemplatesView: View {
                         if !model.includedItemTypeGroups.isEmpty {
                             Section("From Decks") {
                                 ForEach(model.includedItemTypeGroups) { group in
-                                    DisclosureGroup(
-                                        isExpanded: includedGroupExpansion(group.id)
-                                    ) {
+                                    includedGroupButton(group)
+                                    if expandedIncludedGroupIDs.contains(group.id) {
                                         ForEach(group.itemTypes) { itemType in
                                             itemTypeRow(itemType, readOnly: true)
                                                 .tag(itemType.id)
+                                                .padding(.leading, DesignSystem.Spacing.lg)
                                         }
-                                    } label: {
-                                        includedGroupLabel(group)
                                     }
                                 }
                             }
@@ -238,11 +236,20 @@ struct TemplatesView: View {
         )
     }
 
-    private func includedGroupLabel(_ group: IncludedItemTypeGroup) -> some View {
+    private func includedGroupButton(_ group: IncludedItemTypeGroup) -> some View {
         Button {
             includedGroupExpansion(group.id).wrappedValue.toggle()
         } label: {
             HStack(spacing: DesignSystem.Spacing.xs) {
+                Image(
+                    systemName: expandedIncludedGroupIDs.contains(group.id)
+                        ? "chevron.down"
+                        : "chevron.right"
+                )
+                .font(DesignSystem.Typography.sidebarRowMeta)
+                .frame(width: DesignSystem.Spacing.sm)
+                .accessibilityHidden(true)
+
                 Image(systemName: "folder")
                     .imageScale(.medium)
                     .accessibilityHidden(true)
@@ -265,6 +272,9 @@ struct TemplatesView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(group.deckPath), \(includedTypeCount(group.itemTypes.count))")
         .accessibilityHint("Shows read-only item types provided by this deck")
+        .accessibilityValue(
+            expandedIncludedGroupIDs.contains(group.id) ? "Expanded" : "Collapsed"
+        )
         .accessibilityIdentifier("includedDeckGroup-\(group.rootDeck.id.uuidString)")
     }
 
