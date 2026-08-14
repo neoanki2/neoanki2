@@ -13,7 +13,8 @@ goal or explanation you need.
 ## Start
 
 1. [Build and launch NeoAnki2](getting-started/)
-2. [Complete a first study session](first-study-session/)
+2. [Use NeoAnki2 on iPhone or iPad](iphone-ipad/)
+3. [Complete a first study session](first-study-session/)
 
 ## Tasks
 
@@ -23,6 +24,7 @@ goal or explanation you need.
 - [Add text, cloze, and media](content-and-media/)
 - [Study and grade cards](studying/)
 - [Import or export](import-export/)
+- [Set up iCloud sync, reminders, and widgets](sync-reminders-widgets/)
 - [Configure the local automation API](local-api/)
 
 ## Understand

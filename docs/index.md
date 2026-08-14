@@ -1,42 +1,49 @@
 ---
 layout: landing
-title: Native spaced repetition for macOS
+title: Native spaced repetition for Apple devices
 description: Model knowledge once, practice it in multiple ways, and let modern FSRS scheduling decide when each review returns.
-image: /assets/screenshots/item-types.png
+image: /assets/screenshots/template-advanced.png
 nav_order: 1
 ---
 
-{% assign release = site.data.release %}
-
 <section class="quiet-hero" aria-labelledby="hero-title">
   <div class="quiet-hero-copy">
-    <p class="quiet-intro">A native, local-first study tool for macOS</p>
+    <p class="quiet-intro">A native, local-first study tool for Mac, iPhone, and iPad</p>
     <h1 id="hero-title">Structure the idea.<br>Practice the skill.</h1>
     <p class="quiet-lede">NeoAnki2 stores knowledge as structured data—not tiny webpages—then turns it into focused recall and schedules each review with FSRS.</p>
     <div class="quiet-actions">
-      <a class="button button-primary" href="{{ release.download_url }}">
+      <a class="button button-primary" href="{{ '/download/' | relative_url }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
-        Download {{ release.version }}
+        Download for Mac
       </a>
       <a class="button button-secondary" href="{{ '/user/' | relative_url }}">Read the guides</a>
     </div>
-    <p class="quiet-release-note">{{ release.size }} · Universal Mac app · macOS 14+ · <a href="{{ '/download/' | relative_url }}">installation details</a></p>
+    <p class="quiet-release-note">Universal Mac app · macOS 14+ · <a href="{{ '/download/' | relative_url }}">installation details</a></p>
     <p class="quiet-caveat">Ad-hoc signed and not yet Apple-notarized. The download page explains the safe first launch.</p>
   </div>
 
   <figure class="quiet-hero-figure">
-    <a class="screenshot-link" href="{{ '/assets/screenshots/item-types.png' | relative_url }}" aria-label="Open the item type screenshot at full size">
-      <img src="{{ '/assets/screenshots/item-types.png' | relative_url }}" width="992" height="640" alt="NeoAnki2 showing structured fields and templates for a poem line item type">
+    <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the template editor screenshot at full size">
+      <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="1024" height="708" alt="NeoAnki2 showing structured prompt, answer, and skill settings for a study template">
     </a>
     <figcaption><strong>Knowledge has structure.</strong> Fields hold the material; templates decide how you practise it.</figcaption>
   </figure>
 </section>
 
+<section class="compatibility-note" aria-labelledby="mobile-title">
+  <p class="quiet-margin-note">Study anywhere</p>
+  <div>
+    <h2 id="mobile-title">One native model, adapted for iPhone and iPad.</h2>
+    <p>The mobile app has complete study and authoring flows, import and export, optional private iCloud sync, daily reminders, and due-count widgets. Public downloads currently ship for macOS; iPhone and iPad builds still require a maintainer build or TestFlight invitation.</p>
+    <a href="{{ '/user/iphone-ipad/' | relative_url }}">Use NeoAnki2 on iPhone or iPad <span aria-hidden="true">→</span></a>
+  </div>
+</section>
+
 <section class="release-ledger" aria-label="Current release">
-  <p><span>Current release</span><strong>{{ release.name }}</strong></p>
-  <p><span>Published</span><strong>{{ release.published_at | date: "%B %-d, %Y" }}</strong></p>
+  <p><span>Release channel</span><strong>Official macOS builds</strong></p>
+  <p><span>Updates</span><strong>Homebrew or GitHub Releases</strong></p>
   <p><span>Architecture</span><strong>Apple silicon + Intel</strong></p>
-  <p class="release-ledger-links"><a href="{{ release.release_url }}">Release notes</a><a href="{{ release.checksum_url }}">SHA-256</a></p>
+  <p class="release-ledger-links"><a href="https://github.com/neoanki2/neoanki2/releases/latest">Latest release and checksum</a></p>
 </section>
 
 <section class="quiet-thesis" aria-labelledby="thesis-title">
@@ -111,7 +118,7 @@ nav_order: 1
     <h2 id="close-title">Ready for your next subject.</h2>
   </div>
   <div class="quiet-actions quiet-close-actions">
-    <a class="button button-primary" href="{{ release.download_url }}">Download for macOS</a>
+    <a class="button button-primary" href="{{ '/download/' | relative_url }}">Download for macOS</a>
     <a class="button button-secondary" href="{{ '/download/' | relative_url }}">Install with Homebrew</a>
   </div>
 </section>

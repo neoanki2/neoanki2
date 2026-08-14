@@ -17,6 +17,8 @@ requirement, or unavailable action.
 - **A Terminal command, build, signing step, or launch failed:** use [Build,
   launch, and support](../support/).
 - **The app says Could Not Start:** see [Startup problems](#startup-problems).
+- **iCloud, a reminder, or the widget is not current:** use [iCloud, reminders,
+  and widgets](../sync-reminders-widgets/#troubleshoot-icloud).
 - **The app looks empty, loading, or caught up:** see [Empty and loading
   states](#empty-and-loading-states).
 - **Import or export failed:** see [Import and export errors](#import-and-export-errors).
@@ -220,6 +222,12 @@ normally and a later session tries again.
 All current interaction types—reveal, type, choose, record, audio submission, cloze, and
 arrange—are supported. Automatic correctness checking can still be unavailable
 when a card lacks suitable answer content; grading remains self-assessed.
+
+For iPhone/iPad iCloud status, retained conflicts, notification permission, or
+stale widget data, use the dedicated [iCloud, reminders, and widgets
+guide](../sync-reminders-widgets/). These services are intentionally
+non-blocking: an Offline sync state or denied reminder permission does not make
+the local library unavailable.
 
 ## Intentional limitations
 

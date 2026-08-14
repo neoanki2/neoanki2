@@ -7,13 +7,14 @@ parent: User Guide
 
 # Getting started
 
-NeoAnki2 is a native, local-first macOS spaced-repetition app. Homebrew is the
-recommended installation because it verifies the release and simplifies
-updates. The same official build is also available as a direct DMG from the
+NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and
+iPad. Homebrew is the recommended Mac installation because it verifies the
+release and simplifies updates. The same official Mac build is also available as a direct DMG from the
 [download page]({{ site.baseurl }}/download/). Maintainers and contributors can
-build the current source checkout.
+build the current source checkout for macOS or iOS. There is not yet a public
+App Store or TestFlight download; see the [iPhone and iPad guide](../iphone-ipad/).
 
-## Install the official release
+## Install the official Mac release
 
 On macOS 14 or newer with Homebrew installed, run:
 

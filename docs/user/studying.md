@@ -15,6 +15,7 @@ NeoAnki2 builds a study session from cards that are due now in the scope selecte
 **On this page**
 
 - [Session states](#session-states)
+- [Study queue order](#study-queue-order)
 - [Card interactions](#card-interactions)
 - [Feedback and grading](#feedback-and-grading)
 - [Fix a card during a session](#fix-a-card-during-a-session)
@@ -49,6 +50,25 @@ card appears once per repair round. When no cards are due, the scope home says
 opened on an empty queue shows **Nothing Due Right Now**.
 
 [![The revealed answer and grading controls]({{ site.baseurl }}/assets/screenshots/study-answer.png)]({{ site.baseurl }}/assets/screenshots/study-answer.png)
+
+## Study queue order
+
+NeoAnki2 builds the selected scope's eligible queue in two partitions:
+
+1. **Learned cards first:** Review, Learning, and Relearning cards that are due
+   now, ordered from earliest due time to latest.
+2. **New cards second:** eligible New cards, also ordered by due time, after
+   daily new-card limits are applied.
+
+Stable card identifiers break ties, so the same snapshot produces the same
+order. A New card with an older timestamp does not jump ahead of a learned card
+that needs reinforcement. This rule is the same for All Decks, an individual
+deck, Unassigned, the app session, and a local API study session.
+
+The session preserves that queue while you work. If grading places a card back
+into Learning, it returns after the rest of the current queue rather than
+interrupting the next card. Editing an item refreshes its queued cards; deleting
+a card removes it from the session.
 
 ## Card interactions
 

@@ -17,6 +17,8 @@ primary:
     children:
       - title: Getting started
         url: /user/getting-started/
+      - title: iPhone and iPad
+        url: /user/iphone-ipad/
       - title: First study session
         url: /user/first-study-session/
   - title: Tasks
@@ -34,6 +36,8 @@ primary:
         url: /user/import-export/
       - title: Scheduling
         url: /user/scheduling/
+      - title: iCloud, reminders, and widgets
+        url: /user/sync-reminders-widgets/
       - title: Local automation API
         url: /user/local-api/
   - title: Understand

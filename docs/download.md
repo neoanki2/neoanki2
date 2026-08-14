@@ -1,15 +1,13 @@
 ---
 layout: landing
 title: Download NeoAnki2
-description: Download the current universal macOS release or install NeoAnki2 with Homebrew.
+description: Install the current universal Mac release and check iPhone and iPad availability.
 permalink: /download/
 ---
 
-{% assign release = site.data.release %}
-
 <article class="download-sheet">
   <header class="download-heading">
-    <p class="quiet-intro">Current release · {{ release.name }}</p>
+    <p class="quiet-intro">Official macOS release</p>
     <h1>Install NeoAnki2.</h1>
     <p>Choose Homebrew for automatic upgrades or download the universal DMG directly. Both install the same official build.</p>
   </header>
@@ -30,12 +28,11 @@ permalink: /download/
     <div>
       <p class="download-label">Direct download</p>
       <h2 id="direct-title">Download the universal DMG</h2>
-      <p>{{ release.name }} · {{ release.size }} · Apple silicon and Intel · macOS 14 or newer.</p>
+      <p>Open the latest GitHub release, then download its universal Mac DMG. The release page identifies the exact version, publication date, file size, release notes, and SHA-256 file.</p>
     </div>
     <div class="download-option-actions">
-      <a class="button button-primary" href="{{ release.download_url }}">Download DMG</a>
-      <a href="{{ release.checksum_url }}">SHA-256 checksum</a>
-      <a href="{{ release.release_url }}">Release notes</a>
+      <a class="button button-primary" href="https://github.com/neoanki2/neoanki2/releases/latest">Open latest release</a>
+      <a href="https://github.com/neoanki2/neoanki2/releases">All releases</a>
     </div>
   </section>
 
@@ -44,14 +41,26 @@ permalink: /download/
     <p>NeoAnki2 is ad-hoc signed and provenance-attested, but it is not yet Apple-notarized. If macOS blocks it, Control-click NeoAnki2 in Applications, choose <strong>Open</strong>, then confirm <strong>Open</strong>. Do not disable Gatekeeper globally.</p>
   </aside>
 
+  <section class="download-option" aria-labelledby="mobile-download-title">
+    <div>
+      <p class="download-label">iPhone and iPad</p>
+      <h2 id="mobile-download-title">Mobile builds are not public yet</h2>
+      <p>The iOS 17+ app and Due Cards widget are implemented and validated in CI, but there is currently no public App Store listing or TestFlight invitation. Do not install an unofficial profile or package that claims to be a NeoAnki2 mobile release.</p>
+    </div>
+    <div class="download-option-actions">
+      <a href="{{ '/user/iphone-ipad/' | relative_url }}">Mobile features and maintainer builds</a>
+      <a href="https://github.com/neoanki2/neoanki2/blob/main/IOS_RELEASE.md">Release readiness checklist</a>
+    </div>
+  </section>
+
   <section class="download-details" aria-labelledby="details-title">
     <h2 id="details-title">Release details</h2>
     <dl>
-      <div><dt>Version</dt><dd>{{ release.version }}</dd></div>
-      <div><dt>Published</dt><dd>{{ release.published_at | date: "%B %-d, %Y" }}</dd></div>
+      <div><dt>Version</dt><dd><a href="https://github.com/neoanki2/neoanki2/releases/latest">Latest published release</a></dd></div>
+      <div><dt>Integrity</dt><dd>Version-matched SHA-256 file on the release page</dd></div>
       <div><dt>System</dt><dd>macOS 14+</dd></div>
       <div><dt>Architecture</dt><dd>Universal</dd></div>
-      <div><dt>Library</dt><dd>Local to this Mac</dd></div>
+      <div><dt>Library</dt><dd>Local to this Mac; check the selected release notes for provisioned private iCloud support</dd></div>
       <div><dt>Source</dt><dd><a href="{{ site.source_url }}">Available on GitHub</a></dd></div>
     </dl>
   </section>

@@ -1,5 +1,28 @@
 {
   "schemaVersion": 1,
+  "requiredScreenshotFeatureIDs": [
+    "app-first-launch",
+    "app-navigation",
+    "content-media",
+    "content-text-rich",
+    "deck-management",
+    "deck-scopes",
+    "errors-empty-states",
+    "import-json-csv",
+    "item-create-edit",
+    "item-detail",
+    "item-types",
+    "library-items",
+    "portable-deck",
+    "scheduling-optimize",
+    "study-grading",
+    "study-reveal",
+    "study-start",
+    "study-type",
+    "study-undo-end",
+    "template-advanced",
+    "templates"
+  ],
   "inventory": {
     "sourceRoots": ["Sources/NeoAnki2"],
     "fullyMappedSourceRoots": [
@@ -8,11 +31,16 @@
       "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck",
       "NeoAnkiCore/Sources/NeoAnkiCore/Media",
       "NeoAnkiCore/Sources/NeoAnkiDeckCLI",
+      "Platforms/iOS",
+      "Platforms/iOSWidget",
+      "Sources/NeoAnkiCloudSync",
       "Sources/NeoAnkiDeckBuilderKit",
+      "Sources/NeoAnkiFeatures",
+      "Sources/NeoAnkiIOS",
       "Sources/PoemDeckBuilder"
     ],
     "sourceMarkers": ["CommandMenu(", "CommandGroup(", ": Commands {", ": View {", ".keyboardShortcut(", ".accessibilityIdentifier("],
-    "testRoots": ["UITests/NeoAnki2UITests", "Tests/NeoAnki2Tests", "Tests/PoemDeckBuilderTests"],
+    "testRoots": ["UITests/NeoAnki2UITests", "Platforms/iOSUITests", "Tests/NeoAnki2Tests", "Tests/NeoAnkiApplicationTests", "Tests/NeoAnkiFeaturesTests", "Tests/PoemDeckBuilderTests"],
     "testMarkers": ["func test", "@Test"],
     "excludedFiles": [
       "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift",
@@ -37,6 +65,48 @@
       "sources": ["Sources/NeoAnki2/ContentView.swift"],
       "tests": ["UITests/NeoAnki2UITests/NavigationGatingUITests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
+    },
+    {
+      "id": "mobile-shell",
+      "name": "Navigate the adaptive iPhone and iPad app",
+      "article": "user/iphone-ipad.md",
+      "sources": ["Platforms/iOS/MobilePaths.swift", "Platforms/iOS/NeoAnkiIOSApp.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiIOS/MobileAppModel.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/NeoAnkiIOSApp.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiApplicationTests/AppSessionTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
+    },
+    {
+      "id": "mobile-library-authoring",
+      "name": "Browse, author, organize, and transfer on iOS",
+      "article": "user/iphone-ipad.md",
+      "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
+    },
+    {
+      "id": "mobile-study",
+      "name": "Complete native mobile study sessions",
+      "article": "user/iphone-ipad.md",
+      "sources": ["Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiIOS/StudySessionView.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift"]
+    },
+    {
+      "id": "mobile-saved-responses",
+      "name": "Manage local saved spoken responses on iOS",
+      "article": "user/iphone-ipad.md",
+      "sources": ["Sources/NeoAnkiFeatures/SavedResponsesFeatureModel.swift", "Sources/NeoAnkiIOS/SavedResponsesMobileView.swift"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyResponseTests.swift"]
+    },
+    {
+      "id": "cloudkit-sync",
+      "name": "Opt in to offline-first private CloudKit sync",
+      "article": "user/sync-reminders-widgets.md",
+      "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOS/MobilePaths.swift", "Sources/NeoAnki2/MacCloudSyncSettings.swift", "Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnkiCloudSync/CKSyncEngineTransport.swift", "Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift", "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift", "Sources/NeoAnkiCloudSync/SyncMergePolicy.swift", "Sources/NeoAnkiCloudSync/SyncMetadataStore.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
+      "tests": ["Tests/NeoAnkiApplicationTests/OfflineFirstSyncServiceTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiApplicationTests/SyncMergePolicyTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
+    },
+    {
+      "id": "mobile-reminders-widgets",
+      "name": "Configure daily reminders and due-count widgets",
+      "article": "user/sync-reminders-widgets.md",
+      "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOSWidget/NeoAnkiWidget.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
     },
     {
       "id": "deck-scopes",
@@ -122,6 +192,13 @@
       "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift"],
       "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnki2Tests/StudyStartPerformanceTests.swift", "Tests/NeoAnki2Tests/DockBadgeTests.swift"],
       "screenshot": "assets/screenshots/study-prompt.png"
+    },
+    {
+      "id": "study-queue-ordering",
+      "name": "Prioritize due learned cards before new material",
+      "article": "user/studying.md",
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnkiFeatures/StudyFeatureModel.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"]
     },
     {
       "id": "study-reveal",
@@ -292,8 +369,8 @@
       "id": "offline-vocabulary",
       "name": "Install and use offline vocabulary packs",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnki2/VocabularyLibraryModel.swift", "Sources/VocabularyDeckBuilder/VocabularyDeckBuilderView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/VocabularyUITests.swift", "Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift", "Tests/VocabularyDeckBuilderTests/VocabularyDeckBuilderTests.swift"]
+      "sources": ["Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnki2/VocabularyLibraryModel.swift", "Sources/NeoAnkiIOS/MobileVocabularyLibraryModel.swift", "Sources/VocabularyDeckBuilder/VocabularyDeckBuilderView.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "UITests/NeoAnki2UITests/VocabularyUITests.swift", "Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift", "Tests/VocabularyDeckBuilderTests/VocabularyDeckBuilderTests.swift"]
     },
     {
       "id": "deck-cli",

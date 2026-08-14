@@ -160,12 +160,9 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
     func testIncludedDefinitionsAreGroupedReadOnlyAndDuplicateAsNormal() throws {
         let app = launchApp(scenario: "deck-included-item-types")
         openTemplates(in: app)
-        let disclosure = app.descendants(matching: .any)
-            .identified("includedWithDecksDisclosure")
-        XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
-        let disclosureTriangle = app.disclosureTriangles.firstMatch
-        XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
-        disclosureTriangle.click()
+        let includedDeckGroup = app.buttons.identified("includedDeckGroup-Poetry Lab")
+        XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
+        includedDeckGroup.click()
 
         let included = app.descendants(matching: .any)
             .identified("includedItemTypeRow-Poem Line")

@@ -209,7 +209,8 @@ exactly matching item-type schemas are reused when safe. Re-importing a
 portable deck creates another copy of its content.
 
 Version-3 packages preserve the ordered item types offered by each deck.
-Newly introduced schemas stay under **Included with Decks**; an exact match
+Newly introduced schemas stay under **From Decks** beneath their owning deck;
+an exact match
 that is already a normal Item Type remains normal. Older version-1 and
 version-2 packages keep their previous behavior and add their types to the
 normal Item Types list.

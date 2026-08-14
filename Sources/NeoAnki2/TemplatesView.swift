@@ -165,15 +165,13 @@ struct TemplatesView: View {
                         if !model.includedItemTypeGroups.isEmpty {
                             Section("From Decks") {
                                 ForEach(model.includedItemTypeGroups) { group in
-                                    DisclosureGroup(
-                                        isExpanded: includedGroupExpansion(group.id)
-                                    ) {
+                                    includedGroupButton(group)
+                                    if expandedIncludedGroupIDs.contains(group.id) {
                                         ForEach(group.itemTypes) { itemType in
                                             itemTypeRow(itemType, readOnly: true)
                                                 .tag(itemType.id)
+                                                .padding(.leading, DesignSystem.Spacing.lg)
                                         }
-                                    } label: {
-                                        includedGroupLabel(group)
                                     }
                                 }
                             }
@@ -225,42 +223,50 @@ struct TemplatesView: View {
         return "\(itemType.templates.count) \(templateNoun) · \(itemType.fields.count) \(fieldNoun)"
     }
 
-    private func includedGroupExpansion(_ id: UUID) -> Binding<Bool> {
-        Binding(
-            get: { expandedIncludedGroupIDs.contains(id) },
-            set: { isExpanded in
-                if isExpanded {
-                    expandedIncludedGroupIDs.insert(id)
-                } else {
-                    expandedIncludedGroupIDs.remove(id)
-                }
+    private func includedGroupButton(_ group: IncludedItemTypeGroup) -> some View {
+        Button {
+            if expandedIncludedGroupIDs.contains(group.id) {
+                expandedIncludedGroupIDs.remove(group.id)
+            } else {
+                expandedIncludedGroupIDs.insert(group.id)
             }
-        )
-    }
-
-    private func includedGroupLabel(_ group: IncludedItemTypeGroup) -> some View {
-        HStack(spacing: DesignSystem.Spacing.xs) {
-            Image(systemName: "folder")
-                .imageScale(.medium)
+        } label: {
+            HStack(spacing: DesignSystem.Spacing.xs) {
+                Image(
+                    systemName: expandedIncludedGroupIDs.contains(group.id)
+                        ? "chevron.down"
+                        : "chevron.right"
+                )
+                .font(DesignSystem.Typography.sidebarRowMeta)
+                .frame(width: DesignSystem.Spacing.sm)
                 .accessibilityHidden(true)
 
-            Text(group.deckPath)
-                .font(DesignSystem.Typography.sidebarRowTitle)
-                .lineLimit(1)
+                Image(systemName: "folder")
+                    .imageScale(.medium)
+                    .accessibilityHidden(true)
 
-            Spacer(minLength: DesignSystem.Spacing.xs)
+                Text(group.deckPath)
+                    .font(DesignSystem.Typography.sidebarRowTitle)
+                    .lineLimit(1)
 
-            Text(includedTypeCount(group.itemTypes.count))
-                .font(DesignSystem.Typography.sidebarRowMeta)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
+                Spacer(minLength: DesignSystem.Spacing.xs)
+
+                Text(includedTypeCount(group.itemTypes.count))
+                    .font(DesignSystem.Typography.sidebarRowMeta)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(group.deckPath), \(includedTypeCount(group.itemTypes.count))")
         .accessibilityHint("Shows read-only item types provided by this deck")
-        .accessibilityIdentifier("includedDeckGroup-\(group.rootDeck.id.uuidString)")
+        .accessibilityValue(
+            expandedIncludedGroupIDs.contains(group.id) ? "Expanded" : "Collapsed"
+        )
+        .accessibilityIdentifier("includedDeckGroup-\(group.deckPath)")
     }
 
     private func includedTypeCount(_ count: Int) -> String {
