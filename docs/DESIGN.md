@@ -134,8 +134,8 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 - **Card Answer** (regular, `.title` / ~28pt, 1.3 line-height): Revealed content; visually subordinate to prompt but still comfortable to read.
 - **Display** (bold, `.title2`): The one number a pane exists to deliver — today, the scope home's due headline. Bold, not larger, because size above this belongs to the card. Whatever sits near it must be quieter than a section heading, or the weight stops reading as hierarchy.
 - **Title** (semibold, `.title2` / `.title3`): Pane headlines and section headings.
-- **Row Title / Row Meta** (`.headline` over `.caption`): The two lines of a sidebar
-  scope row. Denser than body text because a list row is not prose.
+- **Sidebar Row / Meta** (`.body` beside `.caption`): A compact, single-line
+  navigation row. Name leads; actionable status such as “7 due” trails.
 - **Body** (regular, `.body` / ~17pt): Form labels, descriptions, empty-state copy. Max ~65 characters per line in study column.
 - **Caption** (regular, `.subheadline` / ~15pt): Progress, card counts, metadata, error banners.
 
@@ -147,9 +147,9 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 
 ## Layout
 
-**Spatial model:** `NavigationSplitView` — sidebar (deck scopes) + detail (scope home, study, browse, or item). This matches Mac user expectations (Reminders, Notes) and the confirmed study-flow brief.
+**Spatial model:** `NavigationSplitView` — sidebar (library destinations and deck scopes) + detail (scope home, study, browse, recordings, or item). This matches Mac user expectations (Reminders, Notes) and the confirmed study-flow brief.
 
-The sidebar navigates **scopes**, not items: All Decks, the deck tree, Unassigned. The detail pane defaults to a **scope home** that answers "is there anything to study right now, and can I start" — not an enumeration of the library. Enumerating items is **browse mode**, a deliberate destination reached from the scope home link, the Library menu, or ⌥⌘B, and left with Escape.
+The sidebar has one selection model and two clear groups. **Library** contains All Decks and Recordings; **Decks** contains the deck tree and Unassigned. Recordings is a first-class destination rather than a button floating above the selected scope, so the highlight always agrees with the detail pane. Deck rows navigate scopes, not items. The detail pane defaults to a **scope home** that answers "is there anything to study right now, and can I start" — not an enumeration of the library. Enumerating items is **browse mode**, a deliberate destination reached from the scope home link, the Library menu, or ⌥⌘B, and left with Escape.
 
 | Region | Width | Behavior |
 |--------|-------|----------|
@@ -228,7 +228,9 @@ The sidebar navigates **scopes**, not items: All Decks, the deck tree, Unassigne
 ### Lists (sidebar)
 
 - **Style:** Standard `List` with selection
-- **Row content:** Title (headline) + subtitle (secondary) + metadata line (caption/tertiary)
+- **Row content:** SF Symbol + body-weight title + compact trailing status; full
+  inventory detail stays in the detail pane and accessibility label
+- **Selection:** Exactly one highlighted destination, including Recordings
 - **No** custom row backgrounds, swipe chrome, or trailing button clusters in v1
 
 ### Empty states
