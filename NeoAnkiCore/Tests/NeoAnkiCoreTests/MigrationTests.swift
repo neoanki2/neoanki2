@@ -20,6 +20,8 @@ import Testing
     #expect(try tableExists("new_card_introductions", at: url))
     #expect(try indexExists("idx_new_card_introductions_day_deck_log", at: url))
     #expect(try indexExists("idx_cards_active_new_due", at: url))
+    #expect(try indexExists("idx_cards_active_learned_due", at: url))
+    #expect(try indexExists("idx_cards_active_deck_learned_due", at: url))
     #expect(try columnExists("new_cards_per_day", in: "decks", at: url))
     #expect(try tableExists("library_item_types", at: url))
     #expect(try tableExists("deck_included_item_types", at: url))
@@ -580,10 +582,73 @@ import Testing
     let migrated = try SQLiteDatabase(path: url)
     try await migrated.migrate()
 
-    #expect(try integer("SELECT version FROM schema_version;", at: url) == 23)
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
     #expect(try tableExists("study_responses", at: url))
     #expect(try tableExists("study_response_media_privacy", at: url))
     #expect(try indexExists("idx_study_responses_submitted", at: url))
+}
+
+@Test func versionTwentyFourMigrationAddsLearnedQueueIndexesWithoutChangingCards() async throws {
+    let url = migrationDatabaseURL()
+    do {
+        let store = try ItemStore(databaseURL: url)
+        try await store.bootstrap()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        for title in ["New", "Learned"] {
+            _ = try await store.createItem(
+                Item(
+                    itemTypeID: BuiltInItemTypes.basicID,
+                    fields: [
+                        FieldValue(
+                            fieldID: BuiltInItemTypes.frontFieldID,
+                            value: .text(title)
+                        ),
+                        FieldValue(
+                            fieldID: BuiltInItemTypes.backFieldID,
+                            value: .text("Answer")
+                        ),
+                    ]
+                ),
+                now: now
+            )
+        }
+        let learned = try #require(try await store.fetchDueCards(asOf: now).last)
+        _ = try await store.submitReview(
+            cardID: learned.card.id,
+            rating: .good,
+            now: now
+        )
+    }
+    let cardSnapshot = try text(
+        """
+        SELECT GROUP_CONCAT(id || ':' || phase || ':' || due_at, '|')
+        FROM (SELECT id, phase, due_at FROM cards ORDER BY id);
+        """,
+        at: url
+    )
+    try executeMigrationSQL(
+        """
+        DROP INDEX idx_cards_active_learned_due;
+        DROP INDEX idx_cards_active_deck_learned_due;
+        UPDATE schema_version SET version = 23;
+        PRAGMA user_version = 23;
+        """,
+        at: url
+    )
+
+    let migrated = try SQLiteDatabase(path: url)
+    try await migrated.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try indexExists("idx_cards_active_learned_due", at: url))
+    #expect(try indexExists("idx_cards_active_deck_learned_due", at: url))
+    #expect(try text(
+        """
+        SELECT GROUP_CONCAT(id || ':' || phase || ':' || due_at, '|')
+        FROM (SELECT id, phase, due_at FROM cards ORDER BY id);
+        """,
+        at: url
+    ) == cardSnapshot)
 }
 
 @Test func corruptSchemaVersionReadDoesNotRecreateDatabase() async throws {
