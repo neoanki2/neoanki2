@@ -233,6 +233,16 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 - **Selection:** Exactly one highlighted destination, including Recordings
 - **No** custom row backgrounds, swipe chrome, or trailing button clusters in v1
 
+### Item type navigator
+
+- **Editable definitions:** Lead the list without a redundant section label;
+  use compact title + schema metadata rows.
+- **Deck-provided definitions:** Group under **From Decks**, then disclose each
+  source deck independently. Never present all imported definitions as one
+  selectable “Included with Decks” object.
+- **Read-only state:** Pair the section context with a lock glyph, an explicit
+  accessibility value, and “From [deck] · Read-only” in the detail pane.
+
 ### Empty states
 
 - **Component:** `ContentUnavailableView` + SF Symbol + one primary action
