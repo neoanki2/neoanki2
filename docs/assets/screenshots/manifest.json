@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-14T12:16:12Z",
+  "capturedAt" : "2026-08-14T22:22:39Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 716,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "a8664adb187e3eb7819f7ae2fe950aac0f0ae474a1e6d088e81433c2a30a502f",
+      "sha256" : "60d1f610fba9128a9062f9161a1cd86ee393a0351942c4814b08c3d40998a23f",
       "width" : 1024
     },
     {
@@ -85,14 +85,13 @@
     {
       "expectedVisibleIdentifiers" : [
         "templatesDone",
-        "includedWithDecksDisclosure",
-        "includedItemTypeOwner",
-        "duplicateIncludedItemType"
+        "itemTypeRow-Basic",
+        "includedDeckGroup-Poetry Lab"
       ],
       "filename" : "item-types.png",
       "height" : 680,
-      "scenario" : "item types manager with an included read-only deck type selected",
-      "sha256" : "48aa7a95c87e2cb5ded78e5aaa481c28f353a2514c7ded6a384d8e450f481732",
+      "scenario" : "item types manager with a deck-grouped read-only section",
+      "sha256" : "ba7beae06ab4dd3e8e1c3672ab34644aee0e8983011556456cd8162719b30967",
       "width" : 1024
     },
     {
@@ -204,7 +203,7 @@
       "filename" : "template-advanced.png",
       "height" : 708,
       "scenario" : "advanced template editor with answer reveal controls and advanced settings entry point",
-      "sha256" : "170de0a340975a2bede5bd56cc6ee383f77aff4120a2741ed69f42d05336bdb8",
+      "sha256" : "01fe24426289de8fb76d727e339320bd7c03f1e2093faf07f808ce12d77819aa",
       "width" : 1024
     },
     {
@@ -216,9 +215,9 @@
       "filename" : "template-editor.png",
       "height" : 708,
       "scenario" : "new template editor",
-      "sha256" : "446dc943d7aa29db59743aada423bb10692e029bfba1714859e894a13bd87ff8",
+      "sha256" : "90f3abb86a4c55fb9c29db44716806b5f4caabe92eea10f8cd1944dd63c38c16",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "9d118e8a952aa9b84a199e70c6e03a9561148454"
+  "sourceSHA" : "2678599b8180f60b67fb4880335423bc69119c90"
 }
