@@ -171,9 +171,10 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "deck-included-item-types"
         )
         openTemplates(in: app)
-        let disclosure = app.descendants(matching: .any)
-            .identified("includedWithDecksDisclosure")
-        XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
+        let includedDeckGroup = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "includedDeckGroup-")
+        ).firstMatch
+        XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
         let disclosureTriangle = app.disclosureTriangles.firstMatch
         XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
         disclosureTriangle.click()
@@ -184,10 +185,10 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         captureDocumentationScreenshot(
             named: "item-types",
             of: app,
-            scenario: "item types manager with an included read-only deck type selected",
+            scenario: "item types manager with a deck-grouped read-only type selected",
             expectedVisibleIdentifiers: [
                 "templatesDone",
-                "includedWithDecksDisclosure",
+                "includedItemTypeRow-Poem Line",
                 "includedItemTypeOwner",
                 "duplicateIncludedItemType",
             ]

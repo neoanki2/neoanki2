@@ -39,6 +39,13 @@ boundary in `docs/features.json` also scans user-facing source and UI-test roots
 for unmapped files with stable UI markers. Add a narrow exclusion only for
 non-product infrastructure such as the screenshot capture suite.
 
+`requiredScreenshotFeatureIDs` is the explicit minimum visual-evidence set.
+Every listed feature must name a screenshot. With `--require-screenshots`, the
+validator also compares the capture's source SHA with the current tree and
+rejects an image when any source owned by that feature changed after capture.
+Updating a hash or timestamp without recapturing the UI does not satisfy this
+check.
+
 When a mapped source diff is exclusively debug-only test infrastructure and
 does not change production behavior, record the reviewed files, reason, and
 exact patch SHA-256 in `docs/infrastructure-change-review.json`. The validator
@@ -78,8 +85,9 @@ cropped to the focused NeoAnki2 app window, so the desktop, Dock, and menu bar
 are not published. Capture rejects partially clipped expected controls. Images
 are not captured during normal local testing.
 
-1. Run the **Documentation screenshots** workflow manually, or wait for its
-   weekly run.
+1. Run the **Documentation screenshots** workflow on the pull request, dispatch
+   it manually, or wait for its weekly run. Product-UI pull requests trigger it
+   automatically so a fresh artifact is available before merge.
 2. Download the `neoanki2-documentation-screenshots` artifact.
    It must contain all PNG files and `manifest.json`.
 3. Review every image for correct content, layout, visible formatting and
@@ -92,7 +100,9 @@ are not captured during normal local testing.
    ./Scripts/promote-doc-screenshots.sh path/to/downloaded/screenshots
    ```
 
-5. Run `swift Scripts/validate-docs.swift --require-screenshots`.
+5. Run `swift Scripts/validate-docs.swift --require-screenshots`. When a feature
+   source changed after the artifact's source SHA, capture and promote a newer
+   artifact; never edit `sourceSHA` by hand.
 
 Capture records each image's source SHA, UTC capture date, pixel dimensions,
 scenario, and identifiers that were required to be visible. Both capture and
@@ -113,5 +123,14 @@ capture workflow context, limitations, or user-facing language reliably.
 Every documentation pull request builds Jekyll and runs the rendered-site
 crawler. The crawler checks internal routes and fragments, assets, canonical
 metadata, heading order, image alternatives, duplicate IDs, language, and
-landmarks. Deployment remains restricted to `main`; the footer identifies the
-exact source revision and UTC publication time used for that build.
+landmarks. The stable **Documentation and screenshot gate** job runs on every
+pull request so branch protection can require one status regardless of changed
+paths.
+
+The only canonical public content site is `https://neoanki2.github.io/`. The
+`neoanki2/neoanki2.github.io` deployment builds this repository's `docs/`
+directory at the root URL. This repository's own Pages deployment contains
+only route-preserving redirects from the legacy `/neoanki2` project URL and is
+validated to contain no copied documentation assets. Deployment remains
+restricted to `main`; the footer identifies the exact source revision and UTC
+publication time used for the canonical build.

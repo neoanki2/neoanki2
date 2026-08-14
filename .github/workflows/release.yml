@@ -123,6 +123,3 @@ jobs:
           assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
           grep -Fxq "$VERSIONED_NAME" <<< "$assets"
           grep -Fxq "NeoAnki2-latest-mac-universal.dmg" <<< "$assets"
-
-      - name: Refresh the published website
-        run: gh workflow run docs-pages.yml --ref main

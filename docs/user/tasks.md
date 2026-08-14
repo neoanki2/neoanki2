@@ -12,6 +12,7 @@ Choose what you want to accomplish.
 ## Start learning
 
 - **Build and open the app:** [Getting started](../getting-started/)
+- **Use the iPhone or iPad app:** [iPhone and iPad](../iphone-ipad/)
 - **Finish one real review:** [First study session](../first-study-session/)
 - **Understand the terminology:** [Concepts and glossary](../concepts/)
 
@@ -37,6 +38,14 @@ Choose what you want to accomplish.
 - **Learn what FSRS changes:** [Scheduling](../scheduling/)
 - **Understand when scheduling retunes itself:** [Scheduling](../scheduling/#optimization-happens-on-its-own)
 - **Study with the keyboard:** [Shortcuts and accessibility](../shortcuts-accessibility/#study)
+- **Understand learned-before-new queue order:** [Study queue order](../studying/#study-queue-order)
+
+## Use device services
+
+- **Sync privately through iCloud:** [iCloud setup](../sync-reminders-widgets/#set-up-icloud-sync)
+- **Recover a sync conflict:** [Sync status and issues](../sync-reminders-widgets/#sync-status-and-issues)
+- **Schedule a daily reminder:** [Daily reminders](../sync-reminders-widgets/#daily-reminders)
+- **Add or refresh the due widget:** [Due Cards widget](../sync-reminders-widgets/#due-cards-widget)
 
 ## Move content in or out
 

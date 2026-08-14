@@ -9,7 +9,9 @@ parent: User Guide
 
 An **item type** defines the fields an item stores. Its **templates** turn those fields into study cards: each template chooses what appears on the prompt and answer, how the learner responds, and when the card should exist.
 
-Open **Item Types** from the library to manage both. The left column lists types; the detail shows fields and templates for the selected type.
+Open **Item Types** from the library to manage both. The left column lists your
+editable types first, followed by a **From Decks** section; the detail shows
+fields and templates for the selected type.
 
 [![The Item Types manager]({{ site.baseurl }}/assets/screenshots/item-types.png)]({{ site.baseurl }}/assets/screenshots/item-types.png)
 
@@ -37,9 +39,10 @@ Starter types are not protected system definitions. You may edit or delete them 
 
 ## Included with decks
 
-Imported, deck-specific schemas are collected in the collapsed **Included with
-Decks** disclosure and grouped by the owning deck's current path. They do not
-crowd the main Item Types list.
+Imported, deck-specific schemas appear under **From Decks**. Each owning deck
+has its own disclosure row, labeled with the deck's current path and included
+type count. Expand a deck to see its read-only types. They do not crowd the
+main editable list.
 
 An included-only definition is read-only. You can inspect its fields,
 templates, and owning deck, but Edit, Delete, and Add Template are unavailable.

@@ -160,9 +160,10 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
     func testIncludedDefinitionsAreGroupedReadOnlyAndDuplicateAsNormal() throws {
         let app = launchApp(scenario: "deck-included-item-types")
         openTemplates(in: app)
-        let disclosure = app.descendants(matching: .any)
-            .identified("includedWithDecksDisclosure")
-        XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
+        let includedDeckGroup = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "includedDeckGroup-")
+        ).firstMatch
+        XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
         let disclosureTriangle = app.disclosureTriangles.firstMatch
         XCTAssertTrue(disclosureTriangle.waitUntilExists(timeout: 3))
         disclosureTriangle.click()

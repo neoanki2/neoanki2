@@ -5,6 +5,7 @@ import Foundation
 
 struct Manifest: Decodable {
     let schemaVersion: Int
+    let requiredScreenshotFeatureIDs: [String]
     let inventory: Inventory
     let features: [Feature]
 }
@@ -230,6 +231,23 @@ for feature in manifest.features {
     }
 }
 
+let requiredScreenshotFeatureIDs = Set(manifest.requiredScreenshotFeatureIDs)
+if requiredScreenshotFeatureIDs.count != manifest.requiredScreenshotFeatureIDs.count
+    || manifest.requiredScreenshotFeatureIDs != manifest.requiredScreenshotFeatureIDs.sorted() {
+    fail("requiredScreenshotFeatureIDs must be unique and sorted")
+}
+let unknownScreenshotRequirements = requiredScreenshotFeatureIDs.subtracting(identifiers)
+if !unknownScreenshotRequirements.isEmpty {
+    fail(
+        "Required screenshots reference unknown features: "
+            + unknownScreenshotRequirements.sorted().joined(separator: ", ")
+    )
+}
+for feature in manifest.features
+    where requiredScreenshotFeatureIDs.contains(feature.id) && feature.screenshot == nil {
+    fail("Feature '\(feature.id)' is required to provide a documentation screenshot")
+}
+
 if requireScreenshots {
     let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/manifest.json")
     guard
@@ -271,6 +289,32 @@ if requireScreenshots {
         }
     } catch {
         fail("Could not verify screenshot manifest source revision")
+    }
+    do {
+        let changedSinceCapture = try gitOutput(
+            arguments: ["diff", "--name-only", screenshotManifest.sourceSHA, "--"]
+        )
+        if changedSinceCapture.status != 0 {
+            fail("Could not compare screenshot evidence with its source revision")
+        } else {
+            let changedPaths = Set(
+                String(decoding: changedSinceCapture.data, as: UTF8.self)
+                    .split(separator: "\n")
+                    .map(String.init)
+            )
+            for feature in manifest.features where feature.screenshot != nil {
+                let changedEvidenceSources = changedPaths.intersection(feature.sources)
+                if !changedEvidenceSources.isEmpty {
+                    fail(
+                        "Screenshot for feature '\(feature.id)' is stale because its "
+                            + "source changed after capture: "
+                            + changedEvidenceSources.sorted().joined(separator: ", ")
+                    )
+                }
+            }
+        }
+    } catch {
+        fail("Could not run git for screenshot freshness: \(error.localizedDescription)")
     }
     let expectedFilenames = Set(
         manifest.features.compactMap(\.screenshot).map {

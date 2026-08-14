@@ -1,8 +1,18 @@
 name: Documentation screenshots
 
 on:
+  pull_request:
+    paths:
+      - NeoAnkiCore/Sources/NeoAnkiCore/**
+      - Sources/NeoAnki2/**
+      - UITests/NeoAnki2UITests/**
+      - UITests/NeoAnki2UITests.xcodeproj/**
+      - Scripts/capture-doc-screenshots.sh
+      - Scripts/run-ui-tests.sh
+      - .github/workflows/docs-screenshots.yml
   push:
     paths:
+      - NeoAnkiCore/Sources/NeoAnkiCore/**
       - Sources/NeoAnki2/**
       - UITests/NeoAnki2UITests/**
       - UITests/NeoAnki2UITests.xcodeproj/**
@@ -30,6 +40,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # A promoted PR artifact must name a durable branch commit, not the
+          # synthetic refs/pull/<number>/merge commit GitHub may later discard.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Pin macOS appearance
         run: |
           defaults write -g AppleInterfaceStyle -string Dark

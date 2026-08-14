@@ -34,6 +34,7 @@ Visual token sidecar: [`.impeccable/design.json`](../.impeccable/design.json).
 
 Run `swift Scripts/validate-docs.swift --write` after changing
 `docs/features.json`, then run `./Scripts/test-fast.sh`. The validator checks
-feature ownership, referenced source and test files, generated output, and local
-links. Documentation screenshots are captured in reviewed CI artifacts; see
+feature ownership, referenced source and test files, generated output, local
+links, required screenshot coverage, and screenshot freshness. Documentation
+screenshots are captured in reviewed CI artifacts; see
 [`user/maintaining-documentation.md`](user/maintaining-documentation.md).

@@ -1,13 +1,13 @@
 title: NeoAnki2
 description: User guide and reference documentation for NeoAnki2
 url: https://neoanki2.github.io
-baseurl: /neoanki2
+baseurl: ""
 repository: neoanki2/neoanki2
 source_url: https://github.com/neoanki2/neoanki2
 documentation:
   status: Development documentation
   revision: main
-  published_at: 2026-07-27
+  published_at: 2026-08-15
 markdown: kramdown
 permalink: pretty
 exclude:
