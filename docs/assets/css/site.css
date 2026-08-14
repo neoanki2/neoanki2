@@ -642,7 +642,7 @@ blockquote {
   margin: 0;
   display: block;
   border: 0;
-  border-radius: 0;
+  border-radius: 14px;
   box-shadow: none;
 }
 
@@ -865,6 +865,8 @@ blockquote {
 
 .screenshot-link {
   display: block;
+  overflow: hidden;
+  border-radius: 14px;
   cursor: zoom-in;
 }
 .download-option-actions {
