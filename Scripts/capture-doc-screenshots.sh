@@ -31,8 +31,12 @@ for screenshot in "${EXPECTED[@]}"; do
   fi
 done
 
+swift "$ROOT/Scripts/normalize-doc-screenshot-corners.swift" \
+  "$OUTPUT_DIR" "${EXPECTED[@]}"
+
 python3 - "$OUTPUT_DIR" "$DOC_SCREENSHOT_SOURCE_SHA" "${EXPECTED[@]}" <<'PY'
 import datetime
+import hashlib
 import json
 import pathlib
 import re
@@ -90,6 +94,12 @@ for filename in sorted(expected_files):
         or any(not isinstance(value, str) or not value.strip() for value in identifiers)
     ):
         raise SystemExit(f"Expected visible identifiers are missing for {filename}")
+    entry["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+
+manifest_path.write_text(
+    json.dumps(manifest, indent=2, sort_keys=True, separators=(",", " : ")) + "\n",
+    encoding="utf-8",
+)
 PY
 
 echo "Captured and validated ${#EXPECTED[@]} documentation screenshots in $OUTPUT_DIR"

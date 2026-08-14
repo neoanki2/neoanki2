@@ -1,7 +1,9 @@
 #!/usr/bin/env swift
 
 import CryptoKit
+import CoreGraphics
 import Foundation
+import ImageIO
 
 struct Manifest: Decodable {
     let schemaVersion: Int
@@ -107,6 +109,45 @@ var failures: [String] = []
 
 func exists(_ relativePath: String, under base: URL = root) -> Bool {
     fileManager.fileExists(atPath: base.appendingPathComponent(relativePath).standardizedFileURL.path)
+}
+
+func hasTransparentWindowCorners(_ url: URL) -> Bool {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        return false
+    }
+    let width = image.width
+    let height = image.height
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    guard let context = CGContext(
+        data: &pixels,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: width * 4,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else {
+        return false
+    }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    func alpha(x: Int, y: Int) -> UInt8 {
+        pixels[((y * width + x) * 4) + 3]
+    }
+    let transparentCorners = [
+        alpha(x: 0, y: 0),
+        alpha(x: width - 1, y: 0),
+        alpha(x: 0, y: height - 1),
+        alpha(x: width - 1, y: height - 1),
+    ]
+    let opaqueEdges = [
+        alpha(x: width / 2, y: 0),
+        alpha(x: width / 2, y: height - 1),
+        alpha(x: 0, y: height / 2),
+        alpha(x: width - 1, y: height / 2),
+    ]
+    return transparentCorners.allSatisfy { $0 == 0 }
+        && opaqueEdges.allSatisfy { $0 == 255 }
 }
 
 func fail(_ message: String) {
@@ -352,6 +393,11 @@ if requireScreenshots {
             .joined()
         if entry.sha256 != digest {
             fail("Screenshot \(entry.filename) SHA-256 does not match its manifest")
+        }
+        if !hasTransparentWindowCorners(screenshotURL) {
+            fail(
+                "Screenshot \(entry.filename) must have transparent rounded window corners"
+            )
         }
         if entry.scenario.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || entry.expectedVisibleIdentifiers.isEmpty {

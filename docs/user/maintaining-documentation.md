@@ -82,8 +82,11 @@ rendered site, source revision label, screenshot provenance, and support path.
 Documentation screenshots use isolated databases, deterministic test
 scenarios, a 1024 × 680 minimum window, and dark appearance. Each image is
 cropped to the focused NeoAnki2 app window, so the desktop, Dock, and menu bar
-are not published. Capture rejects partially clipped expected controls. Images
-are not captured during normal local testing.
+are not published. The capture pipeline converts the opaque matte outside the
+native macOS window curve to transparent corners, so the window edge stays
+clean against both light and dark documentation surfaces. Capture rejects
+partially clipped expected controls. Images are not captured during normal
+local testing.
 
 1. Run the **Documentation screenshots** workflow on the pull request, dispatch
    it manually, or wait for its weekly run. Product-UI pull requests trigger it
