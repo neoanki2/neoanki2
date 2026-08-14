@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 23
+    static let version = 24
 
     static let createStatements: [String] = [
         """
@@ -133,6 +133,16 @@ enum Schema {
         CREATE INDEX IF NOT EXISTS idx_cards_active_new_due
         ON cards(due_at, id)
         WHERE is_suspended = 0 AND phase = 'new';
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_active_learned_due
+        ON cards(due_at, id)
+        WHERE is_suspended = 0 AND phase != 'new';
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_active_deck_learned_due
+        ON cards(deck_id, due_at, id)
+        WHERE is_suspended = 0 AND phase != 'new';
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_decks_with_new_card_limit
@@ -1204,6 +1214,21 @@ enum Schema {
             SET ref_count = ref_count - 1
             WHERE hash = OLD.media_hash;
         END;
+        """,
+    ]
+
+    /// Lets the learned-first queue prove that no review is due without
+    /// scanning the new-card population, including deck and unassigned scopes.
+    static let migrationV24Statements: [String] = [
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_active_learned_due
+        ON cards(due_at, id)
+        WHERE is_suspended = 0 AND phase != 'new';
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_cards_active_deck_learned_due
+        ON cards(deck_id, due_at, id)
+        WHERE is_suspended = 0 AND phase != 'new';
         """,
     ]
 

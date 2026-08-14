@@ -19,6 +19,41 @@ import Testing
     #expect(!plan.contains { $0.contains("new_card_introductions") })
 }
 
+@Test func learnedQueueHeadsUsePartialIndexesInsteadOfScanningNewCards() async throws {
+    let url = studyQueryPlanDatabaseURL()
+    let database = try SQLiteDatabase(path: url)
+    try await database.migrate()
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let deck = Deck(name: "Scoped")
+    try await database.insertDeck(deck)
+
+    let allDecks = try await database.studyQueueQueryPlan(
+        scope: .all,
+        asOf: now,
+        studyDay: "2027-01-15",
+        isNew: false
+    )
+    let unassigned = try await database.studyQueueQueryPlan(
+        scope: .unassigned,
+        asOf: now,
+        studyDay: "2027-01-15",
+        isNew: false
+    )
+    let scopedDeck = try await database.studyQueueQueryPlan(
+        scope: .decks([deck.id]),
+        asOf: now,
+        studyDay: "2027-01-15",
+        isNew: false
+    )
+
+    #expect(allDecks.contains { $0.contains("idx_cards_active_learned_due") })
+    #expect(unassigned.contains { $0.contains("idx_cards_active_deck_learned_due") })
+    #expect(scopedDeck.contains { $0.contains("idx_cards_active_deck_learned_due") })
+    #expect(!allDecks.contains { $0.contains("TEMP B-TREE") })
+    #expect(!unassigned.contains { $0.contains("TEMP B-TREE") })
+    #expect(!scopedDeck.contains { $0.contains("TEMP B-TREE") })
+}
+
 @Test func singleLimitedDeckUsesBoundedActiveNewIndex() async throws {
     let url = studyQueryPlanDatabaseURL()
     let database = try SQLiteDatabase(path: url)

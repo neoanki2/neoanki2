@@ -387,6 +387,17 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 24,
+               try tableExists("cards"),
+               try columnExists("deck_id", in: "cards"),
+               try columnExists("due_at", in: "cards"),
+               try columnExists("phase", in: "cards"),
+               try columnExists("is_suspended", in: "cards") {
+                for sql in Schema.migrationV24Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -1522,41 +1533,25 @@ actor SQLiteDatabase {
     ) throws -> [Card] {
         guard !deckIDs.isEmpty else { return [] }
         return try inReadTransaction {
-            let eligible = try eligibleDueCardsCTE(
+            try fetchStudyQueueCards(
                 scope: .decks(deckIDs),
                 asOf: now,
-                studyDay: studyDay
+                studyDay: studyDay,
+                limit: limit
             )
-            var sql = eligible.sql + """
-
-                SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
-                FROM eligible_due
-                ORDER BY due_at ASC, id ASC
-                """
-            if let limit {
-                sql += " LIMIT \(max(limit, 0));"
-            } else {
-                sql += ";"
-            }
-            let rows = try query(sql, bindings: eligible.bindings)
-            return try rows.map { try decodeCard(from: $0) }
         }
     }
 
     func fetchUnassignedDueCards(asOf now: Date, limit: Int? = nil) throws -> [Card] {
-        var sql = """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
-            FROM cards
-            WHERE is_suspended = 0 AND due_at <= ? AND deck_id IS NULL
-            ORDER BY due_at ASC
-            """
-        if let limit {
-            sql += " LIMIT \(limit);"
-        } else {
-            sql += ";"
+        try inReadTransaction {
+            let effectiveLimit = limit.flatMap { $0 < 0 ? nil : $0 }
+            return try fetchStudyQueueCards(
+                scope: .unassigned,
+                asOf: now,
+                studyDay: nil,
+                limit: effectiveLimit
+            )
         }
-        let rows = try query(sql, bindings: [.double(now.timeIntervalSince1970)])
-        return try rows.map { try decodeCard(from: $0) }
     }
 
     func countDueCards(deckIDs: Set<UUID>, asOf now: Date, studyDay: String) throws -> Int {
@@ -2144,21 +2139,12 @@ actor SQLiteDatabase {
 
     func fetchDueCards(asOf now: Date, studyDay: String, limit: Int? = nil) throws -> [Card] {
         try inReadTransaction {
-            let eligible = try eligibleDueCardsCTE(scope: .all, asOf: now, studyDay: studyDay)
-            var sql = eligible.sql + """
-
-                SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
-                FROM eligible_due
-                ORDER BY due_at ASC, id ASC
-                """
-            if let limit {
-                sql += " LIMIT \(max(limit, 0));"
-            } else {
-                sql += ";"
-            }
-
-            let rows = try query(sql, bindings: eligible.bindings)
-            return try rows.map { try decodeCard(from: $0) }
+            try fetchStudyQueueCards(
+                scope: .all,
+                asOf: now,
+                studyDay: studyDay,
+                limit: limit
+            )
         }
     }
 
@@ -2441,6 +2427,29 @@ actor SQLiteDatabase {
                 "EXPLAIN QUERY PLAN " + eligible.sql
                     + "\nSELECT COUNT(*) AS count FROM eligible_due;",
                 bindings: eligible.bindings
+            ).compactMap { $0["detail"] as? String }
+        }
+    }
+
+    /// Test and profiling diagnostic for the two queue partitions selected by
+    /// `fetchStudyQueueCards`.
+    func studyQueueQueryPlan(
+        scope: CardScope,
+        asOf now: Date,
+        studyDay: String,
+        isNew: Bool
+    ) throws -> [String] {
+        try inReadTransaction {
+            let statement = try studyQueueStatement(
+                scope: scope,
+                asOf: now,
+                studyDay: studyDay,
+                isNew: isNew,
+                limit: 1
+            )
+            return try query(
+                "EXPLAIN QUERY PLAN " + statement.sql,
+                bindings: statement.bindings
             ).compactMap { $0["detail"] as? String }
         }
     }
@@ -3114,29 +3123,56 @@ actor SQLiteDatabase {
                 return try decodeCard(from: row)
             }
 
-            let eligible = try eligibleDueCardsCTE(
-                scope: scope,
-                asOf: now,
-                studyDay: studyDay
-            )
-            let rows = try query(
-                eligible.sql + """
-
-                SELECT eligible_due.id, eligible_due.item_id, eligible_due.template_id,
-                       eligible_due.skill, eligible_due.memory, eligible_due.is_suspended,
-                       eligible_due.deck_id, eligible_due.cloze_group
-                FROM eligible_due
-                WHERE NOT EXISTS (
+            let reservationBinding = Binding.double(now.timeIntervalSince1970)
+            let scopeFilter = scopeClause(scope, column: "cards.deck_id")
+            var rows = try query(
+                """
+                SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
+                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                FROM cards
+                WHERE cards.is_suspended = 0
+                  AND cards.due_at <= ?
+                  AND \(scopeFilter.sql)
+                  AND cards.phase != 'new'
+                  AND NOT EXISTS (
                     SELECT 1
                     FROM api_card_reservations AS reservations
-                    WHERE reservations.card_id = eligible_due.id
+                    WHERE reservations.card_id = cards.id
                       AND reservations.expires_at > ?
                 )
-                ORDER BY eligible_due.due_at ASC, eligible_due.id ASC
+                ORDER BY cards.due_at ASC, cards.id ASC
                 LIMIT 1;
                 """,
-                bindings: eligible.bindings + [.double(now.timeIntervalSince1970)]
+                bindings: [.double(now.timeIntervalSince1970)]
+                    + scopeFilter.bindings
+                    + [reservationBinding]
             )
+            if rows.isEmpty {
+                let eligible = try eligibleDueCardsCTE(
+                    scope: scope,
+                    asOf: now,
+                    studyDay: studyDay
+                )
+                rows = try query(
+                    eligible.sql + """
+
+                    SELECT eligible_due.id, eligible_due.item_id, eligible_due.template_id,
+                           eligible_due.skill, eligible_due.memory, eligible_due.is_suspended,
+                           eligible_due.deck_id, eligible_due.cloze_group
+                    FROM eligible_due
+                    WHERE eligible_due.phase = 'new'
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM api_card_reservations AS reservations
+                        WHERE reservations.card_id = eligible_due.id
+                          AND reservations.expires_at > ?
+                    )
+                    ORDER BY eligible_due.due_at ASC, eligible_due.id ASC
+                    LIMIT 1;
+                    """,
+                    bindings: eligible.bindings + [reservationBinding]
+                )
+            }
             guard let row = rows.first else {
                 try touchStudySession(id: sessionID, now: now)
                 return nil
@@ -3156,6 +3192,113 @@ actor SQLiteDatabase {
             try touchStudySession(id: sessionID, now: now)
             return card
         }
+    }
+
+    /// Reads learned cards directly because daily introduction limits never
+    /// exclude them. The more expensive limit-aware CTE is built only if the
+    /// queue also needs new material.
+    private func fetchStudyQueueCards(
+        scope: CardScope,
+        asOf now: Date,
+        studyDay: String?,
+        limit: Int?
+    ) throws -> [Card] {
+        return try fetchStudyQueueCards(limit: limit) { isNew, groupLimit in
+            let statement = try studyQueueStatement(
+                scope: scope,
+                asOf: now,
+                studyDay: studyDay,
+                isNew: isNew,
+                limit: groupLimit
+            )
+            return try query(statement.sql, bindings: statement.bindings)
+        }
+    }
+
+    private func studyQueueStatement(
+        scope: CardScope,
+        asOf now: Date,
+        studyDay: String?,
+        isNew: Bool,
+        limit: Int?
+    ) throws -> (sql: String, bindings: [Binding]) {
+        if isNew {
+            if case .unassigned = scope {
+                let scopeFilter = scopeClause(scope, column: "cards.deck_id")
+                var sql = """
+                    SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
+                           cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                    FROM cards
+                    WHERE cards.is_suspended = 0
+                      AND cards.due_at <= ?
+                      AND \(scopeFilter.sql)
+                      AND cards.phase = 'new'
+                    ORDER BY cards.due_at ASC, cards.id ASC
+                    """
+                sql += studyQueueLimitSQL(limit)
+                return (
+                    sql,
+                    [.double(now.timeIntervalSince1970)] + scopeFilter.bindings
+                )
+            }
+            guard let studyDay else {
+                throw DatabaseError.queryFailed("A study day is required for deck queues.")
+            }
+            let eligible = try eligibleDueCardsCTE(
+                scope: scope,
+                asOf: now,
+                studyDay: studyDay
+            )
+            var sql = eligible.sql + """
+
+                SELECT id, item_id, template_id, skill, memory, is_suspended,
+                       deck_id, cloze_group
+                FROM eligible_due
+                WHERE phase = 'new'
+                ORDER BY due_at ASC, id ASC
+                """
+            sql += studyQueueLimitSQL(limit)
+            return (sql, eligible.bindings)
+        }
+
+        let scopeFilter = scopeClause(scope, column: "cards.deck_id")
+        var sql = """
+            SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
+                   cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+            FROM cards
+            WHERE cards.is_suspended = 0
+              AND cards.due_at <= ?
+              AND \(scopeFilter.sql)
+              AND cards.phase != 'new'
+            ORDER BY cards.due_at ASC, cards.id ASC
+            """
+        sql += studyQueueLimitSQL(limit)
+        return (
+            sql,
+            [.double(now.timeIntervalSince1970)] + scopeFilter.bindings
+        )
+    }
+
+    private func fetchStudyQueueCards(
+        limit: Int?,
+        fetchGroup: (_ isNew: Bool, _ limit: Int?) throws -> [[String: Any?]]
+    ) throws -> [Card] {
+        let normalizedLimit = limit.map { max($0, 0) }
+        guard normalizedLimit != 0 else { return [] }
+
+        var rows = try fetchGroup(false, normalizedLimit)
+        if let normalizedLimit {
+            if rows.count < normalizedLimit {
+                rows += try fetchGroup(true, normalizedLimit - rows.count)
+            }
+        } else {
+            rows += try fetchGroup(true, nil)
+        }
+        return try rows.map { try decodeCard(from: $0) }
+    }
+
+    private func studyQueueLimitSQL(_ limit: Int?) -> String {
+        limit.map { " LIMIT \($0);" } ?? ";"
     }
 
     func releaseStudyCard(sessionID: UUID, cardID: UUID, now: Date) throws -> Bool {
