@@ -266,7 +266,7 @@ struct TemplatesView: View {
         .accessibilityValue(
             expandedIncludedGroupIDs.contains(group.id) ? "Expanded" : "Collapsed"
         )
-        .accessibilityIdentifier("includedDeckGroup-\(group.rootDeck.id.uuidString)")
+        .accessibilityIdentifier("includedDeckGroup-\(group.deckPath)")
     }
 
     private func includedTypeCount(_ count: Int) -> String {

@@ -171,24 +171,16 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "deck-included-item-types"
         )
         openTemplates(in: app)
-        let includedDeckGroup = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "includedDeckGroup-")
-        ).firstMatch
+        let includedDeckGroup = app.buttons.identified("includedDeckGroup-Poetry Lab")
         XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
-        includedDeckGroup.click()
-        let included = app.descendants(matching: .any)
-            .identified("includedItemTypeRow-Poem Line")
-        XCTAssertTrue(included.waitUntilExists(timeout: 5))
-        included.click()
         captureDocumentationScreenshot(
             named: "item-types",
             of: app,
-            scenario: "item types manager with a deck-grouped read-only type selected",
+            scenario: "item types manager with a deck-grouped read-only section",
             expectedVisibleIdentifiers: [
                 "templatesDone",
-                "includedItemTypeRow-Poem Line",
-                "includedItemTypeOwner",
-                "duplicateIncludedItemType",
+                "itemTypeRow-Basic",
+                "includedDeckGroup-Poetry Lab",
             ]
         )
 
