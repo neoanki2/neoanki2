@@ -223,22 +223,13 @@ struct TemplatesView: View {
         return "\(itemType.templates.count) \(templateNoun) · \(itemType.fields.count) \(fieldNoun)"
     }
 
-    private func includedGroupExpansion(_ id: UUID) -> Binding<Bool> {
-        Binding(
-            get: { expandedIncludedGroupIDs.contains(id) },
-            set: { isExpanded in
-                if isExpanded {
-                    expandedIncludedGroupIDs.insert(id)
-                } else {
-                    expandedIncludedGroupIDs.remove(id)
-                }
-            }
-        )
-    }
-
     private func includedGroupButton(_ group: IncludedItemTypeGroup) -> some View {
         Button {
-            includedGroupExpansion(group.id).wrappedValue.toggle()
+            if expandedIncludedGroupIDs.contains(group.id) {
+                expandedIncludedGroupIDs.remove(group.id)
+            } else {
+                expandedIncludedGroupIDs.insert(group.id)
+            }
         } label: {
             HStack(spacing: DesignSystem.Spacing.xs) {
                 Image(
