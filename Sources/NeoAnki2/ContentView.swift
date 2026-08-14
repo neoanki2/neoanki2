@@ -189,6 +189,13 @@ struct ContentView: View {
             DeckSidebarView(
                 decksModel: decksModel,
                 selection: $decksModel.selectedScope,
+                isShowingSavedResponses: Binding(
+                    get: { isShowingSavedResponses },
+                    set: { showing in
+                        if showing { selectedItemID = nil }
+                        isShowingSavedResponses = showing
+                    }
+                ),
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
@@ -200,8 +207,7 @@ struct ContentView: View {
                 },
                 onDeckProgressReset: {
                     await refreshLibrary(forceRefresh: true)
-                },
-                onOpenSavedResponses: { openSavedResponses() }
+                }
             )
             .navigationSplitViewColumnWidth(
                 min: DesignSystem.sidebarMin,
@@ -401,7 +407,7 @@ struct ContentView: View {
     private var windowTitle: String {
         if isStudying { return "Study" }
         if isManagingTemplates { return "Item Types" }
-        if isShowingSavedResponses { return "Saved Responses" }
+        if isShowingSavedResponses { return "Recordings" }
         if isAddingItem { return "Add Item" }
         return "NeoAnki2"
     }
@@ -585,9 +591,7 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         if isShowingSavedResponses {
-            SavedResponsesView(library: library) {
-                isShowingSavedResponses = false
-            }
+            SavedResponsesView(library: library)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if isManagingTemplates, let templatesModel {
             TemplatesView(model: templatesModel) {
@@ -677,11 +681,6 @@ struct ContentView: View {
         Task {
             await itemsModel.load(scope: scope)
         }
-    }
-
-    private func openSavedResponses() {
-        selectedItemID = nil
-        isShowingSavedResponses = true
     }
 
     private func closeBrowse() {

@@ -162,3 +162,10 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(SidebarScopeCaption.text(itemCount: 1, dueCount: 0) == "1 item")
     #expect(SidebarScopeCaption.text(itemCount: 1, dueCount: 1) == "1 item · 1 due")
 }
+
+@Test func compactSidebarCaptionPrioritizesDueWork() {
+    #expect(SidebarScopeCaption.compactText(itemCount: 266, dueCount: 73) == "73 due")
+    #expect(SidebarScopeCaption.compactText(itemCount: 26, dueCount: 0) == "26 items")
+    #expect(SidebarScopeCaption.compactText(itemCount: 1, dueCount: 0) == "1 item")
+    #expect(SidebarScopeCaption.compactText(itemCount: 0, dueCount: 0) == "Empty")
+}

@@ -1,13 +1,21 @@
 import NeoAnkiCore
 import SwiftUI
 
+/// Everything the library sidebar can select. Deck scopes remain model state;
+/// recordings are a separate destination, but they participate in the same
+/// native List selection so the sidebar cannot highlight two places at once.
+private enum LibrarySidebarDestination: Hashable {
+    case scope(SidebarSelection)
+    case recordings
+}
+
 struct DeckSidebarView: View {
     @Bindable var decksModel: DecksModel
     @Binding var selection: SidebarSelection
+    @Binding var isShowingSavedResponses: Bool
     var onDeleteAllUnassigned: () -> Void = {}
     var onDeckSettingsSaved: () async -> Void = {}
     var onDeckProgressReset: () async -> Void = {}
-    var onOpenSavedResponses: () -> Void = {}
     @State private var deckToRename: DeckSummary?
     @State private var deckToConfigure: DeckSummary?
     @State private var renameText = ""
@@ -29,33 +37,31 @@ struct DeckSidebarView: View {
                     ProgressView("Loading decks…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(selection: $selection) {
+                    List(selection: sidebarSelection) {
                         Section("Library") {
-                            Button(action: onOpenSavedResponses) {
-                                Label("Saved Responses", systemImage: "waveform")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityHint("Opens persistent spoken responses")
+                            virtualRow(
+                                title: "All Decks",
+                                subtitle: dueCaption(decksModel.allDecksDueCount),
+                                systemImage: "square.stack.3d.up",
+                                tag: .allDecks
+                            )
+
+                            sidebarRow(
+                                title: "Recordings",
+                                subtitle: nil,
+                                systemImage: "waveform",
+                                destination: .recordings
+                            )
+                            .accessibilityHint("Opens spoken responses saved during study")
                             .accessibilityIdentifier("savedResponsesSidebar")
                         }
 
-                        virtualRow(
-                            title: "All Decks",
-                            subtitle: dueCaption(decksModel.allDecksDueCount),
-                            systemImage: "square.stack.3d.up",
-                            tag: .allDecks
-                        )
-
-                        if decksModel.deckTree.isEmpty {
-                            Section {
+                        Section("Decks") {
+                            if decksModel.deckTree.isEmpty {
                                 Text("No decks yet")
                                     .font(DesignSystem.Typography.uiCaption)
                                     .foregroundStyle(.tertiary)
-                            }
-                        } else {
-                            Section("Decks") {
+                            } else {
                                 ForEach(decksModel.deckTree) { node in
                                     DeckSidebarNode(
                                         node: node,
@@ -67,20 +73,29 @@ struct DeckSidebarView: View {
                                     )
                                 }
                             }
-                        }
 
-                        virtualRow(
-                            title: "Unassigned",
-                            subtitle: unassignedCaption,
-                            systemImage: "tray",
-                            tag: .unassigned
-                        )
-                        .contextMenu {
-                            if decksModel.unassignedItemCount > 0 {
-                                Button("Delete All", role: .destructive) {
-                                    showDeleteAllUnassignedConfirm = true
+                            virtualRow(
+                                title: "Unassigned",
+                                subtitle: SidebarScopeCaption.compactText(
+                                    itemCount: decksModel.unassignedItemCount,
+                                    dueCount: decksModel.unassignedDueCount
+                                ),
+                                systemImage: "tray",
+                                tag: .unassigned
+                            )
+                            .accessibilityLabel(
+                                "Unassigned, " + SidebarScopeCaption.text(
+                                    itemCount: decksModel.unassignedItemCount,
+                                    dueCount: decksModel.unassignedDueCount
+                                )
+                            )
+                            .contextMenu {
+                                if decksModel.unassignedItemCount > 0 {
+                                    Button("Delete All", role: .destructive) {
+                                        showDeleteAllUnassignedConfirm = true
+                                    }
+                                    .accessibilityIdentifier("deleteAllUnassignedMenu")
                                 }
-                                .accessibilityIdentifier("deleteAllUnassignedMenu")
                             }
                         }
                     }
@@ -117,6 +132,7 @@ struct DeckSidebarView: View {
                         name: newDeckName,
                         parentID: newDeckParentID
                     ) {
+                        isShowingSavedResponses = false
                         selection = .deck(deck.id)
                     }
                 }
@@ -189,10 +205,22 @@ struct DeckSidebarView: View {
         }
     }
 
-    private var unassignedCaption: String {
-        SidebarScopeCaption.text(
-            itemCount: decksModel.unassignedItemCount,
-            dueCount: decksModel.unassignedDueCount
+    private var sidebarSelection: Binding<LibrarySidebarDestination> {
+        Binding(
+            get: {
+                isShowingSavedResponses ? .recordings : .scope(selection)
+            },
+            set: { destination in
+                switch destination {
+                case .recordings:
+                    isShowingSavedResponses = true
+                case let .scope(scope):
+                    // Close Recordings even if this is the scope that was
+                    // already active before the user opened it.
+                    isShowingSavedResponses = false
+                    selection = scope
+                }
+            }
         )
     }
 
@@ -236,25 +264,49 @@ struct DeckSidebarView: View {
         systemImage: String,
         tag: SidebarSelection
     ) -> some View {
-        Label {
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                Text(title)
-                    .font(DesignSystem.Typography.uiRowTitle)
-                Text(subtitle)
-                    .font(DesignSystem.Typography.uiRowMeta)
-                    .foregroundStyle(.tertiary)
-            }
-        } icon: {
-            Image(systemName: systemImage)
-        }
-        .tag(tag)
+        sidebarRow(
+            title: title,
+            subtitle: subtitle,
+            systemImage: systemImage,
+            destination: .scope(tag)
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(subtitle)")
         .accessibilityIdentifier(scopeAccessibilityIdentifier(for: tag))
     }
 
+    private func sidebarRow(
+        title: String,
+        subtitle: String?,
+        systemImage: String,
+        destination: LibrarySidebarDestination
+    ) -> some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            Image(systemName: systemImage)
+                .imageScale(.medium)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+
+            Text(title)
+                .font(DesignSystem.Typography.sidebarRowTitle)
+                .lineLimit(1)
+
+            Spacer(minLength: DesignSystem.Spacing.xs)
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(DesignSystem.Typography.sidebarRowMeta)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        }
+        .contentShape(Rectangle())
+        .tag(destination)
+    }
+
     private func dueCaption(_ count: Int) -> String {
-        count > 0 ? "\(count) due" : "No cards due"
+        count > 0 ? "\(count) due" : "Up to date"
     }
 
     private func scopeAccessibilityIdentifier(for tag: SidebarSelection) -> String {
@@ -315,18 +367,26 @@ private struct DeckSidebarNode: View {
     }
 
     private func deckRow(_ summary: DeckSummary) -> some View {
-        Label {
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                Text(summary.name)
-                    .font(DesignSystem.Typography.uiRowTitle)
-                Text(rowSubtitle(for: summary))
-                    .font(DesignSystem.Typography.uiRowMeta)
-                    .foregroundStyle(.tertiary)
-            }
-        } icon: {
+        HStack(spacing: DesignSystem.Spacing.sm) {
             Image(systemName: "folder")
+                .imageScale(.medium)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+
+            Text(summary.name)
+                .font(DesignSystem.Typography.sidebarRowTitle)
+                .lineLimit(1)
+
+            Spacer(minLength: DesignSystem.Spacing.xs)
+
+            Text(compactSubtitle(for: summary))
+                .font(DesignSystem.Typography.sidebarRowMeta)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
         }
-        .tag(SidebarSelection.deck(summary.id))
+        .contentShape(Rectangle())
+        .tag(LibrarySidebarDestination.scope(.deck(summary.id)))
         .contextMenu {
             Button("Deck Settings…") {
                 onConfigure(summary)
@@ -351,6 +411,13 @@ private struct DeckSidebarNode: View {
     private func rowSubtitle(for summary: DeckSummary) -> String {
         SidebarScopeCaption.text(itemCount: summary.itemCount, dueCount: summary.dueCount)
     }
+
+    private func compactSubtitle(for summary: DeckSummary) -> String {
+        SidebarScopeCaption.compactText(
+            itemCount: summary.itemCount,
+            dueCount: summary.dueCount
+        )
+    }
 }
 
 /// The line under a sidebar scope's name. Every scope row uses this, so a deck
@@ -365,5 +432,14 @@ enum SidebarScopeCaption {
             parts.append("\(dueCount) due")
         }
         return parts.isEmpty ? "No items" : parts.joined(separator: " · ")
+    }
+
+    /// Sidebar rows prioritize the next action over inventory. Full counts
+    /// remain in the scope home and VoiceOver label, while the visual row stays
+    /// scannable even with long deck names and a narrow sidebar.
+    static func compactText(itemCount: Int, dueCount: Int) -> String {
+        if dueCount > 0 { return "\(dueCount) due" }
+        if itemCount > 0 { return itemCount == 1 ? "1 item" : "\(itemCount) items" }
+        return "Empty"
     }
 }

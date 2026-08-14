@@ -69,6 +69,12 @@ enum DesignSystem {
         static let uiRowTitle = Font.headline
         static let uiRowMeta = Font.caption
 
+        /// Navigation rows are deliberately quieter and denser than content
+        /// rows. The selected background and position establish hierarchy;
+        /// every deck name does not need headline weight to compete for it.
+        static let sidebarRowTitle = Font.body
+        static let sidebarRowMeta = Font.caption
+
         static let uiSecondary = Font.callout
         static let uiCaption = Font.subheadline
         static let uiHint = Font.subheadline
