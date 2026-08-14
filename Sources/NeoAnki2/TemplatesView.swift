@@ -239,31 +239,33 @@ struct TemplatesView: View {
     }
 
     private func includedGroupLabel(_ group: IncludedItemTypeGroup) -> some View {
-        HStack(spacing: DesignSystem.Spacing.xs) {
-            Image(systemName: "folder")
-                .imageScale(.medium)
-                .accessibilityHidden(true)
+        Button {
+            includedGroupExpansion(group.id).wrappedValue.toggle()
+        } label: {
+            HStack(spacing: DesignSystem.Spacing.xs) {
+                Image(systemName: "folder")
+                    .imageScale(.medium)
+                    .accessibilityHidden(true)
 
-            Text(group.deckPath)
-                .font(DesignSystem.Typography.sidebarRowTitle)
-                .lineLimit(1)
+                Text(group.deckPath)
+                    .font(DesignSystem.Typography.sidebarRowTitle)
+                    .lineLimit(1)
 
-            Spacer(minLength: DesignSystem.Spacing.xs)
+                Spacer(minLength: DesignSystem.Spacing.xs)
 
-            Text(includedTypeCount(group.itemTypes.count))
-                .font(DesignSystem.Typography.sidebarRowMeta)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
+                Text(includedTypeCount(group.itemTypes.count))
+                    .font(DesignSystem.Typography.sidebarRowMeta)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(group.deckPath), \(includedTypeCount(group.itemTypes.count))")
         .accessibilityHint("Shows read-only item types provided by this deck")
         .accessibilityIdentifier("includedDeckGroup-\(group.rootDeck.id.uuidString)")
-        .onTapGesture {
-            includedGroupExpansion(group.id).wrappedValue.toggle()
-        }
     }
 
     private func includedTypeCount(_ count: Int) -> String {

@@ -171,7 +171,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "deck-included-item-types"
         )
         openTemplates(in: app)
-        let includedDeckGroup = app.descendants(matching: .any).matching(
+        let includedDeckGroup = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "includedDeckGroup-")
         ).firstMatch
         XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
