@@ -11,6 +11,8 @@
   --focus: #1769aa;
   --code: #ece8dd;
   --shadow: 0 14px 36px rgb(37 36 31 / 12%);
+  --documentation-screenshot-2x-max-width: 512px;
+  --documentation-screenshot-3x-max-width: 341px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
 }
 
@@ -868,6 +870,46 @@ blockquote {
   overflow: hidden;
   border-radius: 14px;
   cursor: zoom-in;
+}
+
+/*
+ * Documentation captures are 1024 physical pixels wide. Keep their rendered
+ * width within the source-pixel budget on high-density displays so AppKit text
+ * and controls never have to be interpolated by the browser.
+ */
+@media (min-resolution: 2dppx) {
+  main a[href*="assets/screenshots/"] > img,
+  .page-landing .quiet-hero-figure img,
+  .page-landing .sequence-figure img {
+    width: min(100%, var(--documentation-screenshot-2x-max-width));
+  }
+
+  .page-landing .quiet-hero-figure,
+  .page-landing .sequence-figure {
+    width: min(100%, var(--documentation-screenshot-2x-max-width));
+  }
+
+  .page-landing .quiet-hero-figure,
+  .page-landing .sequence-figure { justify-self: end; }
+  .page-landing .sequence-step-reverse .sequence-figure { justify-self: start; }
+}
+
+@media (min-resolution: 3dppx) {
+  main a[href*="assets/screenshots/"] > img,
+  .page-landing .quiet-hero-figure img,
+  .page-landing .sequence-figure img {
+    width: min(100%, var(--documentation-screenshot-3x-max-width));
+  }
+
+  .page-landing .quiet-hero-figure,
+  .page-landing .sequence-figure {
+    width: min(100%, var(--documentation-screenshot-3x-max-width));
+  }
+}
+
+@media (max-width: 920px) and (min-resolution: 2dppx) {
+  .page-landing .quiet-hero-figure,
+  .page-landing .sequence-figure { justify-self: start; }
 }
 .download-option-actions {
   display: grid;
