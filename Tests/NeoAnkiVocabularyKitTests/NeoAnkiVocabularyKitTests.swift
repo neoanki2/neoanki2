@@ -2,6 +2,35 @@ import Foundation
 import NeoAnkiVocabularyKit
 import Testing
 
+@Test func installedPackStoreValidatesPersistsAndRemovesPackages() async throws {
+    let workspace = try TestWorkspace()
+    defer { workspace.cleanup() }
+    let entry = LexicalEntry(
+        id: "installed",
+        language: "en",
+        canonicalForm: LexicalForm(text: LocalizedText("installed", language: "en"))
+    )
+    let jsonl = try workspace.writeJSONL([entry])
+    let source = workspace.root.appendingPathComponent("Source.neovocab", isDirectory: true)
+    try VocabularyPackCompiler.compile(
+        jsonlURL: jsonl,
+        to: source,
+        descriptor: .init(id: "fixture.installed", title: "Installed Fixture", languages: ["en"], capabilities: [.lexicon])
+    )
+    let installedRoot = workspace.root.appendingPathComponent("Installed", isDirectory: true)
+    let store = InstalledVocabularyPackStore(rootURL: installedRoot)
+    let installed = try await store.install(from: source)
+    #expect(installed.id == "fixture.installed")
+    #expect(installed.packageURL != source)
+    #expect(try await store.installedPacks().map(\.id) == ["fixture.installed"])
+    await #expect(throws: InstalledVocabularyPackStoreError.self) {
+        try await store.install(from: source)
+    }
+    try await store.remove(id: installed.id)
+    #expect(try await store.installedPacks().isEmpty)
+    #expect(FileManager.default.fileExists(atPath: source.path))
+}
+
 @Test func compilesAndSearchesRichEntriesOffline() async throws {
     let workspace = try TestWorkspace()
     defer { workspace.cleanup() }

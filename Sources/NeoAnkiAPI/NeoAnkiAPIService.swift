@@ -41,7 +41,7 @@ public actor NeoAnkiAPIService {
     private var pairingAttempts: [Date] = []
     private var pairingPromptActive = false
     private struct ImpactAuthorization {
-        let itemTypeID: UUID
+        let resourceID: UUID
         let requestHash: String
         let changeCursor: Int64
         let expiresAt: Date
@@ -243,6 +243,7 @@ public actor NeoAnkiAPIService {
                         "idempotency.durable",
                         "study.reservations",
                         "study.reviews",
+                        "study.responses",
                         "vocabulary.lookup",
                         "vocabulary.pack-lifecycle",
                     ]
@@ -305,17 +306,20 @@ public actor NeoAnkiAPIService {
             try require(grant, scope: .studyReview)
             return try await createDeckResetPlan(request)
         case (.get, "/v1/changes"):
-            try require(grant, scope: .libraryRead)
-            return try await listChanges(request)
+            try requireChangeRead(grant)
+            return try await listChanges(request, grant: grant)
         case (.get, "/v1/events"):
-            try require(grant, scope: .libraryRead)
-            return try await listEvents(request)
+            try requireChangeRead(grant)
+            return try await listEvents(request, grant: grant)
         case (.post, "/v1/study-sessions"):
             try require(grant, scope: .studyReview)
             return try await createStudySession(request, grant: grant)
         case (.post, "/v1/reviews"):
             try require(grant, scope: .studyReview)
             return try await submitReview(request, grant: grant)
+        case (.get, "/v1/study-responses"):
+            try require(grant, scope: .studyResponsesRead)
+            return try await listStudyResponses(request)
         case (.get, "/v1/items"):
             try require(grant, scope: .libraryRead)
             return try await listItems(request)
@@ -527,6 +531,29 @@ public actor NeoAnkiAPIService {
             try require(grant, scope: .studyReview)
             let reviewID = try parseUUID(components[2], pointer: "/reviewLogId")
             return try await revertReview(reviewID, request: request)
+        }
+
+        if components.count >= 3, components[0] == "v1", components[1] == "study-responses" {
+            let responseID = try parseUUID(components[2], pointer: "/id")
+            if components.count == 3 {
+                switch request.method {
+                case .get:
+                    try require(grant, scope: .studyResponsesRead)
+                    return try await getStudyResponse(responseID)
+                case .delete:
+                    try require(grant, scope: .studyResponsesDelete)
+                    return try await deleteStudyResponse(responseID, request: request, grant: grant)
+                default: break
+                }
+            } else if components.count == 4, components[3] == "content",
+                      request.method == .get || request.method == .head {
+                try require(grant, scope: .studyResponsesRead)
+                return try await studyResponseContent(
+                    responseID,
+                    headOnly: request.method == .head,
+                    request: request
+                )
+            }
         }
 
         if components.count >= 3, components[0] == "v1", components[1] == "items" {
@@ -1328,7 +1355,141 @@ public actor NeoAnkiAPIService {
         }
     }
 
-    private func listChanges(_ request: APIRequest) async throws -> APIResponse {
+    private func listStudyResponses(_ request: APIRequest) async throws -> APIResponse {
+        try validateQuery(
+            request.query,
+            allowed: ["cursor", "limit", "cardId", "itemId", "tag", "createdAfter"]
+        )
+        let limit = try pageLimit(request.query)
+        let routeKey = collectionRouteKey(path: "/v1/study-responses", query: request.query)
+        let submittedBefore: Date?
+        let submittedBeforeID: UUID?
+        if let cursor = request.query["cursor"]?.first {
+            let decoded = try APIStudyResponseCursor.decode(
+                cursor,
+                route: routeKey,
+                libraryId: (try await store.libraryID()).uuidString.lowercased(),
+                secret: cursorSecret
+            )
+            submittedBefore = decoded.submittedBefore
+            submittedBeforeID = UUID(uuidString: decoded.submittedBeforeId)
+        } else {
+            submittedBefore = nil
+            submittedBeforeID = nil
+        }
+        let cardID = try request.query["cardId"]?.first.map {
+            try parseUUID($0, pointer: "/query/cardId")
+        }
+        let itemID = try request.query["itemId"]?.first.map {
+            try parseUUID($0, pointer: "/query/itemId")
+        }
+        let createdAfter = try request.query["createdAfter"]?.first.map {
+            try parseDate($0, pointer: "/query/createdAfter")
+        }
+        let responses = try await store.studyResponses(matching: StudyResponseQuery(
+            cardID: cardID,
+            itemID: itemID,
+            tag: request.query["tag"]?.first,
+            createdAfter: createdAfter,
+            submittedBefore: submittedBefore,
+            submittedBeforeID: submittedBeforeID,
+            limit: limit + 1
+        ))
+        let pageResponses = responses.prefix(limit)
+        var data: [APIStudyResponse] = []
+        for response in pageResponses {
+            data.append(try await studyResponseRepresentation(response))
+        }
+        let next: String?
+        if responses.count > limit, let last = pageResponses.last {
+            next = try APIStudyResponseCursor(
+                route: routeKey,
+                submittedBefore: last.submittedAt,
+                submittedBeforeId: last.id.uuidString.lowercased(),
+                libraryId: (try await store.libraryID()).uuidString.lowercased()
+            ).encoded(secret: cursorSecret)
+        } else {
+            next = nil
+        }
+        return try .json(APICollection(
+            data: data,
+            page: APIPageInfo(nextCursor: next, limit: limit)
+        ))
+    }
+
+    private func getStudyResponse(_ id: UUID) async throws -> APIResponse {
+        let response: StudyResponse
+        do { response = try await store.studyResponse(id: id) }
+        catch DatabaseError.studyResponseNotFound { throw APIServiceError.notFound("The requested resource does not exist.") }
+        let representation = try await studyResponseRepresentation(response)
+        return try .json(representation, headers: ["ETag": etag(representation.revision)])
+    }
+
+    private func deleteStudyResponse(
+        _ id: UUID,
+        request: APIRequest,
+        grant: APIClientGrant
+    ) async throws -> APIResponse {
+        _ = grant
+        _ = try requiredIdempotencyKey(request)
+        let response: StudyResponse
+        do { response = try await store.studyResponse(id: id) }
+        catch DatabaseError.studyResponseNotFound { throw APIServiceError.notFound("The requested resource does not exist.") }
+        let representation = try await studyResponseRepresentation(response)
+        try requireIfMatch(request, revision: representation.revision)
+        guard try await store.deleteStudyResponse(id: id, asOf: .now) else {
+            throw APIServiceError.notFound("The requested resource does not exist.")
+        }
+        return APIResponse(status: 204)
+    }
+
+    private func studyResponseContent(
+        _ id: UUID,
+        headOnly: Bool,
+        request: APIRequest
+    ) async throws -> APIResponse {
+        if request.header("range") != nil {
+            throw APIServiceError.problem(
+                status: 416,
+                code: "range_not_supported",
+                title: "Range not supported",
+                detail: "This API version does not support response media range requests.",
+                headers: ["Accept-Ranges": "none"]
+            )
+        }
+        let response: StudyResponse
+        let bytes: Data
+        do { (response, _, bytes) = try await store.studyResponseMediaBytes(id: id) }
+        catch DatabaseError.studyResponseNotFound { throw APIServiceError.notFound("The requested resource does not exist.") }
+        return APIResponse(
+            status: 200,
+            headers: [
+                "Content-Type": "audio/mp4",
+                "Content-Disposition": "attachment; filename=\"study-response-\(response.id.uuidString.lowercased()).m4a\"",
+                "Content-Length": String(bytes.count),
+                "Digest": "sha-256=\(response.mediaHash)",
+                "Accept-Ranges": "none",
+            ],
+            body: headOnly ? Data() : bytes
+        )
+    }
+
+    private func studyResponseRepresentation(
+        _ response: StudyResponse
+    ) async throws -> APIStudyResponse {
+        APIStudyResponse(
+            response,
+            revision: try await revision(
+                resourceType: LibraryResourceKind.studyResponse.rawValue,
+                resourceID: response.id.uuidString
+            )
+        )
+    }
+
+    private func listChanges(
+        _ request: APIRequest,
+        grant: APIClientGrant
+    ) async throws -> APIResponse {
         try validateQuery(request.query, allowed: ["after", "limit"])
         let after: Int64
         if let value = request.query["after"]?.first {
@@ -1339,15 +1500,19 @@ public actor NeoAnkiAPIService {
         }
         try await validateRetainedCursor(after)
         let limit = try changeLimit(request.query)
-        let changes = try await store.changes(after: after, limit: limit)
+        let page = try await visibleChanges(after: after, limit: limit, grant: grant)
+        let changes = page.changes
         let data = changes.map(APIChange.init)
-        let next = changes.count == limit ? changes.last.map { String($0.cursor) } : nil
+        let next = page.lastScanned > after ? String(page.lastScanned) : nil
         return try .json(
             APICollection(data: data, page: APIPageInfo(nextCursor: next, limit: limit))
         )
     }
 
-    private func listEvents(_ request: APIRequest) async throws -> APIResponse {
+    private func listEvents(
+        _ request: APIRequest,
+        grant: APIClientGrant
+    ) async throws -> APIResponse {
         try validateQuery(request.query, allowed: ["after"])
         let queryCursor = try request.query["after"]?.first.map { value -> Int64 in
             guard let cursor = Int64(value), cursor >= 0 else { throw invalidCursor() }
@@ -1364,7 +1529,8 @@ public actor NeoAnkiAPIService {
         }
         let after = headerCursor ?? queryCursor ?? 0
         try await validateRetainedCursor(after)
-        let changes = try await store.changes(after: after, limit: 1_000)
+        let page = try await visibleChanges(after: after, limit: 1_000, grant: grant)
+        let changes = page.changes
         var body = Data()
         if changes.isEmpty {
             body.append(Data(": keep-alive\n\n".utf8))
@@ -1380,10 +1546,48 @@ public actor NeoAnkiAPIService {
             status: 200,
             headers: [
                 "Content-Type": "text/event-stream; charset=utf-8",
-                "X-NeoAnki-Change-Cursor": String(changes.last?.cursor ?? after),
+                "X-NeoAnki-Change-Cursor": String(page.lastScanned),
             ],
             body: body
         )
+    }
+
+    private func visibleChanges(
+        after: Int64,
+        limit: Int,
+        grant: APIClientGrant
+    ) async throws -> (changes: [LibraryChange], lastScanned: Int64) {
+        var visible: [LibraryChange] = []
+        var cursor = after
+        while visible.count < limit {
+            let batch = try await store.changes(after: cursor, limit: 1_000)
+            guard !batch.isEmpty else { break }
+            for change in batch {
+                cursor = change.cursor
+                if try await canReadChange(change, grant: grant) {
+                    visible.append(change)
+                    if visible.count == limit { break }
+                }
+            }
+            if batch.count < 1_000 || visible.count == limit { break }
+        }
+        return (visible, cursor)
+    }
+
+    private func canReadChange(
+        _ change: LibraryChange,
+        grant: APIClientGrant
+    ) async throws -> Bool {
+        if change.resourceType == LibraryResourceKind.studyResponse.rawValue {
+            return grant.scopes.contains(.studyResponsesRead)
+        }
+        guard grant.scopes.contains(.libraryRead) else { return false }
+        if change.resourceType == LibraryResourceKind.media.rawValue,
+           try await store.isStudyResponseMediaHash(change.resourceID),
+           try await store.ordinaryMediaReferenceCount(hash: change.resourceID) == 0 {
+            return false
+        }
+        return true
     }
 
     private func validateRetainedCursor(_ cursor: Int64) async throws {
@@ -2222,6 +2426,23 @@ public actor NeoAnkiAPIService {
     private func deleteItem(_ id: UUID, request: APIRequest) async throws -> APIResponse {
         let currentRevision = try await revision(resourceType: "item", resourceID: id.uuidString)
         try requireIfMatch(request, revision: currentRevision)
+        let cardIDs = Set(try await store.cards().filter { $0.itemID == id }.map(\.id))
+        let responseCount = try await store.studyResponseCount(cardIDs: cardIDs)
+        if responseCount > 0 {
+            let requestHash = try APIJSON.canonicalRequestHash(
+                method: request.method, path: request.path, body: request.body
+            )
+            try await requireStudyResponseDeletionConfirmation(
+                resourceID: id,
+                requestHash: requestHash,
+                suppliedToken: request.header("neoanki-impact-token"),
+                impact: APIImpactSummary(
+                    affectedItemCount: 1,
+                    affectedCardCount: cardIDs.count,
+                    affectedStudyResponseCount: responseCount
+                )
+            )
+        }
         guard try await store.deleteItem(id: id) else {
             throw APIServiceError.notFound("The requested resource does not exist.")
         }
@@ -2656,7 +2877,7 @@ public actor NeoAnkiAPIService {
             let supplied = request.header("neoanki-impact-token")
             let cursor = try await store.currentChangeCursor()
             let valid = supplied.flatMap { impactAuthorizations[$0] }.map {
-                $0.itemTypeID == id
+                $0.resourceID == id
                     && $0.requestHash == requestHash
                     && $0.changeCursor == cursor
                     && $0.expiresAt > .now
@@ -2664,16 +2885,20 @@ public actor NeoAnkiAPIService {
             guard valid else {
                 let token = try APICrypto.randomToken()
                 impactAuthorizations[token] = ImpactAuthorization(
-                    itemTypeID: id,
+                    resourceID: id,
                     requestHash: requestHash,
                     changeCursor: cursor,
                     expiresAt: .now.addingTimeInterval(300)
                 )
                 throw APIServiceError.problem(
                     status: 409,
-                    code: "impact_confirmation_required",
+                    code: impact.affectedStudyResponseCount > 0
+                        ? "study_response_deletion_confirmation_required"
+                        : "impact_confirmation_required",
                     title: "Impact confirmation required",
-                    detail: "This definition change can remove or regenerate cards.",
+                    detail: impact.affectedStudyResponseCount > 0
+                        ? "This definition change will delete persistent spoken responses."
+                        : "This definition change can remove or regenerate cards.",
                     impact: impact,
                     impactToken: token
                 )
@@ -2797,8 +3022,44 @@ public actor NeoAnkiAPIService {
         }
         return APIImpactSummary(
             affectedItemCount: affectedItems.count,
-            affectedCardCount: affectedCards.count
+            affectedCardCount: affectedCards.count,
+            affectedStudyResponseCount: try await store.studyResponseCount(
+                cardIDs: Set(affectedCards.map(\.id))
+            )
         )
+    }
+
+    private func requireStudyResponseDeletionConfirmation(
+        resourceID: UUID,
+        requestHash: String,
+        suppliedToken: String?,
+        impact: APIImpactSummary
+    ) async throws {
+        let cursor = try await store.currentChangeCursor()
+        let valid = suppliedToken.flatMap { impactAuthorizations[$0] }.map {
+            $0.resourceID == resourceID
+                && $0.requestHash == requestHash
+                && $0.changeCursor == cursor
+                && $0.expiresAt > .now
+        } ?? false
+        guard valid else {
+            let token = try APICrypto.randomToken()
+            impactAuthorizations[token] = ImpactAuthorization(
+                resourceID: resourceID,
+                requestHash: requestHash,
+                changeCursor: cursor,
+                expiresAt: .now.addingTimeInterval(300)
+            )
+            throw APIServiceError.problem(
+                status: 409,
+                code: "study_response_deletion_confirmation_required",
+                title: "Saved response deletion confirmation required",
+                detail: "This change will permanently delete persistent spoken responses.",
+                impact: impact,
+                impactToken: token
+            )
+        }
+        if let suppliedToken { impactAuthorizations.removeValue(forKey: suppliedToken) }
     }
 
     private func createImportJob(_ request: APIRequest) async throws -> APIResponse {
@@ -3737,7 +3998,10 @@ public actor NeoAnkiAPIService {
                 headers: ["Accept-Ranges": "none"]
             )
         }
-        guard try await store.mediaAsset(hash: hash) != nil else {
+        let isResponseHash = try await store.isStudyResponseMediaHash(hash)
+        let ordinaryReferenceCount = try await store.ordinaryMediaReferenceCount(hash: hash)
+        let responsePrivate = isResponseHash && ordinaryReferenceCount == 0
+        guard try await store.mediaAsset(hash: hash) != nil, !responsePrivate else {
             throw APIServiceError.notFound("The requested resource does not exist.")
         }
         let (asset, bytes) = try await store.mediaBytes(hash: hash)
@@ -3769,7 +4033,10 @@ public actor NeoAnkiAPIService {
     }
 
     private func mediaMetadata(_ hash: String) async throws -> APIResponse {
-        guard let asset = try await store.mediaAsset(hash: hash) else {
+        let isResponseHash = try await store.isStudyResponseMediaHash(hash)
+        let ordinaryReferenceCount = try await store.ordinaryMediaReferenceCount(hash: hash)
+        let responsePrivate = isResponseHash && ordinaryReferenceCount == 0
+        guard let asset = try await store.mediaAsset(hash: hash), !responsePrivate else {
             throw APIServiceError.notFound("The requested resource does not exist.")
         }
         return try .json(APIMediaMetadata(asset))
@@ -3849,6 +4116,20 @@ public actor NeoAnkiAPIService {
                 title: "Insufficient scope",
                 detail: "This operation requires \(scope.rawValue).",
                 requiredScope: scope.rawValue
+            )
+        }
+    }
+
+    private func requireChangeRead(_ grant: APIClientGrant) throws {
+        guard grant.scopes.contains(.libraryRead)
+                || grant.scopes.contains(.studyResponsesRead)
+        else {
+            throw APIServiceError.problem(
+                status: 403,
+                code: "insufficient_scope",
+                title: "Insufficient scope",
+                detail: "This operation requires library.read or study.responses.read.",
+                requiredScope: "library.read or study.responses.read"
             )
         }
     }

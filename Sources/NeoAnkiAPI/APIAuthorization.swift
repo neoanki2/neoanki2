@@ -8,6 +8,8 @@ public enum APIScope: String, Codable, CaseIterable, Hashable, Sendable {
     case decksWrite = "decks.write"
     case schemasWrite = "schemas.write"
     case studyReview = "study.review"
+    case studyResponsesRead = "study.responses.read"
+    case studyResponsesDelete = "study.responses.delete"
     case mediaWrite = "media.write"
     case libraryImport = "library.import"
     case libraryExport = "library.export"

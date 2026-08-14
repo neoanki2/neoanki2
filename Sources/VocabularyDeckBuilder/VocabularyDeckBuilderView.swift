@@ -1,8 +1,8 @@
-import AppKit
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import NeoAnkiVocabularyKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 public struct VocabularyPackOption: Identifiable, Sendable, Equatable {
     public let id: String
@@ -59,6 +59,7 @@ public struct VocabularyDeckBuilderView: View {
     @State private var isPreparingEntry = false
     @State private var isGenerating = false
     @State private var selectedPackID: VocabularyPackOption.ID?
+    @State private var isChoosingPack = false
     @State private var successMessage: String?
     @FocusState private var searchFocused: Bool
 
@@ -87,6 +88,29 @@ public struct VocabularyDeckBuilderView: View {
             return nil
         }
         self.onCancel = onCancel
+    }
+
+    /// Creates a full deck-builder flow using the device-local installed pack
+    /// collection while retaining destination-deck selection.
+    public init(
+        installedPacks: [VocabularyPackOption],
+        rootDecks: [DeckBuilderDeckOption],
+        workspaceProvider: any DeckBuildWorkspaceProviding = SystemDeckBuildWorkspaceProvider(),
+        limits: AuthoredDeckLimits = .default,
+        onGenerated: @escaping @MainActor (GeneratedDeckBundle) -> Void,
+        onCancel: @escaping @MainActor () -> Void
+    ) {
+        self.rootDecks = rootDecks
+        self.installedPacks = installedPacks
+        fixedDestination = nil
+        self.workspaceProvider = workspaceProvider
+        self.limits = limits
+        importGenerated = { generated in
+            onGenerated(generated)
+            return nil
+        }
+        self.onCancel = onCancel
+        _selectedPackID = State(initialValue: installedPacks.first?.id)
     }
 
     /// Creates the incremental authoring flow: an installed pack is searched
@@ -185,6 +209,22 @@ public struct VocabularyDeckBuilderView: View {
                   let option = installedPacks?.first(where: { $0.id == packID })
             else { return }
             openPack(at: option.packageURL)
+        }
+        .fileImporter(
+            isPresented: $isChoosingPack,
+            allowedContentTypes: [UTType(exportedAs: "com.neoanki2.neovocab", conformingTo: .package)],
+            allowsMultipleSelection: false
+        ) { result in
+            do {
+                guard let url = try result.get().first else { return }
+                guard url.pathExtension.lowercased() == "neovocab" else {
+                    errorMessage = "Choose a directory whose name ends in .neovocab."
+                    return
+                }
+                openPack(at: url)
+            } catch {
+                if (error as NSError).code != NSUserCancelledError { errorMessage = error.localizedDescription }
+            }
         }
     }
 
@@ -518,20 +558,7 @@ public struct VocabularyDeckBuilderView: View {
     }
 
     private func choosePack() {
-        let panel = NSOpenPanel()
-        panel.title = "Choose Offline Vocabulary Pack"
-        panel.prompt = "Choose Pack"
-        panel.message = "Select a local .neovocab directory."
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.resolvesAliases = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard url.pathExtension.lowercased() == "neovocab" else {
-            errorMessage = "Choose a directory whose name ends in .neovocab."
-            return
-        }
-        openPack(at: url)
+        isChoosingPack = true
     }
 
     private func openPack(at url: URL) {

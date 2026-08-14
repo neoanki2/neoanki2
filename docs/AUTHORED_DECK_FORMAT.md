@@ -9,7 +9,7 @@ parent: Reference
 ## 1. Status and purpose
 
 This document is the normative specification for NeoAnki Authored Deck Format
-version 3. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
+version 4. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
 **SHOULD NOT**, and **MAY** are interpreted as in RFC 2119 and RFC 8174.
 
 The format is an import-only, text-based source representation for coding
@@ -89,7 +89,7 @@ resolution.
 MUST reference a declared parent. Identifiers are unique and the hierarchy
 MUST be acyclic and connected to the root.
 
-In version 3 the root deck MUST declare a non-empty, ordered `itemTypes` array.
+In version 3 and later the root deck MUST declare a non-empty, ordered `itemTypes` array.
 A descendant MAY declare its own non-empty array; omission inherits the
 nearest ancestor declaration. Optional `defaultType` MUST reference the same
 record's `itemTypes` array. One available type is selected automatically.
@@ -140,7 +140,10 @@ to `always`. Optional `media` is `default`, `autoplay`, `playOnTap`, or `loop`;
 it defaults to `default`. Non-default media behavior is valid only on audio,
 GIF, or video fields.
 
-`interaction` is `reveal`, `type`, `choose`, `record`, `cloze`, or `arrange`.
+`interaction` is `reveal`, `type`, `choose`, `record`, `audioSubmission`, `cloze`, or `arrange`.
+An `audioSubmission` template MUST contain at least one prompt slot, MUST have an
+empty answer side, and MUST declare `audio` as its skill output. Learner
+recordings are local library data and are never part of an authored bundle.
 
 `skill.input` and `skill.output` are `text`, `audio`, `image`, `video`,
 `diagram`, `none`, `freeResponse`, `selection`, `spatial`, or `sequence`.
@@ -293,7 +296,7 @@ Biology.neoanki/items/cells-001.jsonl:18: AD222: Item contains unknown field "ba
 
 ## 12. Evolution
 
-Version 3 adds deck item-type policies and included item types. Version 2 adds
+Version 4 adds `audioSubmission` templates. Version 3 adds deck item-type policies and included item types. Version 2 adds
 portable inline text color, relative size, links, superscript, and subscript.
 Versions 1 and 2 remain readable; their imported types retain the legacy global
 behavior. Version 1 cannot use the version-2 text members or styles. Writers

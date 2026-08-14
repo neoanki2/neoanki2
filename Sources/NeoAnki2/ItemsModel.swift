@@ -110,11 +110,11 @@ final class ItemsModel {
         await searchTask?.value
     }
 
-    let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
+    let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging & LibraryStudyResponses
     let mediaStore: MediaStore?
 
     init(
-        library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging,
+        library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging & LibraryStudyResponses,
         mediaStore: MediaStore?
     ) {
         self.library = library
@@ -580,6 +580,15 @@ final class ItemsModel {
         }
         await load(scope: scope, asOf: now)
         return deleted
+    }
+
+    func studyResponseCount(itemIDs: Set<UUID>) async -> Int {
+        do {
+            return try await library.studyResponseCount(itemIDs: itemIDs)
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return 0
+        }
     }
 
     /// Acts in the order the user sees, so a failure part-way through leaves a

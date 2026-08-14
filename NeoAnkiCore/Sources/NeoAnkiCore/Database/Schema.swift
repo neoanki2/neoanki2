@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 21
+    static let version = 23
 
     static let createStatements: [String] = [
         """
@@ -13,6 +13,12 @@ enum Schema {
         CREATE TABLE IF NOT EXISTS app_metadata (
             key TEXT PRIMARY KEY NOT NULL,
             value TEXT NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS library_aliases (
+            alias_id TEXT PRIMARY KEY NOT NULL,
+            canonical_id TEXT NOT NULL
         );
         """,
         """
@@ -173,6 +179,46 @@ enum Schema {
         """
         CREATE INDEX IF NOT EXISTS idx_media_reservations_expiry
         ON media_reservations(expires_at);
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS study_responses (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL UNIQUE REFERENCES cards(id) ON DELETE CASCADE,
+            media_hash TEXT NOT NULL REFERENCES media_assets(hash),
+            kind TEXT NOT NULL DEFAULT 'audio' CHECK(kind = 'audio'),
+            duration_ms INTEGER NOT NULL CHECK(duration_ms > 0 AND duration_ms <= 1800000),
+            captured_at REAL NOT NULL,
+            submitted_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS study_response_media_privacy (
+            media_hash TEXT PRIMARY KEY NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_study_responses_submitted
+        ON study_responses(submitted_at DESC, id DESC);
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS study_responses_media_ref_insert
+        AFTER INSERT ON study_responses
+        BEGIN
+            INSERT OR IGNORE INTO study_response_media_privacy (media_hash)
+            VALUES (NEW.media_hash);
+            UPDATE media_assets
+            SET ref_count = ref_count + 1
+            WHERE hash = NEW.media_hash;
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS study_responses_media_ref_delete
+        AFTER DELETE ON study_responses
+        BEGIN
+            UPDATE media_assets
+            SET ref_count = ref_count - 1
+            WHERE hash = OLD.media_hash;
+        END;
         """,
         """
         CREATE TABLE IF NOT EXISTS scheduler_params (
@@ -359,10 +405,94 @@ enum Schema {
             eventStem: "reviewRevert"
         )
         + trackedTableStatements(
+            table: "study_responses",
+            resourceType: "studyResponse",
+            eventStem: "studyResponse"
+        )
+        + trackedTableStatements(
             table: "media_assets",
             resourceType: "media",
             eventStem: "media",
             idColumn: "hash"
+        )
+        + syncResourceChangeTrackingStatements
+
+    static func syncChangeTrackingStatements(forExistingTable table: String) -> [String] {
+        switch table {
+        case "library_item_types":
+            compoundTrackedTableStatements(table: table, resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'library:' || NEW.item_type_id", oldIDExpression: "'library:' || OLD.item_type_id")
+        case "deck_included_item_types":
+            compoundTrackedTableStatements(table: table, resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'included:' || NEW.root_deck_id || ':' || NEW.item_type_id", oldIDExpression: "'included:' || OLD.root_deck_id || ':' || OLD.item_type_id")
+        case "deck_item_type_policy_entries":
+            compoundTrackedTableStatements(table: table, resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'policy:' || NEW.deck_id || ':' || NEW.item_type_id", oldIDExpression: "'policy:' || OLD.deck_id || ':' || OLD.item_type_id")
+        case "scheduler_params":
+            compoundTrackedTableStatements(table: table, resourceType: "schedulingSettings", eventStem: "schedulingSettings", newIDExpression: "'profile:' || NEW.profile_id", oldIDExpression: "'profile:' || OLD.profile_id")
+        case "portable_item_type_mappings":
+            compoundTrackedTableStatements(table: table, resourceType: "portableTypeMapping", eventStem: "portableTypeMapping", newIDExpression: "NEW.origin_library_id || ':' || NEW.origin_type_id || ':' || NEW.schema_digest", oldIDExpression: "OLD.origin_library_id || ':' || OLD.origin_type_id || ':' || OLD.schema_digest")
+        case "app_metadata":
+            conditionalTrackedTableStatements(table: table, triggerStem: "library_identity", resourceType: "library", eventStem: "library", newIDExpression: "NEW.value", oldIDExpression: "OLD.value", insertWhen: "NEW.key = 'library_id'", updateWhen: "NEW.key = 'library_id'", deleteWhen: "OLD.key = 'library_id'")
+            + conditionalTrackedTableStatements(table: table, triggerStem: "study_day_rollover", resourceType: "schedulingSettings", eventStem: "schedulingSettings", newIDExpression: "'rollover'", oldIDExpression: "'rollover'", insertWhen: "NEW.key = 'study_day_rollover_minutes'", updateWhen: "NEW.key = 'study_day_rollover_minutes'", deleteWhen: "OLD.key = 'study_day_rollover_minutes'")
+        default: []
+        }
+    }
+
+    private static let syncResourceChangeTrackingStatements: [String] =
+        compoundTrackedTableStatements(
+            table: "library_item_types",
+            resourceType: "itemTypeMembership",
+            eventStem: "itemTypeMembership",
+            newIDExpression: "'library:' || NEW.item_type_id",
+            oldIDExpression: "'library:' || OLD.item_type_id"
+        )
+        + compoundTrackedTableStatements(
+            table: "deck_included_item_types",
+            resourceType: "itemTypeMembership",
+            eventStem: "itemTypeMembership",
+            newIDExpression: "'included:' || NEW.root_deck_id || ':' || NEW.item_type_id",
+            oldIDExpression: "'included:' || OLD.root_deck_id || ':' || OLD.item_type_id"
+        )
+        + compoundTrackedTableStatements(
+            table: "deck_item_type_policy_entries",
+            resourceType: "itemTypeMembership",
+            eventStem: "itemTypeMembership",
+            newIDExpression: "'policy:' || NEW.deck_id || ':' || NEW.item_type_id",
+            oldIDExpression: "'policy:' || OLD.deck_id || ':' || OLD.item_type_id"
+        )
+        + compoundTrackedTableStatements(
+            table: "scheduler_params",
+            resourceType: "schedulingSettings",
+            eventStem: "schedulingSettings",
+            newIDExpression: "'profile:' || NEW.profile_id",
+            oldIDExpression: "'profile:' || OLD.profile_id"
+        )
+        + compoundTrackedTableStatements(
+            table: "portable_item_type_mappings",
+            resourceType: "portableTypeMapping",
+            eventStem: "portableTypeMapping",
+            newIDExpression: "NEW.origin_library_id || ':' || NEW.origin_type_id || ':' || NEW.schema_digest",
+            oldIDExpression: "OLD.origin_library_id || ':' || OLD.origin_type_id || ':' || OLD.schema_digest"
+        )
+        + conditionalTrackedTableStatements(
+            table: "app_metadata",
+            triggerStem: "library_identity",
+            resourceType: "library",
+            eventStem: "library",
+            newIDExpression: "NEW.value",
+            oldIDExpression: "OLD.value",
+            insertWhen: "NEW.key = 'library_id'",
+            updateWhen: "NEW.key = 'library_id'",
+            deleteWhen: "OLD.key = 'library_id'"
+        )
+        + conditionalTrackedTableStatements(
+            table: "app_metadata",
+            triggerStem: "study_day_rollover",
+            resourceType: "schedulingSettings",
+            eventStem: "schedulingSettings",
+            newIDExpression: "'rollover'",
+            oldIDExpression: "'rollover'",
+            insertWhen: "NEW.key = 'study_day_rollover_minutes'",
+            updateWhen: "NEW.key = 'study_day_rollover_minutes'",
+            deleteWhen: "OLD.key = 'study_day_rollover_minutes'"
         )
 
     /// Applied when upgrading from schema version 20. Backfill is performed by
@@ -387,6 +517,12 @@ enum Schema {
                 table: table,
                 resourceType: "reviewRevert",
                 eventStem: "reviewRevert"
+            )
+        case "study_responses":
+            trackedTableStatements(
+                table: table,
+                resourceType: "studyResponse",
+                eventStem: "studyResponse"
             )
         case "media_assets":
             trackedTableStatements(
@@ -448,6 +584,71 @@ enum Schema {
         ]
     }
 
+    private static func compoundTrackedTableStatements(
+        table: String,
+        resourceType: String,
+        eventStem: String,
+        newIDExpression: String,
+        oldIDExpression: String
+    ) -> [String] {
+        conditionalTrackedTableStatements(
+            table: table,
+            triggerStem: table,
+            resourceType: resourceType,
+            eventStem: eventStem,
+            newIDExpression: newIDExpression,
+            oldIDExpression: oldIDExpression
+        )
+    }
+
+    private static func conditionalTrackedTableStatements(
+        table: String,
+        triggerStem: String,
+        resourceType: String,
+        eventStem: String,
+        newIDExpression: String,
+        oldIDExpression: String,
+        insertWhen: String? = nil,
+        updateWhen: String? = nil,
+        deleteWhen: String? = nil
+    ) -> [String] {
+        [
+            trackedTriggerStatement(
+                table: table,
+                operation: "INSERT",
+                timingSuffix: "insert",
+                resourceType: resourceType,
+                eventType: "\(eventStem).created",
+                idExpression: newIDExpression,
+                isTombstone: false,
+                triggerStem: triggerStem,
+                whenClause: insertWhen
+            ),
+            trackedTriggerStatement(
+                table: table,
+                operation: "UPDATE",
+                timingSuffix: "update",
+                resourceType: resourceType,
+                eventType: "\(eventStem).updated",
+                idExpression: newIDExpression,
+                isTombstone: false,
+                triggerStem: triggerStem,
+                whenClause: updateWhen
+            ),
+            trackedTriggerStatement(
+                table: table,
+                operation: "DELETE",
+                timingSuffix: "delete",
+                resourceType: resourceType,
+                eventType: "\(eventStem).deleted",
+                idExpression: oldIDExpression,
+                isTombstone: true,
+                triggerStem: triggerStem,
+                whenClause: deleteWhen
+            ),
+        ]
+    }
+
     private static func trackedTriggerStatement(
         table: String,
         operation: String,
@@ -455,12 +656,17 @@ enum Schema {
         resourceType: String,
         eventType: String,
         idExpression: String,
-        isTombstone: Bool
+        isTombstone: Bool,
+        triggerStem: String? = nil,
+        whenClause: String? = nil
     ) -> String {
         let tombstone = isTombstone ? 1 : 0
+        let whenSQL = whenClause.map { "WHEN \($0)" } ?? ""
+        let triggerName = triggerStem ?? table
         return """
-        CREATE TRIGGER IF NOT EXISTS api_track_\(table)_\(timingSuffix)
+        CREATE TRIGGER IF NOT EXISTS api_track_\(triggerName)_\(timingSuffix)
         AFTER \(operation) ON \(table)
+        \(whenSQL)
         BEGIN
             INSERT INTO api_transaction_context (
                 singleton, transaction_id, occurred_at, is_implicit
@@ -953,6 +1159,51 @@ enum Schema {
         """
         ALTER TABLE media_assets
         ADD COLUMN ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0);
+        """,
+    ]
+
+    /// Applied when upgrading from schema version 22. Learner responses are
+    /// local-only event data and own one reference to their media asset.
+    static let migrationV23Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS study_responses (
+            id TEXT PRIMARY KEY NOT NULL,
+            card_id TEXT NOT NULL UNIQUE REFERENCES cards(id) ON DELETE CASCADE,
+            media_hash TEXT NOT NULL REFERENCES media_assets(hash),
+            kind TEXT NOT NULL DEFAULT 'audio' CHECK(kind = 'audio'),
+            duration_ms INTEGER NOT NULL CHECK(duration_ms > 0 AND duration_ms <= 1800000),
+            captured_at REAL NOT NULL,
+            submitted_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS study_response_media_privacy (
+            media_hash TEXT PRIMARY KEY NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_study_responses_submitted
+        ON study_responses(submitted_at DESC, id DESC);
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS study_responses_media_ref_insert
+        AFTER INSERT ON study_responses
+        BEGIN
+            INSERT OR IGNORE INTO study_response_media_privacy (media_hash)
+            VALUES (NEW.media_hash);
+            UPDATE media_assets
+            SET ref_count = ref_count + 1
+            WHERE hash = NEW.media_hash;
+        END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS study_responses_media_ref_delete
+        AFTER DELETE ON study_responses
+        BEGIN
+            UPDATE media_assets
+            SET ref_count = ref_count - 1
+            WHERE hash = OLD.media_hash;
+        END;
         """,
     ]
 

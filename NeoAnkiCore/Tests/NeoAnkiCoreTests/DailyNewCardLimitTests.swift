@@ -149,6 +149,48 @@ private let dailyLimitNow = Date(timeIntervalSince1970: 1_800_000_000)
     #expect(due.count == 1)
 }
 
+/// A card rejected by a stricter child limit must not consume one of its
+/// parent's slots. The parent should keep scanning its ordered candidates and
+/// backfill the slot from another subdeck.
+@Test func childLimitRejectionBackfillsTheParentAllowance() async throws {
+    let store = try await dailyLimitStore()
+    let parent = Deck(name: "Parent", newCardsPerDay: 2)
+    let limitedChild = Deck(name: "Limited child", parentID: parent.id, newCardsPerDay: 1)
+    let unlimitedChild = Deck(name: "Unlimited child", parentID: parent.id)
+    _ = try await store.createDeck(parent)
+    _ = try await store.createDeck(limitedChild)
+    _ = try await store.createDeck(unlimitedChild)
+
+    _ = try await store.createItem(
+        dailyLimitItem("Limited first", deckID: limitedChild.id),
+        now: dailyLimitNow
+    )
+    _ = try await store.createItem(
+        dailyLimitItem("Limited second", deckID: limitedChild.id),
+        now: dailyLimitNow.addingTimeInterval(1)
+    )
+    _ = try await store.createItem(
+        dailyLimitItem("Parent backfill", deckID: unlimitedChild.id),
+        now: dailyLimitNow.addingTimeInterval(2)
+    )
+    let asOf = dailyLimitNow.addingTimeInterval(3)
+
+    let due = try await store.fetchDueCards(
+        scope: .deck(parent.id, includeDescendants: true),
+        asOf: asOf
+    )
+    let summary = try await store.scopeSummary(
+        scope: .deck(parent.id, includeDescendants: true),
+        asOf: asOf
+    )
+
+    #expect(due.count == 2)
+    #expect(due.map(\.card.deckID) == [limitedChild.id, unlimitedChild.id])
+    #expect(summary.dueNow == 2)
+    #expect(summary.availableNewCount == 2)
+    #expect(summary.hiddenNewCount == 1)
+}
+
 @Test func zeroLimitDoesNotRestrictUnassignedCardsOrReviews() async throws {
     let store = try await dailyLimitStore()
     let deck = Deck(name: "Paused", newCardsPerDay: 0)

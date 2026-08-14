@@ -111,6 +111,9 @@ public enum Interaction: String, Codable, CaseIterable, Sendable {
     case choose
     /// Record audio/video and self-compare against a reference.
     case record
+    /// Capture one persistent learner audio response, then complete the card
+    /// without revealing an answer or updating review scheduling.
+    case audioSubmission
     /// Fill in cloze blanks.
     case cloze
     /// Arrange items into the correct order.

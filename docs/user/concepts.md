@@ -67,7 +67,9 @@ own memory state, so sibling cards from the same item can become due at
 different times.
 
 **Interaction**  
-How a card asks you to respond: reveal, type, choose, record, cloze, or arrange.
+How a card asks you to respond: reveal, type, choose, record, audio submission,
+cloze, or arrange. Record is a temporary compare-and-grade exercise; Audio
+Submission persistently saves one local spoken response and completes without grading.
 Automatic checking, when available, gives feedback; you still choose the grade.
 
 **Deck**

@@ -7,10 +7,12 @@ struct DeckSidebarView: View {
     var onDeleteAllUnassigned: () -> Void = {}
     var onDeckSettingsSaved: () async -> Void = {}
     var onDeckProgressReset: () async -> Void = {}
+    var onOpenSavedResponses: () -> Void = {}
     @State private var deckToRename: DeckSummary?
     @State private var deckToConfigure: DeckSummary?
     @State private var renameText = ""
     @State private var deckToDelete: DeckSummary?
+    @State private var affectedResponseCount = 0
     @State private var showDeleteAllUnassignedConfirm = false
     @State private var showNewDeckPrompt = false
     @State private var newDeckName = ""
@@ -28,6 +30,17 @@ struct DeckSidebarView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(selection: $selection) {
+                        Section("Library") {
+                            Button(action: onOpenSavedResponses) {
+                                Label("Saved Responses", systemImage: "waveform")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Opens persistent spoken responses")
+                            .accessibilityIdentifier("savedResponsesSidebar")
+                        }
+
                         virtualRow(
                             title: "All Decks",
                             subtitle: dueCaption(decksModel.allDecksDueCount),
@@ -49,7 +62,7 @@ struct DeckSidebarView: View {
                                         decksModel: decksModel,
                                         onConfigure: { deckToConfigure = $0 },
                                         onRename: beginRename,
-                                        onDelete: { deckToDelete = $0 },
+                                        onDelete: prepareDeckDeletion,
                                         onNewSubdeck: beginNewSubdeck
                                     )
                                 }
@@ -152,7 +165,11 @@ struct DeckSidebarView: View {
             }
             .accessibilityIdentifier("cancelDeleteDeck")
         } message: {
-            Text("This permanently deletes the deck, all subdecks, and every item they contain.")
+            if affectedResponseCount > 0 {
+                Text("This permanently deletes the deck, all subdecks, every item they contain, and \(affectedResponseCount) saved spoken \(affectedResponseCount == 1 ? "response" : "responses").")
+            } else {
+                Text("This permanently deletes the deck, all subdecks, and every item they contain.")
+            }
         }
         .confirmationDialog(
             "Delete all unassigned items?",
@@ -196,6 +213,14 @@ struct DeckSidebarView: View {
     private func beginRename(_ summary: DeckSummary) {
         deckToRename = summary
         renameText = summary.name
+    }
+
+    private func prepareDeckDeletion(_ summary: DeckSummary) {
+        Task {
+            guard let impact = await decksModel.deletionImpact(id: summary.id) else { return }
+            affectedResponseCount = impact.studyResponseCount
+            deckToDelete = summary
+        }
     }
 
     private func beginNewSubdeck(parentID: UUID) {

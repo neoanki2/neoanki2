@@ -632,7 +632,7 @@ private struct AuthoredDeckLoader {
             throw DecodeFailure("AD110", "Manifest kind must be \"neoanki\".")
         }
         let version = try requiredInteger(object, "version")
-        guard (1...3).contains(version) else {
+        guard (1...4).contains(version) else {
             throw DecodeFailure("AD111", "Only authored deck versions 1 through 3 are supported.")
         }
         return .init(

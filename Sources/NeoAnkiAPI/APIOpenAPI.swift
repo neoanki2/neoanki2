@@ -105,6 +105,7 @@ enum APIOpenAPI {
                 let required = [
                     "POST /v1/items", "POST /v1/items/bulk", "POST /v1/reviews",
                     "POST /v1/media", "POST /v1/cards/{id}/resets",
+                    "DELETE /v1/study-responses/{id}",
                     "POST /v1/deck-deletion-plans/{id}/commits",
                     "POST /v1/deck-reset-plans/{id}/commits",
                     "POST /v1/imports/{id}/commits",
@@ -233,6 +234,12 @@ enum APIOpenAPI {
         add("/v1/reviews", "post", "submitReview", scope: "study.review", success: 201, request: "SubmitReviewInput", response: "ReviewResult")
         add("/v1/reviews/{reviewLogId}/reverts", "post", "revertReview", scope: "study.review", success: 204, response: nil)
 
+        add("/v1/study-responses", "get", "listStudyResponses", scope: "study.responses.read", response: "StudyResponseCollection", query: ["cursor", "limit", "cardId", "itemId", "tag", "createdAfter"])
+        add("/v1/study-responses/{id}", "get", "getStudyResponse", scope: "study.responses.read", response: "StudyResponse")
+        add("/v1/study-responses/{id}", "delete", "deleteStudyResponse", scope: "study.responses.delete", success: 204, response: nil)
+        add("/v1/study-responses/{id}/content", "get", "downloadStudyResponse", scope: "study.responses.read", response: "Binary", responseContentType: "audio/mp4")
+        add("/v1/study-responses/{id}/content", "head", "headStudyResponse", scope: "study.responses.read", response: nil, responseContentType: "audio/mp4")
+
         add("/v1/media", "post", "uploadMedia", scope: "media.write", success: 201, request: "Binary", response: "MediaReservation", requestContentType: "application/octet-stream")
         add("/v1/media/{sha256}", "head", "headMedia", scope: "library.read", response: nil, responseContentType: "application/octet-stream")
         add("/v1/media/{sha256}", "get", "downloadMedia", scope: "library.read", response: "Binary", responseContentType: "application/octet-stream")
@@ -264,8 +271,8 @@ enum APIOpenAPI {
         add("/v1/exports/{id}", "delete", "deleteExport", scope: "library.export", success: 204, response: nil)
         add("/v1/exports/{id}/content", "get", "exportContent", scope: "library.export", response: "Binary", responseContentType: "application/vnd.neoanki.portable-deck")
 
-        add("/v1/changes", "get", "changes", scope: "library.read", response: "ChangeCollection", query: ["after", "limit"])
-        add("/v1/events", "get", "events", scope: "library.read", response: "EventStream", responseContentType: "text/event-stream", query: ["after"])
+        add("/v1/changes", "get", "changes", scope: "library.read or study.responses.read", response: "ChangeCollection", query: ["after", "limit"])
+        add("/v1/events", "get", "events", scope: "library.read or study.responses.read", response: "EventStream", responseContentType: "text/event-stream", query: ["after"])
 
         let document: [String: Any] = [
             "openapi": "3.1.0",
@@ -414,7 +421,8 @@ enum APIOpenAPI {
             "type": "string",
             "enum": [
                 "library.read", "items.write", "decks.write", "schemas.write",
-                "study.review", "media.write", "library.import", "library.export",
+                "study.review", "study.responses.read", "study.responses.delete",
+                "media.write", "library.import", "library.export",
                 "vocabulary.read", "vocabulary.write",
                 "settings.write", "ui.control",
             ],
@@ -592,9 +600,10 @@ enum APIOpenAPI {
                                                              "moveItemsToParent", "deleteSubtreeAndItems"]],
             ]),
             "DeckDeletionImpact": object(
-                ["deckCount", "itemCount", "cardCount", "reviewLogCount", "mediaReferenceCount"],
+                ["deckCount", "itemCount", "cardCount", "reviewLogCount", "mediaReferenceCount", "studyResponseCount"],
                 ["deckCount": nonnegative, "itemCount": nonnegative, "cardCount": nonnegative,
-                 "reviewLogCount": nonnegative, "mediaReferenceCount": nonnegative]
+                 "reviewLogCount": nonnegative, "mediaReferenceCount": nonnegative,
+                 "studyResponseCount": nonnegative]
             ),
             "DeckResetImpact": object(["deckCount", "cardCount", "reviewLogCount"], [
                 "deckCount": nonnegative, "cardCount": nonnegative, "reviewLogCount": nonnegative,
@@ -650,7 +659,7 @@ enum APIOpenAPI {
                 ["id", "name", "prompt", "answer", "interaction", "skill"],
                 ["id": uuid, "name": ["type": "string"], "prompt": array(reference("Slot")),
                  "answer": array(reference("Slot")),
-                 "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "cloze", "arrange"]],
+                 "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "arrange"]],
                  "skill": reference("Skill"), "generateWhen": reference("Condition")]
             ),
             "ItemTypeInput": object(["name", "fields", "templates"], itemTypeInputProperties),
@@ -780,6 +789,15 @@ enum APIOpenAPI {
                  "resultingPhase": ["type": "string"], "memory": reference("Memory"),
                  "changeCursor": nonnegative]
             ),
+            "StudyResponse": object(
+                ["id", "revision", "cardId", "itemId", "assetHash", "contentType", "fileExtension", "byteSize", "durationMs", "capturedAt", "submittedAt", "sourceTitle"],
+                ["id": uuid, "revision": revision, "cardId": uuid, "itemId": uuid,
+                 "assetHash": sha256, "contentType": ["type": "string", "const": "audio/mp4"],
+                 "fileExtension": ["type": "string", "const": "m4a"], "byteSize": nonnegative,
+                 "durationMs": ["type": "integer", "minimum": 1, "maximum": 1_800_000],
+                 "capturedAt": timestamp, "submittedAt": timestamp, "sourceTitle": ["type": "string"]]
+            ),
+            "StudyResponseCollection": collection("StudyResponse"),
             "MediaReservation": object(
                 ["assetHash", "kind", "fileExtension", "byteSize", "reservationId", "reservationExpiresAt"],
                 ["assetHash": sha256, "kind": ["type": "string", "enum": ["audio", "image", "gif", "video"]],
@@ -839,12 +857,19 @@ enum APIOpenAPI {
             "ValidationError": object(["pointer", "code"], [
                 "pointer": ["type": "string"], "code": ["type": "string"],
             ]),
+            "ImpactSummary": object(
+                ["affectedItemCount", "affectedCardCount", "affectedStudyResponseCount"],
+                ["affectedItemCount": nonnegative, "affectedCardCount": nonnegative,
+                 "affectedStudyResponseCount": nonnegative]
+            ),
             "Problem": object(
                 ["type", "title", "status", "code", "detail", "requestId"],
                 ["type": ["type": "string", "format": "uri"], "title": ["type": "string"],
                  "status": ["type": "integer", "minimum": 400, "maximum": 599],
                  "code": ["type": "string"], "detail": ["type": "string"],
-                 "requestId": uuid, "errors": array(reference("ValidationError"))]
+                 "requestId": uuid, "errors": array(reference("ValidationError")),
+                 "impact": reference("ImpactSummary"),
+                 "impactToken": ["type": "string"]]
             ),
         ]
     }

@@ -22,6 +22,7 @@ struct ItemBrowserView: View {
     @State private var selection: Set<SavedItemSummary.ID> = []
     @State private var columnCustomization = TableColumnCustomization<SavedItemSummary>()
     @State private var pendingDeleteIDs: Set<SavedItemSummary.ID>?
+    @State private var affectedResponseCount = 0
     @State private var pageIndex = 0
 
     /// Reads the table's own state, so revealing the column through the header
@@ -95,7 +96,11 @@ struct ItemBrowserView: View {
                 }
                 ToolbarItem(placement: .automatic) {
                     Button("Delete", systemImage: "trash", role: .destructive) {
-                        pendingDeleteIDs = selection
+                        let ids = selection
+                        Task {
+                            affectedResponseCount = await itemsModel.studyResponseCount(itemIDs: ids)
+                            pendingDeleteIDs = ids
+                        }
                     }
                     .accessibilityIdentifier("browseDeleteSelection")
                 }
@@ -146,7 +151,11 @@ struct ItemBrowserView: View {
             }
             .accessibilityIdentifier("browseCancelDelete")
         } message: {
-            Text("This also deletes the study cards these items generated. It can't be undone.")
+            if affectedResponseCount > 0 {
+                Text("This also permanently deletes the generated study cards and \(affectedResponseCount) saved spoken \(affectedResponseCount == 1 ? "response" : "responses").")
+            } else {
+                Text("This also deletes the study cards these items generated. It can't be undone.")
+            }
         }
     }
 

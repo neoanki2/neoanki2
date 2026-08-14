@@ -1,6 +1,7 @@
 import NeoAnkiCore
 import NeoAnkiApplication
 import NeoAnkiDeckBuilderKit
+import NeoAnkiCloudSync
 import PoemDeckBuilder
 import VocabularyDeckBuilder
 import SwiftUI
@@ -25,6 +26,9 @@ struct NeoAnki2App: App {
     @State private var vocabularyLibraryModel: VocabularyLibraryModel?
     @State private var apiControlModel: APIControlModel?
     @State private var bootstrapError: String?
+    @State private var syncService: OfflineFirstSyncService?
+    @State private var syncStatus: SyncStatus = .offline
+    @AppStorage(AppPreferences.cloudSyncEnabled) private var cloudSyncEnabled = false
 #if DEBUG
     @State private var testConfiguration: UITestRuntimeConfiguration?
     @State private var testGeneration = 0
@@ -127,19 +131,24 @@ struct NeoAnki2App: App {
                         if !visible { apiControlModel?.resolvePairing(approved: false) }
                     }
                 ),
-                presenting: apiControlModel?.pendingPairing
-            ) { _ in
+                presenting: apiControlModel.flatMap(\.pendingPairing)
+            ) { (_: APIPairingPrompt) in
                 Button("Deny", role: .cancel) {
                     apiControlModel?.resolvePairing(approved: false)
                 }
                 Button("Approve") {
                     apiControlModel?.resolvePairing(approved: true)
                 }
-            } message: { prompt in
+            } message: { (prompt: APIPairingPrompt) in
                 let origin = prompt.request.origin.map { "\nOrigin: \($0)" } ?? ""
                 let scopes = prompt.request.requestedScopes.map(\.rawValue).sorted()
                     .joined(separator: ", ")
-                Text("\(prompt.request.displayName) requests access.\(origin)\nScopes: \(scopes)")
+                let responseAccess = prompt.request.requestedScopes.contains(.studyResponsesDelete)
+                    ? "\nThis client can read and permanently delete your saved spoken responses."
+                    : prompt.request.requestedScopes.contains(.studyResponsesRead)
+                        ? "\nThis client can read and download your saved spoken responses."
+                        : ""
+                Text("\(prompt.request.displayName) requests access.\(origin)\nScopes: \(scopes)\(responseAccess)")
             }
         }
         .defaultSize(
@@ -153,8 +162,18 @@ struct NeoAnki2App: App {
         }
 
         Settings {
-            if let apiControlModel {
-                APISettingsView(model: apiControlModel)
+            if let apiControlModel, let library {
+                TabView {
+                    APISettingsView(model: apiControlModel)
+                        .tabItem { Label("Local API", systemImage: "network") }
+                    MacCloudSyncSettings(
+                        isEnabled: $cloudSyncEnabled,
+                        status: syncStatus,
+                        onChange: { enabled in await updateCloudSync(enabled: enabled, library: library) },
+                        synchronize: { await syncService?.synchronize(); await refreshSyncStatus() }
+                    )
+                    .tabItem { Label("iCloud", systemImage: "icloud") }
+                }
             } else {
                 ProgressView("Opening library…")
                     .frame(width: 420, height: 240)
@@ -224,10 +243,45 @@ struct NeoAnki2App: App {
             )
             apiControlModel = apiModel
             await apiModel.restore()
+            if cloudSyncEnabled, !AppDatabase.isTesting {
+                await updateCloudSync(enabled: true, library: payload.library)
+            }
             AppStartupTrace.mark("models_ready")
         } catch {
             bootstrapError = UserFacingError.message(from: error)
         }
+    }
+
+    @MainActor
+    private func updateCloudSync(enabled: Bool, library: SQLiteLibraryRepository) async {
+        guard enabled else {
+            await syncService?.stop()
+            syncService = nil
+            syncStatus = .offline
+            return
+        }
+        do {
+            let root = AppDatabase.defaultURL.deletingLastPathComponent()
+            let metadata = SyncMetadataStore(directory: root.appendingPathComponent("Cloud Sync", isDirectory: true))
+            let transport = try await CKSyncEngineTransport.make(metadataStore: metadata)
+            let service = OfflineFirstSyncService(
+                repository: library,
+                adapter: SQLiteLibrarySyncAdapter(repository: library),
+                transport: transport,
+                metadataStore: metadata,
+                backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
+            )
+            syncService = service
+            await service.start()
+            await refreshSyncStatus()
+        } catch {
+            syncStatus = .accountUnavailable
+        }
+    }
+
+    @MainActor
+    private func refreshSyncStatus() async {
+        syncStatus = await syncService?.status() ?? .offline
     }
 
     private func prepareLibrary(

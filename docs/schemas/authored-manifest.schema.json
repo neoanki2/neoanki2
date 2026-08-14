@@ -7,7 +7,7 @@
   "required": ["kind", "version", "root", "parts"],
   "properties": {
     "kind": {"const": "neoanki"},
-    "version": {"enum": [1, 2, 3]},
+    "version": {"enum": [1, 2, 3, 4]},
     "root": {"$ref": "#/$defs/id"},
     "parts": {
       "type": "array",

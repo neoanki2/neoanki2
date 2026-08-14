@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import NeoAnkiCore
 
 @MainActor
 protocol RecordingPermissionProviding {
@@ -22,7 +23,14 @@ protocol AudioPlayback: AnyObject {
 @MainActor
 protocol StudyAudioFactory {
     func makeRecorder(url: URL) throws -> any AudioRecording
+    func makeSubmissionRecorder(url: URL) throws -> any AudioRecording
     func makePlayer(url: URL, onFinish: @escaping (Bool) -> Void) throws -> any AudioPlayback
+}
+
+extension StudyAudioFactory {
+    func makeSubmissionRecorder(url: URL) throws -> any AudioRecording {
+        try makeRecorder(url: url)
+    }
 }
 
 @MainActor
@@ -46,13 +54,14 @@ private final class AVRecorderBox: AudioRecording {
     let recorder: AVAudioRecorder
     var url: URL { recorder.url }
 
-    init(url: URL) throws {
-        let settings: [String: Any] = [
+    init(url: URL, bitRate: Int? = nil) throws {
+        var settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: 44_100,
             AVNumberOfChannelsKey: 1,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
         ]
+        if let bitRate { settings[AVEncoderBitRateKey] = bitRate }
         recorder = try AVAudioRecorder(url: url, settings: settings)
     }
 
@@ -93,6 +102,10 @@ struct SystemStudyAudioFactory: StudyAudioFactory {
         try AVRecorderBox(url: url)
     }
 
+    func makeSubmissionRecorder(url: URL) throws -> any AudioRecording {
+        try AVRecorderBox(url: url, bitRate: 64_000)
+    }
+
     func makePlayer(url: URL, onFinish: @escaping (Bool) -> Void) throws -> any AudioPlayback {
         try AVPlayerBox(url: url, onFinish: onFinish)
     }
@@ -114,9 +127,15 @@ final class StudyRecordingController {
     private var recorder: (any AudioRecording)?
     private var player: (any AudioPlayback)?
     private(set) var recordingURL: URL?
+    private(set) var elapsedSeconds: TimeInterval = 0
+    private(set) var capturedAt: Date?
+    private(set) var responseID: UUID?
     private let permission: any RecordingPermissionProviding
     private let audioFactory: any StudyAudioFactory
     private let temporaryDirectory: URL
+    private var elapsedTimer: Timer?
+    private var recordingStartedAt: Date?
+    private var isPersistentSubmission = false
 
     init(
         permission: any RecordingPermissionProviding = SystemRecordingPermission(),
@@ -142,7 +161,7 @@ final class StudyRecordingController {
         }
     }
 
-    func start() async {
+    func start(persistentSubmission: Bool = false) async {
         stopPlayback()
         recorder?.stop()
         recorder = nil
@@ -154,15 +173,25 @@ final class StudyRecordingController {
             return
         }
 
+        let responseID = UUID()
+        let stem = persistentSubmission ? "neoanki-audio-submission" : "neoanki-recording"
         let url = temporaryDirectory
-                .appendingPathComponent("neoanki-recording-\(UUID().uuidString).m4a")
+                .appendingPathComponent("\(stem)-\(responseID.uuidString).m4a")
         do {
-            let recorder = try audioFactory.makeRecorder(url: url)
+            let recorder = try persistentSubmission
+                ? audioFactory.makeSubmissionRecorder(url: url)
+                : audioFactory.makeRecorder(url: url)
             guard recorder.start() else {
                 throw RecordingError.couldNotStart
             }
             self.recorder = recorder
             recordingURL = url
+            self.responseID = responseID
+            capturedAt = .now
+            recordingStartedAt = capturedAt
+            elapsedSeconds = 0
+            isPersistentSubmission = persistentSubmission
+            startElapsedTimer()
             state = .recording
         } catch {
             try? FileManager.default.removeItem(at: url)
@@ -175,6 +204,9 @@ final class StudyRecordingController {
         guard state == .recording else { return }
         recorder?.stop()
         recorder = nil
+        updateElapsed()
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
         state = recordingURL == nil ? .failed("No recording was saved. Try again.") : .recorded
     }
 
@@ -204,8 +236,32 @@ final class StudyRecordingController {
         recorder?.stop()
         stopPlayback()
         recorder = nil
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
         discardRecording()
+        elapsedSeconds = 0
+        capturedAt = nil
+        responseID = nil
+        recordingStartedAt = nil
+        isPersistentSubmission = false
         state = .idle
+    }
+
+    func submissionDraft(cardID: UUID) -> StudyResponseDraft? {
+        guard isPersistentSubmission,
+              state != .recording,
+              let responseID,
+              let recordingURL,
+              let capturedAt,
+              FileManager.default.fileExists(atPath: recordingURL.path)
+        else { return nil }
+        return StudyResponseDraft(
+            id: responseID,
+            cardID: cardID,
+            fileURL: recordingURL,
+            durationMilliseconds: max(1, Int(elapsedSeconds * 1_000)),
+            capturedAt: capturedAt
+        )
     }
 
     private func stopPlayback() {
@@ -218,6 +274,33 @@ final class StudyRecordingController {
             try? FileManager.default.removeItem(at: recordingURL)
         }
         recordingURL = nil
+    }
+
+    private func startElapsedTimer() {
+        elapsedTimer?.invalidate()
+        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.state == .recording else { return }
+                self.updateElapsed()
+                guard self.isPersistentSubmission else { return }
+                if self.elapsedSeconds >= 30 * 60 {
+                    self.stop()
+                } else if let url = self.recordingURL,
+                          (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                            >= MediaValidation.maxBytes(for: .audio) {
+                    self.stop()
+                    self.state = .failed(
+                        "Recording stopped at the 20 MB limit. You can play it or save it."
+                    )
+                }
+            }
+        }
+    }
+
+    private func updateElapsed() {
+        guard let recordingStartedAt else { return }
+        let elapsed = Date.now.timeIntervalSince(recordingStartedAt)
+        elapsedSeconds = isPersistentSubmission ? min(30 * 60, elapsed) : elapsed
     }
 
     func playbackFinished(successfully: Bool) {

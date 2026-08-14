@@ -6,22 +6,23 @@ parent: Reference
 
 # NeoAnki2 — Architecture
 
-A native macOS spaced-repetition app (Swift 6 / SwiftUI) with its domain logic in
-a standalone package, `NeoAnkiCore`. A ground-up rewrite of the Anki idea, not a
-port.
+A native macOS, iPhone, and iPad spaced-repetition app (Swift 6 / SwiftUI) with
+domain logic in the standalone `NeoAnkiCore` package and platform-neutral
+workflows in `NeoAnkiFeatures`.
 
 ## System overview and migration status
 
-NeoAnki is becoming a universal Apple-platform product. The domain remains one
-package while platform-neutral workflows and feature content move behind explicit
-boundaries. The macOS application is the first client; an iPhone/iPad shell starts
-only after the shared targets pass their iOS build gates.
+NeoAnki is a universal Apple-platform product. The domain remains one package;
+platform-neutral observable workflows sit behind explicit repository and service
+boundaries, and each application target is a thin composition root.
 
 ```mermaid
 flowchart LR
-    Mac["macOS shell<br/>commands, panels, local API"] --> SharedUI[NeoAnkiSharedUI]
-    iOS["Future iPhone/iPad shell<br/>native navigation and pickers"] --> SharedUI
-    SharedUI --> Application[NeoAnkiApplication]
+    Mac["macOS shell<br/>commands, panels, local API"] --> Features[NeoAnkiFeatures]
+    iOS["iPhone/iPad shell<br/>native navigation and pickers"] --> Mobile[NeoAnkiMobile]
+    Mobile --> Features
+    Features --> SharedUI[NeoAnkiSharedUI]
+    Features --> Application[NeoAnkiApplication]
     Application --> Repository[LibraryRepository]
     Repository --> Core[NeoAnkiCore / ItemStore]
     Mac --> CloudSync[NeoAnkiCloudSync]
@@ -40,11 +41,13 @@ and the local HTTP server are assembled.
 | --- | --- | --- |
 | `NeoAnkiCore` | Domain values, schema validation, persistence, scheduling, study-response and content-visibility semantics | UI copy, navigation, pickers, CloudKit |
 | `NeoAnkiApplication` | Repository capabilities, `AppSession`, routes, presentations, editor/draft state, service protocols, sync-facing types | SwiftUI/AppKit/UIKit/CloudKit |
+| `NeoAnkiFeatures` | Observable library, authoring, study, transfer, reminder, widget, and sync workflows shared by app shells | AppKit/UIKit/CloudKit and direct SQLite access |
+| `NeoAnkiMobile` | Adaptive SwiftUI screens and iOS media/playback adapters | App identity, entitlements, CloudKit credentials |
 | `NeoAnkiSharedUI` | Adaptive reading layout, semantic tokens, common status/empty/error content | File panels, Mac tables, menu commands, database access |
 | `NeoAnkiCloudSync` | CKSyncEngine transport, separate engine metadata, merge/conflict policy | Domain-table ownership, blocking startup, UI |
 | `NeoAnkiDeckBuilderCore` | Generator descriptors, workspaces, generated bundles | SwiftUI type erasure |
 | `NeoAnkiDeckBuilderKit` | `AnyView` feature registry | Generator or persistence rules |
-| `NeoAnki2` | macOS composition, AppKit adapters, commands, local API, remaining feature views/models during migration | New reusable business rules |
+| `NeoAnki2` | macOS composition, AppKit adapters, commands, and local API | Mobile-only services and new reusable business rules |
 
 ### Extraction matrix
 
@@ -56,10 +59,10 @@ and the local HTTP server are assembled.
 | Editors and media | Drafts, validation, semantic rendering | rich text, cloze, image/GIF, audio adapters | AppKit text editors and panels |
 | Import/export | transfer state and validated workflows | document-picker/security-scope adapter | `NSOpenPanel`/`NSSavePanel`, local API |
 
-The current migration is intentionally staged. `ContentView` now stores its
-mutually exclusive route and modal state in `AppSession`; existing model and
-workflow extraction continues feature by feature. New code must enter through
-the target boundaries above rather than increasing the executable's surface.
+The Xcode-managed `NeoAnkiiOS` target contains only lifecycle composition,
+capabilities, and device services. The `NeoAnki2Widget` extension reads a
+privacy-limited App Group snapshot; it never opens the domain database and never
+receives prompts or answers.
 
 ### Offline-first synchronization
 
@@ -76,33 +79,25 @@ screen surfaces those copies. Remote domain application must run through validat
 repository transactions with echo suppression; transport code never mutates
 SQLite directly.
 
-The first merge backs up SQLite, unions local and cloud records, adopts the cloud
-library identity while recording the local identity as an alias, deduplicates item
-types by canonical schema digest, remaps true identifier/schema collisions, and
-uploads the preserved result. Failure rolls back to the verified backup.
+The first merge backs up SQLite, unions local and cloud records, keeps the device's
+existing identity canonical while recording cloud identities as aliases, deduplicates
+item types by canonical schema digest, deterministically remaps cross-library identifier
+collisions, and uploads the preserved result. Validated remote domain batches commit in
+one SQLite transaction; staged assets and the verified pre-merge backup remain available
+for recovery if a transfer fails.
 
 See [ADR 0001](adr/0001-shared-application-and-ui-layers.md),
 [ADR 0002](adr/0002-cloudkit-offline-first-sync.md), and
 [ADR 0003](adr/0003-application-library-boundary.md).
 
-### iOS prerequisite gates
+### iOS release gates
 
-- Complete: package floors, shared target products, forbidden-import validation,
-  `AppSession` route/presentation state, repository capability interfaces, shared
-  semantic UI primitives, Core study/reveal/draft rules, CKSyncEngine transport,
-  separate sync metadata, backup/staging coordinator, deterministic conflict-copy
-  policy, enforced repository-only persistence access from feature models and the
-  local API, and the Xcode-managed universal Mac archive target.
-- In migration: move the remaining concrete feature models out of the executable,
-  finish reducing `ContentView` to composition only, and continue the
-  resource-focused internal `ItemStore`/`SQLiteDatabase` file split. Those internal
-  persistence types no longer form a client-facing boundary.
-- Required before starting the iOS shell: implement and test full resource envelope
-  serialization/validated remote apply for every synchronized record, two-replica
-  restart/echo/first-merge integration tests, a successful generic iOS Simulator
-  CI build, and a signed two-device CloudKit test using the provisioned container.
-- External Apple prerequisite: provision both app IDs, the CloudKit container and
-  environments, push, Developer ID certificate, and CloudKit provisioning profiles.
+- Automated gates: package tests, architecture validation, generic iOS app and
+  widget builds, UI journeys, accessibility configurations, and an unsigned
+  Release archive validation.
+- External Apple gates: signed two-device CloudKit testing and TestFlight upload.
+  These require the Apple team, production CloudKit schema, push environment,
+  App Group, and provisioning profiles described in `IOS_RELEASE.md`.
 
 ---
 

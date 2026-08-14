@@ -36,6 +36,23 @@ public struct DeckDeletionImpact: Codable, Sendable, Equatable {
     public let cardCount: Int
     public let reviewLogCount: Int
     public let mediaReferenceCount: Int
+    public let studyResponseCount: Int
+
+    public init(
+        deckCount: Int,
+        itemCount: Int,
+        cardCount: Int,
+        reviewLogCount: Int,
+        mediaReferenceCount: Int,
+        studyResponseCount: Int = 0
+    ) {
+        self.deckCount = deckCount
+        self.itemCount = itemCount
+        self.cardCount = cardCount
+        self.reviewLogCount = reviewLogCount
+        self.mediaReferenceCount = mediaReferenceCount
+        self.studyResponseCount = studyResponseCount
+    }
 }
 
 public struct DeckResetImpact: Codable, Sendable, Equatable {
@@ -44,7 +61,114 @@ public struct DeckResetImpact: Codable, Sendable, Equatable {
     public let reviewLogCount: Int
 }
 
+public struct SynchronizedReviewRecord: Codable, Sendable, Equatable {
+    public let log: ReviewLog
+    public let memoryBefore: MemoryState
+
+    public init(log: ReviewLog, memoryBefore: MemoryState) {
+        self.log = log
+        self.memoryBefore = memoryBefore
+    }
+}
+
+public struct SynchronizedItemRecord: Codable, Sendable, Equatable {
+    public let item: Item
+    public let createdAt: Date
+    public let updatedAt: Date
+
+    public init(item: Item, createdAt: Date, updatedAt: Date) {
+        self.item = item
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct ReviewRevertRecord: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let reviewLogID: UUID
+    public let revertedAt: Date
+
+    public init(id: UUID, reviewLogID: UUID, revertedAt: Date) {
+        self.id = id
+        self.reviewLogID = reviewLogID
+        self.revertedAt = revertedAt
+    }
+}
+
+public enum ItemTypeMembershipRecord: Codable, Sendable, Equatable, Identifiable {
+    case library(itemTypeID: UUID)
+    case included(rootDeckID: UUID, itemTypeID: UUID, ordinal: Int)
+    case policy(deckID: UUID, itemTypeID: UUID, ordinal: Int, isDefault: Bool)
+
+    public var id: String {
+        switch self {
+        case let .library(itemTypeID): "library:\(itemTypeID.uuidString)"
+        case let .included(rootDeckID, itemTypeID, _):
+            "included:\(rootDeckID.uuidString):\(itemTypeID.uuidString)"
+        case let .policy(deckID, itemTypeID, _, _):
+            "policy:\(deckID.uuidString):\(itemTypeID.uuidString)"
+        }
+    }
+}
+
+public enum SchedulingSettingsRecord: Codable, Sendable, Equatable, Identifiable {
+    case studyDayRollover(minutes: Int)
+    case scheduler(
+        profileID: String,
+        parameters: FSRSScheduler.Parameters,
+        optimizedAt: Date,
+        sampleCount: Int,
+        logLoss: Double
+    )
+
+    public var id: String {
+        switch self {
+        case .studyDayRollover: "rollover"
+        case let .scheduler(profileID, _, _, _, _): "profile:\(profileID)"
+        }
+    }
+}
+
+public struct PortableItemTypeMappingRecord: Codable, Sendable, Equatable, Identifiable {
+    public let originLibraryID: UUID
+    public let originTypeID: UUID
+    public let schemaDigest: String
+    public let localTypeID: UUID
+
+    public var id: String {
+        "\(originLibraryID.uuidString):\(originTypeID.uuidString):\(schemaDigest)"
+    }
+
+    public init(originLibraryID: UUID, originTypeID: UUID, schemaDigest: String, localTypeID: UUID) {
+        self.originLibraryID = originLibraryID
+        self.originTypeID = originTypeID
+        self.schemaDigest = schemaDigest
+        self.localTypeID = localTypeID
+    }
+}
+
+public enum SynchronizedLibraryMutation: Sendable {
+    case deck(Deck)
+    case itemType(ItemType)
+    case item(Item, createdAt: Date, updatedAt: Date)
+    case card(Card)
+    case review(SynchronizedReviewRecord)
+    case reviewRevert(ReviewRevertRecord)
+    case itemTypeMembership(ItemTypeMembershipRecord)
+    case schedulingSettings(SchedulingSettingsRecord)
+    case portableTypeMapping(PortableItemTypeMappingRecord)
+    case tombstone(kind: LibraryResourceKind, id: String)
+}
+
 public extension ItemStore {
+    func recordLibraryAlias(_ aliasID: UUID, canonicalID: UUID) async throws {
+        try await database.recordLibraryAlias(aliasID, canonicalID: canonicalID)
+    }
+
+    func libraryAliases(canonicalID: UUID) async throws -> Set<UUID> {
+        try await database.fetchLibraryAliases(canonicalID: canonicalID)
+    }
+
     func deckDeletionImpact(
         id: UUID,
         policy: DeckDeletionPolicy
@@ -71,7 +195,10 @@ public extension ItemStore {
             itemCount: items.count,
             cardCount: cards.count,
             reviewLogCount: reviewCount,
-            mediaReferenceCount: mediaCount
+            mediaReferenceCount: mediaCount,
+            studyResponseCount: try await database.countStudyResponses(
+                cardIDs: Set(cards.map(\.id))
+            )
         )
     }
 
@@ -146,6 +273,60 @@ public extension ItemStore {
         )
         let url = try await mediaStore.resolve(ref)
         return (asset, try Data(contentsOf: url))
+    }
+
+    func synchronizedReviewRecord(id: UUID) async throws -> SynchronizedReviewRecord {
+        guard let record = try await database.fetchSynchronizedReviewRecord(id: id) else {
+            throw DatabaseError.reviewLogNotFound(id)
+        }
+        return record
+    }
+
+    func synchronizedItemRecord(id: UUID) async throws -> SynchronizedItemRecord {
+        let record = try await itemRecord(id: id)
+        return SynchronizedItemRecord(
+            item: record.item,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt
+        )
+    }
+
+    func reviewRevertRecord(id: UUID) async throws -> ReviewRevertRecord {
+        guard let record = try await database.fetchReviewRevertRecord(id: id) else {
+            throw DatabaseError.reviewLogNotFound(id)
+        }
+        return record
+    }
+
+    func itemTypeMembershipRecord(id: String) async throws -> ItemTypeMembershipRecord {
+        guard let record = try await database.fetchItemTypeMembershipRecord(id: id) else {
+            throw DatabaseError.queryFailed("Item-type membership no longer exists.")
+        }
+        return record
+    }
+
+    func schedulingSettingsRecord(id: String) async throws -> SchedulingSettingsRecord {
+        guard let record = try await database.fetchSchedulingSettingsRecord(id: id) else {
+            throw DatabaseError.queryFailed("Scheduling settings no longer exist.")
+        }
+        return record
+    }
+
+    func portableItemTypeMappingRecord(id: String) async throws -> PortableItemTypeMappingRecord {
+        guard let record = try await database.fetchPortableItemTypeMappingRecord(id: id) else {
+            throw DatabaseError.queryFailed("Portable item-type mapping no longer exists.")
+        }
+        return record
+    }
+
+    func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) async throws {
+        try await database.applySynchronizedBatch(mutations)
+        for mutation in mutations {
+            if case let .schedulingSettings(.scheduler(profileID, parameters, _, _, _)) = mutation,
+               profileID == self.profileID {
+                fsrsParameters = parameters
+            }
+        }
     }
     func itemRecord(id: UUID) async throws -> LibraryItemRecord {
         guard let persisted = try await database.fetchItem(id: id) else {

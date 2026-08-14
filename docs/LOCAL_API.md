@@ -498,7 +498,7 @@ and does not fabricate a review log.
 - **CARD-001:** No version-1 route can create a card, delete one independently,
   change its item/template identity, or directly set memory fields.
 - **CARD-002:** Resolved prompt and answer slots match NeoAnkiCore resolution for
-  reveal, type, choose, record, cloze, and arrange fixture templates.
+  reveal, type, choose, record, audioSubmission, cloze, and arrange fixture templates.
 - **CARD-003:** Suspending a due card removes it from due counts and new study
   reservations; unsuspending it restores eligibility without changing memory.
 - **CARD-004:** Review previews are pure: calling the endpoint repeatedly does
@@ -561,6 +561,48 @@ that card.
   non-latest review fails without changing any log or card.
 - **STUDY-008:** Killing the process after the database commit but before the
   HTTP response and retrying the request records exactly one review.
+
+## 11A. Persistent study responses
+
+Persistent spoken responses require scopes that are independent of
+`library.read` and `study.review`. Existing grants MUST NOT receive them during
+upgrade.
+
+| Method | Path | Scope | Operation |
+| --- | --- | --- | --- |
+| `GET` | `/v1/study-responses` | `study.responses.read` | Filter and page newest-first response metadata |
+| `GET` | `/v1/study-responses/{id}` | `study.responses.read` | Read one response |
+| `GET`, `HEAD` | `/v1/study-responses/{id}/content` | `study.responses.read` | Stream exact validated M4A bytes |
+| `DELETE` | `/v1/study-responses/{id}` | `study.responses.delete` | Conditionally and idempotently delete one response |
+
+The collection accepts `cardId`, `itemId`, `tag`, and `createdAfter` plus a
+signed submitted-time/UUID keyset cursor. A representation includes revision,
+live card and item IDs, source title, asset hash, content type, extension, byte
+size, duration, capture time, and submission time. It has no review-log ID.
+
+Content responses MUST preserve the stored bytes and expose hash verification.
+Generic media endpoints MUST return 404 for a hash with no ordinary-content
+reference. Response-only media changes MUST be hidden from `library.read`.
+`studyResponse` create/delete events are visible only to
+`study.responses.read`; event cursors still advance across hidden records.
+
+Deletion requires `If-Match` and `Idempotency-Key`, releases exactly one media
+reference, runs orphan cleanup after commit, and does not unsuspend the card.
+Source mutations that would cascade a response return
+`study_response_deletion_confirmation_required` with the affected count and a
+revision-bound token. Strict cascades received from sync do not pause sync.
+
+**Acceptance criteria**
+
+- **RESPONSE-001:** Completion produces one response and suspends its card in
+  one transaction without a review log or memory mutation; a stable response
+  UUID makes a retry return the same result.
+- **RESPONSE-002:** Read, filter, keyset pagination, authorization, conditional
+  deletion, SSE/change filtering, and content hash integrity match OpenAPI.
+- **RESPONSE-003:** Generic media and event routes reveal no private-only hash
+  or metadata to a client lacking the response-read scope.
+- **RESPONSE-004:** Response rows and response-only bytes never enter Cloud
+  sync; an ordinary reference to identical bytes continues to sync normally.
 
 ## 12. Media operations
 

@@ -19,6 +19,8 @@ reject_imports() {
 
 reject_imports "Sources/NeoAnkiApplication" "SwiftUI|AppKit|UIKit|CloudKit" \
   "NeoAnkiApplication must remain platform and UI neutral."
+reject_imports "Sources/NeoAnkiFeatures" "SwiftUI|AppKit|UIKit|CloudKit" \
+  "NeoAnkiFeatures must remain platform neutral."
 reject_imports "Sources/NeoAnkiSharedUI" "AppKit|UIKit|CloudKit" \
   "NeoAnkiSharedUI must use shared SwiftUI APIs and explicit adapters."
 reject_imports "Sources/NeoAnkiCloudSync" "SwiftUI|AppKit|UIKit" \
@@ -49,6 +51,11 @@ fi
 if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnki2" \
   --glob '!NeoAnki2App.swift' >/dev/null; then
   echo "Architecture violation: UI features must receive application capabilities, not persistence." >&2
+  FAILURES=1
+fi
+
+if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnkiFeatures" "$ROOT/Sources/NeoAnkiIOS" >/dev/null; then
+  echo "Architecture violation: shared features and mobile UI must use repository capabilities." >&2
   FAILURES=1
 fi
 

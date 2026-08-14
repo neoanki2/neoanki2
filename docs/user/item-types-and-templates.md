@@ -89,16 +89,19 @@ Save is disabled until these requirements are met. Cancel asks before discarding
 
 ## Choose an interaction
 
-The Interaction selector provides six study experiences:
+The Interaction selector provides seven study experiences:
 
 - **Reveal:** recall mentally, reveal the answer, and self-grade.
 - **Type answer:** type a response for automatic comparison, then self-grade.
 - **Choose:** select from answer-derived options, check, then self-grade.
 - **Arrange:** reorder answer units, check the sequence, then self-grade.
 - **Record:** make and optionally replay a temporary audio recording before comparing with the answer.
+- **Audio Submission:** record one persistent, local-only spoken response, then
+  save and complete without revealing an answer or changing FSRS. Its answer
+  side is empty and its skill output is Audio.
 - **Cloze:** conceal the current cloze group in the prompt and reveal it with the answer.
 
-Type, Choose, and Arrange depend on usable text representations from the answer side. Record requires microphone permission for recording but always permits reveal-and-self-grade. A Cloze template must reference exactly one Cloze field on its prompt side; selecting Cloze automatically changes an always-visible prompt slot for a Cloze field to **Hidden until answer**.
+Type, Choose, and Arrange depend on usable text representations from the answer side. Record requires microphone permission for recording but always permits reveal-and-self-grade. Audio Submission requires a prompt and clears the answer side after explicit confirmation when converting an existing template. A Cloze template must reference exactly one Cloze field on its prompt side; selecting Cloze automatically changes an always-visible prompt slot for a Cloze field to **Hidden until answer**.
 
 ## Build prompt and answer sides
 

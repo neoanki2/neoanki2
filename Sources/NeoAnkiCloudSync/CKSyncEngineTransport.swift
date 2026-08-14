@@ -13,7 +13,13 @@ private actor TransportBuffers {
     func envelope(for id: CKRecord.ID) -> SyncRecordEnvelope? { outgoing[id] }
 
     func remove(_ ids: [CKRecord.ID]) {
-        for id in ids { outgoing[id] = nil }
+        for id in ids {
+            if let url = outgoing[id]?.stagedFileURL,
+               url.lastPathComponent.hasPrefix("neoanki-sync-") {
+                try? FileManager.default.removeItem(at: url)
+            }
+            outgoing[id] = nil
+        }
     }
 
     func appendIncoming(_ values: [SyncRecordEnvelope]) { incoming.append(contentsOf: values) }
@@ -98,6 +104,24 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
             await buffers.appendIncoming(received)
         case let .sentRecordZoneChanges(changes):
             await buffers.remove(changes.savedRecords.map(\.recordID) + changes.deletedRecordIDs)
+            var resolvedFailures: [CKRecord.ID] = []
+            for failure in changes.failedRecordSaves where failure.error.code == .serverRecordChanged {
+                if let server = failure.error.serverRecord,
+                   let envelope = Self.envelope(from: server) {
+                    await buffers.appendIncoming([envelope])
+                }
+                resolvedFailures.append(failure.record.recordID)
+                syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(failure.record.recordID)])
+            }
+            for (recordID, error) in changes.failedRecordDeletes where error.code == .serverRecordChanged {
+                if let server = error.serverRecord,
+                   let envelope = Self.envelope(from: server) {
+                    await buffers.appendIncoming([envelope])
+                }
+                resolvedFailures.append(recordID)
+                syncEngine.state.remove(pendingRecordZoneChanges: [.deleteRecord(recordID)])
+            }
+            await buffers.remove(resolvedFailures)
         default:
             break
         }
@@ -131,6 +155,16 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
         record["deviceID"] = envelope.deviceID as CKRecordValue
         record["order"] = envelope.order as CKRecordValue
         record["payload"] = envelope.payload as CKRecordValue
+        if let asset = envelope.asset {
+            record["assetHash"] = asset.hash as CKRecordValue
+            record["assetByteSize"] = asset.byteSize as CKRecordValue
+            record["assetSignature"] = asset.signature as CKRecordValue
+            record["assetExtension"] = asset.fileExtension as CKRecordValue
+            record["assetContentType"] = asset.contentType as CKRecordValue
+            if let fileURL = envelope.stagedFileURL {
+                record["asset"] = CKAsset(fileURL: fileURL)
+            }
+        }
         return record
     }
 
@@ -143,6 +177,22 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
             let order = record["order"] as? Int64,
             let payload = record["payload"] as? Data
         else { return nil }
+        let asset: SyncAssetDescriptor?
+        if let hash = record["assetHash"] as? String,
+           let byteSize = record["assetByteSize"] as? Int64,
+           let signature = record["assetSignature"] as? String,
+           let fileExtension = record["assetExtension"] as? String,
+           let contentType = record["assetContentType"] as? String {
+            asset = SyncAssetDescriptor(
+                hash: hash,
+                byteSize: byteSize,
+                signature: signature,
+                fileExtension: fileExtension,
+                contentType: contentType
+            )
+        } else {
+            asset = nil
+        }
         return SyncRecordEnvelope(
             id: resourceID,
             resourceKind: resourceKind,
@@ -150,7 +200,9 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
             deviceID: deviceID,
             order: order,
             isTombstone: false,
-            payload: payload
+            payload: payload,
+            asset: asset,
+            stagedFileURL: (record["asset"] as? CKAsset)?.fileURL
         )
     }
 

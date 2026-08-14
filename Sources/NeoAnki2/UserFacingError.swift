@@ -56,6 +56,8 @@ enum UserFacingError {
             "This card could not be found."
         case .reviewLogNotFound:
             "There is no recent review to undo."
+        case .studyResponseNotFound:
+            "This saved response could not be found."
         case .templateNotFound:
             "This template could not be found."
         case .deckNotFound:

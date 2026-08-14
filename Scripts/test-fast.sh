@@ -17,6 +17,9 @@ swift test --filter NeoAnkiApplicationTests --parallel
 echo "==> Architecture boundaries"
 bash "$ROOT/Scripts/validate-architecture.sh"
 
+echo "==> Spotlight-safe Xcode build paths"
+bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
+
 echo "==> Documentation coverage and links"
 swift "$ROOT/Scripts/validate-docs.swift"
 

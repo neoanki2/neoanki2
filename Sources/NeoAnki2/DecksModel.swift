@@ -270,6 +270,15 @@ final class DecksModel {
         }
     }
 
+    func deletionImpact(id: UUID) async -> DeckDeletionImpact? {
+        do {
+            return try await library.deckDeletionImpact(id: id, policy: .deleteSubtreeAndItems)
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return nil
+        }
+    }
+
     func resetProgress(id: UUID, now: Date = .now) async -> Int? {
         errorMessage = nil
         do {

@@ -9,12 +9,12 @@ parent: Reference
 ## 1. Status and scope
 
 This document is the normative specification for **NeoAnki Portable Deck
-Format version 3**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
+Format version 4**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
 **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described by
 RFC 2119 and RFC 8174.
 
 A `.neodeck` file is one SQLite database containing deck structure, item-type
-definitions, deck item-type policies, item content, tags, and media bytes. Version 3 is a
+definitions, deck item-type policies, item content, tags, and media bytes. Version 4 is a
 **content-only** interchange format. It never contains cards, scheduling
 state, review history, statistics, scheduler parameters, suspension state, or
 other learner progress.
@@ -38,7 +38,7 @@ The required initialization pragmas are:
 
 ```sql
 PRAGMA application_id = 1313097035;
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 PRAGMA encoding = 'UTF-8';
 PRAGMA foreign_keys = ON;
 ```
@@ -165,7 +165,7 @@ CREATE TABLE templates (
     prompt_json         TEXT NOT NULL,
     answer_json         TEXT NOT NULL,
     interaction         TEXT NOT NULL CHECK (
-        interaction IN ('reveal', 'type', 'choose', 'record', 'cloze', 'arrange')
+        interaction IN ('reveal', 'type', 'choose', 'record', 'audioSubmission', 'cloze', 'arrange')
     ),
     skill_json          TEXT NOT NULL,
     generate_when_json  TEXT,
@@ -472,7 +472,7 @@ Descendant relationships and sibling order are preserved. Item, deck,
 item-type, field, and template transport IDs are preserved from the source
 library. Origin pairs are preserved as specified in section 4.
 
-Version 3 preserves every explicit policy in the exported subtree. If the
+Version 3 and later preserve every explicit policy in the exported subtree. If the
 selected root inherited its effective policy from an omitted ancestor, the
 exporter materializes that policy on the portable root. If a local subtree has
 no policy metadata, the exporter synthesizes a root policy from types used by
@@ -485,7 +485,7 @@ the file.
 
 No table or JSON value may contain card IDs, review logs, due dates, memory
 state, scheduler parameters, suspension flags, study statistics, or deletion
-tombstones. `content_only` is always `1`; version 3 has no progress-export
+tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 4 has no progress-export
 option.
 
 ### 8.2 Import validation and type resolution

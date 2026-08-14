@@ -949,6 +949,9 @@ private func pairWithAuthority(
         "DELETE /v1/study-sessions/{id}", "POST /v1/study-sessions/{id}/next",
         "POST /v1/study-sessions/{id}/skips", "POST /v1/reviews",
         "POST /v1/reviews/{reviewLogId}/reverts",
+        "GET /v1/study-responses", "GET /v1/study-responses/{id}",
+        "DELETE /v1/study-responses/{id}",
+        "GET /v1/study-responses/{id}/content", "HEAD /v1/study-responses/{id}/content",
         "POST /v1/media", "HEAD /v1/media/{sha256}", "GET /v1/media/{sha256}",
         "GET /v1/media/{sha256}/metadata",
         "GET /v1/vocabulary-packs", "GET /v1/vocabulary-packs/{id}",
@@ -1938,21 +1941,28 @@ private func pairWithAuthority(
             isRequired: true
         )
         let answerField = FieldDef(name: "Answer", type: .text, isRequired: true)
+        let answer = interaction == .audioSubmission
+            ? Side(slots: [])
+            : Side(slots: [
+                Slot(source: .literal("Answer:")),
+                Slot(
+                    source: .field(answerField.id),
+                    presentation: Presentation(reveal: .hiddenUntilAnswer)
+                ),
+            ])
         let template = Template(
             name: interaction.rawValue,
             prompt: Side(slots: [Slot(
                 source: .field(promptField.id),
                 presentation: Presentation(reveal: .blurred)
             )]),
-            answer: Side(slots: [
-                Slot(source: .literal("Answer:")),
-                Slot(
-                    source: .field(answerField.id),
-                    presentation: Presentation(reveal: .hiddenUntilAnswer)
-                ),
-            ]),
+            answer: answer,
             interaction: interaction,
-            skill: Skill(input: .text, output: .text, operation: .recall)
+            skill: Skill(
+                input: .text,
+                output: interaction == .audioSubmission ? .audio : .text,
+                operation: .recall
+            )
         )
         let type = ItemType(
             name: "Interaction \(index)",
@@ -1987,6 +1997,156 @@ private func pairWithAuthority(
         #expect(representation.answer.map(\.value) == expectedAnswer.map(\.value))
         #expect(representation.answer.map(\.presentation) == expectedAnswer.map(\.presentation))
     }
+}
+
+@Test func studyResponseAPIProtectsPrivateAudioAndSupportsKeysetAndIdempotentDeletion() async throws {
+    let (api, store) = try await makeAPIAndStore()
+    let prompt = FieldDef(name: "Prompt", type: .text, isRequired: true)
+    let template = Template(
+        name: "Spoken response",
+        prompt: Side(slots: [Slot(source: .field(prompt.id))]),
+        answer: Side(slots: []),
+        interaction: .audioSubmission,
+        skill: Skill(input: .text, output: .audio, operation: .explain)
+    )
+    let itemType = ItemType(name: "Spoken", fields: [prompt], templates: [template])
+    _ = try await store.createItemType(itemType)
+
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-response-api-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let bytes = Data([0x00, 0x00, 0x00, 0x18] + Array("ftypM4A ".utf8))
+
+    var created: [StudyResponse] = []
+    for index in 0 ..< 2 {
+        let item = Item(
+            itemTypeID: itemType.id,
+            fields: [FieldValue(fieldID: prompt.id, value: .text("Prompt \(index)"))],
+            tags: ["private-speaking"]
+        )
+        _ = try await store.createItem(item)
+        let card = try #require(try await store.cards().first { $0.itemID == item.id })
+        let file = root.appendingPathComponent("draft-\(index).m4a")
+        try bytes.write(to: file)
+        created.append(try await store.completeAudioSubmission(
+            StudyResponseDraft(
+                cardID: card.id,
+                fileURL: file,
+                durationMilliseconds: 10_000 + index,
+                capturedAt: Date(timeIntervalSince1970: 1_800_000_000 + Double(index))
+            ),
+            submittedAt: Date(timeIntervalSince1970: 1_800_000_100 + Double(index))
+        ))
+    }
+
+    let ordinaryToken = try await pair(api, scopes: ["library.read"])
+    let readToken = try await pair(api, scopes: ["study.responses.read"])
+    let deleteToken = try await pair(api, scopes: ["study.responses.delete"])
+    func auth(_ token: String) -> [String: String] {
+        ["Authorization": "Bearer \(token)"]
+    }
+
+    #expect(await api.handle(request(
+        .get, "/v1/study-responses", headers: auth(ordinaryToken)
+    )).status == 403)
+
+    let firstPage = await api.handle(APIRequest(
+        method: .get,
+        path: "/v1/study-responses",
+        query: ["limit": ["1"], "tag": ["PRIVATE-SPEAKING"]],
+        headers: [
+            "Host": "127.0.0.1:8766",
+            "Authorization": "Bearer \(readToken)",
+        ]
+    ))
+    #expect(firstPage.status == 200)
+    let firstObject = try jsonObject(firstPage)
+    let firstData = try #require(firstObject["data"] as? [[String: Any]])
+    #expect(firstData.count == 1)
+    #expect(firstData[0]["reviewLogId"] == nil)
+    let nextCursor = try #require((firstObject["page"] as? [String: Any])?["nextCursor"] as? String)
+    let secondPage = await api.handle(APIRequest(
+        method: .get,
+        path: "/v1/study-responses",
+        query: [
+            "limit": ["1"], "tag": ["PRIVATE-SPEAKING"], "cursor": [nextCursor],
+        ],
+        headers: [
+            "Host": "127.0.0.1:8766",
+            "Authorization": "Bearer \(readToken)",
+        ]
+    ))
+    #expect(secondPage.status == 200)
+    #expect((try jsonObject(secondPage)["data"] as? [[String: Any]])?.count == 1)
+
+    let targetID = try #require(firstData[0]["id"] as? String)
+    let detail = await api.handle(request(
+        .get, "/v1/study-responses/\(targetID)", headers: auth(readToken)
+    ))
+    #expect(detail.status == 200)
+    let detailObject = try jsonObject(detail)
+    let hash = try #require(detailObject["assetHash"] as? String)
+    let content = await api.handle(request(
+        .get, "/v1/study-responses/\(targetID)/content", headers: auth(readToken)
+    ))
+    #expect(content.status == 200)
+    #expect(content.body == bytes)
+    #expect(content.headers["Digest"] == "sha-256=\(hash)")
+    #expect(await api.handle(request(
+        .get, "/v1/media/\(hash)", headers: auth(ordinaryToken)
+    )).status == 404)
+
+    var deleteHeaders = auth(deleteToken)
+    deleteHeaders["If-Match"] = try #require(detail.headers["ETag"])
+    deleteHeaders["Idempotency-Key"] = "delete-private-response"
+    let deleted = await api.handle(request(
+        .delete, "/v1/study-responses/\(targetID)", headers: deleteHeaders
+    ))
+    #expect(deleted.status == 204)
+    let retried = await api.handle(request(
+        .delete, "/v1/study-responses/\(targetID)", headers: deleteHeaders
+    ))
+    #expect(retried.status == 204)
+    #expect(await api.handle(request(
+        .get, "/v1/study-responses/\(targetID)", headers: auth(readToken)
+    )).status == 404)
+
+    let sourceResponse = try #require(created.first { $0.id.uuidString.lowercased() != targetID })
+    let itemToken = try await pair(api, scopes: ["library.read", "items.write"])
+    let itemDetail = await api.handle(request(
+        .get,
+        "/v1/items/\(sourceResponse.itemID.uuidString.lowercased())",
+        headers: auth(itemToken)
+    ))
+    var sourceDeleteHeaders = auth(itemToken)
+    sourceDeleteHeaders["If-Match"] = try #require(itemDetail.headers["ETag"])
+    let needsConfirmation = await api.handle(request(
+        .delete,
+        "/v1/items/\(sourceResponse.itemID.uuidString.lowercased())",
+        headers: sourceDeleteHeaders
+    ))
+    #expect(needsConfirmation.status == 409)
+    let problem = try jsonObject(needsConfirmation)
+    #expect(problem["code"] as? String == "study_response_deletion_confirmation_required")
+    #expect((problem["impact"] as? [String: Any])?["affectedStudyResponseCount"] as? Int == 1)
+    sourceDeleteHeaders["NeoAnki-Impact-Token"] = try #require(problem["impactToken"] as? String)
+    #expect(await api.handle(request(
+        .delete,
+        "/v1/items/\(sourceResponse.itemID.uuidString.lowercased())",
+        headers: sourceDeleteHeaders
+    )).status == 204)
+    #expect(await api.handle(request(
+        .get,
+        "/v1/study-responses/\(sourceResponse.id.uuidString.lowercased())",
+        headers: auth(readToken)
+    )).status == 404)
+
+    let ordinaryChanges = await api.handle(request(
+        .get, "/v1/changes", headers: auth(ordinaryToken)
+    ))
+    let serialized = String(decoding: ordinaryChanges.body, as: UTF8.self)
+    #expect(!serialized.contains("studyResponse"))
 }
 
 @Test func itemValidationRejectsDuplicateFieldsWithoutWritingChanges() async throws {

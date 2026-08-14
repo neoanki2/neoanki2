@@ -267,17 +267,21 @@ struct TemplateDraft: Equatable {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty
             && !promptSlots.isEmpty
-            && !answerSlots.isEmpty
             && promptSlots.allSatisfy(\.isValid)
-            && answerSlots.allSatisfy(\.isValid)
+            && (interaction == .audioSubmission
+                || (!answerSlots.isEmpty && answerSlots.allSatisfy(\.isValid)))
             && (generateWhen?.isValid ?? true)
     }
 
     func template(id: UUID, in itemType: ItemType) throws -> Template {
         let prompt = Side(slots: try promptSlots.map { try $0.slot() })
-        let answer = Side(slots: try answerSlots.map { try $0.slot() })
+        let answer = interaction == .audioSubmission
+            ? Side(slots: [])
+            : Side(slots: try answerSlots.map { try $0.slot() })
         let resolvedSkill: Skill
-        if usesAutomaticSkill,
+        if interaction == .audioSubmission {
+            resolvedSkill = Skill(input: skill.input, output: .audio, operation: skill.operation)
+        } else if usesAutomaticSkill,
            let promptID = ItemTypeValidation.fieldIDs(in: prompt).first,
            let answerID = ItemTypeValidation.fieldIDs(in: answer).first,
            let promptField = itemType.field(promptID),
@@ -317,10 +321,14 @@ final class TemplatesModel {
 
     var selectedItemTypeID: ItemType.ID?
 
-    let library: any LibraryBrowsing & LibraryItemTypeManaging
+    let library: any LibraryBrowsing & LibraryItemTypeManaging & LibraryStudyResponses
 
-    init(library: any LibraryBrowsing & LibraryItemTypeManaging) {
+    init(library: any LibraryBrowsing & LibraryItemTypeManaging & LibraryStudyResponses) {
         self.library = library
+    }
+
+    func studyResponseCount(templateID: UUID) async throws -> Int {
+        try await library.studyResponseCount(templateIDs: [templateID])
     }
 
     var selectedItemType: ItemType? {

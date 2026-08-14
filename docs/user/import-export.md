@@ -182,7 +182,7 @@ The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
 of the exported tree. Unrelated library items are not loaded into the export snapshot.
 
-`.neodeck` version 3 is deliberately **content-only**. It does not contain:
+`.neodeck` version 4 is deliberately **content-only**. It does not contain:
 
 - review history, due dates, or scheduler parameters;
 - card or memory state, suspension state, or study statistics; or
@@ -249,7 +249,7 @@ local identifiers and never-reviewed cards. An unchanged item-type schema may
 reuse an exact local match; changing the schema creates a distinct type.
 Re-importing creates duplicate content.
 
-Authored format version 3 requires the root to declare its ordered
+Authored format version 3 and later require the root to declare its ordered
 `itemTypes`, supports inherited descendant policies and optional
 `defaultType`, and keeps every declared type included with the imported root.
 Version-1 and version-2 bundles remain compatible and import their types as

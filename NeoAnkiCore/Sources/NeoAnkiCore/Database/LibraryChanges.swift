@@ -11,6 +11,7 @@ public enum LibraryResourceKind: String, Codable, CaseIterable, Sendable {
     case card
     case review
     case reviewRevert
+    case studyResponse
     case media
     case itemTypeMembership
     case schedulingSettings

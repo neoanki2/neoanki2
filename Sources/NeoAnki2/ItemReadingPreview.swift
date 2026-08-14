@@ -78,6 +78,7 @@ struct ItemDetailView: View {
     @State private var isMovingDeck = false
     @State private var isEditing = false
     @State private var showDeleteConfirm = false
+    @State private var affectedResponseCount = 0
     @State private var errorMessage: String?
 
     var body: some View {
@@ -153,7 +154,12 @@ struct ItemDetailView: View {
                 }
                 ToolbarItem(placement: .destructiveAction) {
                     Button("Delete", systemImage: "trash", role: .destructive) {
-                        showDeleteConfirm = true
+                        Task {
+                            affectedResponseCount = await model.studyResponseCount(
+                                itemIDs: [summary.id]
+                            )
+                            showDeleteConfirm = true
+                        }
                     }
                     .disabled(isDeleting)
                     .accessibilityIdentifier("deleteItem")
@@ -190,9 +196,13 @@ struct ItemDetailView: View {
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("cancelDeleteItem")
         } message: {
-            Text(
-                "This removes the item and its \(summary.cardCount) study cards. This can't be undone."
-            )
+            if affectedResponseCount > 0 {
+                Text("This removes the item, its \(summary.cardCount) study cards, and \(affectedResponseCount) saved spoken \(affectedResponseCount == 1 ? "response" : "responses"). This can't be undone.")
+            } else {
+                Text(
+                    "This removes the item and its \(summary.cardCount) study cards. This can't be undone."
+                )
+            }
         }
         .task(id: summary.id) {
             await load()

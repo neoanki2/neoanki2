@@ -65,6 +65,11 @@ struct ContentView: View {
         nonmutating set { updateRoute(active: newValue, route: .browse) }
     }
 
+    private var isShowingSavedResponses: Bool {
+        get { appSession.route == .savedResponses }
+        nonmutating set { updateRoute(active: newValue, route: .savedResponses) }
+    }
+
     private var selectedItemID: SavedItemSummary.ID? {
         get {
             if case let .itemDetail(id) = appSession.route { return id }
@@ -195,7 +200,8 @@ struct ContentView: View {
                 },
                 onDeckProgressReset: {
                     await refreshLibrary(forceRefresh: true)
-                }
+                },
+                onOpenSavedResponses: { openSavedResponses() }
             )
             .navigationSplitViewColumnWidth(
                 min: DesignSystem.sidebarMin,
@@ -243,7 +249,11 @@ struct ContentView: View {
         }
         .onChange(of: decksModel.selectedScope) { _, _ in
             selectedItemID = nil
+            if isShowingSavedResponses { isShowingSavedResponses = false }
             Task { await reloadScope() }
+        }
+        .onChange(of: decksModel.allDecksDueCount, initial: true) { _, dueCount in
+            AppDelegate.updateDockBadge(dueCount: dueCount)
         }
         .onAppear {
             AppStartupTrace.mark("content_appeared")
@@ -391,6 +401,7 @@ struct ContentView: View {
     private var windowTitle: String {
         if isStudying { return "Study" }
         if isManagingTemplates { return "Item Types" }
+        if isShowingSavedResponses { return "Saved Responses" }
         if isAddingItem { return "Add Item" }
         return "NeoAnki2"
     }
@@ -573,7 +584,12 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if isManagingTemplates, let templatesModel {
+        if isShowingSavedResponses {
+            SavedResponsesView(library: library) {
+                isShowingSavedResponses = false
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if isManagingTemplates, let templatesModel {
             TemplatesView(model: templatesModel) {
                 await reloadScope()
             }
@@ -661,6 +677,11 @@ struct ContentView: View {
         Task {
             await itemsModel.load(scope: scope)
         }
+    }
+
+    private func openSavedResponses() {
+        selectedItemID = nil
+        isShowingSavedResponses = true
     }
 
     private func closeBrowse() {

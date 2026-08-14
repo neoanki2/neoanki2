@@ -41,6 +41,7 @@ final class StudyModel {
     /// this becomes false.
     private(set) var isPreparingQueue = false
     private(set) var isGrading = false
+    private(set) var isCompletingSubmission = false
     private(set) var errorMessage: String?
     private(set) var isFinished = false
     /// Set only when the queue could not be read at all. Without it a failed
@@ -57,11 +58,12 @@ final class StudyModel {
     private(set) var selectedArrangementIndex: Int?
     private(set) var interactionMessage: String?
     private(set) var reviewedCount = 0
+    private(set) var completedSubmissionCount = 0
     private(set) var reviewedCardIDs: Set<UUID> = []
     private(set) var reviewedItemIDs: Set<UUID> = []
     private(set) var lastStartTiming = StudyStartTiming()
 
-    let library: any LibraryBrowsing & LibraryStudying
+    let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
@@ -71,7 +73,7 @@ final class StudyModel {
     private let remainingQueueLoadGate: (@Sendable () async -> Void)?
 
     init(
-        library: any LibraryBrowsing & LibraryStudying,
+        library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses,
         remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
     ) {
         self.library = library
@@ -117,7 +119,8 @@ final class StudyModel {
         let reviewNoun = reviewedCount == 1 ? "review" : "reviews"
         let cardCount = reviewedCardIDs.count
         let cardNoun = cardCount == 1 ? "card" : "cards"
-        return "Completed \(reviewedCount) \(reviewNoun) across \(cardCount) \(cardNoun)"
+        let submissionNoun = completedSubmissionCount == 1 ? "submission" : "submissions"
+        return "Completed \(reviewedCount) \(reviewNoun) and \(completedSubmissionCount) \(submissionNoun) across \(cardCount) \(cardNoun)"
     }
 
     var canUndoLastGrade: Bool {
@@ -139,6 +142,7 @@ final class StudyModel {
         isAnswerRevealed = false
         index = 0
         reviewedCount = 0
+        completedSubmissionCount = 0
         reviewedCardIDs = []
         reviewedItemIDs = []
         repairQueue = []
@@ -351,6 +355,33 @@ final class StudyModel {
             completeRecording()
         case .arrange:
             submitArrangement()
+        case .audioSubmission:
+            break
+        }
+    }
+
+    func completeAudioSubmission(_ draft: StudyResponseDraft) async -> Bool {
+        guard !isCompletingSubmission, !isPreparingQueue,
+              let card = currentCard,
+              card.id == draft.cardID,
+              card.template.interaction == .audioSubmission
+        else { return false }
+        isCompletingSubmission = true
+        defer { isCompletingSubmission = false }
+        errorMessage = nil
+        do {
+            _ = try await library.completeAudioSubmission(draft, submittedAt: .now)
+            reviewedCardIDs.insert(card.id)
+            reviewedItemIDs.insert(card.item.id)
+            completedSubmissionCount += 1
+            pendingGradeUndo = nil
+            index += 1
+            isAnswerRevealed = false
+            advanceSession()
+            return true
+        } catch {
+            errorMessage = userFacingError(from: error)
+            return false
         }
     }
 
