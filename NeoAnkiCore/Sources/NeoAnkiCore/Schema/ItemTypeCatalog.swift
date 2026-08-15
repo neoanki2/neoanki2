@@ -48,6 +48,43 @@ public struct DeckItemTypePolicy: Sendable, Equatable {
     }
 }
 
+/// Existing content that will share edits after a deck-provided item type is
+/// adopted into the editable library catalog.
+public struct ItemTypeEditingImpact: Sendable, Equatable {
+    public let itemCount: Int
+    public let deckCount: Int
+    public let unassignedItemCount: Int
+
+    public init(itemCount: Int, deckCount: Int, unassignedItemCount: Int) {
+        self.itemCount = itemCount
+        self.deckCount = deckCount
+        self.unassignedItemCount = unassignedItemCount
+    }
+}
+
+/// Populated fields whose stored values may no longer be usable after an item
+/// type schema edit. Renames, reordering, and required-state changes are safe.
+public struct ItemTypeSchemaChangeImpact: Sendable, Equatable {
+    public let affectedItemCount: Int
+    public let removedPopulatedFields: [String]
+    public let typeChangedPopulatedFields: [String]
+
+    public init(
+        affectedItemCount: Int,
+        removedPopulatedFields: [String],
+        typeChangedPopulatedFields: [String]
+    ) {
+        self.affectedItemCount = affectedItemCount
+        self.removedPopulatedFields = removedPopulatedFields
+        self.typeChangedPopulatedFields = typeChangedPopulatedFields
+    }
+
+    public var requiresConfirmation: Bool {
+        affectedItemCount > 0
+            && (!removedPopulatedFields.isEmpty || !typeChangedPopulatedFields.isEmpty)
+    }
+}
+
 /// Included-only definitions grouped beneath the imported root that owns them.
 public struct IncludedItemTypeGroup: Sendable, Equatable, Identifiable {
     public let rootDeck: Deck

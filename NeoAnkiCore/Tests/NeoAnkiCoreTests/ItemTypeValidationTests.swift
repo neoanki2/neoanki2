@@ -49,6 +49,17 @@ private func makeValidItemType() -> ItemType {
     }
 }
 
+@Test func validateFieldsRejectsDuplicateIDs() async {
+    let id = UUID()
+    let fields = [
+        FieldDef(id: id, name: "Front", type: .text),
+        FieldDef(id: id, name: "Back", type: .text),
+    ]
+    await #expect(throws: DatabaseError.invalidItemType("Item type field IDs must be unique.")) {
+        try ItemTypeValidation.validateFields(fields)
+    }
+}
+
 @Test func validateRejectsMissingTemplates() async {
     let front = FieldDef(name: "Front", type: .text)
     let back = FieldDef(name: "Back", type: .text)

@@ -15,6 +15,11 @@ struct TemplatesView: View {
     @State private var expandedIncludedGroupIDs: Set<UUID> = []
     @State private var showDuplicatePrompt = false
     @State private var duplicateName = ""
+    @State private var unlockImpact: ItemTypeEditingImpact?
+    @State private var unlockItemTypeID: UUID?
+    @State private var unlockItemTypeName = ""
+    @State private var isPreparingUnlock = false
+    @State private var isUnlocking = false
 
     var body: some View {
         HSplitView {
@@ -100,6 +105,25 @@ struct TemplatesView: View {
             .accessibilityIdentifier("confirmDuplicateItemType")
         } message: {
             Text("The copy will be an independent, editable Item Type.")
+        }
+        .confirmationDialog(
+            "Unlock \(unlockItemTypeName) for editing?",
+            isPresented: Binding(
+                get: { unlockImpact != nil },
+                set: { if !$0 { clearPendingUnlock() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Unlock for Editing") {
+                Task { await unlockSelectedItemType() }
+            }
+            .accessibilityIdentifier("confirmUnlockIncludedItemType")
+            Button("Cancel", role: .cancel) { clearPendingUnlock() }
+                .accessibilityIdentifier("cancelUnlockIncludedItemType")
+        } message: {
+            if let unlockImpact {
+                Text(unlockImpactMessage(unlockImpact))
+            }
         }
     }
 
@@ -347,6 +371,22 @@ struct TemplatesView: View {
                 }
                 Spacer()
                 if model.isSelectedItemTypeReadOnly {
+                    Button {
+                        Task { await prepareUnlock(for: itemType) }
+                    } label: {
+                        if isPreparingUnlock || isUnlocking {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(isUnlocking ? "Unlocking…" : "Checking…")
+                        } else {
+                            Label("Unlock for Editing…", systemImage: "lock.open")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isPreparingUnlock || isUnlocking)
+                    .accessibilityLabel("Unlock \(itemType.name) for editing")
+                    .accessibilityIdentifier("unlockIncludedItemType")
+
                     Button("Duplicate as Item Type…", systemImage: "plus.square.on.square") {
                         duplicateName = "\(itemType.name) Copy"
                         showDuplicatePrompt = true
@@ -386,6 +426,54 @@ struct TemplatesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.detailBackground)
+    }
+
+    private func prepareUnlock(for itemType: ItemType) async {
+        guard !isPreparingUnlock, !isUnlocking else { return }
+        isPreparingUnlock = true
+        defer { isPreparingUnlock = false }
+        guard let impact = await model.editingImpact(itemTypeID: itemType.id) else { return }
+        unlockItemTypeID = itemType.id
+        unlockItemTypeName = itemType.name
+        unlockImpact = impact
+    }
+
+    private func unlockSelectedItemType() async {
+        guard !isUnlocking, let itemTypeID = unlockItemTypeID else { return }
+        clearPendingUnlock()
+        isUnlocking = true
+        defer { isUnlocking = false }
+        if await model.unlockItemType(id: itemTypeID) {
+            await onTemplatesChanged()
+            await refreshDeleteAvailability()
+        }
+    }
+
+    private func clearPendingUnlock() {
+        unlockImpact = nil
+        unlockItemTypeID = nil
+        unlockItemTypeName = ""
+    }
+
+    private func unlockImpactMessage(_ impact: ItemTypeEditingImpact) -> String {
+        let usage: String
+        if impact.itemCount == 0 {
+            usage = "No existing items currently use it."
+        } else {
+            let items = impact.itemCount == 1 ? "1 existing item" : "\(impact.itemCount) existing items"
+            let decks = impact.deckCount == 1 ? "1 deck" : "\(impact.deckCount) decks"
+            if impact.deckCount == 0 {
+                usage = "It is used by \(items), all currently unassigned."
+            } else if impact.unassignedItemCount == 0 {
+                usage = "It is used by \(items) across \(decks)."
+            } else {
+                let unassigned = impact.unassignedItemCount == 1
+                    ? "1 item is unassigned"
+                    : "\(impact.unassignedItemCount) items are unassigned"
+                usage = "It is used by \(items) across \(decks); \(unassigned)."
+            }
+        }
+        return "\(usage) Unlocking adds this definition to Item Types without making a copy. Changes to its fields and templates will affect every item and deck that uses it."
     }
 
     @ViewBuilder

@@ -149,9 +149,10 @@ and retry once.
   under **For This Deck**; Basic and other reusable types remain under
   **Item Types**.
 - **An imported type is missing from the main list:** expand **Included with
-  Decks** in Item Types. Included-only schemas are intentionally read-only and
-  grouped by their owning deck. Use **Duplicate as Item Type…** for an editable
-  independent copy.
+  Decks** in Item Types. Included-only schemas start read-only and are grouped
+  by their owning deck. Use **Unlock for Editing…** to adopt the existing
+  definition and update its existing items, or **Duplicate as Item Type…** for
+  an independent copy.
 - **Disk is full / could not export:** free space and choose a writable
   destination. Failed portable transfers are atomic and should not leave
   imported partial content.

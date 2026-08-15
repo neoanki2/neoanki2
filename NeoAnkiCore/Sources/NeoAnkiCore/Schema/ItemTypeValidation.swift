@@ -91,8 +91,12 @@ public enum ItemTypeValidation {
             throw DatabaseError.invalidItemType("An item type needs at least one field.")
         }
 
+        var seenIDs: Set<UUID> = []
         var seenNames: Set<String> = []
         for field in fields {
+            guard seenIDs.insert(field.id).inserted else {
+                throw DatabaseError.invalidItemType("Item type field IDs must be unique.")
+            }
             let trimmed = field.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
                 throw DatabaseError.invalidItemType("Every field needs a name.")
