@@ -142,7 +142,7 @@ extension FastFunctionalJourneyTests {
         runJourneyActivity("TemplatesUITests.testTemplatesDeleteTemplate") {
             openTemplateEditor(named: "Renamed", in: app)
             app.menuButtons.identified("templateMoreMenu").click()
-            app.buttons.identified("deleteTemplate").click()
+            app.menuItems.identified("deleteTemplate").click()
             let confirm = app.buttons.identified("confirmDeleteTemplate")
             XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
             confirm.click()
@@ -288,7 +288,7 @@ extension FastFunctionalJourneyTests {
     private func cancelDeletingTemplate(named name: String, in app: XCUIApplication) {
         openTemplateEditor(named: name, in: app)
         app.menuButtons.identified("templateMoreMenu").click()
-        app.buttons.identified("deleteTemplate").click()
+        app.menuItems.identified("deleteTemplate").click()
         let cancel = app.buttons.identified("cancelDeleteTemplate")
         XCTAssertTrue(cancel.waitUntilExists(timeout: 3))
         cancel.click()
@@ -481,7 +481,7 @@ extension FastFunctionalJourneyTests {
 
         openTemplateEditor(named: "To Delete", in: app)
         app.menuButtons.identified("templateMoreMenu").click()
-        app.buttons.identified("deleteTemplate").click()
+        app.menuItems.identified("deleteTemplate").click()
         // Deleting asks first, and leaving the confirmation up keeps the editor
         // open — which later reads as the panel refusing to close.
         let confirm = app.buttons.identified("confirmDeleteTemplate")
@@ -589,7 +589,7 @@ extension FastFunctionalJourneyTests {
         openTemplateEditor(named: "Card", in: app)
 
         app.menuButtons.identified("templateMoreMenu").click()
-        app.buttons.identified("deleteTemplate").click()
+        app.menuItems.identified("deleteTemplate").click()
         XCTAssertTrue(app.buttons.identified("cancelDeleteTemplate").waitUntilExists(timeout: 3))
         app.buttons.identified("cancelDeleteTemplate").click()
 
