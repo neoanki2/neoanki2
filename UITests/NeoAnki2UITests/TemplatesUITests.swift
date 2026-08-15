@@ -141,7 +141,7 @@ extension FastFunctionalJourneyTests {
 
         runJourneyActivity("TemplatesUITests.testTemplatesDeleteTemplate") {
             openTemplateEditor(named: "Renamed", in: app)
-            app.buttons.identified("templateMoreMenu").click()
+            app.menuButtons.identified("templateMoreMenu").click()
             app.buttons.identified("deleteTemplate").click()
             let confirm = app.buttons.identified("confirmDeleteTemplate")
             XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
@@ -287,7 +287,7 @@ extension FastFunctionalJourneyTests {
 
     private func cancelDeletingTemplate(named name: String, in app: XCUIApplication) {
         openTemplateEditor(named: name, in: app)
-        app.buttons.identified("templateMoreMenu").click()
+        app.menuButtons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         let cancel = app.buttons.identified("cancelDeleteTemplate")
         XCTAssertTrue(cancel.waitUntilExists(timeout: 3))
@@ -480,7 +480,7 @@ extension FastFunctionalJourneyTests {
         XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitUntilExists(timeout: 5))
 
         openTemplateEditor(named: "To Delete", in: app)
-        app.buttons.identified("templateMoreMenu").click()
+        app.menuButtons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         // Deleting asks first, and leaving the confirmation up keeps the editor
         // open — which later reads as the panel refusing to close.
@@ -588,7 +588,7 @@ extension FastFunctionalJourneyTests {
         openTemplates(in: app)
         openTemplateEditor(named: "Card", in: app)
 
-        app.buttons.identified("templateMoreMenu").click()
+        app.menuButtons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         XCTAssertTrue(app.buttons.identified("cancelDeleteTemplate").waitUntilExists(timeout: 3))
         app.buttons.identified("cancelDeleteTemplate").click()
