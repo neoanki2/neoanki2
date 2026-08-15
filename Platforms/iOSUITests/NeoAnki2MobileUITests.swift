@@ -154,10 +154,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         let addFirstCard = app.buttons["Add First Card"]
         XCTAssertTrue(addFirstCard.waitForExistence(timeout: 5))
-        if !addFirstCard.isHittable {
-            let emptyStateTitle = app.staticTexts["Build Your Library"]
-            XCTAssertTrue(emptyStateTitle.waitForExistence(timeout: 3))
-            emptyStateTitle.swipeUp()
+        let emptyStateScroll = app.scrollViews["emptyLibraryScroll"]
+        XCTAssertTrue(emptyStateScroll.waitForExistence(timeout: 3))
+        for _ in 0..<3 where !addFirstCard.isHittable {
+            emptyStateScroll.swipeUp()
         }
         XCTAssertTrue(addFirstCard.isHittable)
         try app.performAccessibilityAudit(

@@ -79,6 +79,7 @@ struct LibraryView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                         }
+                        .accessibilityIdentifier("emptyLibraryScroll")
                     } else if visibleItems.isEmpty {
                         ContentUnavailableView.search(text: searchText)
                     } else {
