@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-15T10:25:36Z",
+  "capturedAt" : "2026-08-15T10:47:31Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -85,13 +85,14 @@
     {
       "expectedVisibleIdentifiers" : [
         "templatesDone",
-        "itemTypeRow-Basic",
-        "includedDeckGroup-Poetry Lab"
+        "includedItemTypeOwner",
+        "unlockIncludedItemType",
+        "duplicateIncludedItemType"
       ],
       "filename" : "item-types.png",
       "height" : 680,
-      "scenario" : "item types manager with a deck-grouped read-only section",
-      "sha256" : "5372df9c2353dbf4bdbd63151b2e7bf3d7602ccd7234a0816095eb5c1161392b",
+      "scenario" : "deck-provided item type with its owner and unlock action",
+      "sha256" : "9efdfdccbddc03fab987b26d1604535c3b8e7a979823f4bceb7948344b1e17d7",
       "width" : 1024
     },
     {
@@ -203,7 +204,7 @@
       "filename" : "template-advanced.png",
       "height" : 680,
       "scenario" : "Study-Stage Builder Generation and Skill inspector",
-      "sha256" : "228a7d88078a53bbd6f1be5aaf762706d3535d42779dc2ddeaccffdb21cd2154",
+      "sha256" : "34c967084829f73d1e40bf5af2f760cda4ad573fbe68aa27863e5226eb89d81d",
       "width" : 1024
     },
     {
@@ -216,9 +217,9 @@
       "filename" : "template-editor.png",
       "height" : 680,
       "scenario" : "new Study-Stage Builder with Ingredients, Preview, and Inspector",
-      "sha256" : "5e13c25676ce89710579bdbeb861b0ed8aa13d518dd3a63a151cb9d50d5e10ae",
+      "sha256" : "d0007f2087bd1975d550ee9240008b2b1e9fc90872463ee65d8e8fc94d728f0a",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "ce7ced99a88ed4a5d63e97acac97708d34f0ddd3"
+  "sourceSHA" : "5057d3c72fc8ecee00bf0bf5ee21d2aa4e263987"
 }
