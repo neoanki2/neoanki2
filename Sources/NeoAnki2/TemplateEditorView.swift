@@ -63,7 +63,6 @@ struct TemplateEditorView: View {
                 isCompactLayout = width < 900
             }
         }
-        .accessibilityIdentifier("templateEditorForm")
         .navigationTitle(editingTemplate == nil ? "Add Template" : "Edit Template")
         .toolbar { toolbar }
         .sheet(item: $compactSheet) { sheet in
