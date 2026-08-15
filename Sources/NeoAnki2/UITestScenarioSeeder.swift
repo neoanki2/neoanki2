@@ -68,6 +68,8 @@ enum UITestScenarioSeeder {
             try await seedAuthoringFieldTypes(store: store)
         case "deck-included-item-types":
             try await seedDeckIncludedItemTypes(store: store)
+        case "item-type-risky-edit":
+            try await seedRiskyItemTypeEdit(store: store)
         default:
             break
         }
@@ -87,6 +89,35 @@ enum UITestScenarioSeeder {
             promptName: "Expression",
             answerName: "Translation",
             store: store
+        )
+    }
+
+    private static func seedRiskyItemTypeEdit(store: any LibraryScenarioSeeding) async throws {
+        let front = FieldDef(name: "Front", type: .text, isRequired: true)
+        let back = FieldDef(name: "Back", type: .text, isRequired: true)
+        let notes = FieldDef(name: "Notes", type: .text)
+        let template = Template(
+            name: "Card",
+            prompt: Side(slots: [Slot(source: .field(front.id))]),
+            answer: Side(slots: [Slot(source: .field(back.id))]),
+            interaction: .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )
+        let itemType = ItemType(
+            name: "Risky Edit",
+            fields: [front, back, notes],
+            templates: [template]
+        )
+        _ = try await store.createItemType(itemType)
+        _ = try await store.createItem(
+            Item(
+                itemTypeID: itemType.id,
+                fields: [
+                    FieldValue(fieldID: front.id, value: .text("Question")),
+                    FieldValue(fieldID: back.id, value: .text("Answer")),
+                    FieldValue(fieldID: notes.id, value: .text("Keep this content")),
+                ]
+            )
         )
     }
 

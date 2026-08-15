@@ -22,10 +22,17 @@ struct ItemTypesMobileView: View {
                         Text(type.name).font(.headline)
                         Text("\(type.fields.count) fields · \(type.templates.count) templates")
                             .font(.subheadline).foregroundStyle(.secondary)
+                        if let owner = model.includedItemTypeOwner(id: type.id) {
+                            Label("From \(owner.deckPath) · Read-only", systemImage: "lock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }.padding(.vertical, 4)
                 }
                 .swipeActions(edge: .trailing) {
-                    Button("Delete", role: .destructive) { Task { await perform { try await model.deleteItemType(id: type.id) } } }
+                    if model.includedItemTypeOwner(id: type.id) == nil {
+                        Button("Delete", role: .destructive) { Task { await perform { try await model.deleteItemType(id: type.id) } } }
+                    }
                     Button("Duplicate") { Task { await perform { try await model.duplicateItemType(id: type.id, name: "\(type.name) Copy") } } }.tint(.blue)
                 }
             }
@@ -59,7 +66,13 @@ private struct ItemTypeDetailMobileView: View {
     @State private var confirmsDiscard = false
     @State private var affectedResponseCount = 0
     @State private var confirmsResponseDeletion = false
+    @State private var unlockImpact: ItemTypeEditingImpact?
+    @State private var schemaImpact: ItemTypeSchemaChangeImpact?
     private let original: ItemType
+
+    private var includedOwner: IncludedItemTypeGroup? {
+        model.includedItemTypeOwner(id: itemType.id)
+    }
 
     init(model: MobileAppModel, itemType: ItemType) {
         self.model = model
@@ -69,13 +82,40 @@ private struct ItemTypeDetailMobileView: View {
 
     var body: some View {
         Form {
+            if let includedOwner {
+                Section {
+                    Label("From \(includedOwner.deckPath) · Read-only", systemImage: "lock")
+                    Button("Unlock for Editing…", systemImage: "lock.open") {
+                        Task { await prepareUnlock() }
+                    }
+                    .disabled(isSaving)
+                    Button("Duplicate as Item Type…", systemImage: "plus.square.on.square") {
+                        Task {
+                            await perform {
+                                try await model.duplicateItemType(
+                                    id: itemType.id,
+                                    name: "\(itemType.name) Copy"
+                                )
+                            }
+                        }
+                    }
+                    .disabled(isSaving)
+                } footer: {
+                    Text("Unlock the original to change every item and deck that uses it, or duplicate it for an independent copy.")
+                }
+            }
             identitySection
+                .disabled(includedOwner != nil)
             fieldsSection
+                .disabled(includedOwner != nil)
             templatesSection
-            Section {
-                Button("Repair Definition") { Task { await perform { try await model.repairItemType(id: itemType.id) } } }
-            } footer: {
-                Text("Advanced slot, reveal, media, skill, and generation controls are shown progressively in each template.")
+                .disabled(includedOwner != nil)
+            if includedOwner == nil {
+                Section {
+                    Button("Repair Definition") { Task { await perform { try await model.repairItemType(id: itemType.id) } } }
+                } footer: {
+                    Text("Advanced slot, reveal, media, skill, and generation controls are shown progressively in each template.")
+                }
             }
         }
         .navigationTitle(itemType.name)
@@ -87,9 +127,11 @@ private struct ItemTypeDetailMobileView: View {
                     if itemType == original { dismiss() } else { confirmsDiscard = true }
                 }
             }
-            ToolbarItem(placement: .confirmationAction) {
-                Button(isSaving ? "Saving…" : "Save") { Task { await requestSave() } }
-                    .disabled(isSaving || itemType.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if includedOwner == nil {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving…" : "Save") { Task { await requestSave() } }
+                        .disabled(isSaving || itemType.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
         }
         .confirmationDialog("Discard unsaved changes?", isPresented: $confirmsDiscard) {
@@ -106,6 +148,35 @@ private struct ItemTypeDetailMobileView: View {
         } message: {
             Text("This template change removes cards with \(affectedResponseCount) saved spoken \(affectedResponseCount == 1 ? "response" : "responses"). The recordings will be permanently deleted.")
         }
+        .confirmationDialog(
+            "Unlock \(itemType.name) for editing?",
+            isPresented: Binding(
+                get: { unlockImpact != nil },
+                set: { if !$0 { unlockImpact = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Unlock for Editing") { Task { await unlock() } }
+            Button("Cancel", role: .cancel) { unlockImpact = nil }
+        } message: {
+            if let unlockImpact { Text(unlockImpactMessage(unlockImpact)) }
+        }
+        .confirmationDialog(
+            "Save potentially destructive changes?",
+            isPresented: Binding(
+                get: { schemaImpact != nil },
+                set: { if !$0 { schemaImpact = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Save Changes", role: .destructive) {
+                schemaImpact = nil
+                Task { await prepareResponseDeletionOrSave() }
+            }
+            Button("Keep Editing", role: .cancel) { schemaImpact = nil }
+        } message: {
+            if let schemaImpact { Text(schemaImpactMessage(schemaImpact)) }
+        }
         .alert("Could Not Save Item Type", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
     }
 
@@ -113,22 +184,90 @@ private struct ItemTypeDetailMobileView: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            let currentTemplateIDs = Set(itemType.templates.map(\.id))
-            let removedTemplateIDs = Set(original.templates.map(\.id)).subtracting(currentTemplateIDs)
-            affectedResponseCount = try await model.studyResponseCount(templateIDs: removedTemplateIDs)
-            if affectedResponseCount > 0 {
-                confirmsResponseDeletion = true
-            } else {
-                try await model.updateItemType(itemType)
-                dismiss()
+            let impact = try await model.itemTypeSchemaChangeImpact(
+                from: original,
+                to: itemType
+            )
+            if impact.requiresConfirmation {
+                schemaImpact = impact
+                return
             }
+            try await resolveResponseDeletionOrSave()
         } catch {
             errorMessage = MobileAppModel.message(for: error)
         }
     }
 
+    private func prepareResponseDeletionOrSave() async {
+        isSaving = true
+        defer { isSaving = false }
+        do { try await resolveResponseDeletionOrSave() }
+        catch { errorMessage = MobileAppModel.message(for: error) }
+    }
+
+    private func resolveResponseDeletionOrSave() async throws {
+        let currentTemplateIDs = Set(itemType.templates.map(\.id))
+        let removedTemplateIDs = Set(original.templates.map(\.id)).subtracting(currentTemplateIDs)
+        affectedResponseCount = try await model.studyResponseCount(templateIDs: removedTemplateIDs)
+        if affectedResponseCount > 0 {
+            confirmsResponseDeletion = true
+        } else {
+            try await model.updateItemType(itemType)
+            dismiss()
+        }
+    }
+
+    private func prepareUnlock() async {
+        isSaving = true
+        defer { isSaving = false }
+        do { unlockImpact = try await model.itemTypeEditingImpact(id: itemType.id) }
+        catch { errorMessage = MobileAppModel.message(for: error) }
+    }
+
+    private func unlock() async {
+        unlockImpact = nil
+        isSaving = true
+        defer { isSaving = false }
+        await perform { try await model.unlockItemType(id: itemType.id) }
+    }
+
     private func save() async { isSaving = true; defer { isSaving = false }; await perform { try await model.updateItemType(itemType); dismiss() } }
     private func perform(_ operation: () async throws -> Void) async { do { try await operation() } catch { errorMessage = MobileAppModel.message(for: error) } }
+
+    private func unlockImpactMessage(_ impact: ItemTypeEditingImpact) -> String {
+        let usage: String
+        if impact.itemCount == 0 {
+            usage = "No existing items currently use it."
+        } else {
+            let items = impact.itemCount == 1 ? "1 existing item" : "\(impact.itemCount) existing items"
+            let decks = impact.deckCount == 1 ? "1 deck" : "\(impact.deckCount) decks"
+            if impact.deckCount == 0 {
+                usage = "It is used by \(items), all currently unassigned."
+            } else if impact.unassignedItemCount == 0 {
+                usage = "It is used by \(items) across \(decks)."
+            } else {
+                let unassigned = impact.unassignedItemCount == 1
+                    ? "1 item is unassigned"
+                    : "\(impact.unassignedItemCount) items are unassigned"
+                usage = "It is used by \(items) across \(decks); \(unassigned)."
+            }
+        }
+        return "\(usage) Unlocking adds the same definition to Item Types without making a copy. Later changes affect every item and deck that uses it."
+    }
+
+    private func schemaImpactMessage(_ impact: ItemTypeSchemaChangeImpact) -> String {
+        var changes: [String] = []
+        if !impact.removedPopulatedFields.isEmpty {
+            changes.append("Removed: \(impact.removedPopulatedFields.joined(separator: ", ")).")
+        }
+        if !impact.typeChangedPopulatedFields.isEmpty {
+            changes.append("Type changed: \(impact.typeChangedPopulatedFields.joined(separator: ", ")).")
+        }
+        let items = impact.affectedItemCount == 1
+            ? "1 existing item has stored content in these fields."
+            : "\(impact.affectedItemCount) existing items have stored content in these fields."
+        return "\(items) That content may no longer be usable after this edit. \(changes.joined(separator: " "))"
+    }
 
     private var identitySection: some View {
         Section("Identity") { TextField("Name", text: $itemType.name) }

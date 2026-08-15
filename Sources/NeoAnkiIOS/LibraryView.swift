@@ -41,7 +41,7 @@ struct LibraryView: View {
                                 .font(.headline)
                             Text("Persistent spoken responses · Local only")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")

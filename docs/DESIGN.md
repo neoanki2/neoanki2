@@ -242,6 +242,9 @@ The sidebar has one selection model and two clear groups. **Library** contains A
   selectable “Included with Decks” object.
 - **Read-only state:** Pair the section context with a lock glyph, an explicit
   accessibility value, and “From [deck] · Read-only” in the detail pane.
+- **Adoption:** Offer one primary **Unlock for Editing…** action. Confirm with
+  concrete existing-item and deck counts before moving the same definition into
+  the editable list; retain duplication as the secondary isolation path.
 
 ### Empty states
 

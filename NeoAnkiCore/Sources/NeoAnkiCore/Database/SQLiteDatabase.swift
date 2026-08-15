@@ -3728,6 +3728,27 @@ actor SQLiteDatabase {
         return Int(count)
     }
 
+    func itemTypeEditingImpact(itemTypeID: UUID) throws -> ItemTypeEditingImpact {
+        let rows = try query(
+            """
+            SELECT COUNT(*) AS item_count,
+                   COUNT(DISTINCT deck_id) AS deck_count,
+                   SUM(CASE WHEN deck_id IS NULL THEN 1 ELSE 0 END) AS unassigned_count
+            FROM items
+            WHERE item_type_id = ?;
+            """,
+            bindings: [.text(itemTypeID.uuidString)]
+        )
+        guard let row = rows.first else {
+            return ItemTypeEditingImpact(itemCount: 0, deckCount: 0, unassignedItemCount: 0)
+        }
+        return ItemTypeEditingImpact(
+            itemCount: Int(row["item_count"] as? Int64 ?? 0),
+            deckCount: Int(row["deck_count"] as? Int64 ?? 0),
+            unassignedItemCount: Int(row["unassigned_count"] as? Int64 ?? 0)
+        )
+    }
+
     func deleteItemType(id: UUID) throws {
         try execute(
             "DELETE FROM item_types WHERE id = ?;",

@@ -80,13 +80,15 @@ increased contrast, Reduce Motion, and portrait or landscape layouts.
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
 type, then fill its typed fields. Visual media requires a description. The
 Library supports item detail, editing, multi-selection, bulk move, and bulk
-delete. Deleting items or changing templates warns before removing saved spoken
-responses.
+delete. Its Saved Responses shortcut keeps the local-only status readable with
+increased contrast and accessibility text sizes. Deleting items or changing
+templates warns before removing saved spoken responses.
 
 Use **Create → Item Types & Templates** to create or edit fields, templates,
 interactions, prompt and answer slots, skills, and generation conditions.
-Deck-provided item types remain read-only until duplicated into an independent
-editable type.
+Deck-provided item types start read-only. Unlock the original for editing when
+changes should affect its existing items and decks, or duplicate it for an
+independent editable type.
 
 Deck settings support rename, nesting, daily new-card limits, progress reset,
 and deletion policies. Scheduling settings expose study-day rollover and manual

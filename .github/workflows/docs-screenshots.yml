@@ -39,7 +39,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           # A promoted PR artifact must name a durable branch commit, not the
           # synthetic refs/pull/<number>/merge commit GitHub may later discard.
@@ -59,7 +59,7 @@ jobs:
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh Scripts/capture-doc-screenshots.sh
           ./Scripts/capture-doc-screenshots.sh "$RUNNER_TEMP/neoanki2-doc-screenshots"
       - name: Upload screenshot artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: neoanki2-documentation-screenshots
           path: ${{ runner.temp }}/neoanki2-doc-screenshots/

@@ -46,8 +46,9 @@ hard-coded subjects.
 
 **Included item type**
 An import-provided schema owned by a deck. It can be recommended for that
-deck without crowding the ordinary Item Types list. It is read-only until you
-choose **Duplicate as Item Type…**.
+deck without crowding the ordinary Item Types list. It starts read-only. Choose
+**Unlock for Editing…** to adopt the same definition and update its existing
+items, or **Duplicate as Item Type…** to create an independent copy.
 
 **Deck item-type policy**
 The ordered types a deck offers for new items and, optionally, its recommended

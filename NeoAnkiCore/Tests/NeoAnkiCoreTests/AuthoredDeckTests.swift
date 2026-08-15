@@ -103,6 +103,43 @@ private let authoredV3RootDeck =
     #expect(afterDuplicate.includedWithDecks.flatMap(\.itemTypes).contains { $0.id == included.id })
 }
 
+@Test func authoredDeckV3IncludedTypeUnlocksInPlaceAndReportsSharedContent() async throws {
+    let directory = try authoredTestDirectory()
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredV3Manifest, authoredType, authoredV3RootDeck],
+        itemRecords: [
+            #"{"kind":"item","deck":"root","type":"Study","fields":{"front":{"text":"Question"},"back":{"rich":[{"text":"Answer"}]}}}"#,
+        ]
+    )
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let result = try await AuthoredDeck.importDeck(from: bundle, into: store)
+    let rootID = try #require(result.deckIDs.first)
+    let included = try #require(
+        try await store.loadItemTypeCatalog().includedWithDecks.first?.itemTypes.first
+    )
+
+    #expect(
+        try await store.itemTypeEditingImpact(id: included.id)
+            == ItemTypeEditingImpact(itemCount: 1, deckCount: 1, unassignedItemCount: 0)
+    )
+    let unlocked = try await store.unlockItemType(id: included.id)
+    #expect(unlocked.id == included.id)
+
+    let catalog = try await store.loadItemTypeCatalog()
+    #expect(catalog.itemTypes.contains { $0.id == included.id })
+    #expect(!catalog.includedWithDecks.flatMap(\.itemTypes).contains { $0.id == included.id })
+    let policy = try #require(try await store.effectiveItemTypePolicy(for: rootID))
+    #expect(policy.itemTypes.map(\.id) == [included.id])
+
+    var edited = unlocked
+    edited.name = "My Authored Study"
+    _ = try await store.updateItemType(edited)
+    #expect(try await store.itemType(id: included.id).name == "My Authored Study")
+    #expect(try await store.countItems(itemTypeID: included.id) == 1)
+}
+
 @Test func authoredDeckV3RequiresAChoiceForAmbiguousPolicy() async throws {
     let directory = try authoredTestDirectory()
     let secondType = authoredType

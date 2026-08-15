@@ -44,12 +44,17 @@ has its own disclosure row, labeled with the deck's current path and included
 type count. Expand a deck to see its read-only types. They do not crowd the
 main editable list.
 
-An included-only definition is read-only. You can inspect its fields,
+An included-only definition starts read-only. You can inspect its fields,
 templates, and owning deck, but Edit, Delete, and Add Template are unavailable.
-Choose **Duplicate as Item Type…**, enter a name, and NeoAnki2 creates and
-selects an independent editable copy. Existing items and the imported deck
-policy continue using the original. If import reused a type that was already a
-normal Item Type, it remains editable and appears only in the main list.
+Choose **Unlock for Editing…** to adopt that same definition into your normal
+Item Types. The confirmation reports how many existing items and decks use it.
+Its identity does not change, so those items and the imported deck policy keep
+using it; later field and template edits affect all of them.
+
+Choose **Duplicate as Item Type…** instead when you want an independent editable
+copy. Existing items and the imported deck policy continue using the original.
+If import reused a type that was already a normal Item Type, it remains editable
+and appears only in the main list.
 
 ## Create and edit an item type
 
@@ -63,7 +68,7 @@ Use **Add Field** to append another field. Use each row’s arrows to move it up
 
 Save is available only when the type has a nonblank name, at least two fields, and complete, unique field names. A newly created type must also have at least two text-like fields so NeoAnki2 can create its initial **Card** template from the first two of them.
 
-Editing preserves field identities and existing templates. You cannot remove a field used by a template’s prompt, answer, or card-generation condition. Edit or delete those references first. Changing a field type can also make an existing cloze or media configuration invalid; NeoAnki2 reports the validation problem instead of saving an inconsistent definition.
+Editing preserves field identities and existing templates. You cannot remove a field used by a template’s prompt, answer, or card-generation condition. Edit or delete those references first. Changing a field type can also make an existing cloze or media configuration invalid; NeoAnki2 reports the validation problem instead of saving an inconsistent definition. If a removed field or type-changed field contains stored content, NeoAnki2 reports the affected item count and requires a separate confirmation before saving.
 
 Cancel closes an unchanged draft immediately. If there are edits, choose **Discard Changes** or **Keep Editing**.
 

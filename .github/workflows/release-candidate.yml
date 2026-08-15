@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Check out exact pull-request head
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refs/pull/${{ inputs.pr }}/head
           fetch-depth: 0
@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out exact pull-request head
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refs/pull/${{ inputs.pr }}/head
           fetch-depth: 0
@@ -57,7 +57,7 @@ jobs:
           ./Scripts/run-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: neoanki2-release-candidate-ui-results
           path: .build/ui-results
@@ -71,7 +71,7 @@ jobs:
       tag: ${{ steps.manifest.outputs.tag }}
     steps:
       - name: Check out exact pull-request head
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refs/pull/${{ inputs.pr }}/head
           fetch-depth: 0
@@ -84,11 +84,11 @@ jobs:
         id: manifest
         run: echo "tag=$(jq -r .tag .build/release-candidate/release-candidate.json)" >> "$GITHUB_OUTPUT"
       - name: Attest candidate provenance
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-path: .build/release-candidate/*.dmg
       - name: Upload candidate
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: neoanki2-release-candidate-${{ steps.manifest.outputs.tag }}
           path: .build/release-candidate/
@@ -101,11 +101,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact pull-request head
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refs/pull/${{ inputs.pr }}/head
       - name: Download candidate
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: neoanki2-release-candidate-${{ needs.package.outputs.tag }}
           path: .build/release-candidate

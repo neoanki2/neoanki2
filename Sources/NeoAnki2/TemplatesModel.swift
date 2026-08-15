@@ -327,6 +327,17 @@ final class TemplatesModel {
         self.library = library
     }
 
+    private var itemTypeEditingSafeguards: any LibraryItemTypeEditingSafeguarding {
+        get throws {
+            guard let safeguards = library as? any LibraryItemTypeEditingSafeguarding else {
+                throw DatabaseError.invalidItemType(
+                    "This library does not support unlocking deck-provided item types."
+                )
+            }
+            return safeguards
+        }
+    }
+
     func studyResponseCount(templateID: UUID) async throws -> Int {
         try await library.studyResponseCount(templateIDs: [templateID])
     }
@@ -479,6 +490,69 @@ final class TemplatesModel {
 
     func itemCount(for itemTypeID: UUID) async -> Int {
         (try? await library.countItems(itemTypeID: itemTypeID)) ?? 0
+    }
+
+    func editingImpact(itemTypeID: UUID) async -> ItemTypeEditingImpact? {
+        errorMessage = nil
+        guard includedItemTypeGroups.contains(where: { group in
+            group.itemTypes.contains { $0.id == itemTypeID }
+        }) else {
+            errorMessage = "Select an item type provided by a deck."
+            return nil
+        }
+        do {
+            return try await itemTypeEditingSafeguards.itemTypeEditingImpact(id: itemTypeID)
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return nil
+        }
+    }
+
+    func unlockItemType(id: UUID) async -> Bool {
+        errorMessage = nil
+        guard includedItemTypeGroups.contains(where: { group in
+            group.itemTypes.contains { $0.id == id }
+        }) else {
+            errorMessage = "Select an item type provided by a deck."
+            return false
+        }
+        do {
+            _ = try await itemTypeEditingSafeguards.unlockItemType(id: id)
+            await load()
+            return itemTypes.contains { $0.id == id }
+                && !includedItemTypeGroups.flatMap(\.itemTypes).contains { $0.id == id }
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
+    func schemaChangeImpact(
+        _ draft: ItemTypeDraft,
+        editingID: UUID
+    ) async -> ItemTypeSchemaChangeImpact? {
+        errorMessage = nil
+        guard let existing = itemTypes.first(where: { $0.id == editingID }) else {
+            errorMessage = "Item type not found."
+            return nil
+        }
+        do {
+            let updated = try ItemTypeBuilder.updatedItemType(
+                from: existing,
+                name: draft.name,
+                fields: draft.fieldDefs()
+            )
+            return try await itemTypeEditingSafeguards.itemTypeSchemaChangeImpact(
+                from: existing,
+                to: updated
+            )
+        } catch let error as DatabaseError {
+            errorMessage = itemTypeErrorMessage(from: error)
+            return nil
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return nil
+        }
     }
 
     func canDeleteSelectedItemType() async -> Bool {

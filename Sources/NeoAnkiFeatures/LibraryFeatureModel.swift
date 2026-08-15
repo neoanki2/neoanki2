@@ -34,6 +34,7 @@ public final class LibraryFeatureModel {
     public private(set) var decks: [DeckSummary] = []
     public private(set) var items: [SavedItemSummary] = []
     public private(set) var itemTypes: [ItemType] = []
+    public private(set) var includedItemTypeGroups: [IncludedItemTypeGroup] = []
     public private(set) var isRefreshing = false
     public private(set) var syncStatus: SyncStatus = .offline
     public private(set) var syncIssues: [SyncIssue] = []
@@ -108,6 +109,7 @@ public final class LibraryFeatureModel {
         decks = snapshot.deckSummaries
         items = itemRows
         itemTypes = typeCatalog.allItemTypes
+        includedItemTypeGroups = typeCatalog.includedWithDecks
         selectedItemIDs.formIntersection(Set(itemRows.map(\.id)))
         await publishDeviceState(asOf: now)
     }
@@ -354,6 +356,42 @@ public final class LibraryFeatureModel {
     public func duplicateItemType(id: UUID, name: String) async throws {
         _ = try await library.duplicateItemType(id: id, name: name)
         try await didMutate()
+    }
+
+    public func includedItemTypeOwner(id: UUID) -> IncludedItemTypeGroup? {
+        includedItemTypeGroups.first { group in
+            group.itemTypes.contains { $0.id == id }
+        }
+    }
+
+    public func itemTypeEditingImpact(id: UUID) async throws -> ItemTypeEditingImpact {
+        try await itemTypeEditingSafeguards.itemTypeEditingImpact(id: id)
+    }
+
+    public func unlockItemType(id: UUID) async throws {
+        _ = try await itemTypeEditingSafeguards.unlockItemType(id: id)
+        try await didMutate()
+    }
+
+    public func itemTypeSchemaChangeImpact(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeSchemaChangeImpact {
+        try await itemTypeEditingSafeguards.itemTypeSchemaChangeImpact(
+            from: existing,
+            to: updated
+        )
+    }
+
+    private var itemTypeEditingSafeguards: any LibraryItemTypeEditingSafeguarding {
+        get throws {
+            guard let safeguards = library as? any LibraryItemTypeEditingSafeguarding else {
+                throw DatabaseError.invalidItemType(
+                    "This library does not support unlocking deck-provided item types."
+                )
+            }
+            return safeguards
+        }
     }
 
     public func repairItemType(id: UUID) async throws {

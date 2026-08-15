@@ -59,6 +59,15 @@ public protocol LibraryItemTypeManaging: Sendable {
     func deleteItemType(id: UUID) async throws -> Bool
 }
 
+public protocol LibraryItemTypeEditingSafeguarding: Sendable {
+    func itemTypeEditingImpact(id: UUID) async throws -> ItemTypeEditingImpact
+    func unlockItemType(id: UUID) async throws -> ItemType
+    func itemTypeSchemaChangeImpact(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeSchemaChangeImpact
+}
+
 public protocol LibraryStudying: Sendable {
     func dueCount(scope: DeckScope, asOf: Date) async throws -> Int
     func dueCards(scope: DeckScope, asOf: Date, limit: Int?) async throws -> [DueCard]
@@ -269,7 +278,7 @@ public extension LibraryScheduling {
 
 /// The sole production adapter that knows `ItemStore`. Presentation, API, and
 /// synchronization code receive application capabilities instead of the store.
-public actor SQLiteLibraryRepository: LibraryRepository {
+public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingSafeguarding {
     let store: ItemStore
 
     public init(databaseURL: URL, profileID: String = "default") throws {
@@ -366,6 +375,18 @@ public actor SQLiteLibraryRepository: LibraryRepository {
     }
     public func duplicateItemType(id: UUID, name: String) async throws -> ItemType {
         try await store.duplicateItemType(id: id, name: name)
+    }
+    public func itemTypeEditingImpact(id: UUID) async throws -> ItemTypeEditingImpact {
+        try await store.itemTypeEditingImpact(id: id)
+    }
+    public func unlockItemType(id: UUID) async throws -> ItemType {
+        try await store.unlockItemType(id: id)
+    }
+    public func itemTypeSchemaChangeImpact(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeSchemaChangeImpact {
+        try await store.itemTypeSchemaChangeImpact(from: existing, to: updated)
     }
     public func repairItemTypeDefinition(id: UUID, asOf: Date) async throws -> ItemType {
         try await store.repairItemTypeDefinition(id: id, now: asOf)

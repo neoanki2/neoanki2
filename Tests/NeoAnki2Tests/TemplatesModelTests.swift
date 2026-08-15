@@ -54,6 +54,81 @@ private func makeTemplatesModel() async throws -> (TemplatesModel, ItemStore) {
     #expect(model.includedItemTypeGroups.flatMap(\.itemTypes).contains { $0.id == included.id })
 }
 
+@Test @MainActor func templatesModelUnlocksIncludedTypeWithoutChangingItsIdentity() async throws {
+    let (model, store) = try await makeTemplatesModel()
+    _ = try await importContextualDeck(into: store)
+    await model.load()
+    let included = try #require(model.includedItemTypeGroups.first?.itemTypes.first)
+    model.selectedItemTypeID = included.id
+
+    #expect(await model.editingImpact(itemTypeID: included.id) == .init(
+        itemCount: 0,
+        deckCount: 0,
+        unassignedItemCount: 0
+    ))
+    #expect(await model.unlockItemType(id: included.id))
+    #expect(model.selectedItemType?.id == included.id)
+    #expect(!model.isSelectedItemTypeReadOnly)
+    #expect(model.itemTypes.contains { $0.id == included.id })
+    #expect(!model.includedItemTypeGroups.flatMap(\.itemTypes).contains { $0.id == included.id })
+
+    var draft = ItemTypeDraft(itemType: included)
+    draft.name = "Unlocked Special"
+    #expect(await model.updateItemType(draft, editingID: included.id))
+    #expect(try await store.itemType(id: included.id).name == "Unlocked Special")
+}
+
+@Test @MainActor func templatesModelUnlocksTheConfirmedTypeAfterSelectionChanges() async throws {
+    let (model, store) = try await makeTemplatesModel()
+    _ = try await importContextualDeck(into: store)
+    await model.load()
+    let included = try #require(model.includedItemTypeGroups.first?.itemTypes.first)
+    let other = try #require(model.itemTypes.first)
+
+    #expect(await model.editingImpact(itemTypeID: included.id) != nil)
+    model.selectedItemTypeID = other.id
+    #expect(await model.unlockItemType(id: included.id))
+
+    #expect(model.selectedItemTypeID == other.id)
+    #expect(model.itemTypes.contains { $0.id == included.id })
+    #expect(!model.includedItemTypeGroups.flatMap(\.itemTypes).contains { $0.id == included.id })
+}
+
+@Test @MainActor func templatesModelWarnsOnlyForPopulatedRiskySchemaChanges() async throws {
+    let (model, store) = try await makeTemplatesModel()
+    let basic = try await store.defaultItemType()
+    let optional = FieldDef(name: "Unused", type: .text)
+    var withOptional = basic
+    withOptional.fields.append(optional)
+    _ = try await store.updateItemType(withOptional)
+    _ = try await store.createItem(
+        Item(
+            itemTypeID: basic.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+            ]
+        )
+    )
+    await model.load()
+    model.selectedItemTypeID = basic.id
+
+    var riskyDraft = ItemTypeDraft(itemType: withOptional)
+    riskyDraft.fields.removeAll { $0.id == optional.id }
+    riskyDraft.fields[0].type = .richText
+    let risky = try #require(await model.schemaChangeImpact(riskyDraft, editingID: basic.id))
+    #expect(risky.requiresConfirmation)
+    #expect(risky.affectedItemCount == 1)
+    #expect(risky.removedPopulatedFields.isEmpty)
+    #expect(risky.typeChangedPopulatedFields == ["Front"])
+
+    var safeDraft = ItemTypeDraft(itemType: withOptional)
+    safeDraft.fields.removeAll { $0.id == optional.id }
+    let safe = try #require(await model.schemaChangeImpact(safeDraft, editingID: basic.id))
+    #expect(!safe.requiresConfirmation)
+    #expect(safe.removedPopulatedFields.isEmpty)
+}
+
 @Test @MainActor func templatesModelSavesNewTemplate() async throws {
     let (model, store) = try await makeTemplatesModel()
     await model.load()
