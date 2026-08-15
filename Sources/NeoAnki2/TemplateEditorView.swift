@@ -738,7 +738,9 @@ private struct ValidationMessage: View {
         Label(message, systemImage: "exclamationmark.circle.fill")
             .font(DesignSystem.Typography.uiHint)
             .foregroundStyle(Color(nsColor: .systemRed))
-            .accessibilityLabel("Error, \(message)")
+            // The focused banner announces the error context; the inline
+            // field message keeps its visible wording for local navigation.
+            .accessibilityLabel(message)
     }
 }
 
