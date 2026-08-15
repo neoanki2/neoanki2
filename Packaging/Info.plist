@@ -8,6 +8,8 @@
     <string>NeoAnki2</string>
     <key>CFBundleIdentifier</key>
     <string>com.neoanki2.app</string>
+    <key>CFBundleIconFile</key>
+    <string>NeoAnki2.icns</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>

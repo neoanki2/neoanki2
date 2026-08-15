@@ -108,10 +108,11 @@ BUILD_DIR="$(swift build "${BUILD_ARGUMENTS[@]}" --show-bin-path)"
 
 echo "Assembling $APP_NAME..."
 rm -rf "$STAGE"
-mkdir -p "$STAGE/Contents/MacOS"
+mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources"
 cp "$BUILD_DIR/NeoAnki2" "$STAGE/Contents/MacOS/NeoAnki2"
 chmod +x "$STAGE/Contents/MacOS/NeoAnki2"
 cp "$ROOT/Packaging/Info.plist" "$STAGE/Contents/Info.plist"
+cp "$ROOT/Packaging/NeoAnki2.icns" "$STAGE/Contents/Resources/NeoAnki2.icns"
 
 # Local builds have no release version to speak of, so record which commit this
 # came from. Without it, two installs a month apart are indistinguishable.
