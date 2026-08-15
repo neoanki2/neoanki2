@@ -18,7 +18,7 @@
     <meta property="og:url" content="{{ canonical_url }}">
     <meta property="og:type" content="website">
     {% if page.image %}<meta property="og:image" content="{{ site.url }}{{ site.baseurl }}{{ page.image }}">{% endif %}
-    <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}?v=7">
+    <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}?v=8">
   </head>
   <body class="page-landing{% if page.url == '/download/' %} page-download{% endif %}">
     <a class="skip-link" href="#content">Skip to content</a>
@@ -33,9 +33,15 @@
     <main id="content" tabindex="-1" class="landing-main">
       {{ content }}
     </main>
+    {% assign documentation_revision = site.data.build.commit_sha | default: site.documentation.revision %}
+    {% assign documentation_published_at = site.data.build.published_at | default: site.documentation.published_at %}
     <footer class="landing-footer">
       <a class="landing-brand landing-footer-brand" href="{{ '/' | relative_url }}" aria-label="NeoAnki2 home">NeoAnki2</a>
-      <p>Native, local-first spaced repetition for Mac, iPhone, and iPad.</p>
+      <p class="landing-footer-publication">
+        <a href="{{ site.source_url }}/tree/{{ documentation_revision }}/docs">Source revision {{ documentation_revision | slice: 0, 12 }}</a>
+        <span aria-hidden="true"> · </span>
+        Published <time datetime="{{ documentation_published_at | date_to_xmlschema }}">{{ documentation_published_at | date: "%B %-d, %Y at %H:%M UTC" }}</time>
+      </p>
       <nav aria-label="Footer">
         <a href="{{ '/user/' | relative_url }}">Guides</a>
         <a href="{{ '/download/' | relative_url }}">Download</a>

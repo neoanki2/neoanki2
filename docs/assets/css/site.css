@@ -1063,7 +1063,11 @@ pre code {
   .sequence-step-reverse .sequence-figure { order: initial; }
   .quiet-close { align-items: flex-start; flex-direction: column; }
   .landing-footer { grid-template-columns: 1fr 1fr; }
-  .landing-footer p { display: none; }
+  .landing-footer-publication {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    text-align: left;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1107,6 +1111,7 @@ pre code {
   .quiet-close { padding: 4rem 0; }
   .quiet-close-actions { width: 100%; }
   .landing-footer { grid-template-columns: 1fr; }
+  .landing-footer-publication { grid-column: auto; grid-row: auto; }
   .landing-footer nav { justify-content: flex-start; flex-wrap: wrap; }
 
   .download-heading { margin-bottom: 4rem; }
