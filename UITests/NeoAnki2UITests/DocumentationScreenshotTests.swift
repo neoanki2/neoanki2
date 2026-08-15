@@ -173,14 +173,21 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         openTemplates(in: app)
         let includedDeckGroup = app.buttons.identified("includedDeckGroup-Poetry Lab")
         XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
+        includedDeckGroup.click()
+        let includedItemType = app.descendants(matching: .any)
+            .identified("includedItemTypeRow-Poem Line")
+        XCTAssertTrue(includedItemType.waitUntilExists(timeout: 5))
+        includedItemType.click()
+        XCTAssertTrue(app.buttons.identified("unlockIncludedItemType").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "item-types",
             of: app,
-            scenario: "item types manager with a deck-grouped read-only section",
+            scenario: "deck-provided item type with its owner and unlock action",
             expectedVisibleIdentifiers: [
                 "templatesDone",
-                "itemTypeRow-Basic",
-                "includedDeckGroup-Poetry Lab",
+                "includedItemTypeOwner",
+                "unlockIncludedItemType",
+                "duplicateIncludedItemType",
             ]
         )
 
