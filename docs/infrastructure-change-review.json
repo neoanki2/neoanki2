@@ -1,12 +1,9 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "a52654ea5ec3af37a6cf060e8e84e3de2925529b960f5749a508eb6a4bb32b83",
+  "diffSHA256": "ecd2382db3bf38b9c6c57f51e75d8ecc6a29553968e1960924b60bc93957b1a2",
   "files": [
-    "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
-    "Sources/NeoAnki2/ContentView.swift",
-    "Sources/NeoAnki2/ItemEditorState.swift",
-    "Sources/NeoAnki2/StudySupport.swift",
-    "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift"
+    "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+    "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"
   ],
-  "reason": "These mapped files were reduced to compatibility adapters while their platform-neutral state, validation, and study rules moved into the new Application and Core boundaries. Existing macOS workflows and rendered states are unchanged, so the current user guides and screenshots remain accurate."
+  "reason": "These shared files add item-type ownership queries and unlock forwarding only. They do not change study queue ordering, CloudKit sync, reminders, or widgets, so the documentation for those unrelated features remains accurate."
 }

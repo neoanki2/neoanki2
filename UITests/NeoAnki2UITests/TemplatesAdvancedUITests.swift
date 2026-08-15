@@ -183,4 +183,68 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
         )
         XCTAssertTrue(app.buttons.identified("editItemType").exists)
     }
+
+    func testIncludedDefinitionCanBeUnlockedInPlace() throws {
+        let app = launchApp(scenario: "deck-included-item-types")
+        openTemplates(in: app)
+        let includedDeckGroup = app.buttons.identified("includedDeckGroup-Poetry Lab")
+        XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 5))
+        includedDeckGroup.click()
+
+        let included = app.descendants(matching: .any)
+            .identified("includedItemTypeRow-Poem Line")
+        XCTAssertTrue(included.waitUntilExists(timeout: 5))
+        included.click()
+        app.buttons.identified("unlockIncludedItemType").click()
+
+        let confirm = app.buttons.identified("confirmUnlockIncludedItemType")
+        XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
+        confirm.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .identified("itemTypeRow-Poem Line")
+                .waitUntilExists(timeout: 5)
+        )
+        XCTAssertTrue(app.buttons.identified("editItemType").exists)
+        XCTAssertFalse(app.descendants(matching: .any).identified("includedItemTypeOwner").exists)
+    }
+
+    func testPopulatedFieldRemovalRequiresExplicitConfirmation() throws {
+        let app = launchApp(scenario: "item-type-risky-edit")
+        openTemplates(in: app)
+        app.descendants(matching: .any).identified("itemTypeRow-Risky Edit").click()
+        app.buttons.identified("editItemType").click()
+
+        let removeNotes = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'removeItemTypeField-'")
+        ).element(boundBy: 2)
+        XCTAssertTrue(removeNotes.waitUntilExists(timeout: 5))
+        removeNotes.click()
+        app.buttons.identified("saveItemType").click()
+
+        let keepEditing = app.buttons.identified("cancelRiskyItemTypeChanges")
+        XCTAssertTrue(keepEditing.waitUntilExists(timeout: 3))
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "1 existing item has stored content")
+        ).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Removed: Notes.")
+        ).firstMatch.exists)
+        keepEditing.click()
+        XCTAssertTrue(app.textFields.identified("itemTypeNameField").exists)
+
+        app.buttons.identified("saveItemType").click()
+        let confirm = app.buttons.identified("confirmRiskyItemTypeChanges")
+        XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
+        confirm.click()
+        XCTAssertTrue(app.buttons.identified("editItemType").waitUntilExists(timeout: 5))
+
+        app.buttons.identified("editItemType").click()
+        XCTAssertEqual(
+            app.textFields.matching(
+                NSPredicate(format: "identifier BEGINSWITH 'itemTypeField-'")
+            ).count,
+            2
+        )
+    }
 }

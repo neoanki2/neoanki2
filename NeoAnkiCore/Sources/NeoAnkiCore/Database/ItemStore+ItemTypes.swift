@@ -107,6 +107,64 @@ public extension ItemStore {
         try await database.countItems(itemTypeID: itemTypeID)
     }
 
+    func itemTypeEditingImpact(id: UUID) async throws -> ItemTypeEditingImpact {
+        guard try await database.fetchItemType(id: id) != nil else {
+            throw DatabaseError.itemTypeNotFound(id)
+        }
+        return try await database.itemTypeEditingImpact(itemTypeID: id)
+    }
+
+    /// Adopts the existing definition into the user's editable catalog without
+    /// changing its identity, its items, or any deck policy references.
+    @discardableResult
+    func unlockItemType(id: UUID) async throws -> ItemType {
+        guard let itemType = try await database.fetchItemType(id: id) else {
+            throw DatabaseError.itemTypeNotFound(id)
+        }
+        try await database.markItemTypeAsLibrary(id)
+        return itemType
+    }
+
+    func itemTypeSchemaChangeImpact(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeSchemaChangeImpact {
+        guard existing.id == updated.id else {
+            throw DatabaseError.invalidItemType("The edited item type identity changed.")
+        }
+        let updatedFieldIDs = updated.fields.map(\.id)
+        guard Set(updatedFieldIDs).count == updatedFieldIDs.count else {
+            throw DatabaseError.invalidItemType("Item type field IDs must be unique.")
+        }
+        let updatedFields = Dictionary(uniqueKeysWithValues: updated.fields.map { ($0.id, $0) })
+        let removed = existing.fields.filter { updatedFields[$0.id] == nil }
+        let changed = existing.fields.filter { field in
+            guard let updatedField = updatedFields[field.id] else { return false }
+            return updatedField.type != field.type
+        }
+        let riskyIDs = Set((removed + changed).map(\.id))
+        guard !riskyIDs.isEmpty else {
+            return ItemTypeSchemaChangeImpact(
+                affectedItemCount: 0,
+                removedPopulatedFields: [],
+                typeChangedPopulatedFields: []
+            )
+        }
+
+        let items = try await database.fetchItems(itemTypeID: existing.id).map(\.item)
+        let populatedIDs = Set(riskyIDs.filter { fieldID in
+            items.contains { !$0.isFieldEmpty(fieldID) }
+        })
+        let affectedItems = items.filter { item in
+            populatedIDs.contains { !item.isFieldEmpty($0) }
+        }.count
+        return ItemTypeSchemaChangeImpact(
+            affectedItemCount: affectedItems,
+            removedPopulatedFields: removed.filter { populatedIDs.contains($0.id) }.map(\.name),
+            typeChangedPopulatedFields: changed.filter { populatedIDs.contains($0.id) }.map(\.name)
+        )
+    }
+
     @discardableResult
     func deleteItemType(id: UUID) async throws -> Bool {
         guard try await database.fetchItemType(id: id) != nil else { return false }

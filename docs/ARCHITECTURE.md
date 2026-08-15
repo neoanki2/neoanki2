@@ -213,6 +213,12 @@ deck. Policy lookup walks to the nearest ancestor with entries. Thus digest
 deduplication can reuse one schema without accidentally changing whether it is
 an ordinary type, an included type, or both.
 
+Unlocking a deck-provided type adds its existing identifier to
+`library_item_types`; it does not clone or migrate the definition, items, or
+deck policies. The included association remains as provenance and prevents
+incorrect cleanup. Schema edits separately inspect populated removed or
+type-changed fields so the UI can require explicit confirmation.
+
 ### Layer 3 — Memory / Scheduling
 
 ```swift

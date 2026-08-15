@@ -78,7 +78,7 @@
       "name": "Browse, author, organize, and transfer on iOS",
       "article": "user/iphone-ipad.md",
       "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/ItemTypeEditingFeatureTests.swift"]
     },
     {
       "id": "mobile-study",

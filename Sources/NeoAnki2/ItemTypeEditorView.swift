@@ -24,6 +24,7 @@ struct ItemTypeEditorView: View {
     @State private var draft: ItemTypeDraft
     @State private var isSaving = false
     @State private var showDiscardConfirmation = false
+    @State private var pendingSchemaImpact: ItemTypeSchemaChangeImpact?
 
     init(
         model: TemplatesModel,
@@ -165,6 +166,26 @@ struct ItemTypeEditorView: View {
         } message: {
             Text("Your unsaved item type changes will be lost.")
         }
+        .confirmationDialog(
+            "Save potentially destructive changes?",
+            isPresented: Binding(
+                get: { pendingSchemaImpact != nil },
+                set: { if !$0 { pendingSchemaImpact = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Save Changes", role: .destructive) {
+                pendingSchemaImpact = nil
+                Task { await persistDraft() }
+            }
+            .accessibilityIdentifier("confirmRiskyItemTypeChanges")
+            Button("Keep Editing", role: .cancel) { pendingSchemaImpact = nil }
+                .accessibilityIdentifier("cancelRiskyItemTypeChanges")
+        } message: {
+            if let pendingSchemaImpact {
+                Text(schemaImpactMessage(pendingSchemaImpact))
+            }
+        }
     }
 
     private func moveField(from index: Int, by offset: Int) {
@@ -174,6 +195,24 @@ struct ItemTypeEditorView: View {
     private func save() async {
         isSaving = true
         defer { isSaving = false }
+
+        if let editingItemType {
+            guard let impact = await model.schemaChangeImpact(
+                draft,
+                editingID: editingItemType.id
+            ) else { return }
+            if impact.requiresConfirmation {
+                pendingSchemaImpact = impact
+                return
+            }
+        }
+
+        await persistDraft(isSavingAlready: true)
+    }
+
+    private func persistDraft(isSavingAlready: Bool = false) async {
+        if !isSavingAlready { isSaving = true }
+        defer { if !isSavingAlready { isSaving = false } }
 
         let saved: Bool
         if let editingItemType {
@@ -185,6 +224,20 @@ struct ItemTypeEditorView: View {
         if saved {
             onDismiss()
         }
+    }
+
+    private func schemaImpactMessage(_ impact: ItemTypeSchemaChangeImpact) -> String {
+        var changes: [String] = []
+        if !impact.removedPopulatedFields.isEmpty {
+            changes.append("Removed: \(impact.removedPopulatedFields.joined(separator: ", ")).")
+        }
+        if !impact.typeChangedPopulatedFields.isEmpty {
+            changes.append("Type changed: \(impact.typeChangedPopulatedFields.joined(separator: ", ")).")
+        }
+        let items = impact.affectedItemCount == 1
+            ? "1 existing item has stored content in these fields."
+            : "\(impact.affectedItemCount) existing items have stored content in these fields."
+        return "\(items) That content may no longer be usable after this edit. \(changes.joined(separator: " "))"
     }
 
     private func requestDismissal() {

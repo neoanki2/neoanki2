@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-14T22:36:05Z",
+  "capturedAt" : "2026-08-15T09:34:50Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -85,13 +85,14 @@
     {
       "expectedVisibleIdentifiers" : [
         "templatesDone",
-        "itemTypeRow-Basic",
-        "includedDeckGroup-Poetry Lab"
+        "includedItemTypeOwner",
+        "unlockIncludedItemType",
+        "duplicateIncludedItemType"
       ],
       "filename" : "item-types.png",
       "height" : 680,
-      "scenario" : "item types manager with a deck-grouped read-only section",
-      "sha256" : "094db64b13a0614fbdd07eab6f02bb5b0126376636888c365751ea726a1c549e",
+      "scenario" : "deck-provided item type with its owner and unlock action",
+      "sha256" : "2a9db7debb35827a182f1742c9a49af5870677e45f55359220d55ea1fe95c9a8",
       "width" : 1024
     },
     {
@@ -124,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 680,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "08fa97b20777ff621d9138eee7e2fb35f475e5650e4ec2d0cf0c00555551fd6b",
+      "sha256" : "fbdb529187d49e5284e44e653fb8cf1d628ae8b46cb365e7830c7e0c150eee99",
       "width" : 1024
     },
     {
@@ -215,9 +216,9 @@
       "filename" : "template-editor.png",
       "height" : 708,
       "scenario" : "new template editor",
-      "sha256" : "e671188ecb7d8ddd05726c909df2e74eb7e54a741fc514e94944c42c06105beb",
+      "sha256" : "b28b388380b88ce143a73e8247bc7eebc74bafe430dbfcbef36d143d621fe684",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "7cdb239850b90212d0ac1663a97647c3d26dc590"
+  "sourceSHA" : "a988acd01eb4e51b4c5f06f6828bccb56116fd94"
 }

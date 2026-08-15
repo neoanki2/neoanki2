@@ -97,7 +97,8 @@ Multiple types without a default deliberately require the user to choose.
 
 Every type record in a version-3 bundle is included with the imported root,
 even when no deck policy offers it for new items. Included definitions stay
-out of the ordinary Item Types list unless the user explicitly duplicates one.
+out of the ordinary Item Types list until the user unlocks one for in-place
+editing or explicitly duplicates one as an independent definition.
 
 ## 6. Item-type records
 
