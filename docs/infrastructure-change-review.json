@@ -1,9 +1,8 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "ecd2382db3bf38b9c6c57f51e75d8ecc6a29553968e1960924b60bc93957b1a2",
+  "diffSHA256": "e603d30183be3bed6491ff06b514cfb7b1d301d5d0d4040a364d0cd716f1db67",
   "files": [
-    "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
-    "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"
+    "Sources/NeoAnki2/TemplatesView.swift"
   ],
-  "reason": "These shared files add item-type ownership queries and unlock forwarding only. They do not change study queue ordering, CloudKit sync, reminders, or widgets, so the documentation for those unrelated features remains accurate."
+  "reason": "This fixes an asynchronous confirmation-state race in the existing Unlock for Editing flow. It does not change any visible labels, layout, documented steps, or screenshot state, so the current item-type guide and screenshot remain accurate."
 }
