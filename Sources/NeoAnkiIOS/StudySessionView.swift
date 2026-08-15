@@ -327,7 +327,7 @@ struct StudySessionView: View {
         hint: String
     ) -> some View {
         let preview = session.schedulePreviews[rating]
-        Button {
+        return Button {
             Task { await session.grade(rating) }
         } label: {
             VStack(spacing: 2) {
