@@ -69,10 +69,10 @@ struct LibraryView: View {
                         Button("Add First Card") { isAddingItem = true }
                             .buttonStyle(.plain)
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(uiColor: .systemBackground))
                             .padding(.horizontal, 20)
                             .frame(minHeight: 44)
-                            .background(Color.accentColor, in: Capsule())
+                            .background(Color.primary, in: Capsule())
                             .contentShape(Capsule())
                     }
                     } else if visibleItems.isEmpty {

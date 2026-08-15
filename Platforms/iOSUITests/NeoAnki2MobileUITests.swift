@@ -144,10 +144,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeRight
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = launchApp(additionalArguments: [
-            "-AppleInterfaceStyle", "Dark",
-            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
-            "-UIAccessibilityDarkerSystemColorsEnabled", "YES",
-            "-UIAccessibilityReduceMotionEnabled", "YES",
+            "-NeoAnkiUITestingAccessibility",
         ])
         open("Library", in: app)
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
