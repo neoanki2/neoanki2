@@ -1,6 +1,12 @@
 import NeoAnkiCore
 import SwiftUI
 
+private struct PendingItemTypeUnlock {
+    let itemTypeID: UUID
+    let itemTypeName: String
+    let impact: ItemTypeEditingImpact
+}
+
 struct TemplatesView: View {
     @Bindable var model: TemplatesModel
     @Binding private var isTemplateEditorPresented: Bool
@@ -16,9 +22,7 @@ struct TemplatesView: View {
     @State private var expandedIncludedGroupIDs: Set<UUID> = []
     @State private var showDuplicatePrompt = false
     @State private var duplicateName = ""
-    @State private var unlockImpact: ItemTypeEditingImpact?
-    @State private var unlockItemTypeID: UUID?
-    @State private var unlockItemTypeName = ""
+    @State private var pendingUnlock: PendingItemTypeUnlock?
     @State private var isPreparingUnlock = false
     @State private var isUnlocking = false
 
@@ -139,22 +143,25 @@ struct TemplatesView: View {
             Text("The copy will be an independent, editable Item Type.")
         }
         .confirmationDialog(
-            "Unlock \(unlockItemTypeName) for editing?",
+            "Unlock \(pendingUnlock?.itemTypeName ?? "item type") for editing?",
             isPresented: Binding(
-                get: { unlockImpact != nil },
+                get: { pendingUnlock != nil },
                 set: { if !$0 { clearPendingUnlock() } }
             ),
             titleVisibility: .visible
         ) {
             Button("Unlock for Editing") {
-                Task { await unlockSelectedItemType() }
+                // Capture the request before dismissing the dialog clears its state.
+                guard let request = pendingUnlock else { return }
+                clearPendingUnlock()
+                Task { await unlockItemType(id: request.itemTypeID) }
             }
             .accessibilityIdentifier("confirmUnlockIncludedItemType")
             Button("Cancel", role: .cancel) { clearPendingUnlock() }
                 .accessibilityIdentifier("cancelUnlockIncludedItemType")
         } message: {
-            if let unlockImpact {
-                Text(unlockImpactMessage(unlockImpact))
+            if let impact = pendingUnlock?.impact {
+                Text(unlockImpactMessage(impact))
             }
         }
     }
@@ -448,14 +455,15 @@ struct TemplatesView: View {
         isPreparingUnlock = true
         defer { isPreparingUnlock = false }
         guard let impact = await model.editingImpact(itemTypeID: itemType.id) else { return }
-        unlockItemTypeID = itemType.id
-        unlockItemTypeName = itemType.name
-        unlockImpact = impact
+        pendingUnlock = PendingItemTypeUnlock(
+            itemTypeID: itemType.id,
+            itemTypeName: itemType.name,
+            impact: impact
+        )
     }
 
-    private func unlockSelectedItemType() async {
-        guard !isUnlocking, let itemTypeID = unlockItemTypeID else { return }
-        clearPendingUnlock()
+    private func unlockItemType(id itemTypeID: UUID) async {
+        guard !isUnlocking else { return }
         isUnlocking = true
         defer { isUnlocking = false }
         if await model.unlockItemType(id: itemTypeID) {
@@ -465,9 +473,7 @@ struct TemplatesView: View {
     }
 
     private func clearPendingUnlock() {
-        unlockImpact = nil
-        unlockItemTypeID = nil
-        unlockItemTypeName = ""
+        pendingUnlock = nil
     }
 
     private func unlockImpactMessage(_ impact: ItemTypeEditingImpact) -> String {
