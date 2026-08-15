@@ -201,6 +201,9 @@ struct TemplateEditorView: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(editor.isSaving)
                 .accessibilityIdentifier("saveTemplate")
+                // Keep the prominent hit target inside short CI and compact
+                // macOS toolbar bounds instead of letting its trailing edge clip.
+                .padding(.trailing, DesignSystem.Spacing.md)
         }
     }
 
