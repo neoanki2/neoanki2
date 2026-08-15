@@ -67,8 +67,13 @@ struct LibraryView: View {
                             .foregroundStyle(.primary)
                     } actions: {
                         Button("Add First Card") { isAddingItem = true }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
+                            .buttonStyle(.plain)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .frame(minHeight: 44)
+                            .background(Color.accentColor, in: Capsule())
+                            .contentShape(Capsule())
                     }
                     } else if visibleItems.isEmpty {
                         ContentUnavailableView.search(text: searchText)
