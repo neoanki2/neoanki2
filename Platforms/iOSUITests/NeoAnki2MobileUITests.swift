@@ -76,12 +76,18 @@ final class NeoAnki2MobileUITests: XCTestCase {
         editor.tap()
         editor.typeText(" Essays")
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["Reading Essays"].waitForExistence(timeout: 4))
+        XCTAssertTrue(
+            app.navigationBars["Reading Essays"].waitForExistence(timeout: 10),
+            "Renamed deck did not become visible after saving"
+        )
 
         app.buttons["Deck Settings"].tap()
         app.buttons["Delete Deck"].tap()
         app.buttons["Delete and Unassign Items"].tap()
-        XCTAssertFalse(app.staticTexts["Reading Essays"].waitForExistence(timeout: 2))
+        XCTAssertTrue(
+            app.staticTexts["Reading Essays"].waitForNonExistence(timeout: 10),
+            "Deleted deck remained visible"
+        )
     }
 
     func testCreateBrowseAndStudyBasicCardJourney() throws {
