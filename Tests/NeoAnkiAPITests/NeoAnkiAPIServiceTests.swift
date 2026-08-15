@@ -1849,20 +1849,20 @@ private func pairWithAuthority(
     #expect(content.status == 200)
     #expect((try jsonObject(content)["prompt"] as? [Any])?.isEmpty == false)
 
-    let cursorBefore = try await api.handle(
+    let cursorBefore = await api.handle(
         request(.get, "/v1/changes", headers: auth)
     ).body
     let preview = await api.handle(
         request(.get, "/v1/cards/\(cardID)/review-preview", headers: auth)
     )
     #expect(preview.status == 200)
-    let cursorAfter = try await api.handle(
+    let cursorAfter = await api.handle(
         request(.get, "/v1/changes", headers: auth)
     ).body
     #expect(cursorBefore == cursorAfter)
 
     var suspendHeaders = auth
-    suspendHeaders["If-Match"] = try #require(content.headers["ETag"])
+    suspendHeaders["If-Match"] = content.headers["ETag"]
     let suspended = await api.handle(
         request(
             .patch,
@@ -1878,7 +1878,7 @@ private func pairWithAuthority(
         .replacingOccurrences(of: "\"id\":\"\(itemID)\",", with: "")
         .replacingOccurrences(of: "\"Front\"", with: "\"Updated front\"")
     var updateHeaders = auth
-    updateHeaders["If-Match"] = try #require(created.headers["ETag"])
+    updateHeaders["If-Match"] = created.headers["ETag"]
     let updated = await api.handle(
         request(.put, "/v1/items/\(itemID)", headers: updateHeaders, body: updateBody)
     )
@@ -1921,7 +1921,7 @@ private func pairWithAuthority(
     #expect(cardAfterTagRemoval == cardBeforeTagRemoval)
 
     var deleteHeaders = auth
-    deleteHeaders["If-Match"] = try #require(afterTagRemoval.headers["ETag"])
+    deleteHeaders["If-Match"] = afterTagRemoval.headers["ETag"]
     let deleted = await api.handle(
         request(.delete, "/v1/items/\(itemID)", headers: deleteHeaders)
     )
@@ -2098,7 +2098,7 @@ private func pairWithAuthority(
     )).status == 404)
 
     var deleteHeaders = auth(deleteToken)
-    deleteHeaders["If-Match"] = try #require(detail.headers["ETag"])
+    deleteHeaders["If-Match"] = detail.headers["ETag"]
     deleteHeaders["Idempotency-Key"] = "delete-private-response"
     let deleted = await api.handle(request(
         .delete, "/v1/study-responses/\(targetID)", headers: deleteHeaders
@@ -2120,7 +2120,7 @@ private func pairWithAuthority(
         headers: auth(itemToken)
     ))
     var sourceDeleteHeaders = auth(itemToken)
-    sourceDeleteHeaders["If-Match"] = try #require(itemDetail.headers["ETag"])
+    sourceDeleteHeaders["If-Match"] = itemDetail.headers["ETag"]
     let needsConfirmation = await api.handle(request(
         .delete,
         "/v1/items/\(sourceResponse.itemID.uuidString.lowercased())",
@@ -2216,7 +2216,7 @@ private func pairWithAuthority(
         encoding: .utf8
     )!
     var updateHeaders = auth
-    updateHeaders["If-Match"] = try #require(duplicate.headers["ETag"])
+    updateHeaders["If-Match"] = duplicate.headers["ETag"]
     let added = await api.handle(
         request(.put, "/v1/item-types/\(typeID)", headers: updateHeaders, body: addTemplateBody)
     )
@@ -2240,7 +2240,7 @@ private func pairWithAuthority(
         encoding: .utf8
     )!
     var impactHeaders = auth
-    impactHeaders["If-Match"] = try #require(added.headers["ETag"])
+    impactHeaders["If-Match"] = added.headers["ETag"]
     let needsConfirmation = await api.handle(
         request(
             .put,
@@ -2267,7 +2267,7 @@ private func pairWithAuthority(
     #expect(try await store.itemRecord(id: item.id).cardIDs.count == 1)
 
     var deleteHeaders = auth
-    deleteHeaders["If-Match"] = try #require(confirmed.headers["ETag"])
+    deleteHeaders["If-Match"] = confirmed.headers["ETag"]
     let inUse = await api.handle(
         request(.delete, "/v1/item-types/\(typeID)", headers: deleteHeaders)
     )
@@ -2407,7 +2407,7 @@ private func pairWithAuthority(
 
     let itemOneID = try #require(try jsonObject(itemOne)["id"] as? String)
     var deleteHeaders = auth
-    deleteHeaders["If-Match"] = try #require(itemOne.headers["ETag"])
+    deleteHeaders["If-Match"] = itemOne.headers["ETag"]
     #expect(await api.handle(
         request(.delete, "/v1/items/\(itemOneID)", headers: deleteHeaders)
     ).status == 204)
@@ -2790,7 +2790,7 @@ private func pairWithAuthority(
         #expect(impact["reviewLogCount"] as? Int == 1)
         #expect(impact["mediaReferenceCount"] as? Int == 0)
         plans[policy] = object
-        planETags[policy] = try #require(response.headers["ETag"])
+        planETags[policy] = response.headers["ETag"]
     }
 
     let rejectID = try #require(plans["rejectIfNonempty"]?["id"] as? String)
