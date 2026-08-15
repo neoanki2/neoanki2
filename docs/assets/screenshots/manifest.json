@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-15T11:28:52Z",
+  "capturedAt" : "2026-08-15T18:54:11Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 680,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "a6c94c357541d54dd8f8dfa63319d832db70fbddedbcbc0c292c196d4ee99591",
+      "sha256" : "039fa24c20424575b02831c6162c83397faa0beea45b97b3a18e67c6d4b2da32",
       "width" : 1024
     },
     {
@@ -92,7 +92,7 @@
       "filename" : "item-types.png",
       "height" : 680,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "c3a81d5d578a1443c2698bd2ad8982cb108df3f6c2bc6c7d0f77459fbf85b312",
+      "sha256" : "2a9db7debb35827a182f1742c9a49af5870677e45f55359220d55ea1fe95c9a8",
       "width" : 1024
     },
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 680,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "fbdb529187d49e5284e44e653fb8cf1d628ae8b46cb365e7830c7e0c150eee99",
+      "sha256" : "08fa97b20777ff621d9138eee7e2fb35f475e5650e4ec2d0cf0c00555551fd6b",
       "width" : 1024
     },
     {
@@ -204,7 +204,7 @@
       "filename" : "template-advanced.png",
       "height" : 680,
       "scenario" : "Study-Stage Builder Generation and Skill inspector",
-      "sha256" : "041c24eacad07c578fc9eb5ae65ad62d00a6e1486f5439d7b5ac41daa1750bb5",
+      "sha256" : "72e140a3814ad6691f229964c6d03bfc27c7f6e596a0d4a4adfa819c5f496cac",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "0dc60713bd56429daaa401d9002b028a69850bf8"
+  "sourceSHA" : "dfeedfd336924703e8a3e771072c1d7dc3c1f878"
 }
