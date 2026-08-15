@@ -186,12 +186,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
 
         app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
         app.buttons.identified("addTemplateToolbar").click()
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .identified("templateNameField")
-                .waitUntilExists(timeout: 5),
-            app.debugDescription
-        )
+        XCTAssertTrue(app.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "template-editor",
             of: app,
@@ -202,12 +197,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
         openTemplateEditor(named: "Card", in: advancedApp)
-        XCTAssertTrue(
-            advancedApp.descendants(matching: .any)
-                .identified("templateNameField")
-                .waitUntilExists(timeout: 5),
-            advancedApp.debugDescription
-        )
+        XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
         let advancedSettings = advancedApp.descendants(matching: .any)
             .identified("templateAdvancedSettings")
         XCTAssertTrue(advancedSettings.waitUntilExists(timeout: 5))
