@@ -1,6 +1,7 @@
 ---
 title: iPhone and iPad
-description: Build, navigate, study, author, and transfer content with NeoAnki2 on iOS and iPadOS.
+description: Navigate, study, author, and transfer content with NeoAnki2 on iOS and iPadOS.
+audience: user
 nav_order: 2
 parent: User Guide
 permalink: /user/iphone-ipad/
@@ -15,12 +16,12 @@ window at a smaller size.
 
 There is currently no public App Store listing or TestFlight invitation. The
 official public download is the Mac release. Maintainers can build and archive
-the mobile targets from source; see the [iOS release checklist][ios-release].
+the mobile targets from source; see the
+[iOS release checklist]({{ '/IOS_RELEASE/' | relative_url }}).
 
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
 
-- [Build a development app](#build-a-development-app)
 - [Navigate on iPhone and iPad](#navigate-on-iphone-and-ipad)
 - [Study](#study)
 - [Author and organize](#author-and-organize)
@@ -28,20 +29,9 @@ the mobile targets from source; see the [iOS release checklist][ios-release].
 - [Mobile data and feature boundaries](#mobile-data-and-feature-boundaries)
 </nav>
 
-## Build a development app
-
-From a checkout with Xcode 26 and an iOS 17 or newer SDK, run:
-
-```bash
-./Scripts/build-ios.sh
-```
-
-This performs the repository's unsigned build validation for the iPhone/iPad
-app and embedded WidgetKit extension. It does not install a build on a physical
-device and does not create a distributable IPA. Running on hardware, CloudKit,
-push updates, widgets, and TestFlight require the Apple identifiers,
-entitlements, App Group, iCloud container, and profiles listed in the
-[release checklist][ios-release].
+Maintainers can follow the [development setup](../developer/setup/) and
+[iOS release checklist]({{ '/IOS_RELEASE/' | relative_url }}) for unsigned builds, devices, CloudKit,
+widgets, and TestFlight.
 
 ## Navigate on iPhone and iPad
 
@@ -123,5 +113,3 @@ keyboard command menus are not mobile features.
 
 Continue with [iCloud, reminders, and widgets](../sync-reminders-widgets/) or
 the [first study session](../first-study-session/).
-
-[ios-release]: https://github.com/neoanki2/neoanki2/blob/main/IOS_RELEASE.md

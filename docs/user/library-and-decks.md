@@ -1,6 +1,7 @@
 ---
 title: Library and decks
 description: Create, nest, rename, select, and safely remove decks while understanding All Decks and Unassigned.
+audience: user
 nav_order: 2
 parent: User Guide
 ---

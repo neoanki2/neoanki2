@@ -1,6 +1,7 @@
 ---
 title: User guide
 description: Navigate NeoAnki2 guides by starting point, user goal, concept, or problem.
+audience: user
 nav_order: 2
 permalink: /user/
 ---
@@ -42,8 +43,8 @@ goal or explanation you need.
 ## Advanced
 
 - [Deck authoring CLI](cli/)
-- [Maintain this documentation](maintaining-documentation/)
 - [Implementation and file-format reference](../reference/)
+- [Developer guide](developer/)
 
 ---
 

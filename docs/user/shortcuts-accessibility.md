@@ -1,6 +1,7 @@
 ---
 title: Shortcuts and accessibility
 description: Use NeoAnki2 by keyboard and distinguish automated accessibility coverage from unverified behavior.
+audience: user
 nav_order: 9
 parent: User Guide
 ---

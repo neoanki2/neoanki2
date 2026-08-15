@@ -1,12 +1,17 @@
 ---
 title: Documentation quality audit — July 2026
 description: Final adversarial assessment of NeoAnki2 documentation accuracy, task coverage, accessibility, evidence, and maintenance controls.
+audience: developer
+archived: true
 permalink: /audits/state-of-art-2026-07-27/
 ---
 
 # Documentation quality audit — July 2026
 
-**Result: 9.2/10, publication ready with disclosed limitations.**
+> **Archived snapshot.** This score described the July 27, 2026 tree. It is not
+> current project status; see the [August documentation audit]({{ '/audits/documentation-2026-08-15/' | relative_url }}).
+
+**Result at the time: 9.2/10, publication ready with disclosed limitations.**
 
 This audit assessed the documentation as a product, not only as a collection of
 pages. Reviewers attempted first-run, migration, recovery, deck-authoring,

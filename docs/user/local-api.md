@@ -1,6 +1,7 @@
 ---
 title: Local automation API
 description: Enable the loopback API, approve least-privilege clients, manage access, and diagnose connections safely.
+audience: user
 nav_order: 10
 parent: User Guide
 ---
@@ -135,9 +136,12 @@ curl --fail --silent \
   http://127.0.0.1:8766/v1/clients/current
 ```
 
-The API contract is available from `GET /v1/openapi.json`. Mutating clients
-must follow its `If-Match` and `Idempotency-Key` requirements; retrying a write
-without those controls can produce a revision conflict or be rejected.
+The [generated API reference]({{ '/api/' | relative_url }}) documents every
+endpoint, parameter, scope, response, and shared error. Its downloadable
+OpenAPI document is byte-for-byte identical to `GET /v1/openapi.json` from the
+app. Mutating clients must follow its `If-Match` and `Idempotency-Key`
+requirements; retrying a write without those controls can produce a revision
+conflict or be rejected.
 
 ## Inspect or revoke access
 
@@ -186,4 +190,5 @@ a token must be represented, use a fixed placeholder such as
 
 ---
 
-**Reference:** [Normative local API requirements]({{ '/LOCAL_API/' | relative_url }})
+**References:** [Generated endpoint reference]({{ '/api/' | relative_url }}) ·
+[Internal design requirements]({{ '/LOCAL_API/' | relative_url }})

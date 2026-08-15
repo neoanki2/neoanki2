@@ -1,6 +1,7 @@
 ---
 title: "Proposal: persistent spoken responses"
 description: Accepted design for local-only, persistent Audio Submission responses.
+audience: developer
 ---
 
 # Persistent spoken responses

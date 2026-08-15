@@ -1,7 +1,8 @@
 ---
 title: Local API acceptance evidence
 description: Reproducible test commands and criterion-to-suite traceability for the version-1 local API release gate.
-parent: Reference
+audience: developer
+parent: Developer Guide
 ---
 
 # Local API acceptance evidence

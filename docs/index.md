@@ -2,6 +2,7 @@
 layout: landing
 title: Native spaced repetition for Apple devices
 description: Model knowledge once, practice it in multiple ways, and let modern FSRS scheduling decide when each review returns.
+audience: user
 image: /assets/screenshots/template-advanced.png
 nav_order: 1
 ---

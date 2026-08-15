@@ -1,8 +1,10 @@
 header:
   - title: Guides
     url: /user/
-  - title: Reference
-    url: /reference/
+  - title: API
+    url: /api/
+  - title: Develop
+    url: /user/developer/
   - title: Download
     url: /download/
   - title: GitHub
@@ -52,7 +54,7 @@ primary:
     children:
       - title: Troubleshooting
         url: /user/troubleshooting/
-      - title: Build, launch, and support
+      - title: Support and issue reporting
         url: /user/support/
   - title: Advanced authoring
     url: /user/item-types-and-templates/
@@ -64,38 +66,69 @@ primary:
   - title: Feature index
     short_title: Features
     url: /features/
+  - title: API
+    url: /api/
+    children:
+      - title: API overview
+        url: /api/
+      - title: Authentication and clients
+        url: /api/authentication/
+      - title: Decks
+        url: /api/decks/
+      - title: Item types
+        url: /api/item-types/
+      - title: Items and tags
+        url: /api/items-and-tags/
+      - title: Cards and study
+        url: /api/cards-and-study/
+      - title: Responses and media
+        url: /api/responses-and-media/
+      - title: Vocabulary
+        url: /api/vocabulary/
+      - title: Import and export
+        url: /api/import-and-export/
+      - title: Changes and events
+        url: /api/changes-and-events/
+      - title: Schemas and errors
+        url: /api/schemas/
+  - title: Develop
+    url: /user/developer/
+    children:
+      - title: Developer guide
+        url: /user/developer/
+      - title: Development setup
+        url: /user/developer/setup/
+      - title: Tests and validation
+        url: /user/developer/testing/
+      - title: Local API development
+        url: /user/developer/api-development/
+      - title: Documentation development
+        url: /user/developer/documentation/
+      - title: Architecture
+        url: /ARCHITECTURE/
+      - title: Design system
+        url: /DESIGN/
+      - title: Product model
+        url: /PRODUCT/
+      - title: Release process
+        url: /RELEASING/
+      - title: iOS release checklist
+        url: /IOS_RELEASE/
   - title: Reference
     url: /reference/
     children:
-      - title: Product model
-        url: /PRODUCT/
-      - title: Architecture
-        url: /ARCHITECTURE/
-      - title: Local API requirements
-        url: /LOCAL_API/
-      - title: Vocabulary API requirements
-        url: /VOCABULARY_API/
-      - title: Design system
-        url: /DESIGN/
+      - title: Local HTTP API
+        url: /api/
       - title: Authored deck format
         url: /AUTHORED_DECK_FORMAT/
       - title: Portable deck format
         url: /PORTABLE_DECK_FORMAT/
-      - title: Offline vocabulary packs
-        url: /OFFLINE_VOCABULARY/
       - title: LLM deck authoring
         url: /LLM_DECK_AUTHORING/
       - title: JSON Schemas
         url: /schemas/
       - title: Example deck
         url: /examples/
-  - title: Contribute
-    url: /user/maintaining-documentation/
-    children:
-      - title: Maintaining documentation
-        url: /user/maintaining-documentation/
-      - title: Documentation quality audit
-        url: /audits/state-of-art-2026-07-27/
   - title: GitHub
     url: https://github.com/neoanki2/neoanki2
     external: true

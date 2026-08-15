@@ -1,7 +1,8 @@
 ---
 title: Deck builder addons
 description: Extend NeoAnki with bundled or external deck builders without adding subject-specific behavior to Core.
-parent: Architecture
+audience: developer
+parent: Developer Guide
 ---
 
 # Deck builder addons

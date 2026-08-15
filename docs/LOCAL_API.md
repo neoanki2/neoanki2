@@ -1,7 +1,8 @@
 ---
 title: Local API requirements
 description: Normative requirements and acceptance criteria for the versioned NeoAnki local automation API.
-parent: Reference
+audience: developer
+parent: Developer Guide
 ---
 
 # NeoAnki Local API Requirements

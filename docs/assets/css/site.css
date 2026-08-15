@@ -1028,6 +1028,14 @@ pre code {
   word-break: normal;
 }
 
+.page-api main :is(h2, h3) {
+  overflow-wrap: anywhere;
+}
+
+.page-api main > * {
+  max-width: 100%;
+}
+
 @media (prefers-color-scheme: dark) {
   .page-landing .button-primary {
     background: var(--accent);

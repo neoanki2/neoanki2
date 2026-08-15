@@ -1,3 +1,11 @@
+---
+title: Releasing NeoAnki2
+description: Validate, package, attest, publish, and install a NeoAnki2 release.
+audience: developer
+parent: Developer Guide
+permalink: /RELEASING/
+---
+
 # Releasing NeoAnki2
 
 Official releases use a slow preparation phase and a queue-free promotion

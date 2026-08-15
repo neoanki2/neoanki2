@@ -1,6 +1,7 @@
 ---
 title: iCloud, Reminders, and Widgets
 description: Opt in to private CloudKit sync, recover sync issues, schedule due-card reminders, and use the iOS widget.
+audience: user
 nav_order: 8
 parent: User Guide
 permalink: /user/sync-reminders-widgets/

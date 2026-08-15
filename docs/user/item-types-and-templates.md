@@ -1,6 +1,7 @@
 ---
 title: Item Types and Templates
 description: Define reusable fields and templates that generate accessible, interactive study cards.
+audience: user
 nav_order: 4
 parent: User Guide
 ---

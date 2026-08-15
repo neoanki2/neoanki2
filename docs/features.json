@@ -366,6 +366,13 @@
       "tests": ["Tests/NeoAnki2Tests/APIControlModelTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift", "Tests/NeoAnkiVocabularyKitTests/NeoAnkiVocabularyKitTests.swift"]
     },
     {
+      "id": "local-http-api-contract",
+      "name": "Integrate with the local HTTP API contract",
+      "article": "api/index.md",
+      "sources": ["Sources/NeoAnkiAPI/APIEndpointRegistry.swift", "Sources/NeoAnkiAPI/APIOpenAPI.swift", "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift"],
+      "tests": ["Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
+    },
+    {
       "id": "offline-vocabulary",
       "name": "Install and use offline vocabulary packs",
       "article": "user/import-export.md",

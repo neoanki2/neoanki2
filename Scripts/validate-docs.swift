@@ -348,17 +348,12 @@ if requireScreenshots {
     if ISO8601DateFormatter().date(from: screenshotManifest.capturedAt) == nil {
         fail("Screenshot manifest capturedAt must be an ISO-8601 timestamp")
     }
-    let ancestryCheck = Process()
-    ancestryCheck.currentDirectoryURL = root
-    ancestryCheck.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-    ancestryCheck.arguments = [
-        "merge-base", "--is-ancestor", screenshotManifest.sourceSHA, "HEAD",
-    ]
     do {
-        try ancestryCheck.run()
-        ancestryCheck.waitUntilExit()
-        if ancestryCheck.terminationStatus != 0 {
-            fail("Screenshot manifest sourceSHA is not an ancestor of the validated revision")
+        let sourceRevision = try gitOutput(
+            arguments: ["cat-file", "-e", screenshotManifest.sourceSHA + "^{commit}"]
+        )
+        if sourceRevision.status != 0 {
+            fail("Screenshot manifest sourceSHA is not an available Git commit")
         }
     } catch {
         fail("Could not verify screenshot manifest source revision")
@@ -506,6 +501,7 @@ func featureIndex(_ features: [Feature]) -> String {
     ---
     title: Feature index
     description: Coverage map from every NeoAnki2 feature to its guide, implementation, tests, and screenshot.
+    audience: developer
     nav_order: 3
     permalink: /features/
     ---
@@ -531,7 +527,9 @@ func featureIndex(_ features: [Feature]) -> String {
     | --- | --- | --- | --- | --- |
     """
     for feature in features.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) {
-        let article = feature.article.replacingOccurrences(of: ".md", with: "/")
+        let article = feature.article.hasSuffix("/index.md")
+            ? feature.article.replacingOccurrences(of: "/index.md", with: "/")
+            : feature.article.replacingOccurrences(of: ".md", with: "/")
         let sourceLinks = feature.sources.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/{{ source_revision }}/\($0))" }.joined(separator: "<br>")
         let testLinks = feature.tests.map { "[`\($0.split(separator: "/").last!)`](https://github.com/neoanki2/neoanki2/blob/{{ source_revision }}/\($0))" }.joined(separator: "<br>")
         let screenshot = feature.screenshot.map { "[View](../\($0))" } ?? "—"
@@ -557,6 +555,90 @@ let enumerator = fileManager.enumerator(
     options: [.skipsHiddenFiles]
 )
 let markdownFiles = (enumerator?.allObjects as? [URL] ?? []).filter { $0.pathExtension == "md" }
+
+func frontMatterValue(_ key: String, in text: String) -> String? {
+    let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+    guard lines.first == "---",
+          let closingIndex = lines.dropFirst().firstIndex(where: { $0 == "---" }) else {
+        return nil
+    }
+    let prefix = "\(key):"
+    guard let line = lines[1..<closingIndex].first(where: { $0.hasPrefix(prefix) }) else {
+        return nil
+    }
+    return line.dropFirst(prefix.count)
+        .trimmingCharacters(in: .whitespaces)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+}
+
+func publishedRoute(for relativePath: String, text: String) -> String {
+    if let permalink = frontMatterValue("permalink", in: text) {
+        return permalink
+    }
+    let sourcePath = String(relativePath.dropLast(3))
+    if sourcePath == "index" {
+        return "/"
+    }
+    if sourcePath.hasSuffix("/index") {
+        return "/\(sourcePath.dropLast(6))/"
+    }
+    return "/\(sourcePath)/"
+}
+
+let allowedAudiences = Set(["user", "api", "developer", "reference"])
+let navigationURL = docs.appendingPathComponent("_data/navigation.yml")
+let navigationText = (try? String(contentsOf: navigationURL, encoding: .utf8)) ?? ""
+let hubPaths = [
+    "user/index.md",
+    "user/developer/index.md",
+    "api/index.md",
+    "reference/index.md",
+]
+let hubText = hubPaths.compactMap {
+    try? String(contentsOf: docs.appendingPathComponent($0), encoding: .utf8)
+}.joined(separator: "\n")
+
+let repositoryLinkPattern = try! NSRegularExpression(
+    pattern: #"https://github\.com/neoanki2/neoanki2/(?:blob|tree)/([A-Za-z0-9._-]+)/([^\s)#?]+)"#
+)
+
+for file in markdownFiles {
+    guard let text = try? String(contentsOf: file, encoding: .utf8) else {
+        fail("Could not read \(file.path)")
+        continue
+    }
+    let relativePath = file.path.replacingOccurrences(of: docs.path + "/", with: "")
+    if relativePath == "README.md" {
+        continue
+    }
+    guard text.hasPrefix("---\n") else {
+        fail("\(relativePath) is published without YAML front matter")
+        continue
+    }
+    guard let audience = frontMatterValue("audience", in: text),
+          allowedAudiences.contains(audience) else {
+        fail("\(relativePath) must declare audience: user, api, developer, or reference")
+        continue
+    }
+
+    let route = publishedRoute(for: relativePath, text: text)
+    let archived = frontMatterValue("archived", in: text) == "true"
+    let specialPage = relativePath == "404.md"
+    let inNavigation = navigationText.contains("url: \(route)")
+    let ownedByHub = hubText.contains("'\(route)'") || hubText.contains("\"\(route)\"")
+    if !archived && !specialPage && !inNavigation && !ownedByHub {
+        fail("\(relativePath) (\(route)) is not reachable from navigation or an owning hub")
+    }
+
+    let range = NSRange(text.startIndex..., in: text)
+    for match in repositoryLinkPattern.matches(in: text, range: range) {
+        guard let pathRange = Range(match.range(at: 2), in: text) else { continue }
+        let path = String(text[pathRange]).removingPercentEncoding ?? String(text[pathRange])
+        if !exists(path) {
+            fail("\(relativePath) links to a missing path in this repository: \(path)")
+        }
+    }
+}
 
 let linkPattern = try! NSRegularExpression(pattern: #"(!?)\[[^\]]*\]\(([^)]+)\)"#)
 for file in markdownFiles {

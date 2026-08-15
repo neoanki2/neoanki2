@@ -24,19 +24,16 @@ Maintainers can prepare locally before the first push or use an attested CI
 candidate; see [the release procedure](docs/RELEASING.md).
 
 For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the
-repository and run:
+repository and run the supported headless loop:
 
 ```bash
-./Scripts/run-app.sh
+swift build
+./Scripts/test-fast.sh
 ```
 
-That builds and launches a debug macOS bundle from the checkout. Maintainers can
-also install the current source revision into `/Applications` for pre-release
-testing:
-
-```bash
-./Scripts/install-app.sh --restart
-```
+The [Developer Guide](https://neoanki2.github.io/user/developer/) covers
+architecture, focused checks, interactive app runs, API changes, documentation,
+and releases.
 
 The full iPhone and iPad app requires iOS/iPadOS 17 or newer. Build the app and
 WidgetKit extension headlessly with:
@@ -86,6 +83,8 @@ The published manual is available at
 Documentation is versioned with the source in [`docs/`](docs/):
 
 - [User guide](https://neoanki2.github.io/user/) — every app feature, workflow, shortcut, and limitation
+- [Local HTTP API reference](https://neoanki2.github.io/api/) — generated endpoints, schemas, examples, and OpenAPI JSON
+- [Developer guide](https://neoanki2.github.io/user/developer/) — setup, architecture, tests, API changes, docs, and releases
 - [Feature index](https://neoanki2.github.io/features/) — source- and test-backed coverage map
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — domain model, learning-science mapping, FSRS rationale
 - [`docs/AUTHORED_DECK_FORMAT.md`](docs/AUTHORED_DECK_FORMAT.md) — import-only JSONL deck source format
@@ -93,3 +92,7 @@ Documentation is versioned with the source in [`docs/`](docs/):
 - [`docs/DESIGN.md`](docs/DESIGN.md) — visual design system (SwiftUI shell)
 - [`docs/LLM_DECK_AUTHORING.md`](docs/LLM_DECK_AUTHORING.md) — coding-agent deck authoring workflow
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product context for design and UX work
+
+The supported headless contributor loop is `swift build` followed by
+`./Scripts/test-fast.sh`; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
+contract-generation commands required by API changes.

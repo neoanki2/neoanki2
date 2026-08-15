@@ -1,7 +1,8 @@
 ---
 title: Vocabulary API requirements
 description: Normative version-1 contract for discovering, querying, installing, and removing managed offline vocabulary packs.
-parent: Reference
+audience: developer
+parent: Developer Guide
 ---
 
 # Vocabulary API requirements

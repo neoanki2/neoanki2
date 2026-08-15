@@ -928,49 +928,13 @@ private func pairWithAuthority(
     let actual = Set(paths.flatMap { path, item in
         item.keys.map { "\($0.uppercased()) \(path)" }
     })
-    let expected: Set<String> = [
-        "GET /health", "GET /v1/meta", "GET /v1/openapi.json", "POST /v1/pairings",
-        "GET /v1/clients/current", "DELETE /v1/clients/current",
-        "GET /v1/decks", "POST /v1/decks", "GET /v1/decks/{id}", "PATCH /v1/decks/{id}",
-        "POST /v1/deck-deletion-plans", "POST /v1/deck-deletion-plans/{id}/commits",
-        "POST /v1/deck-reset-plans", "POST /v1/deck-reset-plans/{id}/commits",
-        "GET /v1/decks/{id}/item-type-policy",
-        "GET /v1/item-types", "POST /v1/item-types", "POST /v1/item-types/validate",
-        "GET /v1/item-types/{id}", "PUT /v1/item-types/{id}", "DELETE /v1/item-types/{id}",
-        "POST /v1/item-types/{id}/duplicate",
-        "GET /v1/items", "POST /v1/items", "POST /v1/items/validate", "POST /v1/items/bulk",
-        "GET /v1/items/{id}", "PUT /v1/items/{id}", "DELETE /v1/items/{id}",
-        "POST /v1/items/{id}/duplicate-checks", "GET /v1/tags", "POST /v1/tag-renames",
-        "DELETE /v1/tags/{encodedTag}",
-        "GET /v1/cards", "GET /v1/cards/{id}", "PATCH /v1/cards/{id}",
-        "GET /v1/cards/{id}/content", "GET /v1/cards/{id}/review-preview",
-        "POST /v1/cards/{id}/resets",
-        "POST /v1/study-sessions", "GET /v1/study-sessions/{id}",
-        "DELETE /v1/study-sessions/{id}", "POST /v1/study-sessions/{id}/next",
-        "POST /v1/study-sessions/{id}/skips", "POST /v1/reviews",
-        "POST /v1/reviews/{reviewLogId}/reverts",
-        "GET /v1/study-responses", "GET /v1/study-responses/{id}",
-        "DELETE /v1/study-responses/{id}",
-        "GET /v1/study-responses/{id}/content", "HEAD /v1/study-responses/{id}/content",
-        "POST /v1/media", "HEAD /v1/media/{sha256}", "GET /v1/media/{sha256}",
-        "GET /v1/media/{sha256}/metadata",
-        "GET /v1/vocabulary-packs", "GET /v1/vocabulary-packs/{id}",
-        "DELETE /v1/vocabulary-packs/{id}",
-        "GET /v1/vocabulary-packs/{id}/entries",
-        "GET /v1/vocabulary-packs/{id}/entries/{entryId}",
-        "GET /v1/vocabulary-packs/{id}/media", "HEAD /v1/vocabulary-packs/{id}/media",
-        "POST /v1/vocabulary-pack-imports", "GET /v1/vocabulary-pack-imports/{id}",
-        "DELETE /v1/vocabulary-pack-imports/{id}",
-        "PUT /v1/vocabulary-pack-imports/{id}/files/{fileId}",
-        "POST /v1/vocabulary-pack-imports/{id}/validations",
-        "POST /v1/vocabulary-pack-imports/{id}/commits",
-        "POST /v1/imports", "GET /v1/imports/{id}", "DELETE /v1/imports/{id}",
-        "PUT /v1/imports/{id}/files/{fileId}", "POST /v1/imports/{id}/validations",
-        "POST /v1/imports/{id}/commits", "POST /v1/exports", "GET /v1/exports/{id}",
-        "DELETE /v1/exports/{id}", "GET /v1/exports/{id}/content",
-        "GET /v1/changes", "GET /v1/events",
-    ]
-    #expect(actual == expected)
+    let registered = Set(APIOpenAPI.endpoints.map {
+        "\($0.method.rawValue) \($0.pathTemplate)"
+    })
+    #expect(actual == registered)
+    #expect(Set(APIOpenAPI.endpoints.map(\.handler)) == Set(APIEndpointHandler.allCases))
+    #expect(APIOpenAPI.endpoints.count == APIEndpointHandler.allCases.count)
+    #expect(Set(APIOpenAPI.endpoints.map(\.operationID)).count == APIOpenAPI.endpoints.count)
 
     let vocabularySearchPath = try #require(
         paths["/v1/vocabulary-packs/{id}/entries"]
@@ -1027,11 +991,82 @@ private func pairWithAuthority(
     for (_, pathItem) in paths {
         for (_, rawOperation) in pathItem {
             let operation = try #require(rawOperation as? [String: Any])
+            #expect((operation["summary"] as? String)?.isEmpty == false)
+            #expect((operation["description"] as? String)?.isEmpty == false)
+            #expect((operation["tags"] as? [String])?.count == 1)
+            #expect((operation["x-codeSamples"] as? [[String: Any]])?.isEmpty == false)
+            #expect(APIEndpointHandler(rawValue: operation["operationId"] as? String ?? "") != nil)
+            for parameter in operation["parameters"] as? [[String: Any]] ?? [] {
+                #expect((parameter["description"] as? String)?.isEmpty == false)
+            }
             let responses = try #require(operation["responses"] as? [String: Any])
             #expect(responses["default"] != nil)
             #expect(responses.keys.contains { Int($0).map { (200 ..< 300).contains($0) } == true })
         }
     }
+
+    for endpoint in APIOpenAPI.endpoints {
+        #expect(!endpoint.description.isEmpty)
+        #expect(!endpoint.errorResponses.isEmpty)
+        #expect(endpoint.parameters.allSatisfy { !$0.description.isEmpty })
+    }
+}
+
+@Test func representativeEncodedDTOsMatchTheirDeclaredSchemaKeys() throws {
+    let root = try #require(
+        JSONSerialization.jsonObject(with: APIOpenAPI.document) as? [String: Any]
+    )
+    let components = try #require(root["components"] as? [String: Any])
+    let schemas = try #require(components["schemas"] as? [String: Any])
+
+    func expectSchemaKeys<T: Encodable>(
+        _ value: T,
+        schema name: String
+    ) throws {
+        let schema = try #require(schemas[name] as? [String: Any])
+        let properties = Set(try #require((schema["properties"] as? [String: Any])?.keys))
+        let required = Set(schema["required"] as? [String] ?? [])
+        let encoded = try #require(
+            JSONSerialization.jsonObject(with: APIJSON.encoder.encode(value)) as? [String: Any]
+        )
+        let keys = Set(encoded.keys)
+        #expect(keys.isSubset(of: properties))
+        #expect(required.isSubset(of: keys))
+    }
+
+    try expectSchemaKeys(APIHealth(status: "ok"), schema: "Health")
+    try expectSchemaKeys(APIMeta(
+        apiVersion: 1,
+        applicationVersion: "test",
+        serverInstanceId: "00000000-0000-0000-0000-000000000001",
+        pairingAvailable: true,
+        capabilities: ["decks.read"]
+    ), schema: "Meta")
+    try expectSchemaKeys(APIProblem(
+        status: 403,
+        code: "insufficient_scope",
+        title: "Insufficient scope",
+        detail: "A scope is required.",
+        requestID: "00000000-0000-0000-0000-000000000002",
+        requiredScope: "library.read"
+    ), schema: "Problem")
+}
+
+@Test func runtimeOpenAPIDocumentIsTheRegistryDocument() async throws {
+    let api = try await makeAPI()
+    let response = await api.handle(request(.get, "/v1/openapi.json"))
+    #expect(response.status == 200)
+    #expect(response.body == APIOpenAPI.document)
+    #expect(response.headers["X-NeoAnki-Contract-Digest"] == APIOpenAPI.contractDigest)
+    let repositoryRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let published = try Data(contentsOf: repositoryRoot.appendingPathComponent(
+        "docs/api/openapi.json"
+    ))
+    #expect(published == APIOpenAPI.document)
+    #expect("sha256:" + APICrypto.sha256Hex(published) == APIOpenAPI.contractDigest)
 }
 
 @Test func corsOnlyReflectsApprovedOrigins() async throws {

@@ -1,6 +1,7 @@
 ---
 title: "ADR 0003: Application library boundary"
 description: Keep persistence actors behind capability-oriented application protocols.
+audience: developer
 ---
 
 # ADR 0003: Application library boundary

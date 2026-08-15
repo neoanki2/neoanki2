@@ -1,7 +1,8 @@
 ---
 title: Maintaining this documentation
 description: Keep guides, high-risk claims, feature coverage, screenshots, and rendered pages synchronized with product behavior.
-parent: Contributor Guide
+audience: developer
+parent: Developer Guide
 ---
 
 # Maintaining this documentation
@@ -11,7 +12,7 @@ articles are intentionally hand-written; a manifest and tests keep their
 coverage verifiable.
 
 The latest published assessment is the
-[July 2026 documentation quality audit]({{ site.baseurl }}/audits/state-of-art-2026-07-27/).
+[August 2026 documentation audit]({{ site.baseurl }}/audits/documentation-2026-08-15/).
 
 ## When product behavior changes
 
@@ -103,9 +104,10 @@ local testing.
    ./Scripts/promote-doc-screenshots.sh path/to/downloaded/screenshots
    ```
 
-5. Run `swift Scripts/validate-docs.swift --require-screenshots`. When a feature
-   source changed after the artifact's source SHA, capture and promote a newer
-   artifact; never edit `sourceSHA` by hand.
+5. Run `swift Scripts/validate-docs.swift --require-screenshots`. The validator
+   compares every screenshot-backed feature source with the artifact's source
+   commit, including when that commit was squash-merged. When a source differs,
+   capture and promote a newer artifact; never edit `sourceSHA` by hand.
 
 Capture records each image's source SHA, UTC capture date, pixel dimensions,
 scenario, and identifiers that were required to be visible. Both capture and
@@ -124,9 +126,16 @@ documentation gate verifies those density caps against every manifest entry.
 
 ## What is generated
 
-Only `docs/features.md` is generated. User instructions, format specifications,
-and troubleshooting guidance remain curated because source comments cannot
-capture workflow context, limitations, or user-facing language reliably.
+`docs/features.md` is generated from the feature manifest. `docs/api/` is
+generated from the typed HTTP endpoint registry and schema catalog with:
+
+```bash
+swift run neoanki-api-reference generate
+```
+
+User instructions, format specifications, and troubleshooting guidance remain
+curated because source metadata cannot capture workflow context, limitations,
+or user-facing recovery language reliably.
 
 Every documentation pull request builds Jekyll and runs the rendered-site
 crawler. The crawler checks internal routes and fragments, assets, canonical

@@ -1,6 +1,7 @@
 ---
 title: Scheduling
 description: Understand FSRS grading and how scheduling tunes itself after 100 usable review outcomes.
+audience: user
 nav_order: 8
 parent: User Guide
 ---

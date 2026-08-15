@@ -208,17 +208,19 @@ public actor NeoAnkiAPIService {
         if request.method == .options {
             return try await preflight(request)
         }
-        let publicPaths: Set<String> = ["/health", "/v1/meta", "/v1/openapi.json", "/v1/pairings"]
-        if publicPaths.contains(request.path),
-           APIOpenAPI.documentedMethods(for: request.path).contains(request.method)
-        {
+        guard let endpoint = APIOpenAPI.endpoint(
+            for: request.path,
+            method: request.method
+        ) else {
+            throw APIServiceError.notFound(
+                "No version-1 operation matches this method and path."
+            )
+        }
+        if endpoint.requiredScope == nil {
             try rejectUndocumentedBody(request)
             try validateQuery(
                 request.query,
-                allowed: APIOpenAPI.documentedQueryParameters(
-                    for: request.path,
-                    method: request.method
-                )
+                allowed: endpoint.queryParameters
             )
         }
 
@@ -252,7 +254,11 @@ public actor NeoAnkiAPIService {
         case (.get, "/v1/openapi.json"):
             return APIResponse(
                 status: 200,
-                headers: ["Content-Type": "application/json; charset=utf-8"],
+                headers: [
+                    "Content-Type": "application/json; charset=utf-8",
+                    "ETag": "\"\(APIOpenAPI.contractDigest)\"",
+                    "X-NeoAnki-Contract-Digest": APIOpenAPI.contractDigest,
+                ],
                 body: APIOpenAPI.document
             )
         case (.post, "/v1/pairings"):
@@ -262,16 +268,9 @@ public actor NeoAnkiAPIService {
         }
 
         let grant = try await authenticate(request)
-        if APIOpenAPI.documentedMethods(for: request.path).contains(request.method) {
-            try rejectUndocumentedBody(request)
-            try validateQuery(
-                request.query,
-                allowed: APIOpenAPI.documentedQueryParameters(
-                    for: request.path,
-                    method: request.method
-                )
-            )
-        }
+        try require(grant, endpoint: endpoint)
+        try rejectUndocumentedBody(request)
+        try validateQuery(request.query, allowed: endpoint.queryParameters)
         if !bypassGenericIdempotency,
            shouldUseGenericIdempotency(for: request),
            let key = try optionalIdempotencyKey(request)
@@ -870,8 +869,7 @@ public actor NeoAnkiAPIService {
         else {
             throw APIServiceError.validation("The preflight method is invalid.")
         }
-        let documentedMethods = APIOpenAPI.documentedMethods(for: request.path)
-        guard documentedMethods.contains(method) else {
+        guard let endpoint = APIOpenAPI.endpoint(for: request.path, method: method) else {
             throw APIServiceError.notFound(
                 "No version-1 operation matches the requested preflight method and path."
             )
@@ -890,18 +888,9 @@ public actor NeoAnkiAPIService {
         }
         var allowedHeaders = ["Content-Type"]
         if !isPairing { allowedHeaders.append("Authorization") }
-        if method == .post || method == .put || method == .patch || method == .delete {
-            allowedHeaders.append("Idempotency-Key")
-        }
-        if method == .put || method == .patch || method == .delete
-            || request.path.hasSuffix("/resets")
-            || request.path.hasSuffix("/commits")
-        {
-            allowedHeaders.append("If-Match")
-        }
-        if request.path == "/v1/events" { allowedHeaders.append("Last-Event-ID") }
-        if request.path.contains("/item-types/") && method == .put {
-            allowedHeaders.append("NeoAnki-Impact-Token")
+        for name in endpoint.parameters.filter({ $0.location == "header" }).map(\.name)
+        where !allowedHeaders.contains(name) {
+            allowedHeaders.append(name)
         }
         return APIResponse(
             status: 204,
@@ -4116,6 +4105,27 @@ public actor NeoAnkiAPIService {
                 title: "Insufficient scope",
                 detail: "This operation requires \(scope.rawValue).",
                 requiredScope: scope.rawValue
+            )
+        }
+    }
+
+    private func require(
+        _ grant: APIClientGrant,
+        endpoint: APIEndpointDefinition
+    ) throws {
+        guard let expression = endpoint.requiredScope, expression != "any" else {
+            return
+        }
+        let alternatives = expression.components(separatedBy: " or ")
+        let scopes = alternatives.compactMap(APIScope.init(rawValue:))
+        guard scopes.count == alternatives.count,
+              scopes.contains(where: grant.scopes.contains) else {
+            throw APIServiceError.problem(
+                status: 403,
+                code: "insufficient_scope",
+                title: "Insufficient scope",
+                detail: "This operation requires \(expression).",
+                requiredScope: expression
             )
         }
     }

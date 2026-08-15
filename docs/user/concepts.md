@@ -1,6 +1,7 @@
 ---
 title: Concepts and glossary
 description: Understand how knowledge becomes independently scheduled retrieval cards in NeoAnki2.
+audience: user
 nav_order: 20
 parent: User Guide
 ---
