@@ -148,13 +148,6 @@ These messages do not choose a rating. Grade based on the quality of your recall
 
 Open **Grade Help** from the question-mark button for the same guidance.
 
-Each grade button shows the schedule NeoAnki2 would apply if you chose it,
-such as **Now**, **17m**, or **12d**. These values are computed from the current
-card history and active parameter set; they are not generic promises attached
-to the grade names. Open the scheduling explanation to inspect elapsed model
-days, retrievability, stability, difficulty, the raw FSRS interval, any product
-policy applied to it, and the resulting due date before grading.
-
 [![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
 NeoAnki2 uses a native Swift implementation pinned to its documented upstream

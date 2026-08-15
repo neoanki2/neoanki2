@@ -61,12 +61,6 @@ interaction uses FSRS. Edit updates the current item and the remaining queued
 cards generated from it. End asks for confirmation; completion reports reviews
 and saved submissions separately.
 
-The four grade buttons show their live computed intervals. Scheduling details
-explain the active model, elapsed model days, retrievability, pre/post memory
-state, raw interval, applied policy, and exact due date. Again returns for an
-immediate repair round; passing grades preserve the model's fractional-day
-interval instead of applying fixed learning steps.
-
 The mobile study view supports native images, audio, video, rich text, cloze
 selection, microphone permission and recording, Dynamic Type, dark appearance,
 increased contrast, Reduce Motion, and portrait or landscape layouts.

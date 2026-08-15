@@ -17,7 +17,6 @@ struct StudyView: View {
     @State private var showGradeGuide = false
     @State private var showEndSessionConfirm = false
     @State private var showDeleteDraftConfirm = false
-    @State private var showSchedulingExplanation = false
     @State private var recording = StudyRecordingController()
     @AccessibilityFocusState private var answerAccessibilityFocused: Bool
     @AccessibilityFocusState private var recordingErrorAccessibilityFocused: Bool
@@ -85,15 +84,6 @@ struct StudyView: View {
         }
         .sheet(isPresented: $isEditingCard) {
             cardEditor
-        }
-        .sheet(isPresented: $showSchedulingExplanation) {
-            if let card = model.currentCard {
-                SchedulingExplanationView(
-                    card: card,
-                    previews: model.schedulePreviews,
-                    health: model.schedulingHealth
-                )
-            }
         }
         .focusedSceneValue(\.studyPrimaryActionHandler, primaryActionHandler)
     }
@@ -676,41 +666,22 @@ struct StudyView: View {
     }
 
     private var gradeButtons: some View {
-        VStack(spacing: DesignSystem.Spacing.xs) {
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                ForEach(ReviewRating.allCases, id: \.self) { rating in
-                    let preview = model.schedulePreviews[rating]
-                    Button {
-                        Task { await model.grade(rating) }
-                    } label: {
-                        VStack(spacing: 2) {
-                            Text(rating.studyButtonTitleWithShortcut)
-                            Text(preview?.compactIntervalDescription ?? "—")
-                                .font(DesignSystem.Typography.uiCaption)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        .frame(minWidth: 72, minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .keyboardShortcut(
-                        KeyEquivalent(Character(rating.studyShortcutLabel)),
-                        modifiers: []
-                    )
-                    .help(preview.map { "\(rating.studyTooltip) Next review: \($0.accessibleIntervalDescription)." } ?? rating.studyTooltip)
-                    .disabled(model.isGrading || model.isPreparingQueue || model.isLoadingSchedulePreviews)
-                    .accessibilityLabel(rating.studyAccessibilityLabel(preview: preview))
-                    .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            ForEach(ReviewRating.allCases, id: \.self) { rating in
+                Button(rating.studyButtonTitleWithShortcut) {
+                    Task { await model.grade(rating) }
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .keyboardShortcut(
+                    KeyEquivalent(Character(rating.studyShortcutLabel)),
+                    modifiers: []
+                )
+                .help(rating.studyTooltip)
+                .disabled(model.isGrading || model.isPreparingQueue)
+                .accessibilityLabel(rating.studyAccessibilityLabel)
+                .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
             }
-
-            Button("Scheduling Details", systemImage: "info.circle") {
-                showSchedulingExplanation = true
-            }
-            .buttonStyle(.link)
-            .disabled(model.schedulePreviews.isEmpty)
-            .accessibilityHint("Explains how each possible answer changes this card's schedule")
         }
     }
 

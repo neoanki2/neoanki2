@@ -30,12 +30,9 @@ public final class StudyFeatureModel: Identifiable {
     public private(set) var arrangedItems: [String] = []
     public private(set) var selectedArrangementIndex: Int?
     public private(set) var interactionMessage: String?
-    public private(set) var schedulePreviews: [ReviewRating: ReviewSchedulePreview] = [:]
-    public private(set) var schedulingHealth: LibrarySchedulingHealth?
-    public private(set) var isLoadingSchedulePreviews = false
     public private(set) var completion = StudyCompletion(reviews: 0, uniqueCards: 0, uniqueItems: 0)
 
-    private let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses & LibraryScheduling
+    private let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
     private let scope: DeckScope
     private let errorMapper: any UserFacingErrorMapping
     private let onMutation: (@MainActor @Sendable () async -> Void)?
@@ -48,7 +45,7 @@ public final class StudyFeatureModel: Identifiable {
     private var cardStartedAt = Date.now
 
     public init(
-        library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses & LibraryScheduling,
+        library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses,
         scope: DeckScope,
         title: String,
         mediaStore: MediaStore? = nil,
@@ -101,11 +98,7 @@ public final class StudyFeatureModel: Identifiable {
         }
     }
 
-    public func revealAnswer() {
-        guard currentCard != nil else { return }
-        isAnswerRevealed = true
-        Task { await loadSchedulePreviews() }
-    }
+    public func revealAnswer() { if currentCard != nil { isAnswerRevealed = true } }
     public func updateTypedAnswer(_ value: String) { typedAnswer = value; answerEvaluation = nil }
     public func selectChoice(_ value: String) { guard choiceOptions.contains(value) else { return }; selectedChoice = value }
     public func selectArrangementItem(at value: Int) { guard arrangedItems.indices.contains(value) else { return }; selectedArrangementIndex = value }
@@ -134,9 +127,6 @@ public final class StudyFeatureModel: Identifiable {
             isAnswerRevealed = true
         case .audioSubmission:
             break
-        }
-        if isAnswerRevealed {
-            Task { await loadSchedulePreviews() }
         }
     }
 
@@ -236,25 +226,8 @@ public final class StudyFeatureModel: Identifiable {
 
     private func prepareInteraction() {
         typedAnswer = ""; answerEvaluation = nil; selectedChoice = nil; selectedArrangementIndex = nil; interactionMessage = nil
-        schedulePreviews = [:]
-        isLoadingSchedulePreviews = false
         guard let card = currentCard else { choiceOptions = []; arrangedItems = []; return }
         choiceOptions = card.template.interaction == .choose ? StudyResponseEvaluator.choiceOptions(for: card) : []
         arrangedItems = card.template.interaction == .arrange ? (StudyResponseEvaluator.arrangement(for: card)?.initial ?? []) : []
-    }
-
-    private func loadSchedulePreviews() async {
-        guard let cardID = currentCard?.id else { return }
-        isLoadingSchedulePreviews = true
-        let reviewedAt = Date.now
-        defer {
-            if currentCard?.id == cardID { isLoadingSchedulePreviews = false }
-        }
-        guard let values = try? await library.reviewSchedulePreviews(
-            cardID: cardID,
-            asOf: reviewedAt
-        ), currentCard?.id == cardID else { return }
-        schedulePreviews = values
-        schedulingHealth = try? await library.schedulingHealthSnapshot()
     }
 }
