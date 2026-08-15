@@ -121,8 +121,8 @@ while [[ $attempt -le 2 ]]; do
     total_tests=$(jq -r '.totalTestCount' "$compact_summary")
     jq -r '
       "result=\(.result) tests=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests)",
-      (if .testFailures == null then empty
-       else "failure=\(.testFailures.testName): \(.testFailures.failureText)" end)
+      ([.testFailures] | flatten | .[]? | select(type == "object")
+       | "failure=\(.testName): \(.failureText)")
     ' "$compact_summary" > "$text_summary"
   else
     printf 'result=unknown tests=unknown\n' > "$text_summary"
