@@ -75,7 +75,7 @@ import VocabularyDeckBuilder
 
     let result = try #require(await transfer.importDeck(from: generated.bundleURL))
     var poem = try await store.deck(id: try #require(result.deckIDs.first))
-    poem.parentID = try #require(generated.destinationDeckID)
+    poem.parentID = generated.destinationDeckID
     try await store.updateDeck(poem)
     await decksModel.load()
     await itemsModel.load()

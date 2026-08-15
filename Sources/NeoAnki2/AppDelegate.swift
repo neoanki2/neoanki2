@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Self.updateDockBadge(dueCount: 0)
     }
 
+    @MainActor
     static func updateDockBadge(dueCount: Int) {
         NSApp.dockTile.badgeLabel = badgeLabel(forDueCount: dueCount)
     }
