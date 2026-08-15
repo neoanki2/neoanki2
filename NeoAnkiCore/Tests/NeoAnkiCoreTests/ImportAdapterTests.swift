@@ -23,31 +23,31 @@ import Testing
     #expect(payload.rows[1].tags.isEmpty)
 }
 
-@Test func jsonImportAdapterRejectsEmptyRows() async {
+@Test func jsonImportAdapterRejectsEmptyRows() {
     let json = """
     { "itemType": "Basic", "rows": [] }
     """.data(using: .utf8)!
 
-    await #expect(throws: ImportError.emptyPayload) {
+    #expect(throws: ImportError.emptyPayload) {
         try JSONImportAdapter().parse(json)
     }
 }
 
-@Test func jsonImportAdapterRejectsMalformedJSON() async {
+@Test func jsonImportAdapterRejectsMalformedJSON() {
     let json = "{ not valid json".data(using: .utf8)!
 
-    await #expect(throws: ImportError.self) {
+    #expect(throws: ImportError.self) {
         try JSONImportAdapter().parse(json)
     }
 }
 
-@Test func jsonImportAdapterRejectsUnsupportedFieldValueShapes() async {
+@Test func jsonImportAdapterRejectsUnsupportedFieldValueShapes() {
     for jsonText in [
         #"{"itemType":"Basic","rows":[{"Front":"Question","Back":7}]}"#,
         #"{"itemType":"Basic","rows":[{"Front":"Question","Back":"Answer","Unknown":false}]}"#,
     ] {
         let json = Data(jsonText.utf8)
-        await #expect(throws: ImportError.self) {
+        #expect(throws: ImportError.self) {
             try JSONImportAdapter().parse(json)
         }
     }
@@ -69,18 +69,18 @@ import Testing
     #expect(payload.rows[0].tags == ["tag1", "tag2"])
 }
 
-@Test func csvImportAdapterRejectsMissingDataRows() async {
+@Test func csvImportAdapterRejectsMissingDataRows() {
     let csv = "Front,Back\n".data(using: .utf8)!
 
-    await #expect(throws: ImportError.emptyPayload) {
+    #expect(throws: ImportError.emptyPayload) {
         try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
     }
 }
 
-@Test func csvImportAdapterRejectsInvalidUTF8() async {
+@Test func csvImportAdapterRejectsInvalidUTF8() {
     let data = Data([0xFF, 0xFE, 0xFD])
 
-    await #expect(throws: ImportError.invalidFormat("Expected UTF-8 text.")) {
+    #expect(throws: ImportError.invalidFormat("Expected UTF-8 text.")) {
         try CSVImportAdapter(itemTypeName: "Basic").parse(data)
     }
 }
@@ -108,33 +108,33 @@ import Testing
     #expect(payload.rows[0].fieldValues["Back"] == "Answer")
 }
 
-@Test func csvImportAdapterRejectsUnclosedQuotes() async {
+@Test func csvImportAdapterRejectsUnclosedQuotes() {
     let csv = "Front,Back\n\"never ends,Answer".data(using: .utf8)!
 
-    await #expect(throws: ImportError.self) {
+    #expect(throws: ImportError.self) {
         try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
     }
 }
 
-@Test func csvImportAdapterRejectsOversizedFieldDuringParsing() async {
+@Test func csvImportAdapterRejectsOversizedFieldDuringParsing() {
     let oversized = String(repeating: "x", count: ImportLimits.maxFieldStringBytes + 1)
     let csv = "Front,Back\n\(oversized),Answer".data(using: .utf8)!
 
-    await #expect(throws: ImportError.self) {
+    #expect(throws: ImportError.self) {
         try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
     }
 }
 
-@Test func csvImportAdapterRejectsTooManyRowsDuringParsing() async {
+@Test func csvImportAdapterRejectsTooManyRowsDuringParsing() {
     let rows = Array(repeating: "Question,Answer", count: ImportLimits.maxRows + 1)
     let csv = (["Front,Back"] + rows).joined(separator: "\n").data(using: .utf8)!
 
-    await #expect(throws: ImportError.self) {
+    #expect(throws: ImportError.self) {
         try CSVImportAdapter(itemTypeName: "Basic").parse(csv)
     }
 }
 
-@Test func decodedPayloadRejectsTooManyFieldsBeforePersistence() async {
+@Test func decodedPayloadRejectsTooManyFieldsBeforePersistence() {
     let values = Dictionary(
         uniqueKeysWithValues: (0...ImportLimits.maxFieldsPerRow).map { ("Field \($0)", "value") }
     )
@@ -143,7 +143,7 @@ import Testing
         rows: [ImportRow(fieldValues: values)]
     )
 
-    await #expect(throws: ImportError.self) {
+    #expect(throws: ImportError.self) {
         try ImportLimits.validateDecodedPayload(payload)
     }
 }

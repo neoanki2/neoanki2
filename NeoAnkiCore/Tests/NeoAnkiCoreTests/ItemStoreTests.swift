@@ -787,7 +787,7 @@ private func bindAndRun(
     defer { sqlite3_finalize(statement) }
     sqlite3_bind_text(statement, 1, text1, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     sqlite3_bind_text(statement, 2, text2, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-    blob.withUnsafeBytes { buffer in
+    _ = blob.withUnsafeBytes { buffer in
         sqlite3_bind_blob(statement, 3, buffer.baseAddress, Int32(buffer.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
     guard sqlite3_step(statement) == SQLITE_DONE else {
@@ -812,10 +812,10 @@ private func bindAndRun(
     defer { sqlite3_finalize(statement) }
     sqlite3_bind_text(statement, 1, text1, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     sqlite3_bind_text(statement, 2, text2, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-    blob1.withUnsafeBytes { buffer in
+    _ = blob1.withUnsafeBytes { buffer in
         sqlite3_bind_blob(statement, 3, buffer.baseAddress, Int32(buffer.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
-    blob2.withUnsafeBytes { buffer in
+    _ = blob2.withUnsafeBytes { buffer in
         sqlite3_bind_blob(statement, 4, buffer.baseAddress, Int32(buffer.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
     sqlite3_bind_double(statement, 5, double1)
@@ -843,10 +843,10 @@ private func bindAndRun(
     sqlite3_bind_text(statement, 1, text1, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     sqlite3_bind_text(statement, 2, text2, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     sqlite3_bind_text(statement, 3, text3, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-    blob1.withUnsafeBytes { buffer in
+    _ = blob1.withUnsafeBytes { buffer in
         sqlite3_bind_blob(statement, 4, buffer.baseAddress, Int32(buffer.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
-    blob2.withUnsafeBytes { buffer in
+    _ = blob2.withUnsafeBytes { buffer in
         sqlite3_bind_blob(statement, 5, buffer.baseAddress, Int32(buffer.count), unsafeBitCast(-1, to: sqlite3_destructor_type.self))
     }
     sqlite3_bind_double(statement, 6, double1)

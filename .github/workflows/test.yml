@@ -19,64 +19,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  core-fast:
-    name: Core unit + flow + architecture tests
+  swift-tests:
+    name: Swift unit + flow + architecture tests
     runs-on: macos-26
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Validate module boundaries
-        run: bash Scripts/validate-architecture.sh
-      - name: Run NeoAnkiCore tests
+      - name: Run every SwiftPM test gate with shared build products
         run: |
-          cd NeoAnkiCore
-          swift test --parallel
-
-  app-models:
-    name: App ViewModel tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Run NeoAnki2Tests
-        run: swift test --filter NeoAnki2Tests --parallel
-      - name: Verify Xcode build products stay out of Spotlight
-        run: bash Scripts/validate-xcode-build-paths.sh
+          failures=0
+          bash Scripts/validate-architecture.sh || failures=1
+          (cd NeoAnkiCore && swift test --parallel) || failures=1
+          swift test --filter NeoAnki2Tests --parallel || failures=1
+          bash Scripts/validate-xcode-build-paths.sh || failures=1
+          swift test --filter NeoAnkiApplicationTests --parallel || failures=1
+          swift test --filter NeoAnkiFeaturesTests --parallel || failures=1
+          exit "$failures"
 
   shared-platforms:
-    name: Shared targets (${{ matrix.platform }})
+    name: Shared targets (macOS + iOS Simulator)
     runs-on: macos-26
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macOS, iOS Simulator]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Build shared package schemes
-        env:
-          PLATFORM: ${{ matrix.platform }}
+      - name: Build every shared scheme on both platforms
         run: |
-          destination="generic/platform=$PLATFORM"
-          for scheme in NeoAnkiApplication NeoAnkiFeatures NeoAnkiSharedUI NeoAnkiCloudSync NeoAnkiDeckBuilderCore NeoAnkiMobile; do
-            xcodebuild build \
-              -scheme "$scheme" \
-              -destination "$destination" \
-              CODE_SIGNING_ALLOWED=NO
+          failures=0
+          for platform in macOS 'iOS Simulator'; do
+            destination="generic/platform=$platform"
+            for scheme in NeoAnkiApplication NeoAnkiFeatures NeoAnkiSharedUI NeoAnkiCloudSync NeoAnkiDeckBuilderCore NeoAnkiMobile; do
+              xcodebuild build \
+                -scheme "$scheme" \
+                -destination "$destination" \
+                CODE_SIGNING_ALLOWED=NO || failures=1
+            done
+            (
+              cd NeoAnkiCore
+              xcodebuild build \
+                -scheme NeoAnkiCore \
+                -destination "$destination" \
+                CODE_SIGNING_ALLOWED=NO
+            ) || failures=1
           done
-      - name: Build Core for the same platform
-        env:
-          PLATFORM: ${{ matrix.platform }}
-        run: |
-          cd NeoAnkiCore
-          xcodebuild build \
-            -scheme NeoAnkiCore \
-            -destination "generic/platform=$PLATFORM" \
-            CODE_SIGNING_ALLOWED=NO
-
-  application-tests:
-    name: Application and sync policy tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - run: swift test --filter NeoAnkiApplicationTests --parallel
+          exit "$failures"
 
   ios-build:
     name: iPhone/iPad app + widget + archive
@@ -84,8 +68,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Run shared mobile feature tests
-        run: swift test --filter NeoAnkiFeaturesTests --parallel
       - name: Build app and embedded widgets
         run: |
           chmod +x Scripts/build-ios.sh
@@ -173,10 +155,8 @@ jobs:
     name: CI Gate
     if: always()
     needs:
-      - core-fast
-      - app-models
+      - swift-tests
       - shared-platforms
-      - application-tests
       - ios-build
       - ios-ui-build
       - ios-ui
