@@ -348,17 +348,12 @@ if requireScreenshots {
     if ISO8601DateFormatter().date(from: screenshotManifest.capturedAt) == nil {
         fail("Screenshot manifest capturedAt must be an ISO-8601 timestamp")
     }
-    let ancestryCheck = Process()
-    ancestryCheck.currentDirectoryURL = root
-    ancestryCheck.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-    ancestryCheck.arguments = [
-        "merge-base", "--is-ancestor", screenshotManifest.sourceSHA, "HEAD",
-    ]
     do {
-        try ancestryCheck.run()
-        ancestryCheck.waitUntilExit()
-        if ancestryCheck.terminationStatus != 0 {
-            fail("Screenshot manifest sourceSHA is not an ancestor of the validated revision")
+        let sourceRevision = try gitOutput(
+            arguments: ["cat-file", "-e", screenshotManifest.sourceSHA + "^{commit}"]
+        )
+        if sourceRevision.status != 0 {
+            fail("Screenshot manifest sourceSHA is not an available Git commit")
         }
     } catch {
         fail("Could not verify screenshot manifest source revision")

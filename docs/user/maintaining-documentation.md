@@ -104,9 +104,10 @@ local testing.
    ./Scripts/promote-doc-screenshots.sh path/to/downloaded/screenshots
    ```
 
-5. Run `swift Scripts/validate-docs.swift --require-screenshots`. When a feature
-   source changed after the artifact's source SHA, capture and promote a newer
-   artifact; never edit `sourceSHA` by hand.
+5. Run `swift Scripts/validate-docs.swift --require-screenshots`. The validator
+   compares every screenshot-backed feature source with the artifact's source
+   commit, including when that commit was squash-merged. When a source differs,
+   capture and promote a newer artifact; never edit `sourceSHA` by hand.
 
 Capture records each image's source SHA, UTC capture date, pixel dimensions,
 scenario, and identifiers that were required to be visible. Both capture and
