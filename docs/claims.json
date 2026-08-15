@@ -151,7 +151,7 @@
       "contains": [
         "repair round",
         "due immediately",
-        "built-in 90%",
+        "shared preset starts at 90%",
         "The first card appears as soon as its exact due count and content are ready"
       ]
     },

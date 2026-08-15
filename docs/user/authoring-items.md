@@ -125,8 +125,10 @@ Append-only review logs are retained when items or cards are deleted, for
 history integrity, but no longer belong to an active card. Outcomes that were
 not undone can still contribute to later scheduling optimization.
 Database migrations and performance indexes do not change this retention rule. An
-explicit **Reset All Progress** action in Deck Settings is the exception: it
-permanently removes review history for the selected deck subtree.
+explicit **Reset All Progress** action in Deck Settings starts a new scheduling
+history origin for the selected deck subtree. Earlier immutable review evidence
+is retained for audit and sync integrity but is excluded from replay, previews,
+and future optimizer input after that origin.
 Local API token verifiers are stored outside the library database and its snapshots,
 so restoring library content does not authorize an API client.
 Media no longer referenced by any item is eligible for cleanup. Choose

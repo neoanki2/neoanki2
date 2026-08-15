@@ -137,6 +137,10 @@ include counts, item rows include title, summary, card count, and item type, and
 study progress is labeled as progress. Choice and arrange controls announce
 their position and selected state.
 
+After reveal, every grade control includes its computed next-review interval in
+the VoiceOver label. Scheduling health uses text and symbols as well as color,
+and migration or optimization progress remains readable with Dynamic Type.
+
 Parent deck selection and disclosure remain separate actions. Activating the
 row selects that deck's scope without expanding it; use the disclosure triangle
 to show or hide its children. A focused UI test verifies both actions.

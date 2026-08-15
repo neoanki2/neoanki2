@@ -61,6 +61,12 @@ interaction uses FSRS. Edit updates the current item and the remaining queued
 cards generated from it. End asks for confirmation; completion reports reviews
 and saved submissions separately.
 
+The four grade buttons show their live computed intervals. Scheduling details
+explain the active model, elapsed model days, retrievability, pre/post memory
+state, raw interval, applied policy, and exact due date. Again returns for an
+immediate repair round; passing grades preserve the model's fractional-day
+interval instead of applying fixed learning steps.
+
 The mobile study view supports native images, audio, video, rich text, cloze
 selection, microphone permission and recording, Dynamic Type, dark appearance,
 increased contrast, Reduce Motion, and portrait or landscape layouts.
@@ -83,8 +89,10 @@ changes should affect its existing items and decks, or duplicate it for an
 independent editable type.
 
 Deck settings support rename, nesting, daily new-card limits, progress reset,
-and deletion policies. Scheduling settings expose study-day rollover and manual
-FSRS optimization from review history.
+and deletion policies. Scheduling settings expose study-day rollover, desired
+retention, maximum interval, automatic-personalization status, active model
+health, restore-defaults, and rollback controls. Optimization runs locally after
+eligible sessions or idle time; it never runs inline while a grade is saved.
 
 ## Import, export, and build decks
 
