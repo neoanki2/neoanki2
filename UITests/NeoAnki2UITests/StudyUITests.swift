@@ -410,10 +410,10 @@ extension FastFunctionalJourneyTests {
         app.textFields.identified("templateNameField").click()
         app.textFields.identified("templateNameField").typeText("Reverse")
 
-        app.popUpButtons.identified("templatePromptField").click()
+        app.menuButtons.identified("templatePromptField").click()
         app.menuItems.identified("Back").click()
         showTemplateAnswer(in: app)
-        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Front").click()
         saveTemplateEditor(in: app)
         closeTemplates(in: app)

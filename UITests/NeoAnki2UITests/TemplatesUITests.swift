@@ -107,13 +107,13 @@ extension FastFunctionalJourneyTests {
             enterText("Reverse", into: app.textFields.identified("templateNameField"), app: app)
             selectPopUpOption(
                 named: "Back",
-                picker: app.popUpButtons.identified("templatePromptField"),
+                picker: app.menuButtons.identified("templatePromptField"),
                 in: app
             )
             showTemplateAnswer(in: app)
             selectPopUpOption(
                 named: "Front",
-                picker: app.popUpButtons.identified("templateAnswerField"),
+                picker: app.menuButtons.identified("templateAnswerField"),
                 in: app
             )
             saveTemplateEditor(in: app)
@@ -352,10 +352,10 @@ extension FastFunctionalJourneyTests {
         app.textFields.identified("templateNameField").click()
         app.textFields.identified("templateNameField").typeText("Reverse")
 
-        app.popUpButtons.identified("templatePromptField").click()
+        app.menuButtons.identified("templatePromptField").click()
         app.menuItems.identified("Back").click()
         showTemplateAnswer(in: app)
-        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Front").click()
         saveTemplateEditor(in: app)
 
@@ -368,7 +368,7 @@ extension FastFunctionalJourneyTests {
         openTemplates(in: app)
         app.buttons.identified("addTemplateToolbar").click()
 
-        XCTAssertTrue(app.popUpButtons.identified("templatePromptField").waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.menuButtons.identified("templatePromptField").waitUntilExists(timeout: 5))
 
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         XCTAssertTrue(advanced.waitUntilExists(timeout: 5))
@@ -444,10 +444,10 @@ extension FastFunctionalJourneyTests {
         let nameField = app.textFields.identified("templateNameField")
         nameField.click()
         nameField.typeText("Original")
-        app.popUpButtons.identified("templatePromptField").click()
+        app.menuButtons.identified("templatePromptField").click()
         app.menuItems.identified("Front").click()
         showTemplateAnswer(in: app)
-        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Back").click()
         saveTemplateEditor(in: app)
         XCTAssertTrue(app.buttons.identified("templateRow-Original").waitUntilExists(timeout: 5))
@@ -471,10 +471,10 @@ extension FastFunctionalJourneyTests {
         let nameField = app.textFields.identified("templateNameField")
         nameField.click()
         nameField.typeText("To Delete")
-        app.popUpButtons.identified("templatePromptField").click()
+        app.menuButtons.identified("templatePromptField").click()
         app.menuItems.identified("Front").click()
         showTemplateAnswer(in: app)
-        app.popUpButtons.identified("templateAnswerField").click()
+        app.menuButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Back").click()
         saveTemplateEditor(in: app)
         XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitUntilExists(timeout: 5))
