@@ -120,8 +120,10 @@ succeeds, so an abandoned or failed submission remains due.
 The recording is persistent and local-only. It appears under **Library → Saved
 Responses** with its source, time, duration, playback, and deletion controls,
 and it is excluded from Cloud sync and deck exports. Leaving with a draft asks
-for confirmation. A save error keeps the draft available for retry. Recordings
-stop automatically at 30 minutes and remain subject to the 20 MB audio limit.
+for confirmation. A save error keeps the draft available for retry. Retrying
+the same save safely reuses the completed response if the first confirmation
+was interrupted, rather than creating a duplicate. Recordings stop automatically
+at 30 minutes and remain subject to the 20 MB audio limit.
 
 ### Cloze
 
