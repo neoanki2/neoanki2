@@ -25,18 +25,25 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5), "App navigation unavailable")
         let navigationTitle = title == "Home" ? "NeoAnki2" : title
         let navigationBar = app.navigationBars[navigationTitle]
-        for _ in 0..<3 {
-            if navigationBar.exists { return }
+        let destination: XCUIElement
+        if app.tabBars.firstMatch.exists {
+            destination = app.tabBars.buttons[title]
+        } else {
+            destination = app.buttons["top-level-\(title.lowercased())"]
+        }
 
-            let destination: XCUIElement
-            if app.tabBars.firstMatch.exists {
-                destination = app.tabBars.buttons[title]
-            } else {
-                destination = app.buttons["top-level-\(title.lowercased())"]
-            }
+        for _ in 0..<3 {
             guard destination.waitForExistence(timeout: 5) else { continue }
+            if destination.isSelected { return }
             destination.tap()
-            if navigationBar.waitForExistence(timeout: 5) { return }
+            let selected = NSPredicate(format: "isSelected == true")
+            if XCTWaiter.wait(
+                for: [XCTNSPredicateExpectation(predicate: selected, object: destination)],
+                timeout: 5
+            ) == .completed,
+               navigationBar.waitForExistence(timeout: 5) {
+                return
+            }
         }
 
         XCTFail("Failed to open \(title) destination")
