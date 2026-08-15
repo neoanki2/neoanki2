@@ -316,6 +316,7 @@ private struct TemplateStudyPreviewPane: View {
                         ForEach(TemplatePreviewPhase.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                    .labelsHidden()
                     .frame(maxWidth: 260, minHeight: 44)
                     .accessibilityIdentifier("templatePreviewPhase")
                 }
