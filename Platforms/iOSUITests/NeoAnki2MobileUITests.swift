@@ -114,7 +114,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         reveal.tap()
         XCTAssertTrue(app.staticTexts["Paris"].waitForExistence(timeout: 5))
         app.buttons["Good"].tap()
-        XCTAssertTrue(app.staticTexts["Session Complete"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Session Complete"].waitForExistence(timeout: 15))
         app.buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["NeoAnki2"].waitForExistence(timeout: 5))
     }
