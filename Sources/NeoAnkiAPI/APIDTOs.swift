@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
 
 public struct APIHealth: Codable, Sendable, Equatable {
@@ -544,7 +545,180 @@ struct ResetCardInput: Decodable {
 
 public struct APIRatingPreview: Codable, Sendable, Equatable {
     public let rating: String
+    public let reviewedAt: Date
+    public let intervalSeconds: Double
+    public let rawIntervalDays: Double
+    public let operationalIntervalSeconds: Int
+    public let memoryBefore: APIMemory
+    public let memoryAfter: APIMemory
     public let memory: APIMemory
+    public let predictedRetrievability: Double
+    public let presetId: String?
+    public let parameterSetId: String?
+    public let modelVersion: String
+    public let timingPolicyVersion: String
+    public let intervalPolicyVersion: String
+    public let finalDueAt: Date
+    public let constraintReason: String?
+
+    init(rating: String, preview: ReviewSchedulePreview) {
+        self.rating = rating
+        reviewedAt = preview.reviewedAt
+        intervalSeconds = preview.intervalSeconds
+        rawIntervalDays = preview.rawIntervalDays
+        operationalIntervalSeconds = preview.operationalIntervalSeconds
+        memoryBefore = APIMemory(preview.memoryBefore)
+        memoryAfter = APIMemory(preview.memoryAfter)
+        memory = memoryAfter
+        predictedRetrievability = preview.predictedRetrievability
+        presetId = preview.presetID?.uuidString.lowercased()
+        parameterSetId = preview.parameterSetID?.uuidString.lowercased()
+        modelVersion = preview.modelVersion
+        timingPolicyVersion = preview.timingPolicyVersion
+        intervalPolicyVersion = preview.intervalPolicyVersion
+        finalDueAt = preview.finalDueAt
+        constraintReason = preview.constraintReason
+    }
+}
+
+public struct APISchedulingExplanation: Codable, Sendable, Equatable {
+    public let cardId: String
+    public let reviewedAt: Date
+    public let elapsedSeconds: Double
+    public let elapsedModelDays: Int
+    public let previousMemory: APIMemory
+    public let desiredRetention: Double
+    public let modelIdentifier: String
+    public let elapsedTimePolicy: String
+    public let intervalPolicy: String
+    public let presetId: String?
+    public let parameterSetId: String?
+    public let ratings: [APIRatingPreview]
+}
+
+public struct APISchedulingHealth: Codable, Sendable, Equatable {
+    public let modelIdentifier: String
+    public let desiredRetention: Double
+    public let maximumIntervalDays: Int
+    public let automaticOptimizationEnabled: Bool
+    public let parameterCount: Int
+    public let parameterSource: String
+    public let activeParameterSetId: String?
+    public let activeParameterSource: String?
+    public let optimizerParityVerified: Bool
+    public let optimizerStatus: String
+    public let personalizationStatus: String
+    public let lastOptimizationDecision: String?
+    public let lastOptimizationReason: String?
+    public let lastOptimizationCompletedAt: Date?
+    public let migrationStatus: String?
+    public let legacyParametersQuarantined: Bool
+    public let canRestoreDefaults: Bool
+    public let canRollback: Bool
+
+    init(_ health: LibrarySchedulingHealth) {
+        modelIdentifier = health.modelIdentifier
+        desiredRetention = health.desiredRetention
+        maximumIntervalDays = health.maximumIntervalDays
+        automaticOptimizationEnabled = health.automaticOptimizationEnabled
+        parameterCount = health.parameterCount
+        parameterSource = health.usesPopulationDefaults ? "populationDefaults" : "personalized"
+        activeParameterSetId = health.activeParameterSetID?.uuidString.lowercased()
+        activeParameterSource = health.activeParameterSource
+        optimizerParityVerified = health.optimizerParityVerified
+        optimizerStatus = health.optimizerStatus
+        personalizationStatus = health.optimizerParityVerified
+            ? (health.usesPopulationDefaults ? "populationDefaults" : "personalized")
+            : "unavailablePendingVerification"
+        lastOptimizationDecision = health.lastOptimizationDecision
+        lastOptimizationReason = health.lastOptimizationReason
+        lastOptimizationCompletedAt = health.lastOptimizationCompletedAt
+        migrationStatus = health.migrationStatus
+        legacyParametersQuarantined = health.legacyParametersQuarantined
+        canRestoreDefaults = health.canRestoreDefaults
+        canRollback = health.canRollback
+    }
+}
+
+public struct APIFSRSParameterSet: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let isActive: Bool
+    public let weights: [Double]
+    public let modelVersion: String
+    public let upstreamCommit: String
+    public let sourceChecksum: String
+    public let fixtureChecksum: String?
+    public let scope: String
+    public let source: String
+    public let inputFingerprint: String?
+    public let trainingCutoff: Date?
+    public let metrics: [String: Double]
+    public let previousParameterSetId: String?
+    public let createdAt: Date
+
+    init(_ value: LibraryFSRSParameterSet) {
+        id = value.id.uuidString.lowercased()
+        isActive = value.isActive
+        weights = value.weights
+        modelVersion = value.modelVersion
+        upstreamCommit = value.upstreamCommit
+        sourceChecksum = value.sourceChecksum
+        fixtureChecksum = value.fixtureChecksum
+        scope = value.scope
+        source = value.source
+        inputFingerprint = value.inputFingerprint
+        trainingCutoff = value.trainingCutoff
+        metrics = value.metrics
+        previousParameterSetId = value.previousParameterSetID?.uuidString.lowercased()
+        createdAt = value.createdAt
+    }
+}
+
+public struct APIFSRSOptimizationRun: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let presetId: String
+    public let startedAt: Date
+    public let completedAt: Date
+    public let trainingCutoff: Date
+    public let inputFingerprint: String
+    public let eligibleTargetCount: Int
+    public let distinctCardCount: Int
+    public let failureCount: Int
+    public let studyDayCount: Int
+    public let excludedCounts: [String: Int]
+    public let foldCount: Int
+    public let metrics: [String: Double]
+    public let decision: String
+    public let reason: String?
+    public let candidateParameterSetId: String?
+
+    init(_ value: LibraryFSRSOptimizationRun) {
+        id = value.id.uuidString.lowercased()
+        presetId = value.presetID.uuidString.lowercased()
+        startedAt = value.startedAt
+        completedAt = value.completedAt
+        trainingCutoff = value.trainingCutoff
+        inputFingerprint = value.inputFingerprint
+        eligibleTargetCount = value.eligibleTargetCount
+        distinctCardCount = value.distinctCardCount
+        failureCount = value.failureCount
+        studyDayCount = value.studyDayCount
+        excludedCounts = value.excludedCounts
+        foldCount = value.foldCount
+        metrics = value.metrics
+        decision = value.decision
+        reason = value.reason
+        candidateParameterSetId = value.candidateParameterSetID?.uuidString.lowercased()
+    }
+}
+
+struct RestoreDefaultSchedulingInput: Decodable {
+    let confirm: Bool
+}
+
+struct RollbackSchedulingInput: Decodable {
+    let confirm: Bool
+    let parameterSetId: String?
 }
 
 public struct APITag: Codable, Sendable, Equatable, Identifiable {

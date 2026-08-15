@@ -2,7 +2,7 @@
 title: Cards and study
 description: Generated NeoAnki local API operations for cards and study.
 audience: api
-contract_digest: sha256:d1af897ec9d7e74241218073d7da8ff3b6a56cf62f9130a315e54338cb4c588b
+contract_digest: sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098
 parent: Local API reference
 permalink: /api/cards-and-study/
 ---
@@ -157,6 +157,28 @@ Review preview through the loopback-only NeoAnki API.
 ```bash
 curl --request GET \
   'http://127.0.0.1:8766/v1/cards/{id}/review-preview' \
+  --header 'Authorization: Bearer <token>'
+```
+## `GET /v1/cards/{id}/scheduling-explanation`
+
+Scheduling explanation through the loopback-only NeoAnki API.
+
+- **Operation ID:** `schedulingExplanation`
+- **Authorization:** Bearer token with `library.read`
+- **Success:** `200` with [SchedulingExplanation]({{ '/api/schemas/#schema-schedulingexplanation' | relative_url }})
+- **Request body:** None
+- **Success headers:** None
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `id` — path; required. Resource identifier.
+
+### Example request
+
+```bash
+curl --request GET \
+  'http://127.0.0.1:8766/v1/cards/{id}/scheduling-explanation' \
   --header 'Authorization: Bearer <token>'
 ```
 ## `POST /v1/reviews`
@@ -326,6 +348,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:d1af897ec9d7e74241218073d7da8ff3b6a56cf62f9130a315e54338cb4c588b`.
+Contract digest: `sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

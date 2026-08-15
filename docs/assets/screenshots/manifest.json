@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-15T20:19:54Z",
+  "capturedAt" : "2026-08-15T23:25:49Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -32,7 +32,7 @@
       "filename" : "import-sheet.png",
       "height" : 680,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "e2fb66c844a89c0c46b95bf6eb28cfea639b4655ceaac06091088b0513abd57f",
+      "sha256" : "9d823deb6bfaf6002c89c8998ac2155dc2ef9bcaf4650c4f60da6030a5aa1233",
       "width" : 1024
     },
     {
@@ -136,7 +136,7 @@
       "filename" : "scheduling-result.png",
       "height" : 680,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "5991a003f2214a9f1335c618f4bc10ca8bbc4b2ad257eb75f99c9b16b5e2d0db",
+      "sha256" : "13a8b43e45e7ec20beec7ae1e0815614e847f86416edc0ee5e71baaa1a32c370",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "4159650c7a704d19e87e56b95a7a3edd8c13eeda"
+  "sourceSHA" : "56acfeb0a6c0870890ed60ea9bbfb9d63e56ab8c"
 }

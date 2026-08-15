@@ -1,0 +1,12 @@
+{
+  "source": "fsrs-rs src/inference.rs documentation example",
+  "upstream_commit": "6f5498f8dd1a95c781fcdd4448f28f16dd9e377d",
+  "parameters": [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542],
+  "input": { "state": null, "desired_retention": 0.9, "days_elapsed": 0 },
+  "expected": {
+    "again": { "stability": 0.212, "difficulty": 6.4133, "interval": 0.212 },
+    "hard": { "stability": 1.2931, "difficulty": 5.1121707, "interval": 1.2931 },
+    "good": { "stability": 2.3065, "difficulty": 2.118104, "interval": 2.3065 },
+    "easy": { "stability": 8.2956, "difficulty": 1.0, "interval": 8.2956 }
+  }
+}

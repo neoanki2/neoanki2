@@ -51,9 +51,9 @@
   "scheduling": {
     "article": "user/scheduling.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift",
-    "minimumReviewOutcomes": 100,
+    "minimumReviewOutcomes": 400,
     "minimumReviewsPerCardForOutcome": 2,
-    "automaticMinimumNewReviewLogs": 50,
+    "automaticMinimumNewReviewLogs": 200,
     "automaticGrowthPercent": 25,
     "automaticStaleIntervalDays": 30
   },
@@ -111,14 +111,14 @@
     {
       "article": "user/scheduling.md",
       "contains": [
-        "at least **100 usable review outcomes**",
+        "at least **400 usable interday review outcomes**",
         "**90%**",
         "**36,500 days**",
         "default is **4:00 AM**",
         "There is no **Optimize Scheduling** command",
         "Reset All Progress",
         "grown by **25%**",
-        "**50 new reviews**",
+        "**200 new reviews**",
         "after **30 days**"
       ]
     },
@@ -151,7 +151,7 @@
       "contains": [
         "repair round",
         "due immediately",
-        "built-in 90%",
+        "shared preset starts at 90%",
         "The first card appears as soon as its exact due count and content are ready"
       ]
     },

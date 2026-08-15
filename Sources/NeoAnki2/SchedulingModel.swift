@@ -9,6 +9,8 @@ final class SchedulingModel {
     private(set) var rolloverMinutes = StudyDay.defaultRolloverMinutes
     private(set) var isLoadingSettings = false
     private(set) var isSavingSettings = false
+    private(set) var health: LibrarySchedulingHealth?
+    private(set) var isRecovering = false
     var isShowingSettings = false
     var settingsError: String?
 
@@ -29,6 +31,31 @@ final class SchedulingModel {
         defer { isLoadingSettings = false }
         do {
             rolloverMinutes = try await library.studyDayRolloverMinutes()
+            health = try await library.schedulingHealthSnapshot()
+        } catch {
+            settingsError = UserFacingError.message(from: error)
+        }
+    }
+
+    func restoreDefaults() async {
+        guard !isRecovering else { return }
+        isRecovering = true
+        settingsError = nil
+        defer { isRecovering = false }
+        do {
+            health = try await library.restoreDefaultScheduling(now: .now)
+        } catch {
+            settingsError = UserFacingError.message(from: error)
+        }
+    }
+
+    func rollback() async {
+        guard !isRecovering else { return }
+        isRecovering = true
+        settingsError = nil
+        defer { isRecovering = false }
+        do {
+            health = try await library.rollbackScheduling(to: nil, now: .now)
         } catch {
             settingsError = UserFacingError.message(from: error)
         }

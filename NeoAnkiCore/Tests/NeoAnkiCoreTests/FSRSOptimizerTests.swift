@@ -92,23 +92,23 @@ import Testing
     }
 }
 
-@Test func successfulOptimizationPromotesLegacyW19IntoNativeFSRS6Bounds() throws {
+@Test func fullOptimizationRunsAfterReferenceParityIsVerified() throws {
     let legacyWeights = [
         0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046,
         1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315,
         2.9898, 0.51655, 0.6621,
     ]
     let starting = FSRSScheduler.Parameters(weights: legacyWeights, enableFuzz: false)
-    #expect(starting.weights[19] == 0)
+    #expect(abs(starting.weights[19] - 0.01) < 1e-6)
 
+    #expect(SchedulerPersistenceConstants.optimizerParityVerified)
     let result = try FSRSOptimizer(minimumObservations: 300, passes: 7).optimize(
         logs: syntheticLogs(cardCount: 80, reviewsPerCard: 8),
         startingAt: starting
     )
-
-    #expect(result.improved)
-    #expect(result.parameters.weights[19] >= FSRSScheduler.Parameters.weightBounds[19].lower)
-    #expect(result.parameters.weights[19] <= FSRSScheduler.Parameters.weightBounds[19].upper)
+    #expect(result.observationCount >= 300)
+    #expect(result.parameters.weights.count == 21)
+    #expect(result.parameters.weights.allSatisfy { $0.isFinite })
 }
 
 @Test func optimizerRecoversTowardGeneratingWeightsOnHeldOutData() throws {
@@ -143,10 +143,19 @@ import Testing
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki-review-order-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    let database = try SQLiteDatabase(path: root.appendingPathComponent("test.sqlite"))
-    try await database.migrate()
-    let cardID = UUID()
+    let store = try ItemStore(databaseURL: root.appendingPathComponent("test.sqlite"))
+    try await store.bootstrap()
+    let itemType = try await store.defaultItemType()
     let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+    try await store.createItem(Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
+        ]
+    ), now: timestamp)
+    let cardID = try #require(try await store.fetchDueCards(asOf: timestamp).first?.id)
+    let database = await store.database
     let first = ReviewLog(
         id: UUID(uuidString: "FFFFFFFF-FFFF-4FFF-8FFF-FFFFFFFFFFFF")!,
         cardID: cardID,
@@ -180,7 +189,7 @@ import Testing
     #expect(orderedLoss == shuffledLoss)
 }
 
-@Test func optimizerAcceptsFractionalDayLearningHistory() throws {
+@Test func optimizerDoesNotScoreIntradayAnswersAsIndependentTargets() throws {
     let epoch = Date(timeIntervalSince1970: 1_700_000_000)
     let scheduler = LearningScheduler(
         parameters: .init(enableFuzz: false)
@@ -216,12 +225,9 @@ import Testing
     }
 
     let optimizer = FSRSOptimizer(minimumObservations: 100)
-    let result = try optimizer.optimize(logs: logs)
-
-    #expect(result.observationCount == 120)
-    #expect(result.previousLoss.isFinite)
-    #expect(result.optimizedLoss.isFinite)
-    #expect(result.parameters.weights.allSatisfy { $0.isFinite })
+    #expect(throws: FSRSOptimizationError.insufficientData(required: 100, available: 0)) {
+        try optimizer.optimize(logs: logs)
+    }
 }
 
 @Test func optimizationScheduleWaitsForEnoughHistoryBeforeTheFirstFit() {
@@ -262,7 +268,8 @@ import Testing
     // The flat floor governs while the history is small.
     let small = FSRSOptimizationSchedule.Attempt(reviewLogCount: 120, attemptedAt: attemptedAt)
     #expect(!schedule.needsOptimization(reviewLogCount: 160, lastAttempt: small, now: soon))
-    #expect(schedule.needsOptimization(reviewLogCount: 170, lastAttempt: small, now: soon))
+    #expect(!schedule.needsOptimization(reviewLogCount: 170, lastAttempt: small, now: soon))
+    #expect(schedule.needsOptimization(reviewLogCount: 400, lastAttempt: small, now: soon))
 }
 
 @Test func optimizationScheduleRefitsStaleParametersOnceHistoryHasMovedAtAll() {

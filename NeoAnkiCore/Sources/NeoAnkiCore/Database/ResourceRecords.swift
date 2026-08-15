@@ -390,11 +390,15 @@ public extension ItemStore {
 
     func reviewPreviews(cardID: UUID, now: Date = .now) async throws -> [ReviewRating: MemoryState] {
         let card = try await card(id: cardID)
-        let scheduler: any Scheduler = schedulerOverride
-            ?? LearningScheduler(parameters: fsrsParameters)
-        return Dictionary(uniqueKeysWithValues: ReviewRating.allCases.map {
-            ($0, scheduler.schedule(card.memory, rating: $0, now: now))
-        })
+        return try await previewSchedulingContext(card: card, now: now)
+    }
+
+    func reviewPreviewDetails(
+        cardID: UUID,
+        now: Date = .now
+    ) async throws -> [ReviewRating: ReviewSchedulePreviewDetail] {
+        let card = try await card(id: cardID)
+        return try await detailedReviewPreviews(card: card, now: now)
     }
 
     @discardableResult

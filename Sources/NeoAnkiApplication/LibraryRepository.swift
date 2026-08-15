@@ -78,6 +78,72 @@ public protocol LibraryStudying: Sendable {
         durationMilliseconds: Int
     ) async throws -> ReviewSubmission
     func revertReview(id: UUID, asOf: Date) async throws
+    /// Computes all four outcomes against one instant without recording a review.
+    func reviewSchedulePreviews(
+        cardID: UUID,
+        asOf: Date
+    ) async throws -> [ReviewRating: ReviewSchedulePreview]
+}
+
+/// A presentation-safe projection of one possible review answer.
+public struct ReviewSchedulePreview: Sendable, Equatable {
+    public let rating: ReviewRating
+    public let reviewedAt: Date
+    public let memoryBefore: MemoryState
+    public let memoryAfter: MemoryState
+    public let predictedRetrievability: Double
+    public let rawIntervalDays: Double
+    public let operationalIntervalSeconds: Int
+    public let presetID: UUID?
+    public let parameterSetID: UUID?
+    public let modelVersion: String
+    public let timingPolicyVersion: String
+    public let intervalPolicyVersion: String
+    public let finalDueAt: Date
+    public let constraintReason: String?
+
+    public init(_ value: ReviewSchedulePreviewDetail, reviewedAt: Date) {
+        rating = value.rating
+        self.reviewedAt = reviewedAt
+        memoryBefore = value.memoryBefore
+        memoryAfter = value.memoryAfter
+        predictedRetrievability = value.predictedRetrievability
+        rawIntervalDays = value.rawIntervalDays
+        operationalIntervalSeconds = value.operationalIntervalSeconds
+        presetID = value.presetID
+        parameterSetID = value.parameterSetID
+        modelVersion = value.modelVersion
+        timingPolicyVersion = value.timingPolicyVersion
+        intervalPolicyVersion = value.intervalPolicyVersion
+        finalDueAt = value.finalDueAt
+        constraintReason = value.constraintReason
+    }
+
+    /// Compatibility initializer for lightweight repository doubles. Production
+    /// repositories use the Core detailed-preview projection above.
+    public init(rating: ReviewRating, reviewedAt: Date, memory: MemoryState) {
+        self.rating = rating
+        self.reviewedAt = reviewedAt
+        memoryBefore = memory
+        memoryAfter = memory
+        predictedRetrievability = 1
+        rawIntervalDays = max(0, memory.due.timeIntervalSince(reviewedAt) / 86_400)
+        operationalIntervalSeconds = max(0, Int(ceil(memory.due.timeIntervalSince(reviewedAt))))
+        presetID = nil
+        parameterSetID = nil
+        modelVersion = "unavailable"
+        timingPolicyVersion = "neo-elapsed-24h-v1"
+        intervalPolicyVersion = "continuous-due-v1"
+        finalDueAt = memory.due
+        constraintReason = rating == .again ? "immediate-repair-v1" : nil
+    }
+
+    /// Backwards-compatible presentation alias.
+    public var memory: MemoryState { memoryAfter }
+
+    public var intervalSeconds: TimeInterval {
+        TimeInterval(operationalIntervalSeconds)
+    }
 }
 
 /// Persistent, local-only learner audio responses. Kept separate from graded
@@ -102,6 +168,151 @@ public protocol LibraryScheduling: Sendable {
     func studyDayRolloverMinutes() async throws -> Int
     func setStudyDayRolloverMinutes(_ minutes: Int) async throws
     func optimizeSchedulingIfNeeded(asOf: Date) async throws -> FSRSOptimizationResult?
+    func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth
+    func restoreDefaultScheduling(now: Date) async throws -> LibrarySchedulingHealth
+    func rollbackScheduling(to parameterSetID: UUID?, now: Date) async throws -> LibrarySchedulingHealth
+    func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet]
+    func fsrsOptimizationRunHistory(limit: Int?) async throws -> [LibraryFSRSOptimizationRun]
+}
+
+public enum SchedulingRecoveryError: LocalizedError, Sendable, Equatable {
+    case unavailable
+
+    public var errorDescription: String? {
+        "No recoverable scheduling parameter version is available."
+    }
+}
+
+public struct LibrarySchedulingHealth: Sendable, Equatable {
+    public let modelIdentifier: String
+    public let desiredRetention: Double
+    public let maximumIntervalDays: Int
+    public let automaticOptimizationEnabled: Bool
+    public let parameterCount: Int
+    public let usesPopulationDefaults: Bool
+    public let activeParameterSetID: UUID?
+    public let activeParameterSource: String?
+    public let optimizerParityVerified: Bool
+    public let lastOptimizationDecision: String?
+    public let lastOptimizationReason: String?
+    public let lastOptimizationCompletedAt: Date?
+    public let migrationStatus: String?
+    public let legacyParametersQuarantined: Bool
+    public let canRestoreDefaults: Bool
+    public let canRollback: Bool
+
+    public var optimizerStatus: String {
+        if !optimizerParityVerified { return "parityVerificationPending" }
+        return lastOptimizationDecision ?? "notRun"
+    }
+
+    public init(
+        modelIdentifier: String,
+        desiredRetention: Double,
+        maximumIntervalDays: Int,
+        automaticOptimizationEnabled: Bool,
+        parameterCount: Int,
+        usesPopulationDefaults: Bool,
+        activeParameterSetID: UUID? = nil,
+        activeParameterSource: String? = nil,
+        optimizerParityVerified: Bool = false,
+        lastOptimizationDecision: String? = nil,
+        lastOptimizationReason: String? = nil,
+        lastOptimizationCompletedAt: Date? = nil,
+        migrationStatus: String? = nil,
+        legacyParametersQuarantined: Bool = false,
+        canRestoreDefaults: Bool,
+        canRollback: Bool
+    ) {
+        self.modelIdentifier = modelIdentifier
+        self.desiredRetention = desiredRetention
+        self.maximumIntervalDays = maximumIntervalDays
+        self.automaticOptimizationEnabled = automaticOptimizationEnabled
+        self.parameterCount = parameterCount
+        self.usesPopulationDefaults = usesPopulationDefaults
+        self.activeParameterSetID = activeParameterSetID
+        self.activeParameterSource = activeParameterSource
+        self.optimizerParityVerified = optimizerParityVerified
+        self.lastOptimizationDecision = lastOptimizationDecision
+        self.lastOptimizationReason = lastOptimizationReason
+        self.lastOptimizationCompletedAt = lastOptimizationCompletedAt
+        self.migrationStatus = migrationStatus
+        self.legacyParametersQuarantined = legacyParametersQuarantined
+        self.canRestoreDefaults = canRestoreDefaults
+        self.canRollback = canRollback
+    }
+}
+
+public struct LibraryFSRSParameterSet: Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let isActive: Bool
+    public let weights: [Double]
+    public let modelVersion: String
+    public let upstreamCommit: String
+    public let sourceChecksum: String
+    public let fixtureChecksum: String?
+    public let scope: String
+    public let source: String
+    public let inputFingerprint: String?
+    public let trainingCutoff: Date?
+    public let metrics: [String: Double]
+    public let previousParameterSetID: UUID?
+    public let createdAt: Date
+
+    public init(_ value: FSRSParameterSet, isActive: Bool = false) {
+        id = value.id
+        self.isActive = isActive
+        weights = value.weights
+        modelVersion = value.modelVersion
+        upstreamCommit = value.upstreamCommit
+        sourceChecksum = value.sourceChecksum
+        fixtureChecksum = value.fixtureChecksum
+        scope = value.scope
+        source = value.source.rawValue
+        inputFingerprint = value.inputFingerprint
+        trainingCutoff = value.trainingCutoff
+        metrics = value.metrics
+        previousParameterSetID = value.previousParameterSetID
+        createdAt = value.createdAt
+    }
+}
+
+public struct LibraryFSRSOptimizationRun: Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let presetID: UUID
+    public let startedAt: Date
+    public let completedAt: Date
+    public let trainingCutoff: Date
+    public let inputFingerprint: String
+    public let eligibleTargetCount: Int
+    public let distinctCardCount: Int
+    public let failureCount: Int
+    public let studyDayCount: Int
+    public let excludedCounts: [String: Int]
+    public let foldCount: Int
+    public let metrics: [String: Double]
+    public let decision: String
+    public let reason: String?
+    public let candidateParameterSetID: UUID?
+
+    public init(_ value: FSRSOptimizationRun) {
+        id = value.id
+        presetID = value.presetID
+        startedAt = value.startedAt
+        completedAt = value.completedAt
+        trainingCutoff = value.trainingCutoff
+        inputFingerprint = value.inputFingerprint
+        eligibleTargetCount = value.eligibleTargetCount
+        distinctCardCount = value.distinctCardCount
+        failureCount = value.failureCount
+        studyDayCount = value.studyDayCount
+        excludedCounts = value.excludedCounts
+        foldCount = value.foldCount
+        metrics = value.metrics
+        decision = value.decision.rawValue
+        reason = value.reason
+        candidateParameterSetID = value.candidateParameterSetID
+    }
 }
 
 /// High-level import operations keep parser and persistence details behind the boundary.
@@ -247,6 +458,13 @@ public extension LibraryStudying {
     ) async throws -> [DueCard] {
         try await dueCards(scope: scope, asOf: asOf, limit: limit)
     }
+
+    func reviewSchedulePreviews(
+        cardID: UUID,
+        asOf: Date
+    ) async throws -> [ReviewRating: ReviewSchedulePreview] {
+        [:]
+    }
 }
 
 public extension LibraryStudyResponses {
@@ -271,6 +489,36 @@ public extension LibraryStudyResponses {
 public extension LibraryScheduling {
     func optimizeSchedulingIfNeeded(asOf: Date = .now) async throws -> FSRSOptimizationResult? {
         try await optimizeSchedulingIfNeeded(asOf: asOf)
+    }
+
+    func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth {
+        LibrarySchedulingHealth(
+            modelIdentifier: "Unavailable",
+            desiredRetention: SchedulerPersistenceConstants.desiredRetention,
+            maximumIntervalDays: SchedulerPersistenceConstants.maximumIntervalDays,
+            automaticOptimizationEnabled: false,
+            parameterCount: 0,
+            usesPopulationDefaults: true,
+            canRestoreDefaults: false,
+            canRollback: false
+        )
+    }
+
+    func restoreDefaultScheduling(now: Date = .now) async throws -> LibrarySchedulingHealth {
+        throw SchedulingRecoveryError.unavailable
+    }
+
+    func rollbackScheduling(
+        to parameterSetID: UUID? = nil,
+        now: Date = .now
+    ) async throws -> LibrarySchedulingHealth {
+        throw SchedulingRecoveryError.unavailable
+    }
+
+    func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet] { [] }
+
+    func fsrsOptimizationRunHistory(limit: Int? = nil) async throws -> [LibraryFSRSOptimizationRun] {
+        []
     }
 }
 
@@ -422,6 +670,16 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
         )
     }
 
+    public func reviewSchedulePreviews(
+        cardID: UUID,
+        asOf: Date
+    ) async throws -> [ReviewRating: ReviewSchedulePreview] {
+        let details = try await store.reviewPreviewDetails(cardID: cardID, now: asOf)
+        return Dictionary(uniqueKeysWithValues: details.map { rating, detail in
+            (rating, ReviewSchedulePreview(detail, reviewedAt: asOf))
+        })
+    }
+
     public func completeAudioSubmission(
         _ draft: StudyResponseDraft,
         submittedAt: Date
@@ -476,6 +734,58 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
     }
     public func optimizeSchedulingIfNeeded(asOf: Date) async throws -> FSRSOptimizationResult? {
         try await store.optimizeSchedulingIfNeeded(now: asOf)
+    }
+    public func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth {
+        let snapshot = try await store.schedulingHealthSnapshot()
+        return LibrarySchedulingHealth(
+            modelIdentifier: snapshot.activeModelVersion
+                ?? SchedulerPersistenceConstants.memoryModelVersion,
+            desiredRetention: snapshot.desiredRetention,
+            maximumIntervalDays: snapshot.preset.maximumIntervalDays,
+            automaticOptimizationEnabled: snapshot.automaticOptimizationEnabled,
+            parameterCount: snapshot.activeParameterSet?.weights.count ?? 0,
+            usesPopulationDefaults: snapshot.activeSource == .populationDefault,
+            activeParameterSetID: snapshot.activeParameterSet?.id,
+            activeParameterSource: snapshot.activeSource?.rawValue,
+            optimizerParityVerified: snapshot.optimizerParityVerified,
+            lastOptimizationDecision: snapshot.lastOptimizationRun?.decision.rawValue,
+            lastOptimizationReason: snapshot.lastOptimizationRun?.reason,
+            lastOptimizationCompletedAt: snapshot.lastOptimizationRun?.completedAt,
+            migrationStatus: snapshot.latestMigration?.status.rawValue,
+            legacyParametersQuarantined: snapshot.legacyParametersQuarantined,
+            canRestoreDefaults: snapshot.activeSource != .populationDefault,
+            canRollback: snapshot.rollbackAvailable
+        )
+    }
+    public func restoreDefaultScheduling(now: Date) async throws -> LibrarySchedulingHealth {
+        try await store.restoreDefaultScheduling(now: now)
+        return try await schedulingHealthSnapshot()
+    }
+    public func rollbackScheduling(
+        to parameterSetID: UUID?,
+        now: Date
+    ) async throws -> LibrarySchedulingHealth {
+        let snapshot = try await store.schedulingHealthSnapshot()
+        guard let target = parameterSetID ?? snapshot.rollbackParameterSetIDs.first else {
+            throw SchedulingRecoveryError.unavailable
+        }
+        guard snapshot.rollbackParameterSetIDs.contains(target) else {
+            throw SchedulingRecoveryError.unavailable
+        }
+        try await store.rollbackScheduling(to: target, now: now)
+        return try await schedulingHealthSnapshot()
+    }
+    public func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet] {
+        let snapshot = try await store.schedulingHealthSnapshot()
+        let activeID = snapshot.activeParameterSet?.id
+        return try await store.fsrsParameterSets().map {
+            LibraryFSRSParameterSet($0, isActive: $0.id == activeID)
+        }
+    }
+    public func fsrsOptimizationRunHistory(
+        limit: Int?
+    ) async throws -> [LibraryFSRSOptimizationRun] {
+        try await store.fsrsOptimizationRuns(limit: limit).map(LibraryFSRSOptimizationRun.init)
     }
 
     public func importJSONItems(

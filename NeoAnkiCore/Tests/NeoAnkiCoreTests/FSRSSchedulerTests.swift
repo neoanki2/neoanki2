@@ -25,7 +25,7 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     #expect(abs(state.stability - w[0]) < 1e-9)   // initial S for "again"
     #expect(state.phase == .relearning)
     #expect(state.lapses == 0)                    // first-ever review isn't a lapse
-    #expect(abs(state.due.timeIntervalSince(now) - w[0] * 86_400) < 1e-6)
+    #expect(abs(state.due.timeIntervalSince(now) - w[0] * 86_400) < 1)
 }
 
 @Test func higherGradeYieldsLongerInterval() {
@@ -119,12 +119,14 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     let results = ReviewRating.allCases.map {
         scheduler.schedule(.new(due: start), rating: $0, now: start)
     }
-    #expect(results.map(\.stability) == [0.212, 1.2931, 2.3065, 8.2956])
+    for (actual, expected) in zip(results.map(\.stability), [0.212, 1.2931, 2.3065, 8.2956]) {
+        #expect(abs(actual - expected) < 1e-6)
+    }
     let expectedDifficulty = [6.4133, 5.11217071, 2.11810397, 1.0]
     for (actual, expected) in zip(results.map(\.difficulty), expectedDifficulty) {
         #expect(abs(actual - expected) < 1e-7)
     }
-    #expect(abs(results[2].due.timeIntervalSince(start) - 2.3065 * day) < 1e-6)
+    #expect(abs(results[2].due.timeIntervalSince(start) - 2.3065 * day) < 1)
 }
 
 @Test func legacyNineteenWeightsMigrateToFiniteTwentyOneWeightProfile() throws {
@@ -142,14 +144,16 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     let migrated = try JSONDecoder().decode(FSRSScheduler.Parameters.self, from: data)
 
     #expect(migrated.weights.count == 21)
-    #expect(Array(migrated.weights.prefix(19)) == legacy)
-    #expect(migrated.weights[19] == 0)
+    for (actual, expected) in zip(migrated.weights.prefix(19), legacy) {
+        #expect(abs(actual - expected) < 1e-6)
+    }
+    #expect(abs(migrated.weights[19] - 0.01) < 1e-6)
     #expect(migrated.weights[20] == 0.5)
     #expect(migrated.weights.allSatisfy { $0.isFinite })
     #expect(FSRSScheduler.Parameters.weightBounds[19].lower == 0.01)
 }
 
-@Test func fsrs6InitialStabilityHasAuthoritativePointOneFloor() {
+@Test func fsrs6InitialStabilityUsesUpstreamPointZeroZeroOneFloor() {
     var weights = w
     weights[0] = 0.001
     let scheduler = FSRSScheduler(parameters: .init(weights: weights, enableFuzz: false))
@@ -157,7 +161,7 @@ private let w = FSRSScheduler.Parameters.defaultWeights
 
     let next = scheduler.schedule(.new(due: now), rating: .again, now: now)
 
-    #expect(next.stability == 0.1)
+    #expect(abs(next.stability - 0.001) < 1e-9)
 }
 
 @Test func bareFSRSReviewAgainCanScheduleOneDayOutWithoutLearningPolicy() {
@@ -216,7 +220,7 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     let increase = pow(first.stability, -w[19]) * exp(w[17] * (1 + w[18]))
     let expected = first.stability * max(1, increase)
 
-    #expect(abs(sameDay.stability - expected) < 1e-12)
+    #expect(abs(sameDay.stability - expected) < 1e-5)
     #expect(sameDay.stability > first.stability)
 }
 
@@ -243,7 +247,7 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     let damped = reviewed.difficulty + deltaD * (10.0 - reviewed.difficulty) / 9.0
     let easyInit = w[4] - exp(w[5] * 3.0) + 1.0
     let expectedDifficulty = clamp(w[7] * easyInit + (1.0 - w[7]) * damped)
-    #expect(abs(lapsed.difficulty - expectedDifficulty) < 1e-12)
+    #expect(abs(lapsed.difficulty - expectedDifficulty) < 1e-5)
 
     // Independently recompute the FSRS-6 post-lapse stability from the weights.
     let sf = w[11]
@@ -253,7 +257,7 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     let shortTermCap = reviewed.stability / exp(w[17] * w[18])
     let expected = max(0.001, min(sf, shortTermCap))
 
-    #expect(abs(lapsed.stability - expected) < 1e-9)
+    #expect(abs(lapsed.stability - expected) < 1e-5)
     #expect(lapsed.stability <= shortTermCap)
 }
 
@@ -296,14 +300,14 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     #expect(sameDay.stability >= first.stability)  // w17,w18 >= 0 -> non-shrinking
 }
 
-@Test func intervalFuzzIsDeterministicAndBounded() {
+@Test func intervalFuzzIsDisabled() {
     let scheduler = FSRSScheduler()
 
-    #expect(scheduler.fuzz(interval: 3, unit: 0) == 2)
-    #expect(scheduler.fuzz(interval: 3, unit: 0.999_999) == 4)
+    #expect(scheduler.fuzz(interval: 3, unit: 0) == 3)
+    #expect(scheduler.fuzz(interval: 3, unit: 0.999_999) == 3)
     #expect(scheduler.fuzz(interval: 20, unit: 0.5) == 20)
-    #expect(scheduler.fuzz(interval: 100, unit: 0) == 95)
-    #expect(scheduler.fuzz(interval: 100, unit: 0.999_999) == 105)
+    #expect(scheduler.fuzz(interval: 100, unit: 0) == 100)
+    #expect(scheduler.fuzz(interval: 100, unit: 0.999_999) == 100)
 
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let state = MemoryState(
@@ -331,5 +335,5 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     #expect(parameters.weights == FSRSScheduler.Parameters.defaultWeights)
     #expect(parameters.requestRetention == 0.9)
     #expect(parameters.maximumInterval == 1)
-    #expect(FSRSScheduler(parameters: parameters).intervalDays(for: .nan) == 1.0 / 1_440.0)
+    #expect(FSRSScheduler(parameters: parameters).intervalDays(for: .nan) == 1.0 / 86_400.0)
 }

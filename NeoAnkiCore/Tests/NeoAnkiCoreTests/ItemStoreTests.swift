@@ -311,7 +311,7 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(items.first?.subtitle == "Legacy back")
 }
 
-@Test func persistedProfileParametersLoadAndDriveScheduling() async throws {
+@Test func persistedLegacyProfileIsQuarantinedAndDoesNotDriveScheduling() async throws {
     let databaseURL = tempDatabaseURL()
     var weights = FSRSScheduler.Parameters.defaultWeights
     weights[0] = 2.5
@@ -329,7 +329,8 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
 
     let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-a")
     try await store.bootstrap()
-    #expect(await store.schedulingParameters() == expected)
+    #expect(await store.schedulingParameters() == FSRSScheduler.Parameters())
+    #expect(try await store.schedulingHealthSnapshot().legacyParametersQuarantined)
 
     let itemType = try await store.defaultItemType()
     let item = Item(
@@ -344,10 +345,10 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     let card = try #require(await store.fetchDueCards(asOf: now).first)
     let memory = try await store.submitReview(cardID: card.id, rating: .again, now: now)
 
-    #expect(memory.stability == 2.5)
+    #expect(memory.stability == FSRSScheduler.Parameters.defaultWeights[0])
 }
 
-@Test func persistedFSRS5ProfileMigratesToFSRS6AcrossRelaunch() async throws {
+@Test func persistedFSRS5ProfileIsQuarantinedAcrossRelaunch() async throws {
     let databaseURL = tempDatabaseURL()
     let database = try SQLiteDatabase(path: databaseURL)
     try await database.migrate()
@@ -375,14 +376,13 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     let firstOpen = try ItemStore(databaseURL: databaseURL, profileID: "legacy-v5")
     try await firstOpen.bootstrap()
     let first = await firstOpen.schedulingParameters()
-    #expect(first.weights.count == 21)
-    #expect(Array(first.weights.prefix(19)) == legacyWeights)
-    #expect(first.weights[19] == 0)
-    #expect(first.weights[20] == 0.5)
+    #expect(first == FSRSScheduler.Parameters())
+    #expect(try await firstOpen.schedulingHealthSnapshot().legacyParametersQuarantined)
 
     let reopened = try ItemStore(databaseURL: databaseURL, profileID: "legacy-v5")
     try await reopened.bootstrap()
     #expect(await reopened.schedulingParameters() == first)
+    #expect(try await reopened.schedulingHealthSnapshot().legacyParametersQuarantined)
 }
 
 @Test func revertMarksReviewInactiveWithoutDeletingHistory() async throws {
@@ -495,7 +495,15 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
         lapses: 0,
         phase: .review
     )
-    try await SQLiteDatabase(path: databaseURL).updateCardMemory(card.id, memory: reviewMemory)
+    let active = try #require(
+        try await store.schedulingHealthSnapshot().activeParameterSet
+    )
+    try await SQLiteDatabase(path: databaseURL).updateCardSchedulingMemory(
+        card.id,
+        memory: reviewMemory,
+        modelVersion: active.modelVersion,
+        parameterSetID: active.id
+    )
 
     let submission = try await store.submitReviewWithReceipt(
         cardID: card.id,
@@ -514,42 +522,23 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     let databaseURL = tempDatabaseURL()
     let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
     try await store.bootstrap()
-    let itemType = try await store.defaultItemType()
-    let item = Item(
-        itemTypeID: itemType.id,
-        fields: [
-            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
-            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
-        ]
-    )
     let start = Date(timeIntervalSince1970: 1_700_000_000)
-    _ = try await store.createItem(item, now: start)
-    let card = try #require(await store.fetchDueCards(asOf: start).first)
-    let database = try SQLiteDatabase(path: databaseURL)
+    _ = try await seedEligibleOptimizationHistory(in: store, start: start)
 
-    for index in 0..<130 {
-        let rating: ReviewRating = index == 0 || index % 5 != 0 ? .good : .again
-        try await database.insertReviewLog(
-            ReviewLog(
-                cardID: card.id,
-                reviewedAt: start.addingTimeInterval(Double(index * 12) * 86_400),
-                rating: rating,
-                elapsedDays: index == 0 ? 0 : 12,
-                scheduledDays: index == 0 ? 0 : 12,
-                phaseBefore: index == 0 ? .new : .review,
-                durationMs: 1_000
-            ),
-            memoryBefore: .new(due: start)
-        )
-    }
-
-    let result = try await store.optimizeScheduling(minimumObservations: 100)
-    #expect(result.improved)
-    #expect(result.optimizedLoss < result.previousLoss)
+    let result = try await store.optimizeScheduling(minimumObservations: 400)
+    let health = try await store.schedulingHealthSnapshot()
+    let run = try #require(health.lastOptimizationRun)
+    let candidateID = try #require(run.candidateParameterSetID)
+    let candidate = try #require(
+        try await store.fsrsParameterSets().first { $0.id == candidateID }
+    )
+    #expect(candidate.weights == result.parameters.weights)
 
     let reopened = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
     try await reopened.bootstrap()
-    #expect(await reopened.schedulingParameters() == result.parameters)
+    let reopenedHealth = try await reopened.schedulingHealthSnapshot()
+    #expect(reopenedHealth.lastOptimizationRun?.id == run.id)
+    #expect(reopenedHealth.activeParameterSet?.id == health.activeParameterSet?.id)
 }
 
 @Test func automaticOptimizationFitsOnceAndThenWaitsForNewHistory() async throws {
@@ -577,33 +566,78 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(await store.schedulingParameters() == untuned)
     #expect(try await store.lastOptimizationAttempt() == nil)
 
-    for index in 0..<130 {
-        let rating: ReviewRating = index == 0 || index % 5 != 0 ? .good : .again
-        _ = try await store.submitReview(
-            cardID: card.id,
-            rating: rating,
-            now: start.addingTimeInterval(Double(index * 12) * 86_400),
-            durationMs: 1_000
-        )
-    }
-    let end = start.addingTimeInterval(130 * 12 * 86_400)
+    _ = card // The initial no-history gate is intentionally exercised above.
+    let end = try await seedEligibleOptimizationHistory(in: store, start: start)
 
     let result = try #require(try await store.optimizeSchedulingIfNeeded(now: end))
-    #expect(result.improved)
-    #expect(await store.schedulingParameters() == result.parameters)
+    #expect(result.observationCount >= 400)
     let attempt = try #require(await store.lastOptimizationAttempt())
-    #expect(attempt.reviewLogCount == 130)
+    #expect(attempt.reviewLogCount == 500)
     #expect(attempt.attemptedAt == end)
 
     // A second call with no new reviews must not refit.
     #expect(try await store.optimizeSchedulingIfNeeded(now: end) == nil)
-    #expect(await store.schedulingParameters() == result.parameters)
+    #expect(try await store.fsrsOptimizationRuns().count == 1)
 
     // Each profile fits its own weights, so a different profile in the same
     // library starts with no attempt of its own.
     let otherProfile = try ItemStore(databaseURL: databaseURL, profileID: "learner-c")
     try await otherProfile.bootstrap()
     #expect(try await otherProfile.lastOptimizationAttempt() == nil)
+}
+
+private func seedEligibleOptimizationHistory(
+    in store: ItemStore,
+    start: Date
+) async throws -> Date {
+    let itemType = try await store.defaultItemType()
+    try await store.createItem(Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Optimizer front")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Optimizer back")),
+        ]
+    ), now: start)
+    let template = try #require(try await store.fetchDueCards(asOf: start).first?.card)
+    let database = await store.database
+    let deltas = [1, 5, 40, 2]
+    var latest = start
+    for cardIndex in 0 ..< 100 {
+        let cardID = cardIndex == 0 ? template.id : UUID()
+        if cardIndex != 0 {
+            try await database.upsertSynchronizedCard(Card(
+                id: cardID,
+                itemID: template.itemID,
+                templateID: template.templateID,
+                skill: template.skill,
+                memory: .new(due: start)
+            ))
+        }
+        var reviewedAt = start.addingTimeInterval(Double(cardIndex % 40) * 86_400)
+        try await database.insertReviewLog(ReviewLog(
+            cardID: cardID,
+            reviewedAt: reviewedAt,
+            rating: .good,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            phaseBefore: .new,
+            durationMs: 1_000
+        ), memoryBefore: .new(due: start))
+        for (targetIndex, delta) in deltas.enumerated() {
+            reviewedAt = reviewedAt.addingTimeInterval(Double(delta) * 86_400)
+            latest = max(latest, reviewedAt)
+            try await database.insertReviewLog(ReviewLog(
+                cardID: cardID,
+                reviewedAt: reviewedAt,
+                rating: targetIndex.isMultiple(of: 3) ? .again : .good,
+                elapsedDays: Double(delta),
+                scheduledDays: Double(delta),
+                phaseBefore: .review,
+                durationMs: 1_000
+            ), memoryBefore: .new(due: start))
+        }
+    }
+    return latest
 }
 
 private func reviewLogRowCount(at url: URL, cardID: UUID) throws -> Int {

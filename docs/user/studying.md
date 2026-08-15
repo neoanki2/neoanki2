@@ -150,17 +150,18 @@ Open **Grade Help** from the question-mark button for the same guidance.
 
 [![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
-NeoAnki2 uses FSRS-6. Each saved rating updates the card’s estimated difficulty
-and stability, and the next due date is calculated for the built-in 90%
-retention target. The current app does not expose a retention setting. Again
+NeoAnki2 uses a native Swift implementation pinned to its documented upstream
+FSRS-6 reference. Each saved rating updates the card’s estimated difficulty
+and stability, and the next due date uses the active preset's retention target;
+the shared preset starts at 90% and can be changed in Scheduling Settings. Again
 marks one lapse when a review card enters relearning; repeated failures during
 that repair sequence do not add more lapses. Hard reduces growth; Easy can
 increase it. Every repair attempt records its actual timestamp and is never
 fuzzed or delayed: failed acquisition returns in the next repair round.
 After recall, FSRS keeps fractional-day precision and may choose an intraday
 review when the memory state calls for it. Longer review intervals depend on
-the card’s history, elapsed time, scheduler parameters, and small deterministic
-interval variation.
+the card’s history, elapsed time, scheduler parameters, desired retention, and
+configured maximum interval. Interval fuzz is disabled.
 
 ## Fix a card during a session
 
