@@ -7,6 +7,7 @@ package enum APIEndpointGroup: String, CaseIterable, Sendable {
     case itemTypes = "Item types"
     case items = "Items and tags"
     case study = "Cards and study"
+    case scheduling = "Scheduling"
     case responses = "Responses and media"
     case vocabulary = "Vocabulary"
     case transfers = "Import and export"
@@ -20,6 +21,7 @@ package enum APIEndpointGroup: String, CaseIterable, Sendable {
         case .itemTypes: "item-types"
         case .items: "items-and-tags"
         case .study: "cards-and-study"
+        case .scheduling: "scheduling"
         case .responses: "responses-and-media"
         case .vocabulary: "vocabulary"
         case .transfers: "import-and-export"
@@ -60,7 +62,9 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     case replaceItemType, deleteItemType, duplicateItemType
     case listItems, createItem, validateItem, bulkItems, getItem, replaceItem, deleteItem
     case duplicateChecks, listTags, renameTag, removeTag
-    case listCards, getCard, patchCard, cardContent, reviewPreview, resetCard
+    case listCards, getCard, patchCard, cardContent, reviewPreview, schedulingExplanation, resetCard
+    case schedulingHealth, listSchedulingParameterSets, listSchedulingOptimizationRuns
+    case restoreDefaultScheduling, rollbackScheduling
     case createStudySession, getStudySession, endStudySession, nextStudyCard, skipStudyCard
     case submitReview, revertReview
     case listStudyResponses, getStudyResponse, deleteStudyResponse

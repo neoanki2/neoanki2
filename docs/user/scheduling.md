@@ -1,6 +1,6 @@
 ---
 title: Scheduling
-description: Understand FSRS grading and how scheduling tunes itself after 100 usable review outcomes.
+description: Understand FSRS grading and how scheduling tunes itself after sufficient interday history.
 audience: user
 nav_order: 8
 parent: User Guide
@@ -108,13 +108,15 @@ the optimizer.
 
 ## When a fit is attempted
 
-Fitting requires at least **100 usable review outcomes**. This is not
-necessarily the same as 100 button presses: a card needs a prior review before
-a later review supplies an outcome for fitting. Below that, sessions end without
-a fit and nothing changes.
+Fitting requires at least **400 usable interday review outcomes** across at
+least 100 cards. This is not the same as 400 button presses: same-day answers
+remain part of each card's history but are not independent prediction targets.
+The eligibility gate also requires enough failures, study days, interval
+diversity, and held-out validation history. Below those gates, sessions end
+without a fit and nothing changes.
 
 Past the first fit, NeoAnki2 refits when review history has grown by **25%**
-since the previous attempt, with a floor of **50 new reviews** so a small
+since the previous attempt, with a floor of **200 new reviews** so a small
 library is not refitted constantly, and after **30 days** once any new history
 exists. Unchanged history is never refitted: the same reviews cannot produce a
 different answer, however long ago they were read.
@@ -134,5 +136,5 @@ tries again.
 - Treat `.neodeck` exports as content exchange, not scheduling backups. To
   preserve progress, back up the whole local library folder.
 
-The 100-outcome threshold and other documented limits are checked against
+The 400-outcome threshold and other documented limits are checked against
 production constants by the automated [documentation claims registry](../maintaining-documentation/#high-risk-factual-claims).

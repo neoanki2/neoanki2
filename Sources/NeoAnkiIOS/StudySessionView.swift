@@ -1,6 +1,7 @@
 import AVFoundation
 import AVKit
 import ImageIO
+import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiFeatures
 import SwiftUI
@@ -16,6 +17,7 @@ struct StudySessionView: View {
     @State private var loadedItem: (item: Item, itemType: ItemType)?
     @State private var recorder = MobileStudyRecorder()
     @State private var confirmsDeleteDraft = false
+    @State private var showsSchedulingDetails = false
     @AccessibilityFocusState private var answerFocused: Bool
 
     var body: some View {
@@ -78,6 +80,15 @@ struct StudySessionView: View {
             Button("Keep Draft", role: .cancel) {}
         } message: {
             Text("This recording has not been saved and cannot be recovered.")
+        }
+        .sheet(isPresented: $showsSchedulingDetails) {
+            if let card = session.currentCard {
+                MobileSchedulingExplanationView(
+                    card: card,
+                    previews: session.schedulePreviews,
+                    health: session.schedulingHealth
+                )
+            }
         }
         .sheet(isPresented: $isEditing) {
             if let loadedItem {
@@ -187,11 +198,17 @@ struct StudySessionView: View {
                         gradeButton("Good", rating: .good, hint: "I remembered correctly")
                         gradeButton("Easy", rating: .easy, hint: "I remembered immediately")
                     }
-                    Menu("Grade Help", systemImage: "questionmark.circle") {
-                        Text("Again — not remembered")
-                        Text("Hard — remembered with difficulty")
-                        Text("Good — correctly remembered")
-                        Text("Easy — immediate recall")
+                    HStack(spacing: 16) {
+                        Menu("Grade Help", systemImage: "questionmark.circle") {
+                            Text("Again — not remembered")
+                            Text("Hard — remembered with difficulty")
+                            Text("Good — correctly remembered")
+                            Text("Easy — immediate recall")
+                        }
+                        Button("Scheduling Details", systemImage: "info.circle") {
+                            showsSchedulingDetails = true
+                        }
+                        .disabled(session.schedulePreviews.isEmpty)
                     }
                 }
             }
@@ -309,13 +326,136 @@ struct StudySessionView: View {
         rating: ReviewRating,
         hint: String
     ) -> some View {
-        Button(title) {
+        let preview = session.schedulePreviews[rating]
+        Button {
             Task { await session.grade(rating) }
+        } label: {
+            VStack(spacing: 2) {
+                Text(title)
+                Text(compactInterval(preview))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.bordered)
         .frame(maxWidth: .infinity, minHeight: 44)
-            .disabled(session.isGrading)
+        .disabled(session.isGrading || session.isLoadingSchedulePreviews)
+        .accessibilityLabel("\(title), \(accessibleInterval(preview))")
         .accessibilityHint(hint)
+    }
+
+    private func compactInterval(_ preview: ReviewSchedulePreview?) -> String {
+        guard let preview else { return "—" }
+        let seconds = preview.intervalSeconds
+        if seconds < 1 { return "Now" }
+        if seconds < 60 { return "<1m" }
+        if seconds < 3_600 { return "\(max(1, Int((seconds / 60).rounded())))m" }
+        if seconds < 86_400 { return "\(max(1, Int((seconds / 3_600).rounded())))h" }
+        return "\(max(1, Int((seconds / 86_400).rounded())))d"
+    }
+
+    private func accessibleInterval(_ preview: ReviewSchedulePreview?) -> String {
+        guard let preview else { return "schedule loading" }
+        let seconds = preview.intervalSeconds
+        if seconds < 1 { return "next review immediately" }
+        if seconds < 3_600 {
+            let value = max(1, Int((seconds / 60).rounded()))
+            return "next review in \(value) minutes"
+        }
+        if seconds < 86_400 {
+            let value = max(1, Int((seconds / 3_600).rounded()))
+            return "next review in \(value) hours"
+        }
+        let value = max(1, Int((seconds / 86_400).rounded()))
+        return "next review in \(value) days"
+    }
+}
+
+private struct MobileSchedulingExplanationView: View {
+    @Environment(\.dismiss) private var dismiss
+    let card: DueCard
+    let previews: [ReviewRating: ReviewSchedulePreview]
+    let health: LibrarySchedulingHealth?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Current Memory") {
+                    LabeledContent("Stability", value: "\(memoryBefore.stability.formatted(.number.precision(.fractionLength(3)))) days")
+                    LabeledContent("Difficulty", value: memoryBefore.difficulty.formatted(.number.precision(.fractionLength(2))))
+                    LabeledContent("Model days", value: "\(elapsedModelDays)")
+                }
+                Section("Possible Answers") {
+                    ForEach(ReviewRating.allCases, id: \.self) { rating in
+                        if let preview = previews[rating] {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(title(rating)).font(.headline)
+                                    Spacer()
+                                    Text(interval(preview)).font(.headline.monospacedDigit())
+                                }
+                                Text("Stability \(memoryTransition(preview)) · difficulty \(difficultyTransition(preview))")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text("Recall \(preview.predictedRetrievability.formatted(.percent.precision(.fractionLength(1)))) · raw \(preview.rawIntervalDays.formatted(.number.precision(.fractionLength(3)))) days")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text("Applied \(preview.operationalIntervalSeconds) seconds · due \(preview.finalDueAt.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+                Section("Policy") {
+                    LabeledContent("Desired retention", value: retentionDescription)
+                    LabeledContent("Memory model", value: representativePreview?.modelVersion ?? "Unavailable")
+                    LabeledContent("Parameter set", value: representativePreview?.parameterSetID?.uuidString.lowercased() ?? "Unavailable")
+                    LabeledContent("Elapsed-time policy", value: representativePreview?.timingPolicyVersion ?? "Unavailable")
+                    LabeledContent("Interval policy", value: representativePreview?.intervalPolicyVersion ?? "Unavailable")
+                    Text("Raw is the model interval. Applied is the operational interval after the displayed policy and constraint.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Scheduling Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { Button("Done") { dismiss() } }
+        }
+    }
+
+    private var elapsedModelDays: Int {
+        guard let last = memoryBefore.lastReview,
+              let reference = previews.values.first?.reviewedAt else { return 0 }
+        return Int(max(0, reference.timeIntervalSince(last)) / 86_400)
+    }
+
+    private var representativePreview: ReviewSchedulePreview? { previews[.good] ?? previews.values.first }
+    private var memoryBefore: MemoryState { representativePreview?.memoryBefore ?? card.card.memory }
+    private var retentionDescription: String {
+        health?.desiredRetention.formatted(.percent.precision(.fractionLength(0...1))) ?? "Unavailable"
+    }
+
+    private func memoryTransition(_ preview: ReviewSchedulePreview) -> String {
+        "\(preview.memoryBefore.stability.formatted(.number.precision(.fractionLength(3)))) → \(preview.memoryAfter.stability.formatted(.number.precision(.fractionLength(3)))) days"
+    }
+
+    private func difficultyTransition(_ preview: ReviewSchedulePreview) -> String {
+        "\(preview.memoryBefore.difficulty.formatted(.number.precision(.fractionLength(2)))) → \(preview.memoryAfter.difficulty.formatted(.number.precision(.fractionLength(2))))"
+    }
+
+    private func title(_ rating: ReviewRating) -> String {
+        switch rating { case .again: "Again"; case .hard: "Hard"; case .good: "Good"; case .easy: "Easy" }
+    }
+
+    private func interval(_ preview: ReviewSchedulePreview) -> String {
+        let seconds = preview.intervalSeconds
+        if seconds < 1 { return "Now" }
+        if seconds < 3_600 { return "\(max(1, Int((seconds / 60).rounded())))m" }
+        if seconds < 86_400 { return "\(max(1, Int((seconds / 3_600).rounded())))h" }
+        return "\(max(1, Int((seconds / 86_400).rounded())))d"
     }
 }
 

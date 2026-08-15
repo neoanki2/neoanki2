@@ -1,0 +1,33 @@
+{
+  "model_identifier": "fsrs-rs-main-6f5498f8-fsrs6-swift-v1",
+  "upstream_commit": "6f5498f8dd1a95c781fcdd4448f28f16dd9e377d",
+  "upstream_manifest_version": "6.6.2",
+  "github_commit_tarball_sha256": "356b1bac9eab9cd51fad729b844d84c6a7601560b219868f26888457975ade1d",
+  "git_archive_tar_sha256": "22664035118f2179a89fbc255a0323e862d6e36b9cefd64ac9bcf9f75acf75c7",
+  "fixtures": {
+    "reference-next-states.json": "25d6281fc75fa16d32e05bee779fa87a74c406ecb14d475341184a566b4a3472",
+    "optimizer-reference.json": "d1b948f0fc3b01d206e14cade70281c94adb05e98f5f39c91d6b2a53451f5c32"
+  },
+  "sources": {
+    "reference-next-states.json": "fsrs-rs src/inference.rs documented next_states vector",
+    "optimizer-reference.json": "temporary instrumented executable built from the pinned commit"
+  },
+  "reference_toolchain": {
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "1.97.1 (c980f4866 2026-06-30)",
+    "rand_resolved_version": "0.10.2"
+  },
+  "acceptance_tolerances": {
+    "gradient_absolute": 1e-10,
+    "final_parameter_absolute": 1e-4,
+    "log_loss_absolute": 1e-6,
+    "structural_and_rng": "exact"
+  },
+  "verification_report_sha256": "59a61fbc7eb1c812ec51c69a87a1aa06fa0f23bd2f8f55422a7075035dc1404c",
+  "verification_date": "2026-08-16",
+  "status": "verified",
+  "optimizer_status": "verified_complete_five_epoch_parity",
+  "detached_signature": "verification-manifest.json.sig",
+  "signature_namespace": "file",
+  "signer_public_key_fingerprint_sha256": "SHA256:MdJCr8Ome4fGFHukR5W/2oXGZX491F3cUfIQMsTjWug"
+}

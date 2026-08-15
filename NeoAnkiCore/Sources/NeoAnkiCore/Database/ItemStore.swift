@@ -232,16 +232,15 @@ public actor ItemStore {
     /// Opens the database, runs migrations, and applies the configured
     /// first-run starter set once for this library.
     public func bootstrap() async throws {
+        let bootstrapTime = Date.now
         for itemType in starterItemTypes {
             try ItemTypeValidation.validate(itemType)
         }
         try await database.migrate()
         await mediaStore?.attachMetadataDatabase(database)
         try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
-        if schedulerOverride == nil,
-           let saved = try await database.fetchSchedulerParameters(profileID: profileID) {
-            fsrsParameters = saved
-        }
+        try await ensureVersionedSchedulingBootstrap(now: bootstrapTime)
+        try await migrateLegacyCardSchedulingIfNeeded(now: bootstrapTime)
     }
 
     /// Persists a deck and its learner-local new-card introduction policy.
@@ -932,12 +931,17 @@ public actor ItemStore {
         now: Date = .now,
         durationMs: Int = 0
     ) async throws -> ReviewSubmission {
-        guard var card = try await database.fetchCard(id: cardID) else {
+        guard let persistedCard = try await database.fetchCard(id: cardID) else {
             throw DatabaseError.cardNotFound(cardID)
         }
-
-        let memoryBefore = card.memory
-        let phaseBefore = card.memory.phase
+        let prepared = try await prepareSchedulingReview(
+            card: persistedCard,
+            rating: rating,
+            now: now
+        )
+        let card = prepared.card
+        let memoryBefore = prepared.memoryBefore
+        let phaseBefore = memoryBefore.phase
         let elapsedDays: Double
         if let lastReview = card.memory.lastReview {
             elapsedDays = max(now.timeIntervalSince(lastReview) / 86_400, 0)
@@ -950,10 +954,7 @@ public actor ItemStore {
             0
         )
 
-        let scheduler: any Scheduler = schedulerOverride
-            ?? LearningScheduler(parameters: fsrsParameters)
-        let nextMemory = scheduler.schedule(card.memory, rating: rating, now: now)
-        card.memory = nextMemory
+        let nextMemory = prepared.memoryAfter
 
         let log = ReviewLog(
             cardID: card.id,
@@ -962,7 +963,8 @@ public actor ItemStore {
             elapsedDays: elapsedDays,
             scheduledDays: scheduledDays,
             phaseBefore: phaseBefore,
-            durationMs: durationMs
+            durationMs: durationMs,
+            schedulingAudit: prepared.audit
         )
         let introducedDeckID = phaseBefore == .new ? card.deckID : nil
         let introductionStudyDay: String?
@@ -1046,24 +1048,18 @@ public actor ItemStore {
         minimumObservations: Int = 100,
         now: Date = .now
     ) async throws -> FSRSOptimizationResult {
-        let logs = try await database.fetchActiveReviewLogs()
-        let optimizer = FSRSOptimizer(minimumObservations: minimumObservations)
-        // Recorded before the fit can throw: an attempt that finds too little
-        // usable history has still seen this much of it, and repeating that
-        // reading on every session end would cost the same and answer the same.
-        try await recordOptimizationAttempt(reviewLogCount: logs.count, at: now)
-        let result = try optimizer.optimize(logs: logs, startingAt: fsrsParameters)
-        guard result.improved else { return result }
-
-        try await database.saveSchedulerParameters(
-            result.parameters,
-            profileID: profileID,
-            optimizedAt: now,
-            sampleCount: result.observationCount,
-            logLoss: result.optimizedLoss
+        if let result = try await runAutomaticFSRSOptimization(
+            minimumObservations: minimumObservations,
+            now: now,
+            enforceCadence: false
+        ) {
+            return result
+        }
+        let observations = max(0, try await database.countActiveReviewLogs() - 1)
+        throw FSRSOptimizationError.insufficientData(
+            required: max(FSRSOptimizer.defaultMinimumObservations, minimumObservations),
+            available: observations
         )
-        fsrsParameters = result.parameters
-        return result
     }
 
     /// Fits weights only when accumulated history warrants it, and reports
@@ -1079,28 +1075,11 @@ public actor ItemStore {
         minimumObservations: Int = FSRSOptimizer.defaultMinimumObservations,
         now: Date = .now
     ) async throws -> FSRSOptimizationResult? {
-        let reviewLogCount = try await database.countActiveReviewLogs()
-        guard schedule.needsOptimization(
-            reviewLogCount: reviewLogCount,
-            lastAttempt: try await lastOptimizationAttempt(),
+        _ = schedule // Source-compatible; versioned cadence is policy-owned.
+        return try await runAutomaticFSRSOptimization(
+            minimumObservations: minimumObservations,
             now: now
-        ) else {
-            return nil
-        }
-
-        do {
-            return try await optimizeScheduling(
-                minimumObservations: minimumObservations,
-                now: now
-            )
-        } catch let error as FSRSOptimizationError {
-            // Insufficient usable history is the expected outcome for a young
-            // library, and unfittable history is not something the learner can
-            // act on. Either way the attempt is recorded, so this does not
-            // retry until history has grown.
-            _ = error
-            return nil
-        }
+        )
     }
 
     /// What the most recent automatic or explicit fit saw, if any.
@@ -1117,7 +1096,7 @@ public actor ItemStore {
         )
     }
 
-    private func recordOptimizationAttempt(reviewLogCount: Int, at now: Date) async throws {
+    func recordOptimizationAttempt(reviewLogCount: Int, at now: Date) async throws {
         try await database.setMetadataValue(
             OptimizationAttemptRecord(
                 reviewLogCount: reviewLogCount,

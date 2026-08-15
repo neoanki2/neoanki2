@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:d1af897ec9d7e74241218073d7da8ff3b6a56cf62f9130a315e54338cb4c588b
+contract_digest: sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -395,6 +395,58 @@ Type: **object**.
 - `state` — string; required
 - `updatedAt` — string; required
 
+## FSRSOptimizationRun {#schema-fsrsoptimizationrun}
+
+Type: **object**.
+
+### Properties
+
+- `candidateParameterSetId` — string or null; optional
+- `completedAt` — string; required
+- `decision` — string; required
+- `distinctCardCount` — integer; required
+- `eligibleTargetCount` — integer; required
+- `excludedCounts` — object; required
+- `failureCount` — integer; required
+- `foldCount` — integer; required
+- `id` — string; required
+- `inputFingerprint` — string; required
+- `metrics` — object; required
+- `presetId` — string; required
+- `reason` — string or null; optional
+- `startedAt` — string; required
+- `studyDayCount` — integer; required
+- `trainingCutoff` — string; required
+
+## FSRSOptimizationRunArray {#schema-fsrsoptimizationrunarray}
+
+Type: **array of FSRSOptimizationRun**.
+
+## FSRSParameterSet {#schema-fsrsparameterset}
+
+Type: **object**.
+
+### Properties
+
+- `createdAt` — string; required
+- `fixtureChecksum` — string or null; optional
+- `id` — string; required
+- `inputFingerprint` — string or null; optional
+- `isActive` — boolean; required
+- `metrics` — object; required
+- `modelVersion` — string; required
+- `previousParameterSetId` — string or null; optional
+- `scope` — string; required
+- `source` — string; required
+- `sourceChecksum` — string; required
+- `trainingCutoff` — string or null; optional
+- `upstreamCommit` — string; required
+- `weights` — array of number; required
+
+## FSRSParameterSetArray {#schema-fsrsparametersetarray}
+
+Type: **array of FSRSParameterSet**.
+
 ## FieldDefinition {#schema-fielddefinition}
 
 Type: **object**.
@@ -704,8 +756,22 @@ Type: **object**.
 
 ### Properties
 
+- `constraintReason` — string or null; optional
+- `finalDueAt` — string; required
+- `intervalPolicyVersion` — string; required
+- `intervalSeconds` — number; required
 - `memory` — Memory; required
+- `memoryAfter` — Memory; required
+- `memoryBefore` — Memory; required
+- `modelVersion` — string; required
+- `operationalIntervalSeconds` — integer; required
+- `parameterSetId` — string or null; optional
+- `predictedRetrievability` — number; required
+- `presetId` — string or null; optional
 - `rating` — string; required
+- `rawIntervalDays` — number; required
+- `reviewedAt` — string; required
+- `timingPolicyVersion` — string; required
 
 ## RatingPreviewArray {#schema-ratingpreviewarray}
 
@@ -773,6 +839,59 @@ Type: **object**.
 - `text` — string; required
 - `textColor` — string; optional
 - `textSize` — string; optional
+
+## SchedulingExplanation {#schema-schedulingexplanation}
+
+Type: **object**.
+
+### Properties
+
+- `cardId` — string; required
+- `desiredRetention` — number; required
+- `elapsedModelDays` — integer; required
+- `elapsedSeconds` — number; required
+- `elapsedTimePolicy` — string; required
+- `intervalPolicy` — string; required
+- `modelIdentifier` — string; required
+- `parameterSetId` — string or null; optional
+- `presetId` — string or null; optional
+- `previousMemory` — Memory; required
+- `ratings` — RatingPreviewArray; required
+- `reviewedAt` — string; required
+
+## SchedulingHealth {#schema-schedulinghealth}
+
+Type: **object**.
+
+### Properties
+
+- `activeParameterSetId` — string or null; optional
+- `activeParameterSource` — string or null; optional
+- `automaticOptimizationEnabled` — boolean; required
+- `canRestoreDefaults` — boolean; required
+- `canRollback` — boolean; required
+- `desiredRetention` — number; required
+- `lastOptimizationCompletedAt` — string or null; optional
+- `lastOptimizationDecision` — string or null; optional
+- `lastOptimizationReason` — string or null; optional
+- `legacyParametersQuarantined` — boolean; required
+- `maximumIntervalDays` — integer; required
+- `migrationStatus` — string or null; optional
+- `modelIdentifier` — string; required
+- `optimizerParityVerified` — boolean; required
+- `optimizerStatus` — string; required
+- `parameterCount` — integer; required
+- `parameterSource` — string; required
+- `personalizationStatus` — string; required
+
+## SchedulingRollbackInput {#schema-schedulingrollbackinput}
+
+Type: **object**.
+
+### Properties
+
+- `confirm` — boolean; required
+- `parameterSetId` — string or null; optional
 
 ## Skill {#schema-skill}
 
@@ -1031,6 +1150,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:d1af897ec9d7e74241218073d7da8ff3b6a56cf62f9130a315e54338cb4c588b`.
+Contract digest: `sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

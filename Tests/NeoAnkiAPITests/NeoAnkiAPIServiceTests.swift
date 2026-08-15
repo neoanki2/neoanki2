@@ -1846,7 +1846,7 @@ private func pairWithAuthority(
     let (api, store) = try await makeAPIAndStore()
     let token = try await pair(
         api,
-        scopes: ["library.read", "items.write", "study.review"]
+        scopes: ["library.read", "items.write", "study.review", "settings.write"]
     )
     let auth = ["Authorization": "Bearer \(token)"]
     let itemID = UUID().uuidString.lowercased()
@@ -1891,6 +1891,89 @@ private func pairWithAuthority(
         request(.get, "/v1/cards/\(cardID)/review-preview", headers: auth)
     )
     #expect(preview.status == 200)
+    let previewRows = try #require(try JSONSerialization.jsonObject(with: preview.body) as? [[String: Any]])
+    #expect(previewRows.map { $0["rating"] as? String } == ["again", "hard", "good", "easy"])
+    #expect(previewRows.allSatisfy { ($0["intervalSeconds"] as? Double) != nil })
+    #expect(previewRows.allSatisfy { ($0["reviewedAt"] as? String) != nil })
+    #expect(previewRows.allSatisfy { ($0["rawIntervalDays"] as? Double) != nil })
+    #expect(previewRows.allSatisfy { ($0["operationalIntervalSeconds"] as? Int) != nil })
+    #expect(previewRows.allSatisfy { ($0["memoryBefore"] as? [String: Any]) != nil })
+    #expect(previewRows.allSatisfy { ($0["memoryAfter"] as? [String: Any]) != nil })
+    #expect(previewRows.allSatisfy { ($0["predictedRetrievability"] as? Double) != nil })
+    #expect(previewRows.allSatisfy { ($0["modelVersion"] as? String)?.isEmpty == false })
+    #expect(previewRows.allSatisfy { ($0["parameterSetId"] as? String) != nil })
+    #expect(previewRows.allSatisfy { $0["timingPolicyVersion"] as? String == "neo-elapsed-24h-v1" })
+    #expect(previewRows.allSatisfy { $0["intervalPolicyVersion"] as? String == "continuous-due-v1" })
+
+    let explanation = await api.handle(
+        request(.get, "/v1/cards/\(cardID)/scheduling-explanation", headers: auth)
+    )
+    #expect(explanation.status == 200)
+    #expect(try jsonObject(explanation)["cardId"] as? String == cardID)
+    #expect(try jsonObject(explanation)["elapsedTimePolicy"] as? String == "neo-elapsed-24h-v1")
+    let explanationObject = try jsonObject(explanation)
+    #expect((explanationObject["ratings"] as? [[String: Any]])?.count == 4)
+    #expect(explanationObject["parameterSetId"] as? String == previewRows.first?["parameterSetId"] as? String)
+    #expect(explanationObject["modelIdentifier"] as? String == previewRows.first?["modelVersion"] as? String)
+
+    let schedulingHealth = await api.handle(
+        request(.get, "/v1/scheduling/health", headers: auth)
+    )
+    #expect(schedulingHealth.status == 200)
+    #expect(try jsonObject(schedulingHealth)["desiredRetention"] as? Double == 0.9)
+    #expect(try jsonObject(schedulingHealth)["parameterCount"] as? Int == 21)
+    #expect((try jsonObject(schedulingHealth)["optimizerParityVerified"] as? Bool) != nil)
+    #expect((try jsonObject(schedulingHealth)["optimizerStatus"] as? String)?.isEmpty == false)
+    #expect((try jsonObject(schedulingHealth)["personalizationStatus"] as? String)?.isEmpty == false)
+    #expect((try jsonObject(schedulingHealth)["activeParameterSetId"] as? String) != nil)
+    #expect(try jsonObject(schedulingHealth)["activeParameterSource"] as? String == "populationDefault")
+    #expect((try jsonObject(schedulingHealth)["legacyParametersQuarantined"] as? Bool) != nil)
+
+    let parameterHistory = await api.handle(
+        request(.get, "/v1/scheduling/parameter-sets", headers: auth)
+    )
+    #expect(parameterHistory.status == 200)
+    let parameterRows = try #require(
+        try JSONSerialization.jsonObject(with: parameterHistory.body) as? [[String: Any]]
+    )
+    #expect(parameterRows.isEmpty == false)
+    #expect(parameterRows.allSatisfy { ($0["weights"] as? [Double])?.count == 21 })
+    #expect(parameterRows.filter { $0["isActive"] as? Bool == true }.count == 1)
+
+    let optimizationHistory = await api.handle(
+        request(.get, "/v1/scheduling/optimization-runs", headers: auth)
+    )
+    #expect(optimizationHistory.status == 200)
+    #expect((try JSONSerialization.jsonObject(with: optimizationHistory.body) as? [Any]) != nil)
+
+    var recoveryHeaders = auth
+    recoveryHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
+    let unconfirmedRestore = await api.handle(request(
+        .post,
+        "/v1/scheduling/default-restores",
+        headers: recoveryHeaders,
+        body: #"{"confirm":false}"#
+    ))
+    #expect(unconfirmedRestore.status == 422)
+
+    recoveryHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
+    let restoredDefaults = await api.handle(request(
+        .post,
+        "/v1/scheduling/default-restores",
+        headers: recoveryHeaders,
+        body: #"{"confirm":true}"#
+    ))
+    #expect(restoredDefaults.status == 200)
+    #expect(try jsonObject(restoredDefaults)["parameterSource"] as? String == "populationDefaults")
+
+    recoveryHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
+    let invalidRollback = await api.handle(request(
+        .post,
+        "/v1/scheduling/rollbacks",
+        headers: recoveryHeaders,
+        body: #"{"confirm":true,"parameterSetId":"not-a-uuid"}"#
+    ))
+    #expect(invalidRollback.status == 422)
     let cursorAfter = await api.handle(
         request(.get, "/v1/changes", headers: auth)
     ).body

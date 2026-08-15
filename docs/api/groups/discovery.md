@@ -2,7 +2,7 @@
 title: Discovery
 description: Generated NeoAnki local API operations for discovery.
 audience: api
-contract_digest: sha256:d1af897ec9d7e74241218073d7da8ff3b6a56cf62f9130a315e54338cb4c588b
+contract_digest: sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098
 parent: Local API reference
 permalink: /api/discovery/
 ---
@@ -63,6 +63,6 @@ curl --request GET \
   'http://127.0.0.1:8766/v1/openapi.json' \
 ```
 
-Contract digest: `sha256:d1af897ec9d7e74241218073d7da8ff3b6a56cf62f9130a315e54338cb4c588b`.
+Contract digest: `sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

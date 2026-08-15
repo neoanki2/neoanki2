@@ -165,11 +165,17 @@ public extension ItemStore {
         guard durationMs >= 0 else {
             throw DatabaseError.studyConflict("Review duration cannot be negative.")
         }
-        guard var card = try await database.fetchCard(id: cardID) else {
+        guard let persistedCard = try await database.fetchCard(id: cardID) else {
             throw DatabaseError.cardNotFound(cardID)
         }
-        let memoryBefore = card.memory
-        let phaseBefore = card.memory.phase
+        let prepared = try await prepareSchedulingReview(
+            card: persistedCard,
+            rating: rating,
+            now: now
+        )
+        let card = prepared.card
+        let memoryBefore = prepared.memoryBefore
+        let phaseBefore = memoryBefore.phase
         let elapsedDays = card.memory.lastReview.map {
             max(now.timeIntervalSince($0) / 86_400, 0)
         } ?? 0
@@ -177,10 +183,7 @@ public extension ItemStore {
             card.memory.lastReview.map { card.memory.due.timeIntervalSince($0) / 86_400 } ?? 0,
             0
         )
-        let scheduler: any Scheduler = schedulerOverride
-            ?? LearningScheduler(parameters: fsrsParameters)
-        let nextMemory = scheduler.schedule(card.memory, rating: rating, now: now)
-        card.memory = nextMemory
+        let nextMemory = prepared.memoryAfter
         let log = ReviewLog(
             id: reviewLogID,
             cardID: card.id,
@@ -189,7 +192,8 @@ public extension ItemStore {
             elapsedDays: elapsedDays,
             scheduledDays: scheduledDays,
             phaseBefore: phaseBefore,
-            durationMs: durationMs
+            durationMs: durationMs,
+            schedulingAudit: prepared.audit
         )
         let introducedDeckID = phaseBefore == .new ? card.deckID : nil
         let introductionStudyDay = introducedDeckID == nil

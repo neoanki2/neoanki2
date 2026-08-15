@@ -340,6 +340,21 @@ public actor NeoAnkiAPIService {
         case (.get, "/v1/cards"):
             try require(grant, scope: .libraryRead)
             return try await listCards(request)
+        case (.get, "/v1/scheduling/health"):
+            try require(grant, scope: .libraryRead)
+            return try await schedulingHealth(request)
+        case (.get, "/v1/scheduling/parameter-sets"):
+            try require(grant, scope: .libraryRead)
+            return try await schedulingParameterSets(request)
+        case (.get, "/v1/scheduling/optimization-runs"):
+            try require(grant, scope: .libraryRead)
+            return try await schedulingOptimizationRuns(request)
+        case (.post, "/v1/scheduling/default-restores"):
+            try require(grant, scope: .settingsWrite)
+            return try await restoreDefaultScheduling(request)
+        case (.post, "/v1/scheduling/rollbacks"):
+            try require(grant, scope: .settingsWrite)
+            return try await rollbackScheduling(request)
         case (.get, "/v1/item-types"):
             try require(grant, scope: .libraryRead)
             return try await listItemTypes(request)
@@ -630,6 +645,9 @@ public actor NeoAnkiAPIService {
                 case (.get, "review-preview"):
                     try require(grant, scope: .libraryRead)
                     return try await cardReviewPreview(cardID, request: request)
+                case (.get, "scheduling-explanation"):
+                    try require(grant, scope: .libraryRead)
+                    return try await cardSchedulingExplanation(cardID, request: request)
                 case (.post, "resets"):
                     try require(grant, scope: .studyReview)
                     return try await resetCard(cardID, request: request, grant: grant)
@@ -2629,13 +2647,133 @@ public actor NeoAnkiAPIService {
         guard request.body.isEmpty else {
             throw APIServiceError.validation("Review preview does not accept a body.")
         }
-        let previews = try await store.reviewPreviews(cardID: id)
+        let reviewedAt = Date.now
+        let previews = try await store.reviewSchedulePreviews(cardID: id, asOf: reviewedAt)
         let names: [(ReviewRating, String)] = [
             (.again, "again"), (.hard, "hard"), (.good, "good"), (.easy, "easy"),
         ]
         return try .json(names.compactMap { rating, name in
-            previews[rating].map { APIRatingPreview(rating: name, memory: APIMemory($0)) }
+            previews[rating].map { APIRatingPreview(rating: name, preview: $0) }
         })
+    }
+
+    private func cardSchedulingExplanation(
+        _ id: UUID,
+        request: APIRequest
+    ) async throws -> APIResponse {
+        guard request.body.isEmpty else {
+            throw APIServiceError.validation("Scheduling explanation does not accept a body.")
+        }
+        let reviewedAt = Date.now
+        let card = try await store.card(id: id)
+        let previews = try await store.reviewSchedulePreviews(cardID: id, asOf: reviewedAt)
+        let health = try await store.schedulingHealthSnapshot()
+        let names: [(ReviewRating, String)] = [
+            (.again, "again"), (.hard, "hard"), (.good, "good"), (.easy, "easy"),
+        ]
+        let firstPreview = previews[.again]
+        let memoryBefore = firstPreview?.memoryBefore ?? card.memory
+        let elapsedSeconds = max(
+            0,
+            memoryBefore.lastReview.map { reviewedAt.timeIntervalSince($0) } ?? 0
+        )
+        return try .json(APISchedulingExplanation(
+            cardId: id.uuidString.lowercased(),
+            reviewedAt: reviewedAt,
+            elapsedSeconds: elapsedSeconds,
+            elapsedModelDays: Int(elapsedSeconds / 86_400),
+            previousMemory: APIMemory(memoryBefore),
+            desiredRetention: health.desiredRetention,
+            modelIdentifier: firstPreview?.modelVersion ?? health.modelIdentifier,
+            elapsedTimePolicy: firstPreview?.timingPolicyVersion ?? "neo-elapsed-24h-v1",
+            intervalPolicy: firstPreview?.intervalPolicyVersion ?? "continuous-due-v1",
+            presetId: firstPreview?.presetID?.uuidString.lowercased(),
+            parameterSetId: firstPreview?.parameterSetID?.uuidString.lowercased(),
+            ratings: names.compactMap { rating, name in
+                previews[rating].map { APIRatingPreview(rating: name, preview: $0) }
+            }
+        ))
+    }
+
+    private func schedulingHealth(_ request: APIRequest) async throws -> APIResponse {
+        guard request.body.isEmpty else {
+            throw APIServiceError.validation("Scheduling health does not accept a body.")
+        }
+        return try .json(APISchedulingHealth(try await store.schedulingHealthSnapshot()))
+    }
+
+    private func schedulingParameterSets(_ request: APIRequest) async throws -> APIResponse {
+        guard request.body.isEmpty else {
+            throw APIServiceError.validation("Parameter-set history does not accept a body.")
+        }
+        let values = try await store.fsrsParameterSetHistory()
+        return try .json(values.map(APIFSRSParameterSet.init))
+    }
+
+    private func schedulingOptimizationRuns(_ request: APIRequest) async throws -> APIResponse {
+        guard request.body.isEmpty else {
+            throw APIServiceError.validation("Optimization-run history does not accept a body.")
+        }
+        let limit = try pageLimit(request.query)
+        let values = try await store.fsrsOptimizationRunHistory(limit: limit)
+        return try .json(values.map(APIFSRSOptimizationRun.init))
+    }
+
+    private func restoreDefaultScheduling(_ request: APIRequest) async throws -> APIResponse {
+        _ = try requiredIdempotencyKey(request)
+        let input = try APIJSON.decodeStrict(
+            RestoreDefaultSchedulingInput.self,
+            from: request.body,
+            allowedKeys: ["confirm"]
+        )
+        guard input.confirm else {
+            throw APIServiceError.validation(
+                "Restoring scheduler defaults requires confirm=true.",
+                pointer: "/confirm"
+            )
+        }
+        do {
+            return try .json(APISchedulingHealth(
+                try await store.restoreDefaultScheduling(now: .now)
+            ))
+        } catch SchedulingRecoveryError.unavailable {
+            throw APIServiceError.problem(
+                status: 409,
+                code: "scheduling_recovery_unavailable",
+                title: "Scheduling recovery unavailable",
+                detail: "No recoverable scheduling parameter version is available."
+            )
+        }
+    }
+
+    private func rollbackScheduling(_ request: APIRequest) async throws -> APIResponse {
+        _ = try requiredIdempotencyKey(request)
+        let input = try APIJSON.decodeStrict(
+            RollbackSchedulingInput.self,
+            from: request.body,
+            allowedKeys: ["confirm", "parameterSetId"]
+        )
+        guard input.confirm else {
+            throw APIServiceError.validation(
+                "Scheduler rollback requires confirm=true.",
+                pointer: "/confirm"
+            )
+        }
+        let parameterSetID = try input.parameterSetId.map {
+            try parseUUID($0, pointer: "/parameterSetId")
+        }
+        do {
+            return try .json(APISchedulingHealth(
+                try await store.rollbackScheduling(to: parameterSetID, now: .now)
+            ))
+        } catch SchedulingRecoveryError.unavailable {
+            throw APIServiceError.problem(
+                status: 409,
+                code: "scheduling_recovery_unavailable",
+                title: "Scheduling recovery unavailable",
+                detail: "The requested scheduling parameter version is not available for rollback."
+            )
+        }
     }
 
     private func patchCard(_ id: UUID, request: APIRequest) async throws -> APIResponse {

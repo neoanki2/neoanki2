@@ -18,6 +18,9 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
     /// Durable append order assigned by persistence. In-memory/test logs may
     /// omit it, in which case their input order is preserved for timestamp ties.
     public let sequence: Int64?
+    /// Full scheduling provenance. Absent on records written before the
+    /// versioned scheduler audit format was introduced.
+    public let schedulingAudit: ReviewSchedulingAudit?
 
     public init(
         id: UUID = UUID(),
@@ -28,7 +31,8 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
         scheduledDays: Double,
         phaseBefore: Phase,
         durationMs: Int,
-        sequence: Int64? = nil
+        sequence: Int64? = nil,
+        schedulingAudit: ReviewSchedulingAudit? = nil
     ) {
         self.id = id
         self.cardID = cardID
@@ -39,6 +43,7 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
         self.phaseBefore = phaseBefore
         self.durationMs = durationMs
         self.sequence = sequence
+        self.schedulingAudit = schedulingAudit
     }
 
     func withSequence(_ sequence: Int64) -> ReviewLog {
@@ -51,7 +56,32 @@ public struct ReviewLog: Codable, Equatable, Sendable, Identifiable {
             scheduledDays: scheduledDays,
             phaseBefore: phaseBefore,
             durationMs: durationMs,
-            sequence: sequence
+            sequence: sequence,
+            schedulingAudit: schedulingAudit
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, cardID, reviewedAt, rating, elapsedDays, scheduledDays
+        case phaseBefore, durationMs, sequence, schedulingAudit
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try values.decode(UUID.self, forKey: .id),
+            cardID: try values.decode(UUID.self, forKey: .cardID),
+            reviewedAt: try values.decode(Date.self, forKey: .reviewedAt),
+            rating: try values.decode(ReviewRating.self, forKey: .rating),
+            elapsedDays: try values.decode(Double.self, forKey: .elapsedDays),
+            scheduledDays: try values.decode(Double.self, forKey: .scheduledDays),
+            phaseBefore: try values.decode(Phase.self, forKey: .phaseBefore),
+            durationMs: try values.decode(Int.self, forKey: .durationMs),
+            sequence: try values.decodeIfPresent(Int64.self, forKey: .sequence),
+            schedulingAudit: try values.decodeIfPresent(
+                ReviewSchedulingAudit.self,
+                forKey: .schedulingAudit
+            )
         )
     }
 }

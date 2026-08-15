@@ -57,13 +57,16 @@ final class StudyModel {
     private(set) var arrangedItems: [String] = []
     private(set) var selectedArrangementIndex: Int?
     private(set) var interactionMessage: String?
+    private(set) var schedulePreviews: [ReviewRating: ReviewSchedulePreview] = [:]
+    private(set) var schedulingHealth: LibrarySchedulingHealth?
+    private(set) var isLoadingSchedulePreviews = false
     private(set) var reviewedCount = 0
     private(set) var completedSubmissionCount = 0
     private(set) var reviewedCardIDs: Set<UUID> = []
     private(set) var reviewedItemIDs: Set<UUID> = []
     private(set) var lastStartTiming = StudyStartTiming()
 
-    let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
+    let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses & LibraryScheduling
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
@@ -73,7 +76,7 @@ final class StudyModel {
     private let remainingQueueLoadGate: (@Sendable () async -> Void)?
 
     init(
-        library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses,
+        library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses & LibraryScheduling,
         remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
     ) {
         self.library = library
@@ -260,6 +263,7 @@ final class StudyModel {
     func revealAnswer() {
         guard currentCard != nil else { return }
         isAnswerRevealed = true
+        Task { await loadSchedulePreviews() }
     }
 
     func updateTypedAnswer(_ answer: String) {
@@ -357,6 +361,9 @@ final class StudyModel {
             submitArrangement()
         case .audioSubmission:
             break
+        }
+        if isAnswerRevealed {
+            Task { await loadSchedulePreviews() }
         }
     }
 
@@ -529,6 +536,8 @@ final class StudyModel {
         selectedChoice = nil
         selectedArrangementIndex = nil
         interactionMessage = nil
+        schedulePreviews = [:]
+        isLoadingSchedulePreviews = false
         guard let card = currentCard else {
             choiceOptions = []
             arrangedItems = []
@@ -545,6 +554,21 @@ final class StudyModel {
         } else if card.template.interaction == .arrange, arrangedItems.isEmpty {
             interactionMessage = "This card has nothing to arrange. Reveal it to self-grade."
         }
+    }
+
+    private func loadSchedulePreviews() async {
+        guard let cardID = currentCard?.id else { return }
+        isLoadingSchedulePreviews = true
+        let reviewedAt = Date.now
+        defer {
+            if currentCard?.id == cardID { isLoadingSchedulePreviews = false }
+        }
+        guard let values = try? await library.reviewSchedulePreviews(
+            cardID: cardID,
+            asOf: reviewedAt
+        ), currentCard?.id == cardID else { return }
+        schedulePreviews = values
+        schedulingHealth = try? await library.schedulingHealthSnapshot()
     }
 
     private func recoverFromMissingAnswer() {

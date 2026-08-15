@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 24
+    static let version = 25
 
     static let createStatements: [String] = [
         """
@@ -59,7 +59,10 @@ enum Schema {
             lapses INTEGER NOT NULL DEFAULT 0,
             is_suspended INTEGER NOT NULL DEFAULT 0,
             deck_id TEXT,
-            cloze_group INTEGER
+            cloze_group INTEGER,
+            memory_model_version TEXT,
+            memory_parameter_set_id TEXT,
+            scheduling_history_origin REAL
         );
         """,
         """
@@ -69,6 +72,8 @@ enum Schema {
             reviewed_at REAL NOT NULL,
             log BLOB NOT NULL,
             memory_before BLOB NOT NULL,
+            memory_after BLOB,
+            scheduling_audit BLOB,
             sequence INTEGER NOT NULL UNIQUE
         );
         """,
@@ -290,7 +295,128 @@ enum Schema {
         ON deck_item_type_policy_entries(deck_id)
         WHERE is_default = 1;
         """,
-    ] + browseProjectionStatements + apiStateStatements + apiChangeTrackingStatements
+    ] + schedulerPersistenceStatements + browseProjectionStatements
+        + apiStateStatements + apiChangeTrackingStatements
+
+    /// Versioned scheduler records are deliberately separate from the legacy
+    /// mutable `scheduler_params` row. Parameter sets and completed optimizer
+    /// runs are insert-only; activation is an update to the shared preset.
+    static let schedulerPersistenceStatements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS fsrs_parameter_sets (
+            id TEXT PRIMARY KEY NOT NULL,
+            weights BLOB NOT NULL,
+            model_version TEXT NOT NULL,
+            upstream_commit TEXT NOT NULL,
+            source_checksum TEXT NOT NULL,
+            fixture_checksum TEXT,
+            scope TEXT NOT NULL,
+            source TEXT NOT NULL,
+            input_fingerprint TEXT,
+            training_cutoff REAL,
+            metrics BLOB NOT NULL,
+            previous_parameter_set_id TEXT REFERENCES fsrs_parameter_sets(id),
+            created_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS fsrs_parameter_sets_immutable_update
+        BEFORE UPDATE ON fsrs_parameter_sets
+        BEGIN SELECT RAISE(ABORT, 'FSRS parameter sets are immutable'); END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS fsrs_parameter_sets_immutable_delete
+        BEFORE DELETE ON fsrs_parameter_sets
+        BEGIN SELECT RAISE(ABORT, 'FSRS parameter sets are immutable'); END;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_presets (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            desired_retention REAL NOT NULL CHECK(desired_retention > 0 AND desired_retention < 1),
+            maximum_interval_days INTEGER NOT NULL CHECK(maximum_interval_days > 0),
+            automatic_optimization_enabled INTEGER NOT NULL CHECK(automatic_optimization_enabled IN (0, 1)),
+            active_parameter_set_id TEXT REFERENCES fsrs_parameter_sets(id),
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        """,
+        """
+        INSERT OR IGNORE INTO scheduler_presets (
+            id, name, desired_retention, maximum_interval_days,
+            automatic_optimization_enabled, active_parameter_set_id,
+            created_at, updated_at
+        ) VALUES (
+            '00000000-0000-4000-8000-000000000001', 'Default', 0.9, 36500,
+            1, NULL, CAST(strftime('%s', 'now') AS REAL),
+            CAST(strftime('%s', 'now') AS REAL)
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS fsrs_optimization_runs (
+            id TEXT PRIMARY KEY NOT NULL,
+            preset_id TEXT NOT NULL REFERENCES scheduler_presets(id),
+            started_at REAL NOT NULL,
+            completed_at REAL NOT NULL,
+            training_cutoff REAL NOT NULL,
+            input_fingerprint TEXT NOT NULL,
+            eligible_target_count INTEGER NOT NULL,
+            distinct_card_count INTEGER NOT NULL,
+            failure_count INTEGER NOT NULL,
+            study_day_count INTEGER NOT NULL,
+            excluded_counts BLOB NOT NULL,
+            fold_count INTEGER NOT NULL,
+            metrics BLOB NOT NULL,
+            decision TEXT NOT NULL,
+            reason TEXT,
+            candidate_parameter_set_id TEXT REFERENCES fsrs_parameter_sets(id)
+        );
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS fsrs_optimization_runs_immutable_update
+        BEFORE UPDATE ON fsrs_optimization_runs
+        BEGIN SELECT RAISE(ABORT, 'FSRS optimization runs are immutable'); END;
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS fsrs_optimization_runs_immutable_delete
+        BEFORE DELETE ON fsrs_optimization_runs
+        BEGIN SELECT RAISE(ABORT, 'FSRS optimization runs are immutable'); END;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS quarantined_scheduler_params (
+            profile_id TEXT PRIMARY KEY NOT NULL,
+            parameters BLOB NOT NULL,
+            optimized_at REAL NOT NULL,
+            sample_count INTEGER NOT NULL,
+            log_loss REAL NOT NULL,
+            archived_at REAL NOT NULL,
+            reason TEXT NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_migrations (
+            id TEXT PRIMARY KEY NOT NULL,
+            from_model_version TEXT NOT NULL,
+            to_model_version TEXT NOT NULL,
+            status TEXT NOT NULL,
+            started_at REAL NOT NULL,
+            completed_at REAL,
+            replayed_card_count INTEGER NOT NULL DEFAULT 0,
+            reset_card_count INTEGER NOT NULL DEFAULT 0,
+            failure_reason TEXT,
+            card_snapshot BLOB NOT NULL,
+            previous_active_parameter_set_id TEXT
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_fsrs_parameter_sets_created_at
+        ON fsrs_parameter_sets(created_at DESC, id DESC);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_fsrs_optimization_runs_completed_at
+        ON fsrs_optimization_runs(completed_at DESC, id DESC);
+        """,
+    ]
 
     /// Durable application-service state shared by the native UI and local API.
     /// These tables contain no bearer credentials or token verifiers. Keeping
@@ -1231,6 +1357,11 @@ enum Schema {
         WHERE is_suspended = 0 AND phase != 'new';
         """,
     ]
+
+    /// Tables for the versioned FSRS model. Column additions are conditional
+    /// and legacy rows are copied by SQLiteDatabase because migration tests may
+    /// intentionally contain only a subset of the historical schema.
+    static let migrationV25Statements = schedulerPersistenceStatements
 
     /// Applied when upgrading from schema version 1.
     static let migrationV2Statements: [String] = [

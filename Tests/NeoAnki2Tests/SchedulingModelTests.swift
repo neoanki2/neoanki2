@@ -23,7 +23,7 @@ import Testing
 }
 
 @MainActor
-@Test func schedulingModelTunesParametersWhenHistoryWarrantsIt() async throws {
+@Test func schedulingModelDoesNotOptimizeAnIneligibleSingleCardHistory() async throws {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki-scheduling-auto-\(UUID().uuidString)")
         .appendingPathComponent("test.sqlite")
@@ -34,17 +34,26 @@ import Testing
 
     let model = SchedulingModel(store: store)
     let before = await store.schedulingParameters()
+    let healthBefore = try await store.schedulingHealthSnapshot()
+    let parameterSetsBefore = try await store.fsrsParameterSets()
     await model.optimizeIfNeeded()
 
-    #expect(await store.schedulingParameters() != before)
-    let attempt = try #require(await store.lastOptimizationAttempt())
-    #expect(attempt.reviewLogCount == 130)
+    // Review volume alone cannot bypass the conservative personalization
+    // gates. This fixture has only one card and fewer than 400 eligible
+    // interday targets, so it must neither create mutable parameters nor an
+    // immutable optimization run.
+    #expect(await store.schedulingParameters() == before)
+    #expect(try await store.schedulingHealthSnapshot().activeParameterSet?.id
+        == healthBefore.activeParameterSet?.id)
+    #expect(try await store.fsrsParameterSets() == parameterSetsBefore)
+    #expect(try await store.fsrsOptimizationRuns().isEmpty)
+    #expect(try await store.lastOptimizationAttempt() == nil)
 
-    // A second session end that added nothing must not refit.
-    let tuned = await store.schedulingParameters()
+    // A second session end with no new eligible data remains a no-op.
     await model.optimizeIfNeeded()
-    #expect(await store.schedulingParameters() == tuned)
-    #expect(try await store.lastOptimizationAttempt() == attempt)
+    #expect(await store.schedulingParameters() == before)
+    #expect(try await store.fsrsOptimizationRuns().isEmpty)
+    #expect(try await store.lastOptimizationAttempt() == nil)
 }
 
 @MainActor

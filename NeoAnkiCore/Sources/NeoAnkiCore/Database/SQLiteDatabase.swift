@@ -311,7 +311,9 @@ actor SQLiteDatabase {
             }
 
             if current < 17, try tableExists("items") {
-                for sql in Schema.migrationV17Statements {
+                let supportsCardProjection = try cardsSupportScheduleAggregates()
+                for sql in Schema.migrationV17Statements where supportsCardProjection
+                    || !sql.contains("item_browse_cards_") {
                     try execute(sql)
                 }
                 try backfillBrowseProjection()
@@ -395,6 +397,45 @@ actor SQLiteDatabase {
                try columnExists("is_suspended", in: "cards") {
                 for sql in Schema.migrationV24Statements {
                     try execute(sql)
+                }
+            }
+
+            if current < 25 {
+                for sql in Schema.migrationV25Statements {
+                    try execute(sql)
+                }
+                if try tableExists("cards") {
+                    if !(try columnExists("memory_model_version", in: "cards")) {
+                        try execute("ALTER TABLE cards ADD COLUMN memory_model_version TEXT;")
+                    }
+                    if !(try columnExists("memory_parameter_set_id", in: "cards")) {
+                        try execute("ALTER TABLE cards ADD COLUMN memory_parameter_set_id TEXT;")
+                    }
+                    if !(try columnExists("scheduling_history_origin", in: "cards")) {
+                        try execute("ALTER TABLE cards ADD COLUMN scheduling_history_origin REAL;")
+                    }
+                }
+                if try tableExists("review_logs") {
+                    if !(try columnExists("memory_after", in: "review_logs")) {
+                        try execute("ALTER TABLE review_logs ADD COLUMN memory_after BLOB;")
+                    }
+                    if !(try columnExists("scheduling_audit", in: "review_logs")) {
+                        try execute("ALTER TABLE review_logs ADD COLUMN scheduling_audit BLOB;")
+                    }
+                }
+                if try tableExists("scheduler_params") {
+                    try execute(
+                        """
+                        INSERT OR IGNORE INTO quarantined_scheduler_params (
+                            profile_id, parameters, optimized_at, sample_count,
+                            log_loss, archived_at, reason
+                        )
+                        SELECT profile_id, parameters, optimized_at, sample_count,
+                               log_loss, CAST(strftime('%s', 'now') AS REAL),
+                               'Replaced by versioned upstream FSRS implementation'
+                        FROM scheduler_params;
+                        """
+                    )
                 }
             }
 
@@ -1729,9 +1770,10 @@ actor SQLiteDatabase {
                 """
                 INSERT INTO cards (
                     id, item_id, template_id, skill, memory, due_at, phase, lapses,
-                    is_suspended, deck_id, cloze_group
+                    is_suspended, deck_id, cloze_group, memory_model_version,
+                    memory_parameter_set_id, scheduling_history_origin
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """
             )
             let browseStatement = try prepareStatement(
@@ -1803,6 +1845,9 @@ actor SQLiteDatabase {
                             .int(card.isSuspended ? 1 : 0),
                             card.deckID.map { .text($0.uuidString) } ?? .null,
                             card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                            card.memoryModelVersion.map(Binding.text) ?? .null,
+                            card.memoryParameterSetID.map { .text($0.uuidString) } ?? .null,
+                            card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
                         ]
                     )
                     guard !card.isSuspended else { continue }
@@ -2033,9 +2078,10 @@ actor SQLiteDatabase {
                 """
                 INSERT INTO cards (
                     id, item_id, template_id, skill, memory, due_at, phase, lapses,
-                    is_suspended, deck_id, cloze_group
+                    is_suspended, deck_id, cloze_group, memory_model_version,
+                    memory_parameter_set_id, scheduling_history_origin
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 bindings: [
                     .text(card.id.uuidString),
@@ -2049,6 +2095,9 @@ actor SQLiteDatabase {
                     .int(card.isSuspended ? 1 : 0),
                     card.deckID.map { .text($0.uuidString) } ?? .null,
                     card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                    card.memoryModelVersion.map(Binding.text) ?? .null,
+                    card.memoryParameterSetID.map { .text($0.uuidString) } ?? .null,
+                    card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
                 ]
             )
         }
@@ -2064,8 +2113,9 @@ actor SQLiteDatabase {
             """
             INSERT INTO cards (
                 id, item_id, template_id, skill, memory, due_at, phase, lapses,
-                is_suspended, deck_id, cloze_group
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                is_suspended, deck_id, cloze_group, memory_model_version,
+                memory_parameter_set_id, scheduling_history_origin
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 item_id = excluded.item_id,
                 template_id = excluded.template_id,
@@ -2076,7 +2126,10 @@ actor SQLiteDatabase {
                 lapses = excluded.lapses,
                 is_suspended = excluded.is_suspended,
                 deck_id = excluded.deck_id,
-                cloze_group = excluded.cloze_group;
+                cloze_group = excluded.cloze_group,
+                memory_model_version = excluded.memory_model_version,
+                memory_parameter_set_id = excluded.memory_parameter_set_id,
+                scheduling_history_origin = excluded.scheduling_history_origin;
             """,
             bindings: [
                 .text(card.id.uuidString), .text(card.itemID.uuidString), .text(card.templateID.uuidString),
@@ -2085,6 +2138,9 @@ actor SQLiteDatabase {
                 .int(card.isSuspended ? 1 : 0),
                 card.deckID.map { .text($0.uuidString) } ?? .null,
                 card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                card.memoryModelVersion.map(Binding.text) ?? .null,
+                card.memoryParameterSetID.map { .text($0.uuidString) } ?? .null,
+                card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
             ]
         )
     }
@@ -2092,7 +2148,8 @@ actor SQLiteDatabase {
     func fetchCard(id: UUID) throws -> Card? {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group,
+                   memory_model_version, memory_parameter_set_id, scheduling_history_origin
             FROM cards
             WHERE id = ?
             LIMIT 1;
@@ -2106,12 +2163,25 @@ actor SQLiteDatabase {
     func fetchAllCards() throws -> [Card] {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group,
+                   memory_model_version, memory_parameter_set_id, scheduling_history_origin
             FROM cards
             ORDER BY id ASC;
             """
         )
         return try rows.map { try decodeCard(from: $0) }
+    }
+
+    func supportsVersionedCardReplay() throws -> Bool {
+        guard try tableExists("cards") else { return false }
+        for column in [
+            "id", "item_id", "template_id", "skill", "memory", "is_suspended",
+            "deck_id", "cloze_group", "memory_model_version",
+            "memory_parameter_set_id", "scheduling_history_origin",
+        ] where !(try columnExists(column, in: "cards")) {
+            return false
+        }
+        return true
     }
 
     func setCardSuspended(id: UUID, isSuspended: Bool) throws {
@@ -2670,6 +2740,7 @@ actor SQLiteDatabase {
         let cardColumns = [
             "id", "item_id", "template_id", "skill", "memory", "is_suspended",
             "deck_id", "due_at", "cloze_group", "phase", "lapses",
+            "memory_model_version", "memory_parameter_set_id", "scheduling_history_origin",
         ].joined(separator: ", ")
         var commonTableExpressions = [
             """
@@ -2891,15 +2962,79 @@ actor SQLiteDatabase {
         )
     }
 
+    func updateCardSchedulingMemory(
+        _ cardID: UUID,
+        memory: MemoryState,
+        modelVersion: String,
+        parameterSetID: UUID?
+    ) throws {
+        let memoryData = try encode(memory)
+        try execute(
+            """
+            UPDATE cards
+            SET memory = ?, due_at = ?, phase = ?, lapses = ?,
+                memory_model_version = ?, memory_parameter_set_id = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .blob(memoryData),
+                .double(memory.due.timeIntervalSince1970),
+                .text(memory.phase.rawValue),
+                .int(Int64(memory.lapses)),
+                .text(modelVersion),
+                parameterSetID.map { .text($0.uuidString) } ?? .null,
+                .text(cardID.uuidString),
+            ]
+        )
+    }
+
+    func resetCardSchedulingMemory(
+        _ cardID: UUID,
+        modelVersion: String,
+        parameterSetID: UUID,
+        historyOrigin: Date
+    ) throws {
+        let memory = MemoryState.new(due: historyOrigin)
+        try execute(
+            """
+            UPDATE cards
+            SET memory = ?, due_at = ?, phase = ?, lapses = 0,
+                memory_model_version = ?, memory_parameter_set_id = ?,
+                scheduling_history_origin = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .blob(try encode(memory)), .double(historyOrigin.timeIntervalSince1970),
+                .text(Phase.new.rawValue), .text(modelVersion),
+                .text(parameterSetID.uuidString), .double(historyOrigin.timeIntervalSince1970),
+                .text(cardID.uuidString),
+            ]
+        )
+    }
+
+    private func setCardSchedulingHistoryOrigin(_ cardID: UUID, origin: Date?) throws {
+        try execute(
+            "UPDATE cards SET scheduling_history_origin = ? WHERE id = ?;",
+            bindings: [
+                origin.map { .double($0.timeIntervalSince1970) } ?? .null,
+                .text(cardID.uuidString),
+            ]
+        )
+    }
+
     func insertReviewLog(_ log: ReviewLog, memoryBefore: MemoryState) throws {
         let nextSequence = try nextReviewSequence()
         let sequencedLog = log.withSequence(nextSequence)
         let data = try encode(sequencedLog)
         let memoryData = try encode(memoryBefore)
+        let memoryAfterData = try sequencedLog.schedulingAudit.map { try encode($0.memoryAfter) }
+        let auditData = try sequencedLog.schedulingAudit.map(encode)
         try execute(
             """
-            INSERT INTO review_logs (id, card_id, reviewed_at, log, memory_before, sequence)
-            VALUES (?, ?, ?, ?, ?, ?);
+            INSERT INTO review_logs (
+                id, card_id, reviewed_at, log, memory_before, memory_after,
+                scheduling_audit, sequence
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """,
             bindings: [
                 .text(log.id.uuidString),
@@ -2907,6 +3042,8 @@ actor SQLiteDatabase {
                 .double(log.reviewedAt.timeIntervalSince1970),
                 .blob(data),
                 .blob(memoryData),
+                memoryAfterData.map(Binding.blob) ?? .null,
+                auditData.map(Binding.blob) ?? .null,
                 .int(nextSequence),
             ]
         )
@@ -2923,11 +3060,38 @@ actor SQLiteDatabase {
             """
             SELECT review_logs.log, review_logs.sequence
             FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
             LEFT JOIN review_reverts
                 ON review_reverts.review_log_id = review_logs.id
             WHERE review_reverts.id IS NULL
+              AND (cards.scheduling_history_origin IS NULL
+                   OR review_logs.reviewed_at >= cards.scheduling_history_origin)
             ORDER BY review_logs.reviewed_at ASC, review_logs.sequence ASC;
             """
+        )
+        return rows.compactMap { row in
+            guard let data = payload(row, "log"),
+                  let sequence = row["sequence"] as? Int64,
+                  let log = try? decoder.decode(ReviewLog.self, from: data)
+            else { return nil }
+            return log.withSequence(sequence)
+        }
+    }
+
+    func fetchActiveReviewLogs(cardID: UUID) throws -> [ReviewLog] {
+        let rows = try query(
+            """
+            SELECT review_logs.log, review_logs.sequence
+            FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_reverts.id IS NULL AND review_logs.card_id = ?
+              AND (cards.scheduling_history_origin IS NULL
+                   OR review_logs.reviewed_at >= cards.scheduling_history_origin)
+            ORDER BY review_logs.reviewed_at ASC, review_logs.sequence ASC;
+            """,
+            bindings: [.text(cardID.uuidString)]
         )
         return rows.compactMap { row in
             guard let data = payload(row, "log"),
@@ -3011,6 +3175,392 @@ actor SQLiteDatabase {
         )
     }
 
+    // MARK: - Versioned scheduler persistence
+
+    func insertFSRSParameterSet(_ parameterSet: FSRSParameterSet) throws {
+        try execute(
+            """
+            INSERT INTO fsrs_parameter_sets (
+                id, weights, model_version, upstream_commit, source_checksum,
+                fixture_checksum, scope, source, input_fingerprint,
+                training_cutoff, metrics, previous_parameter_set_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            bindings: [
+                .text(parameterSet.id.uuidString),
+                .blob(try encode(parameterSet.weights)),
+                .text(parameterSet.modelVersion),
+                .text(parameterSet.upstreamCommit),
+                .text(parameterSet.sourceChecksum),
+                parameterSet.fixtureChecksum.map(Binding.text) ?? .null,
+                .text(parameterSet.scope),
+                .text(parameterSet.source.rawValue),
+                parameterSet.inputFingerprint.map(Binding.text) ?? .null,
+                parameterSet.trainingCutoff.map { .double($0.timeIntervalSince1970) } ?? .null,
+                .blob(try encode(parameterSet.metrics)),
+                parameterSet.previousParameterSetID.map { .text($0.uuidString) } ?? .null,
+                .double(parameterSet.createdAt.timeIntervalSince1970),
+            ]
+        )
+    }
+
+    func fetchFSRSParameterSet(id: UUID) throws -> FSRSParameterSet? {
+        let rows = try query(
+            "SELECT * FROM fsrs_parameter_sets WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        return try rows.first.map(decodeFSRSParameterSet)
+    }
+
+    func fetchFSRSParameterSets() throws -> [FSRSParameterSet] {
+        try query(
+            "SELECT * FROM fsrs_parameter_sets ORDER BY created_at DESC, id DESC;"
+        ).map(decodeFSRSParameterSet)
+    }
+
+    func fetchSchedulerPreset(id: UUID) throws -> SchedulerPreset? {
+        let rows = try query(
+            "SELECT * FROM scheduler_presets WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        )
+        return rows.first.flatMap(decodeSchedulerPreset)
+    }
+
+    func saveSchedulerPreset(_ preset: SchedulerPreset) throws {
+        guard preset.desiredRetention > 0, preset.desiredRetention < 1,
+              preset.maximumIntervalDays > 0 else {
+            throw DatabaseError.executeFailed("Invalid scheduler preset values.")
+        }
+        try execute(
+            """
+            INSERT INTO scheduler_presets (
+                id, name, desired_retention, maximum_interval_days,
+                automatic_optimization_enabled, active_parameter_set_id,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                desired_retention = excluded.desired_retention,
+                maximum_interval_days = excluded.maximum_interval_days,
+                automatic_optimization_enabled = excluded.automatic_optimization_enabled,
+                active_parameter_set_id = excluded.active_parameter_set_id,
+                updated_at = excluded.updated_at;
+            """,
+            bindings: [
+                .text(preset.id.uuidString), .text(preset.name),
+                .double(preset.desiredRetention), .int(Int64(preset.maximumIntervalDays)),
+                .int(preset.automaticOptimizationEnabled ? 1 : 0),
+                preset.activeParameterSetID.map { .text($0.uuidString) } ?? .null,
+                .double(preset.createdAt.timeIntervalSince1970),
+                .double(preset.updatedAt.timeIntervalSince1970),
+            ]
+        )
+    }
+
+    func activateFSRSParameterSet(
+        _ parameterSetID: UUID,
+        presetID: UUID,
+        now: Date
+    ) throws {
+        guard try fetchFSRSParameterSet(id: parameterSetID) != nil else {
+            throw DatabaseError.executeFailed("FSRS parameter set does not exist.")
+        }
+        try execute(
+            """
+            UPDATE scheduler_presets
+            SET active_parameter_set_id = ?, updated_at = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .text(parameterSetID.uuidString), .double(now.timeIntervalSince1970),
+                .text(presetID.uuidString),
+            ]
+        )
+    }
+
+    func insertFSRSOptimizationRun(_ run: FSRSOptimizationRun) throws {
+        try execute(
+            """
+            INSERT INTO fsrs_optimization_runs (
+                id, preset_id, started_at, completed_at, training_cutoff,
+                input_fingerprint, eligible_target_count, distinct_card_count,
+                failure_count, study_day_count, excluded_counts, fold_count,
+                metrics, decision, reason, candidate_parameter_set_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            bindings: [
+                .text(run.id.uuidString), .text(run.presetID.uuidString),
+                .double(run.startedAt.timeIntervalSince1970),
+                .double(run.completedAt.timeIntervalSince1970),
+                .double(run.trainingCutoff.timeIntervalSince1970),
+                .text(run.inputFingerprint), .int(Int64(run.eligibleTargetCount)),
+                .int(Int64(run.distinctCardCount)), .int(Int64(run.failureCount)),
+                .int(Int64(run.studyDayCount)), .blob(try encode(run.excludedCounts)),
+                .int(Int64(run.foldCount)), .blob(try encode(run.metrics)),
+                .text(run.decision.rawValue), run.reason.map(Binding.text) ?? .null,
+                run.candidateParameterSetID.map { .text($0.uuidString) } ?? .null,
+            ]
+        )
+    }
+
+    func persistFSRSOptimizationOutcome(
+        parameterSet: FSRSParameterSet,
+        run: FSRSOptimizationRun,
+        activate: Bool,
+        now: Date
+    ) throws {
+        try inTransaction {
+            try insertFSRSParameterSet(parameterSet)
+            try insertFSRSOptimizationRun(run)
+            if activate {
+                try activateFSRSParameterSet(
+                    parameterSet.id,
+                    presetID: run.presetID,
+                    now: now
+                )
+            }
+        }
+    }
+
+    func persistFSRSProbationRollback(
+        run: FSRSOptimizationRun,
+        previousParameterSetID: UUID,
+        now: Date
+    ) throws {
+        try inTransaction {
+            try insertFSRSOptimizationRun(run)
+            try activateFSRSParameterSet(
+                previousParameterSetID,
+                presetID: run.presetID,
+                now: now
+            )
+        }
+    }
+
+    func fetchFSRSOptimizationRuns(limit: Int? = nil) throws -> [FSRSOptimizationRun] {
+        var sql = "SELECT * FROM fsrs_optimization_runs ORDER BY completed_at DESC, id DESC"
+        var bindings: [Binding] = []
+        if let limit {
+            sql += " LIMIT ?"
+            bindings.append(.int(Int64(max(limit, 0))))
+        }
+        sql += ";"
+        return try query(sql, bindings: bindings).map(decodeFSRSOptimizationRun)
+    }
+
+    func schedulerHealthSnapshot() throws -> SchedulingHealthSnapshot {
+        guard let preset = try fetchSchedulerPreset(
+            id: SchedulerPersistenceConstants.sharedPresetID
+        ) else {
+            throw DatabaseError.decodingFailed
+        }
+        let active = try preset.activeParameterSetID.flatMap { id in
+            try fetchFSRSParameterSet(id: id)
+        }
+        let allSets = try fetchFSRSParameterSets()
+        let rollbackIDs = allSets.compactMap { candidate -> UUID? in
+            guard candidate.id != active?.id else { return nil }
+            return candidate.id
+        }
+        let quarantined = try query(
+            "SELECT 1 AS found FROM quarantined_scheduler_params LIMIT 1;"
+        ).first != nil
+        return SchedulingHealthSnapshot(
+            preset: preset,
+            activeParameterSet: active,
+            lastOptimizationRun: try fetchFSRSOptimizationRuns(limit: 1).first,
+            rollbackParameterSetIDs: rollbackIDs,
+            legacyParametersQuarantined: quarantined,
+            optimizerParityVerified: SchedulerPersistenceConstants.optimizerParityVerified,
+            latestMigration: try fetchLatestSchedulerMigration()
+        )
+    }
+
+    /// Copies mutable legacy rows into the immutable evidence table without
+    /// ever making them active. This also captures legacy rows received after
+    /// the schema migration (for example from an older replica).
+    func quarantineLegacySchedulerParameters(now: Date) throws {
+        guard try tableExists("scheduler_params") else { return }
+        try execute(
+            """
+            INSERT OR IGNORE INTO quarantined_scheduler_params (
+                profile_id, parameters, optimized_at, sample_count,
+                log_loss, archived_at, reason
+            )
+            SELECT profile_id, parameters, optimized_at, sample_count,
+                   log_loss, ?,
+                   'Replaced by versioned upstream FSRS implementation'
+            FROM scheduler_params;
+            """,
+            bindings: [.double(now.timeIntervalSince1970)]
+        )
+    }
+
+    func fetchLatestSchedulerMigration() throws -> SchedulerMigrationRecord? {
+        let rows = try query(
+            "SELECT * FROM scheduler_migrations ORDER BY started_at DESC, id DESC LIMIT 1;"
+        )
+        guard let row = rows.first,
+              let idText = row["id"] as? String,
+              let id = UUID(uuidString: idText),
+              let fromVersion = row["from_model_version"] as? String,
+              let toVersion = row["to_model_version"] as? String,
+              let statusText = row["status"] as? String,
+              let status = SchedulerMigrationStatus(rawValue: statusText),
+              let startedAt = row["started_at"] as? Double,
+              let replayed = row["replayed_card_count"] as? Int64,
+              let reset = row["reset_card_count"] as? Int64 else {
+            return nil
+        }
+        return SchedulerMigrationRecord(
+            id: id,
+            fromModelVersion: fromVersion,
+            toModelVersion: toVersion,
+            status: status,
+            startedAt: Date(timeIntervalSince1970: startedAt),
+            completedAt: (row["completed_at"] as? Double).map(Date.init(timeIntervalSince1970:)),
+            replayedCardCount: Int(replayed),
+            resetCardCount: Int(reset),
+            failureReason: row["failure_reason"] as? String
+        )
+    }
+
+    func beginSchedulerMigration(
+        fromModelVersion: String,
+        toModelVersion: String,
+        now: Date
+    ) throws -> UUID {
+        try inTransaction {
+            let id = UUID()
+            let snapshots = try fetchAllCards().map {
+                CardSchedulingSnapshot(
+                    cardID: $0.id,
+                    memory: $0.memory,
+                    memoryModelVersion: $0.memoryModelVersion,
+                    memoryParameterSetID: $0.memoryParameterSetID,
+                    schedulingHistoryOrigin: $0.schedulingHistoryOrigin
+                )
+            }
+            let preset = try fetchSchedulerPreset(
+                id: SchedulerPersistenceConstants.sharedPresetID
+            )
+            try execute(
+                """
+                INSERT INTO scheduler_migrations (
+                    id, from_model_version, to_model_version, status, started_at,
+                    card_snapshot, previous_active_parameter_set_id
+                ) VALUES (?, ?, ?, 'running', ?, ?, ?);
+                """,
+                bindings: [
+                    .text(id.uuidString), .text(fromModelVersion), .text(toModelVersion),
+                    .double(now.timeIntervalSince1970), .blob(try encode(snapshots)),
+                    preset?.activeParameterSetID.map { .text($0.uuidString) } ?? .null,
+                ]
+            )
+            return id
+        }
+    }
+
+    /// Atomically installs replay results and resets histories that cannot be
+    /// reconstructed. The original card states remain in the migration row.
+    func completeSchedulerMigration(
+        id: UUID,
+        replayedCards: [CardSchedulingSnapshot],
+        resetCardIDs: [UUID],
+        activeParameterSetID: UUID,
+        now: Date
+    ) throws {
+        try inTransaction {
+            for card in replayedCards {
+                try updateCardSchedulingMemory(
+                    card.cardID,
+                    memory: card.memory,
+                    modelVersion: card.memoryModelVersion
+                        ?? SchedulerPersistenceConstants.memoryModelVersion,
+                    parameterSetID: card.memoryParameterSetID ?? activeParameterSetID
+                )
+                try setCardSchedulingHistoryOrigin(
+                    card.cardID,
+                    origin: card.schedulingHistoryOrigin
+                )
+            }
+            for cardID in resetCardIDs {
+                try resetCardSchedulingMemory(
+                    cardID,
+                    modelVersion: SchedulerPersistenceConstants.memoryModelVersion,
+                    parameterSetID: activeParameterSetID,
+                    historyOrigin: now
+                )
+            }
+            try activateFSRSParameterSet(
+                activeParameterSetID,
+                presetID: SchedulerPersistenceConstants.sharedPresetID,
+                now: now
+            )
+            try execute(
+                """
+                UPDATE scheduler_migrations
+                SET status = 'completed', completed_at = ?,
+                    replayed_card_count = ?, reset_card_count = ?
+                WHERE id = ? AND status = 'running';
+                """,
+                bindings: [
+                    .double(now.timeIntervalSince1970), .int(Int64(replayedCards.count)),
+                    .int(Int64(resetCardIDs.count)), .text(id.uuidString),
+                ]
+            )
+        }
+    }
+
+    func rollbackSchedulerMigration(id: UUID, now: Date) throws {
+        try inTransaction {
+            let rows = try query(
+                "SELECT card_snapshot, previous_active_parameter_set_id FROM scheduler_migrations WHERE id = ? AND status = 'completed' LIMIT 1;",
+                bindings: [.text(id.uuidString)]
+            )
+            guard let row = rows.first, let data = payload(row, "card_snapshot") else {
+                throw DatabaseError.executeFailed("Completed scheduler migration not found.")
+            }
+            for snapshot in try decode([CardSchedulingSnapshot].self, from: data) {
+                if let modelVersion = snapshot.memoryModelVersion {
+                    try updateCardSchedulingMemory(
+                        snapshot.cardID,
+                        memory: snapshot.memory,
+                        modelVersion: modelVersion,
+                        parameterSetID: snapshot.memoryParameterSetID
+                    )
+                    try setCardSchedulingHistoryOrigin(
+                        snapshot.cardID,
+                        origin: snapshot.schedulingHistoryOrigin
+                    )
+                } else {
+                    try updateCardMemory(snapshot.cardID, memory: snapshot.memory)
+                    try execute(
+                        "UPDATE cards SET memory_model_version = NULL, memory_parameter_set_id = NULL, scheduling_history_origin = ? WHERE id = ?;",
+                        bindings: [
+                            snapshot.schedulingHistoryOrigin.map {
+                                .double($0.timeIntervalSince1970)
+                            } ?? .null,
+                            .text(snapshot.cardID.uuidString),
+                        ]
+                    )
+                }
+            }
+            if let previousText = row["previous_active_parameter_set_id"] as? String,
+               let previousID = UUID(uuidString: previousText) {
+                try activateFSRSParameterSet(
+                    previousID,
+                    presetID: SchedulerPersistenceConstants.sharedPresetID,
+                    now: now
+                )
+            }
+            try execute(
+                "UPDATE scheduler_migrations SET status = 'rolledBack', completed_at = ? WHERE id = ?;",
+                bindings: [.double(now.timeIntervalSince1970), .text(id.uuidString)]
+            )
+        }
+    }
+
     func persistReview(
         cardID: UUID,
         memoryBefore: MemoryState,
@@ -3020,7 +3570,16 @@ actor SQLiteDatabase {
         introductionStudyDay: String?
     ) throws {
         try inTransaction {
-            try updateCardMemory(cardID, memory: memoryAfter)
+            if let audit = log.schedulingAudit {
+                try updateCardSchedulingMemory(
+                    cardID,
+                    memory: memoryAfter,
+                    modelVersion: audit.modelVersion,
+                    parameterSetID: audit.parameterSetID
+                )
+            } else {
+                try updateCardMemory(cardID, memory: memoryAfter)
+            }
             try insertReviewLog(log, memoryBefore: memoryBefore)
             if let introducedDeckID, let introductionStudyDay {
                 try execute(
@@ -3110,7 +3669,9 @@ actor SQLiteDatabase {
             let existing = try query(
                 """
                 SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                       cards.memory_model_version, cards.memory_parameter_set_id,
+                       cards.scheduling_history_origin
                 FROM api_card_reservations AS reservations
                 JOIN cards ON cards.id = reservations.card_id
                 WHERE reservations.session_id = ?
@@ -3128,7 +3689,9 @@ actor SQLiteDatabase {
             var rows = try query(
                 """
                 SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                       cards.memory_model_version, cards.memory_parameter_set_id,
+                       cards.scheduling_history_origin
                 FROM cards
                 WHERE cards.is_suspended = 0
                   AND cards.due_at <= ?
@@ -3158,7 +3721,10 @@ actor SQLiteDatabase {
 
                     SELECT eligible_due.id, eligible_due.item_id, eligible_due.template_id,
                            eligible_due.skill, eligible_due.memory, eligible_due.is_suspended,
-                           eligible_due.deck_id, eligible_due.cloze_group
+                           eligible_due.deck_id, eligible_due.cloze_group,
+                           eligible_due.memory_model_version,
+                           eligible_due.memory_parameter_set_id,
+                           eligible_due.scheduling_history_origin
                     FROM eligible_due
                     WHERE eligible_due.phase = 'new'
                       AND NOT EXISTS (
@@ -3227,7 +3793,9 @@ actor SQLiteDatabase {
                 let scopeFilter = scopeClause(scope, column: "cards.deck_id")
                 var sql = """
                     SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                           cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                           cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                           cards.memory_model_version, cards.memory_parameter_set_id,
+                           cards.scheduling_history_origin
                     FROM cards
                     WHERE cards.is_suspended = 0
                       AND cards.due_at <= ?
@@ -3252,7 +3820,8 @@ actor SQLiteDatabase {
             var sql = eligible.sql + """
 
                 SELECT id, item_id, template_id, skill, memory, is_suspended,
-                       deck_id, cloze_group
+                       deck_id, cloze_group, memory_model_version,
+                       memory_parameter_set_id, scheduling_history_origin
                 FROM eligible_due
                 WHERE phase = 'new'
                 ORDER BY due_at ASC, id ASC
@@ -3264,7 +3833,9 @@ actor SQLiteDatabase {
         let scopeFilter = scopeClause(scope, column: "cards.deck_id")
         var sql = """
             SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                   cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group
+                   cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                   cards.memory_model_version, cards.memory_parameter_set_id,
+                   cards.scheduling_history_origin
             FROM cards
             WHERE cards.is_suspended = 0
               AND cards.due_at <= ?
@@ -3521,9 +4092,12 @@ actor SQLiteDatabase {
             """
             SELECT COUNT(*) AS count
             FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
             LEFT JOIN review_reverts
                 ON review_reverts.review_log_id = review_logs.id
-            WHERE review_logs.card_id = ? AND review_reverts.id IS NULL;
+            WHERE review_logs.card_id = ? AND review_reverts.id IS NULL
+              AND (cards.scheduling_history_origin IS NULL
+                   OR review_logs.reviewed_at >= cards.scheduling_history_origin);
             """,
             bindings: [.text(cardID.uuidString)]
         )
@@ -3538,9 +4112,12 @@ actor SQLiteDatabase {
             """
             SELECT COUNT(*) AS count
             FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
             LEFT JOIN review_reverts
                 ON review_reverts.review_log_id = review_logs.id
-            WHERE review_reverts.id IS NULL;
+            WHERE review_reverts.id IS NULL
+              AND (cards.scheduling_history_origin IS NULL
+                   OR review_logs.reviewed_at >= cards.scheduling_history_origin);
             """
         )
         guard let count = rows.first?["count"] as? Int64 else { return 0 }
@@ -3759,7 +4336,8 @@ actor SQLiteDatabase {
     func fetchCards(for itemID: UUID) throws -> [Card] {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group,
+                   memory_model_version, memory_parameter_set_id, scheduling_history_origin
             FROM cards
             WHERE item_id = ?;
             """,
@@ -4888,6 +5466,11 @@ actor SQLiteDatabase {
         let memory = try decode(MemoryState.self, from: memoryData)
         let deckID = (row["deck_id"] as? String).flatMap(UUID.init(uuidString:))
         let clozeGroup = (row["cloze_group"] as? Int64).map(Int.init)
+        let memoryModelVersion = row["memory_model_version"] as? String
+        let memoryParameterSetID = (row["memory_parameter_set_id"] as? String)
+            .flatMap(UUID.init(uuidString:))
+        let schedulingHistoryOrigin = (row["scheduling_history_origin"] as? Double)
+            .map(Date.init(timeIntervalSince1970:))
 
         return Card(
             id: id,
@@ -4895,9 +5478,109 @@ actor SQLiteDatabase {
             templateID: templateID,
             skill: skill,
             memory: memory,
+            memoryModelVersion: memoryModelVersion,
+            memoryParameterSetID: memoryParameterSetID,
+            schedulingHistoryOrigin: schedulingHistoryOrigin,
             isSuspended: suspendedValue != 0,
             deckID: deckID,
             clozeGroup: clozeGroup
+        )
+    }
+
+    private func decodeSchedulerPreset(from row: [String: Any?]) -> SchedulerPreset? {
+        guard let idText = row["id"] as? String,
+              let id = UUID(uuidString: idText),
+              let name = row["name"] as? String,
+              let desiredRetention = row["desired_retention"] as? Double,
+              let maximumIntervalDays = row["maximum_interval_days"] as? Int64,
+              let automatic = row["automatic_optimization_enabled"] as? Int64,
+              let createdAt = row["created_at"] as? Double,
+              let updatedAt = row["updated_at"] as? Double else { return nil }
+        return SchedulerPreset(
+            id: id,
+            name: name,
+            desiredRetention: desiredRetention,
+            maximumIntervalDays: Int(maximumIntervalDays),
+            automaticOptimizationEnabled: automatic != 0,
+            activeParameterSetID: (row["active_parameter_set_id"] as? String)
+                .flatMap(UUID.init(uuidString:)),
+            createdAt: Date(timeIntervalSince1970: createdAt),
+            updatedAt: Date(timeIntervalSince1970: updatedAt)
+        )
+    }
+
+    private func decodeFSRSParameterSet(from row: [String: Any?]) throws -> FSRSParameterSet {
+        guard let idText = row["id"] as? String,
+              let id = UUID(uuidString: idText),
+              let weightsData = payload(row, "weights"),
+              let modelVersion = row["model_version"] as? String,
+              let upstreamCommit = row["upstream_commit"] as? String,
+              let sourceChecksum = row["source_checksum"] as? String,
+              let scope = row["scope"] as? String,
+              let sourceText = row["source"] as? String,
+              let source = FSRSParameterSource(rawValue: sourceText),
+              let metricsData = payload(row, "metrics"),
+              let createdAt = row["created_at"] as? Double else {
+            throw DatabaseError.decodingFailed
+        }
+        return FSRSParameterSet(
+            id: id,
+            weights: try decode([Double].self, from: weightsData),
+            modelVersion: modelVersion,
+            upstreamCommit: upstreamCommit,
+            sourceChecksum: sourceChecksum,
+            fixtureChecksum: row["fixture_checksum"] as? String,
+            scope: scope,
+            source: source,
+            inputFingerprint: row["input_fingerprint"] as? String,
+            trainingCutoff: (row["training_cutoff"] as? Double)
+                .map(Date.init(timeIntervalSince1970:)),
+            metrics: try decode([String: Double].self, from: metricsData),
+            previousParameterSetID: (row["previous_parameter_set_id"] as? String)
+                .flatMap(UUID.init(uuidString:)),
+            createdAt: Date(timeIntervalSince1970: createdAt)
+        )
+    }
+
+    private func decodeFSRSOptimizationRun(
+        from row: [String: Any?]
+    ) throws -> FSRSOptimizationRun {
+        guard let idText = row["id"] as? String, let id = UUID(uuidString: idText),
+              let presetText = row["preset_id"] as? String,
+              let presetID = UUID(uuidString: presetText),
+              let startedAt = row["started_at"] as? Double,
+              let completedAt = row["completed_at"] as? Double,
+              let trainingCutoff = row["training_cutoff"] as? Double,
+              let fingerprint = row["input_fingerprint"] as? String,
+              let eligible = row["eligible_target_count"] as? Int64,
+              let cards = row["distinct_card_count"] as? Int64,
+              let failures = row["failure_count"] as? Int64,
+              let days = row["study_day_count"] as? Int64,
+              let excludedData = payload(row, "excluded_counts"),
+              let folds = row["fold_count"] as? Int64,
+              let metricsData = payload(row, "metrics"),
+              let decisionText = row["decision"] as? String,
+              let decision = FSRSOptimizationDecision(rawValue: decisionText) else {
+            throw DatabaseError.decodingFailed
+        }
+        return FSRSOptimizationRun(
+            id: id,
+            presetID: presetID,
+            startedAt: Date(timeIntervalSince1970: startedAt),
+            completedAt: Date(timeIntervalSince1970: completedAt),
+            trainingCutoff: Date(timeIntervalSince1970: trainingCutoff),
+            inputFingerprint: fingerprint,
+            eligibleTargetCount: Int(eligible),
+            distinctCardCount: Int(cards),
+            failureCount: Int(failures),
+            studyDayCount: Int(days),
+            excludedCounts: try decode([String: Int].self, from: excludedData),
+            foldCount: Int(folds),
+            metrics: try decode([String: Double].self, from: metricsData),
+            decision: decision,
+            reason: row["reason"] as? String,
+            candidateParameterSetID: (row["candidate_parameter_set_id"] as? String)
+                .flatMap(UUID.init(uuidString:))
         )
     }
 

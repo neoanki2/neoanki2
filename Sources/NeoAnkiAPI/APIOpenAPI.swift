@@ -24,6 +24,7 @@ package enum APIOpenAPI {
             {
                 return .study
             }
+            if path.hasPrefix("/v1/scheduling") { return .scheduling }
             if path.hasPrefix("/v1/study-responses") || path.hasPrefix("/v1/media") {
                 return .responses
             }
@@ -311,7 +312,13 @@ package enum APIOpenAPI {
         add("/v1/cards/{id}", .patch, .patchCard, authorization: .scope(.studyReview), request: "PatchCardInput", response: "Card")
         add("/v1/cards/{id}/content", .get, .cardContent, authorization: .scope(.libraryRead), response: "StudyCard")
         add("/v1/cards/{id}/review-preview", .get, .reviewPreview, authorization: .scope(.libraryRead), response: "RatingPreviewArray")
+        add("/v1/cards/{id}/scheduling-explanation", .get, .schedulingExplanation, authorization: .scope(.libraryRead), response: "SchedulingExplanation")
         add("/v1/cards/{id}/resets", .post, .resetCard, authorization: .scope(.studyReview), request: "RequiredConfirmInput", response: "Card")
+        add("/v1/scheduling/health", .get, .schedulingHealth, authorization: .scope(.libraryRead), response: "SchedulingHealth")
+        add("/v1/scheduling/parameter-sets", .get, .listSchedulingParameterSets, authorization: .scope(.libraryRead), response: "FSRSParameterSetArray")
+        add("/v1/scheduling/optimization-runs", .get, .listSchedulingOptimizationRuns, authorization: .scope(.libraryRead), response: "FSRSOptimizationRunArray", query: ["limit"])
+        add("/v1/scheduling/default-restores", .post, .restoreDefaultScheduling, authorization: .scope(.settingsWrite), request: "RequiredConfirmInput", response: "SchedulingHealth")
+        add("/v1/scheduling/rollbacks", .post, .rollbackScheduling, authorization: .scope(.settingsWrite), request: "SchedulingRollbackInput", response: "SchedulingHealth")
 
         add("/v1/study-sessions", .post, .createStudySession, authorization: .scope(.studyReview), success: 201, request: "CreateStudySessionInput", response: "StudySession")
         add("/v1/study-sessions/{id}", .get, .getStudySession, authorization: .scope(.studyReview), response: "StudySession")
@@ -887,9 +894,80 @@ package enum APIOpenAPI {
                  "answer": array(reference("ResolvedSlot")), "memory": reference("Memory")]
             ),
             "RatingPreviewArray": array(reference("RatingPreview")),
-            "RatingPreview": object(["rating", "memory"], [
+            "RatingPreview": object(["rating", "reviewedAt", "intervalSeconds", "rawIntervalDays", "operationalIntervalSeconds", "memoryBefore", "memoryAfter", "memory", "predictedRetrievability", "modelVersion", "timingPolicyVersion", "intervalPolicyVersion", "finalDueAt"], [
                 "rating": ["type": "string", "enum": ["again", "hard", "good", "easy"]],
+                "reviewedAt": timestamp,
+                "intervalSeconds": ["type": "number", "minimum": 0],
+                "rawIntervalDays": ["type": "number", "minimum": 0],
+                "operationalIntervalSeconds": nonnegative,
+                "memoryBefore": reference("Memory"),
+                "memoryAfter": reference("Memory"),
                 "memory": reference("Memory"),
+                "predictedRetrievability": ["type": "number", "minimum": 0, "maximum": 1],
+                "presetId": nullableUUID, "parameterSetId": nullableUUID,
+                "modelVersion": ["type": "string"],
+                "timingPolicyVersion": ["type": "string"],
+                "intervalPolicyVersion": ["type": "string"],
+                "finalDueAt": timestamp,
+                "constraintReason": ["type": ["string", "null"]],
+            ]),
+            "SchedulingExplanation": object(
+                ["cardId", "reviewedAt", "elapsedSeconds", "elapsedModelDays", "previousMemory", "desiredRetention", "modelIdentifier", "elapsedTimePolicy", "intervalPolicy", "ratings"],
+                ["cardId": uuid, "reviewedAt": timestamp,
+                 "elapsedSeconds": ["type": "number", "minimum": 0],
+                 "elapsedModelDays": nonnegative, "previousMemory": reference("Memory"),
+                 "desiredRetention": ["type": "number", "minimum": 0, "maximum": 1],
+                 "modelIdentifier": ["type": "string"], "elapsedTimePolicy": ["type": "string"],
+                 "intervalPolicy": ["type": "string"], "presetId": nullableUUID,
+                 "parameterSetId": nullableUUID, "ratings": reference("RatingPreviewArray")]
+            ),
+            "SchedulingHealth": object(
+                ["modelIdentifier", "desiredRetention", "maximumIntervalDays", "automaticOptimizationEnabled", "parameterCount", "parameterSource", "optimizerParityVerified", "optimizerStatus", "personalizationStatus", "legacyParametersQuarantined", "canRestoreDefaults", "canRollback"],
+                ["modelIdentifier": ["type": "string"],
+                 "desiredRetention": ["type": "number", "minimum": 0, "maximum": 1],
+                 "maximumIntervalDays": nonnegative, "automaticOptimizationEnabled": ["type": "boolean"],
+                 "parameterCount": nonnegative,
+                 "parameterSource": ["type": "string", "enum": ["populationDefaults", "personalized"]],
+                 "activeParameterSetId": nullableUUID,
+                 "activeParameterSource": ["type": ["string", "null"], "enum": ["populationDefault", "optimized", "imported", "legacyQuarantine", NSNull()]],
+                 "optimizerParityVerified": ["type": "boolean"],
+                 "optimizerStatus": ["type": "string", "enum": ["parityVerificationPending", "notRun", "promoted", "held", "rejected", "notEnoughData", "failed"]],
+                 "personalizationStatus": ["type": "string", "enum": ["populationDefaults", "personalized", "unavailablePendingVerification"]],
+                 "lastOptimizationDecision": ["type": ["string", "null"]],
+                 "lastOptimizationReason": ["type": ["string", "null"]],
+                 "lastOptimizationCompletedAt": ["oneOf": [timestamp, ["type": "null"]]],
+                 "migrationStatus": ["type": ["string", "null"]],
+                 "legacyParametersQuarantined": ["type": "boolean"],
+                 "canRestoreDefaults": ["type": "boolean"], "canRollback": ["type": "boolean"]]
+            ),
+            "FSRSParameterSetArray": array(reference("FSRSParameterSet")),
+            "FSRSParameterSet": object(
+                ["id", "isActive", "weights", "modelVersion", "upstreamCommit", "sourceChecksum", "scope", "source", "metrics", "createdAt"],
+                ["id": uuid, "isActive": ["type": "boolean"], "weights": array(["type": "number"]),
+                 "modelVersion": ["type": "string"], "upstreamCommit": ["type": "string"],
+                 "sourceChecksum": ["type": "string"], "fixtureChecksum": ["type": ["string", "null"]],
+                 "scope": ["type": "string"],
+                 "source": ["type": "string", "enum": ["populationDefault", "optimized", "imported", "legacyQuarantine"]],
+                 "inputFingerprint": ["type": ["string", "null"]],
+                 "trainingCutoff": ["oneOf": [timestamp, ["type": "null"]]],
+                 "metrics": ["type": "object", "additionalProperties": ["type": "number"]],
+                 "previousParameterSetId": nullableUUID, "createdAt": timestamp]
+            ),
+            "FSRSOptimizationRunArray": array(reference("FSRSOptimizationRun")),
+            "FSRSOptimizationRun": object(
+                ["id", "presetId", "startedAt", "completedAt", "trainingCutoff", "inputFingerprint", "eligibleTargetCount", "distinctCardCount", "failureCount", "studyDayCount", "excludedCounts", "foldCount", "metrics", "decision"],
+                ["id": uuid, "presetId": uuid, "startedAt": timestamp, "completedAt": timestamp,
+                 "trainingCutoff": timestamp, "inputFingerprint": ["type": "string"],
+                 "eligibleTargetCount": nonnegative, "distinctCardCount": nonnegative,
+                 "failureCount": nonnegative, "studyDayCount": nonnegative,
+                 "excludedCounts": ["type": "object", "additionalProperties": nonnegative],
+                 "foldCount": nonnegative,
+                 "metrics": ["type": "object", "additionalProperties": ["type": "number"]],
+                 "decision": ["type": "string", "enum": ["promoted", "held", "rejected", "notEnoughData", "failed"]],
+                 "reason": ["type": ["string", "null"]], "candidateParameterSetId": nullableUUID]
+            ),
+            "SchedulingRollbackInput": object(["confirm"], [
+                "confirm": ["type": "boolean"], "parameterSetId": nullableUUID,
             ]),
             "StudyScope": object(["kind"], [
                 "kind": ["type": "string", "enum": ["allDecks", "unassigned", "deck"]],
