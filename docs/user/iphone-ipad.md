@@ -80,8 +80,9 @@ increased contrast, Reduce Motion, and portrait or landscape layouts.
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
 type, then fill its typed fields. Visual media requires a description. The
 Library supports item detail, editing, multi-selection, bulk move, and bulk
-delete. Deleting items or changing templates warns before removing saved spoken
-responses.
+delete. Its Saved Responses shortcut keeps the local-only status readable with
+increased contrast and accessibility text sizes. Deleting items or changing
+templates warns before removing saved spoken responses.
 
 Use **Create → Item Types & Templates** to create or edit fields, templates,
 interactions, prompt and answer slots, skills, and generation conditions.
