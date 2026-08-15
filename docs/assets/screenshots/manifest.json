@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-15T10:47:31Z",
+  "capturedAt" : "2026-08-15T11:06:38Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 680,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "039fa24c20424575b02831c6162c83397faa0beea45b97b3a18e67c6d4b2da32",
+      "sha256" : "a6c94c357541d54dd8f8dfa63319d832db70fbddedbcbc0c292c196d4ee99591",
       "width" : 1024
     },
     {
@@ -92,7 +92,7 @@
       "filename" : "item-types.png",
       "height" : 680,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "9efdfdccbddc03fab987b26d1604535c3b8e7a979823f4bceb7948344b1e17d7",
+      "sha256" : "c3a81d5d578a1443c2698bd2ad8982cb108df3f6c2bc6c7d0f77459fbf85b312",
       "width" : 1024
     },
     {
@@ -136,7 +136,7 @@
       "filename" : "scheduling-result.png",
       "height" : 680,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "5991a003f2214a9f1335c618f4bc10ca8bbc4b2ad257eb75f99c9b16b5e2d0db",
+      "sha256" : "dcca3ab1f9eef420ab9b5edfe956070b74b64ee708b050efa49394eb9ea73040",
       "width" : 1024
     },
     {
@@ -204,7 +204,7 @@
       "filename" : "template-advanced.png",
       "height" : 680,
       "scenario" : "Study-Stage Builder Generation and Skill inspector",
-      "sha256" : "34c967084829f73d1e40bf5af2f760cda4ad573fbe68aa27863e5226eb89d81d",
+      "sha256" : "041c24eacad07c578fc9eb5ae65ad62d00a6e1486f5439d7b5ac41daa1750bb5",
       "width" : 1024
     },
     {
@@ -217,9 +217,9 @@
       "filename" : "template-editor.png",
       "height" : 680,
       "scenario" : "new Study-Stage Builder with Ingredients, Preview, and Inspector",
-      "sha256" : "d0007f2087bd1975d550ee9240008b2b1e9fc90872463ee65d8e8fc94d728f0a",
+      "sha256" : "b9fa66ff9d90444ef8ce27d2e431f3e7cbf25c4c63fca32d2d661d323a39739a",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "5057d3c72fc8ecee00bf0bf5ee21d2aa4e263987"
+  "sourceSHA" : "d782240358279e316954121747cf9a8ccf8c6184"
 }
