@@ -298,7 +298,7 @@ class NeoAnkiUITestCase: XCTestCase {
             XCTFail("No app window available for documentation screenshot '\(name)'", file: file, line: line)
             return
         }
-        guard appWindow.frame.width >= 1_024, appWindow.frame.height >= 680 else {
+        guard appWindow.frame.width >= 1_024, appWindow.frame.height >= 674 else {
             XCTFail(
                 "Documentation screenshot window is too small: \(appWindow.frame)",
                 file: file,

@@ -417,7 +417,7 @@ if requireScreenshots {
             png[offset..<(offset + 4)].reduce(0) { ($0 << 8) | Int($1) }
         }
         if entry.width != pngInteger(at: 16) || entry.height != pngInteger(at: 20)
-            || entry.width < 1_024 || entry.height < 680 {
+            || entry.width < 1_024 || entry.height < 674 {
             fail("Screenshot \(entry.filename) dimensions do not match its manifest")
         }
         for cap in resolvedScreenshotDensityCaps

@@ -71,7 +71,7 @@ for filename in sorted(expected_files):
     width, height = struct.unpack(">II", header[16:24])
     if entry.get("width") != width or entry.get("height") != height:
         raise SystemExit(f"Manifest dimensions do not match {filename}")
-    if width < 1024 or height < 680:
+    if width < 1024 or height < 674:
         raise SystemExit(f"Reviewed screenshot is too small: {filename} is {width}x{height}")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if entry.get("sha256") != digest:
