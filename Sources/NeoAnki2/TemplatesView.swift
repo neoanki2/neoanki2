@@ -28,7 +28,24 @@ struct TemplatesView: View {
     }
 
     var body: some View {
-        Group {
+        ZStack {
+            HSplitView {
+                itemTypesSidebar
+                    .frame(
+                        minWidth: DesignSystem.sidebarMin,
+                        idealWidth: DesignSystem.sidebarIdeal,
+                        maxWidth: DesignSystem.sidebarMax
+                    )
+                    .layoutPriority(1)
+
+                itemTypeDetail
+                    .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(0)
+            }
+            .opacity(isTemplateEditorActive ? 0 : 1)
+            .accessibilityHidden(isTemplateEditorActive)
+            .allowsHitTesting(!isTemplateEditorActive)
+
             if isTemplateEditorActive, let itemType = model.selectedItemType {
                 NavigationStack {
                     TemplateEditorView(
@@ -40,20 +57,7 @@ struct TemplatesView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(DesignSystem.detailBackground)
-            } else {
-                HSplitView {
-                    itemTypesSidebar
-                        .frame(
-                            minWidth: DesignSystem.sidebarMin,
-                            idealWidth: DesignSystem.sidebarIdeal,
-                            maxWidth: DesignSystem.sidebarMax
-                        )
-                        .layoutPriority(1)
-
-                    itemTypeDetail
-                        .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-                        .layoutPriority(0)
-                }
+                .zIndex(1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -320,27 +324,6 @@ struct TemplatesView: View {
                     model: model,
                     editingItemType: editingItemType,
                     onDismiss: dismissItemTypeEditor
-                )
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DesignSystem.detailBackground)
-        } else if isAddingTemplate, let itemType = model.selectedItemType {
-            NavigationStack {
-                TemplateEditorView(
-                    model: model,
-                    itemType: itemType,
-                    onDismiss: dismissTemplateEditor
-                )
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DesignSystem.detailBackground)
-        } else if let editingTemplate, let itemType = model.selectedItemType {
-            NavigationStack {
-                TemplateEditorView(
-                    model: model,
-                    itemType: itemType,
-                    editingTemplate: editingTemplate,
-                    onDismiss: dismissTemplateEditor
                 )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
