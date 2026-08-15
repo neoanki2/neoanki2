@@ -159,17 +159,16 @@ final class NeoAnki2MobileUITests: XCTestCase {
         try app.performAccessibilityAudit(
             for: [.contrast, .hitRegion, .sufficientElementDescription]
         ) { issue in
-            // SwiftUI owns the TabView/sidebar labels and searchable placeholder, and
-            // reports them as contrast failures in this simulated configuration. Keep
-            // all app-rendered content audited.
+            // SwiftUI owns the TabView/sidebar labels and reports them as contrast
+            // failures in this simulated configuration. Keep all app-rendered content
+            // audited.
             guard issue.auditType == .contrast,
                   let element = issue.element
             else { return false }
 
             let isSystemNavigationLabel = element.elementType == .staticText
                 && ["Home", "Library", "Create", "Settings"].contains(element.label)
-            let isSystemSearchPlaceholder = element.label == "Search cards"
-            return isSystemNavigationLabel || isSystemSearchPlaceholder
+            return isSystemNavigationLabel
         }
     }
 }

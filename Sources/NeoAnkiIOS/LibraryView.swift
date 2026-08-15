@@ -109,7 +109,7 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("Library")
-            .searchable(text: $searchText, prompt: "Search cards")
+            .modifier(ConditionalLibrarySearch(text: $searchText, isEnabled: !model.items.isEmpty))
             .navigationDestination(for: UUID.self) { itemID in
                 ItemDetailView(model: model, itemID: itemID)
             }
@@ -186,6 +186,20 @@ struct LibraryView: View {
                 pendingDeletion = []
                 deletionError = MobileAppModel.message(for: error)
             }
+        }
+    }
+}
+
+private struct ConditionalLibrarySearch: ViewModifier {
+    @Binding var text: String
+    let isEnabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.searchable(text: $text, prompt: "Search cards")
+        } else {
+            content
         }
     }
 }
