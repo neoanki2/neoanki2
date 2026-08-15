@@ -519,7 +519,7 @@ class NeoAnkiUITestCase: XCTestCase {
             return app.descendants(matching: .any).matching(
                 NSPredicate(
                     format: "identifier IN %@",
-                    ["templatesItemTypesHeader", "templatesPanel"]
+                    ["templatesItemTypesHeader"]
                 )
             ).firstMatch.exists
         }

@@ -42,7 +42,6 @@ struct TemplatesView: View {
                     .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
                     .layoutPriority(0)
             }
-            .accessibilityIdentifier("templatesPanel")
             .opacity(isTemplateEditorActive ? 0 : 1)
             .accessibilityHidden(isTemplateEditorActive)
             .allowsHitTesting(!isTemplateEditorActive)
