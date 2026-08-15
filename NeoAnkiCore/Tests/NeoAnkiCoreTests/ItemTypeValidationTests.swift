@@ -20,57 +20,57 @@ private func makeValidItemType() -> ItemType {
     #expect(name == "Geography")
 }
 
-@Test func validateNameRejectsEmpty() async {
-    await #expect(throws: DatabaseError.invalidItemType("Item type name is required.")) {
+@Test func validateNameRejectsEmpty() {
+    #expect(throws: DatabaseError.invalidItemType("Item type name is required.")) {
         try ItemTypeValidation.validateName("   ")
     }
 }
 
-@Test func validateFieldsRejectsEmptyList() async {
-    await #expect(throws: DatabaseError.invalidItemType("An item type needs at least one field.")) {
+@Test func validateFieldsRejectsEmptyList() {
+    #expect(throws: DatabaseError.invalidItemType("An item type needs at least one field.")) {
         try ItemTypeValidation.validateFields([])
     }
 }
 
-@Test func validateFieldsRejectsBlankFieldName() async {
+@Test func validateFieldsRejectsBlankFieldName() {
     let field = FieldDef(name: "  ", type: .text)
-    await #expect(throws: DatabaseError.invalidItemType("Every field needs a name.")) {
+    #expect(throws: DatabaseError.invalidItemType("Every field needs a name.")) {
         try ItemTypeValidation.validateFields([field])
     }
 }
 
-@Test func validateFieldsRejectsDuplicateNamesCaseInsensitive() async {
+@Test func validateFieldsRejectsDuplicateNamesCaseInsensitive() {
     let fields = [
         FieldDef(name: "Front", type: .text),
         FieldDef(name: "front", type: .text),
     ]
-    await #expect(throws: DatabaseError.invalidItemType("Field names must be unique.")) {
+    #expect(throws: DatabaseError.invalidItemType("Field names must be unique.")) {
         try ItemTypeValidation.validateFields(fields)
     }
 }
 
-@Test func validateFieldsRejectsDuplicateIDs() async {
+@Test func validateFieldsRejectsDuplicateIDs() {
     let id = UUID()
     let fields = [
         FieldDef(id: id, name: "Front", type: .text),
         FieldDef(id: id, name: "Back", type: .text),
     ]
-    await #expect(throws: DatabaseError.invalidItemType("Item type field IDs must be unique.")) {
+    #expect(throws: DatabaseError.invalidItemType("Item type field IDs must be unique.")) {
         try ItemTypeValidation.validateFields(fields)
     }
 }
 
-@Test func validateRejectsMissingTemplates() async {
+@Test func validateRejectsMissingTemplates() {
     let front = FieldDef(name: "Front", type: .text)
     let back = FieldDef(name: "Back", type: .text)
     let itemType = ItemType(name: "Empty", fields: [front, back], templates: [])
 
-    await #expect(throws: DatabaseError.invalidItemType("An item type must have at least one template.")) {
+    #expect(throws: DatabaseError.invalidItemType("An item type must have at least one template.")) {
         try ItemTypeValidation.validate(itemType)
     }
 }
 
-@Test func validateRejectsBlankTemplateName() async {
+@Test func validateRejectsBlankTemplateName() {
     let front = FieldDef(name: "Front", type: .text)
     let back = FieldDef(name: "Back", type: .text)
     let template = Template(
@@ -82,12 +82,12 @@ private func makeValidItemType() -> ItemType {
     )
     let itemType = ItemType(name: "Test", fields: [front, back], templates: [template])
 
-    await #expect(throws: DatabaseError.invalidItemType("Every template needs a name.")) {
+    #expect(throws: DatabaseError.invalidItemType("Every template needs a name.")) {
         try ItemTypeValidation.validate(itemType)
     }
 }
 
-@Test func validateRejectsUnknownFieldReference() async {
+@Test func validateRejectsUnknownFieldReference() {
     let front = FieldDef(name: "Front", type: .text)
     let unknownID = UUID()
     let template = Template(
@@ -99,7 +99,7 @@ private func makeValidItemType() -> ItemType {
     )
     let itemType = ItemType(name: "Test", fields: [front], templates: [template])
 
-    await #expect(throws: DatabaseError.invalidItemType("Template \"Card\" references an unknown field.")) {
+    #expect(throws: DatabaseError.invalidItemType("Template \"Card\" references an unknown field.")) {
         try ItemTypeValidation.validate(itemType)
     }
 }
@@ -145,8 +145,8 @@ private func makeValidItemType() -> ItemType {
     #expect(ids.contains(map.id))
 }
 
-@Test func itemTypeBuilderRejectsSingleTextField() async {
-    await #expect(throws: DatabaseError.invalidItemType("Add at least two text-like fields.")) {
+@Test func itemTypeBuilderRejectsSingleTextField() {
+    #expect(throws: DatabaseError.invalidItemType("Add at least two text-like fields.")) {
         try ItemTypeBuilder.makeItemType(
             name: "Solo",
             fields: [FieldDef(name: "Only", type: .text, isRequired: true)]

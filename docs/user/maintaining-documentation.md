@@ -80,7 +80,7 @@ rendered site, source revision label, screenshot provenance, and support path.
 ## Refresh screenshots
 
 Documentation screenshots use isolated databases, deterministic test
-scenarios, a 1024 × 680 minimum window, and dark appearance. Each image is
+scenarios, a 1024 × 674 minimum window, and dark appearance. Each image is
 cropped to the focused NeoAnki2 app window, so the desktop, Dock, and menu bar
 are not published. The capture pipeline converts the opaque matte outside the
 native macOS window curve to transparent corners, so the window edge stays

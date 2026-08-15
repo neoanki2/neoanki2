@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TemplatesView: View {
     @Bindable var model: TemplatesModel
+    @Binding private var isTemplateEditorPresented: Bool
     var onTemplatesChanged: () async -> Void = {}
 
     @State private var editingTemplate: Template?
@@ -21,26 +22,54 @@ struct TemplatesView: View {
     @State private var isPreparingUnlock = false
     @State private var isUnlocking = false
 
-    var body: some View {
-        HSplitView {
-            itemTypesSidebar
-                .frame(
-                    minWidth: DesignSystem.sidebarMin,
-                    idealWidth: DesignSystem.sidebarIdeal,
-                    maxWidth: DesignSystem.sidebarMax
-                )
-                .layoutPriority(1)
+    init(
+        model: TemplatesModel,
+        isTemplateEditorPresented: Binding<Bool> = .constant(false),
+        onTemplatesChanged: @escaping () async -> Void = {}
+    ) {
+        self.model = model
+        _isTemplateEditorPresented = isTemplateEditorPresented
+        self.onTemplatesChanged = onTemplatesChanged
+    }
 
-            itemTypeDetail
-                .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(0)
+    var body: some View {
+        ZStack {
+            HSplitView {
+                itemTypesSidebar
+                    .frame(
+                        minWidth: DesignSystem.sidebarMin,
+                        idealWidth: DesignSystem.sidebarIdeal,
+                        maxWidth: DesignSystem.sidebarMax
+                    )
+                    .layoutPriority(1)
+
+                itemTypeDetail
+                    .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(0)
+            }
+            .opacity(isTemplateEditorActive ? 0 : 1)
+            .accessibilityHidden(isTemplateEditorActive)
+            .allowsHitTesting(!isTemplateEditorActive)
+
+            if isTemplateEditorActive, let itemType = model.selectedItemType {
+                NavigationStack {
+                    TemplateEditorView(
+                        model: model,
+                        itemType: itemType,
+                        editingTemplate: editingTemplate,
+                        onDismiss: dismissTemplateEditor
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(DesignSystem.detailBackground)
+                .zIndex(1)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("templatesPanel")
         .task {
             await model.load()
         }
-        .onChange(of: model.selectedItemTypeID, initial: true) { _, _ in
+        .onChange(of: model.selectedItemTypeID) { _, _ in
             editingItemType = nil
             editingTemplate = nil
             isAddingTemplate = false
@@ -48,6 +77,9 @@ struct TemplatesView: View {
                 expandedIncludedGroupIDs.insert(group.id)
             }
             Task { await refreshDeleteAvailability() }
+        }
+        .onChange(of: isTemplateEditorActive, initial: true) { _, active in
+            isTemplateEditorPresented = active
         }
         .confirmationDialog(
             deleteDialogTitle,
@@ -125,6 +157,10 @@ struct TemplatesView: View {
                 Text(unlockImpactMessage(unlockImpact))
             }
         }
+    }
+
+    private var isTemplateEditorActive: Bool {
+        isAddingTemplate || editingTemplate != nil
     }
 
     @ViewBuilder
@@ -311,27 +347,6 @@ struct TemplatesView: View {
                     model: model,
                     editingItemType: editingItemType,
                     onDismiss: dismissItemTypeEditor
-                )
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DesignSystem.detailBackground)
-        } else if isAddingTemplate, let itemType = model.selectedItemType {
-            NavigationStack {
-                TemplateEditorView(
-                    model: model,
-                    itemType: itemType,
-                    onDismiss: dismissTemplateEditor
-                )
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DesignSystem.detailBackground)
-        } else if let editingTemplate, let itemType = model.selectedItemType {
-            NavigationStack {
-                TemplateEditorView(
-                    model: model,
-                    itemType: itemType,
-                    editingTemplate: editingTemplate,
-                    onDismiss: dismissTemplateEditor
                 )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

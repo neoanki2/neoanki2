@@ -9,6 +9,10 @@ struct NeoAnkiIOSApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: LibraryFeatureModel
 
+    private var usesAccessibilityUITestEnvironment: Bool {
+        ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingAccessibility")
+    }
+
     init() {
         let paths = MobilePaths()
         if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") {
@@ -41,11 +45,21 @@ struct NeoAnkiIOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+            if usesAccessibilityUITestEnvironment {
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+                    .preferredColorScheme(.dark)
+                    .dynamicTypeSize(.accessibility5)
+            } else {
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await model.refresh(); if model.syncEnabled { await model.synchronize() } }
+                Task {
+                    guard model.loadState == .ready else { return }
+                    await model.refresh()
+                    if model.syncEnabled { await model.synchronize() }
+                }
             } else if phase == .background {
                 IOSBackgroundRefresh.shared.schedule()
             }

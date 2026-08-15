@@ -27,6 +27,7 @@ struct ContentView: View {
     @State private var studyModel: StudyModel?
     @State private var studyScope: StudyScope = .allDecks
     @State private var templatesModel: TemplatesModel?
+    @State private var isEditingTemplate = false
     @State private var endSessionTrigger = false
     /// Lives here rather than in `StudyView` because the Study menu opens the
     /// card editor, and every study command has to stand down while it is open:
@@ -234,7 +235,7 @@ struct ContentView: View {
                         .accessibilityIdentifier("vocabularyPackImportBusy")
                 }
             }
-            if isManagingTemplates {
+            if isManagingTemplates && !isEditingTemplate {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
                         closeItemTypes()
@@ -594,7 +595,10 @@ struct ContentView: View {
             SavedResponsesView(library: library)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if isManagingTemplates, let templatesModel {
-            TemplatesView(model: templatesModel) {
+            TemplatesView(
+                model: templatesModel,
+                isTemplateEditorPresented: $isEditingTemplate
+            ) {
                 await reloadScope()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1065,6 +1069,7 @@ struct ContentView: View {
     }
 
     private func closeItemTypes() {
+        isEditingTemplate = false
         Task {
             itemsModel.invalidateItemTypes()
             await reloadScope()
@@ -1078,6 +1083,7 @@ struct ContentView: View {
             templatesModel = TemplatesModel(library: library)
         }
         selectedItemID = nil
+        isEditingTemplate = false
         isManagingTemplates = true
         setTemplatesFocus(true)
     }

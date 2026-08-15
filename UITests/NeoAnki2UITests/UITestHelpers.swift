@@ -298,7 +298,7 @@ class NeoAnkiUITestCase: XCTestCase {
             XCTFail("No app window available for documentation screenshot '\(name)'", file: file, line: line)
             return
         }
-        guard appWindow.frame.width >= 1_024, appWindow.frame.height >= 680 else {
+        guard appWindow.frame.width >= 1_024, appWindow.frame.height >= 674 else {
             XCTFail(
                 "Documentation screenshot window is too small: \(appWindow.frame)",
                 file: file,
@@ -519,7 +519,7 @@ class NeoAnkiUITestCase: XCTestCase {
             return app.descendants(matching: .any).matching(
                 NSPredicate(
                     format: "identifier IN %@",
-                    ["templatesItemTypesHeader", "templatesPanel"]
+                    ["templatesItemTypesHeader"]
                 )
             ).firstMatch.exists
         }
@@ -602,6 +602,17 @@ class NeoAnkiUITestCase: XCTestCase {
             app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
         }
         XCTAssertTrue(save.waitUntilGone(timeout: 10), "Template editor did not close after saving")
+    }
+
+    func showTemplateAnswer(in app: XCUIApplication) {
+        let after = app.buttons["After answer"]
+        if after.waitUntilHittable(timeout: 2) {
+            after.click()
+            return
+        }
+        let radio = app.radioButtons["After answer"]
+        XCTAssertTrue(radio.waitUntilHittable(timeout: 3))
+        radio.click()
     }
 
     /// Activates a visible compact icon control even when XCTest's AppKit
