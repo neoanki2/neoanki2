@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TemplatesView: View {
     @Bindable var model: TemplatesModel
+    @Binding private var isTemplateEditorPresented: Bool
     var onTemplatesChanged: () async -> Void = {}
 
     @State private var editingTemplate: Template?
@@ -16,19 +17,44 @@ struct TemplatesView: View {
     @State private var showDuplicatePrompt = false
     @State private var duplicateName = ""
 
-    var body: some View {
-        HSplitView {
-            itemTypesSidebar
-                .frame(
-                    minWidth: DesignSystem.sidebarMin,
-                    idealWidth: DesignSystem.sidebarIdeal,
-                    maxWidth: DesignSystem.sidebarMax
-                )
-                .layoutPriority(1)
+    init(
+        model: TemplatesModel,
+        isTemplateEditorPresented: Binding<Bool> = .constant(false),
+        onTemplatesChanged: @escaping () async -> Void = {}
+    ) {
+        self.model = model
+        _isTemplateEditorPresented = isTemplateEditorPresented
+        self.onTemplatesChanged = onTemplatesChanged
+    }
 
-            itemTypeDetail
-                .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(0)
+    var body: some View {
+        Group {
+            if isTemplateEditorActive, let itemType = model.selectedItemType {
+                NavigationStack {
+                    TemplateEditorView(
+                        model: model,
+                        itemType: itemType,
+                        editingTemplate: editingTemplate,
+                        onDismiss: dismissTemplateEditor
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(DesignSystem.detailBackground)
+            } else {
+                HSplitView {
+                    itemTypesSidebar
+                        .frame(
+                            minWidth: DesignSystem.sidebarMin,
+                            idealWidth: DesignSystem.sidebarIdeal,
+                            maxWidth: DesignSystem.sidebarMax
+                        )
+                        .layoutPriority(1)
+
+                    itemTypeDetail
+                        .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+                        .layoutPriority(0)
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("templatesPanel")
@@ -43,6 +69,9 @@ struct TemplatesView: View {
                 expandedIncludedGroupIDs.insert(group.id)
             }
             Task { await refreshDeleteAvailability() }
+        }
+        .onChange(of: isTemplateEditorActive, initial: true) { _, active in
+            isTemplateEditorPresented = active
         }
         .confirmationDialog(
             deleteDialogTitle,
@@ -101,6 +130,10 @@ struct TemplatesView: View {
         } message: {
             Text("The copy will be an independent, editable Item Type.")
         }
+    }
+
+    private var isTemplateEditorActive: Bool {
+        isAddingTemplate || editingTemplate != nil
     }
 
     @ViewBuilder

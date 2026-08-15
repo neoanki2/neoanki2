@@ -190,8 +190,8 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         captureDocumentationScreenshot(
             named: "template-editor",
             of: app,
-            scenario: "new template editor",
-            expectedVisibleIdentifiers: ["templateNameField", "templatePromptField", "templateAnswerField"]
+            scenario: "new Study-Stage Builder with Ingredients, Preview, and Inspector",
+            expectedVisibleIdentifiers: ["templateNameField", "templateIngredientsPane", "templateStudyPreviewPane", "templateInspectorPane"]
         )
 
         let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
@@ -201,26 +201,16 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedSettings = advancedApp.descendants(matching: .any)
             .identified("templateAdvancedSettings")
         XCTAssertTrue(advancedSettings.waitUntilExists(timeout: 5))
-        let advancedForm = advancedApp.descendants(matching: .any)
-            .identified("templateEditorForm")
-        XCTAssertTrue(advancedForm.waitUntilExists(timeout: 3))
-        // A form taller than the display has no hit point, so no gesture can be
-        // placed on the form itself. This nudge is only to bring the answer
-        // controls closer; scrolling by that element below is what the capture
-        // actually depends on, so skip it rather than fail the run.
-        if advancedForm.isHittable {
-            advancedForm.swipeUp()
-        }
-        let answerReveal = advancedApp.popUpButtons.identified("answerSlotReveal")
-        XCTAssertTrue(answerReveal.waitUntilExists(timeout: 5))
-        answerReveal.scroll(byDeltaX: 0, deltaY: 240)
+        advancedSettings.click()
+        let skillInput = advancedApp.popUpButtons.identified("templateSkillInput")
+        XCTAssertTrue(skillInput.waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "template-advanced",
             of: advancedApp,
-            scenario: "advanced template editor with answer reveal controls and advanced settings entry point",
+            scenario: "Study-Stage Builder Generation and Skill inspector",
             expectedVisibleIdentifiers: [
-                "answerSlotSource",
-                "answerSlotReveal",
+                "templateInspectorPane",
+                "templateSkillInput",
                 "templateAdvancedSettings",
                 "saveTemplate",
             ]

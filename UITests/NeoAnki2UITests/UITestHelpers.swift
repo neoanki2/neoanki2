@@ -604,6 +604,17 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.waitUntilGone(timeout: 10), "Template editor did not close after saving")
     }
 
+    func showTemplateAnswer(in app: XCUIApplication) {
+        let after = app.buttons["After answer"]
+        if after.waitUntilHittable(timeout: 2) {
+            after.click()
+            return
+        }
+        let radio = app.radioButtons["After answer"]
+        XCTAssertTrue(radio.waitUntilHittable(timeout: 3))
+        radio.click()
+    }
+
     /// Activates a visible compact icon control even when XCTest's AppKit
     /// bridge declines to mark its small accessibility frame as hittable.
     func activateCompactButton(_ button: XCUIElement) {

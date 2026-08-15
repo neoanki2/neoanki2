@@ -87,6 +87,7 @@ extension FastFunctionalJourneyTests {
         let app = launchApp()
         openTemplates(in: app)
         openTemplateEditor(named: "Card", in: app)
+        app.buttons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         app.buttons.identified("cancelDeleteTemplate").click()
         XCTAssertTrue(app.textFields.identified("templateNameField").waitForExistence(timeout: 3))

@@ -412,6 +412,7 @@ extension FastFunctionalJourneyTests {
 
         app.popUpButtons.identified("templatePromptField").click()
         app.menuItems.identified("Back").click()
+        showTemplateAnswer(in: app)
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Front").click()
         saveTemplateEditor(in: app)

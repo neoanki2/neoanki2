@@ -27,6 +27,13 @@ extension FastFunctionalJourneyTests {
         }
 
         openNewTemplateEditor(in: app)
+        runJourneyActivity("TemplatesUITests.testTemplateEditorUsesFocusedThreePaneWorkspace") {
+            XCTAssertFalse(app.buttons.identified("templatesDone").exists)
+            XCTAssertFalse(app.descendants(matching: .any).identified("templatesItemTypesHeader").exists)
+            XCTAssertTrue(app.descendants(matching: .any).identified("templateIngredientsPane").exists)
+            XCTAssertTrue(app.descendants(matching: .any).identified("templateStudyPreviewPane").exists)
+            XCTAssertTrue(app.descendants(matching: .any).identified("templateInspectorPane").exists)
+        }
         let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
         runJourneyActivity("TemplatesUITests.testNewTemplateKeepsAdvancedSettingsCollapsedByDefault") {
             XCTAssertTrue(advanced.waitUntilExists(timeout: 3))
@@ -43,7 +50,9 @@ extension FastFunctionalJourneyTests {
 
         runJourneyActivity("TemplatesUITests.testTemplateValidationAndDiscardConfirmation") {
             let save = app.buttons.identified("saveTemplate")
-            XCTAssertFalse(save.isEnabled)
+            XCTAssertTrue(save.isEnabled)
+            save.click()
+            XCTAssertTrue(app.staticTexts["Enter a template name."].waitUntilExists(timeout: 3))
             enterText(
                 "Unsaved Template",
                 into: app.textFields.identified("templateNameField"),
@@ -101,6 +110,7 @@ extension FastFunctionalJourneyTests {
                 picker: app.popUpButtons.identified("templatePromptField"),
                 in: app
             )
+            showTemplateAnswer(in: app)
             selectPopUpOption(
                 named: "Front",
                 picker: app.popUpButtons.identified("templateAnswerField"),
@@ -131,6 +141,7 @@ extension FastFunctionalJourneyTests {
 
         runJourneyActivity("TemplatesUITests.testTemplatesDeleteTemplate") {
             openTemplateEditor(named: "Renamed", in: app)
+            app.buttons.identified("templateMoreMenu").click()
             app.buttons.identified("deleteTemplate").click()
             let confirm = app.buttons.identified("confirmDeleteTemplate")
             XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
@@ -276,6 +287,7 @@ extension FastFunctionalJourneyTests {
 
     private func cancelDeletingTemplate(named name: String, in app: XCUIApplication) {
         openTemplateEditor(named: name, in: app)
+        app.buttons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         let cancel = app.buttons.identified("cancelDeleteTemplate")
         XCTAssertTrue(cancel.waitUntilExists(timeout: 3))
@@ -342,6 +354,7 @@ extension FastFunctionalJourneyTests {
 
         app.popUpButtons.identified("templatePromptField").click()
         app.menuItems.identified("Back").click()
+        showTemplateAnswer(in: app)
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Front").click()
         saveTemplateEditor(in: app)
@@ -433,6 +446,7 @@ extension FastFunctionalJourneyTests {
         nameField.typeText("Original")
         app.popUpButtons.identified("templatePromptField").click()
         app.menuItems.identified("Front").click()
+        showTemplateAnswer(in: app)
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Back").click()
         saveTemplateEditor(in: app)
@@ -459,12 +473,14 @@ extension FastFunctionalJourneyTests {
         nameField.typeText("To Delete")
         app.popUpButtons.identified("templatePromptField").click()
         app.menuItems.identified("Front").click()
+        showTemplateAnswer(in: app)
         app.popUpButtons.identified("templateAnswerField").click()
         app.menuItems.identified("Back").click()
         saveTemplateEditor(in: app)
         XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitUntilExists(timeout: 5))
 
         openTemplateEditor(named: "To Delete", in: app)
+        app.buttons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         // Deleting asks first, and leaving the confirmation up keeps the editor
         // open — which later reads as the panel refusing to close.
@@ -552,7 +568,10 @@ extension FastFunctionalJourneyTests {
         openTemplates(in: app)
         app.buttons.identified("addTemplateToolbar").click()
 
-        XCTAssertFalse(app.buttons.identified("saveTemplate").isEnabled)
+        let save = app.buttons.identified("saveTemplate")
+        XCTAssertTrue(save.isEnabled)
+        save.click()
+        XCTAssertTrue(app.staticTexts["Enter a template name."].waitUntilExists(timeout: 3))
         enterText("Unsaved Template", into: app.textFields.identified("templateNameField"), app: app)
         app.buttons.identified("cancelTemplateEditor").click()
         XCTAssertTrue(app.buttons.identified("cancelDiscardTemplate").waitUntilExists(timeout: 3))
@@ -569,6 +588,7 @@ extension FastFunctionalJourneyTests {
         openTemplates(in: app)
         openTemplateEditor(named: "Card", in: app)
 
+        app.buttons.identified("templateMoreMenu").click()
         app.buttons.identified("deleteTemplate").click()
         XCTAssertTrue(app.buttons.identified("cancelDeleteTemplate").waitUntilExists(timeout: 3))
         app.buttons.identified("cancelDeleteTemplate").click()

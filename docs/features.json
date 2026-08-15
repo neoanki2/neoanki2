@@ -286,8 +286,8 @@
       "id": "templates",
       "name": "Create, edit, and delete templates",
       "article": "user/item-types-and-templates.md",
-      "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "Sources/NeoAnki2/TemplatesModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "Tests/NeoAnki2Tests/TemplatesModelTests.swift", "Tests/NeoAnki2Tests/TemplateItemCoordinationFlowTests.swift"],
+      "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "Sources/NeoAnki2/TemplateEditorState.swift", "Sources/NeoAnki2/TemplatesModel.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "Tests/NeoAnki2Tests/TemplateEditorStateTests.swift", "Tests/NeoAnki2Tests/TemplatesModelTests.swift", "Tests/NeoAnki2Tests/TemplateItemCoordinationFlowTests.swift"],
       "screenshot": "assets/screenshots/template-editor.png"
     },
     {
