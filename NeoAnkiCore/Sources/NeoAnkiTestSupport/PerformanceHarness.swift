@@ -232,7 +232,7 @@ private final class LockedFileWriter: @unchecked Sendable {
             return
         }
         defer { try? handle.close() }
-        try? handle.seekToEnd()
+        _ = try? handle.seekToEnd()
         try? handle.write(contentsOf: Data(payload.utf8))
     }
 }
