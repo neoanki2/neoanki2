@@ -8,6 +8,7 @@ env:
 
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
     - cron: '0 6 * * *'
@@ -18,64 +19,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  core-fast:
-    name: Core unit + flow tests
+  swift-tests:
+    name: Swift unit + flow + architecture tests
     runs-on: macos-26
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Run NeoAnkiCore tests
+      - name: Run every SwiftPM test gate with shared build products
         run: |
-          cd NeoAnkiCore
-          swift test --parallel
-
-  app-models:
-    name: App ViewModel tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Run NeoAnki2Tests
-        run: swift test --filter NeoAnki2Tests --parallel
-      - name: Verify Xcode build products stay out of Spotlight
-        run: bash Scripts/validate-xcode-build-paths.sh
+          failures=0
+          bash Scripts/validate-architecture.sh || failures=1
+          (cd NeoAnkiCore && swift test --parallel) || failures=1
+          swift test --filter NeoAnki2Tests --parallel || failures=1
+          bash Scripts/validate-xcode-build-paths.sh || failures=1
+          swift test --filter NeoAnkiApplicationTests --parallel || failures=1
+          swift test --filter NeoAnkiFeaturesTests --parallel || failures=1
+          exit "$failures"
 
   shared-platforms:
-    name: Shared targets (${{ matrix.platform }})
+    name: Shared targets (macOS + iOS Simulator)
     runs-on: macos-26
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macOS, iOS Simulator]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Validate module boundaries
-        run: bash Scripts/validate-architecture.sh
-      - name: Build shared package schemes
-        env:
-          PLATFORM: ${{ matrix.platform }}
+      - name: Build every shared scheme on both platforms
         run: |
-          destination="generic/platform=$PLATFORM"
-          for scheme in NeoAnkiApplication NeoAnkiFeatures NeoAnkiSharedUI NeoAnkiCloudSync NeoAnkiDeckBuilderCore NeoAnkiMobile; do
-            xcodebuild build \
-              -scheme "$scheme" \
-              -destination "$destination" \
-              CODE_SIGNING_ALLOWED=NO
+          failures=0
+          for platform in macOS 'iOS Simulator'; do
+            destination="generic/platform=$platform"
+            for scheme in NeoAnkiApplication NeoAnkiFeatures NeoAnkiSharedUI NeoAnkiCloudSync NeoAnkiDeckBuilderCore NeoAnkiMobile; do
+              xcodebuild build \
+                -scheme "$scheme" \
+                -destination "$destination" \
+                CODE_SIGNING_ALLOWED=NO || failures=1
+            done
+            (
+              cd NeoAnkiCore
+              xcodebuild build \
+                -scheme NeoAnkiCore \
+                -destination "$destination" \
+                CODE_SIGNING_ALLOWED=NO
+            ) || failures=1
           done
-      - name: Build Core for the same platform
-        env:
-          PLATFORM: ${{ matrix.platform }}
-        run: |
-          cd NeoAnkiCore
-          xcodebuild build \
-            -scheme NeoAnkiCore \
-            -destination "generic/platform=$PLATFORM" \
-            CODE_SIGNING_ALLOWED=NO
-
-  application-tests:
-    name: Application and sync policy tests
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - run: swift test --filter NeoAnkiApplicationTests --parallel
+          exit "$failures"
 
   ios-build:
     name: iPhone/iPad app + widget + archive
@@ -83,8 +68,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Run shared mobile feature tests
-        run: swift test --filter NeoAnkiFeaturesTests --parallel
       - name: Build app and embedded widgets
         run: |
           chmod +x Scripts/build-ios.sh
@@ -102,8 +85,26 @@ jobs:
           test -x .build/NeoAnki2-unsigned.xcarchive/Products/Applications/NeoAnki2.app/NeoAnki2
           test -x .build/NeoAnki2-unsigned.xcarchive/Products/Applications/NeoAnki2.app/PlugIns/NeoAnki2Widget.appex/NeoAnki2Widget
 
+  ios-ui-build:
+    name: Build iOS UI test bundle
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build once for all simulator destinations
+        run: bash Scripts/build-ios-ui-tests.sh
+      - name: Upload exact-revision UI build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ios-ui-build-${{ github.sha }}
+          path: .build/ios-ui-artifact/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
+
   ios-ui:
     name: iOS UI + accessibility (${{ matrix.device }})
+    needs: ios-ui-build
     runs-on: macos-26
     timeout-minutes: 35
     strategy:
@@ -112,24 +113,21 @@ jobs:
         device: [iPhone 17e, iPhone 17 Pro Max, iPad Pro 13-inch (M5)]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Download exact-revision UI build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ios-ui-build-${{ github.sha }}
+          path: .build/ios-ui-artifact
       - name: Run mobile UI journeys
         env:
           DEVICE: ${{ matrix.device }}
-        run: |
-          xcodebuild test \
-            -project Xcode/NeoAnkiiOS.xcodeproj \
-            -scheme NeoAnki2MobileUITests \
-            -destination "platform=iOS Simulator,name=$DEVICE" \
-            -resultBundlePath ".build/ios-ui-$DEVICE.xcresult" \
-            CODE_SIGNING_ALLOWED=NO \
-            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
-            "SWIFT_INCLUDE_PATHS=$PWD/build/Debug-iphonesimulator $PWD/NeoAnkiCore/build/Debug-iphonesimulator"
+        run: bash Scripts/run-ios-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ios-ui-${{ matrix.device }}
-          path: .build/*.xcresult
+          path: .build/ios-ui-results/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
@@ -152,3 +150,26 @@ jobs:
           path: .build/ui-results
           if-no-files-found: warn
           retention-days: 7
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - swift-tests
+      - shared-platforms
+      - ios-build
+      - ios-ui-build
+      - ios-ui
+      - ui-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test and build job
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' >/dev/null; then
+            exit 0
+          fi
+          echo "One or more required CI jobs did not succeed." >&2
+          exit 1
