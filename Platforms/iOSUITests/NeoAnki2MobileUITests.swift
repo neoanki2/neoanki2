@@ -22,9 +22,16 @@ final class NeoAnki2MobileUITests: XCTestCase {
     }
 
     private func open(_ title: String, in app: XCUIApplication) {
-        let destination = app.buttons[title].firstMatch
-        XCTAssertTrue(destination.waitForExistence(timeout: 5), "Missing \(title) destination")
-        destination.tap()
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5), "App navigation unavailable")
+        if app.tabBars.firstMatch.exists {
+            let tab = app.tabBars.buttons[title]
+            XCTAssertTrue(tab.waitForExistence(timeout: 3), "Missing \(title) tab")
+            tab.tap()
+        } else {
+            let sidebar = app.buttons["top-level-\(title.lowercased())"]
+            XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "Missing \(title) sidebar destination")
+            sidebar.tap()
+        }
 
         let navigationTitle = title == "Home" ? "NeoAnki2" : title
         XCTAssertTrue(
