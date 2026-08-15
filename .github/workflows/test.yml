@@ -22,7 +22,7 @@ jobs:
     name: Core unit + flow tests
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Run NeoAnkiCore tests
         run: |
           cd NeoAnkiCore
@@ -32,7 +32,7 @@ jobs:
     name: App ViewModel tests
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Run NeoAnki2Tests
         run: swift test --filter NeoAnki2Tests --parallel
       - name: Verify Xcode build products stay out of Spotlight
@@ -46,7 +46,7 @@ jobs:
       matrix:
         platform: [macOS, iOS Simulator]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Validate module boundaries
         run: bash Scripts/validate-architecture.sh
       - name: Build shared package schemes
@@ -74,7 +74,7 @@ jobs:
     name: Application and sync policy tests
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: swift test --filter NeoAnkiApplicationTests --parallel
 
   ios-build:
@@ -82,7 +82,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Run shared mobile feature tests
         run: swift test --filter NeoAnkiFeaturesTests --parallel
       - name: Build app and embedded widgets
@@ -111,7 +111,7 @@ jobs:
       matrix:
         device: [iPhone 17e, iPhone 17 Pro Max, iPad Pro 13-inch (M5)]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Run mobile UI journeys
         env:
           DEVICE: ${{ matrix.device }}
@@ -126,10 +126,11 @@ jobs:
             "SWIFT_INCLUDE_PATHS=$PWD/build/Debug-iphonesimulator $PWD/NeoAnkiCore/build/Debug-iphonesimulator"
       - name: Upload UI diagnostics
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ios-ui-${{ matrix.device }}
           path: .build/*.xcresult
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
 
@@ -138,14 +139,14 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build app bundle and run UI tests
         run: |
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh
           ./Scripts/run-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: neoanki2-fast-ui-results
           path: .build/ui-results

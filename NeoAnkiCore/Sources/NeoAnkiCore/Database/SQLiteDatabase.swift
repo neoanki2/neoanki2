@@ -3826,7 +3826,7 @@ actor SQLiteDatabase {
             guard existing.cardID == cardID,
                   existing.mediaHash == media.assetHash,
                   existing.durationMilliseconds == durationMilliseconds,
-                  existing.capturedAt == capturedAt
+                  abs(existing.capturedAt.timeIntervalSince(capturedAt)) < 1e-6
             else { throw DatabaseError.studyConflict("The response identifier was reused.") }
             return existing
         }
