@@ -59,22 +59,26 @@ struct LibraryView: View {
 
                 Group {
                     if model.items.isEmpty {
-                    ContentUnavailableView {
-                        Label("Build Your Library", systemImage: "rectangle.stack.badge.plus")
-                    } description: {
-                        Text("Add a question and answer. NeoAnki2 will turn them into cards and schedule each review.")
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                    } actions: {
-                        Button("Add First Card") { isAddingItem = true }
-                            .buttonStyle(.plain)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(uiColor: .systemBackground))
-                            .padding(.horizontal, 20)
-                            .frame(minHeight: 44)
-                            .background(Color.primary, in: Capsule())
-                            .contentShape(Capsule())
-                    }
+                        ScrollView {
+                            ContentUnavailableView {
+                                Label("Build Your Library", systemImage: "rectangle.stack.badge.plus")
+                            } description: {
+                                Text("Add a question and answer. NeoAnki2 will turn them into cards and schedule each review.")
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                            } actions: {
+                                Button("Add First Card") { isAddingItem = true }
+                                    .buttonStyle(.plain)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Color(uiColor: .systemBackground))
+                                    .padding(.horizontal, 20)
+                                    .frame(minHeight: 44)
+                                    .background(Color.primary, in: Capsule())
+                                    .contentShape(Capsule())
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        }
                     } else if visibleItems.isEmpty {
                         ContentUnavailableView.search(text: searchText)
                     } else {

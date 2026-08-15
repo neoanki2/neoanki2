@@ -150,6 +150,11 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         let addFirstCard = app.buttons["Add First Card"]
         XCTAssertTrue(addFirstCard.waitForExistence(timeout: 5))
+        if !addFirstCard.isHittable {
+            let emptyStateTitle = app.staticTexts["Build Your Library"]
+            XCTAssertTrue(emptyStateTitle.waitForExistence(timeout: 3))
+            emptyStateTitle.swipeUp()
+        }
         XCTAssertTrue(addFirstCard.isHittable)
         try app.performAccessibilityAudit(
             for: [.contrast, .hitRegion, .sufficientElementDescription]
@@ -158,12 +163,14 @@ final class NeoAnki2MobileUITests: XCTestCase {
             // reports them as contrast failures in this simulated configuration. Keep
             // all app-rendered content audited.
             guard issue.auditType == .contrast,
-                  let element = issue.element,
-                  element.elementType == .staticText,
-                  ["Home", "Library", "Create", "Settings", "Search cards"].contains(element.label)
+                  let element = issue.element
             else { return false }
 
-            return true
+            let isSystemNavigationLabel = element.elementType == .staticText
+                && ["Home", "Library", "Create", "Settings"].contains(element.label)
+            let isSystemSearchPlaceholder = element.label == "Search cards"
+                && [.staticText, .searchField].contains(element.elementType)
+            return isSystemNavigationLabel || isSystemSearchPlaceholder
         }
     }
 }
