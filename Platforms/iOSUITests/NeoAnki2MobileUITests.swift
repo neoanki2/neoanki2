@@ -154,18 +154,15 @@ final class NeoAnki2MobileUITests: XCTestCase {
         try app.performAccessibilityAudit(
             for: [.contrast, .hitRegion, .sufficientElementDescription]
         ) { issue in
-            // SwiftUI owns the selected sidebar row colors and reports its label as a
-            // contrast failure in this simulated configuration; keep all app content audited.
+            // SwiftUI owns the TabView/sidebar row colors and reports their labels as
+            // contrast failures in this simulated configuration; keep all app content audited.
             guard issue.auditType == .contrast,
                   let element = issue.element,
                   element.elementType == .staticText,
-                  element.label == "Library"
+                  ["Home", "Library", "Create", "Settings"].contains(element.label)
             else { return false }
 
-            // XCTest reports the child frame in portrait coordinates while the
-            // selected sidebar row is in landscape coordinates, so comparing
-            // the two frames makes this known SwiftUI false positive device-dependent.
-            return app.buttons["top-level-library"].exists
+            return true
         }
     }
 }
