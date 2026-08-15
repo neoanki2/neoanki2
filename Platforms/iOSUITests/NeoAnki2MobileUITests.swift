@@ -25,12 +25,11 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5), "App navigation unavailable")
         let navigationTitle = title == "Home" ? "NeoAnki2" : title
         let navigationBar = app.navigationBars[navigationTitle]
-        let destination: XCUIElement
-        if app.tabBars.firstMatch.exists {
-            destination = app.tabBars.buttons[title]
-        } else {
-            destination = app.buttons["top-level-\(title.lowercased())"]
-        }
+        let tabDestination = app.tabBars.buttons[title]
+        let sidebarDestination = app.buttons["top-level-\(title.lowercased())"]
+        let destination = tabDestination.waitForExistence(timeout: 2)
+            ? tabDestination
+            : sidebarDestination
 
         for _ in 0..<3 {
             guard destination.waitForExistence(timeout: 5) else { continue }
@@ -133,7 +132,11 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
         app.buttons["Vocabulary Packs"].tap()
         XCTAssertTrue(app.navigationBars["Vocabulary Packs"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Install Pack…"].exists || app.buttons["Install Pack"].exists)
+        XCTAssertTrue(
+            app.buttons["Install Pack…"].waitForExistence(timeout: 5)
+                || app.buttons["Install Pack"].waitForExistence(timeout: 5),
+            "Vocabulary pack install action is unavailable"
+        )
 
         open("Settings", in: app)
         let enableSync = app.buttons["Enable iCloud Sync…"]
@@ -141,7 +144,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         enableSync.tap()
         let cancel = app.buttons["Not Now"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Create Backup & Enable"].exists)
+        XCTAssertTrue(app.buttons["Create Backup & Enable"].waitForExistence(timeout: 5))
         cancel.tap()
         XCTAssertTrue(enableSync.waitForExistence(timeout: 3))
     }
