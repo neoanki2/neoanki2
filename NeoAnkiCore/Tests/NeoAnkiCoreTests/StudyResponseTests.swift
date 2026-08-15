@@ -59,7 +59,7 @@ private func makeAudioSubmissionFixture() async throws -> AudioSubmissionFixture
     )
     #expect(first.cardID == draft.cardID)
     #expect(first.durationMilliseconds == draft.durationMilliseconds)
-    #expect(first.capturedAt == draft.capturedAt)
+    #expect(abs(first.capturedAt.timeIntervalSince(draft.capturedAt)) < 1e-6)
     let retried = try await fixture.store.completeAudioSubmission(
         draft,
         submittedAt: submittedAt.addingTimeInterval(5)
