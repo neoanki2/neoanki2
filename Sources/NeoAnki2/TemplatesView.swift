@@ -61,7 +61,7 @@ struct TemplatesView: View {
         .task {
             await model.load()
         }
-        .onChange(of: model.selectedItemTypeID, initial: true) { _, _ in
+        .onChange(of: model.selectedItemTypeID) { _, _ in
             editingItemType = nil
             editingTemplate = nil
             isAddingTemplate = false

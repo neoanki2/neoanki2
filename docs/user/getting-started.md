@@ -281,9 +281,11 @@ open it with **Command-Option-B** and leave it with **Escape**. The sidebar can
 also be shown or hidden with the standard macOS split-view controls.
 
 NeoAnki2 uses focused, detail-only modes while adding an item, managing item
-types, or studying. The sidebar collapses automatically to make room, but can
-still be revealed with the normal sidebar control. Leaving the task restores
-the full split view. Reduced Motion is respected when these columns change.
+types, editing a template, or studying. The sidebar collapses automatically to
+make room; the template builder also hides the Item Types list and outer Done
+action while it is open. Leaving the task restores the full split view and the
+previous item-type selection. Reduced Motion is respected when these columns
+change.
 
 Leaving a study session returns you to the scope home with its counts already
 revised. NeoAnki2 may also retune its scheduler against your review history at
