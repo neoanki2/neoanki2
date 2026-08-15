@@ -8,6 +8,7 @@ env:
 
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
     - cron: '0 6 * * *'
@@ -19,10 +20,12 @@ concurrency:
 
 jobs:
   core-fast:
-    name: Core unit + flow tests
+    name: Core unit + flow + architecture tests
     runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Validate module boundaries
+        run: bash Scripts/validate-architecture.sh
       - name: Run NeoAnkiCore tests
         run: |
           cd NeoAnkiCore
@@ -47,8 +50,6 @@ jobs:
         platform: [macOS, iOS Simulator]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Validate module boundaries
-        run: bash Scripts/validate-architecture.sh
       - name: Build shared package schemes
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -102,8 +103,26 @@ jobs:
           test -x .build/NeoAnki2-unsigned.xcarchive/Products/Applications/NeoAnki2.app/NeoAnki2
           test -x .build/NeoAnki2-unsigned.xcarchive/Products/Applications/NeoAnki2.app/PlugIns/NeoAnki2Widget.appex/NeoAnki2Widget
 
+  ios-ui-build:
+    name: Build iOS UI test bundle
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build once for all simulator destinations
+        run: bash Scripts/build-ios-ui-tests.sh
+      - name: Upload exact-revision UI build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ios-ui-build-${{ github.sha }}
+          path: .build/ios-ui-artifact/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
+
   ios-ui:
     name: iOS UI + accessibility (${{ matrix.device }})
+    needs: ios-ui-build
     runs-on: macos-26
     timeout-minutes: 35
     strategy:
@@ -112,24 +131,21 @@ jobs:
         device: [iPhone 17e, iPhone 17 Pro Max, iPad Pro 13-inch (M5)]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Download exact-revision UI build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ios-ui-build-${{ github.sha }}
+          path: .build/ios-ui-artifact
       - name: Run mobile UI journeys
         env:
           DEVICE: ${{ matrix.device }}
-        run: |
-          xcodebuild test \
-            -project Xcode/NeoAnkiiOS.xcodeproj \
-            -scheme NeoAnki2MobileUITests \
-            -destination "platform=iOS Simulator,name=$DEVICE" \
-            -resultBundlePath ".build/ios-ui-$DEVICE.xcresult" \
-            CODE_SIGNING_ALLOWED=NO \
-            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
-            "SWIFT_INCLUDE_PATHS=$PWD/build/Debug-iphonesimulator $PWD/NeoAnkiCore/build/Debug-iphonesimulator"
+        run: bash Scripts/run-ios-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ios-ui-${{ matrix.device }}
-          path: .build/*.xcresult
+          path: .build/ios-ui-results/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
@@ -152,3 +168,28 @@ jobs:
           path: .build/ui-results
           if-no-files-found: warn
           retention-days: 7
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - core-fast
+      - app-models
+      - shared-platforms
+      - application-tests
+      - ios-build
+      - ios-ui-build
+      - ios-ui
+      - ui-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test and build job
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' >/dev/null; then
+            exit 0
+          fi
+          echo "One or more required CI jobs did not succeed." >&2
+          exit 1

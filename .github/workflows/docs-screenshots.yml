@@ -11,6 +11,7 @@ on:
       - Scripts/run-ui-tests.sh
       - .github/workflows/docs-screenshots.yml
   push:
+    branches: [main]
     paths:
       - NeoAnkiCore/Sources/NeoAnkiCore/**
       - Sources/NeoAnki2/**

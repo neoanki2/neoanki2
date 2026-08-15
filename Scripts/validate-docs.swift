@@ -1,9 +1,6 @@
 #!/usr/bin/env swift
 
-import CryptoKit
-import CoreGraphics
 import Foundation
-import ImageIO
 
 struct Manifest: Decodable {
     let schemaVersion: Int
@@ -112,42 +109,48 @@ func exists(_ relativePath: String, under base: URL = root) -> Bool {
 }
 
 func hasTransparentWindowCorners(_ url: URL) -> Bool {
-    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+    let process = Process()
+    process.currentDirectoryURL = root
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = [
+        "python3", root.appendingPathComponent("Scripts/validate-doc-image.py").path,
+        url.path,
+    ]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    do {
+        try process.run()
+        process.waitUntilExit()
+        return process.terminationStatus == 0
+    } catch {
         return false
     }
-    let width = image.width
-    let height = image.height
-    var pixels = [UInt8](repeating: 0, count: width * height * 4)
-    guard let context = CGContext(
-        data: &pixels,
-        width: width,
-        height: height,
-        bitsPerComponent: 8,
-        bytesPerRow: width * 4,
-        space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else {
-        return false
-    }
-    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-    func alpha(x: Int, y: Int) -> UInt8 {
-        pixels[((y * width + x) * 4) + 3]
-    }
-    let transparentCorners = [
-        alpha(x: 0, y: 0),
-        alpha(x: width - 1, y: 0),
-        alpha(x: 0, y: height - 1),
-        alpha(x: width - 1, y: height - 1),
+}
+
+func sha256Hex(_ data: Data) -> String? {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = [
+        "python3", "-c",
+        "import hashlib,sys;print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())",
     ]
-    let opaqueEdges = [
-        alpha(x: width / 2, y: 0),
-        alpha(x: width / 2, y: height - 1),
-        alpha(x: 0, y: height / 2),
-        alpha(x: width - 1, y: height / 2),
-    ]
-    return transparentCorners.allSatisfy { $0 == 0 }
-        && opaqueEdges.allSatisfy { $0 == 255 }
+    let input = Pipe()
+    let output = Pipe()
+    process.standardInput = input
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    do {
+        try process.run()
+        input.fileHandleForWriting.write(data)
+        try input.fileHandleForWriting.close()
+        let digest = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return String(decoding: digest, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    } catch {
+        return nil
+    }
 }
 
 func fail(_ message: String) {
@@ -422,10 +425,7 @@ if requireScreenshots {
                     + "display cap (\(entry.width)px source for \(cap.width)px CSS)"
             )
         }
-        let digest = SHA256.hash(data: png)
-            .map { String(format: "%02x", $0) }
-            .joined()
-        if entry.sha256 != digest {
+        if entry.sha256 != sha256Hex(png) {
             fail("Screenshot \(entry.filename) SHA-256 does not match its manifest")
         }
         if !hasTransparentWindowCorners(screenshotURL) {
@@ -741,10 +741,7 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
                 if patchResult.status != 0 {
                     fail("Could not compute the reviewed infrastructure diff")
                 } else {
-                    let digest = SHA256.hash(data: patchResult.data)
-                        .map { String(format: "%02x", $0) }
-                        .joined()
-                    if digest != review.diffSHA256 {
+                    if sha256Hex(patchResult.data) != review.diffSHA256 {
                         fail(
                             "Infrastructure change review hash is stale; review the mapped source diff again"
                         )
