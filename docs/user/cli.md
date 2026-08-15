@@ -1,6 +1,7 @@
 ---
 title: Deck authoring CLI
 description: Build and run neoanki-deck to validate editable authored deck bundles before import.
+audience: user
 nav_order: 11
 parent: User Guide
 ---

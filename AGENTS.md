@@ -1,5 +1,17 @@
 # Project agent instructions
 
+## Supported headless workflow
+
+- Build: `swift build`
+- Fast verification: `./Scripts/test-fast.sh`
+- API contracts: `swift test --filter NeoAnkiAPITests --parallel`
+- API reference freshness: `swift run neoanki-api-reference check`
+- Documentation: `swift Scripts/validate-docs.swift`
+- Contributor guide: `docs/user/developer/index.md`
+
+Preserve unrelated working-tree changes. API changes must update the typed
+endpoint registry, tests, and generated `docs/api/` artifacts together.
+
 ## Desktop isolation
 
 - Do not launch, control, capture, or otherwise interact with the user's desktop or graphical applications.

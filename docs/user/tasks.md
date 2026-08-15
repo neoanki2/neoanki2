@@ -1,6 +1,7 @@
 ---
 title: Tasks
 description: Find the shortest NeoAnki2 guide for the learning goal or action you want to complete.
+audience: user
 nav_order: 10
 parent: User Guide
 ---

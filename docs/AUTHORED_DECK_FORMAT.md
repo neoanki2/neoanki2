@@ -1,6 +1,7 @@
 ---
 title: Authored deck format
 description: Implement or inspect editable .neoanki bundles, records, validation rules, and safety limits.
+audience: reference
 parent: Reference
 ---
 

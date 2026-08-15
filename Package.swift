@@ -21,6 +21,10 @@ let package = Package(
         .library(name: "NeoAnkiVocabularyCLI", targets: ["NeoAnkiVocabularyCLI"]),
         .library(name: "VocabularyDeckBuilder", targets: ["VocabularyDeckBuilder"]),
         .executable(name: "neoanki-vocab", targets: ["neoanki-vocab"]),
+        .executable(
+            name: "neoanki-api-reference",
+            targets: ["NeoAnkiAPIReferenceGenerator"]
+        ),
         .library(name: "PoemDeckBuilder", targets: ["PoemDeckBuilder"]),
     ],
     dependencies: [
@@ -126,6 +130,11 @@ let package = Package(
             name: "neoanki-vocab",
             dependencies: ["NeoAnkiVocabularyCLI"],
             path: "Sources/neoanki-vocab"
+        ),
+        .executableTarget(
+            name: "NeoAnkiAPIReferenceGenerator",
+            dependencies: ["NeoAnkiAPI"],
+            path: "Tools/NeoAnkiAPIReferenceGenerator"
         ),
         .target(
             name: "PoemDeckBuilder",

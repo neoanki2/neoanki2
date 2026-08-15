@@ -1,7 +1,8 @@
 ---
 title: Maintaining this documentation
 description: Keep guides, high-risk claims, feature coverage, screenshots, and rendered pages synchronized with product behavior.
-parent: Contributor Guide
+audience: developer
+parent: Developer Guide
 ---
 
 # Maintaining this documentation
@@ -11,7 +12,7 @@ articles are intentionally hand-written; a manifest and tests keep their
 coverage verifiable.
 
 The latest published assessment is the
-[July 2026 documentation quality audit]({{ site.baseurl }}/audits/state-of-art-2026-07-27/).
+[August 2026 documentation audit]({{ site.baseurl }}/audits/documentation-2026-08-15/).
 
 ## When product behavior changes
 
@@ -124,9 +125,16 @@ documentation gate verifies those density caps against every manifest entry.
 
 ## What is generated
 
-Only `docs/features.md` is generated. User instructions, format specifications,
-and troubleshooting guidance remain curated because source comments cannot
-capture workflow context, limitations, or user-facing language reliably.
+`docs/features.md` is generated from the feature manifest. `docs/api/` is
+generated from the typed HTTP endpoint registry and schema catalog with:
+
+```bash
+swift run neoanki-api-reference generate
+```
+
+User instructions, format specifications, and troubleshooting guidance remain
+curated because source metadata cannot capture workflow context, limitations,
+or user-facing recovery language reliably.
 
 Every documentation pull request builds Jekyll and runs the rendered-site
 crawler. The crawler checks internal routes and fragments, assets, canonical

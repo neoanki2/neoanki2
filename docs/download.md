@@ -2,6 +2,7 @@
 layout: landing
 title: Download NeoAnki2
 description: Install the current universal Mac release and check iPhone and iPad availability.
+audience: user
 permalink: /download/
 ---
 
@@ -49,7 +50,7 @@ permalink: /download/
     </div>
     <div class="download-option-actions">
       <a href="{{ '/user/iphone-ipad/' | relative_url }}">Mobile features and maintainer builds</a>
-      <a href="https://github.com/neoanki2/neoanki2/blob/main/IOS_RELEASE.md">Release readiness checklist</a>
+      <a href="{{ '/IOS_RELEASE/' | relative_url }}">Release readiness checklist</a>
     </div>
   </section>
 

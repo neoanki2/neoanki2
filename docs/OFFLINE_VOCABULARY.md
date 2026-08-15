@@ -1,7 +1,8 @@
 ---
 title: Offline vocabulary packs
 description: Normalize local lexical datasets, compile .neovocab packs, validate them, and search without network access.
-parent: Reference
+audience: developer
+parent: Developer Guide
 ---
 
 # Offline vocabulary packs

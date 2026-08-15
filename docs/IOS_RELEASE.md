@@ -1,7 +1,9 @@
 ---
 title: iOS Release Checklist
 description: Build, provision, verify, and upload NeoAnki2 for iPhone and iPad.
-parent: Reference
+audience: developer
+parent: Developer Guide
+permalink: /IOS_RELEASE/
 ---
 
 # iOS and iPadOS release checklist

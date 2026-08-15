@@ -24,6 +24,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - name: Check generated API reference
+        run: swift run neoanki-api-reference check
+      - name: Test endpoint registry and OpenAPI contract
+        run: swift test --filter NeoAnkiAPITests --parallel
       - name: Validate feature coverage and links
         run: swift Scripts/validate-docs.swift --require-screenshots
       - name: Check changed features have documentation updates
@@ -78,6 +82,19 @@ jobs:
         run: >-
           python3 Scripts/validate-built-docs.py _site
           --base-url https://neoanki2.github.io
+      - name: Install headless documentation browser
+        run: |
+          npm install --prefix .build/docs-playwright --no-save playwright@1.62.1
+          .build/docs-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Validate responsive and keyboard behavior
+        env:
+          PLAYWRIGHT_MODULE: ${{ github.workspace }}/.build/docs-playwright/node_modules/playwright/index.mjs
+        run: |
+          python3 -m http.server 4173 --directory _site >/tmp/neoanki-docs-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          sleep 1
+          node Scripts/check-docs-responsive.mjs http://127.0.0.1:4173
       - name: Build legacy project-site redirects
         run: >-
           python3 Scripts/build-docs-redirect.py _site _redirect_site
@@ -108,3 +125,29 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128
+
+  publish-canonical:
+    name: Publish and verify canonical documentation
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out validated source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Dispatch canonical-site deployment
+        env:
+          GH_TOKEN: ${{ secrets.ROOT_DOCS_DISPATCH_TOKEN }}
+        run: |
+          test -n "$GH_TOKEN" || {
+            echo "ROOT_DOCS_DISPATCH_TOKEN must dispatch neoanki2/neoanki2.github.io workflows" >&2
+            exit 1
+          }
+          gh workflow run root-docs.yml \
+            --repo neoanki2/neoanki2.github.io \
+            --ref main
+      - name: Wait for the exact source revision and smoke-test API pages
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: python3 Scripts/check-published-docs.py --expected-sha "$EXPECTED_SHA"

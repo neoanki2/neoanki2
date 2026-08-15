@@ -1,7 +1,8 @@
 ---
 title: Product
 description: Review NeoAnki2 product goals, user workflows, requirements, and deliberate scope boundaries.
-parent: Reference
+audience: developer
+parent: Developer Guide
 ---
 
 # Product

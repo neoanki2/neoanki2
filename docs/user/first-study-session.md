@@ -1,6 +1,7 @@
 ---
 title: First study session
 description: Create one Basic item and complete a tested prompt-reveal-grade loop in five minutes.
+audience: user
 nav_order: 2
 parent: User Guide
 ---

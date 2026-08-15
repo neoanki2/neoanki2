@@ -1,6 +1,7 @@
 ---
 title: Content and media
 description: Author text, numbers, cloze blanks, images, GIFs, audio, and video in formats NeoAnki2 validates.
+audience: user
 nav_order: 4
 parent: User Guide
 ---

@@ -1,6 +1,7 @@
 ---
 title: Authoring items
 description: Create, edit, move, and delete structured study items without losing track of their generated cards.
+audience: user
 nav_order: 3
 parent: User Guide
 ---

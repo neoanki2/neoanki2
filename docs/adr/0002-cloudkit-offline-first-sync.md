@@ -1,6 +1,7 @@
 ---
 title: "ADR 0002: Offline-first CloudKit synchronization"
 description: Synchronize independent SQLite replicas through CKSyncEngine without making iCloud the local authority.
+audience: developer
 ---
 
 # ADR 0002: Offline-first CloudKit synchronization

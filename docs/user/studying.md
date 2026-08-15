@@ -1,6 +1,7 @@
 ---
 title: Studying
 description: Complete due-card sessions, including persistent prompt-only spoken submissions.
+audience: user
 nav_order: 3
 parent: User Guide
 ---

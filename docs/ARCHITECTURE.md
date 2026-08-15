@@ -1,7 +1,8 @@
 ---
 title: Architecture
 description: Trace NeoAnki2 data, storage, scheduling, media, import, and application boundaries.
-parent: Reference
+audience: developer
+parent: Developer Guide
 ---
 
 # NeoAnki2 — Architecture
@@ -86,9 +87,9 @@ collisions, and uploads the preserved result. Validated remote domain batches co
 one SQLite transaction; staged assets and the verified pre-merge backup remain available
 for recovery if a transfer fails.
 
-See [ADR 0001](adr/0001-shared-application-and-ui-layers.md),
-[ADR 0002](adr/0002-cloudkit-offline-first-sync.md), and
-[ADR 0003](adr/0003-application-library-boundary.md).
+See [ADR 0001]({{ '/adr/0001-shared-application-and-ui-layers/' | relative_url }}),
+[ADR 0002]({{ '/adr/0002-cloudkit-offline-first-sync/' | relative_url }}), and
+[ADR 0003]({{ '/adr/0003-application-library-boundary/' | relative_url }}).
 
 ### iOS release gates
 

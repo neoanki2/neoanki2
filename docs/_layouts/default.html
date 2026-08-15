@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}?v=6">
     <script src="{{ '/assets/js/search.js' | relative_url }}?v=3" defer></script>
   </head>
-  <body class="{% if page.url == '/features/' %}page-features{% endif %}">
+  <body class="{% if page.url == '/features/' %}page-features {% endif %}{% if page.audience == 'api' %}page-api{% endif %}">
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="site-header">
       <div class="header-bar">

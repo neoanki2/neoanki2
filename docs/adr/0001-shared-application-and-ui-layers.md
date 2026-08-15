@@ -1,6 +1,7 @@
 ---
 title: "ADR 0001: Shared application and UI layers"
 description: Separate platform-neutral workflows and adaptive feature content from Apple-platform shells.
+audience: developer
 ---
 
 # ADR 0001: Shared application and UI layers

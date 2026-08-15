@@ -1,15 +1,67 @@
 import Foundation
 
-enum APIOpenAPI {
-    static let document: Data = {
+package enum APIOpenAPI {
+    package static let document: Data = {
         let publicSecurity: [[String: [String]]] = []
         var paths: [String: Any] = [:]
 
+        func group(for path: String) -> APIEndpointGroup {
+            if ["/health", "/v1/meta", "/v1/openapi.json"].contains(path) {
+                return .discovery
+            }
+            if path == "/v1/pairings" || path.hasPrefix("/v1/clients/") {
+                return .authentication
+            }
+            if path.hasPrefix("/v1/deck") { return .decks }
+            if path.hasPrefix("/v1/item-types") { return .itemTypes }
+            if path.hasPrefix("/v1/items") || path.hasPrefix("/v1/tags")
+                || path == "/v1/tag-renames"
+            {
+                return .items
+            }
+            if path.hasPrefix("/v1/cards") || path.hasPrefix("/v1/study-sessions")
+                || path.hasPrefix("/v1/reviews")
+            {
+                return .study
+            }
+            if path.hasPrefix("/v1/study-responses") || path.hasPrefix("/v1/media") {
+                return .responses
+            }
+            if path.hasPrefix("/v1/vocabulary") { return .vocabulary }
+            if path.hasPrefix("/v1/imports") || path.hasPrefix("/v1/exports") {
+                return .transfers
+            }
+            return .events
+        }
+
+        func summary(for operationID: String) -> String {
+            var words = ""
+            for character in operationID {
+                if character.isUppercase, !words.isEmpty { words.append(" ") }
+                words.append(character.lowercased())
+            }
+            return words.prefix(1).uppercased() + words.dropFirst()
+        }
+
+        func parameterDescription(_ name: String, location: String) -> String {
+            switch (location, name) {
+            case ("path", "id"): "Resource identifier."
+            case ("path", "fileId"): "Staged file identifier."
+            case ("path", "reviewLogId"): "Review-log identifier."
+            case ("path", "sha256"): "Lowercase SHA-256 content digest."
+            case ("query", "cursor"): "Opaque cursor returned by the preceding page."
+            case ("query", "limit"): "Maximum number of results to return."
+            case ("query", "after"): "Return durable changes after this cursor."
+            case ("query", "query"): "Search text."
+            default: "The \(name) \(location) parameter."
+            }
+        }
+
         func add(
             _ path: String,
-            _ method: String,
-            _ operationID: String,
-            scope: String? = nil,
+            _ method: APIHTTPMethod,
+            _ handler: APIEndpointHandler,
+            authorization: APIEndpointAuthorization = .publicAccess,
             success: Int = 200,
             request: String? = nil,
             response: String? = "Resource",
@@ -19,8 +71,11 @@ enum APIOpenAPI {
             requiredQuery: Set<String> = [],
             successHeaders: [String: Any] = [:]
         ) {
-            let isProtectedMutation = scope != nil
-                && ["post", "put", "patch", "delete"].contains(method)
+            let operationID = handler.rawValue
+            let methodName = method.rawValue.lowercased()
+            let scope = authorization.requiredScope
+            let isProtectedMutation = authorization.isProtected
+                && [.post, .put, .patch, .delete].contains(method)
             var operationResponses = responses(
                 success: success,
                 schema: response,
@@ -42,13 +97,22 @@ enum APIOpenAPI {
             }
             var operation: [String: Any] = [
                 "operationId": operationID,
+                "summary": summary(for: operationID),
+                "description": "\(summary(for: operationID)) through the loopback-only NeoAnki API.",
+                "tags": [group(for: path).rawValue],
                 "responses": operationResponses,
                 "security": scope == nil ? publicSecurity : [["bearerAuth": []]],
+                "x-codeSamples": [[
+                    "lang": "Shell",
+                    "label": "curl",
+                    "source": "curl --request \(method.rawValue) http://127.0.0.1:8766\(path)",
+                ]],
             ]
             if let scope { operation["x-required-scope"] = scope }
             if let request {
                 operation["requestBody"] = [
                     "required": true,
+                    "description": "Request payload for \(summary(for: operationID).lowercased()).",
                     "content": [requestContentType: ["schema": reference(request)]],
                 ]
             }
@@ -74,6 +138,7 @@ enum APIOpenAPI {
                     }
                     return [
                         "name": name, "in": "path", "required": true,
+                        "description": parameterDescription(name, location: "path"),
                         "schema": schema,
                     ] as [String: Any]
                 }
@@ -98,6 +163,7 @@ enum APIOpenAPI {
                 }
                 return [
                     "name": name, "in": "query",
+                    "description": parameterDescription(name, location: "query"),
                     "required": requiredQuery.contains(name), "schema": schema,
                 ]
             }
@@ -110,14 +176,15 @@ enum APIOpenAPI {
                     "POST /v1/deck-reset-plans/{id}/commits",
                     "POST /v1/imports/{id}/commits",
                     "POST /v1/vocabulary-pack-imports/{id}/commits",
-                ].contains("\(method.uppercased()) \(path)")
+                ].contains("\(method.rawValue) \(path)")
                 parameters.append([
                     "name": "Idempotency-Key", "in": "header", "required": required,
+                    "description": "Caller-generated key used to replay a mutation safely.",
                     "schema": ["type": "string", "minLength": 1, "maxLength": 256],
                 ])
             }
             let needsIfMatch = scope != nil && (
-                ["put", "patch", "delete"].contains(method)
+                [.put, .patch, .delete].contains(method)
                     || path.hasSuffix("/resets")
                     || path.hasSuffix("/commits")
                     || path == "/v1/tag-renames"
@@ -126,26 +193,31 @@ enum APIOpenAPI {
             if needsIfMatch {
                 parameters.append([
                     "name": "If-Match", "in": "header", "required": true,
+                    "description": "Current quoted resource revision.",
                     "schema": ["type": "string", "pattern": "^\\\"revision-[0-9]+\\\"$"],
                 ])
             }
-            if path == "/v1/item-types/{id}", method == "put" {
+            if path == "/v1/item-types/{id}", method == .put {
                 parameters.append([
                     "name": "NeoAnki-Impact-Token", "in": "header", "required": false,
+                    "description": "Confirmation token returned after inspecting a destructive schema edit.",
                     "schema": ["type": "string"],
                 ])
             }
-            if path == "/v1/media", method == "post" {
+            if path == "/v1/media", method == .post {
                 parameters += [
                     ["name": "NeoAnki-Media-Kind", "in": "header", "required": true,
+                     "description": "Declared kind of the uploaded media.",
                      "schema": ["type": "string", "enum": ["audio", "image", "gif", "video"]]],
                     ["name": "NeoAnki-Alt-Text", "in": "header", "required": false,
+                     "description": "Accessible description stored with the media.",
                      "schema": ["type": "string"]],
                 ]
             }
             if path == "/v1/events" {
                 parameters.append([
                     "name": "Last-Event-ID", "in": "header", "required": false,
+                    "description": "Last durable event cursor received by an SSE client.",
                     "schema": ["type": "integer", "minimum": 0],
                 ])
             }
@@ -153,7 +225,7 @@ enum APIOpenAPI {
                 operation["parameters"] = parameters
             }
             var pathItem = paths[path] as? [String: Any] ?? [:]
-            pathItem[method] = operation
+            pathItem[methodName] = operation
             paths[path] = pathItem
         }
 
@@ -181,98 +253,113 @@ enum APIOpenAPI {
                 "schema": ["type": "string", "const": "none"],
             ],
         ]
+        let contractHeaders: [String: Any] = [
+            "ETag": [
+                "description": "Strong validator derived from the exact OpenAPI bytes.",
+                "required": true,
+                "schema": ["type": "string"],
+            ],
+            "X-NeoAnki-Contract-Digest": [
+                "description": "SHA-256 digest shared by runtime and published API artifacts.",
+                "required": true,
+                "schema": ["type": "string", "pattern": "^sha256:[0-9a-f]{64}$"],
+            ],
+        ]
 
-        add("/health", "get", "health", success: 200, response: "Health")
-        add("/v1/meta", "get", "meta", response: "Meta")
-        add("/v1/openapi.json", "get", "openapi", response: "OpenAPIDocument")
-        add("/v1/pairings", "post", "pair", success: 201, request: "PairingInput", response: "PairingResult")
-        add("/v1/clients/current", "get", "currentClient", scope: "any", response: "Client")
-        add("/v1/clients/current", "delete", "revokeCurrentClient", scope: "any", success: 204, response: nil)
+        add("/health", .get, .health, success: 200, response: "Health")
+        add("/v1/meta", .get, .meta, response: "Meta")
+        add(
+            "/v1/openapi.json", .get, .openapi,
+            response: "OpenAPIDocument", successHeaders: contractHeaders
+        )
+        add("/v1/pairings", .post, .pair, success: 201, request: "PairingInput", response: "PairingResult")
+        add("/v1/clients/current", .get, .currentClient, authorization: .authenticated, response: "Client")
+        add("/v1/clients/current", .delete, .revokeCurrentClient, authorization: .authenticated, success: 204, response: nil)
 
-        add("/v1/decks", "get", "listDecks", scope: "library.read", response: "DeckCollection", query: ["cursor", "limit"])
-        add("/v1/decks", "post", "createDeck", scope: "decks.write", success: 201, request: "CreateDeckInput", response: "Deck")
-        add("/v1/decks/{id}", "get", "getDeck", scope: "library.read", response: "Deck")
-        add("/v1/decks/{id}", "patch", "updateDeck", scope: "decks.write", request: "UpdateDeckInput", response: "Deck")
-        add("/v1/deck-deletion-plans", "post", "createDeckDeletionPlan", scope: "decks.write", success: 201, request: "CreateDeckDeletionPlanInput", response: "DeckDeletionPlan")
-        add("/v1/deck-deletion-plans/{id}/commits", "post", "commitDeckDeletionPlan", scope: "decks.write", request: "ConfirmInput", response: "DeckDeletionCommitResult")
-        add("/v1/deck-reset-plans", "post", "createDeckResetPlan", scope: "study.review", success: 201, request: "DeckIdentifierInput", response: "DeckResetPlan")
-        add("/v1/deck-reset-plans/{id}/commits", "post", "commitDeckResetPlan", scope: "study.review", request: "RequiredConfirmInput", response: "DeckResetCommitResult")
-        add("/v1/decks/{id}/item-type-policy", "get", "deckItemTypePolicy", scope: "library.read", response: "ItemTypePolicy")
+        add("/v1/decks", .get, .listDecks, authorization: .scope(.libraryRead), response: "DeckCollection", query: ["cursor", "limit"])
+        add("/v1/decks", .post, .createDeck, authorization: .scope(.decksWrite), success: 201, request: "CreateDeckInput", response: "Deck")
+        add("/v1/decks/{id}", .get, .getDeck, authorization: .scope(.libraryRead), response: "Deck")
+        add("/v1/decks/{id}", .patch, .updateDeck, authorization: .scope(.decksWrite), request: "UpdateDeckInput", response: "Deck")
+        add("/v1/deck-deletion-plans", .post, .createDeckDeletionPlan, authorization: .scope(.decksWrite), success: 201, request: "CreateDeckDeletionPlanInput", response: "DeckDeletionPlan")
+        add("/v1/deck-deletion-plans/{id}/commits", .post, .commitDeckDeletionPlan, authorization: .scope(.decksWrite), request: "ConfirmInput", response: "DeckDeletionCommitResult")
+        add("/v1/deck-reset-plans", .post, .createDeckResetPlan, authorization: .scope(.studyReview), success: 201, request: "DeckIdentifierInput", response: "DeckResetPlan")
+        add("/v1/deck-reset-plans/{id}/commits", .post, .commitDeckResetPlan, authorization: .scope(.studyReview), request: "RequiredConfirmInput", response: "DeckResetCommitResult")
+        add("/v1/decks/{id}/item-type-policy", .get, .deckItemTypePolicy, authorization: .scope(.libraryRead), response: "ItemTypePolicy")
 
-        add("/v1/item-types", "get", "listItemTypes", scope: "library.read", response: "ItemTypeCollection", query: ["cursor", "limit"])
-        add("/v1/item-types", "post", "createItemType", scope: "schemas.write", success: 201, request: "ItemTypeInput", response: "ItemType")
-        add("/v1/item-types/validate", "post", "validateItemType", scope: "schemas.write", success: 204, request: "ItemTypeInput", response: nil)
-        add("/v1/item-types/{id}", "get", "getItemType", scope: "library.read", response: "ItemType")
-        add("/v1/item-types/{id}", "put", "replaceItemType", scope: "schemas.write", request: "ItemTypeInput", response: "ItemType")
-        add("/v1/item-types/{id}", "delete", "deleteItemType", scope: "schemas.write", success: 204, response: nil)
-        add("/v1/item-types/{id}/duplicate", "post", "duplicateItemType", scope: "schemas.write", success: 201, request: "DuplicateItemTypeInput", response: "ItemType")
+        add("/v1/item-types", .get, .listItemTypes, authorization: .scope(.libraryRead), response: "ItemTypeCollection", query: ["cursor", "limit"])
+        add("/v1/item-types", .post, .createItemType, authorization: .scope(.schemasWrite), success: 201, request: "ItemTypeInput", response: "ItemType")
+        add("/v1/item-types/validate", .post, .validateItemType, authorization: .scope(.schemasWrite), success: 204, request: "ItemTypeInput", response: nil)
+        add("/v1/item-types/{id}", .get, .getItemType, authorization: .scope(.libraryRead), response: "ItemType")
+        add("/v1/item-types/{id}", .put, .replaceItemType, authorization: .scope(.schemasWrite), request: "ItemTypeInput", response: "ItemType")
+        add("/v1/item-types/{id}", .delete, .deleteItemType, authorization: .scope(.schemasWrite), success: 204, response: nil)
+        add("/v1/item-types/{id}/duplicate", .post, .duplicateItemType, authorization: .scope(.schemasWrite), success: 201, request: "DuplicateItemTypeInput", response: "ItemType")
 
-        add("/v1/items", "get", "listItems", scope: "library.read", response: "ItemCollection", query: ["cursor", "limit", "deckId", "includeDescendants", "itemTypeId", "tag", "text", "schedulePhase", "dueBefore", "createdAfter", "updatedAfter"])
-        add("/v1/items", "post", "createItem", scope: "items.write", success: 201, request: "CreateItemInput", response: "Item")
-        add("/v1/items/validate", "post", "validateItem", scope: "items.write", success: 204, request: "CreateItemInput", response: nil)
-        add("/v1/items/bulk", "post", "bulkItems", scope: "items.write", request: "BulkItemsInput", response: "BulkItemsResult")
-        add("/v1/items/{id}", "get", "getItem", scope: "library.read", response: "Item")
-        add("/v1/items/{id}", "put", "replaceItem", scope: "items.write", request: "ReplaceItemInput", response: "Item")
-        add("/v1/items/{id}", "delete", "deleteItem", scope: "items.write", success: 204, response: nil)
-        add("/v1/items/{id}/duplicate-checks", "post", "duplicateChecks", scope: "library.read", request: "EmptyObject", response: "DuplicateCheckResult")
-        add("/v1/tags", "get", "listTags", scope: "library.read", response: "TagCollection", query: ["cursor", "limit"])
-        add("/v1/tag-renames", "post", "renameTag", scope: "items.write", request: "RenameTagInput", response: "MutationCount")
-        add("/v1/tags/{encodedTag}", "delete", "removeTag", scope: "items.write", success: 204, response: nil)
+        add("/v1/items", .get, .listItems, authorization: .scope(.libraryRead), response: "ItemCollection", query: ["cursor", "limit", "deckId", "includeDescendants", "itemTypeId", "tag", "text", "schedulePhase", "dueBefore", "createdAfter", "updatedAfter"])
+        add("/v1/items", .post, .createItem, authorization: .scope(.itemsWrite), success: 201, request: "CreateItemInput", response: "Item")
+        add("/v1/items/validate", .post, .validateItem, authorization: .scope(.itemsWrite), success: 204, request: "CreateItemInput", response: nil)
+        add("/v1/items/bulk", .post, .bulkItems, authorization: .scope(.itemsWrite), request: "BulkItemsInput", response: "BulkItemsResult")
+        add("/v1/items/{id}", .get, .getItem, authorization: .scope(.libraryRead), response: "Item")
+        add("/v1/items/{id}", .put, .replaceItem, authorization: .scope(.itemsWrite), request: "ReplaceItemInput", response: "Item")
+        add("/v1/items/{id}", .delete, .deleteItem, authorization: .scope(.itemsWrite), success: 204, response: nil)
+        add("/v1/items/{id}/duplicate-checks", .post, .duplicateChecks, authorization: .scope(.libraryRead), request: "EmptyObject", response: "DuplicateCheckResult")
+        add("/v1/tags", .get, .listTags, authorization: .scope(.libraryRead), response: "TagCollection", query: ["cursor", "limit"])
+        add("/v1/tag-renames", .post, .renameTag, authorization: .scope(.itemsWrite), request: "RenameTagInput", response: "MutationCount")
+        add("/v1/tags/{encodedTag}", .delete, .removeTag, authorization: .scope(.itemsWrite), success: 204, response: nil)
 
-        add("/v1/cards", "get", "listCards", scope: "library.read", response: "CardCollection", query: ["cursor", "limit", "itemId", "deckId", "includeDescendants", "templateId", "phase", "isSuspended", "dueBefore"])
-        add("/v1/cards/{id}", "get", "getCard", scope: "library.read", response: "Card")
-        add("/v1/cards/{id}", "patch", "patchCard", scope: "study.review", request: "PatchCardInput", response: "Card")
-        add("/v1/cards/{id}/content", "get", "cardContent", scope: "library.read", response: "StudyCard")
-        add("/v1/cards/{id}/review-preview", "get", "reviewPreview", scope: "library.read", response: "RatingPreviewArray")
-        add("/v1/cards/{id}/resets", "post", "resetCard", scope: "study.review", request: "RequiredConfirmInput", response: "Card")
+        add("/v1/cards", .get, .listCards, authorization: .scope(.libraryRead), response: "CardCollection", query: ["cursor", "limit", "itemId", "deckId", "includeDescendants", "templateId", "phase", "isSuspended", "dueBefore"])
+        add("/v1/cards/{id}", .get, .getCard, authorization: .scope(.libraryRead), response: "Card")
+        add("/v1/cards/{id}", .patch, .patchCard, authorization: .scope(.studyReview), request: "PatchCardInput", response: "Card")
+        add("/v1/cards/{id}/content", .get, .cardContent, authorization: .scope(.libraryRead), response: "StudyCard")
+        add("/v1/cards/{id}/review-preview", .get, .reviewPreview, authorization: .scope(.libraryRead), response: "RatingPreviewArray")
+        add("/v1/cards/{id}/resets", .post, .resetCard, authorization: .scope(.studyReview), request: "RequiredConfirmInput", response: "Card")
 
-        add("/v1/study-sessions", "post", "createStudySession", scope: "study.review", success: 201, request: "CreateStudySessionInput", response: "StudySession")
-        add("/v1/study-sessions/{id}", "get", "getStudySession", scope: "study.review", response: "StudySession")
-        add("/v1/study-sessions/{id}", "delete", "endStudySession", scope: "study.review", success: 204, response: nil)
-        add("/v1/study-sessions/{id}/next", "post", "nextStudyCard", scope: "study.review", response: "StudyCard")
-        add("/v1/study-sessions/{id}/skips", "post", "skipStudyCard", scope: "study.review", success: 204, request: "SkipStudyCardInput", response: nil)
-        add("/v1/reviews", "post", "submitReview", scope: "study.review", success: 201, request: "SubmitReviewInput", response: "ReviewResult")
-        add("/v1/reviews/{reviewLogId}/reverts", "post", "revertReview", scope: "study.review", success: 204, response: nil)
+        add("/v1/study-sessions", .post, .createStudySession, authorization: .scope(.studyReview), success: 201, request: "CreateStudySessionInput", response: "StudySession")
+        add("/v1/study-sessions/{id}", .get, .getStudySession, authorization: .scope(.studyReview), response: "StudySession")
+        add("/v1/study-sessions/{id}", .delete, .endStudySession, authorization: .scope(.studyReview), success: 204, response: nil)
+        add("/v1/study-sessions/{id}/next", .post, .nextStudyCard, authorization: .scope(.studyReview), response: "StudyCard")
+        add("/v1/study-sessions/{id}/skips", .post, .skipStudyCard, authorization: .scope(.studyReview), success: 204, request: "SkipStudyCardInput", response: nil)
+        add("/v1/reviews", .post, .submitReview, authorization: .scope(.studyReview), success: 201, request: "SubmitReviewInput", response: "ReviewResult")
+        add("/v1/reviews/{reviewLogId}/reverts", .post, .revertReview, authorization: .scope(.studyReview), success: 204, response: nil)
 
-        add("/v1/study-responses", "get", "listStudyResponses", scope: "study.responses.read", response: "StudyResponseCollection", query: ["cursor", "limit", "cardId", "itemId", "tag", "createdAfter"])
-        add("/v1/study-responses/{id}", "get", "getStudyResponse", scope: "study.responses.read", response: "StudyResponse")
-        add("/v1/study-responses/{id}", "delete", "deleteStudyResponse", scope: "study.responses.delete", success: 204, response: nil)
-        add("/v1/study-responses/{id}/content", "get", "downloadStudyResponse", scope: "study.responses.read", response: "Binary", responseContentType: "audio/mp4")
-        add("/v1/study-responses/{id}/content", "head", "headStudyResponse", scope: "study.responses.read", response: nil, responseContentType: "audio/mp4")
+        add("/v1/study-responses", .get, .listStudyResponses, authorization: .scope(.studyResponsesRead), response: "StudyResponseCollection", query: ["cursor", "limit", "cardId", "itemId", "tag", "createdAfter"])
+        add("/v1/study-responses/{id}", .get, .getStudyResponse, authorization: .scope(.studyResponsesRead), response: "StudyResponse")
+        add("/v1/study-responses/{id}", .delete, .deleteStudyResponse, authorization: .scope(.studyResponsesDelete), success: 204, response: nil)
+        add("/v1/study-responses/{id}/content", .get, .downloadStudyResponse, authorization: .scope(.studyResponsesRead), response: "Binary", responseContentType: "audio/mp4")
+        add("/v1/study-responses/{id}/content", .head, .headStudyResponse, authorization: .scope(.studyResponsesRead), response: nil, responseContentType: "audio/mp4")
 
-        add("/v1/media", "post", "uploadMedia", scope: "media.write", success: 201, request: "Binary", response: "MediaReservation", requestContentType: "application/octet-stream")
-        add("/v1/media/{sha256}", "head", "headMedia", scope: "library.read", response: nil, responseContentType: "application/octet-stream")
-        add("/v1/media/{sha256}", "get", "downloadMedia", scope: "library.read", response: "Binary", responseContentType: "application/octet-stream")
-        add("/v1/media/{sha256}/metadata", "get", "mediaMetadata", scope: "library.read", response: "MediaMetadata")
+        add("/v1/media", .post, .uploadMedia, authorization: .scope(.mediaWrite), success: 201, request: "Binary", response: "MediaReservation", requestContentType: "application/octet-stream")
+        add("/v1/media/{sha256}", .head, .headMedia, authorization: .scope(.libraryRead), response: nil, responseContentType: "application/octet-stream")
+        add("/v1/media/{sha256}", .get, .downloadMedia, authorization: .scope(.libraryRead), response: "Binary", responseContentType: "application/octet-stream")
+        add("/v1/media/{sha256}/metadata", .get, .mediaMetadata, authorization: .scope(.libraryRead), response: "MediaMetadata")
 
-        add("/v1/vocabulary-packs", "get", "listVocabularyPacks", scope: "vocabulary.read", response: "VocabularyPackCollection")
-        add("/v1/vocabulary-packs/{id}", "get", "getVocabularyPack", scope: "vocabulary.read", response: "VocabularyPack", successHeaders: ["ETag": vocabularyETagHeader])
-        add("/v1/vocabulary-packs/{id}", "delete", "deleteVocabularyPack", scope: "vocabulary.write", success: 204, response: nil)
-        add("/v1/vocabulary-packs/{id}/entries", "get", "searchVocabularyEntries", scope: "vocabulary.read", response: "LexicalEntryCollection", query: ["query", "mode", "limit", "language"], requiredQuery: ["query"])
-        add("/v1/vocabulary-packs/{id}/entries/{entryId}", "get", "getVocabularyEntry", scope: "vocabulary.read", response: "LexicalEntry")
-        add("/v1/vocabulary-packs/{id}/media", "get", "downloadVocabularyMedia", scope: "vocabulary.read", response: "Binary", responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
-        add("/v1/vocabulary-packs/{id}/media", "head", "headVocabularyMedia", scope: "vocabulary.read", response: nil, responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
+        add("/v1/vocabulary-packs", .get, .listVocabularyPacks, authorization: .scope(.vocabularyRead), response: "VocabularyPackCollection")
+        add("/v1/vocabulary-packs/{id}", .get, .getVocabularyPack, authorization: .scope(.vocabularyRead), response: "VocabularyPack", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-packs/{id}", .delete, .deleteVocabularyPack, authorization: .scope(.vocabularyWrite), success: 204, response: nil)
+        add("/v1/vocabulary-packs/{id}/entries", .get, .searchVocabularyEntries, authorization: .scope(.vocabularyRead), response: "LexicalEntryCollection", query: ["query", "mode", "limit", "language"], requiredQuery: ["query"])
+        add("/v1/vocabulary-packs/{id}/entries/{entryId}", .get, .getVocabularyEntry, authorization: .scope(.vocabularyRead), response: "LexicalEntry")
+        add("/v1/vocabulary-packs/{id}/media", .get, .downloadVocabularyMedia, authorization: .scope(.vocabularyRead), response: "Binary", responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
+        add("/v1/vocabulary-packs/{id}/media", .head, .headVocabularyMedia, authorization: .scope(.vocabularyRead), response: nil, responseContentType: "application/octet-stream", query: ["path"], requiredQuery: ["path"], successHeaders: vocabularyMediaHeaders)
 
-        add("/v1/vocabulary-pack-imports", "post", "createVocabularyPackImport", scope: "vocabulary.write", success: 201, request: "CreateVocabularyPackImportInput", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader, "Location": vocabularyLocationHeader])
-        add("/v1/vocabulary-pack-imports/{id}", "get", "getVocabularyPackImport", scope: "vocabulary.write", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader])
-        add("/v1/vocabulary-pack-imports/{id}", "delete", "deleteVocabularyPackImport", scope: "vocabulary.write", success: 204, response: nil)
-        add("/v1/vocabulary-pack-imports/{id}/files/{fileId}", "put", "uploadVocabularyPackFile", scope: "vocabulary.write", request: "Binary", response: "VocabularyPackImport", requestContentType: "application/octet-stream", successHeaders: ["ETag": vocabularyETagHeader])
-        add("/v1/vocabulary-pack-imports/{id}/validations", "post", "validateVocabularyPackImport", scope: "vocabulary.write", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader])
-        add("/v1/vocabulary-pack-imports/{id}/commits", "post", "commitVocabularyPackImport", scope: "vocabulary.write", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader, "Location": vocabularyLocationHeader])
+        add("/v1/vocabulary-pack-imports", .post, .createVocabularyPackImport, authorization: .scope(.vocabularyWrite), success: 201, request: "CreateVocabularyPackImportInput", response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader, "Location": vocabularyLocationHeader])
+        add("/v1/vocabulary-pack-imports/{id}", .get, .getVocabularyPackImport, authorization: .scope(.vocabularyWrite), response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-pack-imports/{id}", .delete, .deleteVocabularyPackImport, authorization: .scope(.vocabularyWrite), success: 204, response: nil)
+        add("/v1/vocabulary-pack-imports/{id}/files/{fileId}", .put, .uploadVocabularyPackFile, authorization: .scope(.vocabularyWrite), request: "Binary", response: "VocabularyPackImport", requestContentType: "application/octet-stream", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-pack-imports/{id}/validations", .post, .validateVocabularyPackImport, authorization: .scope(.vocabularyWrite), response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader])
+        add("/v1/vocabulary-pack-imports/{id}/commits", .post, .commitVocabularyPackImport, authorization: .scope(.vocabularyWrite), response: "VocabularyPackImport", successHeaders: ["ETag": vocabularyETagHeader, "Location": vocabularyLocationHeader])
 
-        add("/v1/imports", "post", "createImport", scope: "library.import", success: 201, request: "CreateImportInput", response: "ImportJob")
-        add("/v1/imports/{id}", "get", "getImport", scope: "library.import", response: "ImportJob")
-        add("/v1/imports/{id}", "delete", "deleteImport", scope: "library.import", success: 204, response: nil)
-        add("/v1/imports/{id}/files/{fileId}", "put", "uploadImportFile", scope: "library.import", success: 204, request: "Binary", response: nil, requestContentType: "application/octet-stream")
-        add("/v1/imports/{id}/validations", "post", "validateImport", scope: "library.import", response: "ImportJob")
-        add("/v1/imports/{id}/commits", "post", "commitImport", scope: "library.import", request: "CommitImportInput", response: "ImportJob")
-        add("/v1/exports", "post", "createExport", scope: "library.export", success: 201, request: "CreateExportInput", response: "ExportJob")
-        add("/v1/exports/{id}", "get", "getExport", scope: "library.export", response: "ExportJob")
-        add("/v1/exports/{id}", "delete", "deleteExport", scope: "library.export", success: 204, response: nil)
-        add("/v1/exports/{id}/content", "get", "exportContent", scope: "library.export", response: "Binary", responseContentType: "application/vnd.neoanki.portable-deck")
+        add("/v1/imports", .post, .createImport, authorization: .scope(.libraryImport), success: 201, request: "CreateImportInput", response: "ImportJob")
+        add("/v1/imports/{id}", .get, .getImport, authorization: .scope(.libraryImport), response: "ImportJob")
+        add("/v1/imports/{id}", .delete, .deleteImport, authorization: .scope(.libraryImport), success: 204, response: nil)
+        add("/v1/imports/{id}/files/{fileId}", .put, .uploadImportFile, authorization: .scope(.libraryImport), success: 204, request: "Binary", response: nil, requestContentType: "application/octet-stream")
+        add("/v1/imports/{id}/validations", .post, .validateImport, authorization: .scope(.libraryImport), response: "ImportJob")
+        add("/v1/imports/{id}/commits", .post, .commitImport, authorization: .scope(.libraryImport), request: "CommitImportInput", response: "ImportJob")
+        add("/v1/exports", .post, .createExport, authorization: .scope(.libraryExport), success: 201, request: "CreateExportInput", response: "ExportJob")
+        add("/v1/exports/{id}", .get, .getExport, authorization: .scope(.libraryExport), response: "ExportJob")
+        add("/v1/exports/{id}", .delete, .deleteExport, authorization: .scope(.libraryExport), success: 204, response: nil)
+        add("/v1/exports/{id}/content", .get, .exportContent, authorization: .scope(.libraryExport), response: "Binary", responseContentType: "application/vnd.neoanki.portable-deck")
 
-        add("/v1/changes", "get", "changes", scope: "library.read or study.responses.read", response: "ChangeCollection", query: ["after", "limit"])
-        add("/v1/events", "get", "events", scope: "library.read or study.responses.read", response: "EventStream", responseContentType: "text/event-stream", query: ["after"])
+        add("/v1/changes", .get, .changes, authorization: .anyOf([.libraryRead, .studyResponsesRead]), response: "ChangeCollection", query: ["after", "limit"])
+        add("/v1/events", .get, .events, authorization: .anyOf([.libraryRead, .studyResponsesRead]), response: "EventStream", responseContentType: "text/event-stream", query: ["after"])
 
         let document: [String: Any] = [
             "openapi": "3.1.0",
@@ -294,77 +381,115 @@ enum APIOpenAPI {
         return try! JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
     }()
 
+    package static let contractDigest = "sha256:" + APICrypto.sha256Hex(document)
+
+    package static let endpoints: [APIEndpointDefinition] = {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: document) as? [String: Any],
+            let paths = object["paths"] as? [String: Any]
+        else {
+            preconditionFailure("The generated OpenAPI document must contain paths.")
+        }
+
+        func referencedSchema(_ value: Any?) -> String? {
+            guard let dictionary = value as? [String: Any],
+                  let reference = dictionary["$ref"] as? String
+            else { return nil }
+            return reference.split(separator: "/").last.map(String.init)
+        }
+
+        var result: [APIEndpointDefinition] = []
+        for (path, rawPathItem) in paths {
+            guard let pathItem = rawPathItem as? [String: Any] else { continue }
+            for (methodName, rawOperation) in pathItem {
+                guard let method = APIHTTPMethod(rawValue: methodName.uppercased()),
+                      let operation = rawOperation as? [String: Any],
+                      let operationID = operation["operationId"] as? String,
+                      let handler = APIEndpointHandler(rawValue: operationID),
+                      let tags = operation["tags"] as? [String],
+                      let groupName = tags.first,
+                      let group = APIEndpointGroup(rawValue: groupName),
+                      let summary = operation["summary"] as? String,
+                      let description = operation["description"] as? String,
+                      let responses = operation["responses"] as? [String: Any],
+                      let successStatus = responses.keys.compactMap(Int.init)
+                        .filter({ (200 ..< 300).contains($0) }).sorted().first
+                else {
+                    preconditionFailure("Every OpenAPI operation must have typed registry metadata.")
+                }
+                let parameters = (operation["parameters"] as? [[String: Any]] ?? []).compactMap {
+                    parameter -> APIEndpointParameter? in
+                    guard let name = parameter["name"] as? String,
+                          let location = parameter["in"] as? String
+                    else { return nil }
+                    return APIEndpointParameter(
+                        name: name,
+                        location: location,
+                        isRequired: parameter["required"] as? Bool ?? false,
+                        description: parameter["description"] as? String ?? ""
+                    )
+                }
+                let requestBody = operation["requestBody"] as? [String: Any]
+                let requestContent = requestBody?["content"] as? [String: Any]
+                let requestMedia = requestContent?.values.first as? [String: Any]
+                let successResponse = responses[String(successStatus)] as? [String: Any]
+                let responseContent = successResponse?["content"] as? [String: Any]
+                let responseMedia = responseContent?.values.first as? [String: Any]
+                let successHeaders = (successResponse?["headers"] as? [String: Any])?.keys
+                    .sorted() ?? []
+                let errorResponses = responses.keys.filter {
+                    $0 == "default" || Int($0).map { !(200 ..< 300).contains($0) } == true
+                }.sorted()
+                result.append(APIEndpointDefinition(
+                    pathTemplate: path,
+                    method: method,
+                    handler: handler,
+                    group: group,
+                    summary: summary,
+                    description: description,
+                    requiredScope: operation["x-required-scope"] as? String,
+                    parameters: parameters,
+                    acceptsRequestBody: requestBody != nil,
+                    successStatus: successStatus,
+                    requestSchema: referencedSchema(requestMedia?["schema"]),
+                    responseSchema: referencedSchema(responseMedia?["schema"]),
+                    successHeaders: successHeaders,
+                    errorResponses: errorResponses
+                ))
+            }
+        }
+        return result.sorted {
+            if $0.pathTemplate != $1.pathTemplate { return $0.pathTemplate < $1.pathTemplate }
+            return $0.method.rawValue < $1.method.rawValue
+        }
+    }()
+
+    package static func endpoint(
+        for requestPath: String,
+        method: APIHTTPMethod
+    ) -> APIEndpointDefinition? {
+        endpoints.first { $0.method == method && $0.matches(path: requestPath) }
+    }
+
     /// Resolves a concrete request path against the paths declared by the
     /// shipped contract. Browser preflight uses this rather than a second,
     /// independently maintained route list.
     static func documentedMethods(for requestPath: String) -> Set<APIHTTPMethod> {
-        guard
-            let object = try? JSONSerialization.jsonObject(with: document) as? [String: Any],
-            let paths = object["paths"] as? [String: Any]
-        else { return [] }
-
-        let requestComponents = requestPath.split(separator: "/", omittingEmptySubsequences: false)
-        for (template, value) in paths {
-            let templateComponents = template.split(separator: "/", omittingEmptySubsequences: false)
-            guard templateComponents.count == requestComponents.count else { continue }
-            let matches = zip(templateComponents, requestComponents).allSatisfy { expected, actual in
-                (expected.hasPrefix("{") && expected.hasSuffix("}")) || expected == actual
-            }
-            guard matches, let operations = value as? [String: Any] else { continue }
-            return Set(operations.keys.compactMap { APIHTTPMethod(rawValue: $0.uppercased()) })
-        }
-        return []
+        Set(endpoints.lazy.filter { $0.matches(path: requestPath) }.map(\.method))
     }
 
     static func documentedQueryParameters(
         for requestPath: String,
         method: APIHTTPMethod
     ) -> Set<String> {
-        guard
-            let object = try? JSONSerialization.jsonObject(with: document) as? [String: Any],
-            let paths = object["paths"] as? [String: Any]
-        else { return [] }
-        let requestComponents = requestPath.split(separator: "/", omittingEmptySubsequences: false)
-        for (template, value) in paths {
-            let templateComponents = template.split(separator: "/", omittingEmptySubsequences: false)
-            guard templateComponents.count == requestComponents.count else { continue }
-            let matches = zip(templateComponents, requestComponents).allSatisfy { expected, actual in
-                (expected.hasPrefix("{") && expected.hasSuffix("}")) || expected == actual
-            }
-            guard matches,
-                  let operations = value as? [String: Any],
-                  let operation = operations[method.rawValue.lowercased()] as? [String: Any],
-                  let parameters = operation["parameters"] as? [[String: Any]]
-            else { continue }
-            return Set(parameters.compactMap { parameter in
-                parameter["in"] as? String == "query" ? parameter["name"] as? String : nil
-            })
-        }
-        return []
+        endpoint(for: requestPath, method: method)?.queryParameters ?? []
     }
 
     static func acceptsRequestBody(
         for requestPath: String,
         method: APIHTTPMethod
     ) -> Bool {
-        guard
-            let object = try? JSONSerialization.jsonObject(with: document) as? [String: Any],
-            let paths = object["paths"] as? [String: Any]
-        else { return false }
-        let requestComponents = requestPath.split(separator: "/", omittingEmptySubsequences: false)
-        for (template, value) in paths {
-            let templateComponents = template.split(separator: "/", omittingEmptySubsequences: false)
-            guard templateComponents.count == requestComponents.count else { continue }
-            let matches = zip(templateComponents, requestComponents).allSatisfy { expected, actual in
-                (expected.hasPrefix("{") && expected.hasSuffix("}")) || expected == actual
-            }
-            guard matches,
-                  let operations = value as? [String: Any],
-                  let operation = operations[method.rawValue.lowercased()] as? [String: Any]
-            else { continue }
-            return operation["requestBody"] != nil
-        }
-        return false
+        endpoint(for: requestPath, method: method)?.acceptsRequestBody ?? false
     }
 
     private static func reference(_ name: String) -> [String: Any] {
@@ -868,6 +993,7 @@ enum APIOpenAPI {
                  "status": ["type": "integer", "minimum": 400, "maximum": 599],
                  "code": ["type": "string"], "detail": ["type": "string"],
                  "requestId": uuid, "errors": array(reference("ValidationError")),
+                 "requiredScope": ["type": "string"],
                  "impact": reference("ImpactSummary"),
                  "impactToken": ["type": "string"]]
             ),

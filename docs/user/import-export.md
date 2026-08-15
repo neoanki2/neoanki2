@@ -1,6 +1,7 @@
 ---
 title: Import and export
 description: Choose JSON, CSV, portable decks, or authored decks and recover safely from validation and conflict errors.
+audience: user
 nav_order: 7
 parent: User Guide
 ---

@@ -126,10 +126,15 @@
       "article": "user/getting-started.md",
       "contains": [
         "macOS 14 or newer",
-        "iOS 17",
-        "Swift tools 6.0",
         "~/Library/Application Support/neoanki2/",
         "The Home summary is prepared while the app window opens"
+      ]
+    },
+    {
+      "article": "user/developer/setup.md",
+      "contains": [
+        "iOS 17",
+        "Swift tools 6.0"
       ]
     },
     {

@@ -1,6 +1,7 @@
 ---
 title: Troubleshooting
 description: Match NeoAnki2 app symptoms to safe recovery steps without risking the local library.
+audience: user
 nav_order: 10
 parent: User Guide
 ---
