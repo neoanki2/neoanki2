@@ -55,7 +55,11 @@ struct NeoAnkiIOSApp: App {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await model.refresh(); if model.syncEnabled { await model.synchronize() } }
+                Task {
+                    guard model.loadState == .ready else { return }
+                    await model.refresh()
+                    if model.syncEnabled { await model.synchronize() }
+                }
             } else if phase == .background {
                 IOSBackgroundRefresh.shared.schedule()
             }

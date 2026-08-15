@@ -169,7 +169,6 @@ final class NeoAnki2MobileUITests: XCTestCase {
             let isSystemNavigationLabel = element.elementType == .staticText
                 && ["Home", "Library", "Create", "Settings"].contains(element.label)
             let isSystemSearchPlaceholder = element.label == "Search cards"
-                && [.staticText, .searchField].contains(element.elementType)
             return isSystemNavigationLabel || isSystemSearchPlaceholder
         }
     }
