@@ -22,14 +22,9 @@ final class NeoAnki2MobileUITests: XCTestCase {
     }
 
     private func open(_ title: String, in app: XCUIApplication) {
-        let tab = app.tabBars.buttons[title]
-        if tab.waitForExistence(timeout: 2) {
-            tab.tap()
-        } else {
-            let sidebar = app.buttons["top-level-\(title.lowercased())"]
-            XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "Missing \(title) destination")
-            sidebar.tap()
-        }
+        let destination = app.buttons[title].firstMatch
+        XCTAssertTrue(destination.waitForExistence(timeout: 5), "Missing \(title) destination")
+        destination.tap()
 
         let navigationTitle = title == "Home" ? "NeoAnki2" : title
         XCTAssertTrue(
