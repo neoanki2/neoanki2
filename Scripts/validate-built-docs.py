@@ -224,6 +224,13 @@ def validate_document(
             continue
         validate_reference(document.route, reference, site, base_url, report)
 
+    if document.route == "/" and not any(
+        re.fullmatch(r"/neoanki2/neoanki2/tree/[^/]+/docs", urlsplit(reference.value).path)
+        for reference in document.references
+        if reference.kind == "route"
+    ):
+        report(1, "landing-page footer must link to its documentation source revision")
+
     if len(document.canonicals) != 1:
         report(
             1,

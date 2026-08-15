@@ -6,7 +6,7 @@ const modulePath = process.env.PLAYWRIGHT_MODULE || "playwright";
 const { chromium } = await import(modulePath);
 const baseURL = process.argv[2] || "http://127.0.0.1:4173";
 const widths = [375, 768, 1024];
-const routes = ["/api/", "/api/decks/", "/user/developer/"];
+const routes = ["/", "/api/", "/api/decks/", "/user/developer/"];
 const browser = await chromium.launch({ headless: true });
 const failures = [];
 
@@ -30,6 +30,9 @@ try {
       });
       if (result.pageOverflow) failures.push(`${width}px ${route}: page-level horizontal overflow`);
       if (result.overflowingCode) failures.push(`${width}px ${route}: code block escapes its container`);
+      if (route === "/" && !(await page.locator(".landing-footer-publication").isVisible())) {
+        failures.push(`${width}px ${route}: source revision is not visible in the footer`);
+      }
 
       const toggle = page.locator(".nav-toggle");
       if (await toggle.isVisible()) {
