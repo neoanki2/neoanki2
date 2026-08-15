@@ -23,21 +23,23 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
     private func open(_ title: String, in app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5), "App navigation unavailable")
-        if app.tabBars.firstMatch.exists {
-            let tab = app.tabBars.buttons[title]
-            XCTAssertTrue(tab.waitForExistence(timeout: 3), "Missing \(title) tab")
-            tab.tap()
-        } else {
-            let sidebar = app.buttons["top-level-\(title.lowercased())"]
-            XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "Missing \(title) sidebar destination")
-            sidebar.tap()
+        let navigationTitle = title == "Home" ? "NeoAnki2" : title
+        let navigationBar = app.navigationBars[navigationTitle]
+        for _ in 0..<3 {
+            if navigationBar.exists { return }
+
+            let destination: XCUIElement
+            if app.tabBars.firstMatch.exists {
+                destination = app.tabBars.buttons[title]
+            } else {
+                destination = app.buttons["top-level-\(title.lowercased())"]
+            }
+            guard destination.waitForExistence(timeout: 5) else { continue }
+            destination.tap()
+            if navigationBar.waitForExistence(timeout: 5) { return }
         }
 
-        let navigationTitle = title == "Home" ? "NeoAnki2" : title
-        XCTAssertTrue(
-            app.navigationBars[navigationTitle].waitForExistence(timeout: 5),
-            "Failed to open \(title) destination"
-        )
+        XCTFail("Failed to open \(title) destination")
     }
 
     func testTopLevelProductNavigation() throws {
