@@ -43,6 +43,10 @@ CloudKit is off until you opt in on each device:
 5. Repeat these steps on every other Mac, iPhone, or iPad you want to sync.
    Consent is deliberately device-local.
 
+On Mac, wait for the local library to finish opening if the iCloud tab is not
+visible yet. The Study tab can appear first because its preferences do not
+depend on the library or CloudKit.
+
 Before its first upload, NeoAnki2 creates and verifies a SQLite backup in the
 app container. It then merges the local and private CloudKit libraries; neither
 library is silently replaced wholesale. Local SQLite remains authoritative, so
@@ -68,6 +72,7 @@ when it can be restored.
 These remain local to each device:
 
 - the iCloud opt-in itself;
+- the Fail / Pass grading-control preference;
 - reminder time and scope;
 - installed offline vocabulary packs;
 - persistent Audio Submission recordings and their private-only media; and

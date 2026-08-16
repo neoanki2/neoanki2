@@ -92,6 +92,10 @@ items or decks, so a new library opens to **All Decks** with an empty state.
 Documentation screenshots use dark appearance for consistency. NeoAnki2
 normally follows your current macOS appearance setting.
 
+App-level preferences are under **NeoAnki2 → Settings**. The **Study** tab
+includes the device-local Fail / Pass grading option; Local API and iCloud tabs
+appear after the library finishes opening.
+
 Do not stop at the empty screen: the [five-minute first study
 session](../first-study-session/) creates one Basic item, reviews its generated
 card, and confirms the scheduler recorded the result.
