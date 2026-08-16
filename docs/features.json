@@ -253,10 +253,10 @@
     },
     {
       "id": "study-grading",
-      "name": "Again, Hard, Good, and Easy grading",
+      "name": "Configurable four-grade or Fail / Pass grading",
       "article": "user/studying.md",
-      "sources": ["Sources/NeoAnki2/ReviewRating+StudyUI.swift", "Sources/NeoAnki2/GradeGuideView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "sources": ["Sources/NeoAnkiSharedUI/StudyGradingMode.swift", "Sources/NeoAnki2/StudySettingsView.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyCommands.swift", "Sources/NeoAnki2/ReviewRating+StudyUI.swift", "Sources/NeoAnki2/GradeGuideView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyGradingModeTests.swift"],
       "screenshot": "assets/screenshots/study-grade-help.png"
     },
     {

@@ -111,8 +111,10 @@ history warrants it, so there is no menu item to find, enable, or wait on.
   primary check action.
 - **Right Arrow:** reveal without automatic checking and self-grade on typed,
   choice, record, and arrange cards.
-- **1–4:** select Again, Hard, Good, or Easy after reveal. Before reveal, the
-  same number keys choose a multiple-choice option when one is present.
+- **1–4:** select Again, Hard, Good, or Easy after reveal. With Fail / Pass
+  grades enabled, **1** selects Fail (Again) and **2** selects Pass (Good).
+  Before reveal, the same number keys choose a multiple-choice option when one
+  is present.
 - **Command-E:** edit the item behind the current card, then **Return** to save
   or **Escape** to cancel.
 - **Command-Z:** undo the most recent grade when undo is available.

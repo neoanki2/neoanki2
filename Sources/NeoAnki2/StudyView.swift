@@ -1,8 +1,10 @@
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 
 struct StudyView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var model: StudyModel
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
@@ -284,7 +286,7 @@ struct StudyView: View {
             .accessibilityLabel("Grade help")
             .accessibilityIdentifier("gradeHelp")
             .popover(isPresented: $showGradeGuide, arrowEdge: .top) {
-                GradeGuideView()
+                GradeGuideView(gradingMode: gradingMode)
             }
 
             Button("End Session") {
@@ -667,27 +669,27 @@ struct StudyView: View {
 
     private var gradeButtons: some View {
         HStack(spacing: DesignSystem.Spacing.sm) {
-            ForEach(ReviewRating.allCases, id: \.self) { rating in
-                Button(rating.studyButtonTitleWithShortcut) {
-                    Task { await model.grade(rating) }
+            ForEach(gradingMode.choices, id: \.rating) { choice in
+                Button(choice.titleWithShortcut) {
+                    Task { await model.grade(choice.rating) }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .keyboardShortcut(
-                    KeyEquivalent(Character(rating.studyShortcutLabel)),
+                    KeyEquivalent(Character(choice.shortcutLabel)),
                     modifiers: []
                 )
-                .help(rating.studyTooltip)
+                .help(choice.guidance)
                 .disabled(model.isGrading || model.isPreparingQueue)
-                .accessibilityLabel(rating.studyAccessibilityLabel)
-                .accessibilityIdentifier(rating.gradeAccessibilityIdentifier)
+                .accessibilityLabel(choice.accessibilityLabel)
+                .accessibilityIdentifier(choice.rating.gradeAccessibilityIdentifier)
             }
         }
     }
 
     private func gradeUndoBanner(for undo: PendingGradeUndo) -> some View {
         HStack(spacing: DesignSystem.Spacing.sm) {
-            Text("Graded as \(undo.rating.studyButtonTitle).")
+            Text("Graded as \(gradingMode.title(for: undo.rating)).")
                 .font(DesignSystem.Typography.uiSecondary)
                 .foregroundStyle(.secondary)
 
@@ -713,6 +715,10 @@ struct StudyView: View {
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.xs)
         .background(DesignSystem.sidebarBackground)
+    }
+
+    private var gradingMode: StudyGradingMode {
+        StudyGradingMode(usesPassFailGrades: usesPassFailGrades)
     }
 
     private func requestEndSession() {
