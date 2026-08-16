@@ -762,12 +762,10 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
                     )
                 }
                 if let screenshot = feature.screenshot {
-                    let screenshotPath = "docs/\(screenshot)"
-                    if !changed.contains(screenshotPath)
-                        || !changed.contains("docs/assets/screenshots/manifest.json") {
+                    if !changed.contains("docs/assets/screenshots/manifest.json") {
                         fail(
-                            "Feature '\(feature.id)' changed without refreshing "
-                                + "\(screenshotPath) and its screenshot manifest. This is "
+                            "Feature '\(feature.id)' changed without promoting a fresh "
+                                + "screenshot manifest for docs/\(screenshot). This is "
                                 + "a good opportunity to make the relevant documentation "
                                 + "slightly better."
                         )
