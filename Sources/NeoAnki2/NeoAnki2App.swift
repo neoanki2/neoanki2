@@ -162,10 +162,16 @@ struct NeoAnki2App: App {
         }
 
         Settings {
-            if let apiControlModel, let library {
-                TabView {
+            TabView {
+                StudySettingsView()
+                    .tabItem { Label("Study", systemImage: "rectangle.stack") }
+
+                if let apiControlModel {
                     APISettingsView(model: apiControlModel)
                         .tabItem { Label("Local API", systemImage: "network") }
+                }
+
+                if let library {
                     MacCloudSyncSettings(
                         isEnabled: $cloudSyncEnabled,
                         status: syncStatus,
@@ -174,9 +180,6 @@ struct NeoAnki2App: App {
                     )
                     .tabItem { Label("iCloud", systemImage: "icloud") }
                 }
-            } else {
-                ProgressView("Opening library…")
-                    .frame(width: 420, height: 240)
             }
         }
     }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewedAt": "2026-08-05",
+  "lastReviewedAt": "2026-08-16",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",

@@ -3,12 +3,14 @@ import AVKit
 import ImageIO
 import NeoAnkiCore
 import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import SwiftUI
 
 #if os(iOS)
 struct StudySessionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var session: StudyFeatureModel
     @Bindable var model: MobileAppModel
     @State private var confirmsEnd = false
@@ -182,16 +184,14 @@ struct StudySessionView: View {
             } else {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
-                        gradeButton("Again", rating: .again, hint: "I did not remember")
-                        gradeButton("Hard", rating: .hard, hint: "I remembered with difficulty")
-                        gradeButton("Good", rating: .good, hint: "I remembered correctly")
-                        gradeButton("Easy", rating: .easy, hint: "I remembered immediately")
+                        ForEach(gradingMode.choices, id: \.rating) { choice in
+                            gradeButton(choice)
+                        }
                     }
                     Menu("Grade Help", systemImage: "questionmark.circle") {
-                        Text("Again — not remembered")
-                        Text("Hard — remembered with difficulty")
-                        Text("Good — correctly remembered")
-                        Text("Easy — immediate recall")
+                        ForEach(gradingMode.choices, id: \.rating) { choice in
+                            Text("\(choice.title) — \(choice.guidance)")
+                        }
                     }
                 }
             }
@@ -304,18 +304,18 @@ struct StudySessionView: View {
         isEditing = loadedItem != nil
     }
 
-    private func gradeButton(
-        _ title: String,
-        rating: ReviewRating,
-        hint: String
-    ) -> some View {
-        Button(title) {
-            Task { await session.grade(rating) }
+    private func gradeButton(_ choice: StudyGradeChoice) -> some View {
+        Button(choice.title) {
+            Task { await session.grade(choice.rating) }
         }
         .buttonStyle(.bordered)
         .frame(maxWidth: .infinity, minHeight: 44)
             .disabled(session.isGrading)
-        .accessibilityHint(hint)
+        .accessibilityHint(choice.guidance)
+    }
+
+    private var gradingMode: StudyGradingMode {
+        StudyGradingMode(usesPassFailGrades: usesPassFailGrades)
     }
 }
 

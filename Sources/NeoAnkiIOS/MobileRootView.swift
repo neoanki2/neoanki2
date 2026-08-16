@@ -1,6 +1,7 @@
 import NeoAnkiCore
 import NeoAnkiApplication
 import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import SwiftUI
 
 #if os(iOS)
@@ -145,6 +146,7 @@ private struct CreateHubView: View {
 
 private struct SettingsView: View {
     @Bindable var model: MobileAppModel
+    @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @State private var showsSyncConsent = false
     @State private var errorMessage: String?
 
@@ -180,6 +182,11 @@ private struct SettingsView: View {
                     .disabled(!model.reminderSettings.isEnabled)
                 }
                 Section("Study") {
+                    Toggle("Use Fail / Pass grades", isOn: $usesPassFailGrades)
+                        .accessibilityIdentifier("usesPassFailGrades")
+                    Text("Fail schedules as Again; Pass schedules as Good.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Toggle("Conceal answers while browsing", isOn: $model.concealsAnswers)
                     NavigationLink("Scheduling") { SchedulingMobileView(model: model) }
                 }

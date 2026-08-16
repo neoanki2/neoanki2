@@ -42,7 +42,7 @@ On iPhone, four labeled tabs stay available at the bottom:
 - **Library** browses, searches, selects, moves, edits, and deletes items.
 - **Create** adds items and decks, manages item types and templates, transfers
   files, opens deck builders, and manages offline vocabulary packs.
-- **Settings** contains iCloud sync, reminders, browsing privacy, and
+- **Settings** contains iCloud sync, reminders, browsing privacy, grading, and
   scheduling controls.
 
 On iPad and other regular-width layouts, the same four destinations appear in
@@ -56,8 +56,10 @@ Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:
 Reveal, Type Answer, Choose, Arrange, Record, Audio Submission, and Cloze.
 
-Reveal or check the response, then choose Again, Hard, Good, or Easy when the
-interaction uses FSRS. Edit updates the current item and the remaining queued
+Reveal or check the response, then grade it when the interaction uses FSRS. The
+default choices are Again, Hard, Good, and Easy. In **Settings → Study**, enable
+**Use Fail / Pass grades** to show only Fail and Pass; they schedule as Again
+and Good, respectively. Edit updates the current item and the remaining queued
 cards generated from it. End asks for confirmation; completion reports reviews
 and saved submissions separately.
 

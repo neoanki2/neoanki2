@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 
 struct StudyCommandHandlers {
@@ -49,6 +50,7 @@ extension FocusedValues {
 struct StudyCommands: Commands {
     @FocusedValue(\.studyCommandHandlers) private var handlers
     @FocusedValue(\.studyPrimaryActionHandler) private var primaryAction
+    @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
 
     var body: some Commands {
         CommandMenu("Study") {
@@ -81,11 +83,14 @@ struct StudyCommands: Commands {
 
             Divider()
 
-            ForEach(ReviewRating.allCases, id: \.self) { rating in
-                Button("Grade: \(rating.studyButtonTitle)") {
-                    handlers?.grade?(rating)
+            ForEach(gradingMode.choices, id: \.rating) { choice in
+                Button("Grade: \(choice.title)") {
+                    handlers?.grade?(choice.rating)
                 }
-                .keyboardShortcut(rating.studyKeyboardShortcut, modifiers: [])
+                .keyboardShortcut(
+                    KeyEquivalent(Character(choice.shortcutLabel)),
+                    modifiers: []
+                )
                 .disabled(!(handlers?.canGrade ?? false))
             }
 
@@ -97,5 +102,9 @@ struct StudyCommands: Commands {
             .keyboardShortcut("z", modifiers: [.command])
             .disabled(!(handlers?.canUndoLastGrade ?? false))
         }
+    }
+
+    private var gradingMode: StudyGradingMode {
+        StudyGradingMode(usesPassFailGrades: usesPassFailGrades)
     }
 }

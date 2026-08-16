@@ -74,8 +74,9 @@ a card removes it from the session.
 ## Card interactions
 
 Every ordinary review interaction ends with self-grading. Automatic feedback is
-guidance, not a grade: you still choose Again, Hard, Good, or Easy. Audio
-Submission is the exception: it completes by persisting the response instead.
+guidance, not a grade: you choose from the configured grading controls. By
+default those controls are Again, Hard, Good, and Easy. Audio Submission is the
+exception: it completes by persisting the response instead.
 
 ### Reveal
 
@@ -148,6 +149,12 @@ These messages do not choose a rating. Grade based on the quality of your recall
 
 Open **Grade Help** from the question-mark button for the same guidance.
 
+For a simpler choice, open **Settings → Study** and enable **Use Fail / Pass
+grades**. Study sessions then show only **Fail (1)** and **Pass (2)**. Fail is
+saved and scheduled exactly as Again; Pass is saved and scheduled exactly as
+Good. This is a device-local display preference and does not change the
+scheduler or rewrite earlier reviews.
+
 [![Grade Help explains the four ratings]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)]({{ site.baseurl }}/assets/screenshots/study-grade-help.png)
 
 NeoAnki2 uses a native Swift implementation pinned to its documented upstream
@@ -197,7 +204,8 @@ The **Study** menu mirrors the main actions:
 
 - Command-Shift-S: start studying the current scope.
 - Space or Return: continue with the primary action when it is available.
-- 1, 2, 3, 4: grade Again, Hard, Good, or Easy after reveal.
+- 1, 2, 3, 4: grade Again, Hard, Good, or Easy after reveal. With Fail / Pass
+  grades enabled, 1 selects Fail (Again) and 2 selects Pass (Good).
 - Right Arrow: reveal without checking for Type, Choose, Arrange, or Record.
 - Command-E: edit the card you are reviewing.
 - Command-Z: undo the last saved grade while undo is available.

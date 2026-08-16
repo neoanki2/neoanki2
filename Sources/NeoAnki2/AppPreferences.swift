@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiSharedUI
 
 /// The keys behind `@AppStorage`, in one place so a UI test launch can start
 /// from the shipped defaults instead of inheriting whatever the previous test
@@ -10,7 +11,13 @@ enum AppPreferences {
     static let localAPIPort = "localAPIPort"
     static let cloudSyncEnabled = "cloudSyncEnabled"
 
-    private static let all = [browseShowsAnswerColumn, localAPIEnabled, localAPIPort, cloudSyncEnabled]
+    private static let all = [
+        browseShowsAnswerColumn,
+        localAPIEnabled,
+        localAPIPort,
+        cloudSyncEnabled,
+        StudyPreferences.usesPassFailGrades,
+    ]
 
     static func resetForTesting() {
         for key in all {

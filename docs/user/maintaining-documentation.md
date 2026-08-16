@@ -109,6 +109,11 @@ local testing.
    commit, including when that commit was squash-merged. When a source differs,
    capture and promote a newer artifact; never edit `sourceSHA` by hand.
 
+When a refreshed capture is pixel-for-pixel identical, Git may record only the
+new manifest rather than a binary PNG change. The manifest's source commit and
+per-image checksums remain the evidence that the full reviewed set was freshly
+captured; validation checks both.
+
 Capture records each image's source SHA, UTC capture date, pixel dimensions,
 scenario, and identifiers that were required to be visible. Both capture and
 promotion reject a missing or malformed manifest, mismatched dimensions, or an

@@ -124,6 +124,10 @@ cards…**, **Importing…**, and **Transferring deck…** indicate active work.
 starting another transfer. If a state never completes, quit normally, relaunch,
 and retry once.
 
+If **Settings** temporarily shows only the Study tab during startup, wait for
+the library to finish opening. Local API and iCloud settings appear once their
+library-backed services are ready.
+
 ## Import and export errors
 
 - **Choose a JSON or CSV file:** use the File import for `.json`/`.csv`, or
