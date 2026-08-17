@@ -136,6 +136,12 @@ shared-platform, iOS archive, API, and documentation gates stay mandatory. A
 later capture should replace the deferred evidence before relying on those
 screenshots as a current visual reference.
 
+The file list always names every source still stale relative to the promoted
+screenshot manifest. When a later headless release does not change those
+sources, carry the list forward with the SHA-256 of their empty diff against the
+new release base. This keeps inherited stale visual evidence explicit without
+pretending that unrelated sources changed in the later release.
+
 Published captures are 1024 physical pixels wide. The site caps their rendered
 width to 512 CSS pixels on 2x displays and 341 CSS pixels on 3x displays, so a
 browser never has to enlarge screenshot pixels on Retina screens. The required
