@@ -52,16 +52,9 @@ class NeoAnkiUITestCase: XCTestCase {
         waitForLibrary: Bool = true
     ) -> XCUIApplication {
         let databaseDirectory = NSTemporaryDirectory() + "neoanki2-ui-\(databaseLabel)"
-        // Import and portable-import fixtures are one-shot startup actions.
-        // Reusing the app can acknowledge the reset after bootstrap but before
-        // SwiftUI starts the replacement ContentView's transfer task, leaving
-        // the test on an empty library with no import ever attempted.
-        let requiresFreshTransferLaunch = environment["NEOANKI_TEST_IMPORT_PATH"] != nil
-            || environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"] != nil
         let requiresLaunch = Self.sharedApp == nil
             || Self.sharedApp?.state == .notRunning
             || environment["NEOANKI_TEST_BOOTSTRAP_FAILURE"] == "1"
-            || requiresFreshTransferLaunch
         let app: XCUIApplication
 
         if requiresLaunch {
