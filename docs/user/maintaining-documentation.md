@@ -130,8 +130,11 @@ capture, the local release path may instead carry
 screenshot feature and changed source, explain the restriction, and contain the
 exact source-diff hash. The release validator accepts only that narrow, auditable
 deferral; ordinary validation and all non-deferred screenshot evidence remain
-strict. A later capture should replace the deferred evidence before relying on
-those screenshots as a current visual reference.
+strict. When that deferral file itself is part of a pull request, remote GUI
+journeys are also skipped for that exact change while unit, flow, architecture,
+shared-platform, iOS archive, API, and documentation gates stay mandatory. A
+later capture should replace the deferred evidence before relying on those
+screenshots as a current visual reference.
 
 Published captures are 1024 physical pixels wide. The site caps their rendered
 width to 512 CSS pixels on 2x displays and 341 CSS pixels on 3x displays, so a
