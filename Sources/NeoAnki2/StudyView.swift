@@ -305,7 +305,7 @@ struct StudyView: View {
             mediaStore: mediaStore,
             clozeGroup: card.card.clozeGroup
         )
-            .accessibilityIdentifier("studyPrompt")
+            .accessibilityIdentifier(model.isAnswerRevealed ? "studyAnswer" : "studyPrompt")
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
 
