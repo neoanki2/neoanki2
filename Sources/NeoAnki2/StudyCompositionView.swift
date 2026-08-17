@@ -15,6 +15,10 @@ struct StudyCompositionView: View {
         }
     }
 
+    private var effectiveLayout: CardLayoutID {
+        StudyStageGeometry.effectiveLayout(for: template, item: item)
+    }
+
     var body: some View {
         GeometryReader { proxy in
             composition(width: proxy.size.width)
@@ -28,7 +32,7 @@ struct StudyCompositionView: View {
 
     @ViewBuilder
     private func composition(width: CGFloat) -> some View {
-        switch template.layout {
+        switch effectiveLayout {
         case .focus:
             VStack(spacing: DesignSystem.Spacing.lg) {
                 Spacer(minLength: 0)
@@ -131,7 +135,7 @@ struct StudyCompositionView: View {
 
     private func accessibilityPriority(for region: ComponentRegion) -> Double {
         let order = StudyStageGeometry.accessibilityRegions(
-            for: template.layout,
+            for: effectiveLayout,
             answerRevealed: isAnswerRevealed
         )
         guard let index = order.firstIndex(of: region) else { return 0 }

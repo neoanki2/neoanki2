@@ -100,7 +100,12 @@ struct StudySessionView: View {
     }
 
     private func studyCard(_ card: DueCard) -> some View {
-        AdaptiveStudyStage(layout: card.template.layout) {
+        AdaptiveStudyStage(
+            layout: StudyStageGeometry.effectiveLayout(
+                for: card.template,
+                item: card.item
+            )
+        ) {
             VStack(spacing: 28) {
                 MobileStudyCompositionView(
                     template: card.template,
