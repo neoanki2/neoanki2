@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "e603d30183be3bed6491ff06b514cfb7b1d301d5d0d4040a364d0cd716f1db67",
+  "diffSHA256": "752d33d097a2fb536e0fc5d514300ac53ddd06400b8937e1c1e957b41508c151",
   "files": [
-    "Sources/NeoAnki2/TemplatesView.swift"
+    "Sources/NeoAnki2/StudyView.swift"
   ],
-  "reason": "This fixes an asynchronous confirmation-state race in the existing Unlock for Editing flow. It does not change any visible labels, layout, documented steps, or screenshot state, so the current item-type guide and screenshot remain accurate."
+  "reason": "This restores the existing studyAnswer accessibility identifier after the adaptive-composition rewrite so UI automation and screenshot checks can observe the revealed state again. It does not change visible labels, layout, or documented study behavior."
 }
