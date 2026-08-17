@@ -86,6 +86,8 @@ enum UserFacingError {
             "This library was created by a newer version of NeoAnki2."
         case .schemaVersionReadFailed:
             "NeoAnki2 couldn't read this library. Its database may be damaged."
+        case .templateDefinitionMigrationRequired:
+            "This library needs its study templates migrated before NeoAnki2 can open it."
         }
     }
 

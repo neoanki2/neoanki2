@@ -10,7 +10,7 @@ parent: Reference
 ## 1. Status and purpose
 
 This document is the normative specification for NeoAnki Authored Deck Format
-version 4. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
+version 5. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
 **SHOULD NOT**, and **MAY** are interpreted as in RFC 2119 and RFC 8174.
 
 The format is an import-only, text-based source representation for coding
@@ -65,13 +65,13 @@ templates, slots, rich spans, and tags.
 `deck.jsonl` MUST contain exactly one manifest record:
 
 ```json
-{"kind":"neoanki","version":3,"root":"biology","parts":["items/cells-001.jsonl"]}
+{"kind":"neoanki","version":5,"root":"biology","parts":["items/cells-001.jsonl"]}
 ```
 
 Members are exact:
 
 - `kind`: `"neoanki"`;
-- `version`: integer `3`;
+- `version`: integer `5`;
 - `root`: identifier of the root deck; and
 - `parts`: ordered, unique relative paths to `.jsonl` item files.
 
@@ -115,6 +115,11 @@ editing or explicitly duplicates one as an independent definition.
   "templates": [
     {
       "name":"Forward",
+      "layout":"focus",
+      "components":[
+        {"region":"primary","purpose":"question","field":"front"},
+        {"region":"secondary","purpose":"expectedAnswer","field":"back","reveal":"hiddenUntilAnswer"}
+      ],
       "prompt":[{"field":"front"}],
       "answer":[{"field":"back"}],
       "interaction":"reveal",
@@ -128,7 +133,20 @@ Field `required` defaults to `false`. Field types are `text`, `richText`,
 `audio`, `image`, `gif`, `video`, `number`, and `cloze`. Field identifiers are
 unique within their type. Every type needs at least one field and template.
 
-### 6.1 Template slots
+### 6.1 Template compositions
+
+Version 5 templates provide `layout` and `components` together. `layout` is one
+of `focus`, `split`, `mediaAside`, `mediaHero`, or `actionStage`. Every component
+has a `region` (`primary`, `secondary`, `media`, `supporting`, or `label`) and a
+`purpose` (`question`, `expectedAnswer`, or `supporting`) plus exactly one source.
+Expected answers MUST use a concealed reveal treatment. Media regions accept
+only image, GIF, or video fields. The `prompt` and `answer` arrays remain
+required compatibility projections and MUST describe the same source order.
+
+Versions 1–4 omit `layout` and `components`; import converts their prompt and
+answer slots deterministically to a composition.
+
+### 6.2 Slot sources and presentation
 
 A slot has exactly one source:
 
@@ -152,7 +170,7 @@ recordings are local library data and are never part of an authored bundle.
 `skill.operation` is `recognize`, `recall`, `discriminate`, `classify`,
 `locate`, `order`, `apply`, `explain`, or `reproduce`.
 
-### 6.2 Generation conditions
+### 6.3 Generation conditions
 
 `generateWhen` is optional. It is exactly one of:
 
@@ -298,10 +316,12 @@ Biology.neoanki/items/cells-001.jsonl:18: AD222: Item contains unknown field "ba
 
 ## 12. Evolution
 
-Version 4 adds `audioSubmission` templates. Version 3 adds deck item-type policies and included item types. Version 2 adds
+Version 5 adds preset layouts and semantic components. Version 4 adds
+`audioSubmission` templates. Version 3 adds deck item-type policies and
+included item types. Version 2 adds
 portable inline text color, relative size, links, superscript, and subscript.
-Versions 1 and 2 remain readable; their imported types retain the legacy global
-behavior. Version 1 cannot use the version-2 text members or styles. Writers
+Versions 1–4 remain readable and are converted during import. Version 1 cannot
+use the version-2 text members or styles. Writers
 MUST NOT add members or record kinds not defined here.
 Incompatible changes increment the manifest `version`; importers MUST reject
 unsupported versions rather than guessing.

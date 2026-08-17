@@ -139,6 +139,11 @@ include counts, item rows include title, summary, card count, and item type, and
 study progress is labeled as progress. Choice and arrange controls announce
 their position and selected state.
 
+The active study stage follows the preset's semantic region order and omits
+concealed answer regions from VoiceOver until reveal. It does not scroll; when
+Dynamic Type or long content exceeds the available stage, **View full content**
+opens a scrollable detail sheet while the grading footer remains stable.
+
 Scheduling health uses text and symbols as well as color, and migration or
 optimization progress remains readable with Dynamic Type.
 

@@ -25,6 +25,14 @@ let package = Package(
             name: "neoanki-api-reference",
             targets: ["NeoAnkiAPIReferenceGenerator"]
         ),
+        .executable(
+            name: "neoanki-template-migrator",
+            targets: ["NeoAnkiTemplateMigrator"]
+        ),
+        .library(
+            name: "NeoAnkiTemplateMigration",
+            targets: ["NeoAnkiTemplateMigration"]
+        ),
         .library(name: "PoemDeckBuilder", targets: ["PoemDeckBuilder"]),
     ],
     dependencies: [
@@ -137,6 +145,17 @@ let package = Package(
             path: "Tools/NeoAnkiAPIReferenceGenerator"
         ),
         .target(
+            name: "NeoAnkiTemplateMigration",
+            dependencies: [.product(name: "NeoAnkiCore", package: "NeoAnkiCore")],
+            path: "Sources/NeoAnkiTemplateMigration",
+            linkerSettings: [.linkedLibrary("sqlite3")]
+        ),
+        .executableTarget(
+            name: "NeoAnkiTemplateMigrator",
+            dependencies: ["NeoAnkiTemplateMigration"],
+            path: "Tools/NeoAnkiTemplateMigrator"
+        ),
+        .target(
             name: "PoemDeckBuilder",
             dependencies: [
                 "NeoAnkiDeckBuilderKit",
@@ -185,8 +204,10 @@ let package = Package(
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
                 "VocabularyDeckBuilder",
+                "NeoAnkiTemplateMigration",
             ],
-            path: "Tests/NeoAnki2Tests"
+            path: "Tests/NeoAnki2Tests",
+            linkerSettings: [.linkedLibrary("sqlite3")]
         ),
         .testTarget(
             name: "NeoAnkiAPITests",

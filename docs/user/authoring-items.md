@@ -131,6 +131,9 @@ is retained for audit and sync integrity but is excluded from replay, previews,
 and future optimizer input after that origin.
 Local API token verifiers are stored outside the library database and its snapshots,
 so restoring library content does not authorize an API client.
+The one-shot template-definition migration likewise preserves item, card,
+review-log, saved-response, and media identities; it changes only the item type's
+validated composition definition and its derived revision records.
 Media no longer referenced by any item is eligible for cleanup. Choose
 **Cancel** to keep the item.
 

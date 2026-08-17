@@ -23,6 +23,10 @@ Each grade updates that card's memory state and appends a review outcome. A new
 or newly imported card starts never-reviewed and is due immediately. Portable
 and authored deck imports do not carry scheduling history.
 
+Upgrading legacy template definitions to study compositions changes presentation
+only. Card identities, memory state, due dates, and append-only review outcomes
+remain attached to the same cards.
+
 ## Limit new cards per day
 
 To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,

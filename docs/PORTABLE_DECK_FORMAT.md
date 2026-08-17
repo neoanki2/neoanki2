@@ -10,12 +10,12 @@ parent: Reference
 ## 1. Status and scope
 
 This document is the normative specification for **NeoAnki Portable Deck
-Format version 4**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
+Format version 5**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
 **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described by
 RFC 2119 and RFC 8174.
 
 A `.neodeck` file is one SQLite database containing deck structure, item-type
-definitions, deck item-type policies, item content, tags, and media bytes. Version 4 is a
+definitions, deck item-type policies, item content, tags, and media bytes. Version 5 is a
 **content-only** interchange format. It never contains cards, scheduling
 state, review history, statistics, scheduler parameters, suspension state, or
 other learner progress.
@@ -30,7 +30,7 @@ Writers MUST produce a SQLite 3 database with:
 - filename extension `.neodeck`;
 - page-header `application_id` equal to `0x4E44454B` (ASCII `NDEK`,
   decimal `1313097035`);
-- `user_version` equal to `3`;
+- `user_version` equal to `5`;
 - UTF-8 text encoding;
 - foreign-key enforcement enabled while writing; and
 - no attached databases, virtual tables, triggers, views, or executable SQL.
@@ -39,16 +39,16 @@ The required initialization pragmas are:
 
 ```sql
 PRAGMA application_id = 1313097035;
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
 PRAGMA encoding = 'UTF-8';
 PRAGMA foreign_keys = ON;
 ```
 
 Readers MUST inspect `application_id` and `user_version` before reading
 application data. A reader MUST reject a file with a different
-`application_id`. A version-3 reader MUST reject `user_version > 3`; it MUST
+`application_id`. A version-5 reader MUST reject `user_version > 5`; it MUST
 NOT guess at a newer schema. A reader MAY support older versions through an
-explicit compatibility path. NeoAnki supports versions 1, 2, and 3.
+explicit compatibility path. NeoAnki supports versions 1 through 5.
 
 The schema uses only portable SQLite storage classes and features available in
 SQLite 3.24 or later. UUIDs and timestamps are text, JSON is UTF-8 text, and
@@ -93,14 +93,14 @@ Columns ending in `_json` MUST contain one complete UTF-8 JSON value:
 - with absent optional members omitted, not set to `null`; and
 - with arrays retained in their specified semantic order.
 
-Readers MUST accept semantically valid non-canonical JSON in version-3 files,
+Readers MUST accept semantically valid non-canonical JSON in supported files,
 but MUST canonicalize it before digest comparison. Writers MUST emit canonical
 JSON. Unknown object members are an error unless a future version of this
 document explicitly makes that object extensible.
 
 ## 4. Required schema
 
-The following DDL is exact. A version-3 file MUST contain these tables,
+The following DDL is exact. A version-5 file MUST contain these tables,
 columns, constraints, foreign keys, and indexes. It MUST NOT contain
 application rows outside these tables. Additional indexes are allowed;
 additional tables, columns, views, triggers, and virtual tables are not.
@@ -109,7 +109,7 @@ additional tables, columns, views, triggers, and virtual tables are not.
 CREATE TABLE manifest (
     singleton          INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
     format_name        TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-    format_version     INTEGER NOT NULL CHECK (format_version = 3),
+    format_version     INTEGER NOT NULL CHECK (format_version = 5),
     created_at         TEXT NOT NULL,
     exporter           TEXT NOT NULL,
     source_library_id  TEXT NOT NULL,
@@ -165,6 +165,10 @@ CREATE TABLE templates (
     name                TEXT NOT NULL,
     prompt_json         TEXT NOT NULL,
     answer_json         TEXT NOT NULL,
+    layout              TEXT NOT NULL CHECK (
+        layout IN ('focus', 'split', 'mediaAside', 'mediaHero', 'actionStage')
+    ),
+    components_json     TEXT NOT NULL,
     interaction         TEXT NOT NULL CHECK (
         interaction IN ('reveal', 'type', 'choose', 'record', 'audioSubmission', 'cloze', 'arrange')
     ),
@@ -260,7 +264,19 @@ current local type ID and is not itself provenance.
 The schemas below are exhaustive. Literal strings are shown in quotes;
 `<...>` denotes a value described in prose, not literal JSON.
 
-### 5.1 Template sides, slots, and conditions
+### 5.1 Template compositions, projections, and conditions
+
+`layout` selects `focus`, `split`, `mediaAside`, `mediaHero`, or `actionStage`.
+`components_json` is the authoritative ordered composition:
+
+```json
+[{"id":"<uuid>","region":"primary","purpose":"question","source":{"field":0},"presentation":{"media":"default","reveal":"always"}}]
+```
+
+`region` is `primary`, `secondary`, `media`, `supporting`, or `label`.
+`purpose` is `question`, `expectedAnswer`, or `supporting`. Component UUIDs are
+preserved by version-5 round trips. Expected answers MUST be concealed before
+reveal, and visual media regions accept only image, GIF, or video fields.
 
 `prompt_json` and `answer_json` are arrays of slots in display order:
 
@@ -381,7 +397,8 @@ and cloze values containing only Unicode whitespace are empty for this rule.
 SHA-256(UTF8(JCS(canonical-schema-object)))
 ```
 
-The canonical schema object contains no UUID and has this exact shape:
+The canonical schema object contains no item, type, field, template, or
+component UUID and has this exact shape:
 
 ```json
 {
@@ -391,15 +408,14 @@ The canonical schema object contains no UUID and has this exact shape:
   "name": "Basic",
   "templates": [
     {
-      "answer": [
-        {"presentation":{"media":"default","reveal":"always"},"source":{"field":1}}
+      "components": [
+        {"presentation":{"media":"default","reveal":"always"},"purpose":"question","region":"primary","source":{"field":0}},
+        {"presentation":{"media":"default","reveal":"hiddenUntilAnswer"},"purpose":"expectedAnswer","region":"secondary","source":{"field":1}}
       ],
       "generateWhen": null,
       "interaction": "reveal",
+      "layout": "focus",
       "name": "Forward",
-      "prompt": [
-        {"presentation":{"media":"default","reveal":"always"},"source":{"field":0}}
-      ],
       "skill": {"input":"text","operation":"recall","output":"text"}
     }
   ]
@@ -412,10 +428,10 @@ The object is constructed as follows:
    and condition literal strings to Unicode NFC. Do not trim or case-fold them.
 2. Emit fields in ascending `fields.ordinal`. Emit only `name`, `kind`, and
    boolean `required`; omit field IDs and ordinals.
-3. Emit templates in ascending `templates.ordinal`. Emit `name`, `prompt`,
-   `answer`, `interaction`, `skill`, and `generateWhen`; omit template IDs,
-   item-type IDs, and ordinals.
-4. Emit side slots in stored array order.
+3. Emit templates in ascending `templates.ordinal`. Emit `name`, `layout`,
+   `components`, `interaction`, `skill`, and `generateWhen`; omit template IDs,
+   item-type IDs, component IDs, and ordinals.
+4. Emit components in stored array order.
 5. Replace every field UUID/reference with that field's zero-based ordinal.
 6. Encode a missing generation condition as JSON `null` in this digest object,
    even though the table column is SQL `NULL`.
@@ -486,7 +502,7 @@ the file.
 
 No table or JSON value may contain card IDs, review logs, due dates, memory
 state, scheduler parameters, suspension flags, study statistics, or deletion
-tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 4 has no progress-export
+tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 5 has no progress-export
 option.
 
 ### 8.2 Import validation and type resolution
@@ -553,7 +569,7 @@ single import transaction. Media MUST be copied in bounded chunks.
 ## 9. Validation and security limits
 
 An implementation MAY impose lower limits before the user selects a file, but
-a conforming version-3 importer MUST reject a file exceeding any of these hard
+a conforming version-5 importer MUST reject a file exceeding any of these hard
 limits before committing:
 
 - file size: 2 GiB;
@@ -647,7 +663,7 @@ skip-invalid-row, or partial-import mode.
 
 ## 11. Compatibility rules
 
-A version-3 reader MUST validate exact table and column names and MUST tolerate
+A version-5 reader MUST validate exact table and column names and MUST tolerate
 additional indexes only. It MUST reject missing or additional application
 schema objects because those can change semantics or expand the attack surface.
 

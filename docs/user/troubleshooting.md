@@ -80,6 +80,14 @@ method.
 
 ## Startup problems
 
+### This library needs its study templates migrated
+
+NeoAnki2 found a library created with the prompt/answer definition format. The
+app refuses to quarantine those valid definitions. Close NeoAnki2, make a full
+backup, then run `neoanki-template-migrator plan`, `apply`, and `verify` against
+the library database before reopening it. `apply` validates every transformed
+item type and commits all definitions atomically.
+
 During launch, **Starting…** is normal briefly. **Could Not Start** means the
 library could not be opened or bootstrapped.
 

@@ -38,7 +38,7 @@ styles, semantic text colors, relative text sizes, and safe HTTP, HTTPS, or
 mailto links. The validator also accepts legacy version 1 rich text; conflicting
 legacy style pairs are normalized during import.
 
-For new bundles, use manifest version 4. The root deck must provide a
+For new bundles, use manifest version 5. The root deck must provide a
 non-empty `itemTypes` array; add `defaultType` when one choice should be
 recommended. Descendants inherit the nearest declaration unless they provide
 their own non-empty array.
@@ -64,6 +64,25 @@ library.
 NeoAnki2 also reuses this authored-bundle validation and atomic import boundary
 when an installed offline vocabulary pack generates items for an existing
 deck. That app workflow does not change the CLI command or its diagnostics.
+
+## Migrate a version-1 template library
+
+The one-shot `neoanki-template-migrator` upgrades a local library from stored
+prompt/answer sides to template definition format 2. Keep NeoAnki2 closed and
+back up both the database and media directory first:
+
+```bash
+swift run neoanki-template-migrator plan --database /path/to/neoanki2.sqlite
+swift run neoanki-template-migrator apply --database /path/to/neoanki2.sqlite
+swift run neoanki-template-migrator verify --database /path/to/neoanki2.sqlite
+```
+
+`plan` reads item-type definitions only and reports structural mappings.
+`apply` rejects broken field references, validates every transformed item type,
+preserves item/template/card/review/response/media identities, refreshes
+digests and change records, and performs one atomic commit. `verify` checks the
+format marker, references, counts, and SQLite integrity. The app deliberately
+contains no runtime decoder for the earlier definition format.
 
 If the invocation itself is wrong, the tool prints:
 

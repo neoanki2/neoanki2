@@ -32,6 +32,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case decodingFailed
     case unsupportedSchemaVersion(Int)
     case schemaVersionReadFailed
+    case templateDefinitionMigrationRequired
 
     public var errorDescription: String? {
         switch self {
@@ -83,6 +84,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return "Database schema version \(version) is newer than this app supports."
         case .schemaVersionReadFailed:
             return "Could not read the database schema version."
+        case .templateDefinitionMigrationRequired:
+            return "This library uses the earlier template format. Run neoanki-template-migrator before opening it."
         }
     }
 }
@@ -445,6 +448,37 @@ actor SQLiteDatabase {
             )
         }
         changeTrackingReady = true
+    }
+
+    func ensureTemplateDefinitionFormat() throws {
+        let key = "template_definition_format"
+        if let value = try metadataValue(forKey: key) {
+            guard value == "2" else {
+                throw DatabaseError.templateDefinitionMigrationRequired
+            }
+            return
+        }
+        let rows = try query("SELECT COUNT(*) AS count FROM item_types;")
+        let count = (rows.first?["count"] as? Int64) ?? 0
+        let usesCompositionFormat = count == 0 ? true : try storedDefinitionsUseCompositionFormat()
+        guard usesCompositionFormat else {
+            throw DatabaseError.templateDefinitionMigrationRequired
+        }
+        try setMetadataValue("2", forKey: key)
+    }
+
+    /// Structural detection handles synthetic historical-schema fixtures that
+    /// already contain current definitions. It does not decode or convert the
+    /// legacy format; real prompt/answer definitions still require the tool.
+    private func storedDefinitionsUseCompositionFormat() throws -> Bool {
+        for row in try query("SELECT definition FROM item_types;") {
+            guard let data = payload(row, "definition"),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let templates = object["templates"] as? [[String: Any]],
+                  templates.allSatisfy({ $0["layout"] != nil && $0["components"] != nil })
+            else { return false }
+        }
+        return true
     }
 
     /// Existing resources begin at revision one without manufacturing change

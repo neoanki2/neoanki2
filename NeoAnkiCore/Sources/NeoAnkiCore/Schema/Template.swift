@@ -1,21 +1,37 @@
 import Foundation
 
-/// A declarative recipe for producing one card from an item. Pure data (no
-/// markup), so a visual builder and a text/DSL form can share one source of
-/// truth. Each item type owns a list of these.
+/// A declarative recipe for producing one card from an item. Templates store
+/// semantic components and a code-owned layout preset rather than markup or an
+/// unbounded prompt/answer document.
 public struct Template: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public var name: String
-    /// What the learner sees before answering.
-    public var prompt: Side
-    /// What is revealed / checked against after answering.
-    public var answer: Side
+    public var layout: CardLayoutID
+    public var components: [TemplateComponent]
     public var interaction: Interaction
     public var skill: Skill
-    /// Optional gate: if set and unsatisfied, this template produces no card
-    /// for a given item (e.g. only make a listening card when audio exists).
     public var generateWhen: SlotCondition?
 
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        layout: CardLayoutID,
+        components: [TemplateComponent],
+        interaction: Interaction,
+        skill: Skill,
+        generateWhen: SlotCondition? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.layout = layout
+        self.components = components
+        self.interaction = interaction
+        self.skill = skill
+        self.generateWhen = generateWhen
+    }
+
+    /// Source compatibility for authored builders and API v1 projections.
+    /// New persisted definitions encode only `layout` and `components`.
     public init(
         id: UUID = UUID(),
         name: String,
@@ -25,17 +41,208 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         skill: Skill,
         generateWhen: SlotCondition? = nil
     ) {
-        self.id = id
-        self.name = name
-        self.prompt = prompt
-        self.answer = answer
-        self.interaction = interaction
-        self.skill = skill
-        self.generateWhen = generateWhen
+        let composition = TemplateCompositionMigration.map(
+            prompt: prompt,
+            answer: answer,
+            interaction: interaction,
+            fields: []
+        )
+        self.init(
+            id: id,
+            name: name,
+            layout: composition.layout,
+            components: composition.components,
+            interaction: interaction,
+            skill: skill,
+            generateWhen: generateWhen
+        )
+    }
+
+    /// API/import projection. It is deliberately computed so the local
+    /// database cannot silently persist the legacy document representation.
+    public var prompt: Side {
+        get {
+            Side(slots: components.compactMap { component in
+                guard component.purpose != .expectedAnswer else { return nil }
+                return Slot(source: component.source, presentation: component.presentation)
+            })
+        }
+        set {
+            let answers = components.filter { $0.purpose == .expectedAnswer }
+            let mapped = TemplateCompositionMigration.map(
+                prompt: newValue,
+                answer: Side(slots: answers.map {
+                    Slot(source: $0.source, presentation: $0.presentation)
+                }),
+                interaction: interaction,
+                fields: []
+            )
+            components = mapped.components
+        }
+    }
+
+    public var answer: Side {
+        get {
+            Side(slots: components.compactMap { component in
+                guard component.purpose == .expectedAnswer else { return nil }
+                return Slot(source: component.source, presentation: component.presentation)
+            })
+        }
+        set {
+            let projectedPrompt = Side(slots: components.compactMap { component in
+                guard component.purpose != .expectedAnswer else { return nil }
+                return Slot(source: component.source, presentation: component.presentation)
+            })
+            let mapped = TemplateCompositionMigration.map(
+                prompt: projectedPrompt,
+                answer: newValue,
+                interaction: interaction,
+                fields: []
+            )
+            components = mapped.components
+        }
     }
 }
 
-/// One face of a card: an ordered list of slots to lay out natively.
+public enum CardLayoutID: String, Codable, CaseIterable, Sendable {
+    case focus
+    case split
+    case mediaAside
+    case mediaHero
+    case actionStage
+}
+
+public enum ComponentRegion: String, Codable, CaseIterable, Sendable {
+    case primary
+    case secondary
+    case media
+    case supporting
+    case label
+}
+
+public enum ComponentPurpose: String, Codable, CaseIterable, Sendable {
+    case question
+    case expectedAnswer
+    case supporting
+}
+
+public struct TemplateComponent: Codable, Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public var region: ComponentRegion
+    public var purpose: ComponentPurpose
+    public var source: SlotSource
+    public var presentation: Presentation
+
+    public init(
+        id: UUID = UUID(),
+        region: ComponentRegion,
+        purpose: ComponentPurpose,
+        source: SlotSource,
+        presentation: Presentation = Presentation()
+    ) {
+        self.id = id
+        self.region = region
+        self.purpose = purpose
+        self.source = source
+        self.presentation = presentation
+    }
+}
+
+public struct TemplateComposition: Equatable, Sendable {
+    public let layout: CardLayoutID
+    public let components: [TemplateComponent]
+
+    public init(layout: CardLayoutID, components: [TemplateComponent]) {
+        self.layout = layout
+        self.components = components
+    }
+}
+
+/// Shared deterministic conversion used by source-compatible initializers,
+/// old portable/authored imports, and the one-shot local-library migrator.
+public enum TemplateCompositionMigration {
+    public static func map(
+        prompt: Side,
+        answer: Side,
+        interaction: Interaction,
+        fields: [FieldDef]
+    ) -> TemplateComposition {
+        let fieldsByID = Dictionary(uniqueKeysWithValues: fields.map { ($0.id, $0) })
+        let allSlots = prompt.slots + answer.slots
+        let visualCount = allSlots.filter { slot in
+            visualSource(slot.source, fieldsByID: fieldsByID)
+        }.count
+        let dominantVisualPrompt = prompt.slots.count == 1 && visualCount == 1
+        let actionHeavy = [Interaction.record, .audioSubmission, .choose, .arrange]
+            .contains(interaction)
+        let layout: CardLayoutID
+        if visualCount > 0 {
+            layout = dominantVisualPrompt ? .mediaHero : .mediaAside
+        } else if actionHeavy {
+            layout = .actionStage
+        } else if prompt.slots.count > 1 || answer.slots.count > 1 {
+            layout = .split
+        } else {
+            layout = .focus
+        }
+
+        var components: [TemplateComponent] = []
+        let questionIndex = prompt.slots.firstIndex { slot in
+            if case .field = slot.source { return true }
+            return false
+        } ?? prompt.slots.firstIndex { isUsableQuestion($0.source) }
+        for (index, slot) in prompt.slots.enumerated() {
+            let isVisual = visualSource(slot.source, fieldsByID: fieldsByID)
+            let purpose: ComponentPurpose = index == questionIndex ? .question : .supporting
+            components.append(TemplateComponent(
+                region: isVisual ? .media : (purpose == .question ? .primary : .supporting),
+                purpose: purpose,
+                source: slot.source,
+                presentation: slot.presentation
+            ))
+        }
+        if questionIndex == nil, !components.isEmpty {
+            components[0].purpose = .question
+            if components[0].region != .media { components[0].region = .primary }
+        }
+
+        for (index, slot) in answer.slots.enumerated() {
+            var presentation = slot.presentation
+            if presentation.reveal == .always {
+                presentation.reveal = .hiddenUntilAnswer
+            }
+            components.append(TemplateComponent(
+                region: visualSource(slot.source, fieldsByID: fieldsByID)
+                    ? .media
+                    : (index == 0 ? .secondary : .supporting),
+                purpose: .expectedAnswer,
+                source: slot.source,
+                presentation: presentation
+            ))
+        }
+        return TemplateComposition(layout: layout, components: components)
+    }
+
+    private static func isUsableQuestion(_ source: SlotSource) -> Bool {
+        switch source {
+        case .field:
+            true
+        case let .literal(value):
+            !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    private static func visualSource(
+        _ source: SlotSource,
+        fieldsByID: [UUID: FieldDef]
+    ) -> Bool {
+        guard case let .field(id) = source,
+              let kind = fieldsByID[id]?.type.mediaKind else { return false }
+        return kind == .image || kind == .gif || kind == .video
+    }
+}
+
+/// Legacy source projection used by API v1 and old import formats.
 public struct Side: Codable, Equatable, Sendable {
     public var slots: [Slot]
 
@@ -44,7 +251,6 @@ public struct Side: Codable, Equatable, Sendable {
     }
 }
 
-/// A single rendered element on a side: a content source plus presentation.
 public struct Slot: Codable, Equatable, Sendable {
     public var source: SlotSource
     public var presentation: Presentation
@@ -55,16 +261,11 @@ public struct Slot: Codable, Equatable, Sendable {
     }
 }
 
-/// Where a slot's content comes from.
 public enum SlotSource: Codable, Equatable, Sendable {
-    /// Content of an item field, referenced by `FieldDef.id`.
     case field(UUID)
-    /// Static template text (labels like "Translate:", "Define:").
     case literal(String)
 }
 
-/// How a slot is displayed. Decoupled from content so any value can be shown
-/// in any way (e.g. an image blurred on the prompt, shown plainly on the answer).
 public struct Presentation: Codable, Equatable, Sendable {
     public var reveal: RevealMode
     public var media: MediaBehavior
@@ -90,9 +291,9 @@ public enum MediaBehavior: String, Codable, CaseIterable, Sendable {
     public static func supported(for kind: MediaKind?) -> [MediaBehavior] {
         switch kind {
         case .audio, .gif, .video:
-            return allCases
+            allCases
         case .image, nil:
-            return [.default]
+            [.default]
         }
     }
 
@@ -101,26 +302,16 @@ public enum MediaBehavior: String, Codable, CaseIterable, Sendable {
     }
 }
 
-/// How the learner responds — this is where desirable difficulty is encoded.
 public enum Interaction: String, Codable, CaseIterable, Sendable {
-    /// Flip to reveal the answer, then self-grade.
     case reveal
-    /// Type the answer; can be auto-checked against the answer side.
     case type
-    /// Choose among options.
     case choose
-    /// Record audio/video and self-compare against a reference.
     case record
-    /// Capture one persistent learner audio response, then complete the card
-    /// without revealing an answer or updating review scheduling.
     case audioSubmission
-    /// Fill in cloze blanks.
     case cloze
-    /// Arrange items into the correct order.
     case arrange
 }
 
-/// A boolean condition over an item's fields, used to gate card generation.
 public indirect enum SlotCondition: Codable, Equatable, Sendable {
     case fieldNotEmpty(UUID)
     case fieldEmpty(UUID)

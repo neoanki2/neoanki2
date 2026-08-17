@@ -35,26 +35,45 @@ public struct CanonicalField: Codable, Equatable, Sendable {
 
 public struct CanonicalTemplate: Codable, Equatable, Sendable {
     public let name: String
-    public let prompt: CanonicalSide
-    public let answer: CanonicalSide
+    public let layout: CardLayoutID
+    public let components: [CanonicalComponent]
     public let interaction: Interaction
     public let skill: Skill
     public let generateWhen: CanonicalSlotCondition?
 
     public init(
         name: String,
-        prompt: CanonicalSide,
-        answer: CanonicalSide,
+        layout: CardLayoutID,
+        components: [CanonicalComponent],
         interaction: Interaction,
         skill: Skill,
         generateWhen: CanonicalSlotCondition?
     ) {
         self.name = name
-        self.prompt = prompt
-        self.answer = answer
+        self.layout = layout
+        self.components = components
         self.interaction = interaction
         self.skill = skill
         self.generateWhen = generateWhen
+    }
+}
+
+public struct CanonicalComponent: Codable, Equatable, Sendable {
+    public let region: ComponentRegion
+    public let purpose: ComponentPurpose
+    public let source: CanonicalSlotSource
+    public let presentation: Presentation
+
+    public init(
+        region: ComponentRegion,
+        purpose: ComponentPurpose,
+        source: CanonicalSlotSource,
+        presentation: Presentation
+    ) {
+        self.region = region
+        self.purpose = purpose
+        self.source = source
+        self.presentation = presentation
     }
 }
 
@@ -186,8 +205,15 @@ public enum PortableItemTypeIdentity {
             templates: try itemType.templates.map { template in
                 CanonicalTemplate(
                     name: normalized(template.name),
-                    prompt: try canonicalSide(template.prompt, ordinals: ordinals),
-                    answer: try canonicalSide(template.answer, ordinals: ordinals),
+                    layout: template.layout,
+                    components: try template.components.map { component in
+                        CanonicalComponent(
+                            region: component.region,
+                            purpose: component.purpose,
+                            source: try canonicalSource(component.source, ordinals: ordinals),
+                            presentation: component.presentation
+                        )
+                    },
                     interaction: template.interaction,
                     skill: template.skill,
                     generateWhen: try template.generateWhen.map {
@@ -226,6 +252,18 @@ public enum PortableItemTypeIdentity {
             }
             return CanonicalSlot(source: source, presentation: slot.presentation)
         })
+    }
+
+    private static func canonicalSource(
+        _ source: SlotSource,
+        ordinals: [UUID: Int]
+    ) throws -> CanonicalSlotSource {
+        switch source {
+        case let .field(id):
+            .field(ordinal: try ordinal(for: id, in: ordinals))
+        case let .literal(value):
+            .literal(normalized(value))
+        }
     }
 
     private static func canonicalCondition(

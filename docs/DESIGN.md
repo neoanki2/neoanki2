@@ -86,7 +86,12 @@ NeoAnki2 expresses brand through **precision and calm** — correct split-view s
 
 **Key Characteristics:**
 
-- Content-first: card prompt/answer dominates the detail pane
+- Content-first: the selected Focus, Split, Media Aside, Media Hero, or Action
+  Stage composition dominates the detail pane
+- The active Study Stage does not scroll; its action/grading footer is fixed.
+  Measured overflow opens a separate full-content sheet.
+- Presets own responsive geometry. Authored data selects named regions and
+  semantic purposes but never supplies arbitrary layout or markup.
 - Mac-native: `NavigationSplitView`, menus, keyboard shortcuts, tooltips
 - Semantically colored: SwiftUI system colors, not hard-coded grays
 - Restrained accent: tint appears on ≤2 primary actions per screen

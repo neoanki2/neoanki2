@@ -259,11 +259,19 @@ private struct FieldRecord {
 
 private struct TemplateRecord {
     let name: String
+    let layout: CardLayoutID?
+    let components: [ComponentRecord]?
     let prompt: [SlotRecord]
     let answer: [SlotRecord]
     let interaction: Interaction
     let skill: Skill
     let condition: ConditionRecord?
+}
+
+private struct ComponentRecord {
+    let region: ComponentRegion
+    let purpose: ComponentPurpose
+    let slot: SlotRecord
 }
 
 private struct SlotRecord {
@@ -350,6 +358,17 @@ private struct AuthoredDeckLoader {
                 message: "Add one manifest record with kind \"neoanki\"."
             ))
             return .init(package: nil, diagnostics: diagnostics)
+        }
+        if manifest.version < 5,
+           types.contains(where: { type in
+               type.templates.contains { $0.layout != nil || $0.components != nil }
+           }) {
+            diagnostics.append(.init(
+                file: manifest.location.file,
+                line: manifest.location.line,
+                code: "AD112",
+                message: "Template layout and components require authored deck version 5."
+            ))
         }
         var decks: [DeckRecord] = []
         for record in rawDecks {
@@ -632,8 +651,8 @@ private struct AuthoredDeckLoader {
             throw DecodeFailure("AD110", "Manifest kind must be \"neoanki\".")
         }
         let version = try requiredInteger(object, "version")
-        guard (1...4).contains(version) else {
-            throw DecodeFailure("AD111", "Only authored deck versions 1 through 3 are supported.")
+        guard (1...5).contains(version) else {
+            throw DecodeFailure("AD111", "Only authored deck versions 1 through 5 are supported.")
         }
         return .init(
             version: version,
@@ -693,7 +712,7 @@ private struct AuthoredDeckLoader {
         try exactKeys(
             object,
             required: ["name", "prompt", "answer", "interaction", "skill"],
-            optional: ["generateWhen"]
+            optional: ["generateWhen", "layout", "components"]
         )
         guard let interaction = Interaction(rawValue: try requiredString(object, "interaction")) else {
             throw DecodeFailure("AD121", "Template interaction is not supported.")
@@ -707,12 +726,37 @@ private struct AuthoredDeckLoader {
         }
         return .init(
             name: try nonemptyString(object, "name"),
+            layout: try object["layout"].map { raw in
+                guard let value = raw as? String, let layout = CardLayoutID(rawValue: value) else {
+                    throw DecodeFailure("AD128", "Template layout is not supported.")
+                }
+                return layout
+            },
+            components: try object["components"].map { _ in
+                try objectArray(object, "components").map(decodeComponent)
+            },
             prompt: try objectArray(object, "prompt").map(decodeSlot),
             answer: try objectArray(object, "answer").map(decodeSlot),
             interaction: interaction,
             skill: Skill(input: input, output: output, operation: operation),
             condition: try object["generateWhen"].map { try decodeCondition($0, depth: 0) }
         )
+    }
+
+    private func decodeComponent(_ object: [String: Any]) throws -> ComponentRecord {
+        try exactKeys(
+            object,
+            required: ["region", "purpose"],
+            optional: ["field", "literal", "reveal", "media"]
+        )
+        guard let region = ComponentRegion(rawValue: try requiredString(object, "region")),
+              let purpose = ComponentPurpose(rawValue: try requiredString(object, "purpose")) else {
+            throw DecodeFailure("AD129", "Template component semantics are not supported.")
+        }
+        var slotObject = object
+        slotObject.removeValue(forKey: "region")
+        slotObject.removeValue(forKey: "purpose")
+        return ComponentRecord(region: region, purpose: purpose, slot: try decodeSlot(slotObject))
     }
 
     private func decodeSlot(_ object: [String: Any]) throws -> SlotRecord {
@@ -867,6 +911,7 @@ private struct AuthoredDeckCompiler {
                 guard record.templates.allSatisfy({
                     $0.prompt.count <= 512
                         && $0.answer.count <= 512
+                        && ($0.components?.count ?? 0) <= 512
                         && ($0.condition.map(conditionNodeCount) ?? 0) <= 1_024
                 }) else {
                     throw DecodeFailure("AD212", "A template exceeds slot or condition limits.")
@@ -1051,13 +1096,43 @@ private struct AuthoredDeckCompiler {
         _ record: TemplateRecord,
         fields: [String: FieldDef]
     ) throws -> Template {
-        Template(
+        let prompt = Side(slots: try record.prompt.map { try compileSlot($0, fields: fields) })
+        let answer = Side(slots: try record.answer.map { try compileSlot($0, fields: fields) })
+        let condition = try record.condition.map { try compileCondition($0, fields: fields) }
+        if let layout = record.layout, let components = record.components {
+            return Template(
+                name: record.name,
+                layout: layout,
+                components: try components.map { component in
+                    let slot = try compileSlot(component.slot, fields: fields)
+                    return TemplateComponent(
+                        region: component.region,
+                        purpose: component.purpose,
+                        source: slot.source,
+                        presentation: slot.presentation
+                    )
+                },
+                interaction: record.interaction,
+                skill: record.skill,
+                generateWhen: condition
+            )
+        }
+        guard record.layout == nil, record.components == nil else {
+            throw DecodeFailure("AD128", "Template layout and components must be provided together.")
+        }
+        let composition = TemplateCompositionMigration.map(
+            prompt: prompt,
+            answer: answer,
+            interaction: record.interaction,
+            fields: Array(fields.values)
+        )
+        return Template(
             name: record.name,
-            prompt: Side(slots: try record.prompt.map { try compileSlot($0, fields: fields) }),
-            answer: Side(slots: try record.answer.map { try compileSlot($0, fields: fields) }),
+            layout: composition.layout,
+            components: composition.components,
             interaction: record.interaction,
             skill: record.skill,
-            generateWhen: try record.condition.map { try compileCondition($0, fields: fields) }
+            generateWhen: condition
         )
     }
 

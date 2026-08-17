@@ -2019,12 +2019,28 @@ public actor NeoAnkiAPIService {
                     template,
                     allowed: [
                         "id", "name", "prompt", "answer", "interaction", "skill",
-                        "generateWhen",
+                        "generateWhen", "layout", "components",
                     ],
                     pointer: pointer
                 )
                 try validateSlots(template["prompt"], pointer: pointer + "/prompt")
                 try validateSlots(template["answer"], pointer: pointer + "/answer")
+                if let components = template["components"] as? [Any] {
+                    for (componentIndex, value) in components.enumerated() {
+                        let componentPointer = pointer + "/components/\(componentIndex)"
+                        guard let component = value as? [String: Any] else { continue }
+                        try rejectUnknownMembers(
+                            component,
+                            allowed: ["id", "region", "purpose", "source", "presentation"],
+                            pointer: componentPointer
+                        )
+                        try validateSlots(
+                            [["source": component["source"] as Any,
+                              "presentation": component["presentation"] as Any]],
+                            pointer: componentPointer
+                        )
+                    }
+                }
                 if let skill = template["skill"] as? [String: Any] {
                     try rejectUnknownMembers(
                         skill,

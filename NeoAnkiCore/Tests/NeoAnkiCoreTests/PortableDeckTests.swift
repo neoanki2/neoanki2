@@ -151,7 +151,7 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     #expect(imported.title == "Selected question")
 }
 
-@Test func portableDeckV4WritesExactOrderedPolicyTable() async throws {
+@Test func portableDeckV5WritesExactOrderedPolicyTable() async throws {
     let directory = try portableTestDirectory()
     let source = try await portableStore(in: directory, name: "source")
     let deck = try await source.createDeck(Deck(name: "Deck"))
@@ -184,7 +184,7 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     ) == SQLITE_OK)
     defer { sqlite3_finalize(statement) }
     #expect(sqlite3_step(statement) == SQLITE_ROW)
-    #expect(sqlite3_column_int(statement, 0) == 4)
+    #expect(sqlite3_column_int(statement, 0) == 5)
     #expect(sqlite3_column_int(statement, 1) == 0)
     #expect(sqlite3_column_int(statement, 2) == 1)
     #expect(sqlite3_step(statement) == SQLITE_DONE)

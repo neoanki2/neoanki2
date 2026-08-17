@@ -22,7 +22,9 @@ This separation prevents invalid policy combinations and, most importantly, prev
 
 `Interaction.audioSubmission` has wire value `"audioSubmission"`. Its template must have at least one prompt slot, an empty answer side, and a skill whose output is `audio`. Converting a template with answer slots requires confirmation before the editor clears them.
 
-Authored and portable deck format version 4 can carry the template definition. Versions 1–3 remain importable. Exports never include learner responses or response-only media.
+Authored and portable deck format version 4 introduced this interaction.
+Version 5 carries it in semantic study compositions; versions 1–4 remain
+importable. Exports never include learner responses or response-only media.
 
 ## Persistence contract
 

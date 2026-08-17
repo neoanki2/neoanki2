@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098
+contract_digest: sha256:b8d1671781abe659c6515747087c057789606e89c9a5b738c3f7c2468c280ec8
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -806,6 +806,18 @@ Type: **object**.
 
 - `confirm` — boolean; required
 
+## ResolvedComponent {#schema-resolvedcomponent}
+
+Type: **object**.
+
+### Properties
+
+- `id` — string; required
+- `presentation` — Presentation; required
+- `purpose` — string; required
+- `region` — string; required
+- `value` — ContentValue; required
+
 ## ResolvedSlot {#schema-resolvedslot}
 
 Type: **object**.
@@ -938,10 +950,12 @@ Type: **object**.
 
 - `answer` — array of ResolvedSlot; required
 - `clozeGroup` — integer or null; optional
+- `components` — array of ResolvedComponent; required
 - `deckId` — string or null; optional
 - `id` — string; required
 - `interaction` — string; required
 - `itemId` — string; required
+- `layout` — string; required
 - `memory` — Memory; required
 - `prompt` — array of ResolvedSlot; required
 - `revision` — integer; required
@@ -1029,6 +1043,18 @@ Type: **object**.
 - `data` — array of Tag; required
 - `page` — PageInfo; required
 
+## TemplateComponent {#schema-templatecomponent}
+
+Type: **object**.
+
+### Properties
+
+- `id` — string; required
+- `presentation` — Presentation; required
+- `purpose` — string; required
+- `region` — string; required
+- `source` — SlotSource; required
+
 ## TemplateDefinition {#schema-templatedefinition}
 
 Type: **object**.
@@ -1036,9 +1062,11 @@ Type: **object**.
 ### Properties
 
 - `answer` — array of Slot; required
+- `components` — array of TemplateComponent or null; optional
 - `generateWhen` — Condition; optional
 - `id` — string; required
 - `interaction` — string; required
+- `layout` — string or null; optional
 - `name` — string; required
 - `prompt` — array of Slot; required
 - `skill` — Skill; required
@@ -1150,6 +1178,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:e3d1f9032b959e51db40c7fd95fbcc86363e640d4198057f58f0d19293017098`.
+Contract digest: `sha256:b8d1671781abe659c6515747087c057789606e89c9a5b738c3f7c2468c280ec8`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

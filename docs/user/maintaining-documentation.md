@@ -124,6 +124,15 @@ The workflow never commits or promotes images automatically. This review step
 prevents a UI failure, permission dialog, or runner-specific content from
 silently replacing published documentation.
 
+When an accepted release plan explicitly excludes GUI automation and screenshot
+capture, the local release path may instead carry
+`docs/headless-screenshot-deferral.json`. The record must name every affected
+screenshot feature and changed source, explain the restriction, and contain the
+exact source-diff hash. The release validator accepts only that narrow, auditable
+deferral; ordinary validation and all non-deferred screenshot evidence remain
+strict. A later capture should replace the deferred evidence before relying on
+those screenshots as a current visual reference.
+
 Published captures are 1024 physical pixels wide. The site caps their rendered
 width to 512 CSS pixels on 2x displays and 341 CSS pixels on 3x displays, so a
 browser never has to enlarge screenshot pixels on Retina screens. The required

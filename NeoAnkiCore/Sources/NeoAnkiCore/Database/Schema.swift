@@ -16,6 +16,10 @@ enum Schema {
         );
         """,
         """
+        INSERT OR IGNORE INTO app_metadata(key, value)
+        VALUES ('template_definition_format', '2');
+        """,
+        """
         CREATE TABLE IF NOT EXISTS library_aliases (
             alias_id TEXT PRIMARY KEY NOT NULL,
             canonical_id TEXT NOT NULL

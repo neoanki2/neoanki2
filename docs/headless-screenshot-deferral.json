@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "diffSHA256": "9a72b723d8ba55bec66e918d167e6b46310b0a969d7f1171b3c73836825322a9",
+  "featureIDs": [
+    "errors-empty-states",
+    "import-json-csv",
+    "item-types",
+    "portable-deck",
+    "study-grading",
+    "study-reveal",
+    "study-start",
+    "study-type",
+    "study-undo-end",
+    "template-advanced",
+    "templates"
+  ],
+  "files": [
+    "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift",
+    "NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift",
+    "Sources/NeoAnki2/StudyCompositionView.swift",
+    "Sources/NeoAnki2/StudyView.swift",
+    "Sources/NeoAnki2/TemplateEditorState.swift",
+    "Sources/NeoAnki2/TemplateEditorView.swift",
+    "Sources/NeoAnki2/TemplatesModel.swift",
+    "Sources/NeoAnki2/UserFacingError.swift",
+    "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
+  ],
+  "reason": "The accepted study-compositions release plan and repository desktop-isolation policy explicitly exclude GUI automation and screenshot capture from this headless workflow. Product documentation, accessibility behavior, and deterministic UI geometry are updated and tested; visual evidence is deferred for a later reviewed capture."
+}

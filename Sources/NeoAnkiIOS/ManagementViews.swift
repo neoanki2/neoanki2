@@ -4,6 +4,7 @@ import NeoAnkiCore
 import NeoAnkiDeckBuilderCore
 import NeoAnkiFeatures
 import PoemDeckBuilder
+import NeoAnkiSharedUI
 import VocabularyDeckBuilder
 import SwiftUI
 import UniformTypeIdentifiers
@@ -338,9 +339,37 @@ private struct TemplateMobileEditor: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            slots(title: "Prompt", slots: $template.prompt.slots)
+            Section("Composition") {
+                Picker("Preset", selection: $template.layout) {
+                    ForEach(CardLayoutID.allCases, id: \.self) { layout in
+                        Text(layout.displayName).tag(layout)
+                    }
+                }
+                Text(template.layout.guidance)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            slots(title: "Question ingredients", slots: $template.prompt.slots)
             if template.interaction != .audioSubmission {
-                slots(title: "Answer", slots: $template.answer.slots)
+                slots(title: "Expected answer ingredients", slots: $template.answer.slots)
+            }
+            Section("Named regions") {
+                ForEach(template.components.indices, id: \.self) { index in
+                    VStack(alignment: .leading) {
+                        Text(componentLabel(template.components[index]))
+                            .font(.subheadline.weight(.medium))
+                        Picker("Region", selection: $template.components[index].region) {
+                            ForEach(ComponentRegion.allCases, id: \.self) { region in
+                                Text(region.rawValue.capitalized).tag(region)
+                            }
+                        }
+                        Text(template.components[index].purpose == .expectedAnswer
+                            ? "Expected answer"
+                            : template.components[index].purpose.rawValue.capitalized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             Section("Skill") {
                 Picker("Input", selection: $template.skill.input) {
@@ -420,6 +449,13 @@ private struct TemplateMobileEditor: View {
                 if let first = fields.first { slots.wrappedValue.append(Slot(source: .field(first.id))) }
             }
             Button("Add Literal", systemImage: "text.badge.plus") { slots.wrappedValue.append(Slot(source: .literal("Label"))) }
+        }
+    }
+
+    private func componentLabel(_ component: TemplateComponent) -> String {
+        switch component.source {
+        case let .field(id): fields.first(where: { $0.id == id })?.name ?? "Unknown field"
+        case let .literal(value): value
         }
     }
 

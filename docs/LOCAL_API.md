@@ -373,8 +373,10 @@ not review undo.
 | `POST` | `/v1/item-types/{id}/duplicate` | `schemas.write` | Create an independent copy |
 | `GET` | `/v1/decks/{id}/item-type-policy` | `library.read` | Read effective authoring policy |
 
-Item-type writes are whole-definition operations. Field and template order is
-semantic. Field, template, and slot references use UUIDs. Validation MUST apply
+Item-type writes are whole-definition operations. Field, template, and
+component order is semantic. Templates expose `layout` plus semantic
+`components`; `prompt` and `answer` remain compatibility projections for API v1
+readers and writes. Field, template, and component references use UUIDs. Validation MUST apply
 the same invariants as the native editor.
 
 When a replacement removes or changes a field or template used by persisted
@@ -475,7 +477,7 @@ validation policy that does so.
 | --- | --- | --- | --- |
 | `GET` | `/v1/cards` | `library.read` | Query card metadata and memory |
 | `GET` | `/v1/cards/{id}` | `library.read` | Read one card |
-| `GET` | `/v1/cards/{id}/content` | `library.read` | Resolve prompt and answer slots |
+| `GET` | `/v1/cards/{id}/content` | `library.read` | Resolve layout, components, and prompt/answer projections |
 | `GET` | `/v1/cards/{id}/review-preview` | `library.read` | Preview all rating outcomes |
 | `PATCH` | `/v1/cards/{id}` | `study.review` | Change suspension only |
 | `POST` | `/v1/cards/{id}/resets` | `study.review` | Reset progress after confirmation |
@@ -498,7 +500,7 @@ and does not fabricate a review log.
 
 - **CARD-001:** No version-1 route can create a card, delete one independently,
   change its item/template identity, or directly set memory fields.
-- **CARD-002:** Resolved prompt and answer slots match NeoAnkiCore resolution for
+- **CARD-002:** Resolved components and prompt/answer projections match NeoAnkiCore resolution for
   reveal, type, choose, record, audioSubmission, cloze, and arrange fixture templates.
 - **CARD-003:** Suspending a due card removes it from due counts and new study
   reservations; unsuspending it restores eligibility without changing memory.

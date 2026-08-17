@@ -472,14 +472,28 @@ private func remappedPortableType(_ source: ItemType) -> ItemType {
     let templates = source.templates.map { template in
         Template(
             name: template.name,
-            prompt: remappedSide(template.prompt, ids: idMap),
-            answer: remappedSide(template.answer, ids: idMap),
+            layout: template.layout,
+            components: template.components.map { component in
+                TemplateComponent(
+                    region: component.region,
+                    purpose: component.purpose,
+                    source: remappedSource(component.source, ids: idMap),
+                    presentation: component.presentation
+                )
+            },
             interaction: template.interaction,
             skill: template.skill,
             generateWhen: template.generateWhen.map { remappedCondition($0, ids: idMap) }
         )
     }
     return ItemType(name: source.name, fields: fields, templates: templates)
+}
+
+private func remappedSource(_ source: SlotSource, ids: [UUID: UUID]) -> SlotSource {
+    switch source {
+    case let .field(id): .field(ids[id] ?? id)
+    case let .literal(value): .literal(value)
+    }
 }
 
 private func remappedSide(_ side: Side, ids: [UUID: UUID]) -> Side {

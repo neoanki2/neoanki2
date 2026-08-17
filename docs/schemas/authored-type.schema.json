@@ -31,6 +31,8 @@
       "properties": {
         "id": {"$ref": "#/$defs/id"},
         "name": {"type": "string", "minLength": 1},
+        "layout": {"enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage"]},
+        "components": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/component"}},
         "type": {
           "enum": ["text", "richText", "audio", "image", "gif", "video", "number", "cloze"]
         },
@@ -54,6 +56,23 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "field": {"$ref": "#/$defs/id"},
+        "literal": {"type": "string"},
+        "reveal": {"enum": ["always", "hiddenUntilAnswer", "blurred"]},
+        "media": {"enum": ["default", "autoplay", "playOnTap", "loop"]}
+      },
+      "oneOf": [
+        {"required": ["field"], "not": {"required": ["literal"]}},
+        {"required": ["literal"], "not": {"required": ["field"]}}
+      ]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region", "purpose"],
+      "properties": {
+        "region": {"enum": ["primary", "secondary", "media", "supporting", "label"]},
+        "purpose": {"enum": ["question", "expectedAnswer", "supporting"]},
         "field": {"$ref": "#/$defs/id"},
         "literal": {"type": "string"},
         "reveal": {"enum": ["always", "hiddenUntilAnswer", "blurred"]},
