@@ -314,8 +314,11 @@ class NeoAnkiUITestCase: XCTestCase {
             return
         }
         for identifier in expectedVisibleIdentifiers {
-            let element = appWindow.descendants(matching: .any).identified(identifier)
-            guard element.waitUntilExists(timeout: 3), !element.frame.isEmpty else {
+            let windowElement = appWindow.descendants(matching: .any).identified(identifier)
+            let element = windowElement.waitUntilExists(timeout: 1)
+                ? windowElement
+                : app.descendants(matching: .any).identified(identifier)
+            guard element.waitUntilExists(timeout: 2), !element.frame.isEmpty else {
                 XCTFail(
                     "Expected '\(identifier)' to exist in documentation screenshot '\(name)'",
                     file: file,
