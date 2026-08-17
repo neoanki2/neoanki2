@@ -167,7 +167,7 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 4
+    public static let version = 5
     fileprivate static let supportedVersions = 1...version
 
     public static func export(
@@ -390,8 +390,9 @@ private final class PortableDeckDatabase {
                     try execute(
                         """
                         INSERT INTO templates(id, item_type_id, ordinal, name, prompt_json,
-                            answer_json, interaction, skill_json, generate_when_json)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                            answer_json, layout, components_json, interaction, skill_json,
+                            generate_when_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                         """,
                         [
                             .text(template.id.uuidString.lowercased()),
@@ -399,6 +400,8 @@ private final class PortableDeckDatabase {
                             .integer(Int64(index)), .text(template.name),
                             .text(try PortableJSON.encodeSide(template.prompt, ordinals: ordinals)),
                             .text(try PortableJSON.encodeSide(template.answer, ordinals: ordinals)),
+                            .text(template.layout.rawValue),
+                            .text(try PortableJSON.encodeComponents(template.components, ordinals: ordinals)),
                             .text(template.interaction.rawValue),
                             .text(try PortableJSON.encodeSkill(template.skill)),
                             template.generateWhen.map {
@@ -577,6 +580,12 @@ private final class PortableDeckDatabase {
         if formatVersion >= 3 {
             expected["deck_item_types"] = [
                 "deck_id", "item_type_id", "ordinal", "is_default",
+            ]
+        }
+        if formatVersion >= 5 {
+            expected["templates"] = [
+                "id", "item_type_id", "ordinal", "name", "prompt_json", "answer_json",
+                "layout", "components_json", "interaction", "skill_json", "generate_when_json",
             ]
         }
         for (table, columns) in expected {
@@ -768,7 +777,12 @@ private final class PortableDeckDatabase {
             """
         )
         let fieldsByType = Dictionary(grouping: allFieldRows) { $0.text(0) ?? "" }
-        let allTemplateRows = try query(
+        let allTemplateRows = try query(formatVersion >= 5 ?
+            """
+            SELECT item_type_id, id, ordinal, name, prompt_json, answer_json, layout,
+                components_json, interaction, skill_json, generate_when_json
+            FROM templates ORDER BY item_type_id, ordinal;
+            """ :
             """
             SELECT item_type_id, id, ordinal, name, prompt_json, answer_json, interaction,
                 skill_json, generate_when_json
@@ -807,17 +821,43 @@ private final class PortableDeckDatabase {
                       ordinal == Int64(index), Int(ordinal) < limits.maximumTemplatesPerType,
                       let templateName = templateRow.text(3),
                       let prompt = templateRow.text(4), let answer = templateRow.text(5),
-                      let interactionText = templateRow.text(6),
+                      let interactionText = templateRow.text(formatVersion >= 5 ? 8 : 6),
                       let interaction = Interaction(rawValue: interactionText),
-                      let skill = templateRow.text(7)
+                      let skill = templateRow.text(formatVersion >= 5 ? 9 : 7)
                 else { throw PortableDeckError.invalidPackage("Template row is invalid.") }
-                let condition: SlotCondition? = try templateRow.text(8).map {
+                let condition: SlotCondition? = try templateRow.text(formatVersion >= 5 ? 10 : 8).map {
                     try PortableJSON.decodeCondition($0, fields: decodedFields)
                 }
+                if formatVersion >= 5 {
+                    guard let layoutText = templateRow.text(6),
+                          let layout = CardLayoutID(rawValue: layoutText),
+                          let componentsJSON = templateRow.text(7) else {
+                        throw PortableDeckError.invalidPackage("Template composition is invalid.")
+                    }
+                    return Template(
+                        id: templateID, name: templateName,
+                        layout: layout,
+                        components: try PortableJSON.decodeComponents(
+                            componentsJSON,
+                            fields: decodedFields
+                        ),
+                        interaction: interaction,
+                        skill: try PortableJSON.decodeSkill(skill),
+                        generateWhen: condition
+                    )
+                }
+                let promptSide = try PortableJSON.decodeSide(prompt, fields: decodedFields)
+                let answerSide = try PortableJSON.decodeSide(answer, fields: decodedFields)
+                let composition = TemplateCompositionMigration.map(
+                    prompt: promptSide,
+                    answer: answerSide,
+                    interaction: interaction,
+                    fields: decodedFields
+                )
                 return Template(
                     id: templateID, name: templateName,
-                    prompt: try PortableJSON.decodeSide(prompt, fields: decodedFields),
-                    answer: try PortableJSON.decodeSide(answer, fields: decodedFields),
+                    layout: composition.layout,
+                    components: composition.components,
                     interaction: interaction,
                     skill: try PortableJSON.decodeSkill(skill),
                     generateWhen: condition
@@ -1284,6 +1324,87 @@ enum PortableJSON {
         })
     }
 
+    static func encodeComponents(
+        _ components: [TemplateComponent],
+        ordinals: [UUID: Int]
+    ) throws -> String {
+        try encode(try components.map { component -> [String: Any] in
+            let source: [String: Any]
+            switch component.source {
+            case let .field(id):
+                guard let ordinal = ordinals[id] else { throw invalid() }
+                source = ["field": ordinal]
+            case let .literal(value):
+                try validateText(value)
+                source = ["literal": value]
+            }
+            return [
+                "id": component.id.uuidString.lowercased(),
+                "region": component.region.rawValue,
+                "purpose": component.purpose.rawValue,
+                "source": source,
+                "presentation": [
+                    "reveal": component.presentation.reveal.rawValue,
+                    "media": component.presentation.media.rawValue,
+                ],
+            ]
+        })
+    }
+
+    static func decodeComponents(
+        _ json: String,
+        fields: [FieldDef]
+    ) throws -> [TemplateComponent] {
+        guard let values = try object(json) as? [Any], values.count <= 512 else {
+            throw invalid()
+        }
+        return try values.map { value in
+            let component = try dictionary(
+                value,
+                keys: ["id", "region", "purpose", "source", "presentation"]
+            )
+            guard let idText = component["id"] as? String,
+                  let id = UUID(uuidString: idText),
+                  id.uuidString.lowercased() == idText,
+                  let regionText = component["region"] as? String,
+                  let region = ComponentRegion(rawValue: regionText),
+                  let purposeText = component["purpose"] as? String,
+                  let purpose = ComponentPurpose(rawValue: purposeText) else {
+                throw invalid()
+            }
+            let sourceObject = try dictionary(required(component["source"]))
+            let source: SlotSource
+            if Set(sourceObject.keys) == ["field"] {
+                let ordinal = try integer(required(sourceObject["field"]))
+                guard fields.indices.contains(ordinal) else { throw invalid() }
+                source = .field(fields[ordinal].id)
+            } else if Set(sourceObject.keys) == ["literal"],
+                      let literal = sourceObject["literal"] as? String {
+                try validateText(literal)
+                source = .literal(literal)
+            } else {
+                throw invalid()
+            }
+            let presentation = try dictionary(
+                required(component["presentation"]),
+                keys: ["reveal", "media"]
+            )
+            guard let revealText = presentation["reveal"] as? String,
+                  let reveal = RevealMode(rawValue: revealText),
+                  let mediaText = presentation["media"] as? String,
+                  let media = MediaBehavior(rawValue: mediaText) else {
+                throw invalid()
+            }
+            return TemplateComponent(
+                id: id,
+                region: region,
+                purpose: purpose,
+                source: source,
+                presentation: Presentation(reveal: reveal, media: media)
+            )
+        }
+    }
+
     static func encodeSkill(_ skill: Skill) throws -> String {
         try encode([
             "input": skill.input.rawValue,
@@ -1625,7 +1746,7 @@ private let schema = [
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 4),
+        format_version INTEGER NOT NULL CHECK (format_version = 5),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),
@@ -1675,7 +1796,9 @@ private let schema = [
         item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
         ordinal INTEGER NOT NULL CHECK(ordinal >= 0), name TEXT NOT NULL,
         prompt_json TEXT NOT NULL, answer_json TEXT NOT NULL,
-        interaction TEXT NOT NULL CHECK(interaction IN ('reveal','type','choose','record','cloze','arrange')),
+        layout TEXT NOT NULL CHECK(layout IN ('focus','split','mediaAside','mediaHero','actionStage')),
+        components_json TEXT NOT NULL,
+        interaction TEXT NOT NULL CHECK(interaction IN ('reveal','type','choose','record','audioSubmission','cloze','arrange')),
         skill_json TEXT NOT NULL, generate_when_json TEXT,
         UNIQUE(item_type_id, ordinal), UNIQUE(item_type_id, id)
     );

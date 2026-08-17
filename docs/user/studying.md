@@ -8,6 +8,14 @@ parent: User Guide
 
 # Studying
 
+Every active card uses an adaptive **Study Stage**. The card stays within the
+available window instead of becoming a scrolling review page, while the main
+interaction and grading footer remains fixed. Focus, Split, Media Aside, Media
+Hero, and Action Stage compositions rearrange at compact widths and keep media
+aspect-fit. If content cannot fit because of its length, Dynamic Type, or
+localization, choose **View full content** to open the complete card in a
+scrollable detail sheet; closing it returns to the same review state.
+
 NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The Study button shows the number due and is disabled when that count is zero; future cards are not included.
 
 [![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)]({{ site.baseurl }}/assets/screenshots/study-prompt.png)

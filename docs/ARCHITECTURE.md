@@ -158,7 +158,8 @@ Layer 1 — CONTENT (domain-neutral, native)
 
 Layer 2 — SCHEMA / PRESENTATION (user-declared)
   ItemType → [FieldDef], [Template]
-  Template → prompt/answer Side → [Slot(SlotSource + Presentation)]
+  Template → CardLayoutID + [TemplateComponent]
+  TemplateComponent → region + purpose + SlotSource + Presentation
   Interaction, SlotCondition, Skill
 
 Layer 3 — MEMORY / SCHEDULING (algorithm-agnostic)
@@ -181,8 +182,8 @@ public enum ContentValue: Codable, Equatable, Sendable {
 `MediaRef` is a serializable handle into a content-addressed store (`MediaStore`:
 SHA-256 hash, files under `{AppSupport}/neoanki2/media/`). Legacy URL-based refs
 are rejected during decoding; only validated hash references resolve. Content
-carries no presentation, so the same value can appear differently on prompt vs.
-answer via `Presentation` on each `Slot`.
+carries no presentation, so the same value can appear differently in each
+semantic component through its `Presentation`.
 
 ### Layer 2 — Schema / Presentation
 
@@ -190,8 +191,8 @@ answer via `Presentation` on each `Slot`.
 public struct ItemType { var name: String; var fields: [FieldDef]; var templates: [Template] }
 
 public struct Template {
-    var prompt: Side                 // what the learner sees first
-    var answer: Side                 // what is revealed / checked
+    var layout: CardLayoutID         // Focus, Split, Media Aside/Hero, Action Stage
+    var components: [TemplateComponent]
     var interaction: Interaction     // how the learner responds
     var skill: Skill                 // the cognitive route trained
     var generateWhen: SlotCondition? // optional gate on generation
@@ -202,9 +203,15 @@ public struct Skill { var input: Modality; var output: Modality; var operation: 
 // Operation: recognize, recall, discriminate, classify, locate, order, apply, explain, reproduce
 ```
 
-A `Side` is an ordered list of `Slot`s; each `Slot` pairs a `SlotSource`
-(`.field(UUID)` or `.literal(String)`) with a `Presentation` (`RevealMode` +
-`MediaBehavior`).
+A `TemplateComponent` assigns a field or literal source to a named region and
+semantic purpose (`question`, `expectedAnswer`, or `supporting`). The preset
+geometry is code-owned. API v1 retains computed prompt/answer projections for
+existing clients, but local definitions persist only layouts and components.
+
+The shared `AdaptiveStudyStage` keeps the active card non-scrolling and the
+action footer fixed on macOS and iOS. It measures overflow and exposes complete
+content in a separate detail sheet. Accessibility order is derived from the
+preset and never includes expected-answer content before reveal.
 
 Item-type visibility is separate from schema identity. `library_item_types`
 marks ordinary reusable Item Types. `deck_included_item_types` associates

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewedAt": "2026-08-16",
+  "lastReviewedAt": "2026-08-17",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
@@ -29,7 +29,7 @@
   "portableDeck": {
     "article": "user/import-export.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
-    "formatVersion": 4,
+    "formatVersion": 5,
     "maximumFileBytes": 512000000,
     "maximumDecks": 1000,
     "maximumItemTypes": 256,

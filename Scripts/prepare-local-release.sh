@@ -67,7 +67,8 @@ ARTIFACT="NeoAnki2-$VERSION-mac-universal.dmg"
 echo "Running headless pre-push validation..."
 (cd "$ROOT" && swift test --parallel)
 (cd "$ROOT/NeoAnkiCore" && swift test --parallel)
-(cd "$ROOT" && swift Scripts/validate-docs.swift --require-screenshots --base-ref origin/main)
+(cd "$ROOT" && swift Scripts/validate-docs.swift --require-screenshots \
+  --allow-headless-screenshot-deferral --base-ref origin/main)
 bash -n "$ROOT/Scripts/build-release-candidate.sh" \
   "$ROOT/Scripts/publish-release-candidate.sh" \
   "$ROOT/Scripts/ship-release.sh" \

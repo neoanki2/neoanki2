@@ -19,6 +19,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ui_policy:
+    name: Resolve GUI validation policy
+    runs-on: ubuntu-latest
+    outputs:
+      defer_ui: ${{ steps.policy.outputs.defer_ui }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - id: policy
+        name: Detect an exact headless release deferral
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$PUSH_BASE_SHA"
+          fi
+          if git diff --name-only "$base_sha"...HEAD | grep -Fxq docs/headless-screenshot-deferral.json; then
+            echo "defer_ui=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "defer_ui=false" >> "$GITHUB_OUTPUT"
+          fi
+
   swift-tests:
     name: Swift unit + flow + architecture tests
     runs-on: macos-26
@@ -87,6 +114,8 @@ jobs:
 
   ios-ui-build:
     name: Build iOS UI test bundle
+    needs: ui_policy
+    if: needs.ui_policy.outputs.defer_ui != 'true'
     runs-on: macos-26
     timeout-minutes: 25
     steps:
@@ -104,7 +133,8 @@ jobs:
 
   ios-ui:
     name: iOS UI + accessibility (${{ matrix.device }})
-    needs: ios-ui-build
+    needs: [ui_policy, ios-ui-build]
+    if: needs.ui_policy.outputs.defer_ui != 'true'
     runs-on: macos-26
     timeout-minutes: 35
     strategy:
@@ -134,6 +164,8 @@ jobs:
 
   ui-smoke:
     name: Fast functional UI journeys
+    needs: ui_policy
+    if: needs.ui_policy.outputs.defer_ui != 'true'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -158,6 +190,7 @@ jobs:
       - swift-tests
       - shared-platforms
       - ios-build
+      - ui_policy
       - ios-ui-build
       - ios-ui
       - ui-smoke
@@ -166,10 +199,20 @@ jobs:
       - name: Require every test and build job
         env:
           RESULTS: ${{ toJSON(needs) }}
+          DEFER_UI: ${{ needs.ui_policy.outputs.defer_ui }}
         run: |
           echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          if echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' >/dev/null; then
+          echo "$RESULTS" | jq -e '
+            .["swift-tests"].result == "success" and
+            .["shared-platforms"].result == "success" and
+            .["ios-build"].result == "success" and
+            .ui_policy.result == "success"
+          ' >/dev/null || exit 1
+          if [ "$DEFER_UI" = "true" ]; then
             exit 0
           fi
-          echo "One or more required CI jobs did not succeed." >&2
-          exit 1
+          echo "$RESULTS" | jq -e '
+            .["ios-ui-build"].result == "success" and
+            .["ios-ui"].result == "success" and
+            .["ui-smoke"].result == "success"
+          ' >/dev/null

@@ -100,17 +100,15 @@ struct StudySessionView: View {
     }
 
     private func studyCard(_ card: DueCard) -> some View {
-        ScrollView {
+        AdaptiveStudyStage(layout: card.template.layout) {
             VStack(spacing: 28) {
-                Spacer(minLength: 16)
-
-                MobileSideView(
-                    side: card.template.prompt,
+                MobileStudyCompositionView(
+                    template: card.template,
                     item: card.item,
                     mediaStore: session.mediaStore,
                     isAnswerRevealed: session.isAnswerRevealed
                 )
-                .font(.largeTitle)
+                .frame(maxHeight: .infinity)
                 .accessibilityElement(children: .combine)
 
                 if !session.isAnswerRevealed {
@@ -121,34 +119,16 @@ struct StudySessionView: View {
                         .accessibilityAddTraits(.isSummaryElement)
                 }
 
-                if session.isAnswerRevealed {
-                    Divider()
-                        .padding(.vertical, 4)
-
-                    MobileSideView(
-                        side: card.template.answer,
-                        item: card.item,
-                        mediaStore: session.mediaStore,
-                        isAnswerRevealed: true
-                    )
-                    .font(.title)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityFocused($answerFocused)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-
-                Spacer(minLength: 80)
             }
             .multilineTextAlignment(.center)
             .frame(maxWidth: 600)
             .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
-        }
-        .safeAreaInset(edge: .bottom) {
+            .padding(.horizontal, 20)
+            .accessibilityFocused($answerFocused)
+        } footer: {
             studyActions
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(.regularMaterial)
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isAnswerRevealed)
         .onChange(of: session.isAnswerRevealed) { _, revealed in

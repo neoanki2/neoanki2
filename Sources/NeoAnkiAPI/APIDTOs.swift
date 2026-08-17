@@ -231,6 +231,22 @@ public struct APIResolvedSlot: Codable, Sendable, Equatable {
     }
 }
 
+public struct APIResolvedComponent: Codable, Sendable, Equatable {
+    public let id: String
+    public let region: String
+    public let purpose: String
+    public let value: ContentValue
+    public let presentation: Presentation
+
+    init(_ component: ResolvedTemplateComponent) {
+        id = component.id.uuidString.lowercased()
+        region = component.region.rawValue
+        purpose = component.purpose.rawValue
+        value = component.value
+        presentation = component.presentation
+    }
+}
+
 public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
     public let id: String
     public let revision: Int
@@ -239,6 +255,8 @@ public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
     public let deckId: String?
     public let clozeGroup: Int?
     public let interaction: String
+    public let layout: String
+    public let components: [APIResolvedComponent]
     public let prompt: [APIResolvedSlot]
     public let answer: [APIResolvedSlot]
     public let memory: APIMemory
@@ -251,6 +269,9 @@ public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
         deckId = due.card.deckID?.uuidString.lowercased()
         clozeGroup = due.card.clozeGroup
         interaction = due.template.interaction.rawValue
+        layout = due.template.layout.rawValue
+        components = SideContent.resolvedComponents(for: due.template, from: due.item)
+            .map(APIResolvedComponent.init)
         prompt = SideContent.resolvedSlots(for: due.template.prompt, from: due.item)
             .map(APIResolvedSlot.init)
         answer = SideContent.resolvedSlots(for: due.template.answer, from: due.item)
@@ -849,6 +870,38 @@ public struct APISlot: Codable, Sendable, Equatable {
     }
 }
 
+public struct APITemplateComponent: Codable, Sendable, Equatable {
+    public let id: String
+    public let region: String
+    public let purpose: String
+    public let source: APISlotSource
+    public let presentation: APIPresentation
+
+    init(_ component: TemplateComponent) {
+        id = component.id.uuidString.lowercased()
+        region = component.region.rawValue
+        purpose = component.purpose.rawValue
+        source = APISlotSource(component.source)
+        presentation = APIPresentation(component.presentation)
+    }
+
+    func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> TemplateComponent {
+        guard let region = ComponentRegion(rawValue: region) else {
+            throw APIServiceError.validation("Unknown component region.", pointer: pointer + "/region")
+        }
+        guard let purpose = ComponentPurpose(rawValue: purpose) else {
+            throw APIServiceError.validation("Unknown component purpose.", pointer: pointer + "/purpose")
+        }
+        return TemplateComponent(
+            id: try parseUUID(id, pointer + "/id"),
+            region: region,
+            purpose: purpose,
+            source: try source.domain(parseUUID: parseUUID, pointer: pointer + "/source"),
+            presentation: try presentation.domain(pointer: pointer + "/presentation")
+        )
+    }
+}
+
 public struct APICondition: Codable, Sendable, Equatable {
     public let kind: String
     public let fieldId: String?
@@ -890,6 +943,8 @@ public struct APICondition: Codable, Sendable, Equatable {
 public struct APITemplateDefinition: Codable, Sendable, Equatable {
     public let id: String
     public let name: String
+    public let layout: String?
+    public let components: [APITemplateComponent]?
     public let prompt: [APISlot]
     public let answer: [APISlot]
     public let interaction: String
@@ -899,6 +954,8 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
     init(_ template: Template) {
         id = template.id.uuidString.lowercased()
         name = template.name
+        layout = template.layout.rawValue
+        components = template.components.map(APITemplateComponent.init)
         prompt = template.prompt.slots.map(APISlot.init)
         answer = template.answer.slots.map(APISlot.init)
         interaction = template.interaction.rawValue
@@ -910,14 +967,39 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
         guard let interaction = Interaction(rawValue: interaction) else {
             throw APIServiceError.validation("Unknown interaction.", pointer: pointer + "/interaction")
         }
+        let templateID = try parseUUID(id, pointer + "/id")
+        let resolvedSkill = try skill.domain(pointer: pointer + "/skill")
+        let condition = try generateWhen?.domain(parseUUID: parseUUID, pointer: pointer + "/generateWhen")
+        if let layout, let components {
+            guard let layout = CardLayoutID(rawValue: layout) else {
+                throw APIServiceError.validation("Unknown layout preset.", pointer: pointer + "/layout")
+            }
+            return Template(
+                id: templateID,
+                name: name,
+                layout: layout,
+                components: try components.enumerated().map {
+                    try $0.element.domain(parseUUID: parseUUID, pointer: pointer + "/components/\($0.offset)")
+                },
+                interaction: interaction,
+                skill: resolvedSkill,
+                generateWhen: condition
+            )
+        }
+        guard layout == nil, components == nil else {
+            throw APIServiceError.validation(
+                "Provide layout and components together.",
+                pointer: pointer
+            )
+        }
         return Template(
-            id: try parseUUID(id, pointer + "/id"),
+            id: templateID,
             name: name,
             prompt: Side(slots: try prompt.enumerated().map { try $0.element.domain(parseUUID: parseUUID, pointer: pointer + "/prompt/\($0.offset)") }),
             answer: Side(slots: try answer.enumerated().map { try $0.element.domain(parseUUID: parseUUID, pointer: pointer + "/answer/\($0.offset)") }),
             interaction: interaction,
-            skill: try skill.domain(pointer: pointer + "/skill"),
-            generateWhen: try generateWhen?.domain(parseUUID: parseUUID, pointer: pointer + "/generateWhen")
+            skill: resolvedSkill,
+            generateWhen: condition
         )
     }
 }

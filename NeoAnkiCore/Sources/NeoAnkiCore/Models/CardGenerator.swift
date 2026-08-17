@@ -81,7 +81,11 @@ public enum CardGenerator {
 
     public static func clozeGroups(for template: Template, item: Item) -> [Int] {
         guard template.interaction == .cloze else { return [] }
-        for fieldID in ItemTypeValidation.fieldIDs(in: template.prompt) {
+        for fieldID in template.components.compactMap({ component -> UUID? in
+            guard component.purpose == .question,
+                  case let .field(id) = component.source else { return nil }
+            return id
+        }) {
             if case let .cloze(_, blanks)? = item.value(for: fieldID) {
                 return Set(blanks.map(\.group)).sorted()
             }

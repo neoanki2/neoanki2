@@ -46,6 +46,12 @@ brew upgrade --cask neoanki2
 Your library is not replaced by installation or upgrade; it remains in
 `~/Library/Application Support/neoanki2/`.
 
+The study-composition upgrade is the exception that requires a one-time,
+headless template-definition migration before first launch. Follow the
+[`neoanki-template-migrator`](cli.md#migrate-template-definitions) backup, plan,
+apply, and verify sequence; the app refuses legacy definitions without moving
+them into quarantine.
+
 ## Build from source
 
 Source builds, toolchain checks, headless commands, shared-library cautions, and

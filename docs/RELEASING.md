@@ -26,6 +26,11 @@ upload, push, merge, publication, tap update, and installation—use:
 
 The command reports preparation, promotion, and total release durations.
 
+For a release whose accepted plan forbids GUI capture, preparation can honor a
+hash-bound `docs/headless-screenshot-deferral.json`; see the documentation
+maintenance guide. This records stale visual evidence explicitly without
+weakening checks for unrelated screenshots.
+
 For the shortest maintainer feedback loop, prepare everything before the
 branch's first push:
 

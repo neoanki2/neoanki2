@@ -83,6 +83,8 @@ struct SlotDraft: Identifiable, Equatable {
     var literal = ""
     var reveal: RevealMode = .always
     var media: MediaBehavior = .default
+    var region: ComponentRegion = .primary
+    var purpose: ComponentPurpose = .question
 
     init(
         id: UUID = UUID(),
@@ -90,7 +92,9 @@ struct SlotDraft: Identifiable, Equatable {
         fieldID: UUID? = nil,
         literal: String = "",
         reveal: RevealMode = .always,
-        media: MediaBehavior = .default
+        media: MediaBehavior = .default,
+        region: ComponentRegion = .primary,
+        purpose: ComponentPurpose = .question
     ) {
         self.id = id
         self.sourceKind = sourceKind
@@ -98,6 +102,8 @@ struct SlotDraft: Identifiable, Equatable {
         self.literal = literal
         self.reveal = reveal
         self.media = media
+        self.region = region
+        self.purpose = purpose
     }
 
     init(slot: Slot) {
@@ -111,6 +117,22 @@ struct SlotDraft: Identifiable, Equatable {
         }
         reveal = slot.presentation.reveal
         media = slot.presentation.media
+    }
+
+    init(component: TemplateComponent) {
+        id = component.id
+        switch component.source {
+        case let .field(fieldID):
+            sourceKind = .field
+            self.fieldID = fieldID
+        case let .literal(literal):
+            sourceKind = .literal
+            self.literal = literal
+        }
+        reveal = component.presentation.reveal
+        media = component.presentation.media
+        region = component.region
+        purpose = component.purpose
     }
 
     var isValid: Bool {
@@ -138,6 +160,17 @@ struct SlotDraft: Identifiable, Equatable {
             source = .literal(value)
         }
         return Slot(source: source, presentation: Presentation(reveal: reveal, media: media))
+    }
+
+    func component() throws -> TemplateComponent {
+        let projected = try slot()
+        return TemplateComponent(
+            id: id,
+            region: region,
+            purpose: purpose,
+            source: projected.source,
+            presentation: projected.presentation
+        )
     }
 }
 
@@ -193,6 +226,7 @@ indirect enum ConditionDraft: Equatable {
 
 struct TemplateDraft: Equatable {
     var name: String
+    var layout: CardLayoutID
     var interaction: Interaction
     var skill: Skill
     var usesAutomaticSkill: Bool
@@ -202,6 +236,7 @@ struct TemplateDraft: Equatable {
 
     init(
         name: String = "",
+        layout: CardLayoutID = .focus,
         interaction: Interaction = .reveal,
         skill: Skill = Skill(input: .text, output: .text, operation: .recognize),
         usesAutomaticSkill: Bool = true,
@@ -210,6 +245,7 @@ struct TemplateDraft: Equatable {
         answerSlots: [SlotDraft] = [SlotDraft()]
     ) {
         self.name = name
+        self.layout = layout
         self.interaction = interaction
         self.skill = skill
         self.usesAutomaticSkill = usesAutomaticSkill
@@ -227,18 +263,28 @@ struct TemplateDraft: Equatable {
         self.init(
             name: name,
             promptSlots: [SlotDraft(fieldID: promptFieldID, media: promptMediaBehavior)],
-            answerSlots: [SlotDraft(fieldID: answerFieldID)]
+            answerSlots: [SlotDraft(
+                fieldID: answerFieldID,
+                reveal: .hiddenUntilAnswer,
+                region: .secondary,
+                purpose: .expectedAnswer
+            )]
         )
     }
 
     init(template: Template, in itemType: ItemType) {
         name = template.name
+        layout = template.layout
         interaction = template.interaction
         skill = template.skill
         usesAutomaticSkill = false
         generateWhen = template.generateWhen.map(ConditionDraft.init)
-        promptSlots = template.prompt.slots.map(SlotDraft.init)
-        answerSlots = template.answer.slots.map(SlotDraft.init)
+        promptSlots = template.components
+            .filter { $0.purpose != .expectedAnswer }
+            .map(SlotDraft.init)
+        answerSlots = template.components
+            .filter { $0.purpose == .expectedAnswer }
+            .map(SlotDraft.init)
         for index in promptSlots.indices
             where !promptSlots[index].media.isSupported(
                 for: promptSlots[index].fieldID.flatMap(itemType.field)?.type.mediaKind
@@ -256,9 +302,14 @@ struct TemplateDraft: Equatable {
     var hasAdvancedSettings: Bool {
         !usesAutomaticSkill
             || generateWhen != nil
-            || (promptSlots + answerSlots).contains { slot in
+            || promptSlots.contains { slot in
                 slot.sourceKind != .field
                     || slot.reveal != .always
+                    || slot.media != .default
+            }
+            || answerSlots.contains { slot in
+                slot.sourceKind != .field
+                    || ![.always, .hiddenUntilAnswer].contains(slot.reveal)
                     || slot.media != .default
             }
     }
@@ -294,11 +345,33 @@ struct TemplateDraft: Equatable {
         } else {
             resolvedSkill = skill
         }
+        var promptComponents = try promptSlots.map { draft in
+            var component = try draft.component()
+            if component.purpose == .expectedAnswer { component.purpose = .supporting }
+            if component.purpose == .question, component.presentation.reveal != .always,
+               interaction != .cloze {
+                component.presentation.reveal = .always
+            }
+            return component
+        }
+        if !promptComponents.contains(where: { $0.purpose == .question }),
+           !promptComponents.isEmpty {
+            promptComponents[0].purpose = .question
+            if promptComponents[0].region != .media { promptComponents[0].region = .primary }
+        }
+        let answerComponents: [TemplateComponent] = interaction == .audioSubmission ? [] : try answerSlots.map { draft in
+            var component = try draft.component()
+            component.purpose = .expectedAnswer
+            if component.presentation.reveal == .always {
+                component.presentation.reveal = .hiddenUntilAnswer
+            }
+            return component
+        }
         let template = Template(
             id: id,
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            prompt: prompt,
-            answer: answer,
+            layout: layout,
+            components: promptComponents + answerComponents,
             interaction: interaction,
             skill: resolvedSkill,
             generateWhen: try generateWhen?.condition()

@@ -133,7 +133,12 @@ final class TemplateEditorState {
 
     func addField(_ fieldID: UUID, to side: TemplateSide, at index: Int? = nil) {
         guard side != .answer || draft.interaction != .audioSubmission else { return }
-        var slot = SlotDraft(fieldID: fieldID)
+        var slot = SlotDraft(
+            fieldID: fieldID,
+            reveal: side == .answer ? .hiddenUntilAnswer : .always,
+            region: side == .answer ? .secondary : .primary,
+            purpose: side == .answer ? .expectedAnswer : .question
+        )
         if side == .prompt,
            draft.interaction == .cloze,
            itemType.field(fieldID)?.type == .cloze {
@@ -144,7 +149,12 @@ final class TemplateEditorState {
 
     func addLiteral(to side: TemplateSide, at index: Int? = nil) {
         guard side != .answer || draft.interaction != .audioSubmission else { return }
-        insert(SlotDraft(sourceKind: .literal), on: side, at: index)
+        insert(SlotDraft(
+            sourceKind: .literal,
+            reveal: side == .answer ? .hiddenUntilAnswer : .always,
+            region: side == .answer ? .secondary : .supporting,
+            purpose: side == .answer ? .expectedAnswer : .supporting
+        ), on: side, at: index)
     }
 
     @discardableResult
@@ -206,7 +216,9 @@ final class TemplateEditorState {
             fieldID: source.fieldID,
             literal: source.literal,
             reveal: source.reveal,
-            media: source.media
+            media: source.media,
+            region: source.region,
+            purpose: source.purpose
         )
         values.insert(duplicate, at: index + 1)
         setSlots(values, on: side)
@@ -264,6 +276,14 @@ final class TemplateEditorState {
         let wasAudioSubmission = draft.interaction == .audioSubmission
         draft.interaction = interaction
 
+        if [.record, .audioSubmission, .choose, .arrange].contains(interaction),
+           draft.layout == .focus {
+            draft.layout = .actionStage
+        } else if ![.record, .audioSubmission, .choose, .arrange].contains(interaction),
+                  draft.layout == .actionStage {
+            draft.layout = .focus
+        }
+
         if interaction == .audioSubmission {
             if stashedAnswerSlots == nil {
                 stashedAnswerSlots = draft.answerSlots
@@ -302,6 +322,16 @@ final class TemplateEditorState {
 
     private func insert(_ slot: SlotDraft, on side: TemplateSide, at requestedIndex: Int?) {
         var values = slots(on: side)
+        var slot = slot
+        if side == .answer {
+            slot.purpose = .expectedAnswer
+            if slot.region == .primary { slot.region = .secondary }
+            if slot.reveal == .always { slot.reveal = .hiddenUntilAnswer }
+        } else if slot.purpose == .expectedAnswer {
+            slot.purpose = values.contains(where: { $0.purpose == .question }) ? .supporting : .question
+            if slot.region == .secondary { slot.region = slot.purpose == .question ? .primary : .supporting }
+            slot.reveal = .always
+        }
         let index = min(max(requestedIndex ?? values.count, 0), values.count)
         values.insert(slot, at: index)
         setSlots(values, on: side)
@@ -317,7 +347,20 @@ final class TemplateEditorState {
     ) -> Bool {
         var sourceValues = slots(on: sourceSide)
         guard let sourceIndex = sourceValues.firstIndex(where: { $0.id == id }) else { return false }
-        let moved = sourceValues.remove(at: sourceIndex)
+        var moved = sourceValues.remove(at: sourceIndex)
+
+        if destinationSide == .answer {
+            moved.purpose = .expectedAnswer
+            if moved.region == .primary { moved.region = .secondary }
+            if moved.reveal == .always { moved.reveal = .hiddenUntilAnswer }
+        } else {
+            moved.purpose = sourceValues.contains(where: { $0.purpose == .question })
+                ? .supporting : .question
+            if moved.region == .secondary {
+                moved.region = moved.purpose == .question ? .primary : .supporting
+            }
+            moved.reveal = .always
+        }
 
         if sourceSide == destinationSide {
             var destination = requestedIndex ?? sourceValues.count

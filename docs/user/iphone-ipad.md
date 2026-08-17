@@ -78,8 +78,10 @@ Saved Responses shortcut also keeps the local-only status readable with
 increased contrast and accessibility text sizes. Deleting items or changing
 templates warns before removing saved spoken responses.
 
-Use **Create → Item Types & Templates** to create or edit fields, templates,
-interactions, prompt and answer slots, skills, and generation conditions.
+Use **Create → Item Types & Templates** to create or edit fields, composition
+presets, named component regions, interactions, skills, and generation
+conditions. Study uses the same non-scrolling adaptive stage and fixed footer
+as macOS; overflowing content opens in a separate detail sheet.
 Deck-provided item types start read-only. Unlock the original for editing when
 changes should affect its existing items and decks, or duplicate it for an
 independent editable type.

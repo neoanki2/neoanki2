@@ -237,6 +237,7 @@ public actor ItemStore {
             try ItemTypeValidation.validate(itemType)
         }
         try await database.migrate()
+        try await database.ensureTemplateDefinitionFormat()
         await mediaStore?.attachMetadataDatabase(database)
         try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
         try await ensureVersionedSchedulingBootstrap(now: bootstrapTime)

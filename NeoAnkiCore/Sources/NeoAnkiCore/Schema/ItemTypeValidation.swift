@@ -22,6 +22,7 @@ public enum ItemTypeValidation {
                     "Template \"\(template.name)\" references an unknown field."
                 )
             }
+            try validateComposition(template, in: itemType)
             try validateMediaBehaviors(template, in: itemType)
 
             if template.interaction == .audioSubmission {
@@ -35,14 +36,14 @@ public enum ItemTypeValidation {
     }
 
     private static func validateAudioSubmissionTemplate(_ template: Template) throws {
-        guard !template.prompt.slots.isEmpty else {
+        guard template.components.contains(where: { $0.purpose == .question }) else {
             throw DatabaseError.invalidItemType(
-                "Audio Submission templates need at least one prompt slot."
+                "Audio Submission templates need at least one question component."
             )
         }
-        guard template.answer.slots.isEmpty else {
+        guard !template.components.contains(where: { $0.purpose == .expectedAnswer }) else {
             throw DatabaseError.invalidItemType(
-                "Audio Submission templates cannot have an answer side."
+                "Audio Submission templates cannot have an expected answer."
             )
         }
         guard template.skill.output == .audio else {
@@ -53,27 +54,73 @@ public enum ItemTypeValidation {
     }
 
     private static func validateMediaBehaviors(_ template: Template, in itemType: ItemType) throws {
-        for slot in template.prompt.slots + template.answer.slots {
+        for component in template.components {
             let kind: MediaKind?
-            switch slot.source {
+            switch component.source {
             case let .field(id):
                 kind = itemType.field(id)?.type.mediaKind
             case .literal:
                 kind = nil
             }
-            guard slot.presentation.media.isSupported(for: kind) else {
+            guard component.presentation.media.isSupported(for: kind) else {
                 throw DatabaseError.invalidItemType(
-                    "Template \"\(template.name)\" uses \(slot.presentation.media.rawValue) on content that cannot play media."
+                    "Template \"\(template.name)\" uses \(component.presentation.media.rawValue) on content that cannot play media."
                 )
             }
         }
     }
 
+    private static func validateComposition(_ template: Template, in itemType: ItemType) throws {
+        guard !template.components.isEmpty else {
+            throw DatabaseError.invalidItemType("Every template needs at least one component.")
+        }
+        guard Set(template.components.map(\.id)).count == template.components.count else {
+            throw DatabaseError.invalidItemType("Template component IDs must be unique.")
+        }
+        guard template.components.contains(where: { $0.purpose == .question }) else {
+            throw DatabaseError.invalidItemType("Every template needs a question component.")
+        }
+        if template.interaction != .audioSubmission,
+           !template.components.contains(where: { $0.purpose == .expectedAnswer }) {
+            throw DatabaseError.invalidItemType("Every graded template needs an expected answer component.")
+        }
+
+        for component in template.components {
+            if component.purpose == .expectedAnswer, component.presentation.reveal == .always {
+                throw DatabaseError.invalidItemType(
+                    "Expected answers must stay concealed until answer reveal."
+                )
+            }
+            if component.region == .media, !isVisual(component, in: itemType) {
+                throw DatabaseError.invalidItemType(
+                    "The media region accepts only image, GIF, or video fields."
+                )
+            }
+        }
+
+        if template.layout == .mediaAside || template.layout == .mediaHero,
+           !template.components.contains(where: { $0.region == .media }) {
+            throw DatabaseError.invalidItemType(
+                "Media layouts require a visual component in the media region."
+            )
+        }
+    }
+
+    private static func isVisual(_ component: TemplateComponent, in itemType: ItemType) -> Bool {
+        guard case let .field(id) = component.source,
+              let kind = itemType.field(id)?.type.mediaKind else { return false }
+        return kind == .image || kind == .gif || kind == .video
+    }
+
     private static func validateClozeTemplate(_ template: Template, in itemType: ItemType) throws {
-        let clozeFields = Set(fieldIDs(in: template.prompt)).compactMap(itemType.field).filter { $0.type == .cloze }
+        let clozeFields = Set(template.components.compactMap { component -> UUID? in
+            guard component.purpose == .question,
+                  case let .field(id) = component.source else { return nil }
+            return id
+        }).compactMap(itemType.field).filter { $0.type == .cloze }
         guard clozeFields.count == 1 else {
             throw DatabaseError.invalidItemType(
-                "Cloze templates must use exactly one cloze field on the prompt side."
+                "Cloze templates must use exactly one cloze question component."
             )
         }
     }
@@ -121,7 +168,10 @@ public enum ItemTypeValidation {
     }
 
     public static func fieldIDsReferenced(by template: Template) -> [UUID] {
-        fieldIDs(in: template.prompt) + fieldIDs(in: template.answer) + generateWhenFieldIDs(template.generateWhen)
+        template.components.compactMap { component in
+            if case let .field(id) = component.source { return id }
+            return nil
+        } + generateWhenFieldIDs(template.generateWhen)
     }
 
     public static func fieldIDs(in side: Side) -> [UUID] {

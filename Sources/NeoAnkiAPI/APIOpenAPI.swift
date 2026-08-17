@@ -783,6 +783,12 @@ package enum APIOpenAPI {
             "Slot": object(["source", "presentation"], [
                 "source": reference("SlotSource"), "presentation": reference("Presentation"),
             ]),
+            "TemplateComponent": object(["id", "region", "purpose", "source", "presentation"], [
+                "id": uuid,
+                "region": ["type": "string", "enum": ["primary", "secondary", "media", "supporting", "label"]],
+                "purpose": ["type": "string", "enum": ["question", "expectedAnswer", "supporting"]],
+                "source": reference("SlotSource"), "presentation": reference("Presentation"),
+            ]),
             "Condition": object(["kind"], [
                 "kind": ["type": "string", "enum": ["fieldNotEmpty", "fieldEmpty", "all", "any"]],
                 "fieldId": uuid, "conditions": array(reference("Condition")),
@@ -791,6 +797,8 @@ package enum APIOpenAPI {
                 ["id", "name", "prompt", "answer", "interaction", "skill"],
                 ["id": uuid, "name": ["type": "string"], "prompt": array(reference("Slot")),
                  "answer": array(reference("Slot")),
+                 "layout": ["type": ["string", "null"], "enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage", NSNull()]],
+                 "components": ["oneOf": [array(reference("TemplateComponent")), ["type": "null"]]],
                  "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "arrange"]],
                  "skill": reference("Skill"), "generateWhen": reference("Condition")]
             ),
@@ -886,11 +894,16 @@ package enum APIOpenAPI {
             "ResolvedSlot": object(["value", "presentation"], [
                 "value": reference("ContentValue"), "presentation": reference("Presentation"),
             ]),
+            "ResolvedComponent": object(["id", "region", "purpose", "value", "presentation"], [
+                "id": uuid, "region": ["type": "string"], "purpose": ["type": "string"],
+                "value": reference("ContentValue"), "presentation": reference("Presentation"),
+            ]),
             "StudyCard": object(
-                ["id", "revision", "itemId", "templateId", "interaction", "prompt", "answer", "memory"],
+                ["id", "revision", "itemId", "templateId", "interaction", "layout", "components", "prompt", "answer", "memory"],
                 ["id": uuid, "revision": revision, "itemId": uuid, "templateId": uuid,
                  "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]],
-                 "interaction": ["type": "string"], "prompt": array(reference("ResolvedSlot")),
+                 "interaction": ["type": "string"], "layout": ["type": "string"],
+                 "components": array(reference("ResolvedComponent")), "prompt": array(reference("ResolvedSlot")),
                  "answer": array(reference("ResolvedSlot")), "memory": reference("Memory")]
             ),
             "RatingPreviewArray": array(reference("RatingPreview")),

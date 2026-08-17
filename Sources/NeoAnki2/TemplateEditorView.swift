@@ -1,5 +1,50 @@
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
+
+private enum TemplateDevicePreview: CaseIterable {
+    case phone, tablet, desktop
+
+    var label: String {
+        switch self { case .phone: "Phone"; case .tablet: "Tablet"; case .desktop: "Desktop" }
+    }
+
+    var width: CGFloat {
+        switch self { case .phone: 340; case .tablet: 520; case .desktop: 680 }
+    }
+
+    var height: CGFloat {
+        switch self { case .phone: 440; case .tablet: 430; case .desktop: 400 }
+    }
+
+    var componentBudget: Int {
+        switch self { case .phone: 4; case .tablet: 6; case .desktop: 8 }
+    }
+}
+
+private extension CardLayoutID {
+    var symbolName: String {
+        switch self {
+        case .focus: "rectangle.center.inset.filled"
+        case .split: "rectangle.split.2x1"
+        case .mediaAside: "sidebar.right"
+        case .mediaHero: "photo.fill"
+        case .actionStage: "button.programmable"
+        }
+    }
+}
+
+private extension ComponentRegion {
+    var editorLabel: String {
+        switch self {
+        case .primary: "Primary"
+        case .secondary: "Secondary"
+        case .media: "Media"
+        case .supporting: "Supporting"
+        case .label: "Label"
+        }
+    }
+}
 
 struct TemplateEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -147,6 +192,37 @@ struct TemplateEditorView: View {
                 .accessibilityIdentifier("templateInteractionPicker")
             }
             if let issue = editor.issue(for: .name) { ValidationMessage(issue.message) }
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                Text("Composition preset")
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: DesignSystem.Spacing.xs) {
+                    ForEach(CardLayoutID.allCases, id: \.self) { layout in
+                        Button {
+                            editor.draft.layout = layout
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: layout.symbolName)
+                                Text(layout.displayName).font(.caption)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.plain)
+                        .background(
+                            editor.draft.layout == layout
+                                ? DesignSystem.accent.opacity(0.15)
+                                : Color.secondary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 9)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 9)
+                                .stroke(editor.draft.layout == layout ? DesignSystem.accent : .clear, lineWidth: 2)
+                        }
+                        .accessibilityLabel("\(layout.displayName): \(layout.guidance)")
+                        .accessibilityAddTraits(editor.draft.layout == layout ? .isSelected : [])
+                    }
+                }
+            }
             if editor.draft.interaction == .audioSubmission {
                 Label(
                     "Spoken responses stay on this device and are not included in cloud sync.",
@@ -304,6 +380,7 @@ private struct TemplateStudyPreviewPane: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Bindable var editor: TemplateEditorState
     @FocusState.Binding var validationFocus: TemplateValidationTarget?
+    @State private var devicePreview: TemplateDevicePreview = .desktop
 
     var body: some View {
         ScrollView {
@@ -315,6 +392,10 @@ private struct TemplateStudyPreviewPane: View {
                             .font(DesignSystem.Typography.uiHint).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    Picker("Device size", selection: $devicePreview) {
+                        ForEach(TemplateDevicePreview.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .frame(width: 120)
                     Picker("Preview phase", selection: $editor.previewPhase) {
                         ForEach(TemplatePreviewPhase.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
@@ -335,9 +416,19 @@ private struct TemplateStudyPreviewPane: View {
                     responseSimulation
                 }
                 .padding(DesignSystem.Spacing.xl)
-                .frame(maxWidth: 680, minHeight: 400)
+                .frame(width: devicePreview.width)
+                .frame(minHeight: devicePreview.height)
                 .background(.background, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(.separator))
+                if editor.draft.promptSlots.count + editor.draft.answerSlots.count > devicePreview.componentBudget {
+                    Label(
+                        "This composition may overflow at \(devicePreview.label.lowercased()) size. Full content will remain available from the study detail sheet.",
+                        systemImage: "rectangle.compress.vertical"
+                    )
+                    .font(DesignSystem.Typography.uiHint)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("templateOverflowDiagnostic")
+                }
                 Button {
                     let action = { editor.previewPhase = editor.previewPhase == .beforeAnswer ? .afterAnswer : .beforeAnswer }
                     if reduceMotion { action() } else { withAnimation(.easeOut(duration: 0.18), action) }
@@ -575,6 +666,17 @@ private struct TemplateSlotInspector: View {
                     Text("Answer").tag(TemplateSide.answer)
                 }
                 .disabled(editor.draft.interaction == .audioSubmission)
+                Picker("Named region", selection: binding(\.region)) {
+                    ForEach(ComponentRegion.allCases, id: \.self) { region in
+                        Text(region.editorLabel).tag(region)
+                    }
+                }
+                Picker("Purpose", selection: binding(\.purpose)) {
+                    Text("Question").tag(ComponentPurpose.question)
+                    Text("Supporting").tag(ComponentPurpose.supporting)
+                    if side == .answer { Text("Expected answer").tag(ComponentPurpose.expectedAnswer) }
+                }
+                .disabled(side == .answer)
                 if let issue = editor.issue(for: .slot(side: side, id: id)) { ValidationMessage(issue.message) }
                 Divider()
                 HStack {

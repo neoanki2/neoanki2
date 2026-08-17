@@ -84,7 +84,7 @@
       "id": "mobile-study",
       "name": "Complete native mobile study sessions",
       "article": "user/iphone-ipad.md",
-      "sources": ["Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiIOS/StudySessionView.swift"],
+      "sources": ["Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiIOS/MobileStudyCompositionView.swift", "Sources/NeoAnkiIOS/StudySessionView.swift"],
       "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift"]
     },
     {
@@ -204,8 +204,8 @@
       "id": "study-reveal",
       "name": "Reveal and self-grade interaction",
       "article": "user/studying.md",
-      "sources": ["Sources/NeoAnki2/StudyView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudySupportTests.swift"],
+      "sources": ["Sources/NeoAnki2/StudyCompositionView.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyCompositionTests.swift", "Tests/NeoAnki2Tests/StudySupportTests.swift"],
       "screenshot": "assets/screenshots/study-answer.png"
     },
     {
@@ -311,7 +311,7 @@
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
       "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "Sources/NeoAnki2/PortableDeckImportPanel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
-      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/PortableDeckTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift", "Tests/NeoAnki2Tests/TemplateDefinitionMigratorTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/PortableDeckTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
     {

@@ -221,24 +221,19 @@ struct StudyView: View {
 
             Divider()
 
-            ScrollView {
-                VStack(spacing: DesignSystem.Spacing.lg) {
-                    studyCardContent(card)
+            AdaptiveStudyStage(layout: card.template.layout) {
+                studyCardContent(card)
+            } footer: {
+                VStack(spacing: 0) {
+                    if let errorMessage = model.errorMessage {
+                        ErrorBanner(message: errorMessage)
+                    }
+                    if let undo = model.pendingGradeUndo {
+                        gradeUndoBanner(for: undo)
+                    }
+                    studyFooter(for: card)
                 }
-                .readingColumnLayout()
             }
-
-            if let errorMessage = model.errorMessage {
-                ErrorBanner(message: errorMessage)
-            }
-
-            if let undo = model.pendingGradeUndo {
-                gradeUndoBanner(for: undo)
-            }
-
-            Divider()
-
-            studyFooter(for: card)
         }
         .onExitCommand {
             requestEndSession()
@@ -302,21 +297,22 @@ struct StudyView: View {
 
     @ViewBuilder
     private func studyCardContent(_ card: DueCard) -> some View {
-        SideContentView(
-            side: card.template.prompt,
+        VStack(spacing: DesignSystem.Spacing.md) {
+            StudyCompositionView(
+            template: card.template,
             item: card.item,
             isAnswerRevealed: model.isAnswerRevealed,
-            richTextPointSize: DesignSystem.Typography.cardPromptPointSize,
             mediaStore: mediaStore,
             clozeGroup: card.card.clozeGroup
         )
             .accessibilityIdentifier("studyPrompt")
-            .font(DesignSystem.Typography.cardPrompt)
-            .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
+            .frame(maxHeight: .infinity)
 
         if !model.isAnswerRevealed {
             interactionResponse(for: card)
+                .frame(maxWidth: 640)
+                .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         }
 
         if let message = model.interactionMessage {
@@ -328,28 +324,15 @@ struct StudyView: View {
         }
 
         if model.isAnswerRevealed {
-            Divider()
             evaluationFeedback
 
             if card.template.interaction == .record, recording.hasRecording {
                 revealedRecordingPlayback
             }
-
-            SideContentView(
-                side: card.template.answer,
-                item: card.item,
-                isAnswerRevealed: true,
-                richTextPointSize: DesignSystem.Typography.cardAnswerPointSize,
-                mediaStore: mediaStore,
-                clozeGroup: card.card.clozeGroup
-            )
-                .accessibilityIdentifier("studyAnswer")
-                .font(DesignSystem.Typography.cardAnswer)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .transition(.opacity)
-                .accessibilityFocused($answerAccessibilityFocused)
         }
+        }
+        .transition(.opacity)
+        .accessibilityFocused($answerAccessibilityFocused)
     }
 
     @ViewBuilder

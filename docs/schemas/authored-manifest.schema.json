@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://neoanki.app/schemas/authored-manifest-v3.json",
+  "$id": "https://neoanki.app/schemas/authored-manifest-v5.json",
   "title": "NeoAnki authored deck manifest record",
   "type": "object",
   "additionalProperties": false,
   "required": ["kind", "version", "root", "parts"],
   "properties": {
     "kind": {"const": "neoanki"},
-    "version": {"enum": [1, 2, 3, 4]},
+    "version": {"enum": [1, 2, 3, 4, 5]},
     "root": {"$ref": "#/$defs/id"},
     "parts": {
       "type": "array",

@@ -144,8 +144,16 @@ public extension ItemType {
             Template(
                 id: UUID(),
                 name: template.name,
-                prompt: duplicatedSide(template.prompt, fieldMap: fieldMap),
-                answer: duplicatedSide(template.answer, fieldMap: fieldMap),
+                layout: template.layout,
+                components: template.components.map { component in
+                    TemplateComponent(
+                        id: UUID(),
+                        region: component.region,
+                        purpose: component.purpose,
+                        source: duplicatedSource(component.source, fieldMap: fieldMap),
+                        presentation: component.presentation
+                    )
+                },
                 interaction: template.interaction,
                 skill: template.skill,
                 generateWhen: template.generateWhen.map {
@@ -158,6 +166,13 @@ public extension ItemType {
             fields: copiedFields,
             templates: copiedTemplates
         )
+    }
+}
+
+private func duplicatedSource(_ source: SlotSource, fieldMap: [UUID: UUID]) -> SlotSource {
+    switch source {
+    case let .field(id): .field(fieldMap[id] ?? id)
+    case let .literal(value): .literal(value)
     }
 }
 

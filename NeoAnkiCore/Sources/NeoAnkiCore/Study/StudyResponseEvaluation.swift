@@ -21,7 +21,11 @@ public struct Arrangement: Sendable, Equatable {
 /// Platform-neutral study rules shared by macOS, iPhone, and iPad.
 public enum StudyResponseEvaluator {
     public static func acceptedAnswers(for card: DueCard) -> [String] {
-        let values = SideContent.values(for: card.template.answer, from: card.item)
+        let values = SideContent.values(
+            for: .expectedAnswer,
+            in: card.template,
+            from: card.item
+        )
         let answers = values.flatMap(textRepresentations)
             .map(trimmed)
             .filter { !$0.isEmpty }
@@ -38,7 +42,7 @@ public enum StudyResponseEvaluator {
     }
 
     public static func hasReferenceAudio(for card: DueCard) -> Bool {
-        SideContent.values(for: card.template.answer, from: card.item).contains { value in
+        SideContent.values(for: .expectedAnswer, in: card.template, from: card.item).contains { value in
             guard case let .media(reference) = value else { return false }
             return reference.kind == .audio
         }
@@ -47,7 +51,8 @@ public enum StudyResponseEvaluator {
     public static func choiceOptions(for card: DueCard, maximum: Int = 4) -> [String] {
         guard let correct = acceptedAnswers(for: card).first else { return [] }
         let available = card.item.fields.flatMap { textRepresentations($0.value) }
-            + SideContent.values(for: card.template.prompt, from: card.item).flatMap(textRepresentations)
+            + SideContent.values(for: .question, in: card.template, from: card.item)
+                .flatMap(textRepresentations)
         var options = unique([correct] + available.map(trimmed).filter {
             !$0.isEmpty && normalized($0) != normalized(correct)
         })

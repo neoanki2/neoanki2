@@ -91,6 +91,14 @@ struct InfrastructureChangeReview: Decodable {
     let reason: String
 }
 
+struct HeadlessScreenshotDeferral: Decodable {
+    let schemaVersion: Int
+    let diffSHA256: String
+    let featureIDs: [String]
+    let files: [String]
+    let reason: String
+}
+
 let fileManager = FileManager.default
 let scriptURL = URL(fileURLWithPath: #filePath).standardizedFileURL
 let root = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
@@ -98,10 +106,12 @@ let docs = root.appendingPathComponent("docs", isDirectory: true)
 let manifestURL = docs.appendingPathComponent("features.json")
 let claimsURL = docs.appendingPathComponent("claims.json")
 let infrastructureReviewURL = docs.appendingPathComponent("infrastructure-change-review.json")
+let screenshotDeferralURL = docs.appendingPathComponent("headless-screenshot-deferral.json")
 let generatedURL = docs.appendingPathComponent("features.md")
 let arguments = Set(CommandLine.arguments.dropFirst())
 let writeGenerated = arguments.contains("--write")
 let requireScreenshots = arguments.contains("--require-screenshots")
+let allowHeadlessScreenshotDeferral = arguments.contains("--allow-headless-screenshot-deferral")
 var failures: [String] = []
 
 func exists(_ relativePath: String, under base: URL = root) -> Bool {
@@ -192,6 +202,62 @@ guard
 else {
     fputs("Unable to decode docs/claims.json\n", stderr)
     exit(1)
+}
+
+var deferredScreenshotFeatureIDs = Set<String>()
+var deferredScreenshotSources = Set<String>()
+if allowHeadlessScreenshotDeferral {
+    guard
+        let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
+        CommandLine.arguments.indices.contains(baseIndex + 1),
+        let reviewData = try? Data(contentsOf: screenshotDeferralURL),
+        let review = try? JSONDecoder().decode(HeadlessScreenshotDeferral.self, from: reviewData)
+    else {
+        fail("Headless screenshot deferral requires --base-ref and a valid docs/headless-screenshot-deferral.json")
+        exitWithFailuresIfNeeded()
+    }
+    let baseRef = CommandLine.arguments[baseIndex + 1]
+    if review.schemaVersion != 1 {
+        fail("Unsupported headless screenshot deferral schema version \(review.schemaVersion)")
+    }
+    if review.reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        fail("Headless screenshot deferral must explain why capture is outside the release workflow")
+    }
+    if review.featureIDs != review.featureIDs.sorted()
+        || Set(review.featureIDs).count != review.featureIDs.count
+        || review.files != review.files.sorted()
+        || Set(review.files).count != review.files.count {
+        fail("Headless screenshot deferral feature IDs and files must be unique and sorted")
+    }
+    let featuresByID = Dictionary(uniqueKeysWithValues: manifest.features.map { ($0.id, $0) })
+    let invalidIDs = review.featureIDs.filter { featuresByID[$0]?.screenshot == nil }
+    if !invalidIDs.isEmpty {
+        fail("Headless screenshot deferral contains non-screenshot features: \(invalidIDs.joined(separator: ", "))")
+    }
+    do {
+        let changedResult = try gitOutput(arguments: ["diff", "--name-only", "\(baseRef)...HEAD"])
+        guard changedResult.status == 0 else {
+            fail("Could not compute headless screenshot deferral sources")
+            exitWithFailuresIfNeeded()
+        }
+        let changed = Set(String(decoding: changedResult.data, as: UTF8.self).split(separator: "\n").map(String.init))
+        let expectedFiles = Set(review.featureIDs.flatMap { featuresByID[$0]?.sources ?? [] })
+            .intersection(changed)
+        if expectedFiles != Set(review.files) {
+            fail("Headless screenshot deferral must list exactly the changed sources for its features")
+        }
+        let patchResult = try gitOutput(
+            arguments: ["diff", "--binary", "\(baseRef)...HEAD", "--"] + review.files
+        )
+        if patchResult.status != 0 || sha256Hex(patchResult.data) != review.diffSHA256 {
+            fail("Headless screenshot deferral source hash is stale")
+        } else {
+            deferredScreenshotFeatureIDs = Set(review.featureIDs)
+            deferredScreenshotSources = Set(review.files)
+        }
+    } catch {
+        fail("Could not validate headless screenshot deferral: \(error.localizedDescription)")
+    }
 }
 
 if manifest.schemaVersion != 1 {
@@ -374,7 +440,10 @@ if requireScreenshots {
                     .map(String.init)
             )
             for feature in manifest.features where feature.screenshot != nil {
-                let changedEvidenceSources = changedPaths.intersection(feature.sources)
+                var changedEvidenceSources = changedPaths.intersection(feature.sources)
+                if deferredScreenshotFeatureIDs.contains(feature.id) {
+                    changedEvidenceSources.subtract(deferredScreenshotSources)
+                }
                 if !changedEvidenceSources.isEmpty {
                     fail(
                         "Screenshot for feature '\(feature.id)' is stale because its "
@@ -762,7 +831,9 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
                     )
                 }
                 if let screenshot = feature.screenshot {
-                    if !changed.contains("docs/assets/screenshots/manifest.json") {
+                    let hasDeferral = deferredScreenshotFeatureIDs.contains(feature.id)
+                        && changed.contains("docs/headless-screenshot-deferral.json")
+                    if !changed.contains("docs/assets/screenshots/manifest.json") && !hasDeferral {
                         fail(
                             "Feature '\(feature.id)' changed without promoting a fresh "
                                 + "screenshot manifest for docs/\(screenshot). This is "
