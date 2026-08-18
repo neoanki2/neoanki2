@@ -77,6 +77,10 @@ struct DeckSidebarView: View {
                                         onRename: beginRename,
                                         onDelete: prepareDeckDeletion,
                                         onNewSubdeck: beginNewSubdeck,
+                                        onSelect: { id in
+                                            isShowingSavedResponses = false
+                                            selection = .deck(id)
+                                        },
                                         draggingDeckID: $draggingDeckID
                                     )
                                 }
@@ -362,6 +366,7 @@ private struct DeckSidebarNode: View {
     let onRename: (DeckSummary) -> Void
     let onDelete: (DeckSummary) -> Void
     let onNewSubdeck: (UUID) -> Void
+    let onSelect: (UUID) -> Void
     @Binding var draggingDeckID: UUID?
     @State private var isExpanded = false
     @State private var dropZone: DeckRowDropZone?
@@ -380,6 +385,7 @@ private struct DeckSidebarNode: View {
                         onRename: onRename,
                         onDelete: onDelete,
                         onNewSubdeck: onNewSubdeck,
+                        onSelect: onSelect,
                         draggingDeckID: $draggingDeckID
                     )
                 }
@@ -452,6 +458,9 @@ private struct DeckSidebarNode: View {
             }
         }
         .tag(LibrarySidebarDestination.scope(.deck(summary.id)))
+        .onTapGesture {
+            onSelect(summary.id)
+        }
         .onDrag {
             draggingDeckID = summary.id
             return NSItemProvider(

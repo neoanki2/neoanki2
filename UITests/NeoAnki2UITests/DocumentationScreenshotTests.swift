@@ -54,10 +54,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             databaseLabel: "docs-item-add",
             scenario: "deck-included-item-types"
         )
-        showSidebar(in: contextualApp)
-        contextualApp.descendants(matching: .any)
-            .identified("deckRow-Poetry Lab")
-            .click()
+        selectScope("deckRow-Poetry Lab", in: contextualApp)
         openAddItem(in: contextualApp, waitForDefaultField: false)
         captureDocumentationScreenshot(
             named: "item-add",

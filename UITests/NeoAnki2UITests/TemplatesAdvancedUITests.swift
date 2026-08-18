@@ -119,10 +119,7 @@ extension FastFunctionalJourneyTests {
 final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
     func testSpecializedDeckRecommendsItsTypeAndKeepsBasicReachable() throws {
         let app = launchApp(scenario: "deck-included-item-types")
-        showSidebar(in: app)
-        let deck = app.descendants(matching: .any).identified("deckRow-Poetry Lab")
-        XCTAssertTrue(deck.waitUntilExists(timeout: 5))
-        deck.click()
+        selectScope("deckRow-Poetry Lab", in: app)
         openAddItem(in: app, waitForDefaultField: false)
 
         XCTAssertTrue(field(named: "Previous Lines", in: app).waitUntilExists(timeout: 5))
@@ -140,8 +137,7 @@ final class DeckIncludedItemTypesUITests: NeoAnkiUITestCase {
 
     func testManualTypeChangeConfirmsBeforeClearingContent() throws {
         let app = launchApp(scenario: "deck-included-item-types")
-        showSidebar(in: app)
-        app.descendants(matching: .any).identified("deckRow-Poetry Lab").click()
+        selectScope("deckRow-Poetry Lab", in: app)
         openAddItem(in: app, waitForDefaultField: false)
         enterText(
             "An entered line",
