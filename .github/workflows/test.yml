@@ -55,6 +55,8 @@ jobs:
       - name: Run every SwiftPM test gate with shared build products
         run: |
           failures=0
+          bash -n Scripts/release.sh Scripts/build-release-candidate.sh \
+            Scripts/publish-release-candidate.sh Scripts/ship-release.sh || failures=1
           bash Scripts/validate-architecture.sh || failures=1
           (cd NeoAnkiCore && swift test --parallel) || failures=1
           swift test --filter NeoAnki2Tests --parallel || failures=1

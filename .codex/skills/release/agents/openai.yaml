@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release"
+  short_description: "Ship NeoAnki2 releases safely and quickly"
+  default_prompt: "Use $release to publish and install the current NeoAnki2 change."

@@ -70,9 +70,13 @@ ARTIFACT="NeoAnki2-$VERSION-mac-universal.dmg"
 TREE_SHA="$(git -C "$ROOT" rev-parse 'HEAD^{tree}')"
 
 if RELEASE_JSON="$(gh release view "$TAG" --repo "$REPOSITORY" \
-  --json isDraft 2>/dev/null)"; then
+  --json isDraft,targetCommitish 2>/dev/null)"; then
   if [ "$(jq -r .isDraft <<<"$RELEASE_JSON")" != "true" ]; then
     echo "Release $TAG already exists and is published." >&2
+    exit 1
+  fi
+  if [ "$(jq -r .targetCommitish <<<"$RELEASE_JSON")" != "$HEAD_SHA" ]; then
+    echo "Draft $TAG already belongs to another source revision." >&2
     exit 1
   fi
 fi
