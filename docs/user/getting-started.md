@@ -36,6 +36,11 @@ Apple-notarized. If macOS blocks the first launch, Control-click **NeoAnki2** in
 Applications, choose **Open**, then confirm **Open**. Do not disable Gatekeeper
 globally.
 
+The public Mac release and ordinary source-built app bundles do not carry the
+private CloudKit entitlement, so the iCloud settings report **Unavailable in
+this build** and keep the library local. An iCloud container requires a separately provisioned and signed build.
+This does not affect manual backups, deck export, studying, or authoring.
+
 To update later, run:
 
 ```bash
@@ -100,7 +105,9 @@ normally follows your current macOS appearance setting.
 
 App-level preferences are under **NeoAnki2 → Settings**. The **Study** tab
 includes the device-local Fail / Pass grading option; Local API and iCloud tabs
-appear after the library finishes opening.
+appear after the library finishes opening. An unprovisioned build clears a
+previously saved iCloud opt-in instead of attempting to initialize a container
+that its signature cannot access.
 
 Do not stop at the empty screen: the [five-minute first study
 session](../first-study-session/) creates one Basic item, reviews its generated

@@ -99,7 +99,7 @@
       "name": "Opt in to offline-first private CloudKit sync",
       "article": "user/sync-reminders-widgets.md",
       "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOS/MobilePaths.swift", "Sources/NeoAnki2/MacCloudSyncSettings.swift", "Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnkiCloudSync/CKSyncEngineTransport.swift", "Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift", "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift", "Sources/NeoAnkiCloudSync/SyncMergePolicy.swift", "Sources/NeoAnkiCloudSync/SyncMetadataStore.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
-      "tests": ["Tests/NeoAnkiApplicationTests/OfflineFirstSyncServiceTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiApplicationTests/SyncMergePolicyTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
+      "tests": ["Tests/NeoAnkiApplicationTests/CKSyncEngineTransportTests.swift", "Tests/NeoAnkiApplicationTests/OfflineFirstSyncServiceTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiApplicationTests/SyncMergePolicyTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
     },
     {
       "id": "mobile-reminders-widgets",

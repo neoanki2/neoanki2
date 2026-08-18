@@ -109,6 +109,11 @@ and icon appear when macOS uses light appearance.
   **Archive Original and Repair** action for an unreadable type; it preserves
   the damaged definition and does not delete existing items.
 
+An iCloud opt-in saved by another build does not make local-library startup
+depend on CloudKit. If the current executable lacks the required signed
+container entitlement, NeoAnki2 clears that opt-in, keeps the library local,
+and reports **Unavailable in this build** in iCloud settings.
+
 ## Empty and loading states
 
 These states are informational:
