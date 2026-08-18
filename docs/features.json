@@ -121,7 +121,7 @@
       "name": "Create, nest, rename, and delete decks",
       "article": "user/library-and-decks.md",
       "sources": ["Sources/NeoAnki2/DeckSidebarView.swift", "Sources/NeoAnki2/DecksModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift", "Tests/NeoAnki2Tests/DecksModelCRUDTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/DeckUITests.swift", "Tests/NeoAnki2Tests/DecksModelCRUDTests.swift", "Tests/NeoAnki2Tests/DeckDragInteractionTests.swift"],
       "screenshot": "assets/screenshots/decks-nested.png"
     },
     {

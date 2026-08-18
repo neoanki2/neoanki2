@@ -93,6 +93,46 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             scenario: "library sidebar with nested Languages and French decks",
             expectedVisibleIdentifiers: ["deckRow-Languages", "deckRow-French"]
         )
+
+        let topLevelTarget = deckApp.descendants(matching: .any)
+            .identified("deckTopLevelDropTarget")
+        XCTAssertTrue(topLevelTarget.waitUntilExists(timeout: 3))
+        childDeck.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5))
+            .press(
+                forDuration: 0.6,
+                thenDragTo: topLevelTarget.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                )
+            )
+
+        XCTAssertTrue(
+            waitUntil(timeout: 5) {
+                childDeck.exists && abs(childDeck.frame.minX - parent.frame.minX) < 4
+            },
+            "Dragging French to the Decks heading should move it to the top level"
+        )
+
+        childDeck.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5))
+            .press(
+                forDuration: 0.6,
+                thenDragTo: parent.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                )
+            )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) {
+                childDeck.exists && childDeck.frame.minX > parent.frame.minX + 4
+            },
+            "Dropping French in the center of Languages should indent it as a subdeck"
+        )
+
+        let disclosureAfterMovingIn = deckApp.disclosureTriangles.firstMatch
+        XCTAssertTrue(disclosureAfterMovingIn.waitUntilExists(timeout: 3))
+        disclosureAfterMovingIn.click()
+        XCTAssertTrue(
+            childDeck.waitUntilGone(timeout: 5),
+            "Dropping French in the center of Languages should make it a subdeck"
+        )
     }
 
     func testMediaAuthoringScreenshot() throws {
