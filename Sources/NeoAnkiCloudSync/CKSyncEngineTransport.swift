@@ -1,6 +1,18 @@
 import CloudKit
 import Foundation
 import NeoAnkiApplication
+import Security
+
+public enum CKSyncEngineTransportError: Error, Equatable, LocalizedError, Sendable {
+    case missingContainerEntitlement(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .missingContainerEntitlement(identifier):
+            "This build is not provisioned for the iCloud container \(identifier)."
+        }
+    }
+}
 
 private actor TransportBuffers {
     var outgoing: [CKRecord.ID: SyncRecordEnvelope] = [:]
@@ -35,6 +47,16 @@ private actor TransportBuffers {
 public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate, @unchecked Sendable {
     public static let containerIdentifier = "iCloud.com.neoanki2.app"
     public static let zoneName = "NeoAnkiLibrary"
+    private static let containerIdentifiersEntitlement =
+        "com.apple.developer.icloud-container-identifiers"
+
+    /// Creating a `CKContainer` for an identifier absent from the executable's
+    /// signed entitlements terminates the process instead of throwing an error.
+    /// Check the effective signature first so ad-hoc development builds can
+    /// report that sync is unavailable without crashing.
+    public static var isAvailable: Bool {
+        (try? validateCurrentProcessEntitlements()) != nil
+    }
 
     private let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
     private let buffers = TransportBuffers()
@@ -56,8 +78,28 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     }
 
     public static func make(metadataStore: SyncMetadataStore) async throws -> CKSyncEngineTransport {
+        try validateCurrentProcessEntitlements()
         let metadata = try await metadataStore.load()
         return CKSyncEngineTransport(metadataStore: metadataStore, initialState: metadata.engineState)
+    }
+
+    static func validateContainerIdentifiers(_ identifiers: [String]?) throws {
+        guard identifiers?.contains(containerIdentifier) == true else {
+            throw CKSyncEngineTransportError.missingContainerEntitlement(containerIdentifier)
+        }
+    }
+
+    private static func validateCurrentProcessEntitlements() throws {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let value = SecTaskCopyValueForEntitlement(
+                  task,
+                  containerIdentifiersEntitlement as CFString,
+                  nil
+              )
+        else {
+            throw CKSyncEngineTransportError.missingContainerEntitlement(containerIdentifier)
+        }
+        try validateContainerIdentifiers(value as? [String])
     }
 
     public func start() async throws {

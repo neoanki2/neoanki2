@@ -127,6 +127,7 @@
       "contains": [
         "macOS 14 or newer",
         "~/Library/Application Support/neoanki2/",
+        "An iCloud container requires a separately provisioned and signed build",
         "The Home summary is prepared while the app window opens"
       ]
     },

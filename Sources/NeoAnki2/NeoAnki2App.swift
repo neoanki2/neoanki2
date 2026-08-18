@@ -175,6 +175,7 @@ struct NeoAnki2App: App {
                     MacCloudSyncSettings(
                         isEnabled: $cloudSyncEnabled,
                         status: syncStatus,
+                        isAvailable: CKSyncEngineTransport.isAvailable,
                         onChange: { enabled in await updateCloudSync(enabled: enabled, library: library) },
                         synchronize: { await syncService?.synchronize(); await refreshSyncStatus() }
                     )
@@ -261,6 +262,12 @@ struct NeoAnki2App: App {
             await syncService?.stop()
             syncService = nil
             syncStatus = .offline
+            return
+        }
+        guard CKSyncEngineTransport.isAvailable else {
+            cloudSyncEnabled = false
+            syncService = nil
+            syncStatus = .accountUnavailable
             return
         }
         do {

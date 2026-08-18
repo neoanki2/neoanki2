@@ -18,6 +18,11 @@ installed build, check that build's release notes and entitlements; an older
 public Mac release or unsigned contributor build can operate locally without a
 usable CloudKit container.
 
+On Mac, **Unavailable in this build** means the executable does not have the
+signed entitlement for NeoAnki2's private container. The sync toggle and
+**Sync Now** remain disabled, and any saved opt-in is cleared without touching
+the local library. This is a build capability, not an iCloud account error.
+
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
 
@@ -36,7 +41,8 @@ CloudKit is off until you opt in on each device:
 1. Sign in to iCloud in system Settings and confirm iCloud Drive is available.
 2. On iPhone or iPad, open NeoAnki2 **Settings** and choose **Enable iCloud
    Sync…**. On Mac, open **NeoAnki2 → Settings → iCloud** and turn on **Sync
-   this Mac**.
+   this Mac**. If that control is disabled and Status says **Unavailable in
+   this build**, install a separately provisioned build before continuing.
 3. Read the consent message, then choose **Create Backup & Enable**.
 4. Keep the app open until Status becomes **Current**, or open **Sync Issues**
    if it becomes **Needs attention**.
@@ -113,6 +119,11 @@ If Status is **Account unavailable**:
 2. Confirm the build is an officially provisioned build. Unsigned development
    builds cannot use the production container.
 3. Reopen NeoAnki2, choose **Sync Now**, and check **Sync Issues**.
+
+If Status says **Unavailable in this build**, there is nothing to retry from
+that executable. Keep using the local library or install a build provisioned
+for NeoAnki2's CloudKit container. Repeated launches remain safe and do not
+create the pre-merge backup until sync can actually start.
 
 If Status is **Offline**, keep studying locally, check the network and iCloud
 service, then retry. Rate limits, a busy zone, and temporary CloudKit failures

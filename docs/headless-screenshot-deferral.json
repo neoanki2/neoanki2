@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "50a46bc6b23e756c4e59abacf332599696aed97e28932fcd743a8b13d967fba6",
+  "diffSHA256": "5c283ca0026d61650459f708e958b9323aa4f17e7f3f687e34e60bd59f819f3d",
   "featureIDs": [
+    "app-first-launch",
     "app-navigation",
     "deck-management",
     "deck-scopes",
@@ -27,6 +28,8 @@
     "Sources/NeoAnki2/ContentView.swift",
     "Sources/NeoAnki2/DeckSidebarView.swift",
     "Sources/NeoAnki2/DecksModel.swift",
+    "Sources/NeoAnki2/MacCloudSyncSettings.swift",
+    "Sources/NeoAnki2/NeoAnki2App.swift",
     "Sources/NeoAnki2/StudyCompositionView.swift",
     "Sources/NeoAnki2/StudyView.swift",
     "Sources/NeoAnki2/TemplateEditorState.swift",
@@ -35,5 +38,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release repairs deck sidebar drag handling while carrying inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
+  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release prevents iCloud startup crashes in unprovisioned builds while carrying inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
 }

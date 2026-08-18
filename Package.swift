@@ -98,7 +98,8 @@ let package = Package(
                 "NeoAnkiApplication",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
-            path: "Sources/NeoAnkiCloudSync"
+            path: "Sources/NeoAnkiCloudSync",
+            linkerSettings: [.linkedFramework("Security")]
         ),
         .target(
             name: "NeoAnkiDeckBuilderKit",
