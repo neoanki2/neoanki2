@@ -99,7 +99,9 @@ let package = Package(
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
             path: "Sources/NeoAnkiCloudSync",
-            linkerSettings: [.linkedFramework("Security")]
+            linkerSettings: [
+                .linkedFramework("Security", .when(platforms: [.macOS])),
+            ]
         ),
         .target(
             name: "NeoAnkiDeckBuilderKit",

@@ -1,7 +1,9 @@
 import CloudKit
 import Foundation
 import NeoAnkiApplication
+#if os(macOS)
 import Security
+#endif
 
 public enum CKSyncEngineTransportError: Error, Equatable, LocalizedError, Sendable {
     case missingContainerEntitlement(String)
@@ -55,7 +57,11 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     /// Check the effective signature first so ad-hoc development builds can
     /// report that sync is unavailable without crashing.
     public static var isAvailable: Bool {
+#if os(macOS)
         (try? validateCurrentProcessEntitlements()) != nil
+#else
+        true
+#endif
     }
 
     private let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
@@ -90,6 +96,7 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     }
 
     private static func validateCurrentProcessEntitlements() throws {
+#if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil),
               let value = SecTaskCopyValueForEntitlement(
                   task,
@@ -100,6 +107,7 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
             throw CKSyncEngineTransportError.missingContainerEntitlement(containerIdentifier)
         }
         try validateContainerIdentifiers(value as? [String])
+#endif
     }
 
     public func start() async throws {
