@@ -63,7 +63,7 @@
       "name": "Split navigation and focus modes",
       "article": "user/getting-started.md",
       "sources": ["Sources/NeoAnki2/ContentView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/NavigationGatingUITests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/NavigationGatingUITests.swift", "Tests/NeoAnki2Tests/ContentLayoutPolicyTests.swift"],
       "screenshot": "assets/screenshots/library-populated.png"
     },
     {

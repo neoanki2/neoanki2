@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "752d33d097a2fb536e0fc5d514300ac53ddd06400b8937e1c1e957b41508c151",
+  "diffSHA256": "ee252d7c05b883c41390484fd7ef9c09bad507b42a8b89ab32461ac0f49ad35a",
   "featureIDs": [
+    "app-navigation",
     "errors-empty-states",
     "import-json-csv",
     "item-types",
@@ -21,6 +22,7 @@
     "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift",
     "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift",
     "NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift",
+    "Sources/NeoAnki2/ContentView.swift",
     "Sources/NeoAnki2/StudyCompositionView.swift",
     "Sources/NeoAnki2/StudyView.swift",
     "Sources/NeoAnki2/TemplateEditorState.swift",
@@ -29,5 +31,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The previous headless study-compositions release deferred these screenshots, and the repository desktop-isolation policy still excludes local GUI automation and screenshot capture. This release restores the existing revealed-answer accessibility identifier without changing the rendered study layout; the explicit deferral is carried forward until a later reviewed capture refreshes the inherited visual evidence."
+  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release changes the Study shell from a hidden library split view to a full-window review surface and carries forward the inherited stale screenshot evidence explicitly until a later reviewed capture refreshes it."
 }

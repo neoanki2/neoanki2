@@ -13,6 +13,13 @@ private struct ImportNotice: Identifiable {
     let message: String
 }
 
+enum ContentLayoutPolicy {
+    static func usesLibrarySplitView(for route: AppRoute) -> Bool {
+        if case .study = route { return false }
+        return true
+    }
+}
+
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -186,38 +193,7 @@ struct ContentView: View {
 #endif
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            DeckSidebarView(
-                decksModel: decksModel,
-                selection: $decksModel.selectedScope,
-                isShowingSavedResponses: Binding(
-                    get: { isShowingSavedResponses },
-                    set: { showing in
-                        if showing { selectedItemID = nil }
-                        isShowingSavedResponses = showing
-                    }
-                ),
-                onDeleteAllUnassigned: {
-                    Task {
-                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await refreshLibrary(forceRefresh: true)
-                    }
-                },
-                onDeckSettingsSaved: {
-                    await refreshCounts()
-                },
-                onDeckProgressReset: {
-                    await refreshLibrary(forceRefresh: true)
-                }
-            )
-            .navigationSplitViewColumnWidth(
-                min: DesignSystem.sidebarMin,
-                ideal: DesignSystem.sidebarIdeal,
-                max: DesignSystem.sidebarMax
-            )
-        } detail: {
-            detail
-        }
+        rootContent
         .tint(DesignSystem.accent)
         .navigationTitle(windowTitle)
         .toolbar {
@@ -244,9 +220,6 @@ struct ContentView: View {
                     .accessibilityIdentifier("templatesDone")
                 }
             }
-        }
-        .onChange(of: isStudying) { _, studying in
-            setStudyFocus(studying)
         }
         .onChange(of: isManagingTemplates) { _, managing in
             setTemplatesFocus(managing)
@@ -403,6 +376,49 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.studyCommandHandlers, studyCommandHandlers)
         .focusedSceneValue(\.libraryCommandHandlers, libraryCommandHandlers)
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
+        if ContentLayoutPolicy.usesLibrarySplitView(for: appSession.route) {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                DeckSidebarView(
+                    decksModel: decksModel,
+                    selection: $decksModel.selectedScope,
+                    isShowingSavedResponses: Binding(
+                        get: { isShowingSavedResponses },
+                        set: { showing in
+                            if showing { selectedItemID = nil }
+                            isShowingSavedResponses = showing
+                        }
+                    ),
+                    onDeleteAllUnassigned: {
+                        Task {
+                            _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
+                            await refreshLibrary(forceRefresh: true)
+                        }
+                    },
+                    onDeckSettingsSaved: {
+                        await refreshCounts()
+                    },
+                    onDeckProgressReset: {
+                        await refreshLibrary(forceRefresh: true)
+                    }
+                )
+                .navigationSplitViewColumnWidth(
+                    min: DesignSystem.sidebarMin,
+                    ideal: DesignSystem.sidebarIdeal,
+                    max: DesignSystem.sidebarMax
+                )
+            } detail: {
+                detail
+            }
+        } else {
+            // Study owns the full window. Keeping it outside the library split
+            // view prevents AppKit from reopening or reserving space for the
+            // sidebar while the learner is reviewing a card.
+            detail
+        }
     }
 
     private var windowTitle: String {
@@ -1114,16 +1130,4 @@ struct ContentView: View {
         }
     }
 
-    private func setStudyFocus(_ focused: Bool) {
-        let update = {
-            columnVisibility = focused ? .detailOnly : .all
-        }
-        if reduceMotion || AppDatabase.isTesting {
-            update()
-        } else {
-            withAnimation(.easeOut(duration: DesignSystem.revealDuration)) {
-                update()
-            }
-        }
-    }
 }

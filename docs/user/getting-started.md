@@ -144,11 +144,12 @@ The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.
 
 NeoAnki2 uses focused, detail-only modes while adding an item, managing item
-types, editing a template, or studying. The sidebar collapses automatically to
-make room; the template builder also hides the Item Types list and outer Done
-action while it is open. Leaving the task restores the full split view and the
-previous item-type selection. Reduced Motion is respected when these columns
-change.
+types, or editing a template. The sidebar collapses automatically to make room;
+the template builder also hides the Item Types list and outer Done action while
+it is open. Study replaces the library split view with a full-window review
+surface, so sidebar controls are unavailable until the session ends. Leaving
+Study restores the library and its previous sidebar visibility. Reduced Motion
+is respected when columns change.
 
 Leaving a study session returns you to the scope home with its counts already
 revised. NeoAnki2 may also retune its scheduler against your review history at
