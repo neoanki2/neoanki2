@@ -100,7 +100,7 @@ if [ -z "$PR_NUMBER" ]; then
     REMOTE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" --jq .object.sha)"
   fi
   EXISTING_PR_NUMBER="$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" \
-    --base "$BASE_BRANCH" --state all --limit 1 --json number --jq '.[0].number // empty')"
+    --base "$BASE_BRANCH" --state open --limit 1 --json number --jq '.[0].number // empty')"
 
   NEEDS_PUSH=0
   if [ "$REMOTE_BRANCH_EXISTS" -ne 1 ]; then
