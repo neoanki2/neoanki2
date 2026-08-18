@@ -49,7 +49,11 @@ public enum StudyStageGeometry {
             result = [.label, .primary, .media, .supporting]
         case .split:
             result = [.label, .primary, .secondary, .supporting, .media]
-        case .focus, .actionStage:
+        case .focus:
+            result = answerRevealed
+                ? [.secondary, .primary, .supporting, .media, .label]
+                : [.label, .primary, .supporting, .media]
+        case .actionStage:
             result = [.label, .primary, .supporting, .media, .secondary]
         }
         if !answerRevealed { result.removeAll(where: { $0 == .secondary }) }

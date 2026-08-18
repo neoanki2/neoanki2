@@ -83,6 +83,17 @@ func compositionAccessibilityOrder() {
     )
     #expect(!before.contains(.secondary))
     #expect(after.firstIndex(of: .primary)! < after.firstIndex(of: .secondary)!)
+
+    let focusBefore = StudyStageGeometry.accessibilityRegions(
+        for: .focus,
+        answerRevealed: false
+    )
+    let focusAfter = StudyStageGeometry.accessibilityRegions(
+        for: .focus,
+        answerRevealed: true
+    )
+    #expect(focusBefore.prefix(3) == [.label, .primary, .supporting])
+    #expect(focusAfter.prefix(3) == [.secondary, .primary, .supporting])
 }
 
 @Test("Legacy definitions map to the five presets and protect expected answers")

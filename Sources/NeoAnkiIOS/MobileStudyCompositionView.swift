@@ -32,7 +32,9 @@ struct MobileStudyCompositionView: View {
     @ViewBuilder
     private func composition(width: CGFloat) -> some View {
         switch effectiveLayout {
-        case .focus, .actionStage:
+        case .focus:
+            focusComposition
+        case .actionStage:
             VStack(spacing: 18) {
                 Spacer(minLength: 0)
                 region(.label)
@@ -66,6 +68,23 @@ struct MobileStudyCompositionView: View {
         }
     }
 
+    private var focusComposition: some View {
+        VStack(spacing: 18) {
+            Spacer(minLength: 0)
+            if isAnswerRevealed {
+                region(.secondary, font: .largeTitle)
+                region(.primary, font: .title2)
+                    .foregroundStyle(.secondary)
+                region(.supporting, font: .body, purpose: .expectedAnswer)
+            } else {
+                region(.label)
+                region(.primary, font: .largeTitle)
+                region(.supporting, font: .body)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
     private var question: some View {
         VStack(spacing: 12) {
             region(.label, font: .caption)
@@ -96,8 +115,14 @@ struct MobileStudyCompositionView: View {
     }
 
     @ViewBuilder
-    private func region(_ region: ComponentRegion, font: Font? = nil) -> some View {
-        let matching = components.filter { $0.region == region }
+    private func region(
+        _ region: ComponentRegion,
+        font: Font? = nil,
+        purpose: ComponentPurpose? = nil
+    ) -> some View {
+        let matching = components.filter {
+            $0.region == region && (purpose == nil || $0.purpose == purpose)
+        }
         VStack(spacing: 10) {
             ForEach(matching) { component in
                 MobileContentValueView(
