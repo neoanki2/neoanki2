@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base revision for strict pull-request documentation validation
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -26,10 +31,13 @@ jobs:
         run: swift Scripts/validate-docs.swift
       - name: Check changed features have documentation updates
         if: github.event_name == 'pull_request'
-        run: swift Scripts/validate-docs.swift --require-screenshots --allow-headless-screenshot-deferral --base-ref "origin/${{ github.base_ref }}"
+        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "origin/${{ github.base_ref }}"
       - name: Check direct main changes have documentation updates
         if: github.event_name == 'push'
-        run: swift Scripts/validate-docs.swift --require-screenshots --allow-headless-screenshot-deferral --base-ref "${{ github.event.before }}"
+        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "${{ github.event.before }}"
+      - name: Check dispatched pull-request revision
+        if: github.event_name == 'workflow_dispatch' && inputs.base_ref != ''
+        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "${{ inputs.base_ref }}"
 
   validate-api:
     name: API reference and contract

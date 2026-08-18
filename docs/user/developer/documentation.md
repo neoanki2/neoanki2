@@ -33,7 +33,10 @@ format, limit, compatibility rule, storage location, scheduling default, or
 destructive consequence changes, update the claims registry and its
 production-backed test.
 
-Screenshot capture and promotion remain reviewed operations. Follow the full
+Screenshot capture and promotion run on isolated macOS CI whenever mapped UI
+sources or capture inputs change. The workflow commits the complete generated
+set to the pull-request branch, and the documentation gate rejects the revision
+until its provenance is current. Follow the full
 [screenshot and claims procedure]({{ '/user/maintaining-documentation/' | relative_url }})
 and never replace provenance metadata by hand.
 

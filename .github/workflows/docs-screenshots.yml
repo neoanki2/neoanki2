@@ -2,49 +2,59 @@ name: Documentation screenshots
 
 on:
   pull_request:
-    paths:
-      - NeoAnkiCore/Sources/NeoAnkiCore/**
-      - Sources/NeoAnki2/**
-      - UITests/NeoAnki2UITests/**
-      - UITests/NeoAnki2UITests.xcodeproj/**
-      - Scripts/capture-doc-screenshots.sh
-      - Scripts/run-ui-tests.sh
-      - .github/workflows/docs-screenshots.yml
-  push:
-    branches: [main]
-    paths:
-      - NeoAnkiCore/Sources/NeoAnkiCore/**
-      - Sources/NeoAnki2/**
-      - UITests/NeoAnki2UITests/**
-      - UITests/NeoAnki2UITests.xcodeproj/**
-      - Scripts/capture-doc-screenshots.sh
-      - Scripts/run-ui-tests.sh
-      - .github/workflows/docs-screenshots.yml
-  schedule:
-    - cron: '30 6 * * 1'
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 env:
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
 concurrency:
-  group: docs-screenshots-${{ github.ref }}
+  group: docs-screenshots-${{ github.event.pull_request.head.repo.full_name }}-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
-  capture:
-    name: Capture reviewed screenshot artifact
-    runs-on: macos-26
+  detect:
+    name: Detect screenshot capture requirement
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.freshness.outputs.needed }}
     steps:
-      - name: Check out repository
+      - name: Check out the pull-request head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          # A promoted PR artifact must name a durable branch commit, not the
-          # synthetic refs/pull/<number>/merge commit GitHub may later discard.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - id: freshness
+        name: Detect screenshot inputs changed since capture
+        run: |
+          needed="$(python3 Scripts/documentation-screenshots-needed.py)"
+          echo "needed=$needed" >> "$GITHUB_OUTPUT"
+          if [ "$needed" = "true" ]; then
+            python3 Scripts/documentation-screenshots-needed.py --explain
+          fi
+
+  capture:
+    name: Capture and promote documentation screenshots
+    needs: detect
+    if: needs.detect.outputs.needed == 'true'
+    runs-on: macos-26
+    steps:
+      - name: Require a writable project branch
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]; then
+            echo "Screenshot-backed changes must include CI-generated assets from a writable project branch." >&2
+            exit 1
+          fi
+      - name: Check out the pull-request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Pin macOS appearance
         run: |
           defaults write -g AppleInterfaceStyle -string Dark
@@ -59,10 +69,42 @@ jobs:
         run: |
           chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh Scripts/capture-doc-screenshots.sh
           ./Scripts/capture-doc-screenshots.sh "$RUNNER_TEMP/neoanki2-doc-screenshots"
-      - name: Upload screenshot artifact
+      - name: Promote and validate the generated screenshots
+        run: |
+          ./Scripts/promote-doc-screenshots.sh "$RUNNER_TEMP/neoanki2-doc-screenshots"
+          swift Scripts/validate-docs.swift --require-screenshots
+      - name: Upload exact-revision screenshot artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: neoanki2-documentation-screenshots
           path: ${{ runner.temp }}/neoanki2-doc-screenshots/
           if-no-files-found: error
           retention-days: 14
+      - name: Commit screenshots to the pull-request branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git add docs/assets/screenshots
+          if git diff --cached --quiet; then
+            echo "Capture produced no repository changes." >&2
+            exit 1
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Refresh documentation screenshots for ${SOURCE_SHA:0:12}"
+          git -c credential.helper= \
+            -c 'credential.helper=!gh auth git-credential' \
+            push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_BRANCH"
+      - name: Start required checks for the promoted revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh workflow run docs-pages.yml --repo "$REPOSITORY" --ref "$HEAD_BRANCH" \
+            -f "base_ref=$BASE_SHA"
+          gh workflow run test.yml --repo "$REPOSITORY" --ref "$HEAD_BRANCH"
