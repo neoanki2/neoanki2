@@ -16,6 +16,12 @@ aspect-fit. If content cannot fit because of its length, Dynamic Type, or
 localization, choose **View full content** to open the complete card in a
 scrollable detail sheet; closing it returns to the same review state.
 
+Focus compositions change hierarchy when the answer is revealed. Before
+reveal, the question is the largest content and prompt-only guidance remains
+visible. After reveal, the expected answer becomes the largest content, the
+question stays below it as quieter context, and supplemental answer details
+follow. VoiceOver uses the same answer-first order.
+
 NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The Study button shows the number due and is disabled when that count is zero; future cards are not included.
 
 [![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)]({{ site.baseurl }}/assets/screenshots/study-prompt.png)

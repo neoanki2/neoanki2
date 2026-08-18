@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "diffSHA256": "d682175fcc518e19c4420010a8b9c030e1f255980044ea55a584d54ede54ac10",
   "featureIDs": [
     "app-navigation",
     "errors-empty-states",
@@ -31,5 +31,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release changes only release tooling and carries the inherited stale screenshot evidence forward with an empty source diff until a later reviewed capture refreshes it."
+  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release changes the adaptive study renderer and carries the inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
 }
