@@ -138,8 +138,11 @@ extension FastFunctionalJourneyTests {
         try runJourneyActivity("PortableDeckUITests.testExportDisabledWithoutDeckSelection") {
             selectScope("scopeRow-AllDecks", in: exportApp)
             assertMenuDisabled("Export Deck…", in: exportApp)
-            selectScope("scopeRow-Unassigned", in: exportApp)
-            assertMenuDisabled("Export Deck…", in: exportApp)
+            XCTAssertTrue(
+                exportApp.descendants(matching: .any).identified("scopeRow-Unassigned")
+                    .waitUntilGone(timeout: 5),
+                "An empty Unassigned scope should not occupy a sidebar row"
+            )
         }
 
         try runJourneyActivity("PortableDeckUITests.testExportPortableDeckSucceeds") {

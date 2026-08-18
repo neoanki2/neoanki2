@@ -60,36 +60,53 @@ gh auth status >/dev/null
 REPOSITORY="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 
 wait_for_required_checks() {
-  local required_contexts_json checks_json context bucket missing pending
-  required_contexts_json="$(gh api \
+  local required_checks_json check_runs_json required context app_id state missing pending
+  required_checks_json="$(gh api \
     "repos/$REPOSITORY/branches/$BASE_BRANCH/protection" \
-    --jq '.required_status_checks.contexts')"
-  if [ "$(jq 'length' <<<"$required_contexts_json")" -eq 0 ]; then
+    --jq '.required_status_checks.checks')"
+  if [ "$(jq 'length' <<<"$required_checks_json")" -eq 0 ]; then
     echo "$BASE_BRANCH has no configured required status checks." >&2
     return 1
   fi
 
   while true; do
-    checks_json="$(gh pr checks "$PR_NUMBER" --repo "$REPOSITORY" \
-      --required --json name,bucket 2>/dev/null || true)"
-    [ -n "$checks_json" ] || checks_json='[]'
+    check_runs_json="$(gh api --paginate \
+      "repos/$REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
+      | jq -s '[.[].check_runs[]]')"
     missing=0
     pending=0
-    while IFS= read -r context; do
-      bucket="$(jq -r --arg name "$context" \
-        '[.[] | select(.name == $name)] | last | .bucket // "missing"' \
-        <<<"$checks_json")"
-      case "$bucket" in
-        pass) ;;
-        fail|cancel)
-          echo "Required check failed: $context ($bucket)" >&2
-          gh pr checks "$PR_NUMBER" --repo "$REPOSITORY" --required || true
+    while IFS= read -r required; do
+      context="$(base64 --decode <<<"$required" | jq -r .context)"
+      app_id="$(base64 --decode <<<"$required" | jq -r '.app_id // empty')"
+      state="$(jq -r --arg name "$context" --arg app_id "$app_id" '
+        [
+          .[]
+          | select(.name == $name)
+          | select($app_id == "" or (.app.id | tostring) == $app_id)
+        ]
+        | sort_by(.started_at // .created_at)
+        | last
+        | if . == null then "missing"
+          elif .status != "completed" then "pending"
+          else (.conclusion // "pending")
+          end
+      ' <<<"$check_runs_json")"
+      case "$state" in
+        success|neutral|skipped) ;;
+        failure|cancelled|timed_out|action_required|startup_failure|stale)
+          echo "Required check failed: $context ($state)" >&2
+          jq -r --arg name "$context" --arg app_id "$app_id" '
+            .[]
+            | select(.name == $name)
+            | select($app_id == "" or (.app.id | tostring) == $app_id)
+            | "\(.name): \(.conclusion // .status) \(.details_url)"
+          ' <<<"$check_runs_json" >&2
           return 1
           ;;
         missing) missing=1 ;;
         *) pending=1 ;;
       esac
-    done < <(jq -r '.[]' <<<"$required_contexts_json")
+    done < <(jq -r '.[] | @base64' <<<"$required_checks_json")
 
     if [ "$missing" -eq 0 ] && [ "$pending" -eq 0 ]; then
       echo "All required checks passed."
