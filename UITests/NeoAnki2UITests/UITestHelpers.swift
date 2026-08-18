@@ -935,6 +935,16 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(allDecks.waitUntilHittable(timeout: 3), "Sidebar did not become interactive")
     }
 
+    func assertSidebarCannotOpenDuringStudy(in app: XCUIApplication) {
+        let allDecks = app.descendants(matching: .any).identified("scopeRow-AllDecks")
+        assertSidebarCollapsed(in: app)
+        app.typeKey("0", modifierFlags: [.command])
+        XCTAssertFalse(
+            allDecks.waitUntilHittable(timeout: 1),
+            "Sidebar became interactive during study"
+        )
+    }
+
     func modalContainer(in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement? {
         firstExisting(
             of: [app.dialogs.firstMatch, app.sheets.firstMatch, app.alerts.firstMatch],

@@ -29,9 +29,7 @@ extension FastFunctionalJourneyTests {
 
         try runJourneyActivity("NavigationGatingUITests.testSidebarHiddenDuringStudy") {
             startStudy(in: app)
-            assertSidebarCollapsed(in: app)
-            showSidebar(in: app)
-            XCTAssertTrue(app.buttons.identified("newDeckToolbar").exists)
+            assertSidebarCannotOpenDuringStudy(in: app)
             runJourneyActivity("ImportExportUITests.testImportDisabledDuringStudy") {
                 assertMenuDisabled("Import…", in: app)
             }
@@ -72,9 +70,7 @@ extension FastFunctionalJourneyTests {
         let app = launchApp()
         addBasicItem(front: "Sidebar Study Q", back: "Sidebar Study A", in: app)
         startStudy(in: app)
-        assertSidebarCollapsed(in: app)
-        showSidebar(in: app)
-        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitUntilExists(timeout: 3))
+        assertSidebarCannotOpenDuringStudy(in: app)
         revealAndGrade("gradeGood", in: app)
         finishStudySession(in: app)
     }
