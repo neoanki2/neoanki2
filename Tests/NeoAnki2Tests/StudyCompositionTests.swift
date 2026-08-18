@@ -14,6 +14,63 @@ func compositionPresetGeometry() {
     #expect(StudyStageGeometry.mediaFraction(for: .mediaAside, width: 900) == 0.44)
 }
 
+@Test("Media presets collapse when an item's optional media is empty")
+func compositionPresetEmptyMediaFallback() {
+    let text = FieldDef(name: "Text", type: .text, isRequired: true)
+    let image = FieldDef(name: "Image", type: .image, isRequired: false)
+    let mediaComponent = TemplateComponent(
+        region: .media,
+        purpose: .question,
+        source: .field(image.id)
+    )
+    let textComponent = TemplateComponent(
+        region: .primary,
+        purpose: .question,
+        source: .field(text.id)
+    )
+    let recordTemplate = Template(
+        name: "Record with optional image",
+        layout: .mediaAside,
+        components: [mediaComponent, textComponent],
+        interaction: .record,
+        skill: Skill(input: .text, output: .audio, operation: .reproduce)
+    )
+    let revealTemplate = Template(
+        name: "Reveal with optional image",
+        layout: .mediaHero,
+        components: [mediaComponent, textComponent],
+        interaction: .reveal,
+        skill: Skill(input: .text, output: .text, operation: .recall)
+    )
+    let itemWithoutImage = Item(
+        itemTypeID: UUID(),
+        fields: [
+            FieldValue(fieldID: text.id, value: .text("Question")),
+            FieldValue(fieldID: image.id, value: .empty),
+        ]
+    )
+    let itemWithImage = Item(
+        itemTypeID: UUID(),
+        fields: [
+            FieldValue(fieldID: text.id, value: .text("Question")),
+            FieldValue(
+                fieldID: image.id,
+                value: .media(MediaRef(
+                    kind: .image,
+                    assetHash: String(repeating: "a", count: 64),
+                    fileExtension: "jpg",
+                    altText: "Diagram"
+                ))
+            ),
+        ]
+    )
+
+    #expect(StudyStageGeometry.effectiveLayout(for: recordTemplate, item: itemWithoutImage) == .actionStage)
+    #expect(StudyStageGeometry.effectiveLayout(for: revealTemplate, item: itemWithoutImage) == .focus)
+    #expect(StudyStageGeometry.effectiveLayout(for: recordTemplate, item: itemWithImage) == .mediaAside)
+    #expect(StudyStageGeometry.effectiveLayout(for: revealTemplate, item: itemWithImage) == .mediaHero)
+}
+
 @Test("Accessibility order is stable and conceals answer regions before reveal")
 func compositionAccessibilityOrder() {
     let before = StudyStageGeometry.accessibilityRegions(
@@ -26,6 +83,17 @@ func compositionAccessibilityOrder() {
     )
     #expect(!before.contains(.secondary))
     #expect(after.firstIndex(of: .primary)! < after.firstIndex(of: .secondary)!)
+
+    let focusBefore = StudyStageGeometry.accessibilityRegions(
+        for: .focus,
+        answerRevealed: false
+    )
+    let focusAfter = StudyStageGeometry.accessibilityRegions(
+        for: .focus,
+        answerRevealed: true
+    )
+    #expect(focusBefore.prefix(3) == [.label, .primary, .supporting])
+    #expect(focusAfter.prefix(3) == [.secondary, .primary, .supporting])
 }
 
 @Test("Legacy definitions map to the five presets and protect expected answers")

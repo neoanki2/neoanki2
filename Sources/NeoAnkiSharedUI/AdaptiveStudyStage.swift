@@ -4,6 +4,25 @@ import SwiftUI
 /// Stable geometry for the five code-owned study compositions. Template data
 /// chooses a preset and assigns ingredients; it cannot inject arbitrary layout.
 public enum StudyStageGeometry {
+    /// Media presets describe the template's preferred geometry, but optional
+    /// media can be empty on an individual item. In that case, collapse the
+    /// unused media region instead of reserving a blank column or hero area.
+    public static func effectiveLayout(for template: Template, item: Item) -> CardLayoutID {
+        guard template.layout == .mediaAside || template.layout == .mediaHero else {
+            return template.layout
+        }
+        let hasResolvedMedia = SideContent.resolvedComponents(for: template, from: item)
+            .contains { $0.region == .media }
+        guard !hasResolvedMedia else { return template.layout }
+
+        switch template.interaction {
+        case .record, .audioSubmission, .choose, .arrange:
+            return .actionStage
+        case .reveal, .type, .cloze:
+            return .focus
+        }
+    }
+
     public static func mediaFraction(for layout: CardLayoutID, width: CGFloat) -> CGFloat {
         switch layout {
         case .mediaAside: width < 680 ? 0.38 : 0.44
@@ -30,7 +49,11 @@ public enum StudyStageGeometry {
             result = [.label, .primary, .media, .supporting]
         case .split:
             result = [.label, .primary, .secondary, .supporting, .media]
-        case .focus, .actionStage:
+        case .focus:
+            result = answerRevealed
+                ? [.secondary, .primary, .supporting, .media, .label]
+                : [.label, .primary, .supporting, .media]
+        case .actionStage:
             result = [.label, .primary, .supporting, .media, .secondary]
         }
         if !answerRevealed { result.removeAll(where: { $0 == .secondary }) }

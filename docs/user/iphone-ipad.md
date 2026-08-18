@@ -66,6 +66,9 @@ and saved submissions separately.
 The mobile study view supports native images, audio, video, rich text, cloze
 selection, microphone permission and recording, Dynamic Type, dark appearance,
 increased contrast, Reduce Motion, and portrait or landscape layouts.
+On Focus cards, the question leads before reveal; afterward, the expected
+answer becomes the visual and VoiceOver focus, with the question retained as
+compact context and supplemental answer details following it.
 
 ## Author and organize
 

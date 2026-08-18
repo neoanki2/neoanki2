@@ -15,6 +15,10 @@ struct StudyCompositionView: View {
         }
     }
 
+    private var effectiveLayout: CardLayoutID {
+        StudyStageGeometry.effectiveLayout(for: template, item: item)
+    }
+
     var body: some View {
         GeometryReader { proxy in
             composition(width: proxy.size.width)
@@ -28,16 +32,9 @@ struct StudyCompositionView: View {
 
     @ViewBuilder
     private func composition(width: CGFloat) -> some View {
-        switch template.layout {
+        switch effectiveLayout {
         case .focus:
-            VStack(spacing: DesignSystem.Spacing.lg) {
-                Spacer(minLength: 0)
-                region(.label)
-                region(.primary, font: DesignSystem.Typography.cardPrompt)
-                region(.supporting)
-                if isAnswerRevealed { region(.secondary, font: DesignSystem.Typography.cardAnswer) }
-                Spacer(minLength: 0)
-            }
+            focusComposition
         case .split:
             if StudyStageGeometry.usesVerticalSplit(for: .split, width: width) {
                 VStack(spacing: DesignSystem.Spacing.lg) { questionPanel; answerPanel }
@@ -75,6 +72,36 @@ struct StudyCompositionView: View {
         }
     }
 
+    private var focusComposition: some View {
+        VStack(spacing: DesignSystem.Spacing.lg) {
+            Spacer(minLength: 0)
+            if isAnswerRevealed {
+                region(
+                    .secondary,
+                    font: DesignSystem.Typography.cardPrompt,
+                    richTextPointSize: DesignSystem.Typography.cardPromptPointSize
+                )
+                region(
+                    .primary,
+                    font: DesignSystem.Typography.cardSecondary,
+                    richTextPointSize: DesignSystem.Typography.cardSecondaryPointSize
+                )
+                .foregroundStyle(.secondary)
+                region(
+                    .supporting,
+                    font: DesignSystem.Typography.uiBody,
+                    purpose: .expectedAnswer,
+                    richTextPointSize: DesignSystem.Typography.richTextPointSize
+                )
+            } else {
+                region(.label)
+                region(.primary, font: DesignSystem.Typography.cardPrompt)
+                region(.supporting)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
     private var questionPanel: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
             region(.label)
@@ -106,17 +133,24 @@ struct StudyCompositionView: View {
     }
 
     @ViewBuilder
-    private func region(_ region: ComponentRegion, font: Font? = nil) -> some View {
-        let matching = components.filter { $0.region == region }
+    private func region(
+        _ region: ComponentRegion,
+        font: Font? = nil,
+        purpose: ComponentPurpose? = nil,
+        richTextPointSize: CGFloat? = nil
+    ) -> some View {
+        let matching = components.filter {
+            $0.region == region && (purpose == nil || $0.purpose == purpose)
+        }
         VStack(spacing: DesignSystem.Spacing.sm) {
             ForEach(matching) { component in
                 ContentValueView(
                     value: component.value,
                     presentation: component.presentation,
                     isAnswerRevealed: isAnswerRevealed,
-                    richTextPointSize: region == .primary
+                    richTextPointSize: richTextPointSize ?? (region == .primary
                         ? DesignSystem.Typography.cardPromptPointSize
-                        : DesignSystem.Typography.cardAnswerPointSize,
+                        : DesignSystem.Typography.cardAnswerPointSize),
                     mediaStore: mediaStore,
                     clozeGroup: clozeGroup
                 )
@@ -131,7 +165,7 @@ struct StudyCompositionView: View {
 
     private func accessibilityPriority(for region: ComponentRegion) -> Double {
         let order = StudyStageGeometry.accessibilityRegions(
-            for: template.layout,
+            for: effectiveLayout,
             answerRevealed: isAnswerRevealed
         )
         guard let index = order.firstIndex(of: region) else { return 0 }

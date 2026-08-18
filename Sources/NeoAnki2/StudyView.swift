@@ -221,7 +221,12 @@ struct StudyView: View {
 
             Divider()
 
-            AdaptiveStudyStage(layout: card.template.layout) {
+            AdaptiveStudyStage(
+                layout: StudyStageGeometry.effectiveLayout(
+                    for: card.template,
+                    item: card.item
+                )
+            ) {
                 studyCardContent(card)
             } footer: {
                 VStack(spacing: 0) {
