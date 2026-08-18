@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-18T18:27:15Z",
+  "capturedAt" : "2026-08-18T19:33:45Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -136,7 +136,7 @@
       "filename" : "scheduling-result.png",
       "height" : 680,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "7e322107dbc65e02077b960170fd90d335a587b471590d81ce8dc57257ebdb5e",
+      "sha256" : "527e6f897cbc2d71fa8a02736180b36e7d12774af7645747a5324614b999b44a",
       "width" : 1024
     },
     {
@@ -202,7 +202,7 @@
       "filename" : "template-advanced.png",
       "height" : 680,
       "scenario" : "Study-Stage Builder Generation and Skill inspector",
-      "sha256" : "7d2a9aa1b432a0e3519489a013589755ef8c11ffa85f231c7964c682ef5d8da8",
+      "sha256" : "9138f1d58781efaae6123f94f7caf3307e7b51c50890293174ebe9410b4f0310",
       "width" : 1024
     },
     {
@@ -219,5 +219,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "16f2e0b12462839d85d08151ca9450496aafef1f"
+  "sourceSHA" : "bdf36fb9e2f70dd235f91a9aaa66ff4e6808bb1b"
 }
