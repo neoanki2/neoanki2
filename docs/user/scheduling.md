@@ -40,6 +40,8 @@ all of its subdecks that study day. A subdeck can add a stricter limit of its
 own; cards in that subdeck must fit both allowances. Unassigned cards remain
 unlimited. The scope home keeps **New** as the full backlog while explaining
 how many due new cards are available today and how many are deferred.
+Other scope-home notices, including the affected-items link for repeatedly
+forgotten cards, do not change the daily allowance or hide cards from study.
 
 Moving a deck moves its entire subtree. From the next study session onward,
 new cards in that subtree use the limits inherited from the deck's new parents;

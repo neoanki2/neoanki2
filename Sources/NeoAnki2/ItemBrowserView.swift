@@ -1,6 +1,20 @@
 import NeoAnkiCore
 import SwiftUI
 
+enum ItemBrowserFilter: Equatable {
+    case all
+    case needsAttention
+
+    func apply(to items: [SavedItemSummary]) -> [SavedItemSummary] {
+        switch self {
+        case .all:
+            items
+        case .needsAttention:
+            items.filter { $0.schedule?.isLeech == true }
+        }
+    }
+}
+
 /// Deliberate browse mode: find, inspect, and triage items by their scheduling
 /// state. The answer column is available but hidden, so opening the library
 /// never spoils a card you have not been asked yet.
@@ -11,6 +25,7 @@ struct ItemBrowserView: View {
     /// driven by a menu command so it is discoverable and keyboard-reachable
     /// rather than hiding behind a right-click on a table header.
     @Binding var showsAnswerColumn: Bool
+    @Binding var filter: ItemBrowserFilter
     let scope: StudyScope
     let onOpenItem: (SavedItemSummary.ID) -> Void
     let onAddItem: () -> Void
@@ -53,7 +68,9 @@ struct ItemBrowserView: View {
                         .accessibilityIdentifier("itemBrowserLoading")
                 } else if itemsModel.items.isEmpty {
                     emptyScope
-                } else if itemsModel.visibleItems.isEmpty {
+                } else if browserItems.isEmpty, filter == .needsAttention {
+                    noItemsNeedingAttention
+                } else if browserItems.isEmpty {
                     ContentUnavailableView.search(text: itemsModel.searchText)
                         .accessibilityIdentifier("browseNoSearchResults")
                 } else {
@@ -79,7 +96,10 @@ struct ItemBrowserView: View {
         .onChange(of: itemsModel.searchText) { _, _ in
             resetPagination()
         }
-        .onChange(of: itemsModel.visibleItems.count, initial: true) { _, count in
+        .onChange(of: filter) { _, _ in
+            resetPagination()
+        }
+        .onChange(of: browserItems.count, initial: true) { _, count in
             let pagination = ItemBrowserPagination(
                 itemCount: count,
                 requestedPageIndex: pageIndex
@@ -161,8 +181,12 @@ struct ItemBrowserView: View {
 
     private var subtitle: String {
         let total = itemsModel.items.count
-        let shown = itemsModel.visibleItems.count
+        let shown = browserItems.count
         let noun = total == 1 ? "item" : "items"
+        if filter == .needsAttention {
+            let shownNoun = shown == 1 ? "item" : "items"
+            return "\(shown) \(shownNoun) need attention"
+        }
         if shown != total {
             return "\(shown) of \(total) \(noun)"
         }
@@ -182,15 +206,19 @@ struct ItemBrowserView: View {
 
     // MARK: - Table
 
+    private var browserItems: [SavedItemSummary] {
+        filter.apply(to: itemsModel.visibleItems)
+    }
+
     private var pagination: ItemBrowserPagination {
         ItemBrowserPagination(
-            itemCount: itemsModel.visibleItems.count,
+            itemCount: browserItems.count,
             requestedPageIndex: pageIndex
         )
     }
 
     private var pageItems: ArraySlice<SavedItemSummary> {
-        itemsModel.visibleItems[pagination.itemRange]
+        browserItems[pagination.itemRange]
     }
 
     private var tableSort: Binding<[KeyPathComparator<SavedItemSummary>]> {
@@ -205,11 +233,40 @@ struct ItemBrowserView: View {
 
     private var paginatedTable: some View {
         VStack(spacing: 0) {
+            if filter == .needsAttention {
+                attentionFilterBar
+            }
             table
             if pagination.hasMultiplePages {
                 paginationBar
             }
         }
+    }
+
+    private var attentionFilterBar: some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            Label("Affected items", systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                .font(DesignSystem.Typography.uiSecondary.weight(.medium))
+
+            Text("Cards in these items have lapsed at least \(ScopeSummary.leechThreshold) times.")
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button("Show All Items") {
+                filter = .all
+            }
+            .accessibilityIdentifier("browseShowAllItems")
+        }
+        .padding(.horizontal, DesignSystem.Spacing.sm)
+        .frame(minHeight: 44)
+        .background(DesignSystem.sidebarBackground)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("browseAttentionFilter")
     }
 
     private var table: some View {
@@ -454,6 +511,24 @@ struct ItemBrowserView: View {
     }
 
     // MARK: - Empty
+
+    private var noItemsNeedingAttention: some View {
+        ContentUnavailableView {
+            Label("No Items Need Attention", systemImage: "checkmark.circle")
+        } description: {
+            if itemsModel.searchText.isEmpty {
+                Text("None of this scope's cards have lapsed \(ScopeSummary.leechThreshold) times.")
+            } else {
+                Text("No affected items match “\(itemsModel.searchText)”.")
+            }
+        } actions: {
+            Button("Show All Items") {
+                filter = .all
+            }
+            .accessibilityIdentifier("browseShowAllItems")
+        }
+        .accessibilityIdentifier("browseNoItemsNeedingAttention")
+    }
 
     @ViewBuilder
     private var emptyScope: some View {
