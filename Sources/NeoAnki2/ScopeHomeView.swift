@@ -268,8 +268,9 @@ struct ScopeHomeView: View {
                     .font(DesignSystem.Typography.uiSecondary.weight(.semibold))
                     .foregroundStyle(.primary)
                 Text(
-                    "Review the affected items and rewrite any unclear prompts or answers. "
-                        + "Each card has lapsed at least \(ScopeSummary.leechThreshold) times."
+                    "Check the affected items. Rewrite unclear content, or mark it OK if it "
+                        + "still reads well. Each card has lapsed at least "
+                        + "\(ScopeSummary.leechThreshold) times."
                 )
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)

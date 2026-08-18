@@ -155,8 +155,10 @@ to study right now?
   cards from the deferred backlog and reports when more become available.
 - If cards in the scope have lapsed at least eight times, a note says how many
   and offers **Review Affected Items**. This opens Browse filtered to the items
-  that generated those cards, where you can inspect and edit unclear prompts or
-  answers. Choose **Show All Items** to remove the filter.
+  that generated those cards. Select one or more rows and choose
+  **Mark Selected OK** if the content does not need editing; the warning stays
+  dismissed until one of those cards lapses again. Open a row to edit unclear
+  content, or choose **Show All Items** to remove the filter.
 - **Browse *n* Items** opens browse mode.
 
 The scope home never shows an item's answer.

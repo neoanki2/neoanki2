@@ -178,6 +178,53 @@ private let laterEpoch = Date(timeIntervalSince1970: 1_700_086_400)
     #expect(listed.schedule == schedule)
 }
 
+@Test func acknowledgingRepeatedLapsesHidesOnlyTheCurrentWarning() async throws {
+    let databaseURL = tempDatabaseURL()
+    let store = try ItemStore(databaseURL: databaseURL)
+    try await store.bootstrap()
+    let created = try await store.createItem(
+        item(front: "Difficult", back: "Still valid"),
+        now: epoch
+    )
+    let card = try #require(try await store.fetchDueCards(asOf: epoch).first?.card)
+    let database = try SQLiteDatabase(path: databaseURL)
+
+    func memory(lapses: Int) -> MemoryState {
+        MemoryState(
+            stability: 2,
+            difficulty: 8,
+            due: epoch,
+            lastReview: epoch.addingTimeInterval(-86_400),
+            reps: lapses + 2,
+            lapses: lapses,
+            phase: .review
+        )
+    }
+
+    try await database.updateCardMemory(
+        card.id,
+        memory: memory(lapses: ScopeSummary.leechThreshold)
+    )
+
+    #expect(try await store.scopeSummary(asOf: epoch).leechCount == 1)
+    #expect(try #require(try await store.listItems().first?.schedule).isLeech)
+
+    #expect(try await store.acknowledgeRepeatedLapses(itemIDs: [created.id], asOf: epoch) == 1)
+    #expect(try await store.scopeSummary(asOf: epoch).leechCount == 0)
+    let acknowledged = try #require(try await store.listItems().first?.schedule)
+    #expect(acknowledged.lapses == ScopeSummary.leechThreshold)
+    #expect(!acknowledged.isLeech)
+    #expect(try await store.acknowledgeRepeatedLapses(itemIDs: [created.id], asOf: epoch) == 0)
+
+    try await database.updateCardMemory(
+        card.id,
+        memory: memory(lapses: ScopeSummary.leechThreshold + 1)
+    )
+
+    #expect(try await store.scopeSummary(asOf: epoch).leechCount == 1)
+    #expect(try #require(try await store.listItems().first?.schedule).isLeech)
+}
+
 /// Browse rows are projected alongside the items they describe, so every edit
 /// that changes a title, a deck, a card count, or a schedule has to reach the
 /// projection. A stale row would show a learner text they already replaced.

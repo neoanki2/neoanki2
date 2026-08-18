@@ -212,9 +212,30 @@ private func addItem(
             lapses: ScopeSummary.leechThreshold
         )
     )
+    let acknowledged = SavedItemSummary(
+        id: UUID(),
+        itemTypeID: itemTypeID,
+        itemTypeName: "Basic",
+        title: "Already checked",
+        subtitle: "No edit needed",
+        cardCount: 1,
+        createdAt: .now,
+        schedule: ItemScheduleSummary(
+            dueAt: .now,
+            phase: .review,
+            lapses: ScopeSummary.leechThreshold,
+            needsAttention: false
+        )
+    )
 
-    #expect(ItemBrowserFilter.needsAttention.apply(to: [ordinary, affected]) == [affected])
-    #expect(ItemBrowserFilter.all.apply(to: [ordinary, affected]) == [ordinary, affected])
+    #expect(
+        ItemBrowserFilter.needsAttention.apply(to: [ordinary, affected, acknowledged])
+            == [affected]
+    )
+    #expect(
+        ItemBrowserFilter.all.apply(to: [ordinary, affected, acknowledged])
+            == [ordinary, affected, acknowledged]
+    )
 }
 
 @Test @MainActor func browseSearchPublishesOnlyTheLatestRapidQuery() async throws {

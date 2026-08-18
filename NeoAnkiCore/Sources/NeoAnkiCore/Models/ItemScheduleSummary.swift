@@ -13,11 +13,20 @@ public struct ItemScheduleSummary: Sendable, Equatable {
     public let phase: Phase?
     /// Highest lapse count across the item's unsuspended cards.
     public let lapses: Int
+    /// Whether at least one repeatedly lapsing card has not been acknowledged
+    /// at its current lapse count.
+    public let needsAttention: Bool
 
-    public init(dueAt: Date?, phase: Phase?, lapses: Int) {
+    public init(
+        dueAt: Date?,
+        phase: Phase?,
+        lapses: Int,
+        needsAttention: Bool? = nil
+    ) {
         self.dueAt = dueAt
         self.phase = phase
         self.lapses = lapses
+        self.needsAttention = needsAttention ?? (lapses >= ScopeSummary.leechThreshold)
     }
 
     public func isDue(asOf now: Date = .now) -> Bool {
@@ -25,8 +34,8 @@ public struct ItemScheduleSummary: Sendable, Equatable {
         return dueAt <= now
     }
 
-    /// True when this item is worth rewriting rather than drilling again.
-    public var isLeech: Bool { lapses >= ScopeSummary.leechThreshold }
+    /// True when this item is worth checking rather than drilling again.
+    public var isLeech: Bool { needsAttention }
 }
 
 /// Card count and schedule for patching a browse row after study.

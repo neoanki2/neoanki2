@@ -561,6 +561,27 @@ final class ItemsModel {
         return moved
     }
 
+    /// Acknowledges the selected rows at their cards' current lapse counts,
+    /// then patches only those rows and the loaded scope summary.
+    func markRepeatedLapsesOK(
+        itemIDs: Set<UUID>,
+        asOf now: Date = .now
+    ) async -> Int? {
+        guard !itemIDs.isEmpty else { return 0 }
+        errorMessage = nil
+        do {
+            let acknowledgedCards = try await library.acknowledgeRepeatedLapses(
+                itemIDs: itemIDs,
+                asOf: now
+            )
+            await refreshSchedules(for: itemIDs, asOf: now)
+            return acknowledgedCards
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return nil
+        }
+    }
+
     @discardableResult
     func deleteItems(
         ids: Set<UUID>,
