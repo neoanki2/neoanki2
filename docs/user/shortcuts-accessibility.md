@@ -153,6 +153,11 @@ Parent deck selection and disclosure remain separate actions. Activating the
 row selects that deck's scope without expanding it; use the disclosure triangle
 to show or hide its children. A focused UI test verifies both actions.
 
+Each deck row exposes accessibility actions for moving it up or down, moving it
+out one level, moving it to the top level, or placing it inside another eligible
+deck. The same operations are available from the row's **Move** context menu
+when dragging is inconvenient.
+
 NeoAnki2 also routes important changes to accessibility focus:
 
 - revealing an answer announces **Answer revealed** and moves focus to the

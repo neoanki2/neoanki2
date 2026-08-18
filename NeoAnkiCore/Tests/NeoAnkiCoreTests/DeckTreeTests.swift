@@ -18,6 +18,31 @@ import Testing
     #expect(tree.first?.children.first?.summary.name == "Capitals")
 }
 
+@Test func deckTreeUsesPersistedSiblingOrderBeforeName() {
+    let firstID = UUID()
+    let secondID = UUID()
+    let summaries = [
+        DeckSummary(
+            id: firstID,
+            name: "Zulu",
+            parentID: nil,
+            sortPosition: 0,
+            itemCount: 0,
+            dueCount: 0
+        ),
+        DeckSummary(
+            id: secondID,
+            name: "Alpha",
+            parentID: nil,
+            sortPosition: 1,
+            itemCount: 0,
+            dueCount: 0
+        ),
+    ]
+
+    #expect(DeckTree.build(from: summaries).map(\.id) == [firstID, secondID])
+}
+
 @Test func deckTreeDescendantIDsIncludesNestedDecks() {
     let parentID = UUID()
     let childID = UUID()

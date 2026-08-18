@@ -36,6 +36,47 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(model.deckTree.first?.children.count == 1)
 }
 
+@Test @MainActor func decksModelMovesDecksAcrossSiblingAndParentLevels() async throws {
+    let (model, store) = try await makeDecksModel()
+    let first = try await store.createDeck(Deck(name: "First"))
+    let second = try await store.createDeck(Deck(name: "Second"))
+    let third = try await store.createDeck(Deck(name: "Third"))
+    await model.load()
+
+    #expect(await model.moveDeck(id: third.id, to: .before(first.id)))
+    #expect(model.deckTree.map(\.id) == [third.id, first.id, second.id])
+
+    #expect(await model.moveDeck(id: first.id, to: .inside(second.id)))
+    #expect(model.deckTree.last?.id == second.id)
+    #expect(model.deckTree.last?.children.map(\.id) == [first.id])
+
+    #expect(await model.moveDeckOutOneLevel(id: first.id))
+    #expect(model.deckTree.map(\.id) == [third.id, second.id, first.id])
+}
+
+@Test @MainActor func decksModelOnlyShowsUnassignedWhenItContainsItems() async throws {
+    let (model, store) = try await makeDecksModel()
+    await model.load()
+    #expect(!model.showsUnassigned)
+
+    let itemType = try await store.defaultItemType()
+    let item = try await store.createItem(Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+        ]
+    ))
+    await model.load()
+    #expect(model.showsUnassigned)
+
+    model.selectedScope = .unassigned
+    _ = try await store.deleteItem(id: item.id)
+    await model.load()
+    #expect(!model.showsUnassigned)
+    #expect(model.selectedScope == .allDecks)
+}
+
 @Test @MainActor func decksModelRenamesDeck() async throws {
     let (model, store) = try await makeDecksModel()
     let deck = Deck(name: "Old Name")

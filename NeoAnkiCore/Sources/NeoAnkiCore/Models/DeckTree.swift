@@ -13,16 +13,26 @@ public struct DeckNode: Sendable, Identifiable, Equatable {
 }
 
 public enum DeckTree {
-    /// Builds a forest of root decks ordered by name, with nested children.
+    /// Builds a forest using learner-defined sibling order, with stable
+    /// name/identifier fallbacks for decks created before ordering existed.
     public static func build(from summaries: [DeckSummary]) -> [DeckNode] {
         let byParent = Dictionary(grouping: summaries, by: { $0.parentID })
         func nodes(for parentID: UUID?) -> [DeckNode] {
-            let children = (byParent[parentID] ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            let children = (byParent[parentID] ?? []).sorted(by: areInDisplayOrder)
             return children.map { summary in
                 DeckNode(summary: summary, children: nodes(for: summary.id))
             }
         }
         return nodes(for: nil)
+    }
+
+    public static func areInDisplayOrder(_ lhs: DeckSummary, _ rhs: DeckSummary) -> Bool {
+        if lhs.sortPosition != rhs.sortPosition {
+            return lhs.sortPosition < rhs.sortPosition
+        }
+        let nameOrder = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+        if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+        return lhs.id.uuidString < rhs.id.uuidString
     }
 
     /// Returns the given deck and all nested subdeck IDs.

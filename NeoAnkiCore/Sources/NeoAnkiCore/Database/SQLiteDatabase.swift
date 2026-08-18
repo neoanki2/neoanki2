@@ -442,6 +442,14 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 26,
+               try tableExists("decks"),
+               !(try columnExists("sort_position", in: "decks")) {
+                for sql in Schema.migrationV26Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -1331,18 +1339,30 @@ actor SQLiteDatabase {
     }
 
     func insertDeck(_ deck: Deck) throws {
+        let sortPosition = try nextDeckSortPosition(parentID: deck.parentID)
         try execute(
             """
-            INSERT INTO decks (id, name, parent_id, new_cards_per_day)
-            VALUES (?, ?, ?, ?);
+            INSERT INTO decks (id, name, parent_id, new_cards_per_day, sort_position)
+            VALUES (?, ?, ?, ?, ?);
             """,
             bindings: [
                 .text(deck.id.uuidString),
                 .text(deck.name),
                 deck.parentID.map { .text($0.uuidString) } ?? .null,
                 deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
+                .int(sortPosition),
             ]
         )
+    }
+
+    private func nextDeckSortPosition(parentID: UUID?) throws -> Int64 {
+        let clause = parentID == nil ? "parent_id IS NULL" : "parent_id = ?"
+        let bindings = parentID.map { [Binding.text($0.uuidString)] } ?? []
+        let rows = try query(
+            "SELECT COALESCE(MAX(sort_position), -1) + 1 AS position FROM decks WHERE \(clause);",
+            bindings: bindings
+        )
+        return rows.first?["position"] as? Int64 ?? 0
     }
 
     func fetchDeck(id: UUID) throws -> Deck? {
@@ -1391,17 +1411,128 @@ actor SQLiteDatabase {
         }
     }
 
+    func fetchDeckSortPositions() throws -> [UUID: Int64] {
+        Dictionary(uniqueKeysWithValues: try query(
+            "SELECT id, sort_position FROM decks;"
+        ).compactMap { row in
+            guard let idText = row["id"] as? String,
+                  let id = UUID(uuidString: idText),
+                  let position = row["sort_position"] as? Int64
+            else { return nil }
+            return (id, position)
+        })
+    }
+
+    func moveDeck(id: UUID, to destination: DeckMoveDestination) throws {
+        try inTransaction {
+            guard let movingDeck = try fetchDeck(id: id) else {
+                throw DatabaseError.deckNotFound(id)
+            }
+
+            let destinationParentID: UUID?
+            let targetID: UUID?
+            let insertsAfterTarget: Bool
+            switch destination {
+            case let .before(id):
+                guard id != movingDeck.id, let target = try fetchDeck(id: id) else {
+                    throw DatabaseError.invalidDeck("Choose another deck as the move target.")
+                }
+                destinationParentID = target.parentID
+                targetID = target.id
+                insertsAfterTarget = false
+            case let .after(id):
+                guard id != movingDeck.id, let target = try fetchDeck(id: id) else {
+                    throw DatabaseError.invalidDeck("Choose another deck as the move target.")
+                }
+                destinationParentID = target.parentID
+                targetID = target.id
+                insertsAfterTarget = true
+            case let .inside(id):
+                guard id != movingDeck.id, try fetchDeck(id: id) != nil else {
+                    throw DatabaseError.invalidDeck("Choose another deck as the move target.")
+                }
+                destinationParentID = id
+                targetID = nil
+                insertsAfterTarget = true
+            case .topLevel:
+                destinationParentID = nil
+                targetID = nil
+                insertsAfterTarget = true
+            }
+
+            var sourceSiblings = try siblingDeckIDs(parentID: movingDeck.parentID)
+            sourceSiblings.removeAll { $0 == movingDeck.id }
+            var destinationSiblings = movingDeck.parentID == destinationParentID
+                ? sourceSiblings
+                : try siblingDeckIDs(parentID: destinationParentID).filter { $0 != movingDeck.id }
+
+            let insertionIndex: Int
+            if let targetID,
+               let targetIndex = destinationSiblings.firstIndex(of: targetID) {
+                insertionIndex = targetIndex + (insertsAfterTarget ? 1 : 0)
+            } else if targetID != nil {
+                throw DatabaseError.invalidDeck("The move target is not a sibling at that level.")
+            } else {
+                insertionIndex = destinationSiblings.endIndex
+            }
+            destinationSiblings.insert(movingDeck.id, at: insertionIndex)
+
+            try execute(
+                "UPDATE decks SET parent_id = ? WHERE id = ?;",
+                bindings: [
+                    destinationParentID.map { .text($0.uuidString) } ?? .null,
+                    .text(movingDeck.id.uuidString),
+                ]
+            )
+            if movingDeck.parentID != destinationParentID {
+                try writeDeckSortPositions(sourceSiblings)
+            }
+            try writeDeckSortPositions(destinationSiblings)
+        }
+    }
+
+    private func siblingDeckIDs(parentID: UUID?) throws -> [UUID] {
+        let clause = parentID == nil ? "parent_id IS NULL" : "parent_id = ?"
+        let bindings = parentID.map { [Binding.text($0.uuidString)] } ?? []
+        return try query(
+            """
+            SELECT id FROM decks
+            WHERE \(clause)
+            ORDER BY sort_position ASC, name COLLATE NOCASE ASC, id ASC;
+            """,
+            bindings: bindings
+        ).compactMap { row in
+            (row["id"] as? String).flatMap(UUID.init(uuidString:))
+        }
+    }
+
+    private func writeDeckSortPositions(_ ids: [UUID]) throws {
+        for (position, id) in ids.enumerated() {
+            try execute(
+                "UPDATE decks SET sort_position = ? WHERE id = ?;",
+                bindings: [.int(Int64(position)), .text(id.uuidString)]
+            )
+        }
+    }
+
     func updateDeck(_ deck: Deck) throws {
+        let existingParentID = try fetchDeck(id: deck.id)?.parentID
+        let parentChanged = existingParentID != deck.parentID
+        let sortPosition = parentChanged
+            ? try nextDeckSortPosition(parentID: deck.parentID)
+            : nil
         try execute(
             """
             UPDATE decks
-            SET name = ?, parent_id = ?, new_cards_per_day = ?
+            SET name = ?, parent_id = ?, new_cards_per_day = ?,
+                sort_position = COALESCE(?, sort_position)
             WHERE id = ?;
             """,
             bindings: [
                 .text(deck.name),
                 deck.parentID.map { .text($0.uuidString) } ?? .null,
                 deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
+                sortPosition.map(Binding.int) ?? .null,
                 .text(deck.id.uuidString),
             ]
         )

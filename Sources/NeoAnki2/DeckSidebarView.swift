@@ -1,5 +1,10 @@
 import NeoAnkiCore
 import SwiftUI
+import UniformTypeIdentifiers
+
+private extension UTType {
+    static let neoAnkiDeck = UTType(exportedAs: "com.neoanki2.deck")
+}
 
 /// Everything the library sidebar can select. Deck scopes remain model state;
 /// recordings are a separate destination, but they participate in the same
@@ -25,6 +30,8 @@ struct DeckSidebarView: View {
     @State private var showNewDeckPrompt = false
     @State private var newDeckName = ""
     @State private var newDeckParentID: UUID?
+    @State private var draggingDeckID: UUID?
+    @State private var isTopLevelDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,7 +63,7 @@ struct DeckSidebarView: View {
                             .accessibilityIdentifier("savedResponsesSidebar")
                         }
 
-                        Section("Decks") {
+                        Section {
                             if decksModel.deckTree.isEmpty {
                                 Text("No decks yet")
                                     .font(DesignSystem.Typography.uiCaption)
@@ -69,34 +76,64 @@ struct DeckSidebarView: View {
                                         onConfigure: { deckToConfigure = $0 },
                                         onRename: beginRename,
                                         onDelete: prepareDeckDeletion,
-                                        onNewSubdeck: beginNewSubdeck
+                                        onNewSubdeck: beginNewSubdeck,
+                                        draggingDeckID: $draggingDeckID
                                     )
                                 }
                             }
 
-                            virtualRow(
-                                title: "Unassigned",
-                                subtitle: SidebarScopeCaption.compactText(
-                                    itemCount: decksModel.unassignedItemCount,
-                                    dueCount: decksModel.unassignedDueCount
-                                ),
-                                systemImage: "tray",
-                                tag: .unassigned
-                            )
-                            .accessibilityLabel(
-                                "Unassigned, " + SidebarScopeCaption.text(
-                                    itemCount: decksModel.unassignedItemCount,
-                                    dueCount: decksModel.unassignedDueCount
+                            if decksModel.showsUnassigned {
+                                virtualRow(
+                                    title: "Unassigned",
+                                    subtitle: SidebarScopeCaption.compactText(
+                                        itemCount: decksModel.unassignedItemCount,
+                                        dueCount: decksModel.unassignedDueCount
+                                    ),
+                                    systemImage: "tray",
+                                    tag: .unassigned
                                 )
-                            )
-                            .contextMenu {
-                                if decksModel.unassignedItemCount > 0 {
+                                .accessibilityLabel(
+                                    "Unassigned, " + SidebarScopeCaption.text(
+                                        itemCount: decksModel.unassignedItemCount,
+                                        dueCount: decksModel.unassignedDueCount
+                                    )
+                                )
+                                .contextMenu {
                                     Button("Delete All", role: .destructive) {
                                         showDeleteAllUnassignedConfirm = true
                                     }
                                     .accessibilityIdentifier("deleteAllUnassignedMenu")
                                 }
                             }
+                        } header: {
+                            HStack(spacing: DesignSystem.Spacing.xs) {
+                                Text(isTopLevelDropTargeted ? "Drop for top level" : "Decks")
+                                if isTopLevelDropTargeted {
+                                    Image(systemName: "arrow.up.to.line")
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                            .padding(.horizontal, DesignSystem.Spacing.xs)
+                            .background(
+                                isTopLevelDropTargeted
+                                    ? DesignSystem.accent.opacity(0.14)
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 6)
+                            )
+                            .onDrop(
+                                of: [.neoAnkiDeck],
+                                delegate: TopLevelDeckDropDelegate(
+                                    draggingDeckID: $draggingDeckID,
+                                    isTargeted: $isTopLevelDropTargeted,
+                                    canMove: { decksModel.canMoveDeck(id: $0, to: .topLevel) },
+                                    move: { id in
+                                        Task { _ = await decksModel.moveDeck(id: id, to: .topLevel) }
+                                    }
+                                )
+                            )
+                            .accessibilityLabel("Decks, top level drop target")
+                            .accessibilityHint("Drop a deck here to remove it from its parent")
                         }
                     }
                     .listStyle(.sidebar)
@@ -325,7 +362,10 @@ private struct DeckSidebarNode: View {
     let onRename: (DeckSummary) -> Void
     let onDelete: (DeckSummary) -> Void
     let onNewSubdeck: (UUID) -> Void
+    @Binding var draggingDeckID: UUID?
     @State private var isExpanded = false
+    @State private var dropZone: DeckRowDropZone?
+    @State private var rowHeight: CGFloat = 44
 
     var body: some View {
         if node.children.isEmpty {
@@ -339,7 +379,8 @@ private struct DeckSidebarNode: View {
                         onConfigure: onConfigure,
                         onRename: onRename,
                         onDelete: onDelete,
-                        onNewSubdeck: onNewSubdeck
+                        onNewSubdeck: onNewSubdeck,
+                        draggingDeckID: $draggingDeckID
                     )
                 }
             } label: {
@@ -386,7 +427,52 @@ private struct DeckSidebarNode: View {
                 .lineLimit(1)
         }
         .contentShape(Rectangle())
+        .frame(minHeight: 44)
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: DeckRowHeightPreferenceKey.self,
+                    value: geometry.size.height
+                )
+            }
+        }
+        .onPreferenceChange(DeckRowHeightPreferenceKey.self) { rowHeight = $0 }
+        .background(
+            dropZone == .inside ? DesignSystem.accent.opacity(0.14) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 7)
+        )
+        .overlay(alignment: .top) {
+            if dropZone == .before {
+                Rectangle().fill(DesignSystem.accent).frame(height: 2)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if dropZone == .after {
+                Rectangle().fill(DesignSystem.accent).frame(height: 2)
+            }
+        }
         .tag(LibrarySidebarDestination.scope(.deck(summary.id)))
+        .onDrag {
+            draggingDeckID = summary.id
+            return NSItemProvider(
+                item: summary.id.uuidString as NSString,
+                typeIdentifier: UTType.neoAnkiDeck.identifier
+            )
+        }
+        .onDrop(
+            of: [.neoAnkiDeck],
+            delegate: DeckRowDropDelegate(
+                targetID: summary.id,
+                rowHeight: rowHeight,
+                draggingDeckID: $draggingDeckID,
+                dropZone: $dropZone,
+                canMove: decksModel.canMoveDeck,
+                move: { id, destination in
+                    if destination == .inside(summary.id) { isExpanded = true }
+                    Task { _ = await decksModel.moveDeck(id: id, to: destination) }
+                }
+            )
+        )
         .contextMenu {
             Button("Deck Settings…") {
                 onConfigure(summary)
@@ -395,6 +481,43 @@ private struct DeckSidebarNode: View {
             Divider()
             Button("New Subdeck") {
                 onNewSubdeck(summary.id)
+            }
+            Menu("Move") {
+                Button("Move Up", systemImage: "arrow.up") {
+                    Task { _ = await decksModel.moveDeckUp(id: summary.id) }
+                }
+                .disabled(!decksModel.canMoveDeckUp(id: summary.id))
+                Button("Move Down", systemImage: "arrow.down") {
+                    Task { _ = await decksModel.moveDeckDown(id: summary.id) }
+                }
+                .disabled(!decksModel.canMoveDeckDown(id: summary.id))
+
+                if decksModel.canMoveDeckOutOneLevel(id: summary.id) {
+                    Divider()
+                    Button("Move Out One Level", systemImage: "arrow.turn.up.left") {
+                        Task { _ = await decksModel.moveDeckOutOneLevel(id: summary.id) }
+                    }
+                    Button("Move to Top Level", systemImage: "arrow.up.to.line") {
+                        Task { _ = await decksModel.moveDeck(id: summary.id, to: .topLevel) }
+                    }
+                }
+
+                let parents = decksModel.movableParentDecks(for: summary.id)
+                if !parents.isEmpty {
+                    Divider()
+                    Menu("Move Into") {
+                        ForEach(parents) { parent in
+                            Button(decksModel.deckPath(for: parent.id)) {
+                                Task {
+                                    _ = await decksModel.moveDeck(
+                                        id: summary.id,
+                                        to: .inside(parent.id)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Button("Rename") {
                 onRename(summary)
@@ -405,6 +528,18 @@ private struct DeckSidebarNode: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(summary.name), \(rowSubtitle(for: summary))")
+        .accessibilityHint(
+            "Drag to reorder. Drop on the middle of a deck to make this a subdeck, or use the Move menu."
+        )
+        .accessibilityAction(named: "Move Up") {
+            Task { _ = await decksModel.moveDeckUp(id: summary.id) }
+        }
+        .accessibilityAction(named: "Move Down") {
+            Task { _ = await decksModel.moveDeckDown(id: summary.id) }
+        }
+        .accessibilityAction(named: "Move Out One Level") {
+            Task { _ = await decksModel.moveDeckOutOneLevel(id: summary.id) }
+        }
         .accessibilityIdentifier("deckRow-\(summary.name)")
     }
 
@@ -417,6 +552,127 @@ private struct DeckSidebarNode: View {
             itemCount: summary.itemCount,
             dueCount: summary.dueCount
         )
+    }
+}
+
+private enum DeckRowDropZone: Equatable {
+    case before
+    case inside
+    case after
+
+    static func resolve(y: CGFloat, height: CGFloat) -> Self {
+        let safeHeight = max(height, 1)
+        if y < safeHeight * 0.25 { return .before }
+        if y > safeHeight * 0.75 { return .after }
+        return .inside
+    }
+
+    func destination(targetID: UUID) -> DeckMoveDestination {
+        switch self {
+        case .before: .before(targetID)
+        case .inside: .inside(targetID)
+        case .after: .after(targetID)
+        }
+    }
+}
+
+private struct DeckRowHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 44
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct DeckRowDropDelegate: DropDelegate {
+    let targetID: UUID
+    let rowHeight: CGFloat
+    @Binding var draggingDeckID: UUID?
+    @Binding var dropZone: DeckRowDropZone?
+    let canMove: (UUID, DeckMoveDestination) -> Bool
+    let move: (UUID, DeckMoveDestination) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        guard let id = draggingDeckID, id != targetID else { return false }
+        let destination = DeckRowDropZone.resolve(
+            y: info.location.y,
+            height: rowHeight
+        ).destination(targetID: targetID)
+        return canMove(id, destination)
+    }
+
+    func dropEntered(info: DropInfo) {
+        updateDropZone(info: info)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let isValid = updateDropZone(info: info)
+        return DropProposal(operation: isValid ? .move : .cancel)
+    }
+
+    func dropExited(info: DropInfo) {
+        dropZone = nil
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            dropZone = nil
+            draggingDeckID = nil
+        }
+        guard let id = draggingDeckID, id != targetID else { return false }
+        let zone = DeckRowDropZone.resolve(y: info.location.y, height: rowHeight)
+        let destination = zone.destination(targetID: targetID)
+        guard canMove(id, destination) else { return false }
+        move(id, destination)
+        return true
+    }
+
+    @discardableResult
+    private func updateDropZone(info: DropInfo) -> Bool {
+        guard let id = draggingDeckID, id != targetID else {
+            dropZone = nil
+            return false
+        }
+        let zone = DeckRowDropZone.resolve(y: info.location.y, height: rowHeight)
+        guard canMove(id, zone.destination(targetID: targetID)) else {
+            dropZone = nil
+            return false
+        }
+        dropZone = zone
+        return true
+    }
+}
+
+private struct TopLevelDeckDropDelegate: DropDelegate {
+    @Binding var draggingDeckID: UUID?
+    @Binding var isTargeted: Bool
+    let canMove: (UUID) -> Bool
+    let move: (UUID) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        draggingDeckID.map(canMove) ?? false
+    }
+
+    func dropEntered(info: DropInfo) {
+        isTargeted = draggingDeckID.map(canMove) ?? false
+    }
+
+    func dropExited(info: DropInfo) {
+        isTargeted = false
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: validateDrop(info: info) ? .move : .cancel)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            isTargeted = false
+            draggingDeckID = nil
+        }
+        guard let id = draggingDeckID, canMove(id) else { return false }
+        move(id)
+        return true
     }
 }
 

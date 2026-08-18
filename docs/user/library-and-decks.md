@@ -20,7 +20,8 @@ Use one of the three kinds of sidebar row:
 - **All Decks** shows every item, including items that have no deck.
 - A **deck** shows items in that deck and all of its descendant subdecks.
   Starting a study session here uses the same recursive scope.
-- **Unassigned** shows only items with no deck.
+- **Unassigned** shows only items with no deck. It appears only while at least
+  one unassigned item exists, keeping an empty library sidebar uncluttered.
 
 Changing scope reloads the scope home and its counts. A deck's caption counts the
 items and due cards in that deck **and all its subdecks**, which is the same
@@ -57,6 +58,22 @@ visible in the hierarchy.
 
 Selecting a parent includes content in every level below it. Selecting a child
 limits the list and study session to that child's subtree.
+
+## Rearrange decks
+
+Drag a deck to change its position or parent:
+
+- Drop near the top or bottom edge of another deck to insert before or after it.
+- Drop in the middle of another deck to make it a subdeck.
+- Drop on the **Decks** section heading to move it to the top level.
+
+The insertion line or highlighted folder previews the result before you drop.
+NeoAnki2 prevents moves that would put a deck inside itself or one of its own
+subdecks. The order and hierarchy persist after relaunching the app.
+
+For a non-drag alternative, Control-click a deck and open **Move**. You can move
+it up or down among siblings, out one level, to the top level, or directly into
+another eligible deck. VoiceOver exposes move actions on each deck row as well.
 
 ## Set a daily new-card limit
 

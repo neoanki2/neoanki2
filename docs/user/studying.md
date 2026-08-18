@@ -80,6 +80,10 @@ order. A New card with an older timestamp does not jump ahead of a learned card
 that needs reinforcement. This rule is the same for All Decks, an individual
 deck, Unassigned, the app session, and a local API study session.
 
+Rearranging a deck changes which ancestor scopes include its subtree. A new
+session uses the current hierarchy; a session already in progress keeps the
+queue snapshot it started with.
+
 The session preserves that queue while you work. If grading places a card back
 into Learning, it returns after the rest of the current queue rather than
 interrupting the next card. Editing an item refreshes its queued cards; deleting
