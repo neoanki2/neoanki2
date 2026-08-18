@@ -176,7 +176,8 @@ decks.
 Import itself is not a scheduling answer and does not become optimizer training
 data. Imported cards begin contributing only after you review them; same-day
 repair answers remain context for FSRS but are not independent supervised
-targets.
+targets. Because JSON and CSV imports create new cards, those cards begin with
+no repeated-lapse warning or acknowledgement.
 There is currently no bulk move, search, or duplicate-cleanup action; organize
 or remove imported items one at a time, and test large imports with a small
 sample first.
