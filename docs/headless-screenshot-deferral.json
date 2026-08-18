@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "a1f163d7f5263e480af2b7411c68cd49b4c897361f9e3ece6e1d8ad76e7842c6",
+  "diffSHA256": "50a46bc6b23e756c4e59abacf332599696aed97e28932fcd743a8b13d967fba6",
   "featureIDs": [
     "app-navigation",
     "deck-management",
@@ -35,5 +35,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release corrects the Focus reveal hierarchy while carrying the deck-sidebar and other inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
+  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release repairs deck sidebar drag handling while carrying inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
 }

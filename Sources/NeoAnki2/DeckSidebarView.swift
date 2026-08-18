@@ -2,8 +2,12 @@ import NeoAnkiCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-private extension UTType {
-    static let neoAnkiDeck = UTType(exportedAs: "com.neoanki2.deck")
+enum DeckDragPayload {
+    static let contentType = UTType.utf8PlainText
+
+    static func itemProvider(for id: UUID) -> NSItemProvider {
+        NSItemProvider(object: id.uuidString as NSString)
+    }
 }
 
 /// Everything the library sidebar can select. Deck scopes remain model state;
@@ -77,10 +81,6 @@ struct DeckSidebarView: View {
                                         onRename: beginRename,
                                         onDelete: prepareDeckDeletion,
                                         onNewSubdeck: beginNewSubdeck,
-                                        onSelect: { id in
-                                            isShowingSavedResponses = false
-                                            selection = .deck(id)
-                                        },
                                         draggingDeckID: $draggingDeckID
                                     )
                                 }
@@ -111,22 +111,26 @@ struct DeckSidebarView: View {
                             }
                         } header: {
                             HStack(spacing: DesignSystem.Spacing.xs) {
-                                Text(isTopLevelDropTargeted ? "Drop for top level" : "Decks")
+                                Text("Decks")
                                 if isTopLevelDropTargeted {
                                     Image(systemName: "arrow.up.to.line")
                                         .accessibilityHidden(true)
                                 }
                             }
-                            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
-                            .padding(.horizontal, DesignSystem.Spacing.xs)
-                            .background(
-                                isTopLevelDropTargeted
-                                    ? DesignSystem.accent.opacity(0.14)
-                                    : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .foregroundStyle(
+                                isTopLevelDropTargeted ? DesignSystem.accent : Color.secondary
                             )
+                            .overlay(alignment: .bottom) {
+                                if isTopLevelDropTargeted {
+                                    Rectangle()
+                                        .fill(DesignSystem.accent)
+                                        .frame(height: 2)
+                                }
+                            }
                             .onDrop(
-                                of: [.neoAnkiDeck],
+                                of: [DeckDragPayload.contentType],
                                 delegate: TopLevelDeckDropDelegate(
                                     draggingDeckID: $draggingDeckID,
                                     isTargeted: $isTopLevelDropTargeted,
@@ -136,6 +140,7 @@ struct DeckSidebarView: View {
                                     }
                                 )
                             )
+                            .accessibilityIdentifier("deckTopLevelDropTarget")
                             .accessibilityLabel("Decks, top level drop target")
                             .accessibilityHint("Drop a deck here to remove it from its parent")
                         }
@@ -366,11 +371,10 @@ private struct DeckSidebarNode: View {
     let onRename: (DeckSummary) -> Void
     let onDelete: (DeckSummary) -> Void
     let onNewSubdeck: (UUID) -> Void
-    let onSelect: (UUID) -> Void
     @Binding var draggingDeckID: UUID?
     @State private var isExpanded = false
     @State private var dropZone: DeckRowDropZone?
-    @State private var rowHeight: CGFloat = 44
+    @State private var rowHeight: CGFloat = 1
 
     var body: some View {
         if node.children.isEmpty {
@@ -385,7 +389,6 @@ private struct DeckSidebarNode: View {
                         onRename: onRename,
                         onDelete: onDelete,
                         onNewSubdeck: onNewSubdeck,
-                        onSelect: onSelect,
                         draggingDeckID: $draggingDeckID
                     )
                 }
@@ -431,9 +434,20 @@ private struct DeckSidebarNode: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
                 .lineLimit(1)
+
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .frame(width: 16, height: 20)
+                .contentShape(Rectangle())
+                .onDrag {
+                    draggingDeckID = summary.id
+                    return DeckDragPayload.itemProvider(for: summary.id)
+                }
+                .help("Drag to move \(summary.name)")
+                .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
-        .frame(minHeight: 44)
         .background {
             GeometryReader { geometry in
                 Color.clear.preference(
@@ -458,18 +472,8 @@ private struct DeckSidebarNode: View {
             }
         }
         .tag(LibrarySidebarDestination.scope(.deck(summary.id)))
-        .onTapGesture {
-            onSelect(summary.id)
-        }
-        .onDrag {
-            draggingDeckID = summary.id
-            return NSItemProvider(
-                item: summary.id.uuidString as NSString,
-                typeIdentifier: UTType.neoAnkiDeck.identifier
-            )
-        }
         .onDrop(
-            of: [.neoAnkiDeck],
+            of: [DeckDragPayload.contentType],
             delegate: DeckRowDropDelegate(
                 targetID: summary.id,
                 rowHeight: rowHeight,
@@ -564,7 +568,7 @@ private struct DeckSidebarNode: View {
     }
 }
 
-private enum DeckRowDropZone: Equatable {
+enum DeckRowDropZone: Equatable {
     case before
     case inside
     case after
@@ -586,7 +590,7 @@ private enum DeckRowDropZone: Equatable {
 }
 
 private struct DeckRowHeightPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 44
+    static let defaultValue: CGFloat = 1
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())

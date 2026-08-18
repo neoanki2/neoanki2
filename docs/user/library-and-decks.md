@@ -61,7 +61,9 @@ limits the list and study session to that child's subtree.
 
 ## Rearrange decks
 
-Drag a deck to change its position or parent:
+Drag the small reorder handle beside a deck to change its position or parent.
+The rest of the compact row remains a normal click target for selecting the
+deck:
 
 - Drop near the top or bottom edge of another deck to insert before or after it.
 - Drop in the middle of another deck to make it a subdeck.
