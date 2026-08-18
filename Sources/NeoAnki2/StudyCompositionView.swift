@@ -77,16 +77,15 @@ struct StudyCompositionView: View {
             Spacer(minLength: 0)
             if isAnswerRevealed {
                 region(
-                    .secondary,
+                    .primary,
                     font: DesignSystem.Typography.cardPrompt,
                     richTextPointSize: DesignSystem.Typography.cardPromptPointSize
                 )
                 region(
-                    .primary,
-                    font: DesignSystem.Typography.cardSecondary,
-                    richTextPointSize: DesignSystem.Typography.cardSecondaryPointSize
+                    .secondary,
+                    font: DesignSystem.Typography.cardAnswer,
+                    richTextPointSize: DesignSystem.Typography.cardAnswerPointSize
                 )
-                .foregroundStyle(.secondary)
                 region(
                     .supporting,
                     font: DesignSystem.Typography.uiBody,
