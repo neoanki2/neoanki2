@@ -31,6 +31,7 @@ struct ContentView: View {
     /// Persisted per user, not per browse session: whether you want to see
     /// answers is a standing preference, not something to rediscover.
     @AppStorage(AppPreferences.browseShowsAnswerColumn) private var browseShowsAnswerColumn = false
+    @State private var itemBrowserFilter: ItemBrowserFilter = .all
     @State private var studyModel: StudyModel?
     @State private var studyScope: StudyScope = .allDecks
     @State private var templatesModel: TemplatesModel?
@@ -661,6 +662,7 @@ struct ContentView: View {
                 itemsModel: itemsModel,
                 decksModel: decksModel,
                 showsAnswerColumn: $browseShowsAnswerColumn,
+                filter: $itemBrowserFilter,
                 scope: decksModel.studyScope,
                 onOpenItem: { selectedItemID = $0 },
                 onAddItem: { openAddItem() },
@@ -674,6 +676,7 @@ struct ContentView: View {
                 scope: decksModel.studyScope,
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
+                onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
                 onAddItem: { openAddItem() },
                 onAddFromVocabulary: selectedVocabularyDestination != nil
                     && !vocabularyLibraryModel.installedPacks.isEmpty
@@ -689,8 +692,9 @@ struct ContentView: View {
         }
     }
 
-    private func openBrowse() {
+    private func openBrowse(filter: ItemBrowserFilter = .all) {
         selectedItemID = nil
+        itemBrowserFilter = filter
         let scope = decksModel.studyScope
         guard itemsModel.needsBrowseLoad else {
             isBrowsing = true
@@ -705,6 +709,7 @@ struct ContentView: View {
 
     private func closeBrowse() {
         isBrowsing = false
+        itemBrowserFilter = .all
         itemsModel.searchText = ""
     }
 

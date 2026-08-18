@@ -8,6 +8,7 @@ struct ScopeHomeView: View {
     let scope: StudyScope
     let onStudy: () -> Void
     let onBrowse: () -> Void
+    let onBrowseItemsNeedingAttention: () -> Void
     let onAddItem: () -> Void
     var onAddFromVocabulary: (() -> Void)?
     let onDeleteAllUnassigned: () -> Void
@@ -239,19 +240,54 @@ struct ScopeHomeView: View {
     }
 
     private var leechCallout: some View {
-        let noun = summary.leechCount == 1 ? "card keeps" : "cards keep"
-        return Label {
-            Text(
-                "\(summary.leechCount) \(noun) lapsing. Rewriting an item usually works "
-                    + "better than repeating it."
-            )
+        let noun = summary.leechCount == 1 ? "card has" : "cards have"
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: DesignSystem.Spacing.md) {
+                leechMessage(noun: noun)
+                Spacer(minLength: DesignSystem.Spacing.sm)
+                reviewAffectedItemsButton
+            }
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
+                leechMessage(noun: noun)
+                reviewAffectedItemsButton
+            }
+        }
+        .padding(DesignSystem.Spacing.md)
+        .background(DesignSystem.sidebarBackground, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(.separator, lineWidth: 1)
+        }
+        .accessibilityIdentifier("scopeHomeLeechCallout")
+    }
+
+    private func leechMessage(noun: String) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                Text("\(summary.leechCount) \(noun) been forgotten repeatedly")
+                    .font(DesignSystem.Typography.uiSecondary.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(
+                    "Review the affected items and rewrite any unclear prompts or answers. "
+                        + "Each card has lapsed at least \(ScopeSummary.leechThreshold) times."
+                )
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+            }
         } icon: {
-            Image(systemName: "repeat")
+            Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
         }
-        .font(DesignSystem.Typography.uiSecondary)
-        .foregroundStyle(.secondary)
-        .accessibilityIdentifier("scopeHomeLeechCallout")
+    }
+
+    private var reviewAffectedItemsButton: some View {
+        Button("Review Affected Items") {
+            onBrowseItemsNeedingAttention()
+        }
+        .buttonStyle(.bordered)
+        .accessibilityHint("Opens Browse filtered to items containing repeatedly forgotten cards")
+        .accessibilityIdentifier("scopeHomeReviewAffectedItems")
     }
 
     private var browseLink: some View {

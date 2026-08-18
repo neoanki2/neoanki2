@@ -153,8 +153,10 @@ to study right now?
   Relearning cards count as learning, because relearning is a repair round.
 - When a daily limit defers new cards, a note separates today's available new
   cards from the deferred backlog and reports when more become available.
-- If cards in the scope keep lapsing, a note says how many. Rewriting a
-  confusing item usually works better than repeating it.
+- If cards in the scope have lapsed at least eight times, a note says how many
+  and offers **Review Affected Items**. This opens Browse filtered to the items
+  that generated those cards, where you can inspect and edit unclear prompts or
+  answers. Choose **Show All Items** to remove the filter.
 - **Browse *n* Items** opens browse mode.
 
 The scope home never shows an item's answer.

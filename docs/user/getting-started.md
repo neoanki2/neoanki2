@@ -147,6 +147,11 @@ browse mode. Browse mode is where you search items and open one for editing;
 open it with **Command-Option-B** and leave it with **Escape**. The sidebar can
 also be shown or hidden with the standard macOS split-view controls.
 
+When the scope home reports cards that have been forgotten repeatedly, choose
+**Review Affected Items** to open Browse with only their source items showing.
+Open a row to inspect or edit it, or choose **Show All Items** to clear the
+filter.
+
 The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.
 

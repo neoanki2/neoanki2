@@ -182,6 +182,41 @@ private func addItem(
     #expect(model.visibleItems.count == 2)
 }
 
+@Test func needsAttentionBrowserFilterShowsOnlyItemsWithRepeatedLapses() {
+    let itemTypeID = UUID()
+    let ordinary = SavedItemSummary(
+        id: UUID(),
+        itemTypeID: itemTypeID,
+        itemTypeName: "Basic",
+        title: "Ordinary",
+        subtitle: "Answer",
+        cardCount: 1,
+        createdAt: .now,
+        schedule: ItemScheduleSummary(
+            dueAt: .now,
+            phase: .review,
+            lapses: ScopeSummary.leechThreshold - 1
+        )
+    )
+    let affected = SavedItemSummary(
+        id: UUID(),
+        itemTypeID: itemTypeID,
+        itemTypeName: "Basic",
+        title: "Needs attention",
+        subtitle: "Rewrite me",
+        cardCount: 1,
+        createdAt: .now,
+        schedule: ItemScheduleSummary(
+            dueAt: .now,
+            phase: .relearning,
+            lapses: ScopeSummary.leechThreshold
+        )
+    )
+
+    #expect(ItemBrowserFilter.needsAttention.apply(to: [ordinary, affected]) == [affected])
+    #expect(ItemBrowserFilter.all.apply(to: [ordinary, affected]) == [ordinary, affected])
+}
+
 @Test @MainActor func browseSearchPublishesOnlyTheLatestRapidQuery() async throws {
     let (model, _, _) = try await makeModels()
     await model.load()

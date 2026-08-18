@@ -62,6 +62,9 @@ with the controls in the sidebar.
 
 - **Browse Items** — **Command-Option-B**
 - **Show / Hide Answer Column** — **Command-Option-A** (browse mode only)
+- **Review Affected Items** on the scope home opens the same keyboard-navigable
+  Browse table filtered to repeatedly forgotten cards' source items.
+- **Show All Items** clears that filter.
 - **Vocabulary Packs…** lists the packs installed in the current library.
 - **Item Types…** — **Command-Shift-T**
 

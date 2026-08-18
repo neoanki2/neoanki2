@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "5c283ca0026d61650459f708e958b9323aa4f17e7f3f687e34e60bd59f819f3d",
+  "diffSHA256": "33c2cdf703e3bda5304cd6c66cbb79eaf019cbe4a7dbaa149d899db3d4cdaf77",
   "featureIDs": [
     "app-first-launch",
     "app-navigation",
@@ -9,6 +9,7 @@
     "errors-empty-states",
     "import-json-csv",
     "item-types",
+    "library-items",
     "portable-deck",
     "study-grading",
     "study-reveal",
@@ -28,8 +29,10 @@
     "Sources/NeoAnki2/ContentView.swift",
     "Sources/NeoAnki2/DeckSidebarView.swift",
     "Sources/NeoAnki2/DecksModel.swift",
+    "Sources/NeoAnki2/ItemBrowserView.swift",
     "Sources/NeoAnki2/MacCloudSyncSettings.swift",
     "Sources/NeoAnki2/NeoAnki2App.swift",
+    "Sources/NeoAnki2/ScopeHomeView.swift",
     "Sources/NeoAnki2/StudyCompositionView.swift",
     "Sources/NeoAnki2/StudyView.swift",
     "Sources/NeoAnki2/TemplateEditorState.swift",
@@ -38,5 +41,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release prevents iCloud startup crashes in unprovisioned builds while carrying inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
+  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release makes repeated-lapse guidance actionable while carrying inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
 }
