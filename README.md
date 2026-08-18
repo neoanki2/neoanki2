@@ -20,8 +20,9 @@ prepared in GitHub Actions are also provenance-attested. Releases are not yet
 Apple-notarized, so the first launch may require Control-clicking NeoAnki2 in
 Applications and choosing **Open**.
 
-Maintainers can prepare locally before the first push or use an attested CI
-candidate; see [the release procedure](docs/RELEASING.md).
+Maintainers use one resumable command that prepares an attested CI candidate,
+waits for protected checks, promotes it, and optionally upgrades Homebrew; see
+[the release procedure](docs/RELEASING.md).
 
 For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the
 repository and run the supported headless loop:

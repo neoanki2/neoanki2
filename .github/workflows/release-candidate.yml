@@ -1,10 +1,15 @@
 name: Release candidate
+run-name: "Release candidate for PR #${{ inputs.pr }} at ${{ inputs.head }}"
 
 on:
   workflow_dispatch:
     inputs:
       pr:
         description: Pull request number to validate and package
+        required: true
+        type: string
+      head:
+        description: Exact pull-request head revision
         required: true
         type: string
 
@@ -19,51 +24,10 @@ env:
   GH_TOKEN: ${{ github.token }}
 
 concurrency:
-  group: release-candidate-pr-${{ inputs.pr }}
-  cancel-in-progress: true
+  group: release-candidate
+  cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Validate source and documentation
-    runs-on: macos-26
-    steps:
-      - name: Check out exact pull-request head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: refs/pull/${{ inputs.pr }}/head
-          fetch-depth: 0
-      - name: Run unit and flow tests
-        run: |
-          swift test --parallel
-          (cd NeoAnkiCore && swift test --parallel)
-      - name: Validate documentation
-        run: swift Scripts/validate-docs.swift --require-screenshots --allow-headless-screenshot-deferral --base-ref origin/main
-      - name: Validate release scripts
-        run: bash -n Scripts/build-release-candidate.sh Scripts/publish-release-candidate.sh Scripts/ship-release.sh
-
-  ui:
-    name: Validate functional UI journeys
-    runs-on: macos-26
-    timeout-minutes: 20
-    steps:
-      - name: Check out exact pull-request head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: refs/pull/${{ inputs.pr }}/head
-          fetch-depth: 0
-      - name: Run UI tests
-        run: |
-          chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh
-          ./Scripts/run-ui-tests.sh
-      - name: Upload UI diagnostics
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: neoanki2-release-candidate-ui-results
-          path: .build/ui-results
-          if-no-files-found: warn
-          retention-days: 7
-
   package:
     name: Build and attest candidate
     runs-on: macos-26
@@ -73,12 +37,14 @@ jobs:
       - name: Check out exact pull-request head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: refs/pull/${{ inputs.pr }}/head
+          ref: ${{ inputs.head }}
           fetch-depth: 0
       - name: Build release candidate
         run: |
           chmod +x Scripts/install-app.sh Scripts/build-release-artifact.sh \
             Scripts/build-release-candidate.sh
+          bash -n Scripts/release.sh Scripts/build-release-candidate.sh \
+            Scripts/publish-release-candidate.sh Scripts/ship-release.sh
           ./Scripts/build-release-candidate.sh --pr "${{ inputs.pr }}"
       - name: Read candidate tag
         id: manifest
@@ -97,13 +63,13 @@ jobs:
 
   finalize:
     name: Publish tested draft release
-    needs: [validate, ui, package]
+    needs: package
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact pull-request head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: refs/pull/${{ inputs.pr }}/head
+          ref: ${{ inputs.head }}
       - name: Download candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:

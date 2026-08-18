@@ -8,116 +8,82 @@ permalink: /RELEASING/
 
 # Releasing NeoAnki2
 
-Official releases use a slow preparation phase and a queue-free promotion
-phase. Expensive tests and universal compilation happen before merge; the
-merge-to-install hot path only promotes an immutable candidate.
+NeoAnki2 has one release path. Local preflight catches inexpensive failures;
+GitHub builds an immutable, provenance-attested candidate while the protected
+pull-request checks run. Promotion waits for both and is resumable after any
+remote step.
 
-## Fast local path: push to installed
+## Run a release
 
-To run and time the complete path—including validation, packaging, draft
-upload, push, merge, publication, tap update, and installation—use:
+Start from a clean `codex/*` feature branch based on current `main`. Put the
+pull-request body in an ignored file such as `.build/release-pr.md`, then run:
 
 ```bash
-./Scripts/release-local.sh \
+./Scripts/release.sh \
   --title "Release change" \
-  --body-file .build/release-pr.md \
-  --install
+  --body-file .build/release-pr.md
 ```
 
-The command reports preparation, promotion, and total release durations.
+The command uses authenticated `gh` operations, runs the supported fast tests
+and the strict documentation gate before the first push, creates or reuses the
+pull request, dispatches the **Release candidate** workflow, and waits for both
+the attested candidate and required branch-protection checks. It then merges,
+publishes, updates the official Homebrew tap from the candidate manifest, and
+upgrades `/Applications/NeoAnki2.app`, verifies it, and launches that exact app
+once.
 
-For a release whose accepted plan forbids GUI capture, preparation can honor a
-hash-bound `docs/headless-screenshot-deferral.json`; see the documentation
-maintenance guide. This records stale visual evidence explicitly without
-weakening checks for unrelated screenshots.
+“Release” is deliberately the complete transaction. Use `--no-install` or
+`--no-launch` only for an explicitly requested narrower operation. NeoAnki2
+remains available until the replacement is ready.
 
-For the shortest maintainer feedback loop, prepare everything before the
-branch's first push:
+For a release whose accepted plan forbids GUI capture, the strict documentation
+gate can honor the exact, hash-bound
+`docs/headless-screenshot-deferral.json`. See the documentation maintenance
+guide; never weaken or bypass the screenshot gate.
+
+## Resume safely
+
+Every remote phase is idempotent. If the command is interrupted or a check must
+be rerun, resume without repeating completed work:
 
 ```bash
-./Scripts/prepare-local-release.sh
+./Scripts/release.sh --pr NUMBER
 ```
 
-This runs headless app, core, and documentation validation; builds and signs the
-universal DMG; computes its checksum; and uploads a draft release while the
-branch is still local. It refuses branches that already exist on the remote.
+The command reuses a matching workflow run or draft candidate, waits for
+required checks, and skips an already completed merge, publication, tap update,
+or verified installation. A stale PR, changed source revision, conflicting
+version/checksum, or mismatched manifest stops the release.
 
-Then start the measured push-to-installed path:
+## Invariants
 
-```bash
-./Scripts/push-ship-release.sh \
-  --title "Release title" \
-  --body-file .build/pr-body.md \
-  --install
-```
+- `release-candidate.json` is the only source for version, artifact name,
+  revision, and checksum. The Homebrew cask is generated from it.
+- The candidate schema always includes the pull-request number and exact head,
+  base, and tree revisions. Local pre-push candidate formats do not exist.
+- Standard PR checks are the acceptance authority. Candidate packaging runs in
+  parallel and does not duplicate unit, documentation, or UI jobs.
+- NeoAnki2 remains available during local checks, CI, merge, publication, tap
+  update, and Homebrew refresh. It is stopped only immediately before an actual
+  app replacement.
+- A previously running app is launched once from the absolute path
+  `/Applications/NeoAnki2.app`; the running executable path is verified. Never
+  use `open -a NeoAnki2`, because Launch Services may select a development app.
+- A completed release never fails merely because it exceeded an arbitrary time
+  target. Phase durations are telemetry, not correctness gates.
 
-The timer starts immediately before `git push` and covers push, PR creation,
-merge, publication, direct tap update, Homebrew refresh, installation, and
-verification. Local candidates are checksummed and ad-hoc signed but are not
-GitHub provenance-attested; use the CI path below when that attestation is
-required. The command refreshes only `neoanki2/tap`, so an unavailable unrelated
-tap cannot block or distort the release timing.
+## Recovery-only workflow
 
-## Developer ID and CloudKit archive path
+The legacy **Release** GitHub workflow builds from a tested `main` revision and
+is retained only for recovery when the candidate path cannot be used. Do not run
+it alongside a normal candidate release. The tap's scheduled updater is also a
+repair mechanism, not part of normal promotion.
+
+## Developer ID path
 
 Official CloudKit-capable artifacts are produced by the headless
-`Xcode/NeoAnkiMac.xcodeproj` target. It owns the stable bundle identifier
-`com.neoanki2.app`, hardened runtime, production push entitlement, and container
-`iCloud.com.neoanki2.app`; Swift package targets remain the source implementation.
-
-The Apple Developer team must provision a Developer ID application certificate
-and a Developer ID CloudKit provisioning profile before dispatching Release. Set
-`NEOANKI_DEVELOPMENT_TEAM`, `NEOANKI_PROVISIONING_PROFILE_SPECIFIER`, and
-`NEOANKI_NOTARY_PROFILE` (a `notarytool` keychain profile), then run
-`Scripts/archive-macos-release.sh`. It archives and exports with `xcodebuild`,
-verifies the signature and universal architectures, submits the app for
-notarization, staples the ticket, and verifies Gatekeeper acceptance.
-
-`Scripts/build-release-artifact.sh` selects this path when
-`NEOANKI_RELEASE_SIGNED=1`; its default remains the unsigned/mock-sync contributor
-path so signing credentials are never required for local development. CI also
-needs `APPLE_DEVELOPMENT_TEAM` and `APPLE_DEVELOPER_ID_PROFILE_NAME` secrets after
-the certificate, profile, and `neoanki-ci-notary` credential are installed in the
-runner keychain. Those are external provisioning prerequisites and are not stored
-in this repository.
-
-## Attested CI path
-
-The pull request must be current with `main`. Dispatch **Release candidate**
-with its pull-request number. The workflow runs unit, flow, documentation, and
-functional UI validation in parallel with the universal package build. Only
-after every validation job passes does it publish an attested draft release.
-
-The candidate manifest records the exact PR head, base revision, source tree,
-version, artifact name, and checksum. A change to the PR or to `main`
-invalidates that candidate and requires another preparation run.
-
-## Promote and install
-
-From a clean checkout with authenticated `gh` and Homebrew, run:
-
-```bash
-./Scripts/ship-release.sh --pr NUMBER --install
-```
-
-The command performs all validation before starting its timer. It then:
-
-1. merge-commits the exact tested PR head into `main`;
-2. publishes the prebuilt draft release;
-3. commits the exact version and checksum directly to the official tap;
-4. refreshes Homebrew and upgrades the cask without launching the app; and
-5. verifies the installed version and code signature.
-
-It prints the elapsed time for merge, publication, tap update, Homebrew refresh,
-installation, and the complete measured path so regressions are visible.
-
-The command refuses to proceed if NeoAnki2 is running, the candidate is stale,
-the PR is not cleanly mergeable, or any revision, version, asset, or checksum
-does not match. It never quits or opens a graphical application.
-
-Promotion explicitly replaces GitHub's temporary `untagged-*` draft name with
-the final version tag before the Homebrew cask becomes visible.
-
-The legacy **Release** workflow is retained as a manually dispatched recovery
-path. The tap's scheduled updater remains a repair mechanism, not part of the
-normal release path.
+`Xcode/NeoAnkiMac.xcodeproj` target. A Developer ID certificate, CloudKit
+provisioning profile, and `notarytool` keychain profile are external
+prerequisites. `Scripts/build-release-artifact.sh` selects the signed archive
+path when `NEOANKI_RELEASE_SIGNED=1`; the default contributor candidate remains
+ad-hoc signed so local development does not require private credentials.

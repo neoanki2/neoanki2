@@ -35,9 +35,13 @@ fi
 (cd "$CANDIDATE_DIR" && shasum -a 256 -c "$ARTIFACT.sha256")
 
 if EXISTING="$(gh release view "$TAG" --repo "$REPOSITORY" \
-  --json isDraft 2>/dev/null)"; then
+  --json isDraft,targetCommitish 2>/dev/null)"; then
   if [ "$(jq -r .isDraft <<<"$EXISTING")" != "true" ]; then
     echo "Published release $TAG already exists." >&2
+    exit 1
+  fi
+  if [ "$(jq -r .targetCommitish <<<"$EXISTING")" != "$HEAD_SHA" ]; then
+    echo "Draft $TAG already belongs to another source revision." >&2
     exit 1
   fi
   gh release delete "$TAG" --repo "$REPOSITORY" --yes
