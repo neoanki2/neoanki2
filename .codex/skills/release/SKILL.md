@@ -34,6 +34,12 @@ immediately before replacement and launches `/Applications/NeoAnki2.app` once.
 Use `--no-install` or `--no-launch` only when the user explicitly requests that
 narrower outcome.
 
+When screenshot-backed sources changed, the command waits for the
+**Documentation screenshots** workflow to capture and validate the full set on
+isolated macOS CI, commit it to the pull-request branch, and start required
+checks for that promoted revision. Candidate packaging must use the resulting
+PR head. Stale screenshots have no release deferral or bypass.
+
 Allow the command to wait for CI. Send compact progress updates when waiting;
 do not replace the wait with repeated manual GitHub operations.
 
@@ -54,6 +60,8 @@ installation phases while preserving the full-release default.
 - Treat `release-candidate.json` as authoritative for version, revision,
   artifact, and SHA-256. Never type or infer a checksum.
 - Never merge before required checks and the attested candidate succeed.
+- Never package or merge a revision while CI still requires a documentation
+  screenshot capture.
 - Never run the recovery **Release** workflow alongside the candidate path.
 - Never edit the tap cask by hand.
 - Never quit NeoAnki2 before the release command's just-in-time install phase.

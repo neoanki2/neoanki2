@@ -6,7 +6,7 @@ SOURCE_DIR="${1:-}"
 DESTINATION="$ROOT/docs/assets/screenshots"
 
 if [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
-  echo "Usage: $0 <reviewed-screenshot-directory>" >&2
+  echo "Usage: $0 <generated-screenshot-directory>" >&2
   exit 2
 fi
 
@@ -20,7 +20,7 @@ EXPECTED=(
 
 for screenshot in "${EXPECTED[@]}"; do
   if [[ ! -s "$SOURCE_DIR/$screenshot" ]]; then
-    echo "Reviewed artifact is missing $screenshot" >&2
+    echo "Generated artifact is missing $screenshot" >&2
     exit 1
   fi
 done
@@ -41,25 +41,25 @@ manifest_path = directory / "manifest.json"
 try:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 except (OSError, json.JSONDecodeError) as error:
-    raise SystemExit(f"Reviewed artifact has an invalid or missing screenshot manifest: {error}")
+    raise SystemExit(f"Generated artifact has an invalid or missing screenshot manifest: {error}")
 
 if manifest.get("schemaVersion") != 1:
-    raise SystemExit("Reviewed screenshot manifest must use schemaVersion 1")
+    raise SystemExit("Generated screenshot manifest must use schemaVersion 1")
 if manifest.get("appearance") != "dark":
-    raise SystemExit("Reviewed screenshot manifest appearance must be dark")
+    raise SystemExit("Generated screenshot manifest appearance must be dark")
 if re.fullmatch(r"[0-9a-f]{40}", manifest.get("sourceSHA") or "") is None:
-    raise SystemExit("Reviewed screenshot manifest has an invalid sourceSHA")
+    raise SystemExit("Generated screenshot manifest has an invalid sourceSHA")
 try:
     datetime.datetime.strptime(manifest.get("capturedAt"), "%Y-%m-%dT%H:%M:%SZ")
 except (TypeError, ValueError):
-    raise SystemExit("Reviewed screenshot manifest capturedAt must be a UTC RFC3339 timestamp")
+    raise SystemExit("Generated screenshot manifest capturedAt must be a UTC RFC3339 timestamp")
 
 entries = manifest.get("screenshots")
 if not isinstance(entries, list):
-    raise SystemExit("Reviewed screenshot manifest screenshots must be an array")
+    raise SystemExit("Generated screenshot manifest screenshots must be an array")
 by_filename = {entry.get("filename"): entry for entry in entries if isinstance(entry, dict)}
 if set(by_filename) != expected_files or len(entries) != len(expected_files):
-    raise SystemExit("Reviewed screenshot manifest entries do not exactly match the expected screenshots")
+    raise SystemExit("Generated screenshot manifest entries do not exactly match the expected screenshots")
 
 for filename in sorted(expected_files):
     entry = by_filename[filename]
@@ -72,7 +72,7 @@ for filename in sorted(expected_files):
     if entry.get("width") != width or entry.get("height") != height:
         raise SystemExit(f"Manifest dimensions do not match {filename}")
     if width < 1024 or height < 674:
-        raise SystemExit(f"Reviewed screenshot is too small: {filename} is {width}x{height}")
+        raise SystemExit(f"Generated screenshot is too small: {filename} is {width}x{height}")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if entry.get("sha256") != digest:
         raise SystemExit(f"Manifest SHA-256 does not match {filename}")
@@ -93,4 +93,4 @@ for screenshot in "${EXPECTED[@]}"; do
 done
 cp "$SOURCE_DIR/manifest.json" "$DESTINATION/manifest.json"
 
-echo "Promoted ${#EXPECTED[@]} reviewed screenshots and validated metadata into docs/assets/screenshots"
+echo "Promoted ${#EXPECTED[@]} generated screenshots and validated metadata into docs/assets/screenshots"

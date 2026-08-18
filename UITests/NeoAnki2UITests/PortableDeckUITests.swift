@@ -42,9 +42,11 @@ extension FastFunctionalJourneyTests {
         let app = launchAppWithFixtures(scenario: "portable-export-source")
         selectScope("scopeRow-AllDecks", in: app)
         assertMenuDisabled("Export Deck…", in: app)
-
-        selectScope("scopeRow-Unassigned", in: app)
-        assertMenuDisabled("Export Deck…", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any).identified("scopeRow-Unassigned")
+                .waitUntilGone(timeout: 5),
+            "An empty Unassigned scope should not occupy a sidebar row"
+        )
     }
 
     func checkPortableDeckUITestsImportConflictShowsResolutionDialog() throws {

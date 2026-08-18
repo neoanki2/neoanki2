@@ -24,22 +24,22 @@ pull-request body in an ignored file such as `.build/release-pr.md`, then run:
   --body-file .build/release-pr.md
 ```
 
-The command uses authenticated `gh` operations, runs the supported fast tests
-and the strict documentation gate before the first push, creates or reuses the
-pull request, dispatches the **Release candidate** workflow, and waits for both
-the attested candidate and required branch-protection checks. It then merges,
-publishes, updates the official Homebrew tap from the candidate manifest, and
-upgrades `/Applications/NeoAnki2.app`, verifies it, and launches that exact app
-once.
+The command uses authenticated `gh` operations, runs the supported local build
+and fast tests before the first push, creates or reuses the pull request, waits
+for any required CI screenshot promotion, dispatches the **Release candidate**
+workflow for the resulting revision, and waits for both the attested candidate
+and required branch-protection checks. It then merges, publishes, updates the
+official Homebrew tap from the candidate manifest, and upgrades
+`/Applications/NeoAnki2.app`, verifies it, and launches that exact app once.
 
 “Release” is deliberately the complete transaction. Use `--no-install` or
 `--no-launch` only for an explicitly requested narrower operation. NeoAnki2
 remains available until the replacement is ready.
 
-For a release whose accepted plan forbids GUI capture, the strict documentation
-gate can honor the exact, hash-bound
-`docs/headless-screenshot-deferral.json`. See the documentation maintenance
-guide; never weaken or bypass the screenshot gate.
+When screenshot-backed sources changed, the command waits for the isolated CI
+capture workflow to generate, validate, and commit fresh documentation images
+to the pull-request branch. Candidate packaging and protected checks use that
+promoted revision. There is no release path that accepts stale screenshots.
 
 ## Resume safely
 

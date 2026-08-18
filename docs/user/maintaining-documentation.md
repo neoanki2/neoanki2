@@ -75,8 +75,9 @@ The contributor changing user-visible behavior owns the matching article,
 claim, feature record, and screenshot scenario in the same pull request.
 Review documentation whenever a UI label, command, shortcut, format, limit,
 default, file location, compatibility requirement, error, destructive action,
-or accessibility behavior changes. Before release, a maintainer reviews the
-rendered site, source revision label, screenshot provenance, and support path.
+or accessibility behavior changes. Before release, the documentation workflow
+verifies the rendered site, source revision label, screenshot provenance, and
+support path for the exact pull-request revision.
 
 ## Refresh screenshots
 
@@ -89,58 +90,34 @@ clean against both light and dark documentation surfaces. Capture rejects
 partially clipped expected controls. Images are not captured during normal
 local testing.
 
-1. Run the **Documentation screenshots** workflow on the pull request, dispatch
-   it manually, or wait for its weekly run. Product-UI pull requests trigger it
-   automatically so a fresh artifact is available before merge.
-2. Download the `neoanki2-documentation-screenshots` artifact.
-   It must contain all PNG files and `manifest.json`.
-3. Review every image for correct content, layout, visible formatting and
-   controls, and absence of private data. Also confirm that `manifest.json`
-   names the expected source commit and capture time. This remains a required
-   manual review; metadata validation does not approve screenshots.
-4. Promote the reviewed directory:
+The **Documentation screenshots** workflow compares the pull-request revision
+with the source revision in the promoted manifest. When a screenshot-backed
+source, screenshot scenario, or capture input changed, isolated macOS CI:
 
-   ```bash
-   ./Scripts/promote-doc-screenshots.sh path/to/downloaded/screenshots
-   ```
+1. Captures the complete screenshot set from the pull-request head.
+2. Validates every expected file, visible accessibility identifier, dimension,
+   source revision, and checksum.
+3. Promotes the generated images and `manifest.json` into
+   `docs/assets/screenshots/`.
+4. Commits the generated set to the pull-request branch.
+5. Starts the required documentation and test workflows for that new revision.
 
-5. Run `swift Scripts/validate-docs.swift --require-screenshots`. The validator
-   compares every screenshot-backed feature source with the artifact's source
-   commit, including when that commit was squash-merged. When a source differs,
-   capture and promote a newer artifact; never edit `sourceSHA` by hand.
+The documentation gate remains failing until the generated commit is present.
+The merge therefore contains the exact images later built and deployed from
+`main`. A capture failure or a branch that CI cannot update blocks the merge;
+there is no stale-screenshot exception. Never edit `sourceSHA`, timestamps, or
+checksums by hand.
 
 When a refreshed capture is pixel-for-pixel identical, Git may record only the
 new manifest rather than a binary PNG change. The manifest's source commit and
-per-image checksums remain the evidence that the full reviewed set was freshly
+per-image checksums remain the evidence that the full generated set was freshly
 captured; validation checks both.
 
 Capture records each image's source SHA, UTC capture date, pixel dimensions,
 scenario, and identifiers that were required to be visible. Both capture and
 promotion reject a missing or malformed manifest, mismatched dimensions, or an
-incomplete screenshot set. Promotion copies the reviewed manifest beside the
+incomplete screenshot set. Promotion copies the generated manifest beside the
 images in `docs/assets/screenshots/`.
-
-The workflow never commits or promotes images automatically. This review step
-prevents a UI failure, permission dialog, or runner-specific content from
-silently replacing published documentation.
-
-When an accepted release plan explicitly excludes GUI automation and screenshot
-capture, the local release path may instead carry
-`docs/headless-screenshot-deferral.json`. The record must name every affected
-screenshot feature and changed source, explain the restriction, and contain the
-exact source-diff hash. The release validator accepts only that narrow, auditable
-deferral; ordinary validation and all non-deferred screenshot evidence remain
-strict. When that deferral file itself is part of a pull request, remote GUI
-journeys are also skipped for that exact change while unit, flow, architecture,
-shared-platform, iOS archive, API, and documentation gates stay mandatory. A
-later capture should replace the deferred evidence before relying on those
-screenshots as a current visual reference.
-
-The file list always names every source still stale relative to the promoted
-screenshot manifest. When a later headless release does not change those
-sources, carry the list forward with the SHA-256 of their empty diff against the
-new release base. This keeps inherited stale visual evidence explicit without
-pretending that unrelated sources changed in the later release.
 
 Published captures are 1024 physical pixels wide. The site caps their rendered
 width to 512 CSS pixels on 2x displays and 341 CSS pixels on 3x displays, so a

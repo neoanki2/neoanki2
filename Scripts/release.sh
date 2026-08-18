@@ -20,9 +20,10 @@ Options:
 
 Without --pr, run this command from a clean feature branch. It validates the
 branch, pushes through gh authentication, creates or reuses a pull request,
-builds an attested candidate in parallel with required checks, waits, and then
-promotes it with safe resume support, upgrades Homebrew, and launches the exact
-installed app. NeoAnki2 stays open until the replacement is ready.
+waits for any required CI screenshot promotion, builds an attested candidate
+in parallel with required checks, waits, and then promotes it with safe resume
+support, upgrades Homebrew, and launches the exact installed app. NeoAnki2
+stays open until the replacement is ready.
 EOF
 }
 
@@ -54,7 +55,7 @@ if [ "$LAUNCH" -eq 1 ] && [ "$INSTALL" -ne 1 ]; then
   exit 2
 fi
 
-for command in gh git jq swift; do
+for command in gh git jq python3 swift; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "Missing required command: $command" >&2
     exit 1
@@ -99,7 +100,7 @@ if [ -z "$PR_NUMBER" ]; then
     REMOTE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" --jq .object.sha)"
   fi
   EXISTING_PR_NUMBER="$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" \
-    --base "$BASE_BRANCH" --state all --limit 1 --json number --jq '.[0].number // empty')"
+    --base "$BASE_BRANCH" --state open --limit 1 --json number --jq '.[0].number // empty')"
 
   NEEDS_PUSH=0
   if [ "$REMOTE_BRANCH_EXISTS" -ne 1 ]; then
@@ -116,8 +117,6 @@ if [ -z "$PR_NUMBER" ]; then
     echo "Running local release preflight..."
     (cd "$ROOT" && swift build)
     (cd "$ROOT" && ./Scripts/test-fast.sh)
-    (cd "$ROOT" && swift Scripts/validate-docs.swift --require-screenshots \
-      --allow-headless-screenshot-deferral --base-ref "$BASE_SHA")
     bash -n "$ROOT/Scripts/release.sh" \
       "$ROOT/Scripts/build-release-candidate.sh" \
       "$ROOT/Scripts/publish-release-candidate.sh" \
@@ -167,6 +166,59 @@ HEAD_SHA="$(jq -r .headRefOid <<<"$PR_JSON")"
 PR_BRANCH="$(jq -r .headRefName <<<"$PR_JSON")"
 
 if [ "$PR_STATE" = "OPEN" ]; then
+  for capture_attempt in $(seq 1 4); do
+    git -C "$ROOT" \
+      -c credential.helper= \
+      -c 'credential.helper=!gh auth git-credential' \
+      fetch --quiet "https://github.com/$REPOSITORY.git" "$HEAD_SHA"
+    SCREENSHOTS_NEEDED="$(python3 "$ROOT/Scripts/documentation-screenshots-needed.py" \
+      --revision "$HEAD_SHA")"
+    if [ "$SCREENSHOTS_NEEDED" = "false" ]; then
+      break
+    fi
+
+    echo "Waiting for CI to capture and promote documentation screenshots for $HEAD_SHA..."
+    SCREENSHOT_RUN_ID=""
+    for run_attempt in $(seq 1 30); do
+      SCREENSHOT_RUN_ID="$(gh run list --repo "$REPOSITORY" \
+        --workflow docs-screenshots.yml --branch "$PR_BRANCH" \
+        --event pull_request --limit 20 \
+        --json databaseId,headSha \
+        --jq ".[] | select(.headSha == \"$HEAD_SHA\") | .databaseId" \
+        | head -n 1)"
+      [ -n "$SCREENSHOT_RUN_ID" ] && break
+      sleep 2
+    done
+    if [ -z "$SCREENSHOT_RUN_ID" ]; then
+      echo "Documentation screenshot capture did not start for $HEAD_SHA." >&2
+      exit 1
+    fi
+    gh run watch "$SCREENSHOT_RUN_ID" --repo "$REPOSITORY" --exit-status
+
+    CAPTURED_HEAD="$HEAD_SHA"
+    for promotion_attempt in $(seq 1 30); do
+      HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
+        --json headRefOid --jq .headRefOid)"
+      [ "$HEAD_SHA" != "$CAPTURED_HEAD" ] && break
+      sleep 1
+    done
+    if [ "$HEAD_SHA" = "$CAPTURED_HEAD" ]; then
+      echo "Screenshot capture completed without promoting a new PR revision." >&2
+      exit 1
+    fi
+    echo "CI promoted documentation screenshots in $HEAD_SHA."
+  done
+
+  git -C "$ROOT" \
+    -c credential.helper= \
+    -c 'credential.helper=!gh auth git-credential' \
+    fetch --quiet "https://github.com/$REPOSITORY.git" "$HEAD_SHA"
+  if [ "$(python3 "$ROOT/Scripts/documentation-screenshots-needed.py" \
+    --revision "$HEAD_SHA")" != "false" ]; then
+    echo "Documentation screenshots are still stale after CI promotion." >&2
+    exit 1
+  fi
+
   if [ "$(jq -r .isDraft <<<"$PR_JSON")" = "true" ]; then
     gh pr ready "$PR_NUMBER" --repo "$REPOSITORY"
   fi

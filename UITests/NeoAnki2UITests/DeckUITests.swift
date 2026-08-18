@@ -123,12 +123,14 @@ extension FastFunctionalJourneyTests {
         try runJourneyActivity("AuthoringUITests.testUnassignedScopeEmptyState") {
             let visibleScreenHeight = try XCTUnwrap(NSScreen.main?.visibleFrame.height)
             XCTAssertLessThanOrEqual(authoringApp.windows.firstMatch.frame.height, visibleScreenHeight)
-            selectScope("scopeRow-Unassigned", in: authoringApp)
             XCTAssertTrue(
-                authoringApp.descendants(matching: .any)["emptyUnassignedState"]
-                    .waitUntilExists(timeout: 5)
+                authoringApp.descendants(matching: .any).identified("scopeRow-Unassigned")
+                    .waitUntilGone(timeout: 5),
+                "An empty Unassigned scope should not occupy a sidebar row"
             )
-            XCTAssertTrue(authoringApp.buttons.identified("addItemEmptyState").waitUntilGone(timeout: 2))
+            XCTAssertTrue(
+                authoringApp.descendants(matching: .any).identified("scopeRow-AllDecks").exists
+            )
         }
 
         try runJourneyActivity("AuthoringUITests.testEmptyDeckAddItem") {

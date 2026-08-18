@@ -283,8 +283,9 @@ extension FastFunctionalJourneyTests {
             deleteAll.click()
             seeded.buttons.identified("confirmDeleteAllUnassigned").click()
             XCTAssertTrue(
-                seeded.descendants(matching: .any)["emptyUnassignedState"]
-                    .waitUntilExists(timeout: 5)
+                seeded.descendants(matching: .any).identified("scopeRow-Unassigned")
+                    .waitUntilGone(timeout: 5),
+                "Deleting the final unassigned item should remove the virtual scope"
             )
             selectScope("scopeRow-AllDecks", in: seeded)
             waitForItem(named: "Deck Item", in: seeded)
@@ -299,10 +300,10 @@ extension FastFunctionalJourneyTests {
             unassigned.rightClick()
             selectMenuItem("Delete All", in: sidebarDeleteApp)
             sidebarDeleteApp.buttons.identified("confirmDeleteAllUnassigned").click()
-            selectScope("scopeRow-Unassigned", in: sidebarDeleteApp)
             XCTAssertTrue(
-                sidebarDeleteApp.descendants(matching: .any)["emptyUnassignedState"]
-                    .waitUntilExists(timeout: 5)
+                sidebarDeleteApp.descendants(matching: .any).identified("scopeRow-Unassigned")
+                    .waitUntilGone(timeout: 5),
+                "Deleting the final unassigned item should remove the virtual scope"
             )
             assertNoItem(named: "Original", in: sidebarDeleteApp)
         }
@@ -414,7 +415,11 @@ extension FastFunctionalJourneyTests {
         XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitUntilExists(timeout: 5))
         app.buttons.identified("confirmDeleteAllUnassigned").click()
 
-        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(
+            app.descendants(matching: .any).identified("scopeRow-Unassigned")
+                .waitUntilGone(timeout: 10),
+            "Deleting the final unassigned item should remove the virtual scope"
+        )
         selectScope("scopeRow-AllDecks", in: app)
         waitForItem(named: "Deck Item", in: app)
         assertNoItem(named: "Loose Item", in: app)
@@ -431,8 +436,11 @@ extension FastFunctionalJourneyTests {
         XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitUntilExists(timeout: 5))
         app.buttons.identified("confirmDeleteAllUnassigned").click()
 
-        selectScope("scopeRow-Unassigned", in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["emptyUnassignedState"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(
+            app.descendants(matching: .any).identified("scopeRow-Unassigned")
+                .waitUntilGone(timeout: 10),
+            "Deleting the final unassigned item should remove the virtual scope"
+        )
         assertNoItem(named: "Sidebar Delete", in: app)
     }
 

@@ -118,11 +118,12 @@ extension FastFunctionalJourneyTests {
             visibleScreenHeight,
             "The empty-state content must not make the window taller than its screen."
         )
-        selectScope("scopeRow-Unassigned", in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any)["emptyUnassignedState"].waitUntilExists(timeout: 10)
+            app.descendants(matching: .any).identified("scopeRow-Unassigned")
+                .waitUntilGone(timeout: 5),
+            "An empty Unassigned scope should not occupy a sidebar row"
         )
-        XCTAssertTrue(app.buttons.identified("addItemEmptyState").waitUntilGone(timeout: 2))
+        XCTAssertTrue(app.descendants(matching: .any).identified("scopeRow-AllDecks").exists)
     }
 
     func checkAuthoringUITestsItemPreviewRendersRichText() throws {

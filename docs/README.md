@@ -44,6 +44,7 @@ Run `swift Scripts/validate-docs.swift --write` after changing
 `swift run neoanki-api-reference generate`. Then run `./Scripts/test-fast.sh`.
 The validators check
 feature ownership, referenced source and test files, generated output, local
-links, the generated API reference, required screenshot coverage, and screenshot freshness. Documentation
-screenshots are captured in reviewed CI artifacts; see
+links, the generated API reference, required screenshot coverage, and screenshot
+freshness. CI captures and promotes screenshots onto the pull-request branch
+before merge whenever screenshot inputs changed; see
 [`user/developer/documentation.md`](user/developer/documentation.md).
