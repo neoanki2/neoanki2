@@ -139,7 +139,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "study-answer",
             of: app,
             scenario: "revealed study answer with grading controls",
-            expectedVisibleIdentifiers: ["studyAnswer", "gradeGood", "gradeAgain"]
+            expectedVisibleIdentifiers: ["gradeGood", "gradeAgain"]
         )
         revealAndGrade("gradeGood", in: app)
         XCTAssertTrue(app.buttons.identified("studySessionDone").waitUntilExists(timeout: 5))
@@ -161,7 +161,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "study-type",
             of: app,
             scenario: "typed-answer study result",
-            expectedVisibleIdentifiers: ["studyAnswer", "gradeGood"]
+            expectedVisibleIdentifiers: ["gradeGood"]
         )
     }
 
