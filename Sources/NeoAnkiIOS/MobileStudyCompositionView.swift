@@ -72,9 +72,8 @@ struct MobileStudyCompositionView: View {
         VStack(spacing: 18) {
             Spacer(minLength: 0)
             if isAnswerRevealed {
-                region(.secondary, font: .largeTitle)
-                region(.primary, font: .title2)
-                    .foregroundStyle(.secondary)
+                region(.primary, font: .largeTitle)
+                region(.secondary, font: .title)
                 region(.supporting, font: .body, purpose: .expectedAnswer)
             } else {
                 region(.label)

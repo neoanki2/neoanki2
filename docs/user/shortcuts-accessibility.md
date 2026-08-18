@@ -143,8 +143,10 @@ The active study stage follows the preset's semantic region order and omits
 concealed answer regions from VoiceOver until reveal. It does not scroll; when
 Dynamic Type or long content exceeds the available stage, **View full content**
 opens a scrollable detail sheet while the grading footer remains stable.
-For Focus compositions, reveal changes that order to the expected answer first,
-the original question as context second, and supplemental answer details last.
+For Focus compositions, reveal preserves the authored order: the original
+question remains first, the expected answer follows immediately, and
+supplemental answer details remain last. VoiceOver focus still moves to the
+newly revealed answer.
 
 Scheduling health uses text and symbols as well as color, and migration or
 optimization progress remains readable with Dynamic Type.

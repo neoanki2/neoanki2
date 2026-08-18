@@ -51,7 +51,7 @@ public enum StudyStageGeometry {
             result = [.label, .primary, .secondary, .supporting, .media]
         case .focus:
             result = answerRevealed
-                ? [.secondary, .primary, .supporting, .media, .label]
+                ? [.primary, .secondary, .supporting, .media, .label]
                 : [.label, .primary, .supporting, .media]
         case .actionStage:
             result = [.label, .primary, .supporting, .media, .secondary]

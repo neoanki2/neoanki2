@@ -71,7 +71,7 @@ func compositionPresetEmptyMediaFallback() {
     #expect(StudyStageGeometry.effectiveLayout(for: revealTemplate, item: itemWithImage) == .mediaHero)
 }
 
-@Test("Accessibility order is stable and conceals answer regions before reveal")
+@Test("Accessibility order preserves authored reading order and conceals answers before reveal")
 func compositionAccessibilityOrder() {
     let before = StudyStageGeometry.accessibilityRegions(
         for: .split,
@@ -93,7 +93,7 @@ func compositionAccessibilityOrder() {
         answerRevealed: true
     )
     #expect(focusBefore.prefix(3) == [.label, .primary, .supporting])
-    #expect(focusAfter.prefix(3) == [.secondary, .primary, .supporting])
+    #expect(focusAfter.prefix(3) == [.primary, .secondary, .supporting])
 }
 
 @Test("Legacy definitions map to the five presets and protect expected answers")
