@@ -142,6 +142,22 @@ if [ -z "$PR_NUMBER" ]; then
       --head "$BRANCH" --title "$TITLE" --body-file "$BODY_FILE")"
     PR_NUMBER="$(gh pr view "$PR_URL" --repo "$REPOSITORY" --json number --jq .number)"
   fi
+
+  PR_HEAD_MATCHES=0
+  for _ in $(seq 1 30); do
+    REMOTE_PR_HEAD="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
+      --json headRefOid --jq .headRefOid)"
+    if [ "$REMOTE_PR_HEAD" = "$HEAD_SHA" ]; then
+      PR_HEAD_MATCHES=1
+      break
+    fi
+    echo "Waiting for PR #$PR_NUMBER to expose pushed head $HEAD_SHA..."
+    sleep 1
+  done
+  if [ "$PR_HEAD_MATCHES" -ne 1 ]; then
+    echo "PR #$PR_NUMBER did not converge to pushed head $HEAD_SHA." >&2
+    exit 1
+  fi
 fi
 
 PR_JSON="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
