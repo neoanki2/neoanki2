@@ -129,6 +129,8 @@ explicit **Reset All Progress** action in Deck Settings starts a new scheduling
 history origin for the selected deck subtree. Earlier immutable review evidence
 is retained for audit and sync integrity but is excluded from replay, previews,
 and future optimizer input after that origin.
+The deck-order migration only adds a persistent sibling position used by the
+sidebar. It does not rewrite items, cards, or append-only review outcomes.
 Local API token verifiers are stored outside the library database and its snapshots,
 so restoring library content does not authorize an API client.
 The one-shot template-definition migration likewise preserves item, card,

@@ -82,6 +82,8 @@ final class DecksModel {
         selectedDeckID
     }
 
+    var showsUnassigned: Bool { unassignedItemCount > 0 }
+
     /// Every count in one reload is measured against the same instant, so the
     /// sidebar totals cannot drift from the detail pane's.
     func load(asOf now: Date = .now) async {
@@ -102,6 +104,7 @@ final class DecksModel {
         allDecksDueCount = snapshot.allDecksSummary.dueNow
         unassignedDueCount = snapshot.unassignedSummary.dueNow
         unassignedItemCount = snapshot.unassignedSummary.itemCount
+        resetHiddenSelectionIfNeeded()
         if case let .deck(id) = selectedScope,
            !summaries.contains(where: { $0.id == id }) {
             selectedScope = .allDecks
@@ -117,6 +120,7 @@ final class DecksModel {
         allDecksDueCount = snapshot.allDecksSummary.dueNow
         unassignedDueCount = snapshot.unassignedSummary.dueNow
         unassignedItemCount = snapshot.unassignedSummary.itemCount
+        resetHiddenSelectionIfNeeded()
         if case let .deck(id) = selectedScope,
            !summaries.contains(where: { $0.id == id }) {
             selectedScope = .allDecks
@@ -175,6 +179,7 @@ final class DecksModel {
         if unassignedItemCount != unassignedItems {
             unassignedItemCount = unassignedItems
         }
+        resetHiddenSelectionIfNeeded()
 
         if case let .deck(id) = selectedScope,
            !loadedSummaries.contains(where: { $0.id == id }) {
@@ -252,6 +257,103 @@ final class DecksModel {
         }
     }
 
+    func moveDeck(id: UUID, to destination: DeckMoveDestination) async -> Bool {
+        errorMessage = nil
+        guard canMoveDeck(id: id, to: destination) else { return false }
+        do {
+            guard try await library.moveDeck(id: id, to: destination) else { return false }
+            await load()
+            return true
+        } catch {
+            errorMessage = UserFacingError.message(from: error)
+            return false
+        }
+    }
+
+    func canMoveDeck(id: UUID, to destination: DeckMoveDestination) -> Bool {
+        guard summaries.contains(where: { $0.id == id }) else { return false }
+        let destinationParentID: UUID?
+        switch destination {
+        case let .before(targetID), let .after(targetID):
+            guard targetID != id,
+                  let target = summaries.first(where: { $0.id == targetID })
+            else { return false }
+            destinationParentID = target.parentID
+        case let .inside(parentID):
+            guard parentID != id,
+                  summaries.contains(where: { $0.id == parentID })
+            else { return false }
+            destinationParentID = parentID
+        case .topLevel:
+            destinationParentID = nil
+        }
+        return !DeckTree.wouldCreateCycle(
+            deckID: id,
+            newParentID: destinationParentID,
+            in: summaries
+        )
+    }
+
+    func canMoveDeckUp(id: UUID) -> Bool {
+        guard let index = siblingSummaries(containing: id).firstIndex(where: { $0.id == id })
+        else { return false }
+        return index > 0
+    }
+
+    func canMoveDeckDown(id: UUID) -> Bool {
+        let siblings = siblingSummaries(containing: id)
+        guard let index = siblings.firstIndex(where: { $0.id == id }) else { return false }
+        return index < siblings.index(before: siblings.endIndex)
+    }
+
+    func moveDeckUp(id: UUID) async -> Bool {
+        let siblings = siblingSummaries(containing: id)
+        guard let index = siblings.firstIndex(where: { $0.id == id }), index > 0 else {
+            return false
+        }
+        return await moveDeck(id: id, to: .before(siblings[index - 1].id))
+    }
+
+    func moveDeckDown(id: UUID) async -> Bool {
+        let siblings = siblingSummaries(containing: id)
+        guard let index = siblings.firstIndex(where: { $0.id == id }),
+              index < siblings.index(before: siblings.endIndex)
+        else { return false }
+        return await moveDeck(id: id, to: .after(siblings[index + 1].id))
+    }
+
+    func moveDeckOutOneLevel(id: UUID) async -> Bool {
+        guard let parentID = summaries.first(where: { $0.id == id })?.parentID else {
+            return false
+        }
+        return await moveDeck(id: id, to: .after(parentID))
+    }
+
+    func canMoveDeckOutOneLevel(id: UUID) -> Bool {
+        summaries.first(where: { $0.id == id })?.parentID != nil
+    }
+
+    func movableParentDecks(for id: UUID) -> [DeckSummary] {
+        let descendants = DeckTree.descendantIDs(of: id, in: summaries)
+        let currentParentID = summaries.first(where: { $0.id == id })?.parentID
+        return flattenedDeckTree().filter {
+            !descendants.contains($0.id) && $0.id != currentParentID
+        }
+    }
+
+    func deckPath(for id: UUID) -> String {
+        var names: [String] = []
+        var cursor = summaries.first(where: { $0.id == id })
+        var visited: Set<UUID> = []
+        while let summary = cursor, visited.insert(summary.id).inserted {
+            names.append(summary.name)
+            cursor = summary.parentID.flatMap { parentID in
+                summaries.first(where: { $0.id == parentID })
+            }
+        }
+        return names.reversed().joined(separator: " › ")
+    }
+
     func deleteDeck(id: UUID) async -> Bool {
         errorMessage = nil
         do {
@@ -293,5 +395,25 @@ final class DecksModel {
 
     func deckName(for id: UUID) -> String? {
         summaries.first(where: { $0.id == id })?.name
+    }
+
+    private func siblingSummaries(containing id: UUID) -> [DeckSummary] {
+        guard let parentID = summaries.first(where: { $0.id == id })?.parentID else {
+            return summaries.filter { $0.parentID == nil }.sorted(by: DeckTree.areInDisplayOrder)
+        }
+        return summaries.filter { $0.parentID == parentID }.sorted(by: DeckTree.areInDisplayOrder)
+    }
+
+    private func flattenedDeckTree() -> [DeckSummary] {
+        func flatten(_ nodes: [DeckNode]) -> [DeckSummary] {
+            nodes.flatMap { [$0.summary] + flatten($0.children) }
+        }
+        return flatten(deckTree)
+    }
+
+    private func resetHiddenSelectionIfNeeded() {
+        if selectedScope == .unassigned, !showsUnassigned {
+            selectedScope = .allDecks
+        }
     }
 }

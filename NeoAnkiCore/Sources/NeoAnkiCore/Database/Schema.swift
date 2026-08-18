@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 25
+    static let version = 26
 
     static let createStatements: [String] = [
         """
@@ -109,7 +109,8 @@ enum Schema {
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
             parent_id TEXT REFERENCES decks(id),
-            new_cards_per_day INTEGER CHECK(new_cards_per_day >= 0)
+            new_cards_per_day INTEGER CHECK(new_cards_per_day >= 0),
+            sort_position INTEGER NOT NULL DEFAULT 0
         );
         """,
         """
@@ -1366,6 +1367,15 @@ enum Schema {
     /// and legacy rows are copied by SQLiteDatabase because migration tests may
     /// intentionally contain only a subset of the historical schema.
     static let migrationV25Statements = schedulerPersistenceStatements
+
+    /// Existing decks keep their prior alphabetical fallback order until the
+    /// learner moves one; sibling positions are normalized by that move.
+    static let migrationV26Statements: [String] = [
+        """
+        ALTER TABLE decks
+        ADD COLUMN sort_position INTEGER NOT NULL DEFAULT 0;
+        """,
+    ]
 
     /// Applied when upgrading from schema version 1.
     static let migrationV2Statements: [String] = [

@@ -1,8 +1,10 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "d682175fcc518e19c4420010a8b9c030e1f255980044ea55a584d54ede54ac10",
+  "diffSHA256": "5553c1dd8c5f02ac0f4473ea1b5993d764ba49039180530b8569e3c13123b173",
   "featureIDs": [
     "app-navigation",
+    "deck-management",
+    "deck-scopes",
     "errors-empty-states",
     "import-json-csv",
     "item-types",
@@ -23,6 +25,8 @@
     "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift",
     "NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift",
     "Sources/NeoAnki2/ContentView.swift",
+    "Sources/NeoAnki2/DeckSidebarView.swift",
+    "Sources/NeoAnki2/DecksModel.swift",
     "Sources/NeoAnki2/StudyCompositionView.swift",
     "Sources/NeoAnki2/StudyView.swift",
     "Sources/NeoAnki2/TemplateEditorState.swift",
@@ -31,5 +35,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release changes the adaptive study renderer and carries the inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
+  "reason": "The repository desktop-isolation policy excludes local GUI automation and screenshot capture. This release changes the deck sidebar hierarchy and carries inherited stale screenshot evidence forward until a later reviewed capture refreshes it."
 }

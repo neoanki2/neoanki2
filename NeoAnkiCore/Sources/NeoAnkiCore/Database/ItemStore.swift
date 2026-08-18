@@ -301,8 +301,9 @@ public actor ItemStore {
         }
 
         let decks = try await database.fetchAllDecks()
+        let sortPositions = try await database.fetchDeckSortPositions()
         let studyDay = try await studyDayKey(asOf: now)
-        let tree = deckTreeSummaries(from: decks)
+        let tree = deckTreeSummaries(from: decks, sortPositions: sortPositions)
         let directItemCounts = try await database.countItemsGroupedByDeck()
         let directDueCounts = try await database.countDueCardsGroupedByDeck(
             asOf: now,
@@ -322,6 +323,7 @@ public actor ItemStore {
                 name: deck.name,
                 parentID: deck.parentID,
                 newCardsPerDay: deck.newCardsPerDay,
+                sortPosition: sortPositions[deck.id, default: 0],
                 itemCount: itemCount,
                 dueCount: dueCount
             )
@@ -345,13 +347,17 @@ public actor ItemStore {
 
     /// Deck tree metadata without aggregate counts. Used when only descendant
     /// expansion is needed, not sidebar totals.
-    private func deckTreeSummaries(from decks: [Deck]) -> [DeckSummary] {
+    private func deckTreeSummaries(
+        from decks: [Deck],
+        sortPositions: [UUID: Int64]
+    ) -> [DeckSummary] {
         decks.map { deck in
             DeckSummary(
                 id: deck.id,
                 name: deck.name,
                 parentID: deck.parentID,
                 newCardsPerDay: deck.newCardsPerDay,
+                sortPosition: sortPositions[deck.id, default: 0],
                 itemCount: 0,
                 dueCount: 0
             )
@@ -359,7 +365,9 @@ public actor ItemStore {
     }
 
     func deckTreeSummaries() async throws -> [DeckSummary] {
-        deckTreeSummaries(from: try await database.fetchAllDecks())
+        let decks = try await database.fetchAllDecks()
+        let sortPositions = try await database.fetchDeckSortPositions()
+        return deckTreeSummaries(from: decks, sortPositions: sortPositions)
     }
 
     /// Scheduling summaries for specific items, read in batched queries.
@@ -391,6 +399,44 @@ public actor ItemStore {
 
         try await database.updateDeck(deck)
         return deck
+    }
+
+    /// Reorders or reparents one deck as a single validated tree operation.
+    @discardableResult
+    public func moveDeck(id: UUID, to destination: DeckMoveDestination) async throws -> Bool {
+        guard try await database.fetchDeck(id: id) != nil else { return false }
+
+        let summaries = try await deckSummaries()
+        let destinationParentID: UUID?
+        switch destination {
+        case let .before(targetID), let .after(targetID):
+            guard targetID != id,
+                  let target = summaries.first(where: { $0.id == targetID })
+            else {
+                throw DatabaseError.invalidDeck("Choose another deck as the move target.")
+            }
+            destinationParentID = target.parentID
+        case let .inside(parentID):
+            guard parentID != id,
+                  summaries.contains(where: { $0.id == parentID })
+            else {
+                throw DatabaseError.invalidDeck("Choose another deck as the move target.")
+            }
+            destinationParentID = parentID
+        case .topLevel:
+            destinationParentID = nil
+        }
+
+        if DeckTree.wouldCreateCycle(
+            deckID: id,
+            newParentID: destinationParentID,
+            in: summaries
+        ) {
+            throw DatabaseError.invalidDeck("A deck can't be moved inside itself.")
+        }
+
+        try await database.moveDeck(id: id, to: destination)
+        return true
     }
 
     /// Deletes a deck, all nested subdecks, and every item they contain.

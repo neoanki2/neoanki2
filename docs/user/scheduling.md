@@ -41,6 +41,10 @@ own; cards in that subdeck must fit both allowances. Unassigned cards remain
 unlimited. The scope home keeps **New** as the full backlog while explaining
 how many due new cards are available today and how many are deferred.
 
+Moving a deck moves its entire subtree. From the next study session onward,
+new cards in that subtree use the limits inherited from the deck's new parents;
+limits saved directly on the moved deck remain with it.
+
 Deck-included item types affect which fields and templates are offered while
 authoring; they do not create a separate allowance. New cards generated from
 those types consume the destination deck's existing daily allowance in the

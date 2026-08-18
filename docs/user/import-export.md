@@ -171,6 +171,8 @@ The operation is all-or-nothing: a failed import leaves the existing library
 unchanged. Every successful row is always added as a new item. NeoAnki2 does
 not search for matching content, so importing the same file twice creates
 duplicates and new due cards. JSON and CSV rows are placed in **Unassigned**.
+They do not create decks or change the saved order and hierarchy of existing
+decks.
 Import itself is not a scheduling answer and does not become optimizer training
 data. Imported cards begin contributing only after you review them; same-day
 repair answers remain context for FSRS but are not independent supervised

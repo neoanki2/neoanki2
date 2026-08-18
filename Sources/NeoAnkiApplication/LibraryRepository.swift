@@ -43,6 +43,7 @@ public protocol LibraryDeckManaging: Sendable {
     func deckSummaries(asOf: Date) async throws -> [DeckSummary]
     func createDeck(_ deck: Deck) async throws -> Deck
     func updateDeck(_ deck: Deck) async throws -> Deck
+    func moveDeck(id: UUID, to destination: DeckMoveDestination) async throws -> Bool
     func deleteDeck(id: UUID) async throws -> Bool
     func resetDeckProgress(id: UUID, asOf: Date) async throws -> Int
     func deckDeletionImpact(id: UUID, policy: DeckDeletionPolicy) async throws -> DeckDeletionImpact
@@ -610,6 +611,9 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
     }
     public func createDeck(_ deck: Deck) async throws -> Deck { try await store.createDeck(deck) }
     public func updateDeck(_ deck: Deck) async throws -> Deck { try await store.updateDeck(deck) }
+    public func moveDeck(id: UUID, to destination: DeckMoveDestination) async throws -> Bool {
+        try await store.moveDeck(id: id, to: destination)
+    }
     public func deleteDeck(id: UUID) async throws -> Bool { try await store.deleteDeck(id: id) }
     public func resetDeckProgress(id: UUID, asOf: Date) async throws -> Int {
         try await store.resetDeckProgress(id: id, now: asOf)
