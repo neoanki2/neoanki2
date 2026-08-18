@@ -93,13 +93,26 @@ if [ -z "$PR_NUMBER" ]; then
   fi
 
   REMOTE_BRANCH_EXISTS=0
+  REMOTE_SHA=""
   if gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" >/dev/null 2>&1; then
     REMOTE_BRANCH_EXISTS=1
+    REMOTE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" --jq .object.sha)"
   fi
   EXISTING_PR_NUMBER="$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" \
     --base "$BASE_BRANCH" --state all --limit 1 --json number --jq '.[0].number // empty')"
 
-  if [ "$REMOTE_BRANCH_EXISTS" -ne 1 ] || [ -z "$EXISTING_PR_NUMBER" ]; then
+  NEEDS_PUSH=0
+  if [ "$REMOTE_BRANCH_EXISTS" -ne 1 ]; then
+    NEEDS_PUSH=1
+  elif [ "$REMOTE_SHA" != "$HEAD_SHA" ]; then
+    if ! git -C "$ROOT" merge-base --is-ancestor "$REMOTE_SHA" "$HEAD_SHA"; then
+      echo "Remote branch $BRANCH diverged from local HEAD; refusing to overwrite it." >&2
+      exit 1
+    fi
+    NEEDS_PUSH=1
+  fi
+
+  if [ "$NEEDS_PUSH" -eq 1 ] || [ -z "$EXISTING_PR_NUMBER" ]; then
     echo "Running local release preflight..."
     (cd "$ROOT" && swift build)
     (cd "$ROOT" && ./Scripts/test-fast.sh)
@@ -112,7 +125,7 @@ if [ -z "$PR_NUMBER" ]; then
 
   fi
 
-  if [ "$REMOTE_BRANCH_EXISTS" -ne 1 ]; then
+  if [ "$NEEDS_PUSH" -eq 1 ]; then
     echo "Pushing $BRANCH with GitHub CLI credentials..."
     git -C "$ROOT" \
       -c credential.helper= \
@@ -120,12 +133,6 @@ if [ -z "$PR_NUMBER" ]; then
       push "https://github.com/$REPOSITORY.git" \
       "HEAD:refs/heads/$BRANCH"
   else
-    REMOTE_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" --jq .object.sha)"
-    if [ "$REMOTE_SHA" != "$HEAD_SHA" ]; then
-      echo "Remote branch $BRANCH is at $REMOTE_SHA, not local HEAD $HEAD_SHA." >&2
-      echo "Push the intended revision explicitly, then resume with --pr." >&2
-      exit 1
-    fi
     echo "Remote branch already matches HEAD; skipping push."
   fi
 
@@ -184,11 +191,10 @@ if [ "$PR_STATE" = "OPEN" ]; then
   fi
 
   if [ "$CANDIDATE_READY" -ne 1 ]; then
-    RUN_NAME="Release candidate for PR #$PR_NUMBER at $HEAD_SHA"
     STALE_RUN_IDS="$(gh run list --repo "$REPOSITORY" \
       --workflow release-candidate.yml --limit 50 \
-      --json databaseId,displayTitle,status \
-      --jq ".[] | select(.displayTitle | startswith(\"Release candidate for PR #$PR_NUMBER at \")) | select(.displayTitle != \"$RUN_NAME\" and .status != \"completed\") | .databaseId")"
+      --json databaseId,headBranch,headSha,status \
+      --jq ".[] | select(.headBranch == \"$PR_BRANCH\" and .headSha != \"$HEAD_SHA\" and .status != \"completed\") | .databaseId")"
     while IFS= read -r stale_run_id; do
       [ -n "$stale_run_id" ] || continue
       echo "Cancelling stale candidate workflow $stale_run_id for the previous PR head."
@@ -197,8 +203,8 @@ if [ "$PR_STATE" = "OPEN" ]; then
 
     RUN_ID="$(gh run list --repo "$REPOSITORY" \
       --workflow release-candidate.yml --limit 50 \
-      --json databaseId,displayTitle,status,conclusion \
-      --jq ".[] | select(.displayTitle == \"$RUN_NAME\" and .status != \"completed\") | .databaseId" \
+      --json databaseId,headBranch,headSha,status \
+      --jq ".[] | select(.headBranch == \"$PR_BRANCH\" and .headSha == \"$HEAD_SHA\" and .status != \"completed\") | .databaseId" \
       | head -n 1)"
     if [ -z "$RUN_ID" ]; then
       gh workflow run release-candidate.yml --repo "$REPOSITORY" \
@@ -206,8 +212,8 @@ if [ "$PR_STATE" = "OPEN" ]; then
       for _ in $(seq 1 20); do
         RUN_ID="$(gh run list --repo "$REPOSITORY" \
           --workflow release-candidate.yml --limit 20 \
-          --json databaseId,displayTitle \
-          --jq ".[] | select(.displayTitle == \"$RUN_NAME\") | .databaseId" \
+          --json databaseId,headBranch,headSha \
+          --jq ".[] | select(.headBranch == \"$PR_BRANCH\" and .headSha == \"$HEAD_SHA\") | .databaseId" \
           | head -n 1)"
         [ -n "$RUN_ID" ] && break
         sleep 1

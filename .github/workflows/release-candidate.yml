@@ -1,5 +1,5 @@
 name: Release candidate
-run-name: Release candidate for PR #${{ inputs.pr }} at ${{ inputs.head }}
+run-name: "Release candidate for PR #${{ inputs.pr }} at ${{ inputs.head }}"
 
 on:
   workflow_dispatch:
