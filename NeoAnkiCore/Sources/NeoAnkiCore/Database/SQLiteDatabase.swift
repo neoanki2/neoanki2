@@ -450,6 +450,12 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 27, try tableExists("cards") {
+                for sql in Schema.migrationV27Statements {
+                    try execute(sql)
+                }
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -2366,6 +2372,10 @@ actor SQLiteDatabase {
             card.memory = .new(due: now)
             try updateCardMemory(id, memory: card.memory)
             try execute(
+                "DELETE FROM card_attention_acknowledgements WHERE card_id = ?;",
+                bindings: [.text(id.uuidString)]
+            )
+            try execute(
                 "DELETE FROM api_card_reservations WHERE card_id = ?;",
                 bindings: [.text(id.uuidString)]
             )
@@ -2415,8 +2425,13 @@ actor SQLiteDatabase {
         foldItemCardStates(
             try query(
                 """
-                SELECT item_id, phase, due_at, lapses, is_suspended
+                SELECT cards.item_id, cards.phase, cards.due_at, cards.lapses,
+                       cards.is_suspended,
+                       COALESCE(card_attention_acknowledgements.acknowledged_lapses, -1)
+                           AS acknowledged_lapses
                 FROM cards
+                LEFT JOIN card_attention_acknowledgements
+                  ON card_attention_acknowledgements.card_id = cards.id
                 ORDER BY item_id ASC, due_at ASC;
                 """
             )
@@ -2430,9 +2445,14 @@ actor SQLiteDatabase {
         return foldItemCardStates(
             try query(
                 """
-                SELECT item_id, phase, due_at, lapses, is_suspended
+                SELECT cards.item_id, cards.phase, cards.due_at, cards.lapses,
+                       cards.is_suspended,
+                       COALESCE(card_attention_acknowledgements.acknowledged_lapses, -1)
+                           AS acknowledged_lapses
                 FROM cards
-                WHERE deck_id IN (\(placeholders))
+                LEFT JOIN card_attention_acknowledgements
+                  ON card_attention_acknowledgements.card_id = cards.id
+                WHERE cards.deck_id IN (\(placeholders))
                 ORDER BY item_id ASC, due_at ASC;
                 """,
                 bindings: sortedIDs.map { .text($0.uuidString) }
@@ -2444,9 +2464,14 @@ actor SQLiteDatabase {
         foldItemCardStates(
             try query(
                 """
-                SELECT item_id, phase, due_at, lapses, is_suspended
+                SELECT cards.item_id, cards.phase, cards.due_at, cards.lapses,
+                       cards.is_suspended,
+                       COALESCE(card_attention_acknowledgements.acknowledged_lapses, -1)
+                           AS acknowledged_lapses
                 FROM cards
-                WHERE deck_id IS NULL
+                LEFT JOIN card_attention_acknowledgements
+                  ON card_attention_acknowledgements.card_id = cards.id
+                WHERE cards.deck_id IS NULL
                 ORDER BY item_id ASC, due_at ASC;
                 """
             )
@@ -2467,9 +2492,14 @@ actor SQLiteDatabase {
             let states = foldItemCardStates(
                 try query(
                     """
-                    SELECT item_id, phase, due_at, lapses, is_suspended
+                    SELECT cards.item_id, cards.phase, cards.due_at, cards.lapses,
+                           cards.is_suspended,
+                           COALESCE(card_attention_acknowledgements.acknowledged_lapses, -1)
+                               AS acknowledged_lapses
                     FROM cards
-                    WHERE item_id IN (\(placeholders))
+                    LEFT JOIN card_attention_acknowledgements
+                      ON card_attention_acknowledgements.card_id = cards.id
+                    WHERE cards.item_id IN (\(placeholders))
                     ORDER BY item_id ASC, due_at ASC;
                     """,
                     bindings: sortedChunk.map { .text($0.uuidString) }
@@ -2484,15 +2514,70 @@ actor SQLiteDatabase {
         let states = foldItemCardStates(
             try query(
                 """
-                SELECT item_id, phase, due_at, lapses, is_suspended
+                SELECT cards.item_id, cards.phase, cards.due_at, cards.lapses,
+                       cards.is_suspended,
+                       COALESCE(card_attention_acknowledgements.acknowledged_lapses, -1)
+                           AS acknowledged_lapses
                 FROM cards
-                WHERE item_id = ?
+                LEFT JOIN card_attention_acknowledgements
+                  ON card_attention_acknowledgements.card_id = cards.id
+                WHERE cards.item_id = ?
                 ORDER BY due_at ASC;
                 """,
                 bindings: [.text(itemID.uuidString)]
             )
         )
         return states[itemID] ?? ItemCardState()
+    }
+
+    /// Acknowledges every currently affected card generated by the selected
+    /// items. Storing the current lapse count, rather than a permanent flag,
+    /// lets the warning return after the next lapse.
+    func acknowledgeRepeatedLapses(
+        itemIDs: Set<UUID>,
+        asOf now: Date,
+        threshold: Int
+    ) throws -> Int {
+        guard !itemIDs.isEmpty else { return 0 }
+        let orderedIDs = itemIDs.sorted { $0.uuidString < $1.uuidString }
+        let chunkSize = 500
+
+        return try inTransaction {
+            var acknowledgedCards = 0
+            var start = 0
+            while start < orderedIDs.count {
+                let end = min(start + chunkSize, orderedIDs.count)
+                let chunk = orderedIDs[start..<end]
+                start = end
+                let placeholders = Array(repeating: "?", count: chunk.count)
+                    .joined(separator: ", ")
+                try execute(
+                    """
+                    INSERT INTO card_attention_acknowledgements (
+                        card_id, acknowledged_lapses, acknowledged_at
+                    )
+                    SELECT id, lapses, ?
+                    FROM cards
+                    WHERE item_id IN (\(placeholders))
+                      AND is_suspended = 0
+                      AND lapses >= ?
+                    ON CONFLICT(card_id) DO UPDATE SET
+                        acknowledged_lapses = excluded.acknowledged_lapses,
+                        acknowledged_at = excluded.acknowledged_at
+                    WHERE excluded.acknowledged_lapses
+                        > card_attention_acknowledgements.acknowledged_lapses;
+                    """,
+                    bindings: [
+                        .double(now.timeIntervalSince1970),
+                    ] + chunk.map { .text($0.uuidString) } + [
+                        .int(Int64(threshold)),
+                    ]
+                )
+                let changed = try query("SELECT changes() AS count;")
+                acknowledgedCards += Int(changed.first?["count"] as? Int64 ?? 0)
+            }
+            return acknowledgedCards
+        }
     }
 
     /// Expects rows ordered by `due_at` ascending within each item.
@@ -2509,7 +2594,11 @@ actor SQLiteDatabase {
 
             let isSuspended = (row["is_suspended"] as? Int64 ?? 0) != 0
             if !isSuspended {
-                state.lapses = max(state.lapses, Int(row["lapses"] as? Int64 ?? 0))
+                let lapses = Int(row["lapses"] as? Int64 ?? 0)
+                let acknowledgedLapses = Int(row["acknowledged_lapses"] as? Int64 ?? -1)
+                state.lapses = max(state.lapses, lapses)
+                state.needsAttention = state.needsAttention
+                    || (lapses >= ScopeSummary.leechThreshold && lapses > acknowledgedLapses)
                 // Rows arrive due-ascending, so the first unsuspended card seen
                 // for an item is the one the learner meets next.
                 if state.dueAt == nil, let dueAt = row["due_at"] as? Double {
@@ -2547,7 +2636,11 @@ actor SQLiteDatabase {
                     AS relearning_count,
                 SUM(CASE WHEN is_suspended = 0 AND phase = 'review' THEN 1 ELSE 0 END)
                     AS review_count,
-                SUM(CASE WHEN is_suspended = 0 AND lapses >= ? THEN 1 ELSE 0 END) AS leech_count,
+                SUM(CASE WHEN is_suspended = 0 AND lapses >= ? AND NOT EXISTS (
+                    SELECT 1 FROM card_attention_acknowledgements
+                    WHERE card_attention_acknowledgements.card_id = cards.id
+                      AND card_attention_acknowledgements.acknowledged_lapses >= cards.lapses
+                ) THEN 1 ELSE 0 END) AS leech_count,
                 MIN(CASE WHEN is_suspended = 0 AND due_at > ? THEN due_at END) AS next_due_at
             FROM cards
             WHERE \(scopeFilter.sql);
@@ -3174,6 +3267,10 @@ actor SQLiteDatabase {
                 .text(parameterSetID.uuidString), .double(historyOrigin.timeIntervalSince1970),
                 .text(cardID.uuidString),
             ]
+        )
+        try execute(
+            "DELETE FROM card_attention_acknowledgements WHERE card_id = ?;",
+            bindings: [.text(cardID.uuidString)]
         )
     }
 
@@ -4375,7 +4472,20 @@ actor SQLiteDatabase {
         let clause = scopeClause(scope, column: "deck_id")
         let sql = """
             SELECT item_id, item_type_id, item_type_name, title, subtitle,
-                   card_count, deck_id, created_at, due_at, phase, lapses
+                   card_count, deck_id, created_at, due_at, phase, lapses,
+                   EXISTS (
+                       SELECT 1
+                       FROM cards
+                       LEFT JOIN card_attention_acknowledgements
+                         ON card_attention_acknowledgements.card_id = cards.id
+                       WHERE cards.item_id = item_browse_rows.item_id
+                         AND cards.is_suspended = 0
+                         AND cards.lapses >= \(ScopeSummary.leechThreshold)
+                         AND cards.lapses > COALESCE(
+                             card_attention_acknowledgements.acknowledged_lapses,
+                             -1
+                         )
+                   ) AS needs_attention
             FROM item_browse_rows
             WHERE \(clause.sql)
             ORDER BY created_at ASC, item_id ASC;
@@ -4440,7 +4550,8 @@ actor SQLiteDatabase {
                     schedule: ItemScheduleSummary(
                         dueAt: dueAt,
                         phase: phase,
-                        lapses: Int(sqlite3_column_int64(statement, 10))
+                        lapses: Int(sqlite3_column_int64(statement, 10)),
+                        needsAttention: sqlite3_column_int64(statement, 11) != 0
                     )
                 )
             )
@@ -5954,6 +6065,15 @@ actor SQLiteDatabase {
                     ]
                 )
             }
+            try execute(
+                """
+                DELETE FROM card_attention_acknowledgements
+                WHERE card_id IN (
+                    SELECT id FROM cards WHERE deck_id IN (\(placeholders))
+                );
+                """,
+                bindings: deckBindings
+            )
 
             return orderedCardIDs.count
         }

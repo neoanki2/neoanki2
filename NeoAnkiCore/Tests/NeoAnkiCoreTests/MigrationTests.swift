@@ -32,6 +32,7 @@ import Testing
     #expect(try tableExists("api_idempotency", at: url))
     #expect(try tableExists("api_study_sessions", at: url))
     #expect(try tableExists("api_card_reservations", at: url))
+    #expect(try tableExists("card_attention_acknowledgements", at: url))
     let firstLibraryID = try await database.getOrCreateLibraryID()
     let secondLibraryID = try await database.getOrCreateLibraryID()
     #expect(firstLibraryID == secondLibraryID)
@@ -65,6 +66,24 @@ import Testing
     #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
     #expect(try columnExists("sort_position", in: "decks", at: url))
     #expect(try integer("SELECT COUNT(*) FROM decks WHERE sort_position = 0;", at: url) == 1)
+}
+
+@Test func versionTwentySixMigrationAddsCardAttentionAcknowledgements() async throws {
+    let url = migrationDatabaseURL()
+    try executeMigrationSQL(
+        """
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (26);
+        CREATE TABLE cards (id TEXT PRIMARY KEY NOT NULL);
+        """,
+        at: url
+    )
+    let database = try SQLiteDatabase(path: url)
+
+    try await database.migrate()
+
+    #expect(try integer("SELECT version FROM schema_version;", at: url) == Schema.version)
+    #expect(try tableExists("card_attention_acknowledgements", at: url))
 }
 
 @Test func versionNineteenMigrationAddsBoundedNewCardIndexWithoutChangingRows() async throws {

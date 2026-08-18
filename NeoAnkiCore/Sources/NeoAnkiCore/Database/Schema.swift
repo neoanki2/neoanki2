@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 26
+    static let version = 27
 
     static let createStatements: [String] = [
         """
@@ -67,6 +67,13 @@ enum Schema {
             memory_model_version TEXT,
             memory_parameter_set_id TEXT,
             scheduling_history_origin REAL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS card_attention_acknowledgements (
+            card_id TEXT PRIMARY KEY NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            acknowledged_lapses INTEGER NOT NULL CHECK(acknowledged_lapses >= 0),
+            acknowledged_at REAL NOT NULL
         );
         """,
         """
@@ -1374,6 +1381,18 @@ enum Schema {
         """
         ALTER TABLE decks
         ADD COLUMN sort_position INTEGER NOT NULL DEFAULT 0;
+        """,
+    ]
+
+    /// Remembers that the learner reviewed a repeatedly lapsing card without
+    /// suppressing future warnings after another lapse.
+    static let migrationV27Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS card_attention_acknowledgements (
+            card_id TEXT PRIMARY KEY NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            acknowledged_lapses INTEGER NOT NULL CHECK(acknowledged_lapses >= 0),
+            acknowledged_at REAL NOT NULL
+        );
         """,
     ]
 

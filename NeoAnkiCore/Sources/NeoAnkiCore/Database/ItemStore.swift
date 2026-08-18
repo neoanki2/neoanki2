@@ -378,6 +378,21 @@ public actor ItemStore {
         }
     }
 
+    /// Marks the selected items' current repeated-lapse warnings as reviewed.
+    /// The database records each card's current lapse count so a later lapse
+    /// automatically makes it actionable again.
+    @discardableResult
+    public func acknowledgeRepeatedLapses(
+        itemIDs: Set<UUID>,
+        asOf now: Date = .now
+    ) async throws -> Int {
+        try await database.acknowledgeRepeatedLapses(
+            itemIDs: itemIDs,
+            asOf: now,
+            threshold: ScopeSummary.leechThreshold
+        )
+    }
+
     /// Renames or reparents a deck. Rejects cycles.
     @discardableResult
     public func updateDeck(_ deck: Deck) async throws -> Deck {

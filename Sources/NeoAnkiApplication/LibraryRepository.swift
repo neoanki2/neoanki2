@@ -34,6 +34,7 @@ public protocol LibraryItemMutating: Sendable {
     func deleteItem(id: UUID, asOf: Date) async throws -> Bool
     func deleteAllUnassignedItems(asOf: Date) async throws -> Int
     func moveItem(id: UUID, to deckID: UUID?) async throws -> Bool
+    func acknowledgeRepeatedLapses(itemIDs: Set<UUID>, asOf: Date) async throws -> Int
     func performBulkItemOperations(_ operations: [ItemBulkOperation], asOf: Date) async throws -> [ItemBulkOperationResult]
     func reserveMedia(data: Data, kind: MediaKind, altText: String, asOf: Date) async throws -> ReservedMediaAsset
 }
@@ -429,6 +430,13 @@ public extension LibraryItemMutating {
     func deleteAllUnassignedItems(asOf: Date = .now) async throws -> Int {
         try await deleteAllUnassignedItems(asOf: asOf)
     }
+
+    func acknowledgeRepeatedLapses(
+        itemIDs: Set<UUID>,
+        asOf: Date = .now
+    ) async throws -> Int {
+        try await acknowledgeRepeatedLapses(itemIDs: itemIDs, asOf: asOf)
+    }
 }
 
 public extension LibraryDeckManaging {
@@ -589,6 +597,12 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
     }
     public func moveItem(id: UUID, to deckID: UUID?) async throws -> Bool {
         try await store.updateItemDeck(itemID: id, deckID: deckID)
+    }
+    public func acknowledgeRepeatedLapses(
+        itemIDs: Set<UUID>,
+        asOf: Date
+    ) async throws -> Int {
+        try await store.acknowledgeRepeatedLapses(itemIDs: itemIDs, asOf: asOf)
     }
     public func performBulkItemOperations(
         _ operations: [ItemBulkOperation],

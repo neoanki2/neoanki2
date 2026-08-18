@@ -38,6 +38,7 @@ struct ItemBrowserView: View {
     @State private var columnCustomization = TableColumnCustomization<SavedItemSummary>()
     @State private var pendingDeleteIDs: Set<SavedItemSummary.ID>?
     @State private var affectedResponseCount = 0
+    @State private var isMarkingOK = false
     @State private var pageIndex = 0
 
     /// Reads the table's own state, so revealing the column through the header
@@ -210,6 +211,11 @@ struct ItemBrowserView: View {
         filter.apply(to: itemsModel.visibleItems)
     }
 
+    private var selectedAffectedItemIDs: Set<SavedItemSummary.ID> {
+        Set(browserItems.lazy.filter { $0.schedule?.isLeech == true }.map(\.id))
+            .intersection(selection)
+    }
+
     private var pagination: ItemBrowserPagination {
         ItemBrowserPagination(
             itemCount: browserItems.count,
@@ -248,11 +254,16 @@ struct ItemBrowserView: View {
             Label("Affected items", systemImage: "exclamationmark.arrow.triangle.2.circlepath")
                 .font(DesignSystem.Typography.uiSecondary.weight(.medium))
 
-            Text("Cards in these items have lapsed at least \(ScopeSummary.leechThreshold) times.")
+            Text(
+                "Cards lapsed \(ScopeSummary.leechThreshold)+ times. Select items to edit, "
+                    + "or mark them OK until another lapse."
+            )
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
 
             Spacer()
+
+            markOKButton(for: selectedAffectedItemIDs, title: "Mark Selected OK")
 
             Button("Show All Items") {
                 filter = .all
@@ -342,6 +353,14 @@ struct ItemBrowserView: View {
                 if ids.count == 1, let id = ids.first {
                     Button("Open", systemImage: "arrow.forward") { onOpenItem(id) }
                         .accessibilityIdentifier("browseMenuOpen")
+                }
+                let affectedIDs = Set(
+                    browserItems.lazy
+                        .filter { ids.contains($0.id) && $0.schedule?.isLeech == true }
+                        .map(\.id)
+                )
+                if !affectedIDs.isEmpty {
+                    markOKButton(for: affectedIDs)
                 }
                 moveMenu(for: ids)
                 Divider()
@@ -452,6 +471,31 @@ struct ItemBrowserView: View {
         }
     }
 
+    private func markOKButton(
+        for ids: Set<SavedItemSummary.ID>,
+        title: String = "Mark OK"
+    ) -> some View {
+        Button(title, systemImage: "checkmark.circle") {
+            markOK(ids)
+        }
+        .disabled(ids.isEmpty || isMarkingOK)
+        .help("Hide these warnings until one of their cards lapses again")
+        .accessibilityHint("The items return to this list if a card lapses again")
+        .accessibilityIdentifier("browseMarkOK")
+    }
+
+    private func markOK(_ ids: Set<SavedItemSummary.ID>) {
+        guard !ids.isEmpty, !isMarkingOK else { return }
+        isMarkingOK = true
+        Task {
+            let result = await itemsModel.markRepeatedLapsesOK(itemIDs: ids)
+            if result != nil {
+                selection.subtract(ids)
+            }
+            isMarkingOK = false
+        }
+    }
+
     // MARK: - Dynamic Type
     //
     // A table row cannot grow without limit, so at accessibility sizes the prompt
@@ -517,7 +561,7 @@ struct ItemBrowserView: View {
             Label("No Items Need Attention", systemImage: "checkmark.circle")
         } description: {
             if itemsModel.searchText.isEmpty {
-                Text("None of this scope's cards have lapsed \(ScopeSummary.leechThreshold) times.")
+                Text("All repeated-lapse warnings are reviewed. An item returns after another lapse.")
             } else {
                 Text("No affected items match “\(itemsModel.searchText)”.")
             }

@@ -149,8 +149,10 @@ also be shown or hidden with the standard macOS split-view controls.
 
 When the scope home reports cards that have been forgotten repeatedly, choose
 **Review Affected Items** to open Browse with only their source items showing.
-Open a row to inspect or edit it, or choose **Show All Items** to clear the
-filter.
+Open a row to inspect or edit it. If the content is already clear, select its
+row and choose **Mark Selected OK**; the item leaves this attention list until
+one of its cards lapses again. Choose **Done** to return to the scope home, or
+**Show All Items** to clear the filter.
 
 The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.

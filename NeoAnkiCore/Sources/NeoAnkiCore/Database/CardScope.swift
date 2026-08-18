@@ -15,9 +15,15 @@ struct ItemCardState: Sendable, Equatable {
     var dueAt: Date?
     var phase: Phase?
     var lapses: Int = 0
+    var needsAttention = false
 
     var scheduleSummary: ItemScheduleSummary {
-        ItemScheduleSummary(dueAt: dueAt, phase: phase, lapses: lapses)
+        ItemScheduleSummary(
+            dueAt: dueAt,
+            phase: phase,
+            lapses: lapses,
+            needsAttention: needsAttention
+        )
     }
 }
 

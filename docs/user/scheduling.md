@@ -42,6 +42,9 @@ unlimited. The scope home keeps **New** as the full backlog while explaining
 how many due new cards are available today and how many are deferred.
 Other scope-home notices, including the affected-items link for repeatedly
 forgotten cards, do not change the daily allowance or hide cards from study.
+Marking an affected item OK only acknowledges its cards at their current lapse
+counts. It does not change those counts, their due dates, or their place in the
+study queue; another lapse makes the warning appear again.
 
 Moving a deck moves its entire subtree. From the next study session onward,
 new cards in that subtree use the limits inherited from the deck's new parents;
@@ -68,6 +71,8 @@ to return every card in that deck and its subdecks to New. NeoAnki2
 shows a destructive confirmation before committing the reset. Items, deck
 settings, and suspended-card state are preserved; review history and the
 schedule derived from it are permanently removed for the affected cards. The
+reset also clears any repeated-lapse acknowledgements because those lapse
+counts no longer apply. The
 operation cannot be undone, so back up the library first when that history
 matters.
 

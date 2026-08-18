@@ -133,6 +133,10 @@ The deck-order migration only adds a persistent sibling position used by the
 sidebar. It does not rewrite items, cards, or append-only review outcomes.
 Local API token verifiers are stored outside the library database and its snapshots,
 so restoring library content does not authorize an API client.
+Choosing **Mark Selected OK** in the repeated-lapse Browse filter does not edit
+the item or rewrite its review history. It stores only an acknowledgement of
+each affected card's current lapse count; a later lapse makes the item need
+attention again, and resetting progress clears the acknowledgement.
 The one-shot template-definition migration likewise preserves item, card,
 review-log, saved-response, and media identities; it changes only the item type's
 validated composition definition and its derived revision records.

@@ -183,6 +183,9 @@ marks one lapse when a review card enters relearning; repeated failures during
 that repair sequence do not add more lapses. Hard reduces growth; Easy can
 increase it. Every repair attempt records its actual timestamp and is never
 fuzzed or delayed: failed acquisition returns in the next repair round.
+After eight lapses, the scope home can surface the card's item for attention.
+Marking that item OK does not grade the card or change this history; it only
+hides the warning until the card records another lapse.
 After recall, FSRS keeps fractional-day precision and may choose an intraday
 review when the memory state calls for it. Longer review intervals depend on
 the card’s history, elapsed time, scheduler parameters, desired retention, and

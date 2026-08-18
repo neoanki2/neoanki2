@@ -694,7 +694,10 @@ struct ContentView: View {
 
     private func openBrowse(filter: ItemBrowserFilter = .all) {
         selectedItemID = nil
+        // Clear browse-only state while the table is not mounted. Doing this
+        // from Done made SwiftUI rebuild the full table before dismissing it.
         itemBrowserFilter = filter
+        itemsModel.searchText = ""
         let scope = decksModel.studyScope
         guard itemsModel.needsBrowseLoad else {
             isBrowsing = true
@@ -709,8 +712,6 @@ struct ContentView: View {
 
     private func closeBrowse() {
         isBrowsing = false
-        itemBrowserFilter = .all
-        itemsModel.searchText = ""
     }
 
     private func openAddItem() {

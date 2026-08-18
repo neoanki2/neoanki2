@@ -64,6 +64,10 @@ with the controls in the sidebar.
 - **Show / Hide Answer Column** — **Command-Option-A** (browse mode only)
 - **Review Affected Items** on the scope home opens the same keyboard-navigable
   Browse table filtered to repeatedly forgotten cards' source items.
+- Select one or more rows and choose **Mark Selected OK** to remove reviewed
+  warnings without editing their items. The action is disabled with no
+  selection, is also available from the row context menu, and each item returns
+  after another lapse.
 - **Show All Items** clears that filter.
 - **Vocabulary Packs…** lists the packs installed in the current library.
 - **Item Types…** — **Command-Shift-T**
