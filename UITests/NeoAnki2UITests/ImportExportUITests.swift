@@ -195,8 +195,11 @@ extension FastFunctionalJourneyTests {
             )
             waitForPortableImportCompletion(in: app)
             openTemplates(in: app)
+            let includedDeckGroup = app.buttons.identified("includedDeckGroup-Conflict Deck")
+            XCTAssertTrue(includedDeckGroup.waitUntilExists(timeout: 15))
+            includedDeckGroup.click()
             XCTAssertTrue(
-                app.descendants(matching: .any)["itemTypeRow-Portable Custom Revised"]
+                app.descendants(matching: .any)["includedItemTypeRow-Portable Custom Revised"]
                     .waitUntilExists(timeout: 15)
             )
             closeTemplates(in: app)

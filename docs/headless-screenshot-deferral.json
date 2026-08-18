@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "9a72b723d8ba55bec66e918d167e6b46310b0a969d7f1171b3c73836825322a9",
+  "diffSHA256": "752d33d097a2fb536e0fc5d514300ac53ddd06400b8937e1c1e957b41508c151",
   "featureIDs": [
     "errors-empty-states",
     "import-json-csv",
@@ -29,5 +29,5 @@
     "Sources/NeoAnki2/UserFacingError.swift",
     "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"
   ],
-  "reason": "The accepted study-compositions release plan and repository desktop-isolation policy explicitly exclude GUI automation and screenshot capture from this headless workflow. Product documentation, accessibility behavior, and deterministic UI geometry are updated and tested; visual evidence is deferred for a later reviewed capture."
+  "reason": "The previous headless study-compositions release deferred these screenshots, and the repository desktop-isolation policy still excludes local GUI automation and screenshot capture. This release restores the existing revealed-answer accessibility identifier without changing the rendered study layout; the explicit deferral is carried forward until a later reviewed capture refreshes the inherited visual evidence."
 }

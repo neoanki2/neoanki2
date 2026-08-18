@@ -58,7 +58,10 @@ Vocabulary…** or use **Add from Vocabulary** in the deck toolbar. Choose an
 installed pack, search its local index, review the forms, pronunciations,
 meanings, examples, and card paradigms, then choose **Add Cards**. The generated
 items are validated and appended atomically to the selected deck; no new deck is
-created. The window stays open so another word can be added immediately.
+created. Existing deck-provided item types keep their order when a later entry
+needs a different vocabulary card type, so meaning, pronunciation, and example
+cards can be added to the same deck across separate sessions. The window stays
+open so another word can be added immediately.
 
 Both operations are offline-only. Import reads and copies the selected local
 package; lookup reads only the installed SQLite index and local media.

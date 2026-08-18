@@ -137,18 +137,24 @@ extension ItemStore {
                     updatedAt: record.updatedAt
                 )
             }
-            var seenIncludedTypeIDs: Set<UUID> = []
             let includedItemTypeRootID = destinationDeckID ?? package.rootDeckID
+            let existingIncludedItemTypes = try await database.fetchIncludedItemTypeOwners()
+                .filter { $0.rootDeckID == includedItemTypeRootID }
+            var seenIncludedTypeIDs = Set(existingIncludedItemTypes.map(\.itemTypeID))
+            var nextIncludedItemTypeOrdinal =
+                (existingIncludedItemTypes.map(\.ordinal).max() ?? -1) + 1
             let includedItemTypes = package.itemTypes.compactMap { source -> UUID? in
                 guard let localID = typeMap[source.id]?.id,
                       seenIncludedTypeIDs.insert(localID).inserted else { return nil }
                 return localID
-            }.enumerated().map { ordinal, itemTypeID in
-                IncludedItemTypeOwner(
+            }.map { itemTypeID in
+                let owner = IncludedItemTypeOwner(
                     rootDeckID: includedItemTypeRootID,
                     itemTypeID: itemTypeID,
-                    ordinal: ordinal
+                    ordinal: nextIncludedItemTypeOrdinal
                 )
+                nextIncludedItemTypeOrdinal += 1
+                return owner
             }
             let resolvedPolicies = Dictionary(
                 grouping: package.itemTypePolicies,

@@ -49,6 +49,46 @@ import VocabularyDeckBuilder
     #expect(items.count == 1)
     #expect(items.first?.deckID == destination.id)
     #expect(items.first?.cardCount == 2)
+
+    let pronunciation = try VocabularyDeckGenerator.generate(
+        input: VocabularyDeckInput(
+            destinationDeckID: destination.id,
+            deckName: destination.name,
+            language: "uk",
+            form: "хвильовий",
+            pronunciations: [
+                .init(
+                    id: "stress",
+                    scheme: "orthographic-respelling",
+                    displayLabel: "Stress",
+                    content: .text("хвильови́й")
+                ),
+            ],
+            paradigms: [.formToPronunciation]
+        )
+    )
+    defer { pronunciation.cleanup() }
+
+    let pronunciationResult = try await AuthoredDeck.importItems(
+        from: pronunciation.bundleURL,
+        into: store,
+        deckID: destination.id
+    )
+
+    #expect(pronunciationResult.itemCount == 1)
+    #expect(try await store.listDecks().map(\.name) == ["Ukrainian"])
+    let appendedItems = try await store.listItems(
+        scope: .deck(destination.id, includeDescendants: false)
+    )
+    #expect(appendedItems.count == 2)
+    #expect(appendedItems.reduce(0) { $0 + $1.cardCount } == 3)
+    let includedTypes = try #require(
+        try await store.loadItemTypeCatalog().includedWithDecks.first?.itemTypes
+    )
+    #expect(includedTypes.map(\.name) == [
+        "Vocabulary Meaning",
+        "Vocabulary Pronunciation (Text)",
+    ])
 }
 
 @Test @MainActor func generatedPoemImportsThroughAppTransferAndRefreshesModels() async throws {

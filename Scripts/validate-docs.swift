@@ -107,6 +107,7 @@ let manifestURL = docs.appendingPathComponent("features.json")
 let claimsURL = docs.appendingPathComponent("claims.json")
 let infrastructureReviewURL = docs.appendingPathComponent("infrastructure-change-review.json")
 let screenshotDeferralURL = docs.appendingPathComponent("headless-screenshot-deferral.json")
+let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/manifest.json")
 let generatedURL = docs.appendingPathComponent("features.md")
 let arguments = Set(CommandLine.arguments.dropFirst())
 let writeGenerated = arguments.contains("--write")
@@ -235,16 +236,32 @@ if allowHeadlessScreenshotDeferral {
         fail("Headless screenshot deferral contains non-screenshot features: \(invalidIDs.joined(separator: ", "))")
     }
     do {
-        let changedResult = try gitOutput(arguments: ["diff", "--name-only", "\(baseRef)...HEAD"])
-        guard changedResult.status == 0 else {
-            fail("Could not compute headless screenshot deferral sources")
+        guard
+            let screenshotData = try? Data(contentsOf: screenshotManifestURL),
+            let screenshotManifest = try? JSONDecoder().decode(
+                ScreenshotManifest.self,
+                from: screenshotData
+            )
+        else {
+            fail("Could not read screenshot evidence for the headless deferral")
             exitWithFailuresIfNeeded()
         }
-        let changed = Set(String(decoding: changedResult.data, as: UTF8.self).split(separator: "\n").map(String.init))
+        let staleResult = try gitOutput(
+            arguments: ["diff", "--name-only", screenshotManifest.sourceSHA, "HEAD", "--"]
+        )
+        guard staleResult.status == 0 else {
+            fail("Could not compute stale headless screenshot sources")
+            exitWithFailuresIfNeeded()
+        }
+        let stale = Set(
+            String(decoding: staleResult.data, as: UTF8.self)
+                .split(separator: "\n")
+                .map(String.init)
+        )
         let expectedFiles = Set(review.featureIDs.flatMap { featuresByID[$0]?.sources ?? [] })
-            .intersection(changed)
+            .intersection(stale)
         if expectedFiles != Set(review.files) {
-            fail("Headless screenshot deferral must list exactly the changed sources for its features")
+            fail("Headless screenshot deferral must list exactly the stale sources for its features")
         }
         let patchResult = try gitOutput(
             arguments: ["diff", "--binary", "\(baseRef)...HEAD", "--"] + review.files
@@ -391,7 +408,6 @@ if requireScreenshots {
         || !screenshotStyles.contains(#"a[href*="assets/screenshots/"] > img"#) {
         fail("Documentation screenshots must define enforced 2x and 3x display caps")
     }
-    let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/manifest.json")
     guard
         let screenshotData = try? Data(contentsOf: screenshotManifestURL),
         let screenshotManifest = try? JSONDecoder().decode(
