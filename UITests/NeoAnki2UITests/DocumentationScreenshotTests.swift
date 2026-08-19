@@ -262,6 +262,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             ]
         )
 
+        app.terminate()
         let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
         openItemTypeStudio(named: "Basic", in: advancedApp)
