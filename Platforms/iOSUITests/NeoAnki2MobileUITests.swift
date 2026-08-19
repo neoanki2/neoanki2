@@ -132,23 +132,12 @@ final class NeoAnki2MobileUITests: XCTestCase {
     /// the helper resilient to Form scroll positions retained after a pushed
     /// editor is dismissed.
     private func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
-        let offsets: (start: CGFloat, end: CGFloat) = switch direction {
-        // Keep both points inside the visible Form content. In compact
-        // landscape the floating tab bar's dimming material begins around
-        // two-thirds of the window, so a drag starting at 0.72 is intercepted
-        // before the underlying collection view can scroll.
-        case .towardBottom: (0.62, 0.32)
-        case .towardTop: (0.32, 0.62)
+        switch direction {
+        case .towardBottom:
+            surface.swipeUp(velocity: .slow)
+        case .towardTop:
+            surface.swipeDown(velocity: .slow)
         }
-        surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.start))
-            .press(
-                forDuration: 0.1,
-                thenDragTo: surface.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.end)
-                ),
-                withVelocity: .slow,
-                thenHoldForDuration: 0
-            )
     }
 
     private func firstCardSetupButton(in app: XCUIApplication) -> XCUIElement {

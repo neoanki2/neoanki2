@@ -84,8 +84,13 @@ extension FastFunctionalJourneyTests {
         }
 
         runJourneyActivity("ItemTypeStudio.layoutsPreviewAndAdvanced") {
+            let editorScroll = app.scrollViews.identified("cardSetupEditor")
             for layout in ["focus", "split", "mediaAside", "mediaHero", "actionStage"] {
                 let choice = app.buttons.identified("cardSetupEditor.layout.\(layout)")
+                if !choice.exists {
+                    XCTAssertTrue(editorScroll.waitUntilExists(timeout: 3))
+                    editorScroll.scroll(byDeltaX: 0, deltaY: -250)
+                }
                 XCTAssertTrue(choice.waitUntilExists(timeout: 3))
                 choice.click()
                 XCTAssertEqual(choice.value as? String, "Selected")
