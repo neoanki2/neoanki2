@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-19T10:37:07Z",
+  "capturedAt" : "2026-08-19T10:47:40Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 680,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "f6c02f86985578753f6feeadf075331cfc5a00d0dba946374389445acaeb889f",
+      "sha256" : "5a712f295ee464bcb7e413ea1db4f9ed84a8050ddf850224b8b8c240938ee84f",
       "width" : 1024
     },
     {
@@ -219,5 +219,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "08b20bcf157d1c29b2f15c9498446a567abe6a98"
+  "sourceSHA" : "3a012ce7f791040056865faccc1aaa513980b07c"
 }
