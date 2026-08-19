@@ -58,7 +58,11 @@ extension FastFunctionalJourneyTests {
             }
             confirmation.buttons["Cancel"].click()
             chooseAnswerMethod("Audio Submission", in: app)
-            app.buttons["Remove Answer and Continue"].click()
+            guard let secondConfirmation = modalContainer(in: app) else {
+                XCTFail("Expected the Audio Submission confirmation dialog")
+                return
+            }
+            secondConfirmation.buttons["Remove Answer and Continue"].click()
             XCTAssertTrue(app.staticTexts["Spoken response"].waitUntilExists(timeout: 3))
             XCTAssertTrue(
                 app.staticTexts["Responses remain private on this device."].waitUntilExists(timeout: 3)
