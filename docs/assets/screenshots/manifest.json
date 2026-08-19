@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-19T07:38:55Z",
+  "capturedAt" : "2026-08-19T08:12:40Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -219,5 +219,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "da2dc06aafe44511f7045d9c96f555ad7622334a"
+  "sourceSHA" : "751b78b0062ba0b1b81a3613e0702856ce6dbde6"
 }
