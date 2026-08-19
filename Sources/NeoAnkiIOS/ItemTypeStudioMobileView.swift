@@ -194,7 +194,8 @@ struct ItemTypeStudioCatalogMobileView: View {
 }
 
 private struct ItemTypeStudioSetupRoute: Identifiable, Hashable {
-    let id: UUID
+    let id = UUID()
+    let cardSetupID: UUID
 }
 
 private struct PendingFieldRemoval: Identifiable {
@@ -218,6 +219,7 @@ struct ItemTypeStudioMobileView: View {
     @FocusState private var textFocus: ItemTypeStudioTextFocus?
     @State private var validationFocus: ItemTypeStudioValidationTarget?
     @State private var setupRoute: ItemTypeStudioSetupRoute?
+    @State private var selectedCardSetupID: UUID?
     @State private var pendingFieldRemoval: PendingFieldRemoval?
     @State private var pendingSave: ItemTypeStudioSavePreparation?
     @State private var unlockImpact: ItemTypeEditingImpact?
@@ -249,15 +251,15 @@ struct ItemTypeStudioMobileView: View {
         .interactiveDismissDisabled(hasUnsavedStudioChanges)
         .navigationDestination(item: $setupRoute) { route in
             if let draftBinding,
-               draftBinding.wrappedValue.cardSetups.contains(where: { $0.id == route.id }) {
+               draftBinding.wrappedValue.cardSetups.contains(where: { $0.id == route.cardSetupID }) {
                 CardSetupEditorView(
                     draft: draftBinding,
-                    cardSetupID: route.id,
+                    cardSetupID: route.cardSetupID,
                     validationFocus: $validationFocus
                 )
                 .onDisappear {
-                    if setupRoute?.id == route.id {
-                        setupRoute = nil
+                    if selectedCardSetupID == route.cardSetupID {
+                        selectedCardSetupID = nil
                     }
                 }
             } else {
@@ -363,8 +365,13 @@ struct ItemTypeStudioMobileView: View {
                     CardSetupCollectionView(
                         draft: draftBinding,
                         selection: Binding(
-                            get: { setupRoute?.id },
-                            set: { setupRoute = $0.map(ItemTypeStudioSetupRoute.init(id:)) }
+                            get: { selectedCardSetupID },
+                            set: { cardSetupID in
+                                selectedCardSetupID = cardSetupID
+                                setupRoute = cardSetupID.map(
+                                    ItemTypeStudioSetupRoute.init(cardSetupID:)
+                                )
+                            }
                         )
                     )
                     .disabled(isDraftReadOnly || isWorking)
@@ -730,10 +737,16 @@ struct ItemTypeStudioMobileView: View {
     /// observes it even when the invalid control lives in another Card setup.
     private func routeToSetup(_ id: UUID, focusing target: ItemTypeStudioValidationTarget) {
         validationFocus = nil
-        setupRoute = .init(id: id)
+        // A manual Back can leave navigationDestination(item:) holding its
+        // previous value. Give every programmatic push a fresh route identity
+        // so validation can reopen the same Card setup without clearing the
+        // binding first (which can pop the outer Studio on compact devices).
+        selectedCardSetupID = id
+        let route = ItemTypeStudioSetupRoute(cardSetupID: id)
+        setupRoute = route
         Task { @MainActor in
             await Task.yield()
-            guard setupRoute?.id == id else { return }
+            guard setupRoute?.id == route.id else { return }
             validationFocus = target
         }
     }
@@ -748,7 +761,9 @@ struct ItemTypeStudioMobileView: View {
              let .answerMethod(cardSetupID: id),
              let .layout(cardSetupID: id),
              let .recipe(cardSetupID: id, purpose: _):
-            setupRoute = .init(id: id)
+            guard setupRoute?.cardSetupID != id else { return }
+            selectedCardSetupID = id
+            setupRoute = .init(cardSetupID: id)
         }
     }
 

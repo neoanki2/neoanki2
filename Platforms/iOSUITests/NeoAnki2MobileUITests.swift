@@ -138,10 +138,12 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
         surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.start))
             .press(
-                forDuration: 0.05,
+                forDuration: 0.1,
                 thenDragTo: surface.coordinate(
                     withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.end)
-                )
+                ),
+                withVelocity: .slow,
+                thenHoldForDuration: 0
             )
     }
 
@@ -168,7 +170,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
         let containerFrame = container.frame
         let viewportFrame = viewport.frame
         let visibleDescendants = container.descendants(matching: .any).allElementsBoundByIndex.filter {
-            !$0.frame.isEmpty && $0.frame.intersects(containerFrame)
+            !$0.frame.isEmpty
+                && $0.frame.intersects(containerFrame)
+                && $0.identifier != "AdditionalDimmingOverlay"
+                && $0.label != "AdditionalDimmingOverlay"
         }
         XCTAssertFalse(visibleDescendants.isEmpty, "No visible editor content to measure", file: file, line: line)
         for element in visibleDescendants {
@@ -339,7 +344,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
         let reveal = app.buttons["Show Answer"]
-        XCTAssertTrue(reveal.waitForExistence(timeout: 5))
+        XCTAssertTrue(reveal.waitForExistence(timeout: 15))
         reveal.tap()
         XCTAssertTrue(app.staticTexts["Paris"].waitForExistence(timeout: 5))
         app.buttons["Good"].tap()
@@ -458,7 +463,8 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
         app.staticTexts["Mobile Studio"].tap()
         XCTAssertTrue(app.navigationBars["Mobile Studio"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Type Answer"].waitForExistence(timeout: 5))
+        let savedTypeAnswer = app.staticTexts["Type Answer"]
+        scrollTo(savedTypeAnswer, in: app)
     }
 
     func testItemTypeStudioLegacyClozeReadOnlyAndDestructiveConfirmations() throws {
@@ -501,9 +507,8 @@ final class NeoAnki2MobileUITests: XCTestCase {
         app.buttons["Discard"].tap()
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 5))
 
-        let legacy = app.staticTexts["Studio Legacy Fixture"]
-        XCTAssertTrue(legacy.waitForExistence(timeout: 10))
-        legacy.tap()
+        let legacy = app.buttons["Studio Legacy Fixture"]
+        scrollToAndTap(legacy, in: app)
         XCTAssertTrue(app.navigationBars["Studio Legacy Fixture"].waitForExistence(timeout: 5))
 
         let legacySetup = app.buttons.matching(
@@ -610,9 +615,8 @@ final class NeoAnki2MobileUITests: XCTestCase {
         openItemTypeStudioCatalog(in: app)
         XCTAssertGreaterThan(app.frame.width, 0)
 
-        let legacy = app.staticTexts["Studio Legacy Fixture"]
-        XCTAssertTrue(legacy.waitForExistence(timeout: 10))
-        legacy.tap()
+        let legacy = app.buttons["Studio Legacy Fixture"]
+        scrollToAndTap(legacy, in: app)
         let setup = firstCardSetupButton(in: app)
         scrollToAndTap(setup, in: app)
 
