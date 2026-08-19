@@ -60,6 +60,11 @@ struct ItemTypeStudioCatalogMobileView: View {
         .navigationDestination(isPresented: $presentsStudio) {
             ItemTypeStudioMobileView(model: model, reloadLibrary: reloadLibrary)
         }
+        .onChange(of: presentsStudio) { _, presented in
+            if !presented {
+                model.discardStudioDraft()
+            }
+        }
         .task {
             if case .loading = model.loadState {
                 await prepareCatalog()
@@ -675,7 +680,6 @@ struct ItemTypeStudioMobileView: View {
                   activeDraft.originalSnapshot == saved,
                   activeDraft.isDirty == false
             else { return }
-            model.discardStudioDraft()
             dismiss()
         } catch {
             present(error)
@@ -842,7 +846,6 @@ struct ItemTypeStudioMobileView: View {
     }
 
     private func closeStudio() {
-        model.discardStudioDraft()
         dismiss()
     }
 

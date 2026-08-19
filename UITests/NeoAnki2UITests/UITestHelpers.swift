@@ -1011,6 +1011,16 @@ class NeoAnkiUITestCase: XCTestCase {
         )
     }
 
+    func assertSidebarCannotOpenDuringItemTypes(in app: XCUIApplication) {
+        let allDecks = app.descendants(matching: .any).identified("scopeRow-AllDecks")
+        assertSidebarCollapsed(in: app)
+        app.typeKey("0", modifierFlags: [.command])
+        XCTAssertFalse(
+            allDecks.waitUntilHittable(timeout: 1),
+            "Library sidebar became interactive while Item Types owned the window"
+        )
+    }
+
     func modalContainer(in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement? {
         firstExisting(
             of: [app.dialogs.firstMatch, app.sheets.firstMatch, app.alerts.firstMatch],

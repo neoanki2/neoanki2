@@ -231,6 +231,7 @@ public final class ItemTypesFeatureModel {
     }
 
     public func beginCreatingItemType(id: UUID = UUID()) {
+        selectedItemTypeID = nil
         studioDraft = .new(id: id)
     }
 

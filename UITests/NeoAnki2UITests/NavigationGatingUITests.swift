@@ -15,8 +15,8 @@ extension FastFunctionalJourneyTests {
         try runJourneyActivity("NavigationGatingUITests.testSidebarHiddenDuringTemplates") {
             openTemplates(in: app)
             assertSidebarCollapsed(in: app)
-            showSidebar(in: app)
-            XCTAssertTrue(app.buttons.identified("newDeckToolbar").exists)
+            assertSidebarCannotOpenDuringItemTypes(in: app)
+            XCTAssertTrue(app.descendants(matching: .any)["templatesItemTypesHeader"].exists)
             runJourneyActivity("ImportExportUITests.testImportDisabledDuringTemplates") {
                 assertMenuDisabled("Import…", in: app)
             }
@@ -88,8 +88,10 @@ extension FastFunctionalJourneyTests {
         let app = launchApp()
         openTemplates(in: app)
         assertSidebarCollapsed(in: app)
-        showSidebar(in: app)
-        XCTAssertTrue(app.buttons.identified("newDeckToolbar").waitUntilExists(timeout: 3))
+        assertSidebarCannotOpenDuringItemTypes(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["templatesItemTypesHeader"].waitUntilExists(timeout: 3)
+        )
         closeTemplates(in: app)
     }
 

@@ -27,6 +27,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
     private func openItemTypeStudioCatalog(in app: XCUIApplication) {
         open("Create", in: app)
+        // A tab can retain its previous scroll position between launches in the
+        // same test host. Return to the top before searching both directions so
+        // the first Design destination materializes in compact landscape too.
+        for _ in 0..<8 { app.swipeDown() }
         let destination = app.buttons["Item Types & Card Setups"]
         scrollToAndTap(destination, in: app)
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
@@ -38,6 +42,12 @@ final class NeoAnki2MobileUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.exists {
+            let returnKey = keyboard.buttons["Return"]
+            if returnKey.exists { returnKey.tap() }
+            _ = keyboard.waitForNonExistence(timeout: 2)
+        }
         for _ in 0..<8 where !element.exists || !element.isHittable { app.swipeUp() }
         XCTAssertTrue(element.waitForExistence(timeout: 2), file: file, line: line)
         XCTAssertTrue(element.isHittable, "Element is not reachable: \(element)", file: file, line: line)
@@ -302,8 +312,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         moveUp.tap()
 
         let firstSetup = firstCardSetupButton(in: app)
-        XCTAssertTrue(firstSetup.waitForExistence(timeout: 5))
-        firstSetup.tap()
+        scrollToAndTap(firstSetup, in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["cardSetupEditor"].waitForExistence(timeout: 5)
         )

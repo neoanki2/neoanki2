@@ -538,6 +538,22 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     #expect(try await repository.loadItemTypeCatalog().itemTypes.contains(saved))
 }
 
+@Test @MainActor func itemTypesFeatureClearsCatalogSelectionWhenCreatingNewDraft() async throws {
+    let fixture = try await makeItemTypeStudioFeatureFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.root) }
+    let model = ItemTypesFeatureModel(library: fixture.repository)
+    await model.load()
+    model.selectItemType(id: fixture.itemType.id)
+    #expect(model.selectedItemTypeID == fixture.itemType.id)
+
+    let newItemTypeID = UUID()
+    model.beginCreatingItemType(id: newItemTypeID)
+
+    #expect(model.selectedItemTypeID == nil)
+    #expect(model.studioDraft?.id == newItemTypeID)
+    #expect(model.studioDraft?.originalSnapshot == nil)
+}
+
 @Test @MainActor func itemTypesFeaturePersistsFieldReorderingWithoutChangingCardSetups() async throws {
     let fixture = try await makeItemTypeStudioFeatureFixture()
     defer { try? FileManager.default.removeItem(at: fixture.root) }
