@@ -228,9 +228,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             ]
         )
 
-        app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
-        app.buttons.identified("editItemType").click()
-        XCTAssertTrue(app.textFields.identified("itemTypeStudioName").waitUntilExists(timeout: 5))
+        openItemTypeStudio(named: "Basic", in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)
                 .identified("itemTypeStudioCardSetupEditor")
