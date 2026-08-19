@@ -66,11 +66,23 @@ struct MacItemTypeStudioView: View {
             }
 
             if model.studioDraft != nil {
-                HSplitView {
-                    studioOutline
-                        .frame(minWidth: 300, idealWidth: 340, maxWidth: 400)
-                    editor
-                        .frame(minWidth: 440, maxWidth: .infinity, maxHeight: .infinity)
+                GeometryReader { geometry in
+                    HSplitView {
+                        studioOutline
+                            .frame(
+                                minWidth: 220,
+                                idealWidth: min(300, geometry.size.width * 0.4),
+                                maxWidth: 320
+                            )
+                        editor
+                            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    // A split view otherwise reports the sum of its children's
+                    // ideal widths to its parent. Inside the Item Types navigator
+                    // that can widen the detail beyond a compact window and move
+                    // Save/Cancel off-screen. Accept the proposed viewport width;
+                    // the shared editor then uses its responsive fallbacks.
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
             }
         }
