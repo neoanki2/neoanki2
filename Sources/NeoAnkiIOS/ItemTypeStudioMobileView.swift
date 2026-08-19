@@ -761,7 +761,7 @@ struct ItemTypeStudioMobileView: View {
              let .answerMethod(cardSetupID: id),
              let .layout(cardSetupID: id),
              let .recipe(cardSetupID: id, purpose: _):
-            guard setupRoute?.cardSetupID != id else { return }
+            guard selectedCardSetupID != id else { return }
             selectedCardSetupID = id
             setupRoute = .init(cardSetupID: id)
         }
