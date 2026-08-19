@@ -1,15 +1,14 @@
 import Foundation
 
-/// One held-out recall target and the competing predictions for it. Intraday
-/// answers remain in the sequence used to produce these predictions, but are
-/// deliberately absent here because `elapsedDays` must be positive.
+/// One held-out recall target and the competing predictions for it. Exact
+/// fractional elapsed time is retained for both intraday and interday answers.
 public struct FSRSPromotionObservation: Sendable, Equatable, Identifiable {
     public let id: UUID
     public let cardID: UUID
     public let reviewedAt: Date
     public let sequence: Int64?
     public let studyDay: Int
-    public let elapsedDays: UInt32
+    public let elapsedDays: Double
     public let recalled: Bool
     public let activeProbability: Double
     public let defaultProbability: Double
@@ -21,7 +20,7 @@ public struct FSRSPromotionObservation: Sendable, Equatable, Identifiable {
         reviewedAt: Date,
         sequence: Int64? = nil,
         studyDay: Int? = nil,
-        elapsedDays: UInt32,
+        elapsedDays: Double,
         recalled: Bool,
         activeProbability: Double,
         defaultProbability: Double,
@@ -59,7 +58,7 @@ public enum FSRSElapsedBucket: String, CaseIterable, Sendable, Equatable {
     case threeThroughThirtyDays
     case overThirtyDays
 
-    init(days: UInt32) {
+    init(days: Double) {
         if days < 3 { self = .underThreeDays }
         else if days <= 30 { self = .threeThroughThirtyDays }
         else { self = .overThirtyDays }
@@ -253,7 +252,7 @@ public struct FSRSPromotionPolicy: Sendable {
     public func eligibility(
         observations input: [FSRSPromotionObservation]
     ) -> FSRSPromotionEligibility {
-        let observations = Self.interday(input)
+        let observations = Self.elapsedObservations(input)
         let failures = observations.lazy.filter { !$0.recalled }.count
         let cards = Set(observations.map(\.cardID)).count
         let days = Set(observations.map(\.studyDay)).count
@@ -314,7 +313,7 @@ public struct FSRSPromotionPolicy: Sendable {
     public func chronologicalFolds(
         observations input: [FSRSPromotionObservation]
     ) -> [FSRSChronologicalFold] {
-        let count = Self.interday(input).count
+        let count = Self.elapsedObservations(input).count
         guard count >= thresholds.minimumTargets else { return [] }
         let foldCount = count < 700 ? 3 : 5
         let validationTotal = max(thresholds.minimumValidationTargets, count / 4)
@@ -341,7 +340,7 @@ public struct FSRSPromotionPolicy: Sendable {
         observations input: [FSRSPromotionObservation],
         desiredRetention: Double
     ) -> FSRSPromotionMetrics {
-        let observations = Self.interday(input).sorted(by: Self.chronological)
+        let observations = Self.elapsedObservations(input).sorted(by: Self.chronological)
         guard !observations.isEmpty else {
             return FSRSPromotionMetrics(
                 active: .invalid, defaults: .invalid, empiricalBaseRate: .invalid,
@@ -482,7 +481,7 @@ public struct FSRSPromotionPolicy: Sendable {
         return deltas[min(deltas.count - 1, Int(floor(Double(deltas.count - 1) * 0.95)))]
     }
 
-    private static func interday(
+    private static func elapsedObservations(
         _ observations: [FSRSPromotionObservation]
     ) -> [FSRSPromotionObservation] {
         observations.filter { $0.elapsedDays > 0 }

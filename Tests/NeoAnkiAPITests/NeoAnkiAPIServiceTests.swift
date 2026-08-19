@@ -1902,7 +1902,9 @@ private func pairWithAuthority(
     #expect(previewRows.allSatisfy { ($0["predictedRetrievability"] as? Double) != nil })
     #expect(previewRows.allSatisfy { ($0["modelVersion"] as? String)?.isEmpty == false })
     #expect(previewRows.allSatisfy { ($0["parameterSetId"] as? String) != nil })
-    #expect(previewRows.allSatisfy { $0["timingPolicyVersion"] as? String == "neo-elapsed-24h-v1" })
+    #expect(previewRows.allSatisfy {
+        $0["timingPolicyVersion"] as? String == "neo-continuous-elapsed-v2"
+    })
     #expect(previewRows.allSatisfy { $0["intervalPolicyVersion"] as? String == "continuous-due-v1" })
 
     let explanation = await api.handle(
@@ -1910,7 +1912,10 @@ private func pairWithAuthority(
     )
     #expect(explanation.status == 200)
     #expect(try jsonObject(explanation)["cardId"] as? String == cardID)
-    #expect(try jsonObject(explanation)["elapsedTimePolicy"] as? String == "neo-elapsed-24h-v1")
+    #expect(
+        try jsonObject(explanation)["elapsedTimePolicy"] as? String
+            == "neo-continuous-elapsed-v2"
+    )
     let explanationObject = try jsonObject(explanation)
     #expect((explanationObject["ratings"] as? [[String: Any]])?.count == 4)
     #expect(explanationObject["parameterSetId"] as? String == previewRows.first?["parameterSetId"] as? String)

@@ -22,9 +22,9 @@ public struct PreparedDataset: Equatable, Sendable {
     public var distinctCardCount: Int { Set(training.map(\.cardID)).count }
 }
 
-/// Builds expanding-prefix targets from complete card histories. Intraday
-/// reviews are retained in each prefix, while only reviews whose `deltaT > 0`
-/// become supervised outcomes.
+/// Builds expanding-prefix targets from complete card histories. Every review
+/// after positive elapsed time becomes a supervised outcome; only a truly
+/// immediate review remains sequence context without its own target.
 public enum DatasetBuilder {
     public static func examples(cardID: String, history: [Review]) -> [TrainingExample] {
         guard history.first?.deltaT == 0 else { return [] }
@@ -44,7 +44,9 @@ public enum DatasetBuilder {
                   example.item.reviews.first?.deltaT == 0,
                   example.item.reviews.last?.deltaT ?? 0 > 0
             else { return false }
-            return example.item.reviews.allSatisfy { (1...4).contains($0.rating.rawValue) }
+            return example.item.reviews.allSatisfy {
+                (1...4).contains($0.rating.rawValue) && $0.deltaT.isFinite && $0.deltaT >= 0
+            }
         }
 
         typealias Pair = PairKey
@@ -52,7 +54,7 @@ public enum DatasetBuilder {
         for (index, example) in valid.enumerated() where example.item.longTermReviewCount == 1 {
             let first = example.item.reviews[0].rating.rawValue
             guard let delta = example.item.reviews.first(where: { $0.deltaT > 0 })?.deltaT else { continue }
-            groups[first, default: [:]][delta, default: []].append(index)
+            groups[first, default: [:]][initialIntervalBucket(delta), default: []].append(index)
         }
 
         var removed = Set<Pair>()
@@ -82,7 +84,7 @@ public enum DatasetBuilder {
             guard let first = example.item.reviews.first?.rating.rawValue,
                   let delta = example.item.reviews.first(where: { $0.deltaT > 0 })?.deltaT
             else { return false }
-            return !removed.contains(Pair(rating: first, deltaT: delta))
+            return !removed.contains(Pair(rating: first, deltaT: initialIntervalBucket(delta)))
         }
         let initialization = keptInitialization.sorted().map { valid[$0] }
         return PreparedDataset(
@@ -95,6 +97,14 @@ public enum DatasetBuilder {
     private struct PairKey: Hashable {
         let rating: UInt32
         let deltaT: UInt32
+    }
+
+    /// The outlier filter needs populated cohorts, while training itself keeps
+    /// the exact elapsed value. Whole-day buckets preserve the reference
+    /// behavior for integral histories and group sub-day observations safely.
+    private static func initialIntervalBucket(_ delta: Float) -> UInt32 {
+        guard delta.isFinite, delta > 0 else { return 0 }
+        return UInt32(min(Double(UInt32.max), max(1, Double(delta).rounded())))
     }
 }
 

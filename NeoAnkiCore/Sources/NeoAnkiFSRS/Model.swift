@@ -47,10 +47,10 @@ public struct NextStates: Equatable, Sendable {
 
 public struct Review: Codable, Equatable, Sendable {
     public let rating: Rating
-    /// Whole elapsed 24-hour periods. The first review must use zero.
-    public let deltaT: UInt32
+    /// Exact elapsed days. The first review must use zero.
+    public let deltaT: Float
 
-    public init(rating: Rating, deltaT: UInt32) {
+    public init(rating: Rating, deltaT: Float) {
         self.rating = rating
         self.deltaT = deltaT
     }
@@ -162,8 +162,8 @@ public struct FSRS: Sendable {
         self.parameters = parameters
     }
 
-    public func retrievability(state: MemoryState, daysElapsed: UInt32) -> Float {
-        powerForgettingCurve(t: Float(daysElapsed), stability: state.stability)
+    public func retrievability(state: MemoryState, daysElapsed: Float) -> Float {
+        powerForgettingCurve(t: max(0, daysElapsed), stability: state.stability)
     }
 
     public func nextInterval(stability: Float, desiredRetention: Float) -> Float {
@@ -176,9 +176,11 @@ public struct FSRS: Sendable {
     public func nextStates(
         current: MemoryState?,
         desiredRetention: Float,
-        daysElapsed: UInt32
+        daysElapsed: Float
     ) throws -> NextStates {
-        guard desiredRetention.isFinite, desiredRetention > 0, desiredRetention < 1 else {
+        guard desiredRetention.isFinite, desiredRetention > 0, desiredRetention < 1,
+              daysElapsed.isFinite, daysElapsed >= 0
+        else {
             throw FSRSError.invalidInput
         }
         let state = current ?? MemoryState(stability: 0, difficulty: 0)
@@ -197,6 +199,9 @@ public struct FSRS: Sendable {
     }
 
     public func memoryState(item: Item, startingAt start: MemoryState? = nil) throws -> MemoryState {
+        guard item.reviews.allSatisfy({ $0.deltaT.isFinite && $0.deltaT >= 0 }) else {
+            throw FSRSError.invalidInput
+        }
         var state = start ?? MemoryState(stability: 0, difficulty: 0)
         let startIndex = start == nil ? 0 : 0
         for (index, review) in item.reviews.enumerated().dropFirst(startIndex) {
@@ -210,6 +215,9 @@ public struct FSRS: Sendable {
         item: Item,
         startingAt start: MemoryState? = nil
     ) throws -> [MemoryState] {
+        guard item.reviews.allSatisfy({ $0.deltaT.isFinite && $0.deltaT >= 0 }) else {
+            throw FSRSError.invalidInput
+        }
         var result: [MemoryState] = start.map { [$0] } ?? []
         var state = start ?? MemoryState(stability: 0, difficulty: 0)
         for (index, review) in item.reviews.enumerated() {
@@ -237,7 +245,7 @@ public struct FSRS: Sendable {
     }
 
     private func step(
-        deltaT: UInt32,
+        deltaT: Float,
         rating: Rating,
         state: MemoryState,
         nth: Int
@@ -245,7 +253,7 @@ public struct FSRS: Sendable {
         let w = parameters.values
         let lastS = min(ParameterClipper.stabilityMaximum, max(ParameterClipper.stabilityMinimum, state.stability))
         let lastD = min(ParameterClipper.difficultyMaximum, max(ParameterClipper.difficultyMinimum, state.difficulty))
-        let r = powerForgettingCurve(t: Float(deltaT), stability: lastS)
+        let r = powerForgettingCurve(t: deltaT, stability: lastS)
 
         let hardPenalty: Float = rating == .hard ? w[15] : 1
         let easyBonus: Float = rating == .easy ? w[16] : 1

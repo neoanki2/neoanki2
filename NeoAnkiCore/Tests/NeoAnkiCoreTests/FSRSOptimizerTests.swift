@@ -189,7 +189,7 @@ import Testing
     #expect(orderedLoss == shuffledLoss)
 }
 
-@Test func optimizerDoesNotScoreIntradayAnswersAsIndependentTargets() throws {
+@Test func optimizerPreservesPositiveFractionalElapsedTimeAsTargets() throws {
     let epoch = Date(timeIntervalSince1970: 1_700_000_000)
     let scheduler = LearningScheduler(
         parameters: .init(enableFuzz: false)
@@ -224,10 +224,40 @@ import Testing
         }
     }
 
-    let optimizer = FSRSOptimizer(minimumObservations: 100)
-    #expect(throws: FSRSOptimizationError.insufficientData(required: 100, available: 0)) {
-        try optimizer.optimize(logs: logs)
-    }
+    let examples = FSRSOptimizer.examples(from: logs)
+    #expect(examples.count == 60)
+    #expect(examples.allSatisfy {
+        guard let elapsed = $0.item.reviews.last?.deltaT else { return false }
+        return elapsed > 0 && elapsed < 1
+    })
+}
+
+@Test func optimizerAdapterKeepsOvernightSubdayElapsedTime() throws {
+    let cardID = UUID()
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let logs = [
+        ReviewLog(
+            cardID: cardID,
+            reviewedAt: start,
+            rating: .good,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            phaseBefore: .new,
+            durationMs: 500
+        ),
+        ReviewLog(
+            cardID: cardID,
+            reviewedAt: start.addingTimeInterval(21.5 * 3_600),
+            rating: .good,
+            elapsedDays: 21.5 / 24,
+            scheduledDays: 21.5 / 24,
+            phaseBefore: .review,
+            durationMs: 500
+        ),
+    ]
+
+    let example = try #require(FSRSOptimizer.examples(from: logs).first)
+    #expect(abs(Double(example.item.reviews.last!.deltaT) - 21.5 / 24) < 1e-6)
 }
 
 @Test func optimizationScheduleWaitsForEnoughHistoryBeforeTheFirstFit() {

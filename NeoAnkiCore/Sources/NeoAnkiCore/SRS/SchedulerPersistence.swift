@@ -20,7 +20,7 @@ public enum SchedulerPersistenceConstants {
     public static let optimizerParityVerified = FSRSReference.optimizerParityVerified
     /// SHA-256 of the signed full-reference verification manifest.
     public static let fixtureChecksum = "b132b3d6f3ce7bc1292f54001c558acd6230afad6e037dfd1670ef7c93d51a2f"
-    public static let timingPolicyVersion = "neo-elapsed-24h-v1"
+    public static let timingPolicyVersion = FSRSScheduler.elapsedPolicyIdentifier
     public static let intervalPolicyVersion = "continuous-due-v1"
 }
 
@@ -183,7 +183,7 @@ public struct ReviewSchedulingAudit: Codable, Equatable, Sendable {
     public let presetID: UUID?
     public let deckIDAtReview: UUID?
     public let elapsedSeconds: Double
-    public let elapsedModelDays: UInt32
+    public let elapsedModelDays: Double
     public let parameterSetID: UUID?
     public let memoryAfter: MemoryState
     public let predictedRetrievability: Double?
@@ -199,7 +199,7 @@ public struct ReviewSchedulingAudit: Codable, Equatable, Sendable {
         presetID: UUID?,
         deckIDAtReview: UUID?,
         elapsedSeconds: Double,
-        elapsedModelDays: UInt32,
+        elapsedModelDays: Double,
         parameterSetID: UUID?,
         memoryAfter: MemoryState,
         predictedRetrievability: Double?,

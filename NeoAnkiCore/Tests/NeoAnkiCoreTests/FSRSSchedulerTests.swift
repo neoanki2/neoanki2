@@ -208,14 +208,14 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     #expect(hard.due.timeIntervalSince(now).truncatingRemainder(dividingBy: 86_400) != 0)
 }
 
-@Test func sameDayReviewsUseFSRS6W17ThroughW19() {
+@Test func zeroElapsedReviewsRetainFSRS6ShortTermTransition() {
     let start = Date(timeIntervalSince1970: 1_700_000_000)
     let scheduler = FSRSScheduler(parameters: .init(enableFuzz: false))
     let first = scheduler.schedule(.new(due: start), rating: .good, now: start)
     let sameDay = scheduler.schedule(
         first,
         rating: .easy,
-        now: start.addingTimeInterval(3_600)
+        now: start
     )
     let increase = pow(first.stability, -w[19]) * exp(w[17] * (1 + w[18]))
     let expected = first.stability * max(1, increase)
@@ -283,21 +283,28 @@ private let w = FSRSScheduler.Parameters.defaultWeights
     #expect(next.stability == 36_500)
 }
 
-@Test func sameDayGoodUsesFSRS6FactorAndCannotShrink() {
-    let start = Date(timeIntervalSince1970: 1_700_000_000)
+@Test func fractionalElapsedReviewUsesContinuousForgettingCurve() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
     let scheduler = FSRSScheduler(parameters: .init(enableFuzz: false))
-    let first = scheduler.schedule(.new(due: start), rating: .good, now: start)
-    let sameDay = scheduler.schedule(
-        first,
-        rating: .good,
-        now: start.addingTimeInterval(3_600)
+    let elapsedDays = 21.5 / 24.0
+    let state = MemoryState(
+        stability: 0.1063,
+        difficulty: 9.8341,
+        due: now,
+        lastReview: now.addingTimeInterval(-elapsedDays * 86_400),
+        reps: 42,
+        lapses: 8,
+        phase: .review
     )
-    let exponent = w[17] * (Double(ReviewRating.good.rawValue) - 3.0 + w[18])
-    let increase = pow(first.stability, -w[19]) * exp(exponent)
-    let expected = first.stability * max(1, increase)
+    let continuous = scheduler.schedule(state, rating: .good, now: now)
+    var zeroElapsed = state
+    zeroElapsed.lastReview = now
+    let shortTerm = scheduler.schedule(zeroElapsed, rating: .good, now: now)
 
-    #expect(abs(sameDay.stability - expected) < 1e-12)
-    #expect(sameDay.stability >= first.stability)  // w17,w18 >= 0 -> non-shrinking
+    #expect(abs(FSRSScheduler.elapsedModelDays(from: state.lastReview, to: now) - elapsedDays) < 1e-12)
+    #expect(continuous.stability > shortTerm.stability)
+    #expect(continuous.due > shortTerm.due)
+    #expect(continuous.due.timeIntervalSince(now) > 8 * 3_600)
 }
 
 @Test func intervalFuzzIsDisabled() {

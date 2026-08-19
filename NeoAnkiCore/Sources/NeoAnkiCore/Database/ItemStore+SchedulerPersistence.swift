@@ -225,8 +225,7 @@ extension ItemStore {
     func cardReplayedForActiveScheduling(_ card: Card, now: Date) async throws -> Card {
         guard schedulerOverride == nil else { return card }
         let context = try await activeSchedulingContext()
-        guard card.memoryModelVersion != context.parameterSet.modelVersion
-                || card.memoryParameterSetID != context.parameterSet.id else {
+        guard try await cardRequiresReplay(card, context: context) else {
             return card
         }
         let logs = try await database.fetchActiveReviewLogs(cardID: card.id)
@@ -249,6 +248,19 @@ extension ItemStore {
             throw DatabaseError.cardNotFound(card.id)
         }
         return result
+    }
+
+    private func cardRequiresReplay(
+        _ card: Card,
+        context: ActiveSchedulingContext
+    ) async throws -> Bool {
+        if card.memoryModelVersion != context.parameterSet.modelVersion
+            || card.memoryParameterSetID != context.parameterSet.id {
+            return true
+        }
+        guard card.memory.reps > 0 else { return false }
+        let policy = try await database.fetchLatestActiveReviewTimingPolicy(cardID: card.id)
+        return policy.hasReview && policy.version != FSRSScheduler.elapsedPolicyIdentifier
     }
 
     func prepareSchedulingReview(
@@ -347,8 +359,8 @@ extension ItemStore {
         }
         let context = try await activeSchedulingContext()
         let memory: MemoryState
-        if card.memoryModelVersion == context.parameterSet.modelVersion,
-           card.memoryParameterSetID == context.parameterSet.id {
+        let requiresReplay = try await cardRequiresReplay(card, context: context)
+        if !requiresReplay {
             memory = card.memory
         } else {
             let logs = try await database.fetchActiveReviewLogs(cardID: card.id)

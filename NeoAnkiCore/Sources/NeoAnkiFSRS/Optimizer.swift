@@ -169,7 +169,7 @@ private func buildWindowedBatch(_ cards: [[WeightedExample]]) -> HostBatch {
         lengths.append(full.count)
         for (time, review) in full.enumerated() {
             let index = time * batchSize + column
-            times[index] = Float(review.deltaT)
+            times[index] = review.deltaT
             ratings[index] = Float(review.rating.rawValue)
         }
         for weighted in card {
