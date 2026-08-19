@@ -68,7 +68,9 @@ extension FastFunctionalJourneyTests {
                 app.staticTexts["Responses remain private on this device."].waitUntilExists(timeout: 3)
             )
             chooseAnswerMethod("Reveal", in: app)
-            XCTAssertTrue(app.buttons["Back"].waitUntilExists(timeout: 3))
+            let restoredAnswer = app.buttons.identified("cardSetupEditor.recipe.answer")
+            XCTAssertTrue(restoredAnswer.waitUntilExists(timeout: 3))
+            XCTAssertTrue(restoredAnswer.label.localizedCaseInsensitiveContains("Back"))
         }
 
         runJourneyActivity("ItemTypeStudio.allStarters") {

@@ -133,8 +133,12 @@ final class NeoAnki2MobileUITests: XCTestCase {
     /// editor is dismissed.
     private func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
         let offsets: (start: CGFloat, end: CGFloat) = switch direction {
-        case .towardBottom: (0.72, 0.42)
-        case .towardTop: (0.42, 0.72)
+        // Keep both points inside the visible Form content. In compact
+        // landscape the floating tab bar's dimming material begins around
+        // two-thirds of the window, so a drag starting at 0.72 is intercepted
+        // before the underlying collection view can scroll.
+        case .towardBottom: (0.62, 0.32)
+        case .towardTop: (0.32, 0.62)
         }
         surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.start))
             .press(
