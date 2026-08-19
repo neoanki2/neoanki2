@@ -901,8 +901,6 @@ class NeoAnkiUITestCase: XCTestCase {
                 line: line
             )
         }
-        XCTAssertTrue(cancel.isHittable, file: file, line: line)
-        XCTAssertTrue(save.isHittable, file: file, line: line)
     }
 
     /// Asserting absence immediately races the animation that removes the

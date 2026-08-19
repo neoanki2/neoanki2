@@ -28,8 +28,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
     private func openItemTypeStudioCatalog(in app: XCUIApplication) {
         open("Create", in: app)
         let destination = app.buttons["Item Types & Card Setups"]
-        XCTAssertTrue(destination.waitForExistence(timeout: 5))
-        destination.tap()
+        scrollToAndTap(destination, in: app)
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
     }
 
@@ -39,8 +38,8 @@ final class NeoAnki2MobileUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
-        for _ in 0..<6 where !element.isHittable { app.swipeUp() }
+        for _ in 0..<8 where !element.exists || !element.isHittable { app.swipeUp() }
+        XCTAssertTrue(element.waitForExistence(timeout: 2), file: file, line: line)
         XCTAssertTrue(element.isHittable, "Element is not reachable: \(element)", file: file, line: line)
         element.tap()
     }
@@ -279,8 +278,17 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(typeName.waitForExistence(timeout: 5))
         typeName.tap()
         typeName.typeText("Mobile Studio")
-        XCTAssertTrue(app.staticTexts["Front"].exists)
-        XCTAssertTrue(app.staticTexts["Back"].exists)
+        let fieldNames = app.textFields.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                "item-type-studio.field.",
+                ".name"
+            )
+        )
+        XCTAssertTrue(fieldNames.element(boundBy: 0).waitForExistence(timeout: 5))
+        XCTAssertTrue(fieldNames.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertEqual(fieldNames.element(boundBy: 0).value as? String, "Front")
+        XCTAssertEqual(fieldNames.element(boundBy: 1).value as? String, "Back")
         let moveUp = app.buttons.matching(
             NSPredicate(
                 format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
