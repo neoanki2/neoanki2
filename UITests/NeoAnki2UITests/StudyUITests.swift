@@ -400,22 +400,13 @@ extension FastFunctionalJourneyTests {
     func checkStudyUITestsStudyReverseTemplate() throws {
         let app = launchApp()
         openTemplates(in: app)
-
-        if app.buttons.identified("addTemplateToolbar").waitUntilExists(timeout: 2) {
-            app.buttons.identified("addTemplateToolbar").click()
-        } else {
-            app.buttons.identified("Add Template").click()
-        }
-
-        app.textFields.identified("templateNameField").click()
-        app.textFields.identified("templateNameField").typeText("Reverse")
-
-        app.menuButtons.identified("templatePromptField").click()
-        app.menuItems.identified("Back").click()
-        showTemplateAnswer(in: app)
-        app.menuButtons.identified("templateAnswerField").click()
-        app.menuItems.identified("Front").click()
-        saveTemplateEditor(in: app)
+        app.buttons.identified("editItemType").click()
+        let starters = app.menuButtons.identified("itemTypeStudio.addCardSetupMenu")
+        XCTAssertTrue(starters.waitUntilExists(timeout: 5))
+        starters.click()
+        XCTAssertTrue(app.menuItems["Reverse"].waitUntilExists(timeout: 3))
+        app.menuItems["Reverse"].click()
+        saveItemType(in: app)
         closeTemplates(in: app)
 
         addBasicItem(front: "Reverse Q", back: "Reverse A", in: app)

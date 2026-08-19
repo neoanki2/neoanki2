@@ -278,8 +278,8 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
 
 @Test func perfFSRSOptimizeFromReviewHistory() async throws {
     guard let scale = requirePerformanceScale() else { return }
-    let libraryCount = scale.itemCount
     let fsrsCount = scale.fsrsLibraryItemCount
+    let libraryCount = max(scale.itemCount, fsrsCount)
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "fsrs-optimize")
     defer { try? FileManager.default.removeItem(at: directory) }

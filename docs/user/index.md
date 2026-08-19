@@ -31,7 +31,7 @@ goal or explanation you need.
 ## Understand
 
 - [Concept model and glossary](concepts/)
-- [Item types and templates](item-types-and-templates/)
+- [Item types and Card setups](item-types-and-templates/)
 - [Scheduling](scheduling/)
 
 ## Troubleshoot

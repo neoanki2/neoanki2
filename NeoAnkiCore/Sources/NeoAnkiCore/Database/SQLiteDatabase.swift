@@ -1248,6 +1248,100 @@ actor SQLiteDatabase {
         }
     }
 
+    func prepareItemTypeUpdateAuthorization(
+        expectedOriginal: ItemType,
+        updated: ItemType
+    ) throws -> ItemTypeUpdateAuthorization {
+        try inTransaction {
+            guard let current = try fetchItemType(id: updated.id) else {
+                throw DatabaseError.itemTypeNotFound(updated.id)
+            }
+            guard current == expectedOriginal else {
+                throw ItemTypeUpdateError.staleDefinition(updated.id)
+            }
+            let items = try fetchItems(itemTypeID: updated.id).map(\.item)
+            let retirementPlan = try generatedCardRetirementPlan(
+                from: current,
+                to: updated,
+                items: items
+            )
+            let schema = itemTypeSchemaImpactState(
+                from: current,
+                to: updated,
+                items: items
+            )
+            return ItemTypeUpdateAuthorization(
+                expectedOriginal: current,
+                expectedGeneratedCardRetirementIDs: retirementPlan.cardIDs,
+                expectedStudyResponseDeletionIDs: try studyResponseIDs(
+                    cardIDs: retirementPlan.cardIDs
+                ),
+                expectedSchemaImpactState: schema.state,
+                schemaChangeImpact: schema.impact
+            )
+        }
+    }
+
+    func updateItemTypeAndSyncCards(
+        updated: ItemType,
+        authorization: ItemTypeUpdateAuthorization,
+        now: Date
+    ) throws {
+        try inTransaction {
+            guard let current = try fetchItemType(id: updated.id) else {
+                throw DatabaseError.itemTypeNotFound(updated.id)
+            }
+            guard current == authorization.expectedOriginal else {
+                throw ItemTypeUpdateError.staleDefinition(updated.id)
+            }
+
+            let items = try fetchItems(itemTypeID: updated.id).map(\.item)
+            let retirementPlan = try generatedCardRetirementPlan(
+                from: current,
+                to: updated,
+                items: items
+            )
+            guard retirementPlan.cardIDs == authorization.expectedGeneratedCardRetirementIDs else {
+                throw ItemTypeUpdateError.generatedCardRetirementImpactChanged(
+                    expected: authorization.expectedGeneratedCardRetirementCount,
+                    actual: retirementPlan.cardIDs.count
+                )
+            }
+            let currentResponseIDs = try studyResponseIDs(cardIDs: retirementPlan.cardIDs)
+            guard currentResponseIDs == authorization.expectedStudyResponseDeletionIDs else {
+                throw ItemTypeUpdateError.studyResponseImpactChanged(
+                    expected: authorization.expectedStudyResponseDeletionCount,
+                    actual: currentResponseIDs.count
+                )
+            }
+
+            let currentSchema = itemTypeSchemaImpactState(
+                from: current,
+                to: updated,
+                items: items
+            )
+            guard currentSchema.state == authorization.expectedSchemaImpactState else {
+                throw ItemTypeUpdateError.schemaImpactChanged(
+                    expected: authorization.schemaChangeImpact.affectedItemCount,
+                    actual: currentSchema.impact.affectedItemCount
+                )
+            }
+
+            // A guarded no-op still performs every authorization comparison so
+            // external changes are detected, but deliberately emits no writes.
+            guard updated != current else { return }
+
+            try updateItemType(updated)
+            try syncCards(
+                from: current,
+                to: updated,
+                now: now,
+                retirementPlan: retirementPlan
+            )
+            try refreshBrowseProjection(itemTypeID: updated.id)
+        }
+    }
+
     func fetchItemTypesWithCorruption() throws -> ItemTypeLoadResult {
         let rows = try query(
             """
@@ -4852,6 +4946,19 @@ actor SQLiteDatabase {
         try countStudyResponses(joinColumn: "cards.template_id", ids: templateIDs)
     }
 
+    private func studyResponseIDs(cardIDs: Set<UUID>) throws -> Set<UUID> {
+        guard !cardIDs.isEmpty else { return [] }
+        let ordered = cardIDs.sorted { $0.uuidString < $1.uuidString }
+        let placeholders = Array(repeating: "?", count: ordered.count).joined(separator: ",")
+        let rows = try query(
+            "SELECT id FROM study_responses WHERE card_id IN (\(placeholders));",
+            bindings: ordered.map { .text($0.uuidString) }
+        )
+        return Set(rows.compactMap { row in
+            (row["id"] as? String).flatMap(UUID.init(uuidString:))
+        })
+    }
+
     private func countStudyResponses(joinColumn: String, ids: Set<UUID>) throws -> Int {
         guard !ids.isEmpty else { return 0 }
         let ordered = ids.sorted { $0.uuidString < $1.uuidString }
@@ -5104,6 +5211,89 @@ actor SQLiteDatabase {
         let clozeGroup: Int?
     }
 
+    /// One retirement calculation shared by preparation, transactional
+    /// reauthorization, and reconciliation. Keeping the identities in the plan
+    /// prevents a same-count replacement from reusing an earlier confirmation.
+    private struct GeneratedCardRetirementPlan {
+        let cardIDs: Set<UUID>
+    }
+
+    private func generatedCardRetirementPlan(
+        from previous: ItemType,
+        to updated: ItemType,
+        items: [Item]
+    ) throws -> GeneratedCardRetirementPlan {
+        let updatedTemplates = Dictionary(
+            uniqueKeysWithValues: updated.templates.map { ($0.id, $0) }
+        )
+        let previousTemplateIDs = Set(previous.templates.map(\.id))
+        var retired: Set<UUID> = []
+        for item in items {
+            var desiredGroupsByTemplate: [UUID: Set<Int?>] = [:]
+            desiredGroupsByTemplate.reserveCapacity(updatedTemplates.count)
+            for template in updated.templates {
+                guard CardGenerator.shouldGenerate(template, for: item) else {
+                    desiredGroupsByTemplate[template.id] = []
+                    continue
+                }
+                desiredGroupsByTemplate[template.id] = template.interaction == .cloze
+                    ? Set(CardGenerator.clozeGroups(for: template, item: item).map(Optional.some))
+                    : [nil]
+            }
+            for card in try fetchCards(for: item.id) {
+                guard updatedTemplates[card.templateID] != nil else {
+                    if previousTemplateIDs.contains(card.templateID) {
+                        retired.insert(card.id)
+                    }
+                    continue
+                }
+                if desiredGroupsByTemplate[card.templateID]?.contains(card.clozeGroup) != true {
+                    retired.insert(card.id)
+                }
+            }
+        }
+        return GeneratedCardRetirementPlan(cardIDs: retired)
+    }
+
+    private func itemTypeSchemaImpactState(
+        from existing: ItemType,
+        to updated: ItemType,
+        items: [Item]
+    ) -> (state: ItemTypeSchemaImpactState, impact: ItemTypeSchemaChangeImpact) {
+        let updatedFields = Dictionary(uniqueKeysWithValues: updated.fields.map { ($0.id, $0) })
+        let removed = existing.fields.filter { updatedFields[$0.id] == nil }
+        let changed = existing.fields.filter { field in
+            guard let updatedField = updatedFields[field.id] else { return false }
+            return updatedField.type != field.type
+        }
+        let riskyIDs = Set((removed + changed).map(\.id))
+        guard !riskyIDs.isEmpty else { return (.none, .none) }
+
+        let orderedItems = items.sorted { $0.id.uuidString < $1.id.uuidString }
+        let states = orderedItems.map { item in
+            ItemTypeSchemaImpactState.ItemState(
+                itemID: item.id,
+                fieldValues: item.fields
+                    .filter { riskyIDs.contains($0.fieldID) }
+                    .sorted { $0.fieldID.uuidString < $1.fieldID.uuidString }
+            )
+        }
+        let populatedIDs = Set(riskyIDs.filter { fieldID in
+            items.contains { !$0.isFieldEmpty(fieldID) }
+        })
+        let affectedItems = items.filter { item in
+            riskyIDs.contains { !item.isFieldEmpty($0) }
+        }.count
+        return (
+            ItemTypeSchemaImpactState(relevantFieldIDs: riskyIDs, items: states),
+            ItemTypeSchemaChangeImpact(
+                affectedItemCount: affectedItems,
+                removedPopulatedFields: removed.filter { populatedIDs.contains($0.id) }.map(\.name),
+                typeChangedPopulatedFields: changed.filter { populatedIDs.contains($0.id) }.map(\.name)
+            )
+        )
+    }
+
     private func reconcileCards(for itemID: UUID, desired: [Card]) throws {
         var existingByIdentity: [CardIdentity: Card] = [:]
         for card in try fetchCards(for: itemID) {
@@ -5152,33 +5342,32 @@ actor SQLiteDatabase {
         return next
     }
 
-    private func syncCards(from previous: ItemType, to updated: ItemType, now: Date) throws {
-        let previousTemplateIDs = Set(previous.templates.map(\.id))
-        let updatedTemplateIDs = Set(updated.templates.map(\.id))
-        let added = updatedTemplateIDs.subtracting(previousTemplateIDs)
-        let removed = previousTemplateIDs.subtracting(updatedTemplateIDs)
-        let kept = previousTemplateIDs.intersection(updatedTemplateIDs)
+    private func syncCards(
+        from previous: ItemType,
+        to updated: ItemType,
+        now: Date,
+        retirementPlan preparedRetirementPlan: GeneratedCardRetirementPlan? = nil
+    ) throws {
         let items = try fetchItems(itemTypeID: updated.id)
+        let retirementPlan = try preparedRetirementPlan ?? generatedCardRetirementPlan(
+            from: previous,
+            to: updated,
+            items: items.map(\.item)
+        )
+        for cardID in retirementPlan.cardIDs {
+            try deleteCard(id: cardID)
+        }
 
         for entry in items {
             let item = entry.item
-
-            for templateID in removed {
-                try deleteCards(itemID: item.id, templateID: templateID)
-            }
-
             let existingCards = try fetchCards(for: item.id)
 
-            for template in updated.templates where added.contains(template.id) || kept.contains(template.id) {
+            for template in updated.templates {
                 var singleTemplateType = updated
                 singleTemplateType.templates = [template]
                 let desiredCards = CardGenerator.cards(for: item, type: singleTemplateType, now: now)
                 let desiredGroups = Set(desiredCards.map(\.clozeGroup))
                 let currentCards = existingCards.filter { $0.templateID == template.id }
-
-                for card in currentCards where !desiredGroups.contains(card.clozeGroup) {
-                    try deleteCard(id: card.id)
-                }
 
                 let currentGroups = Set(currentCards.map(\.clozeGroup))
                 let missingCards = desiredCards.filter { !currentGroups.contains($0.clozeGroup) }

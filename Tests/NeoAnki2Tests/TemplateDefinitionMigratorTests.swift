@@ -27,6 +27,21 @@ func templateMigratorPreservesIdentities() throws {
     #expect(try fixture.scalar("SELECT id FROM items;") == fixture.itemID)
     #expect(try fixture.scalar("SELECT id FROM cards;") == fixture.cardID)
     #expect(try fixture.scalar("SELECT id FROM review_logs;") == fixture.reviewID)
+    let migrated = try JSONDecoder().decode(ItemType.self, from: fixture.definition())
+    let template = try #require(migrated.templates.first)
+    #expect(template.id == fixture.templateID)
+    #expect(template.layout == .focus)
+    #expect(template.components.map(\.purpose) == [.question, .expectedAnswer])
+    #expect(template.prompt.slots.map(\.source) == [.field(migrated.fields[0].id)])
+    #expect(template.answer.slots.map(\.source) == [.field(migrated.fields[1].id)])
+    let persistedObject = try #require(
+        JSONSerialization.jsonObject(with: fixture.definition()) as? [String: Any]
+    )
+    let persistedTemplates = try #require(persistedObject["templates"] as? [[String: Any]])
+    #expect(persistedTemplates[0]["layout"] as? String == "focus")
+    #expect(persistedTemplates[0]["components"] != nil)
+    #expect(persistedTemplates[0]["prompt"] == nil)
+    #expect(persistedTemplates[0]["answer"] == nil)
 }
 
 @Test("A corrupt legacy reference rolls migration back without a format marker")
@@ -65,6 +80,7 @@ private final class LegacyMigrationFixture {
     let itemID = "10000000-0000-4000-8000-000000000001"
     let cardID = "10000000-0000-4000-8000-000000000002"
     let reviewID = "10000000-0000-4000-8000-000000000003"
+    let templateID = UUID(uuidString: "10000000-0000-4000-8000-000000000005")!
     private var handle: OpaquePointer?
 
     init(corruptReference: Bool) throws {
@@ -85,7 +101,6 @@ private final class LegacyMigrationFixture {
 
         let front = FieldDef(name: "Front", type: .text, isRequired: true)
         let back = FieldDef(name: "Back", type: .text, isRequired: true)
-        let templateID = UUID()
         let promptID = corruptReference ? UUID() : front.id
         let type = LegacyMigrationItemType(
             id: UUID(),

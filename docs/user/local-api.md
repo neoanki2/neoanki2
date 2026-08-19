@@ -71,7 +71,7 @@ Scopes are independent permissions:
 | `library.read` | Read decks, item types, items, cards, media, and changes |
 | `items.write` | Create, replace, delete, and tag items |
 | `decks.write` | Create, update, and delete decks through guarded plans |
-| `schemas.write` | Create and reconcile item types and templates |
+| `schemas.write` | Create and reconcile item types and persisted templates (shown as Card setups) |
 | `study.review` | Create study sessions, reserve cards, review, revert, suspend, and reset |
 | `study.responses.read` | List persistent spoken responses and download their audio |
 | `study.responses.delete` | Permanently delete persistent spoken responses |

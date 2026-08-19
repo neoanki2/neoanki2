@@ -10,7 +10,7 @@ permalink: /user/iphone-ipad/
 # iPhone and iPad
 
 NeoAnki2 has a native app for iOS and iPadOS 17 or newer. It shares the same
-library model, FSRS scheduler, item types, templates, and portable formats as
+library model, FSRS scheduler, item types, Card setups, and portable formats as
 the Mac app. The interface adapts to the device instead of reproducing the Mac
 window at a smaller size.
 
@@ -40,7 +40,7 @@ On iPhone, four labeled tabs stay available at the bottom:
 - **Home** shows All Decks, Unassigned, individual deck scopes, current due
   counts, and the primary Study action.
 - **Library** browses, searches, selects, moves, edits, and deletes items.
-- **Create** adds items and decks, manages item types and templates, transfers
+- **Create** adds items and decks, manages item types and Card setups, transfers
   files, opens deck builders, and manages offline vocabulary packs.
 - **Settings** contains iCloud sync, reminders, browsing privacy, grading, and
   scheduling controls.
@@ -80,12 +80,13 @@ delete. In an empty library, **Add First Card** keeps a high-contrast 44-point
 target at the largest accessibility text size, including in landscape. The
 Saved Responses shortcut also keeps the local-only status readable with
 increased contrast and accessibility text sizes. Deleting items or changing
-templates warns before removing saved spoken responses.
+Card setups warns before removing saved spoken responses.
 
-Use **Create → Item Types & Templates** to create or edit fields, composition
-presets, named component regions, interactions, skills, and generation
-conditions. Study uses the same non-scrolling adaptive stage and fixed footer
-as macOS; overflowing content opens in a separate detail sheet.
+Use **Create → Item Types & Card Setups** to edit fields and Card setups in one
+Studio save. Selecting a setup pushes its fillable static layout. Layout,
+Answer method, Availability, and Learning route use the same shared editor as
+macOS. Study uses the same non-scrolling adaptive stage and fixed footer;
+overflowing content opens in a separate detail sheet.
 Deck-provided item types start read-only. Unlock the original for editing when
 changes should affect its existing items and decks, or duplicate it for an
 independent editable type.

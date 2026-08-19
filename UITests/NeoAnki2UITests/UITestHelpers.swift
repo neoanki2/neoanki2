@@ -550,11 +550,19 @@ class NeoAnkiUITestCase: XCTestCase {
         control.click()
     }
 
-    func openTemplateEditor(named name: String, in app: XCUIApplication) {
-        let edit = app.buttons.identified("editTemplate-\(name)")
+    func openItemTypeStudio(named name: String, in app: XCUIApplication) {
+        let row = app.descendants(matching: .any).identified("itemTypeRow-\(name)")
+        XCTAssertTrue(row.waitUntilExists(timeout: 5))
+        row.click()
+        let edit = app.buttons.identified("editItemType")
         XCTAssertTrue(edit.waitUntilExists(timeout: 5))
         edit.click()
-        XCTAssertTrue(app.textFields.identified("templateNameField").waitUntilExists(timeout: 10))
+        XCTAssertTrue(app.textFields.identified("itemTypeStudioName").waitUntilExists(timeout: 10))
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .identified("itemTypeStudioCardSetupEditor")
+                .waitUntilExists(timeout: 10)
+        )
     }
 
     /// Dismissing right after an edit can land while the panel is still
@@ -597,32 +605,6 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.isEnabled)
         save.click()
         XCTAssertTrue(save.waitUntilGone(timeout: 10))
-    }
-
-    /// Saves through the visible toolbar control when possible and through its
-    /// documented default-action shortcut when AppKit exposes that control as
-    /// visible but temporarily non-hittable.
-    func saveTemplateEditor(in app: XCUIApplication) {
-        let save = app.buttons.identified("saveTemplate")
-        XCTAssertTrue(save.waitUntilExists(timeout: 5))
-        XCTAssertTrue(save.isEnabled)
-        if save.waitUntilHittable(timeout: 2) {
-            save.click()
-        } else {
-            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
-        }
-        XCTAssertTrue(save.waitUntilGone(timeout: 10), "Template editor did not close after saving")
-    }
-
-    func showTemplateAnswer(in app: XCUIApplication) {
-        let after = app.buttons["After answer"]
-        if after.waitUntilHittable(timeout: 2) {
-            after.click()
-            return
-        }
-        let radio = app.radioButtons["After answer"]
-        XCTAssertTrue(radio.waitUntilHittable(timeout: 3))
-        radio.click()
     }
 
     /// Activates a visible compact icon control even when XCTest's AppKit
@@ -792,11 +774,14 @@ class NeoAnkiUITestCase: XCTestCase {
         if app.buttons.identified("cancelAddItem").exists {
             app.buttons.identified("cancelAddItem").click()
         }
+        if app.buttons.identified("cancelItemTypeStudio").exists {
+            app.buttons.identified("cancelItemTypeStudio").click()
+            if app.buttons.identified("confirmDiscardItemTypeStudio").waitUntilExists(timeout: 1) {
+                app.buttons.identified("confirmDiscardItemTypeStudio").click()
+            }
+        }
         if app.buttons.identified("templatesDone").exists {
             app.buttons.identified("templatesDone").click()
-        }
-        if app.buttons.identified("cancelTemplateEditor").exists {
-            app.buttons.identified("cancelTemplateEditor").click()
         }
         if isBrowsing(in: app) {
             leaveBrowseMode(in: app)
@@ -856,7 +841,7 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func saveItemType(in app: XCUIApplication) {
-        let save = app.buttons.identified("saveItemType")
+        let save = app.buttons.identified("saveItemTypeStudio")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
         XCTAssertTrue(save.isEnabled)
         if save.waitUntilHittable(timeout: 2) {

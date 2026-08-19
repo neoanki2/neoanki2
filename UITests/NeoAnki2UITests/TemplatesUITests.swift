@@ -1,598 +1,424 @@
 import XCTest
 
 extension FastFunctionalJourneyTests {
+    /// One process-level journey exercises the unified, atomic Item Type Studio.
+    /// Every named activity performs the behavior it claims; activity-filtered
+    /// compatibility checks below run focused versions instead of aliasing this
+    /// entire journey.
     func runSharedTemplatesAndItemTypesJourney() throws {
-        let app = launchApp()
+        let app = launchApp(databaseLabel: "studio-shared")
 
-        runJourneyActivity("TemplatesAdvancedUITests.testTemplatesKeyboardShortcut") {
+        runJourneyActivity("ItemTypeStudio.keyboardOpenAndOverview") {
             app.typeKey("t", modifierFlags: [.command, .shift])
             XCTAssertTrue(app.buttons.identified("templatesDone").waitUntilExists(timeout: 5))
             waitForTemplatesReady(in: app)
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesOpensAndShowsBasicTemplate") {
             XCTAssertTrue(app.descendants(matching: .any)["templatesItemTypesHeader"].exists)
             XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].exists)
-            XCTAssertTrue(app.buttons.identified("templateRow-Card").exists)
+            XCTAssertTrue(app.descendants(matching: .any)["cardSetupRow-Card"].exists)
         }
 
-        runJourneyActivity("TemplatesUITests.testTemplatesLayoutDoesNotOverlapColumns") {
-            let basicRow = app.descendants(matching: .any).identified("itemTypeRow-Basic")
-            let cardTemplate = app.buttons.identified("templateRow-Card")
-            let detailTitle = app.staticTexts.identified("templatesDetailTitle-Basic")
-            XCTAssertLessThan(basicRow.frame.maxX, cardTemplate.frame.minX)
-            if detailTitle.exists {
-                XCTAssertLessThan(basicRow.frame.maxX, detailTitle.frame.minX)
-            }
+        runJourneyActivity("ItemTypeStudio.pristineCreationDiscardSafeguards") {
+            clickAddItemType(in: app)
+            assertPrefilledStudio(in: app)
+            XCTAssertFalse(app.buttons["Remove Basic Card setup"].isEnabled)
+
+            app.buttons.identified("cancelItemTypeStudio").click()
+            XCTAssertTrue(app.buttons.identified("confirmDiscardItemTypeStudio").waitUntilExists(timeout: 3))
+            app.buttons.identified("cancelDiscardItemTypeStudio").click()
+
+            app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
+            XCTAssertTrue(app.buttons.identified("discardItemTypeStudioSelection").waitUntilExists(timeout: 3))
+            app.buttons["Keep Editing"].click()
+            XCTAssertTrue(app.textFields.identified("itemTypeStudioName").exists)
         }
 
-        openNewTemplateEditor(in: app)
-        runJourneyActivity("TemplatesUITests.testTemplateEditorUsesFocusedThreePaneWorkspace") {
-            XCTAssertFalse(app.buttons.identified("templatesDone").exists)
-            XCTAssertFalse(app.descendants(matching: .any).identified("templatesItemTypesHeader").exists)
-            XCTAssertTrue(app.descendants(matching: .any).identified("templateIngredientsPane").exists)
-            XCTAssertTrue(app.descendants(matching: .any).identified("templateStudyPreviewPane").exists)
-            XCTAssertTrue(app.descendants(matching: .any).identified("templateInspectorPane").exists)
-        }
-        let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
-        runJourneyActivity("TemplatesUITests.testNewTemplateKeepsAdvancedSettingsCollapsedByDefault") {
-            XCTAssertTrue(advanced.waitUntilExists(timeout: 3))
-            XCTAssertEqual(advanced.value as? String, "Collapsed")
-        }
-
-        runJourneyActivity("TemplatesAdvancedUITests.testTemplateAdvancedSettingsExpand") {
-            let automaticSkill = app.descendants(matching: .any)["templateAutomaticSkill"]
-            XCTAssertFalse(automaticSkill.exists)
-            advanced.click()
-            XCTAssertTrue(automaticSkill.waitUntilExists(timeout: 3))
-            XCTAssertEqual(advanced.value as? String, "Expanded")
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplateValidationAndDiscardConfirmation") {
-            let save = app.buttons.identified("saveTemplate")
-            XCTAssertTrue(save.isEnabled)
-            save.click()
-            XCTAssertTrue(app.staticTexts["Enter a template name."].waitUntilExists(timeout: 3))
-            enterText(
-                "Unsaved Template",
-                into: app.textFields.identified("templateNameField"),
-                app: app
-            )
-            app.buttons.identified("cancelTemplateEditor").click()
-            XCTAssertTrue(app.buttons.identified("cancelDiscardTemplate").waitUntilExists(timeout: 3))
-            app.buttons.identified("cancelDiscardTemplate").click()
-            XCTAssertTrue(app.textFields.identified("templateNameField").exists)
-            app.buttons.identified("cancelTemplateEditor").click()
-            app.buttons.identified("confirmDiscardTemplate").click()
-            XCTAssertFalse(app.buttons.identified("templateRow-Unsaved Template").exists)
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesCancelTemplateEditor") {
-            openNewTemplateEditor(in: app)
-            enterText(
-                "Cancelled",
-                into: app.textFields.identified("templateNameField"),
-                app: app
-            )
-            app.buttons.identified("cancelTemplateEditor").click()
-            if app.buttons.identified("confirmDiscardTemplate").waitUntilExists(timeout: 2) {
-                app.buttons.identified("confirmDiscardTemplate").click()
-            }
-            XCTAssertFalse(app.buttons.identified("templateRow-Cancelled").exists)
-        }
-
-        runJourneyActivity("TemplatesAdvancedUITests.testTemplateInteractionPickerAllTypes") {
-            openNewTemplateEditor(in: app)
-            let picker = app.popUpButtons.identified("templateInteractionPicker")
-            XCTAssertTrue(picker.waitUntilHittable(timeout: 2))
-            picker.click()
-            for interaction in ["Reveal", "Cloze", "Type answer", "Choose", "Arrange", "Record"] {
-                XCTAssertTrue(
-                    picker.menuItems[interaction].waitUntilExists(timeout: 2),
-                    "Missing interaction option \(interaction)"
-                )
-            }
-            picker.menuItems["Record"].click()
-            XCTAssertTrue(waitUntil(timeout: 2) {
-                (picker.value as? String)?.contains("Record") == true
-            })
-            app.buttons.identified("cancelTemplateEditor").click()
-            if app.buttons.identified("confirmDiscardTemplate").waitUntilExists(timeout: 2) {
-                app.buttons.identified("confirmDiscardTemplate").click()
-            }
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesAddReverseTemplate") {
-            openNewTemplateEditor(in: app)
-            enterText("Reverse", into: app.textFields.identified("templateNameField"), app: app)
-            selectPopUpOption(
-                named: "Back",
-                picker: app.menuButtons.identified("templatePromptField"),
-                in: app
-            )
-            showTemplateAnswer(in: app)
-            selectPopUpOption(
-                named: "Front",
-                picker: app.menuButtons.identified("templateAnswerField"),
-                in: app
-            )
-            saveTemplateEditor(in: app)
-            XCTAssertTrue(app.buttons.identified("templateRow-Reverse").waitUntilExists(timeout: 5))
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesEditTemplateName") {
-            openTemplateEditor(named: "Reverse", in: app)
-            enterText(
-                "Renamed",
-                into: app.textFields.identified("templateNameField"),
-                app: app
-            )
-            saveTemplateEditor(in: app)
-            XCTAssertTrue(app.buttons.identified("templateRow-Renamed").waitUntilExists(timeout: 5))
-        }
-
-        runJourneyActivity("TemplatesUITests.testDeleteTemplateCanBeCancelled") {
-            cancelDeletingTemplate(named: "Card", in: app)
-        }
-
-        runJourneyActivity("TemplatesAdvancedUITests.testDeleteTemplateCancel") {
-            XCTAssertTrue(app.buttons.identified("templateRow-Card").exists)
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesDeleteTemplate") {
-            openTemplateEditor(named: "Renamed", in: app)
-            app.menuButtons.identified("templateMoreMenu").click()
-            app.menuItems.identified("deleteTemplate").click()
-            let confirm = app.buttons.identified("confirmDeleteTemplate")
-            XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
-            confirm.click()
-            XCTAssertTrue(app.buttons.identified("templateRow-Renamed").waitUntilGone(timeout: 3))
-        }
-
-        clickAddItemType(in: app)
-        runJourneyActivity("TemplatesUITests.testItemTypeValidationDisablesSaveForBlankName") {
-            XCTAssertFalse(app.buttons.identified("saveItemType").isEnabled)
-        }
-
-        runJourneyActivity("TemplatesUITests.testDirtyItemTypeCanKeepEditingThenDiscard") {
-            enterText(
-                "Unsaved Type",
-                into: app.textFields.identified("itemTypeNameField"),
-                app: app
-            )
-            app.buttons.identified("cancelItemTypeEditor").click()
-            XCTAssertTrue(app.buttons.identified("cancelDiscardItemType").waitUntilExists(timeout: 3))
-            app.buttons.identified("cancelDiscardItemType").click()
-            XCTAssertTrue(app.textFields.identified("itemTypeNameField").exists)
-            app.buttons.identified("cancelItemTypeEditor").click()
-            app.buttons.identified("confirmDiscardItemType").click()
-            XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Unsaved Type"].exists)
-        }
-
-        clickAddItemType(in: app)
-        enterText("Structured", into: app.textFields.identified("itemTypeNameField"), app: app)
-        app.buttons.identified("addItemTypeField").click()
-
-        runJourneyActivity("TemplatesAdvancedUITests.testFieldTypePicker") {
-            let typePicker = app.descendants(matching: .any).matching(
-                NSPredicate(format: "identifier BEGINSWITH 'itemTypeFieldType-'")
-            ).firstMatch
-            XCTAssertTrue(typePicker.waitUntilExists(timeout: 3))
-            selectPopUpOption(named: "Rich Text", picker: typePicker, in: app)
-        }
-
-        runJourneyActivity("TemplatesUITests.testItemTypeFieldsCanBeAddedReorderedAndRemoved") {
-            let moveUp = app.buttons.matching(
-                NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
-            )
-            XCTAssertEqual(moveUp.count, 3)
-            moveUp.element(boundBy: 2).click()
-
-            let remove = app.buttons.matching(
-                NSPredicate(format: "identifier BEGINSWITH %@", "removeItemTypeField-")
-            )
-            XCTAssertEqual(remove.count, 3)
-            activateCompactButton(remove.element(boundBy: 2))
-            XCTAssertEqual(
-                app.buttons.matching(
-                    NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
-                ).count,
-                2
-            )
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesCreateItemType") {
-            enterText(
-                "Capitals",
-                into: app.textFields.identified("itemTypeNameField"),
-                app: app
-            )
-            saveItemType(in: app)
-            XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Capitals"].waitUntilExists(timeout: 5))
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesEditItemType") {
-            app.buttons.identified("editItemType").click()
-            enterText(
-                "Renamed Type",
-                into: app.textFields.identified("itemTypeNameField"),
-                app: app
-            )
-            saveItemType(in: app)
+        runJourneyActivity("ItemTypeStudio.validationAndFields") {
+            app.buttons.identified("saveItemTypeStudio").click()
             XCTAssertTrue(
-                app.descendants(matching: .any)["itemTypeRow-Renamed Type"]
-                    .waitUntilExists(timeout: 5)
-            )
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesDeleteBasicStarter") {
-            let basic = app.descendants(matching: .any)["itemTypeRow-Basic"]
-            basic.click()
-            let delete = app.buttons.identified("deleteItemType")
-            if !delete.waitUntilHittable(timeout: 2) {
-                basic.click()
-            }
-            XCTAssertTrue(delete.waitUntilHittable(timeout: 3))
-            delete.click()
-            app.buttons.identified("confirmDeleteItemType").click()
-            XCTAssertTrue(
-                app.descendants(matching: .any)["itemTypeRow-Basic"].waitUntilGone(timeout: 3)
-            )
-        }
-
-        runJourneyActivity("TemplatesUITests.testTemplatesDeleteCustomItemType") {
-            let renamed = app.descendants(matching: .any)["itemTypeRow-Renamed Type"]
-            XCTAssertTrue(renamed.waitUntilHittable(timeout: 3))
-            renamed.click()
-            XCTAssertTrue(
-                app.descendants(matching: .any)["templatesDetailTitle-Renamed Type"]
+                app.descendants(matching: .any)
+                    .identified("itemTypeStudioValidationSummary")
                     .waitUntilExists(timeout: 3)
             )
-            let delete = app.buttons.identified("deleteItemType")
-            XCTAssertTrue(delete.waitUntilHittable(timeout: 3))
-            delete.click()
-            app.buttons.identified("confirmDeleteItemType").click()
-            XCTAssertTrue(
-                app.descendants(matching: .any)["itemTypeRow-Renamed Type"]
-                    .waitUntilGone(timeout: 3)
+            enterText("Unified Studio", into: app.textFields.identified("itemTypeStudioName"), app: app)
+            addStudioField(named: "Visual", type: "GIF", in: app)
+            addStudioField(named: "Cloze Text", type: "Cloze", in: app)
+        }
+
+        runJourneyActivity("ItemTypeStudio.audioConversionAndRestore") {
+            chooseAnswerMethod("Audio Submission", in: app)
+            XCTAssertTrue(app.buttons["Remove Answer and Continue"].waitUntilExists(timeout: 3))
+            XCTAssertTrue(app.staticTexts["Responses remain private on this device."].exists)
+            app.buttons["Cancel"].click()
+            chooseAnswerMethod("Audio Submission", in: app)
+            app.buttons["Remove Answer and Continue"].click()
+            XCTAssertTrue(app.staticTexts["Spoken response"].waitUntilExists(timeout: 3))
+            chooseAnswerMethod("Reveal", in: app)
+            XCTAssertTrue(app.buttons["Back"].waitUntilExists(timeout: 3))
+        }
+
+        runJourneyActivity("ItemTypeStudio.allStarters") {
+            addCardSetupStarter("Reverse", in: app)
+            addCardSetupStarter("Type Answer", in: app)
+            addCardSetupStarter("Visual", in: app)
+            addCardSetupStarter("Cloze", in: app)
+            addCardSetupStarter("Audio Submission", in: app)
+            app.buttons.identified("itemTypeStudio.addBasicCardSetup").click()
+            XCTAssertEqual(studioCardSetupRows(in: app).count, 7)
+        }
+
+        runJourneyActivity("ItemTypeStudio.layoutsPreviewAndAdvanced") {
+            for layout in ["focus", "split", "mediaAside", "mediaHero", "actionStage"] {
+                let choice = app.buttons.identified("cardSetupEditor.layout.\(layout)")
+                XCTAssertTrue(choice.waitUntilExists(timeout: 3))
+                choice.click()
+                XCTAssertEqual(choice.value as? String, "Selected")
+            }
+
+            let showAnswer = app.buttons.identified("cardSetupEditor.showAnswer")
+            XCTAssertTrue(showAnswer.waitUntilExists(timeout: 3))
+            showAnswer.click()
+
+            let advanced = app.descendants(matching: .any).identified("cardSetupEditor.advanced")
+            XCTAssertEqual(advanced.value as? String, "Collapsed")
+            advanced.click()
+            XCTAssertEqual(advanced.value as? String, "Expanded")
+            let availability = app.checkBoxes["Availability rule"]
+            XCTAssertTrue(availability.waitUntilExists(timeout: 3))
+            availability.click()
+            let addRule = app.buttons["Add another rule"]
+            XCTAssertTrue(addRule.waitUntilExists(timeout: 3))
+            addRule.click()
+            XCTAssertTrue(app.segmentedControls.firstMatch.waitUntilExists(timeout: 3))
+            XCTAssertTrue(app.buttons["Use recommendation"].waitUntilExists(timeout: 3))
+        }
+
+        runJourneyActivity("ItemTypeStudio.fixedTextMediaRevealAndReorder") {
+            selectStudioCardSetup(named: "Visual", in: app)
+            addFixedText(to: "Instruction", value: "Study the image", in: app)
+            addFixedText(to: "Instruction", value: "Then answer", in: app)
+            addFixedText(to: "Context", value: "Context note", in: app)
+            let moveButtons = app.buttons.matching(
+                NSPredicate(format: "label == %@", "Move content up")
             )
+            let moveUp = moveButtons.element(boundBy: max(0, moveButtons.count - 1))
+            XCTAssertTrue(moveUp.waitUntilExists(timeout: 3))
+            moveUp.click()
+
+            let reveal = app.popUpButtons["Reveal"]
+            XCTAssertTrue(reveal.waitUntilExists(timeout: 3))
+            reveal.click()
+            app.menuItems["Blur until reveal"].click()
+            let playback = app.popUpButtons["Playback"]
+            XCTAssertTrue(playback.waitUntilExists(timeout: 3))
+            playback.click()
+            app.menuItems["Loop"].click()
+            XCTAssertTrue(app.buttons.identified("cardSetupEditor.hole.media").exists)
+        }
+
+        runJourneyActivity("ItemTypeStudio.removeUndoAndAtomicSave") {
+            let removeReverse = app.buttons["Remove Reverse Card setup"]
+            XCTAssertTrue(removeReverse.waitUntilExists(timeout: 3))
+            removeReverse.click()
+            let undo = app.buttons.identified("itemTypeStudio.undoCardSetupRemoval")
+            XCTAssertTrue(undo.waitUntilExists(timeout: 3))
+            undo.click()
+            XCTAssertTrue(app.buttons["Remove Reverse Card setup"].exists)
+            saveItemType(in: app)
+            XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Unified Studio"].waitUntilExists(timeout: 5))
+        }
+
+        runJourneyActivity("ItemTypeStudio.keyboardCancelAndDelete") {
+            app.buttons.identified("editItemType").click()
+            app.typeKey("f", modifierFlags: [.command, .shift])
+            XCTAssertEqual(studioFieldRows(in: app).count, 5)
+            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+            XCTAssertTrue(app.buttons.identified("confirmDiscardItemTypeStudio").waitUntilExists(timeout: 3))
+            app.buttons.identified("confirmDiscardItemTypeStudio").click()
+            app.buttons.identified("deleteItemType").click()
+            XCTAssertTrue(app.buttons.identified("confirmDeleteItemType").waitUntilExists(timeout: 3))
+            app.buttons.identified("confirmDeleteItemType").click()
+            XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Unified Studio"].waitUntilGone(timeout: 5))
         }
         closeTemplates(in: app)
 
-        let corruptedApp = launchApp(scenario: "corrupted-item-type")
-        runJourneyActivity("TemplatesAdvancedUITests.testRepairCorruptedItemType") {
-            openTemplates(in: corruptedApp)
-            let repair = corruptedApp.buttons.identified("repairItemType-Damaged")
-            XCTAssertTrue(repair.waitUntilExists(timeout: 5))
-            repair.click()
-            corruptedApp.buttons.identified("confirmRepairItemType").click()
-            XCTAssertTrue(
-                corruptedApp.descendants(matching: .any)["itemTypeRow-Damaged"]
-                    .waitUntilExists(timeout: 5)
-            )
-            closeTemplates(in: corruptedApp)
-        }
-
-        let protectedApp = launchApp(scenario: "deck-with-due-items")
-        runJourneyActivity("TemplatesAdvancedUITests.testCannotDeleteItemTypeWithItems") {
-            openTemplates(in: protectedApp)
-            protectedApp.descendants(matching: .any).identified("itemTypeRow-Basic").click()
-            let deleteButton = protectedApp.buttons.identified("deleteItemType")
-            if deleteButton.exists {
-                XCTAssertFalse(deleteButton.isEnabled)
-            }
-            closeTemplates(in: protectedApp)
-        }
+        try runStudioRepairAndImpactJourneys()
     }
 
-    private func cancelDeletingTemplate(named name: String, in app: XCUIApplication) {
-        openTemplateEditor(named: name, in: app)
-        app.menuButtons.identified("templateMoreMenu").click()
-        app.menuItems.identified("deleteTemplate").click()
-        let cancel = app.buttons.identified("cancelDeleteTemplate")
-        XCTAssertTrue(cancel.waitUntilExists(timeout: 3))
-        cancel.click()
-        XCTAssertTrue(app.textFields.identified("templateNameField").exists)
-        app.buttons.identified("cancelTemplateEditor").click()
-    }
-
-    private func openNewTemplateEditor(in app: XCUIApplication) {
-        let editor = app.textFields.identified("templateNameField")
-        let add = app.buttons.identified("addTemplateToolbar")
-        for _ in 0..<3 where !editor.exists {
-            XCTAssertTrue(add.waitUntilHittable(timeout: 1))
-            add.click()
-            if editor.waitUntilExists(timeout: 0.75) { return }
-        }
-        XCTAssertTrue(editor.exists, "New-template editor did not open")
-    }
+    // MARK: Focused activity-filter checks
 
     func checkTemplatesUITestsTemplatesOpensAndShowsBasicTemplate() throws {
-        let app = launchApp()
+        let app = launchApp(databaseLabel: "studio-open")
         openTemplates(in: app)
-
-        XCTAssertTrue(app.descendants(matching: .any)["templatesItemTypesHeader"].waitUntilExists(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].waitUntilExists(timeout: 5))
-        XCTAssertTrue(app.buttons.identified("templateRow-Card").waitUntilExists(timeout: 5))
-
-        closeTemplates(in: app)
-        assertEmptyLibrary(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["cardSetupRow-Card"].exists)
     }
 
     func checkTemplatesUITestsTemplatesLayoutDoesNotOverlapColumns() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        let basicRow = app.descendants(matching: .any).identified("itemTypeRow-Basic")
-        let cardTemplate = app.buttons.identified("templateRow-Card")
-        let detailTitle = app.staticTexts.identified("templatesDetailTitle-Basic")
-
-        XCTAssertTrue(basicRow.waitUntilExists(timeout: 5))
-        XCTAssertTrue(cardTemplate.waitUntilExists(timeout: 5))
-        XCTAssertLessThan(basicRow.frame.maxX, cardTemplate.frame.minX)
-
-        if detailTitle.waitUntilExists(timeout: 2) {
-            XCTAssertLessThan(basicRow.frame.maxX, detailTitle.frame.minX)
-        }
-
-        closeTemplates(in: app)
+        let app = launchNewStudio(label: "studio-columns")
+        XCTAssertTrue(app.descendants(matching: .any).identified("itemTypeStudioOutline").exists)
+        XCTAssertTrue(app.descendants(matching: .any).identified("itemTypeStudioCardSetupEditor").exists)
+        XCTAssertLessThan(
+            app.descendants(matching: .any).identified("itemTypeStudioOutline").frame.maxX,
+            app.descendants(matching: .any).identified("itemTypeStudioCardSetupEditor").frame.maxX
+        )
     }
 
     func checkTemplatesUITestsTemplatesAddReverseTemplate() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].waitUntilExists(timeout: 5))
-
-        if app.buttons.identified("addTemplateToolbar").waitUntilExists(timeout: 2) {
-            app.buttons.identified("addTemplateToolbar").click()
-        } else {
-            app.buttons.identified("Add Template").click()
-        }
-
-        app.textFields.identified("templateNameField").click()
-        app.textFields.identified("templateNameField").typeText("Reverse")
-
-        app.menuButtons.identified("templatePromptField").click()
-        app.menuItems.identified("Back").click()
-        showTemplateAnswer(in: app)
-        app.menuButtons.identified("templateAnswerField").click()
-        app.menuItems.identified("Front").click()
-        saveTemplateEditor(in: app)
-
-        XCTAssertTrue(app.buttons.identified("templateRow-Reverse").waitUntilExists(timeout: 5))
-        closeTemplates(in: app)
+        let app = launchNewStudio(label: "studio-reverse")
+        addCardSetupStarter("Reverse", in: app)
+        XCTAssertTrue(app.buttons["Remove Reverse Card setup"].exists)
     }
 
     func checkTemplatesUITestsNewTemplateKeepsAdvancedSettingsCollapsedByDefault() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-        app.buttons.identified("addTemplateToolbar").click()
-
-        XCTAssertTrue(app.menuButtons.identified("templatePromptField").waitUntilExists(timeout: 5))
-
-        let advanced = app.descendants(matching: .any).identified("templateAdvancedSettings")
-        XCTAssertTrue(advanced.waitUntilExists(timeout: 5))
-        XCTAssertEqual(advanced.value as? String, "Collapsed")
+        let app = launchNewStudio(label: "studio-advanced-collapsed")
+        XCTAssertEqual(
+            app.descendants(matching: .any).identified("cardSetupEditor.advanced").value as? String,
+            "Collapsed"
+        )
     }
 
     func checkTemplatesUITestsTemplatesCreateItemType() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        clickAddItemType(in: app)
-        app.textFields.identified("itemTypeNameField").click()
-        app.textFields.identified("itemTypeNameField").typeText("Capitals")
-
+        let app = launchNewStudio(label: "studio-create")
+        enterText("Created Type", into: app.textFields.identified("itemTypeStudioName"), app: app)
         saveItemType(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Capitals"].waitUntilExists(timeout: 5))
-        closeTemplates(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Created Type"].exists)
     }
 
     func checkTemplatesUITestsTemplatesEditItemType() throws {
-        let app = launchApp()
+        let app = launchApp(databaseLabel: "studio-edit")
         openTemplates(in: app)
-
-        clickAddItemType(in: app)
-        app.textFields.identified("itemTypeNameField").click()
-        app.textFields.identified("itemTypeNameField").typeText("Editable")
-        saveItemType(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Editable"].waitUntilExists(timeout: 5))
-
-        app.buttons.identified("editItemType").click()
-        app.textFields.identified("itemTypeNameField").click()
-        app.textFields.identified("itemTypeNameField").typeKey("a", modifierFlags: [.command])
-        app.textFields.identified("itemTypeNameField").typeText("Renamed Type")
-        saveItemType(in: app)
-
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Renamed Type"].waitUntilExists(timeout: 5))
-        closeTemplates(in: app)
+        openItemTypeStudio(named: "Basic", in: app)
+        enterText("Edited Basic", into: app.textFields.identified("itemTypeStudioName"), app: app)
+        app.typeKey("s", modifierFlags: .command)
+        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Edited Basic"].waitUntilExists(timeout: 5))
     }
 
     func checkTemplatesUITestsTemplatesDeleteBasicStarter() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        app.descendants(matching: .any)["itemTypeRow-Basic"].click()
-        app.buttons.identified("deleteItemType").click()
-        app.buttons.identified("confirmDeleteItemType").click()
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Basic"].waitUntilGone(timeout: 2))
-        closeTemplates(in: app)
+        let app = launchNewStudio(label: "studio-final-protection")
+        XCTAssertFalse(app.buttons["Remove Basic Card setup"].isEnabled)
     }
 
     func checkTemplatesUITestsTemplatesDeleteCustomItemType() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        clickAddItemType(in: app)
-        app.textFields.identified("itemTypeNameField").click()
-        app.textFields.identified("itemTypeNameField").typeText("Disposable")
-        saveItemType(in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Disposable"].waitUntilExists(timeout: 5))
-
+        let app = createSavedStudio(named: "Delete Me", label: "studio-delete")
         app.buttons.identified("deleteItemType").click()
         app.buttons.identified("confirmDeleteItemType").click()
-
-        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Disposable"].waitUntilGone(timeout: 2))
-        closeTemplates(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["itemTypeRow-Delete Me"].waitUntilGone(timeout: 5))
     }
 
     func checkTemplatesUITestsTemplatesEditTemplateName() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        app.buttons.identified("addTemplateToolbar").click()
-        let nameField = app.textFields.identified("templateNameField")
-        nameField.click()
-        nameField.typeText("Original")
-        app.menuButtons.identified("templatePromptField").click()
-        app.menuItems.identified("Front").click()
-        showTemplateAnswer(in: app)
-        app.menuButtons.identified("templateAnswerField").click()
-        app.menuItems.identified("Back").click()
-        saveTemplateEditor(in: app)
-        XCTAssertTrue(app.buttons.identified("templateRow-Original").waitUntilExists(timeout: 5))
-
-        openTemplateEditor(named: "Original", in: app)
-        let editNameField = app.textFields.identified("templateNameField")
-        editNameField.click()
-        editNameField.typeKey("a", modifierFlags: [.command])
-        editNameField.typeText("Renamed")
-        saveTemplateEditor(in: app)
-
-        XCTAssertTrue(app.buttons.identified("templateRow-Renamed").waitUntilExists(timeout: 5))
-        closeTemplates(in: app)
+        let app = launchNewStudio(label: "studio-setup-name")
+        enterText("Question and Answer", into: app.textFields.identified("cardSetupEditor.name"), app: app)
+        XCTAssertEqual(app.textFields.identified("cardSetupEditor.name").value as? String, "Question and Answer")
     }
 
     func checkTemplatesUITestsTemplatesDeleteTemplate() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        app.buttons.identified("addTemplateToolbar").click()
-        let nameField = app.textFields.identified("templateNameField")
-        nameField.click()
-        nameField.typeText("To Delete")
-        app.menuButtons.identified("templatePromptField").click()
-        app.menuItems.identified("Front").click()
-        showTemplateAnswer(in: app)
-        app.menuButtons.identified("templateAnswerField").click()
-        app.menuItems.identified("Back").click()
-        saveTemplateEditor(in: app)
-        XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitUntilExists(timeout: 5))
-
-        openTemplateEditor(named: "To Delete", in: app)
-        app.menuButtons.identified("templateMoreMenu").click()
-        app.menuItems.identified("deleteTemplate").click()
-        // Deleting asks first, and leaving the confirmation up keeps the editor
-        // open — which later reads as the panel refusing to close.
-        let confirm = app.buttons.identified("confirmDeleteTemplate")
-        XCTAssertTrue(confirm.waitUntilExists(timeout: 5))
-        confirm.click()
-
-        XCTAssertTrue(app.buttons.identified("templateRow-To Delete").waitUntilGone(timeout: 5))
-        closeTemplates(in: app)
+        let app = launchNewStudio(label: "studio-remove-setup")
+        addCardSetupStarter("Reverse", in: app)
+        app.buttons["Remove Reverse Card setup"].click()
+        XCTAssertTrue(app.buttons.identified("itemTypeStudio.undoCardSetupRemoval").exists)
     }
 
     func checkTemplatesUITestsTemplatesCancelTemplateEditor() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-
-        app.buttons.identified("addTemplateToolbar").click()
-        let nameField = app.textFields.identified("templateNameField")
-        XCTAssertTrue(nameField.waitUntilExists(timeout: 5))
-        nameField.click()
-        nameField.typeText("Cancelled")
-        app.buttons.identified("cancelTemplateEditor").click()
-        // Cancelling an edited template asks before discarding, and an
-        // unanswered confirmation keeps the editor — and the panel — open.
-        let discard = app.buttons.identified("confirmDiscardTemplate")
-        if discard.waitUntilExists(timeout: 3) {
-            discard.click()
-        }
-
-        XCTAssertTrue(app.buttons.identified("templateRow-Cancelled").waitUntilGone(timeout: 5))
-        closeTemplates(in: app)
+        let app = launchNewStudio(label: "studio-pristine-cancel")
+        app.buttons.identified("cancelItemTypeStudio").click()
+        XCTAssertTrue(app.buttons.identified("confirmDiscardItemTypeStudio").waitUntilExists(timeout: 3))
     }
 
     func checkTemplatesUITestsItemTypeValidationDisablesSaveForBlankName() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-        clickAddItemType(in: app)
-
-        XCTAssertFalse(app.buttons.identified("saveItemType").isEnabled)
+        let app = launchNewStudio(label: "studio-invalid-save")
+        XCTAssertTrue(app.buttons.identified("saveItemTypeStudio").isEnabled)
+        app.buttons.identified("saveItemTypeStudio").click()
+        XCTAssertTrue(app.descendants(matching: .any).identified("itemTypeStudioValidationSummary").exists)
     }
 
     func checkTemplatesUITestsDirtyItemTypeCanKeepEditingThenDiscard() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-        clickAddItemType(in: app)
-        enterText("Unsaved Type", into: app.textFields.identified("itemTypeNameField"), app: app)
-
-        app.buttons.identified("cancelItemTypeEditor").click()
-        XCTAssertTrue(app.buttons.identified("cancelDiscardItemType").waitUntilExists(timeout: 3))
-        app.buttons.identified("cancelDiscardItemType").click()
-        XCTAssertTrue(app.textFields.identified("itemTypeNameField").exists)
-
-        app.buttons.identified("cancelItemTypeEditor").click()
-        app.buttons.identified("confirmDiscardItemType").click()
-        XCTAssertFalse(app.descendants(matching: .any)["itemTypeRow-Unsaved Type"].exists)
+        let app = launchNewStudio(label: "studio-keep-editing")
+        enterText("Unsaved", into: app.textFields.identified("itemTypeStudioName"), app: app)
+        app.buttons.identified("cancelItemTypeStudio").click()
+        app.buttons.identified("cancelDiscardItemTypeStudio").click()
+        XCTAssertTrue(app.textFields.identified("itemTypeStudioName").exists)
+        app.buttons.identified("cancelItemTypeStudio").click()
+        app.buttons.identified("confirmDiscardItemTypeStudio").click()
+        XCTAssertFalse(app.textFields.identified("itemTypeStudioName").exists)
     }
 
     func checkTemplatesUITestsItemTypeFieldsCanBeAddedReorderedAndRemoved() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-        clickAddItemType(in: app)
-        enterText("Structured", into: app.textFields.identified("itemTypeNameField"), app: app)
-
-        app.buttons.identified("addItemTypeField").click()
+        let app = launchNewStudio(label: "studio-fields")
+        addStudioField(named: "Extra", type: "Text", in: app)
+        XCTAssertEqual(studioFieldRows(in: app).count, 3)
         let moveUp = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
-        )
-        XCTAssertEqual(moveUp.count, 3)
-        moveUp.element(boundBy: 2).click()
-
-        let remove = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "removeItemTypeField-")
-        )
-        XCTAssertEqual(remove.count, 3)
-        activateCompactButton(remove.element(boundBy: 2))
-        XCTAssertEqual(
-            app.buttons.matching(
-                NSPredicate(format: "identifier BEGINSWITH %@", "moveFieldUp-")
-            ).count,
-            2
-        )
+            NSPredicate(format: "identifier BEGINSWITH 'moveStudioFieldUp-'")
+        ).element(boundBy: 2)
+        XCTAssertTrue(moveUp.waitUntilHittable(timeout: 3))
+        moveUp.click()
+        let moveDown = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'moveStudioFieldDown-'")
+        ).element(boundBy: 1)
+        XCTAssertTrue(moveDown.waitUntilHittable(timeout: 3))
+        moveDown.click()
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'removeStudioField-'"))
+            .element(boundBy: 2).click()
+        app.buttons.identified("confirmRemoveStudioField").click()
+        XCTAssertEqual(studioFieldRows(in: app).count, 2)
     }
 
     func checkTemplatesUITestsTemplateValidationAndDiscardConfirmation() throws {
-        let app = launchApp()
-        openTemplates(in: app)
-        app.buttons.identified("addTemplateToolbar").click()
-
-        let save = app.buttons.identified("saveTemplate")
-        XCTAssertTrue(save.isEnabled)
-        save.click()
-        XCTAssertTrue(app.staticTexts["Enter a template name."].waitUntilExists(timeout: 3))
-        enterText("Unsaved Template", into: app.textFields.identified("templateNameField"), app: app)
-        app.buttons.identified("cancelTemplateEditor").click()
-        XCTAssertTrue(app.buttons.identified("cancelDiscardTemplate").waitUntilExists(timeout: 3))
-        app.buttons.identified("cancelDiscardTemplate").click()
-        XCTAssertTrue(app.textFields.identified("templateNameField").exists)
-
-        app.buttons.identified("cancelTemplateEditor").click()
-        app.buttons.identified("confirmDiscardTemplate").click()
-        XCTAssertFalse(app.buttons.identified("templateRow-Unsaved Template").exists)
+        let app = launchNewStudio(label: "studio-selection-discard")
+        app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
+        XCTAssertTrue(app.buttons.identified("discardItemTypeStudioSelection").waitUntilExists(timeout: 3))
     }
 
     func checkTemplatesUITestsDeleteTemplateCanBeCancelled() throws {
-        let app = launchApp()
+        let app = launchNewStudio(label: "studio-undo-remove")
+        addCardSetupStarter("Reverse", in: app)
+        app.buttons["Remove Reverse Card setup"].click()
+        app.buttons.identified("itemTypeStudio.undoCardSetupRemoval").click()
+        XCTAssertTrue(app.buttons["Remove Reverse Card setup"].exists)
+    }
+
+    // MARK: Shared focused helpers
+
+    func launchNewStudio(label: String) -> XCUIApplication {
+        let app = launchApp(databaseLabel: label)
         openTemplates(in: app)
-        openTemplateEditor(named: "Card", in: app)
+        clickAddItemType(in: app)
+        assertPrefilledStudio(in: app)
+        return app
+    }
 
-        app.menuButtons.identified("templateMoreMenu").click()
-        app.menuItems.identified("deleteTemplate").click()
-        XCTAssertTrue(app.buttons.identified("cancelDeleteTemplate").waitUntilExists(timeout: 3))
-        app.buttons.identified("cancelDeleteTemplate").click()
+    func createSavedStudio(named name: String, label: String) -> XCUIApplication {
+        let app = launchNewStudio(label: label)
+        enterText(name, into: app.textFields.identified("itemTypeStudioName"), app: app)
+        saveItemType(in: app)
+        return app
+    }
 
-        XCTAssertTrue(app.textFields.identified("templateNameField").exists)
+    func assertPrefilledStudio(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons.identified("saveItemTypeStudio").waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).identified("itemTypeStudioOutline").exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .identified("itemTypeStudioCardSetupEditor")
+                .waitUntilExists(timeout: 5)
+        )
+        XCTAssertEqual(studioFieldRows(in: app).count, 2)
+        XCTAssertEqual(studioCardSetupRows(in: app).count, 1)
+    }
+
+    func studioFieldRows(in app: XCUIApplication) -> XCUIElementQuery {
+        app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'studioFieldRow-'")
+        )
+    }
+
+    func studioCardSetupRows(in app: XCUIApplication) -> XCUIElementQuery {
+        app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'itemTypeStudio.cardSetup.'")
+        )
+    }
+
+    func addStudioField(named name: String, type: String, in app: XCUIApplication) {
+        app.buttons.identified("addStudioField").click()
+        let fieldNames = app.textFields.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'studioFieldName-'")
+        )
+        enterText(name, into: fieldNames.element(boundBy: fieldNames.count - 1), app: app)
+        let fieldTypes = app.popUpButtons.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'studioFieldType-'")
+        )
+        let picker = fieldTypes.element(boundBy: fieldTypes.count - 1)
+        XCTAssertTrue(picker.waitUntilExists(timeout: 3))
+        picker.click()
+        app.menuItems[type].click()
+    }
+
+    func addCardSetupStarter(_ name: String, in app: XCUIApplication) {
+        let menu = app.menuButtons.identified("itemTypeStudio.addCardSetupMenu")
+        XCTAssertTrue(menu.waitUntilExists(timeout: 3))
+        menu.click()
+        XCTAssertTrue(app.menuItems[name].waitUntilExists(timeout: 3))
+        app.menuItems[name].click()
+        XCTAssertTrue(app.buttons["Remove \(name) Card setup"].waitUntilExists(timeout: 3))
+    }
+
+    func selectStudioCardSetup(named name: String, in app: XCUIApplication) {
+        let row = studioCardSetupRows(in: app).matching(
+            NSPredicate(format: "label BEGINSWITH[c] %@", name)
+        ).firstMatch
+        XCTAssertTrue(row.waitUntilExists(timeout: 3))
+        row.click()
+        XCTAssertTrue(app.textFields.identified("cardSetupEditor.name").waitUntilExists(timeout: 3))
+    }
+
+    func chooseAnswerMethod(_ name: String, in app: XCUIApplication) {
+        let picker = app.popUpButtons.identified("cardSetupEditor.answerMethod")
+        XCTAssertTrue(picker.waitUntilExists(timeout: 3))
+        picker.click()
+        XCTAssertTrue(app.menuItems[name].waitUntilExists(timeout: 3))
+        app.menuItems[name].click()
+    }
+
+    func addFixedText(to hole: String, value: String, in app: XCUIApplication) {
+        let button = app.buttons["Add \(hole) content"]
+        XCTAssertTrue(button.waitUntilExists(timeout: 3))
+        if !button.isHittable {
+            app.scrollViews.identified("cardSetupEditor").scroll(byDeltaX: 0, deltaY: -500)
+        }
+        button.click()
+        XCTAssertTrue(app.buttons["Fixed text"].waitUntilExists(timeout: 3))
+        app.buttons["Fixed text"].click()
+        let textFields = app.textFields.matching(NSPredicate(format: "label == %@", "Fixed text"))
+        let field = textFields.element(boundBy: max(0, textFields.count - 1))
+        XCTAssertTrue(field.waitUntilExists(timeout: 3))
+        enterText(value, into: field, app: app)
+    }
+
+    func runStudioRepairAndImpactJourneys() throws {
+        let riskyApp = launchApp(databaseLabel: "studio-risky", scenario: "item-type-risky-edit")
+        runJourneyActivity("ItemTypeStudio.fieldReferenceRepairAndImpact") {
+            openTemplates(in: riskyApp)
+            openItemTypeStudio(named: "Risky Edit", in: riskyApp)
+            let remove = riskyApp.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH 'removeStudioField-'")
+            ).element(boundBy: 0)
+            remove.click()
+            riskyApp.buttons.identified("confirmRemoveStudioField").click()
+            XCTAssertTrue(
+                riskyApp.descendants(matching: .any)
+                    .identified("itemTypeStudioRepairRequired")
+                    .waitUntilExists(timeout: 3)
+            )
+            riskyApp.buttons.identified("saveItemTypeStudio").click()
+            XCTAssertTrue(
+                riskyApp.descendants(matching: .any)
+                    .identified("itemTypeStudioValidationSummary")
+                    .waitUntilExists(timeout: 3)
+            )
+        }
+
+        let privacyApp = launchApp(
+            databaseLabel: "studio-private-response",
+            scenario: "item-type-spoken-response-impact"
+        )
+        runJourneyActivity("ItemTypeStudio.spokenResponseDeletionPrivacy") {
+            openTemplates(in: privacyApp)
+            openItemTypeStudio(named: "Private Responses", in: privacyApp)
+            privacyApp.buttons["Remove Spoken Practice Card setup"].click()
+            privacyApp.buttons.identified("saveItemTypeStudio").click()
+            XCTAssertTrue(
+                privacyApp.staticTexts.matching(
+                    NSPredicate(format: "label CONTAINS %@", "Permanently delete 1 saved spoken response")
+                ).firstMatch.waitUntilExists(timeout: 3)
+            )
+            XCTAssertTrue(privacyApp.buttons.identified("confirmItemTypeStudioSaveImpact").exists)
+        }
+
+        let corruptedApp = launchApp(databaseLabel: "studio-corrupt", scenario: "corrupted-item-type")
+        runJourneyActivity("ItemTypeStudio.corruptedDefinitionRepair") {
+            openTemplates(in: corruptedApp)
+            corruptedApp.buttons.identified("repairItemType-Damaged").click()
+            corruptedApp.buttons.identified("confirmRepairItemType").click()
+            XCTAssertTrue(corruptedApp.descendants(matching: .any)["itemTypeRow-Damaged"].waitUntilExists(timeout: 5))
+        }
     }
 }

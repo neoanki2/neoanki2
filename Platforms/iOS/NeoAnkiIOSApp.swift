@@ -15,8 +15,14 @@ struct NeoAnkiIOSApp: App {
 
     init() {
         let paths = MobilePaths()
+        let usesAccessibilityUITestEnvironment = ProcessInfo.processInfo.arguments.contains(
+            "-NeoAnkiUITestingAccessibility"
+        )
         if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") {
-            UIView.setAnimationsEnabled(false)
+            // Keep ordinary UI journeys deterministic, but leave UIKit motion
+            // enabled for the accessibility matrix so the injected SwiftUI
+            // reduced-motion environment remains the behavior under test.
+            UIView.setAnimationsEnabled(usesAccessibilityUITestEnvironment)
             let fileManager = FileManager.default
             for url in [
                 paths.databaseURL,
@@ -49,6 +55,7 @@ struct NeoAnkiIOSApp: App {
                 NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
+                    .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
             } else {
                 NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
             }

@@ -13,10 +13,6 @@ public enum EditorDecisionState {
     ) -> EditorDismissalDecision {
         initial == current ? .dismiss : .confirmDiscard
     }
-
-    public static func requiresTemplateDeletionConfirmation(templateExists: Bool) -> Bool {
-        templateExists
-    }
 }
 
 public struct ItemEditorSnapshot: Sendable, Equatable {

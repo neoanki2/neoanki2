@@ -519,6 +519,10 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     #expect(imported.item.fields.map(\.value) == expected)
     #expect(imported.item.tags == ["unicode-✓", "repeated"])
     #expect(imported.itemType.templates[0].generateWhen != nil)
+    #expect(
+        try PortableItemTypeIdentity.canonicalRepresentation(of: imported.itemType)
+            == PortableItemTypeIdentity.canonicalRepresentation(of: type)
+    )
 }
 
 @Test func portableDeckRepeatedImportReusesTypesWithoutOverwritingContent() async throws {

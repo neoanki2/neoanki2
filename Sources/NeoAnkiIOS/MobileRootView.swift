@@ -129,7 +129,7 @@ private struct CreateHubView: View {
                     Button { isAddingDeck = true } label: { Label("New Deck", systemImage: "folder.badge.plus") }
                 }
                 Section("Design") {
-                    NavigationLink { ItemTypesMobileView(model: model) } label: { Label("Item Types & Templates", systemImage: "square.stack.3d.up") }
+                    NavigationLink { ItemTypesMobileView(model: model) } label: { Label("Item Types & Card Setups", systemImage: "square.stack.3d.up") }
                 }
                 Section("Transfer & Build") {
                     NavigationLink { TransferToolsView(model: model) } label: { Label("Import or Export", systemImage: "arrow.up.arrow.down.square") }

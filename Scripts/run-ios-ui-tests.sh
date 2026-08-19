@@ -94,6 +94,15 @@ while [[ $attempt -le 2 ]]; do
   printf '%s\n' "$simulator_id" >> "$SIMULATOR_IDS_FILE"
   xcrun simctl boot "$simulator_id"
   xcrun simctl bootstatus "$simulator_id" -b
+  # Use the supported Simulator UI setting so SwiftUI's read-only
+  # colorSchemeContrast environment reflects increased contrast. The simulator
+  # is deleted after this attempt, so no user or later-test state is retained.
+  xcrun simctl ui "$simulator_id" increase_contrast enabled
+  contrast_state=$(xcrun simctl ui "$simulator_id" increase_contrast)
+  if [[ "$contrast_state" != "enabled" ]]; then
+    echo "Simulator did not enable Increase Contrast: $contrast_state" >&2
+    exit 1
+  fi
 
   result_bundle="$RESULT_ROOT/attempt-${attempt}.xcresult"
   raw_log="$RESULT_ROOT/attempt-${attempt}.log"

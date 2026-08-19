@@ -184,6 +184,10 @@ sample first.
 
 ## Export a portable deck
 
+> **Format terminology:** the app displays a persisted Template as a **Card
+> setup**. Portable and authored files continue to use `template` because their
+> schema is unchanged.
+
 Select a real deck in the sidebar, then choose **File → Export Deck…**. Choose
 a destination; NeoAnki2 adds the `.neodeck` extension when needed. Export is
 disabled for **All Decks** and **Unassigned**, and while another modal workflow

@@ -120,12 +120,12 @@ These states are informational:
 
 - **No decks yet:** create a top-level deck with **New Deck**. Items may still
   exist under **All Decks** or **Unassigned**.
-- **No Items Yet:** add an item; templates generate its cards.
+- **No Items Yet:** add an item; Card setups generate its cards.
 - **No Items in Deck:** add an item while that deck is selected.
 - **No Unassigned Items:** every item currently belongs to a deck.
-- **No Item Types:** create an item type to define fields and templates.
+- **No Item Types:** create an item type to define fields and Card setups.
 - **Select an Item Type:** choose a type in the left pane.
-- **No Templates:** add a template; an item without templates generates no
+- **No Card Setups:** add a Card setup; an item without Card setups generates no
   study cards.
 - **You're caught up / Nothing Due Right Now:** there is nothing due in the
   current scope. The scope home names the time the next card returns; this is
@@ -183,8 +183,8 @@ reimporting again will add more copies.
 
 - **Required field:** enter a nonblank value. Images and GIFs also require an
   image description for VoiceOver.
-- **Invalid item type:** check that field names are unique and templates have
-  complete prompt, answer, interaction, and generation settings.
+- **Invalid item type:** check that field names are unique and Card setups have
+  complete Question, Answer method, Answer, and Availability settings.
 - **Cloze error:** enter text, select at least one character, avoid overlapping
   blanks, and mark again if edits made a saved range stale.
 - **Unsupported or ambiguous media:** choose a standard file of the requested
@@ -226,7 +226,7 @@ responses are persistent on this device but are not uploaded through Cloud sync.
   use Right Arrow.
 - **No usable answer options / nothing to arrange / no checkable answer:** the
   card's content cannot support automatic checking. Review the revealed answer
-  and self-grade; then fix the item or template.
+  and self-grade; then fix the item or Card setup.
 - **There is no recent review to undo:** undo is no longer available for this
   state.
 Scheduling optimization reports nothing, successfully or otherwise: it runs

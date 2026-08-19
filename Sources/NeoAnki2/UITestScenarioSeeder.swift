@@ -70,6 +70,8 @@ enum UITestScenarioSeeder {
             try await seedDeckIncludedItemTypes(store: store)
         case "item-type-risky-edit":
             try await seedRiskyItemTypeEdit(store: store)
+        case "item-type-spoken-response-impact":
+            try await seedSpokenResponseItemType(store: store)
         default:
             break
         }
@@ -119,6 +121,65 @@ enum UITestScenarioSeeder {
                 ]
             )
         )
+    }
+
+    private static func seedSpokenResponseItemType(
+        store: any LibraryScenarioSeeding
+    ) async throws {
+        let front = FieldDef(name: "Front", type: .text, isRequired: true)
+        let back = FieldDef(name: "Back", type: .text, isRequired: true)
+        let basic = Template(
+            name: "Basic",
+            prompt: Side(slots: [Slot(source: .field(front.id))]),
+            answer: Side(slots: [Slot(source: .field(back.id))]),
+            interaction: .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )
+        let spoken = Template(
+            name: "Spoken Practice",
+            layout: .actionStage,
+            components: [TemplateComponent(
+                region: .primary,
+                purpose: .question,
+                source: .field(front.id)
+            )],
+            interaction: .audioSubmission,
+            skill: Skill(input: .text, output: .audio, operation: .reproduce)
+        )
+        let itemType = ItemType(
+            name: "Private Responses",
+            fields: [front, back],
+            templates: [basic, spoken]
+        )
+        _ = try await store.createItemType(itemType)
+        _ = try await store.createItem(Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: front.id, value: .text("Say this aloud")),
+                FieldValue(fieldID: back.id, value: .text("Expected answer")),
+            ]
+        ))
+
+        let cards = try await store.dueCards(scope: .allDecks, asOf: .now, limit: nil)
+        guard let cardID = cards.first(where: { $0.template.id == spoken.id })?.id else {
+            throw DatabaseError.queryFailed("UI fixture did not generate the spoken-response card.")
+        }
+        let fixtureDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki-ui-spoken-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: fixtureDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+        let responseURL = fixtureDirectory.appendingPathComponent("response.m4a")
+        try Data([0x00, 0x00, 0x00, 0x18] + Array("ftypM4A ".utf8))
+            .write(to: responseURL)
+        _ = try await store.completeAudioSubmission(StudyResponseDraft(
+            cardID: cardID,
+            fileURL: responseURL,
+            durationMilliseconds: 1_000,
+            capturedAt: .now
+        ))
     }
 
     private static func importIncludedDeck(

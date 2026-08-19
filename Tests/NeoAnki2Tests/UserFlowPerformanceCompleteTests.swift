@@ -1,5 +1,7 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
 import NeoAnkiTestSupport
 import Testing
 
@@ -398,27 +400,24 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfTemplatesModelCreateItemType() async throws {
+@Test @MainActor func perfItemTypesFeatureCreateItemType() async throws {
     guard requirePerformanceScale() != nil else { return }
 
-    let (store, directory) = try await makeAppStore(label: "template-create")
+    let (store, directory) = try await makeAppStore(label: "item-type-create")
     defer { try? FileManager.default.removeItem(at: directory) }
 
-    let model = TemplatesModel(store: store)
+    let model = ItemTypesFeatureModel(library: SQLiteLibraryRepository(store: store))
     await model.load()
 
     _ = try await PerformanceHarness.measure(
-        flow: "templates-model-create-item-type",
+        flow: "item-types-feature-create-item-type",
         layer: "app"
     ) {
-        let draft = ItemTypeDraft(
-            name: "Perf Type",
-            fields: [
-                FieldDraft(name: "Front", type: .text, isRequired: true),
-                FieldDraft(name: "Back", type: .text, isRequired: true),
-            ]
-        )
-        #expect(await model.createItemType(draft))
+        model.beginCreatingItemType()
+        model.studioDraft?.name = "Perf Type"
+        let preparation = try await model.prepareSave()
+        let saved = try await model.commitSave(preparation)
+        #expect(saved.name == "Perf Type")
         return ["item_type_count": "\(model.itemTypes.count)"]
     }
 }

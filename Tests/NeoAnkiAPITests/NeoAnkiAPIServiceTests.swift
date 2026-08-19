@@ -2122,6 +2122,56 @@ private func pairWithAuthority(
     }
 }
 
+@Test func templateAPIProjectionKeepsPromptAndAnswerPurposeBasedAndOrdered() throws {
+    let frontID = UUID(uuidString: "51000000-0000-4000-8000-000000000001")!
+    let backID = UUID(uuidString: "51000000-0000-4000-8000-000000000002")!
+    let components = [
+        TemplateComponent(
+            id: UUID(uuidString: "52000000-0000-4000-8000-000000000001")!,
+            region: .primary,
+            purpose: .expectedAnswer,
+            source: .field(backID),
+            presentation: Presentation(reveal: .blurred)
+        ),
+        TemplateComponent(
+            id: UUID(uuidString: "52000000-0000-4000-8000-000000000002")!,
+            region: .label,
+            purpose: .supporting,
+            source: .literal("Instruction")
+        ),
+        TemplateComponent(
+            id: UUID(uuidString: "52000000-0000-4000-8000-000000000003")!,
+            region: .secondary,
+            purpose: .question,
+            source: .field(frontID)
+        ),
+    ]
+    let template = Template(
+        id: UUID(uuidString: "53000000-0000-4000-8000-000000000001")!,
+        name: "API Contract",
+        layout: .actionStage,
+        components: components,
+        interaction: .type,
+        skill: Skill(input: .text, output: .freeResponse, operation: .recall),
+        generateWhen: .any([.fieldNotEmpty(frontID), .fieldEmpty(backID)])
+    )
+
+    let representation = APITemplateDefinition(template)
+    #expect(representation.layout == "actionStage")
+    #expect(representation.components?.map(\.id) == components.map { $0.id.uuidString.lowercased() })
+    #expect(representation.prompt.map(\.source.kind) == ["literal", "field"])
+    #expect(representation.prompt.map(\.source.text) == ["Instruction", nil])
+    #expect(representation.prompt.map(\.source.fieldId) == [nil, frontID.uuidString.lowercased()])
+    #expect(representation.answer.map(\.source.fieldId) == [backID.uuidString.lowercased()])
+    #expect(representation.answer.map(\.presentation.reveal) == ["blurred"])
+
+    let roundTrip = try representation.domain(
+        parseUUID: { value, _ in try #require(UUID(uuidString: value)) },
+        pointer: "/templates/0"
+    )
+    #expect(roundTrip == template)
+}
+
 @Test func studyResponseAPIProtectsPrivateAudioAndSupportsKeysetAndIdempotentDeletion() async throws {
     let (api, store) = try await makeAPIAndStore()
     let prompt = FieldDef(name: "Prompt", type: .text, isRequired: true)

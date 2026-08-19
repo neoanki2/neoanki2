@@ -4,6 +4,62 @@ import NeoAnkiCloudSync
 import NeoAnkiCore
 import Testing
 
+@Test func itemTypeSyncEnvelopeKeepsCloudKitPayloadContractStable() async throws {
+    let fixture = try await makeSyncRepository()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let repository = fixture.repository
+    let cursor = try await repository.currentChangeCursor()
+    let frontID = UUID(uuidString: "41000000-0000-4000-8000-000000000001")!
+    let backID = UUID(uuidString: "41000000-0000-4000-8000-000000000002")!
+    let templateID = UUID(uuidString: "42000000-0000-4000-8000-000000000001")!
+    let type = ItemType(
+        id: UUID(uuidString: "43000000-0000-4000-8000-000000000001")!,
+        name: "Sync Contract",
+        fields: [
+            FieldDef(id: frontID, name: "Front", type: .text, isRequired: true),
+            FieldDef(id: backID, name: "Back", type: .text, isRequired: true),
+        ],
+        templates: [Template(
+            id: templateID,
+            name: "Card",
+            layout: .split,
+            components: [
+                TemplateComponent(
+                    id: UUID(uuidString: "44000000-0000-4000-8000-000000000001")!,
+                    region: .primary,
+                    purpose: .question,
+                    source: .field(frontID)
+                ),
+                TemplateComponent(
+                    id: UUID(uuidString: "44000000-0000-4000-8000-000000000002")!,
+                    region: .secondary,
+                    purpose: .expectedAnswer,
+                    source: .field(backID),
+                    presentation: Presentation(reveal: .hiddenUntilAnswer)
+                ),
+            ],
+            interaction: .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )]
+    )
+    _ = try await repository.createItemType(type)
+
+    let adapter = SQLiteLibrarySyncAdapter(repository: repository)
+    let changes = try await repository.changes(after: cursor, limit: 100)
+    let envelope = try #require(
+        try await adapter.encode(changes: changes, deviceID: "contract-device")
+            .first { $0.resourceKind == LibraryResourceKind.itemType.rawValue }
+    )
+
+    #expect(envelope.id == type.id.uuidString)
+    #expect(envelope.resourceKind == "itemType")
+    #expect(envelope.deviceID == "contract-device")
+    #expect(envelope.revision == 1)
+    #expect(envelope.isTombstone == false)
+    #expect(envelope.asset == nil)
+    #expect(String(data: envelope.payload, encoding: .utf8) == #"{"itemType":{"_0":{"fields":[{"id":"41000000-0000-4000-8000-000000000001","isRequired":true,"name":"Front","type":"text"},{"id":"41000000-0000-4000-8000-000000000002","isRequired":true,"name":"Back","type":"text"}],"id":"43000000-0000-4000-8000-000000000001","name":"Sync Contract","templates":[{"components":[{"id":"44000000-0000-4000-8000-000000000001","presentation":{"media":"default","reveal":"always"},"purpose":"question","region":"primary","source":{"field":{"_0":"41000000-0000-4000-8000-000000000001"}}},{"id":"44000000-0000-4000-8000-000000000002","presentation":{"media":"default","reveal":"hiddenUntilAnswer"},"purpose":"expectedAnswer","region":"secondary","source":{"field":{"_0":"41000000-0000-4000-8000-000000000002"}}}],"id":"42000000-0000-4000-8000-000000000001","interaction":"reveal","layout":"split","name":"Card","skill":{"input":"text","operation":"recall","output":"text"}}]}}}"#)
+}
+
 @Test func sqliteSyncAdapterReplicatesDeckAndTombstone() async throws {
     let source = try await makeSyncRepository()
     let destination = try await makeSyncRepository()

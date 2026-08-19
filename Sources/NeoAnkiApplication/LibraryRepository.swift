@@ -70,6 +70,21 @@ public protocol LibraryItemTypeEditingSafeguarding: Sendable {
     ) async throws -> ItemTypeSchemaChangeImpact
 }
 
+/// Atomic, transaction-bound persistence capability used only by Item Type
+/// Studio. Kept separate from the historical editing-safeguard contract so
+/// existing repository conformers remain source-compatible.
+public protocol LibraryItemTypeStudioSaving: Sendable {
+    func prepareItemTypeUpdateAuthorization(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeUpdateAuthorization
+    func updateItemType(
+        _ itemType: ItemType,
+        authorization: ItemTypeUpdateAuthorization,
+        asOf: Date
+    ) async throws -> ItemType
+}
+
 public protocol LibraryStudying: Sendable {
     func dueCount(scope: DeckScope, asOf: Date) async throws -> Int
     func dueCards(scope: DeckScope, asOf: Date, limit: Int?) async throws -> [DueCard]
@@ -535,7 +550,11 @@ public extension LibraryScheduling {
 
 /// The sole production adapter that knows `ItemStore`. Presentation, API, and
 /// synchronization code receive application capabilities instead of the store.
-public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingSafeguarding {
+public actor SQLiteLibraryRepository:
+    LibraryRepository,
+    LibraryItemTypeEditingSafeguarding,
+    LibraryItemTypeStudioSaving
+{
     let store: ItemStore
 
     public init(databaseURL: URL, profileID: String = "default") throws {
@@ -639,6 +658,13 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
     public func updateItemType(_ itemType: ItemType, asOf: Date) async throws -> ItemType {
         try await store.updateItemType(itemType, now: asOf)
     }
+    public func updateItemType(
+        _ itemType: ItemType,
+        authorization: ItemTypeUpdateAuthorization,
+        asOf: Date
+    ) async throws -> ItemType {
+        try await store.updateItemType(itemType, authorization: authorization, now: asOf)
+    }
     public func duplicateItemType(id: UUID, name: String) async throws -> ItemType {
         try await store.duplicateItemType(id: id, name: name)
     }
@@ -653,6 +679,12 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
         to updated: ItemType
     ) async throws -> ItemTypeSchemaChangeImpact {
         try await store.itemTypeSchemaChangeImpact(from: existing, to: updated)
+    }
+    public func prepareItemTypeUpdateAuthorization(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeUpdateAuthorization {
+        try await store.prepareItemTypeUpdateAuthorization(from: existing, to: updated)
     }
     public func repairItemTypeDefinition(id: UUID, asOf: Date) async throws -> ItemType {
         try await store.repairItemTypeDefinition(id: id, now: asOf)
@@ -740,6 +772,7 @@ public actor SQLiteLibraryRepository: LibraryRepository, LibraryItemTypeEditingS
     public func studyResponseCount(templateIDs: Set<UUID>) async throws -> Int {
         try await store.studyResponseCount(templateIDs: templateIDs)
     }
+
     public func revertReview(id: UUID, asOf: Date) async throws {
         try await store.revertReview(reviewLogID: id, now: asOf)
     }

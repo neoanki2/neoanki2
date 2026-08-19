@@ -76,6 +76,21 @@ public final class LibraryFeatureModel {
         self.errorMapper = errorMapper
     }
 
+    /// The stricter capability set required by Item Type Studio. Legacy
+    /// `LibraryRepository` conformers remain source-compatible and simply do
+    /// not vend a Studio until they adopt editing safeguards.
+    public var itemTypeStudioLibrary:
+        (any LibraryBrowsing
+            & LibraryItemTypeManaging
+            & LibraryItemTypeEditingSafeguarding
+            & LibraryItemTypeStudioSaving)?
+    {
+        library as? any LibraryBrowsing
+            & LibraryItemTypeManaging
+            & LibraryItemTypeEditingSafeguarding
+            & LibraryItemTypeStudioSaving
+    }
+
     public var visibleItems: [SavedItemSummary] {
         ItemBrowsing.arrange(items, sort: sortOrder, search: searchText)
     }
@@ -288,6 +303,8 @@ public final class LibraryFeatureModel {
         try await library.studyResponseCount(itemIDs: itemIDs)
     }
 
+    /// Compatibility query retained for clients that inspect response impact
+    /// outside Item Type Studio.
     public func studyResponseCount(templateIDs: Set<UUID>) async throws -> Int {
         try await library.studyResponseCount(templateIDs: templateIDs)
     }
@@ -343,36 +360,43 @@ public final class LibraryFeatureModel {
         try await library.exportPortableDeck(id: id, to: url)
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel for atomic Item Type Studio saves.")
     public func createItemType(_ type: ItemType) async throws {
         _ = try await library.createItemType(type)
         try await didMutate()
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel.prepareSave() and commitSave(_:asOf:).")
     public func updateItemType(_ type: ItemType) async throws {
         _ = try await library.updateItemType(type, asOf: .now)
         try await didMutate()
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel duplicate workflows.")
     public func duplicateItemType(id: UUID, name: String) async throws {
         _ = try await library.duplicateItemType(id: id, name: name)
         try await didMutate()
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel catalog and read-only selection state.")
     public func includedItemTypeOwner(id: UUID) -> IncludedItemTypeGroup? {
         includedItemTypeGroups.first { group in
             group.itemTypes.contains { $0.id == id }
         }
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel editing-impact workflows.")
     public func itemTypeEditingImpact(id: UUID) async throws -> ItemTypeEditingImpact {
         try await itemTypeEditingSafeguards.itemTypeEditingImpact(id: id)
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel unlock workflows.")
     public func unlockItemType(id: UUID) async throws {
         _ = try await itemTypeEditingSafeguards.unlockItemType(id: id)
         try await didMutate()
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel.prepareSave() for aggregated impact.")
     public func itemTypeSchemaChangeImpact(
         from existing: ItemType,
         to updated: ItemType
@@ -394,11 +418,13 @@ public final class LibraryFeatureModel {
         }
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel repair workflows.")
     public func repairItemType(id: UUID) async throws {
         _ = try await library.repairItemTypeDefinition(id: id, asOf: .now)
         try await didMutate()
     }
 
+    @available(*, deprecated, message: "Use ItemTypesFeatureModel deletion workflows.")
     public func deleteItemType(id: UUID) async throws {
         _ = try await library.deleteItemType(id: id)
         try await didMutate()

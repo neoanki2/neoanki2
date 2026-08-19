@@ -9,7 +9,8 @@ import SwiftUI
 #if os(iOS)
 struct StudySessionView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.neoAnkiAccessibilityReduceMotionOverride) private var reduceMotionOverride
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var session: StudyFeatureModel
     @Bindable var model: MobileAppModel
@@ -111,7 +112,8 @@ struct StudySessionView: View {
                     template: card.template,
                     item: card.item,
                     mediaStore: session.mediaStore,
-                    isAnswerRevealed: session.isAnswerRevealed
+                    isAnswerRevealed: session.isAnswerRevealed,
+                    clozeGroup: card.card.clozeGroup
                 )
                 .frame(maxHeight: .infinity)
                 .accessibilityElement(children: .combine)
@@ -135,7 +137,10 @@ struct StudySessionView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isAnswerRevealed)
+        .animation(
+            (reduceMotionOverride ?? systemReduceMotion) ? nil : .snappy(duration: 0.24),
+            value: session.isAnswerRevealed
+        )
         .onChange(of: session.isAnswerRevealed) { _, revealed in
             if revealed { answerFocused = true }
         }
@@ -433,35 +438,66 @@ struct MobileContentValueView: View {
     var mediaBehavior: MediaBehavior = .default
     var revealMode: RevealMode = .always
     var isAnswerRevealed = true
+    var clozeGroup: Int? = nil
+
+    private var visibility: SharedStudyContentVisibility {
+        SharedStudyContentVisibilityPolicy.decision(
+            for: value,
+            revealMode: revealMode,
+            isAnswerRevealed: isAnswerRevealed
+        )
+    }
 
     var body: some View {
-        if shouldConceal {
-            Label("Content hidden until answer", systemImage: "eye.slash")
+        switch visibility.rendering {
+        case .placeholder:
+            Label(
+                visibility.accessibilityLabel ?? "Content concealed until answer",
+                systemImage: "eye.slash"
+            )
                 .font(.body)
                 .foregroundStyle(.secondary)
-                .accessibilityElement(children: .combine)
-        } else {
-            switch value {
-            case let .text(text, _):
-                Text(text)
-            case let .rich(spans):
-                Text(Self.attributed(spans))
-            case let .number(number):
-                Text(number, format: .number)
-            case let .cloze(text, blanks):
-                Text(isAnswerRevealed ? text : Self.concealedCloze(text, blanks: blanks))
-            case let .media(reference):
-                MobileResolvedMediaView(reference: reference, store: mediaStore, behavior: mediaBehavior)
-            case .empty:
-                Text("No content")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    visibility.accessibilityLabel ?? "Content concealed until answer"
+                )
+        case .blurredMedia:
+            contentBody
+                .blur(radius: 12)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(visibility.accessibilityLabel ?? "Blurred media")
+        case .content:
+            contentBody
         }
     }
 
-    private var shouldConceal: Bool {
-        !isAnswerRevealed && (revealMode == .hiddenUntilAnswer || revealMode == .blurred)
+    @ViewBuilder
+    private var contentBody: some View {
+        switch value {
+        case let .text(text, _):
+            Text(text)
+        case let .rich(spans):
+            Text(Self.attributed(spans))
+        case let .number(number):
+            Text(number, format: .number)
+        case let .cloze(text, blanks):
+            Text(SharedStudyClozePresentation.displayText(
+                from: text,
+                blanks: blanks,
+                isAnswerRevealed: isAnswerRevealed,
+                group: clozeGroup
+            ))
+        case let .media(reference):
+            MobileResolvedMediaView(
+                reference: reference,
+                store: mediaStore,
+                behavior: mediaBehavior
+            )
+        case .empty:
+            Text("No content")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func symbol(for kind: MediaKind) -> String {
@@ -471,19 +507,6 @@ struct MobileContentValueView: View {
         case .gif: "photo.stack"
         case .video: "video"
         }
-    }
-
-    private static func concealedCloze(_ text: String, blanks: [ClozeSpan]) -> String {
-        var result = text
-        for blank in blanks.sorted(by: { $0.start > $1.start }) {
-            guard blank.start >= 0,
-                  blank.length >= 0,
-                  let start = result.index(result.startIndex, offsetBy: blank.start, limitedBy: result.endIndex),
-                  let end = result.index(start, offsetBy: blank.length, limitedBy: result.endIndex)
-            else { continue }
-            result.replaceSubrange(start..<end, with: "____")
-        }
-        return result
     }
 
     private static func attributed(_ spans: [Span]) -> AttributedString {

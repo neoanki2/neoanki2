@@ -34,6 +34,11 @@ The API follows the NeoAnki domain model:
 3. NeoAnki generates `Card` values from an item and its templates; and
 4. only a successful review changes a card's normal memory state.
 
+> **UI terminology:** Item Type Studio presents a persisted `Template` as a
+> **Card setup**. This API specification continues to use `Template` and
+> `template` because the version-1 contract and wire representation are
+> unchanged.
+
 Clients MUST NOT create or delete cards directly. Clients MUST NOT assign raw
 stability, difficulty, phase, repetition, lapse, last-review, or due values.
 Schema edits, card generation, scheduling, review logging, media reference

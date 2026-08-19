@@ -1,230 +1,199 @@
 ---
-title: Item Types and Templates
-description: Define reusable fields and templates that generate accessible, interactive study cards.
+title: Item Types and Card Setups
+description: Define reusable fields and fill the static layouts that generate accessible study cards.
 audience: user
 nav_order: 4
 parent: User Guide
 ---
 
-# Item Types and Templates
+# Item Types and Card Setups
 
-An **item type** defines the fields an item stores. Its **templates** turn those
-fields into study cards by choosing a code-owned composition preset, assigning
-ingredients to named regions, declaring their semantic purpose, and selecting
-how the learner responds.
+An **item type** defines the fields that store one piece of knowledge. Its
+**Card setups** decide which fields appear on a study card, which of five
+static layouts presents them, and how the learner answers. The saved data model
+calls a Card setup a `Template`; the friendlier name is only a change in the
+app's interface.
 
-Open **Item Types** from the library to manage both. The left column lists your
-editable types first, followed by a **From Decks** section; the detail shows
-fields and templates for the selected type.
+Open **Item Types** on Mac, or **Create → Item Types & Card Setups** on iPhone
+and iPad. The Item Type Studio edits fields and Card setups together and saves
+the complete definition as one change.
 
 [![The Item Types manager]({{ site.baseurl }}/assets/screenshots/item-types.png)]({{ site.baseurl }}/assets/screenshots/item-types.png)
 
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
 
-- [Starter item types](#starter-item-types)
-- [Included with decks](#included-with-decks)
-- [Create and edit an item type](#create-and-edit-an-item-type)
-- [Repair a damaged definition](#repair-a-damaged-definition)
-- [Create, edit, and delete templates](#create-edit-and-delete-templates)
-- [Choose an interaction](#choose-an-interaction)
-- [Choose a composition and assign ingredients](#choose-a-composition-and-assign-ingredients)
-- [Advanced settings](#advanced-settings)
+- [Start with a complete item type](#start-with-a-complete-item-type)
+- [Edit fields and Card setups together](#edit-fields-and-card-setups-together)
+- [Fill a static layout](#fill-a-static-layout)
+- [Choose an Answer method](#choose-an-answer-method)
+- [Use Advanced settings](#use-advanced-settings)
+- [Handle changes safely](#handle-changes-safely)
+- [Use item types included with decks](#use-item-types-included-with-decks)
+- [Repair or delete an item type](#repair-or-delete-an-item-type)
 </nav>
 
-## Starter item types
+## Start with a complete item type
 
-NeoAnki2 creates two ordinary starter types on first run:
+Choose **New Item Type**. A new type already contains required Text fields
+named **Front** and **Back** and a valid Reveal Card setup that asks with Front
+and answers with Back. Name the type, adjust the fields and setup if needed,
+then choose **Save** once for the whole definition.
 
-- **Basic** has required Text fields named **Front** and **Back**. Its **Card** template prompts with Front, answers with Back, and uses Reveal.
-- **Cloze** has a required Cloze field named **Text** and an optional Rich Text field named **Context**. Its **Cloze** template shows Text with the current blank concealed plus Context on the prompt, then Text on the answer. Each distinct blank group generates a separate card.
+NeoAnki2 also creates ordinary Basic and Cloze starter types on first run.
+Basic uses Front → Back Reveal. Cloze stores marked blanks in a Cloze field and
+generates an independently scheduled card for each distinct blank group.
+Starter types follow the same edit and deletion rules as custom types.
 
-Starter types are not protected system definitions. You may edit or delete them under the same rules as a custom type.
+## Edit fields and Card setups together
 
-## Included with decks
+On Mac, the navigator remains visible beside a two-pane Studio: **Fields** and
+**Card setups** are on the leading side, and the selected fillable wireframe is
+on the main side. On iPhone and iPad, select a Card setup to push the same
+editor at the device's adaptive width.
 
-Imported, deck-specific schemas appear under **From Decks**. Each owning deck
-has its own disclosure row, labeled with the deck's current path and included
-type count. Expand a deck to see its read-only types. They do not crowd the
-main editable list.
+For each field, set:
 
-An included-only definition starts read-only. You can inspect its fields,
-templates, and owning deck, but Edit, Delete, and Add Template are unavailable.
-Choose **Unlock for Editing…** to adopt that same definition into your normal
-Item Types. The confirmation reports how many existing items and decks use it.
-Its identity does not change, so those items and the imported deck policy keep
-using it; later field and template edits affect all of them.
-
-Choose **Duplicate as Item Type…** instead when you want an independent editable
-copy. Existing items and the imported deck policy continue using the original.
-If import reused a type that was already a normal Item Type, it remains editable
-and appears only in the main list.
-
-## Create and edit an item type
-
-Choose **Add** above the type list. A new draft starts with required **Front** and **Back** Text fields. Enter a type name, then configure each field:
-
-- **Name:** must not be blank and must be unique within the type, ignoring case.
+- **Name:** nonblank and unique within the type, ignoring case.
 - **Type:** Text, Rich Text, Number, Audio, Image, GIF, Video, or Cloze.
-- **Required:** controls whether an item must supply a value for that field.
+- **Required:** whether every item must contain that value.
 
-Use **Add Field** to append another field. Use each row’s arrows to move it up or down, and use the remove control to delete an unreferenced field. These compact row controls provide a consistent click target and remain keyboard reachable. Field order affects item editing, display, and automatic skill derivation. A type edited in the app must retain at least two fields, so remove controls disappear at two.
+Add, rename, change, or remove fields in the draft. Card setup removals are
+also drafts: **Undo Remove** restores the latest one until Save. The last Card
+setup cannot be removed because every item type must be able to generate a
+card.
 
-Save is available only when the type has a nonblank name, at least two fields, and complete, unique field names. A newly created type must also have at least two text-like fields so NeoAnki2 can create its initial **Card** template from the first two of them.
+Save stays reachable when the draft is invalid. Choosing it explains the
+problems and moves focus to the first field, Card setup, content entry, or
+Advanced rule that needs attention. Cancel closes an untouched existing
+definition directly. A new item type always asks before discarding its new
+identity and prefilled setup; edited definitions ask when they have unsaved work.
 
-Editing preserves field identities and existing templates. You cannot remove a field used by a template’s prompt, answer, or card-generation condition. Edit or delete those references first. Changing a field type can also make an existing cloze or media configuration invalid; NeoAnki2 reports the validation problem instead of saving an inconsistent definition. If a removed field or type-changed field contains stored content, NeoAnki2 reports the affected item count and requires a separate confirmation before saving.
+## Fill a static layout
 
-Cancel closes an unchanged draft immediately. If there are edits, choose **Discard Changes** or **Keep Editing**.
+Every Card setup begins with the compact recipe:
 
-### Delete an item type
+**Question → Answer method → Answer**
 
-The Delete action is available only when no items use the selected type. Delete or move through any dependent items first. Confirmation removes the item type and all of its templates. This applies to starter and custom types alike.
+Choose fields for Question and Answer, then fill any other named holes directly
+in the wireframe: **Instruction**, **Question**, **Media**, **Context**, and
+**Answer**. A source can be a compatible field or **Fixed text**, such as
+“Translate:” or “Explain why:”. Source pickers are searchable when the type has
+many fields.
 
-## Repair a damaged definition
+Choose one of five code-owned layouts:
 
-If NeoAnki2 cannot read an item-type definition, it keeps other types available and shows the damaged type with **Repair**. Items linked to an unreadable type are skipped until it is repaired.
+- **Focus** emphasizes one question and a compact answer.
+- **Split** gives question and answer comparable space.
+- **Media Aside** places visual media beside supporting text.
+- **Media Hero** gives an image, GIF, or video the dominant region.
+- **Action Stage** gives an interactive Answer method room to work.
 
-Choose **Repair**, then **Archive Original and Repair**. NeoAnki2 archives the unreadable definition, preserves the existing items, and installs a minimal editable replacement with required Text fields named Front and Back and a default Card template. The archived source is retained for recovery; repair does not reconstruct custom fields or templates from unreadable data. Review the replacement and existing items before studying. A definition whose identifier itself is invalid requires manual recovery and cannot use this flow.
+The initial recommendation is visible, but choosing another layout is sticky.
+Later Question or Answer changes may produce a new recommendation; they never
+silently replace your chosen layout or Learning route.
 
-## Create, edit, and delete templates
+[![A fillable Card setup wireframe]({{ site.baseurl }}/assets/screenshots/template-editor.png)]({{ site.baseurl }}/assets/screenshots/template-editor.png)
 
-Select an item type and choose **Add Template**, or select an existing template
-to edit it. A template opens in a focused, full-width **Study-Stage Builder**.
-The Item Types list and its outer Done action step aside while you compose, then
-return to the same selected item type after Save or Cancel. A template needs:
+A hole can contain more than one entry. Use the visible move-up and move-down
+controls to set local reading order; dragging is not required. **Show Answer**
+switches the same preview from question to revealed state. Expected answers
+stay concealed before reveal even if an unusual older definition placed them
+in another region.
 
-1. A nonblank name.
-2. One of the five composition presets.
-3. At least one complete **Question** component.
-4. At least one concealed **Expected answer** component, except for Audio Submission.
-5. A valid interaction and, when enabled, a complete generation rule.
+Playback appears only for compatible media. Reveal and blur controls appear
+for content that supports them, and Fixed text can be edited in place. The
+preview uses deterministic placeholders rather than personal item content or
+media and never grades, records, or saves a response.
 
-Save stays available so it can explain incomplete work. Choosing it shows an
-inline error, announces the problem to assistive technology, and moves focus to
-the first affected region. Cancel asks before discarding edits. For an existing
-template, choose **More → Delete Template**; confirmation includes the number
-of saved spoken responses that will also be removed when applicable. An item
-type must always retain at least one template, so its final template cannot be
-deleted.
+Older definitions may contain valid placements that do not correspond to a
+named hole. They remain ordered under **Additional content** and round-trip
+unchanged. Only **Move into named hole** converts one of those entries to the
+current canonical placement.
 
-[![The template editor]({{ site.baseurl }}/assets/screenshots/template-editor.png)]({{ site.baseurl }}/assets/screenshots/template-editor.png)
+## Choose an Answer method
 
-## Choose an interaction
+**Add Card Setup** immediately creates a valid Basic Reveal setup. The adjacent
+menu offers recipes that apply to the current fields:
 
-The Interaction selector provides seven study experiences:
+- **Reverse** asks in the opposite direction.
+- **Type Answer** compares typed text before self-grading.
+- **Visual** uses compatible image, GIF, or video content and can be conditional.
+- **Cloze** conceals the current blank in a Cloze field.
+- **Audio Submission** saves one private spoken response on this device and
+  completes without grading.
 
-- **Reveal:** recall mentally, reveal the answer, and self-grade.
-- **Type answer:** type a response for automatic comparison, then self-grade.
-- **Choose:** select from answer-derived options, check, then self-grade.
-- **Arrange:** reorder answer units, check the sequence, then self-grade.
-- **Record:** make and optionally replay a temporary audio recording before comparing with the answer.
-- **Audio Submission:** record one persistent, local-only spoken response, then
-  save and complete without revealing an answer or changing FSRS. Its answer
-  side is empty and its skill output is Audio.
-- **Cloze:** conceal the current cloze group in the prompt and reveal it with the answer.
+The Answer method picker also supports Reveal, Type Answer, Choose, Arrange,
+Record, Audio Submission, and Cloze. Choose and Arrange need usable textual
+answers. Record is a temporary compare-and-grade exercise. Audio Submission
+has no expected answer: converting an existing setup asks before removing its
+answer. If you switch back before Save, the Studio restores the stashed answer.
 
-Type, Choose, and Arrange depend on usable text representations from expected-answer components. Record requires microphone permission for recording but always permits reveal-and-self-grade. Audio Submission requires a question and clears expected answers after explicit confirmation when converting an existing template. A Cloze template must reference exactly one Cloze question component.
+## Use Advanced settings
 
-## Choose a composition and assign ingredients
+[![Advanced Card setup settings]({{ site.baseurl }}/assets/screenshots/template-advanced.png)]({{ site.baseurl }}/assets/screenshots/template-advanced.png)
 
-Templates cannot inject markup or create arbitrary layouts. Choose one of five
-adaptive presets:
+Open **Advanced** only when a setup needs conditional generation or an explicit
+learning route.
 
-- **Focus:** one clear question with a compact answer reveal.
-- **Split:** comparable question and answer regions.
-- **Media Aside:** visual media beside question and supporting content.
-- **Media Hero:** one dominant image, GIF, or video with minimal text.
-- **Action Stage:** a question organized around Type, Choose, Arrange, Record,
-  or Audio Submission controls generated by NeoAnki2.
+### Availability
 
-The presets adapt between phone, tablet, and desktop geometry. The active study
-stage never becomes a scrolling page: the action/grading footer remains fixed.
-If Dynamic Type, localization, or unusually long content exceeds a region,
-**View full content** opens a region-aware, scrollable detail sheet.
+Turn on **Availability rule** to generate the Card setup only when a selected
+field is present or absent. Start with one rule. Add **All** or **Any** groups
+only when several nested rules are necessary. Incomplete field references are
+reported before Save. Existing legacy definitions with empty **All** or **Any**
+groups are preserved exactly rather than silently normalized.
 
-The builder has three panes when at least 900 points wide:
+Availability is useful for optional media: for example, generate a visual card
+only when an Image field is present. With no rule, the setup normally generates
+for every valid item; Cloze still generates once per distinct blank group.
 
-- **Card Ingredients** lists every item-type field plus **Literal Text**.
-- **Study Preview** composes the Before and After states of the card.
-- **Inspector** edits the selected block or the persistent **Generation & Skill** summary.
+### Learning route
 
-At compact widths the preview remains primary. Use the labelled Ingredients
-and Inspector toolbar controls to open the supporting panes.
+The stored **Learning route** records input modality, output modality, and the
+cognitive operation for generated cards. The Studio may recommend a route from
+the current Question and Answer fields. Choose **Use recommendation** to adopt
+it explicitly. Existing stored learning metadata remains authoritative until
+you do.
 
-Ingredients are semantic **components**. Each component selects a field or
-literal source, a named region (**Primary**, **Secondary**, **Media**,
-**Supporting**, or **Label**), and a purpose (**Question**, **Expected answer**,
-or **Supporting**). Expected answers are always concealed before reveal;
-question components remain available to VoiceOver without leaking answer text.
-Drag ingredients into the preview or use the Inspector's keyboard-accessible
-Move, Duplicate, Region, Purpose, and Remove controls.
+## Handle changes safely
 
-Block order matters. It controls the order content is rendered, the first field
-summarized in the type view, which fields contribute to automatic answer
-checking, and which first prompt and answer fields are used for automatic skill
-mapping.
+Save validates the complete candidate and summarizes consequences before
+changing the library:
 
-Use **Before answer** and **After answer**, or **Show Answer**, to simulate the
-reveal locally. Switch Phone, Tablet, and Desktop sizes to check responsive
-geometry. Overflow diagnostics identify compositions that will need the study
-detail sheet. Examples are deterministic placeholders for the field type; the
-builder never reads personal library items or resolves personal media.
-Response controls are illustrative only: they never grade, save, request
-microphone access, or record audio.
+- Removing or changing a field reports affected populated items.
+- Removing a referenced field clears those draft mappings, identifies every
+  affected Card setup, and requires repair before Save.
+- Removing a Card setup retires only the cards generated by that setup. Cards
+  from surviving setup identities keep their scheduling and review history.
+- Removing an Audio Submission setup reports the persistent spoken responses
+  that will be deleted and requires confirmation.
 
-## Advanced settings
+These checks are performed again during the single save transaction. If the
+library changed since confirmation, the save stops instead of applying a stale
+authorization. Existing Card setup and content identities, order, conditions,
+layout, Answer method, and Learning route remain unchanged when you open and
+save without editing them.
 
-[![Advanced template settings]({{ site.baseurl }}/assets/screenshots/template-advanced.png)]({{ site.baseurl }}/assets/screenshots/template-advanced.png)
+## Use item types included with decks
 
-### Skill mapping
+Imported deck-specific schemas appear under **From Decks**, grouped by owning
+deck. They start read-only and do not crowd the main editable list. You can
+inspect their fields and Card setups.
 
-Select **Generation & Skill** in the Inspector. With **Derive from the first
-prompt and answer fields** enabled, NeoAnki2 maps the first field-backed prompt
-and answer blocks to modalities:
+Choose **Unlock for Editing…** to adopt the same definition. Its identity stays
+the same, so existing items and deck policies continue using it. Choose
+**Duplicate as Item Type…** for an independent editable copy instead; existing
+items keep using the original.
 
-- Text, Rich Text, Number, and Cloze become Text.
-- Audio becomes Audio.
-- Image and GIF become Image.
-- Video becomes Video.
+## Repair or delete an item type
 
-It derives **Recognize** when the prompt field comes before the answer field in the item type, and **Recall** when their order is reversed.
+If a definition is unreadable, choose **Repair**, then **Archive Original and
+Repair**. NeoAnki2 archives the damaged definition, preserves linked items, and
+installs a minimal editable replacement with Front, Back, and a Basic Card
+setup. Repair cannot reconstruct unreadable custom fields or setups, so inspect
+the result before studying.
 
-Turn automatic derivation off to choose the skill explicitly. Input and Output offer Text, Audio, Image, Video, Diagram, None, Free response, Selection, Spatial, and Sequence. Operation offers Recognize, Recall, Discriminate, Classify, Locate, Order, Apply, Explain, and Reproduce. Skill mapping describes the cognitive route stored on generated cards; it does not itself change the selected study interaction.
-
-### Field and literal sources
-
-A slot’s **Source** can be:
-
-- **Field:** dynamic content from the current item.
-- **Literal text:** fixed wording such as “Translate:” or “Explain why:”.
-
-Every field slot must select a field, and literal text cannot be blank. Literal slots can clarify a multi-part prompt without adding redundant data to each item.
-
-### Multiple slots
-
-Use multiple slots to combine labels, context, and media. For example, a prompt can contain the literal “Name this structure,” an Image field, and a Context field, while the answer can contain Name and Explanation fields. Reorder slots to match the reading sequence.
-
-### Reveal behavior
-
-Each slot can be:
-
-- **Always visible:** shown before and after answer reveal.
-- **Hidden until answer:** replaced by a non-revealing placeholder before reveal.
-- **Blurred until answer:** images and GIFs are visibly blurred; other content is concealed by a placeholder.
-
-Cloze values are handled specially: the surrounding sentence remains readable while only the current blank is masked. Hidden media is not resolved before reveal, which avoids exposing it to assistive technology or loading it prematurely.
-
-### Media behavior
-
-Audio, GIF, and Video field slots can use **Default**, **Autoplay**, **Play on tap**, or **Loop**. Image fields and non-media or literal slots support Default only. Changing a slot’s source or selecting a field incompatible with the current behavior resets it to Default. Unsupported media behavior prevents an invalid template from being saved.
-
-### Card-generation conditions
-
-Enable **Only generate this card when…** to make a template conditional for each item. Rules can test:
-
-- **Field is not empty**
-- **Field is empty**
-- **All rules match**
-- **Any rule matches**
-
-All and Any can contain nested child rules. Every field rule must select a field, and every All or Any group must contain at least one complete child. If the condition is false, that template generates no card for that item. This is useful for optional media—for example, create a listening card only when Audio is present. Without a condition, the template generates normally for every valid item; Cloze still generates one card per distinct blank group.
+Delete is available only when no items use the selected editable type. The
+confirmation removes the type and all of its Card setups. Included read-only
+types must first be unlocked or duplicated according to the outcome you want.

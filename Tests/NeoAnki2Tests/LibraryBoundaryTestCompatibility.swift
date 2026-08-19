@@ -52,13 +52,6 @@ extension ImportModel {
 }
 
 @MainActor
-extension TemplatesModel {
-    convenience init(store: ItemStore) {
-        self.init(library: SQLiteLibraryRepository(store: store))
-    }
-}
-
-@MainActor
 extension SchedulingModel {
     convenience init(store: ItemStore) {
         self.init(library: SQLiteLibraryRepository(store: store))

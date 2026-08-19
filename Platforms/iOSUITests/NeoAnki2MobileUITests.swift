@@ -10,15 +10,136 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
     }
 
-    private func launchApp(additionalArguments: [String] = []) -> XCUIApplication {
+    private func launchApp(
+        additionalArguments: [String] = [],
+        environment: [String: String] = [:]
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
             "-NeoAnkiUITestingReset",
         ] + additionalArguments
+        app.launchEnvironment.merge(environment) { _, requested in requested }
         app.launch()
         return app
+    }
+
+    private func openItemTypeStudioCatalog(in app: XCUIApplication) {
+        open("Create", in: app)
+        let destination = app.buttons["Item Types & Card Setups"]
+        XCTAssertTrue(destination.waitForExistence(timeout: 5))
+        destination.tap()
+        XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
+    }
+
+    private func scrollToAndTap(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
+        for _ in 0..<6 where !element.isHittable { app.swipeUp() }
+        XCTAssertTrue(element.isHittable, "Element is not reachable: \(element)", file: file, line: line)
+        element.tap()
+    }
+
+    private func firstCardSetupButton(in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "itemTypeStudio.cardSetup.")
+        ).firstMatch
+    }
+
+    private func clearText(in field: XCUIElement) {
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        let current = field.value as? String ?? ""
+        guard !current.isEmpty else { return }
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+    }
+
+    private func assertNoHorizontalOverflow(
+        in container: XCUIElement,
+        viewport: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let containerFrame = container.frame
+        let viewportFrame = viewport.frame
+        let visibleDescendants = container.descendants(matching: .any).allElementsBoundByIndex.filter {
+            !$0.frame.isEmpty && $0.frame.intersects(containerFrame)
+        }
+        XCTAssertFalse(visibleDescendants.isEmpty, "No visible editor content to measure", file: file, line: line)
+        for element in visibleDescendants {
+            XCTAssertGreaterThanOrEqual(
+                element.frame.minX,
+                max(containerFrame.minX, viewportFrame.minX) - 1,
+                "Editor descendant overflows the leading edge: \(element)",
+                file: file,
+                line: line
+            )
+            XCTAssertLessThanOrEqual(
+                element.frame.maxX,
+                min(containerFrame.maxX, viewportFrame.maxX) + 1,
+                "Editor descendant overflows the trailing edge: \(element)",
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func assertAccessibilityTraversalOrder(
+        _ orderedElements: [(XCUIElement, XCUIElement.ElementType)],
+        in container: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let accessibilityElements = container.descendants(matching: .any)
+            .allElementsBoundByAccessibilityElement
+        var previousIndex = -1
+
+        for (element, expectedType) in orderedElements {
+            XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
+            XCTAssertEqual(element.elementType, expectedType, file: file, line: line)
+            XCTAssertFalse(
+                element.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                "VoiceOver element has no spoken label: \(element)",
+                file: file,
+                line: line
+            )
+            let index = accessibilityElements.firstIndex { candidate in
+                candidate.identifier == element.identifier
+            }
+            XCTAssertNotNil(
+                index,
+                "Element is missing from the accessibility traversal: \(element.identifier)",
+                file: file,
+                line: line
+            )
+            if let index {
+                XCTAssertGreaterThan(
+                    index,
+                    previousIndex,
+                    "Accessibility traversal does not follow the editor's logical order",
+                    file: file,
+                    line: line
+                )
+                previousIndex = index
+            }
+        }
+
+        for pair in zip(orderedElements, orderedElements.dropFirst()) {
+            let upper = pair.0.0.frame
+            let lower = pair.1.0.frame
+            XCTAssertLessThanOrEqual(
+                upper.minY,
+                lower.minY,
+                "Accessibility traversal order disagrees with the visual top-to-bottom order",
+                file: file,
+                line: line
+            )
+        }
     }
 
     private func open(_ title: String, in app: XCUIApplication) {
@@ -127,7 +248,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
     func testAuthoringTransferVocabularyAndSyncConsentSurfaces() throws {
         let app = launchApp()
         open("Create", in: app)
-        for title in ["Item Types & Templates", "Import or Export", "Deck Builders", "Vocabulary Packs"] {
+        for title in ["Item Types & Card Setups", "Import or Export", "Deck Builders", "Vocabulary Packs"] {
             XCTAssertTrue(app.buttons[title].waitForExistence(timeout: 3), "Missing \(title)")
         }
         app.buttons["Vocabulary Packs"].tap()
@@ -147,6 +268,248 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Create Backup & Enable"].waitForExistence(timeout: 5))
         cancel.tap()
         XCTAssertTrue(enableSync.waitForExistence(timeout: 3))
+    }
+
+    func testItemTypeStudioCreatesEditsAndAtomicallySavesCardSetups() throws {
+        let app = launchApp()
+        openItemTypeStudioCatalog(in: app)
+
+        app.buttons["item-types.new"].tap()
+        let typeName = app.textFields["item-type-studio.name"]
+        XCTAssertTrue(typeName.waitForExistence(timeout: 5))
+        typeName.tap()
+        typeName.typeText("Mobile Studio")
+        XCTAssertTrue(app.staticTexts["Front"].exists)
+        XCTAssertTrue(app.staticTexts["Back"].exists)
+        let moveUp = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                "item-type-studio.field.",
+                ".move-up"
+            )
+        ).element(boundBy: 1)
+        XCTAssertTrue(moveUp.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(moveUp.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(moveUp.frame.width, 44)
+        moveUp.tap()
+
+        let firstSetup = firstCardSetupButton(in: app)
+        XCTAssertTrue(firstSetup.waitForExistence(timeout: 5))
+        firstSetup.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["cardSetupEditor"].waitForExistence(timeout: 5)
+        )
+
+        let mediaAside = app.buttons["cardSetupEditor.layout.mediaAside"]
+        scrollToAndTap(mediaAside, in: app)
+        XCTAssertTrue(mediaAside.isSelected)
+
+        let advanced = app.buttons["cardSetupEditor.advanced"]
+        scrollToAndTap(advanced, in: app)
+        let availability = app.switches["Availability rule"]
+        scrollToAndTap(availability, in: app)
+        XCTAssertEqual(availability.value as? String, "1")
+        scrollToAndTap(app.buttons["Add another rule"], in: app)
+        XCTAssertTrue(app.segmentedControls.buttons["All rules"].waitForExistence(timeout: 3))
+        app.segmentedControls.buttons["Any rule"].tap()
+
+        let answerMethod = app.buttons["cardSetupEditor.answerMethod"]
+        scrollToAndTap(answerMethod, in: app)
+        XCTAssertTrue(app.buttons["Audio Submission"].waitForExistence(timeout: 3))
+        app.buttons["Audio Submission"].tap()
+        XCTAssertTrue(app.buttons["Remove Answer and Continue"].waitForExistence(timeout: 3))
+        app.buttons["Remove Answer and Continue"].tap()
+        XCTAssertTrue(app.staticTexts["Spoken response"].waitForExistence(timeout: 3))
+
+        // Media Aside is truthful and therefore invalid without a Media
+        // component. Return to a valid static layout before the atomic save.
+        let focusLayout = app.buttons["cardSetupEditor.layout.focus"]
+        scrollToAndTap(focusLayout, in: app)
+        XCTAssertTrue(focusLayout.isSelected)
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let moreRecipes = app.buttons["itemTypeStudio.addCardSetupMenu"]
+        scrollToAndTap(moreRecipes, in: app)
+        XCTAssertTrue(app.buttons["Type Answer"].waitForExistence(timeout: 3))
+        app.buttons["Type Answer"].tap()
+        XCTAssertTrue(app.textFields["cardSetupEditor.name"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textFields["cardSetupEditor.name"].value as? String, "Type Answer")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        scrollToAndTap(app.buttons["item-type-studio.save"], in: app)
+        XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Mobile Studio"].waitForExistence(timeout: 5))
+
+        app.staticTexts["Mobile Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Mobile Studio"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Type Answer"].waitForExistence(timeout: 5))
+    }
+
+    func testItemTypeStudioLegacyClozeReadOnlyAndDestructiveConfirmations() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"])
+        openItemTypeStudioCatalog(in: app)
+
+        // Cloze is recipe-filtered: a text-only type cannot add it, then the
+        // starter appears immediately after an explicit Cloze field is added.
+        app.buttons["item-types.new"].tap()
+        XCTAssertTrue(app.buttons["item-type-studio.save"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Deck-provided · Read-only"].exists)
+        scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
+        XCTAssertFalse(app.buttons["Cloze"].exists)
+        XCTAssertTrue(app.buttons["Reverse"].waitForExistence(timeout: 3))
+        app.buttons["Reverse"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        scrollToAndTap(app.buttons["item-type-studio.add-field"], in: app)
+        let fieldTypes = app.descendants(matching: .any).matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                "item-type-studio.field.",
+                ".type"
+            )
+        )
+        XCTAssertGreaterThan(fieldTypes.count, 0)
+        let fieldType = fieldTypes.element(boundBy: fieldTypes.count - 1)
+        scrollToAndTap(fieldType, in: app)
+        XCTAssertTrue(app.buttons["Cloze"].waitForExistence(timeout: 3))
+        app.buttons["Cloze"].tap()
+
+        scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
+        XCTAssertTrue(app.buttons["Cloze"].waitForExistence(timeout: 3))
+        app.buttons["Cloze"].tap()
+        XCTAssertTrue(app.textFields["cardSetupEditor.name"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textFields["cardSetupEditor.name"].value as? String, "Cloze")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["item-type-studio.cancel"].tap()
+        XCTAssertTrue(app.buttons["Discard"].waitForExistence(timeout: 3))
+        app.buttons["Discard"].tap()
+        XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 5))
+
+        let legacy = app.staticTexts["Studio Legacy Fixture"]
+        XCTAssertTrue(legacy.waitForExistence(timeout: 10))
+        legacy.tap()
+        XCTAssertTrue(app.navigationBars["Studio Legacy Fixture"].waitForExistence(timeout: 5))
+
+        let legacySetup = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Legacy Additional")
+        ).firstMatch
+        scrollToAndTap(legacySetup, in: app)
+        let additional = app.buttons["Additional content"]
+        scrollToAndTap(additional, in: app)
+        XCTAssertTrue(app.staticTexts["Legacy Notes"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Move into named hole"].waitForExistence(timeout: 3))
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let removeNotes = app.buttons["Remove Legacy Notes"]
+        scrollToAndTap(removeNotes, in: app)
+        XCTAssertTrue(app.buttons["Remove Field"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "clears mappings")
+        ).firstMatch.exists)
+        app.buttons["Keep Field"].tap()
+
+        app.buttons["item-type-studio.cancel"].tap()
+        XCTAssertTrue(app.buttons["Discard"].waitForExistence(timeout: 3))
+        app.buttons["Discard"].tap()
+        XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 5))
+
+        let readOnly = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Read-only Fixture, read-only")
+        ).firstMatch
+        XCTAssertTrue(readOnly.waitForExistence(timeout: 10))
+        readOnly.tap()
+        XCTAssertTrue(app.staticTexts["Deck-provided · Read-only"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["item-type-studio.save"].exists)
+        app.buttons["Unlock for Editing…"].tap()
+        XCTAssertTrue(app.buttons["Unlock for Editing"].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["Duplicate as Item Type…"].exists)
+
+        // A stale included selection must not make a new draft read-only or
+        // leave an Unlock action capable of replacing it.
+        app.buttons["item-type-studio.cancel"].tap()
+        XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 5))
+        app.buttons["item-types.new"].tap()
+        XCTAssertTrue(app.buttons["item-type-studio.save"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Deck-provided · Read-only"].exists)
+        XCTAssertFalse(app.buttons["Unlock for Editing…"].exists)
+
+        // Even an untouched creation owns a new identity and prefilled setup,
+        // so Cancel must never discard it without explicit confirmation.
+        app.buttons["item-type-studio.cancel"].tap()
+        XCTAssertTrue(app.buttons["Discard"].waitForExistence(timeout: 3))
+        app.buttons["Discard"].tap()
+        XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 5))
+    }
+
+    func testItemTypeStudioValidationRoutesToInvalidCardSetupAndFocusesIt() throws {
+        let app = launchApp()
+        openItemTypeStudioCatalog(in: app)
+        app.buttons["item-types.new"].tap()
+        let typeName = app.textFields["item-type-studio.name"]
+        XCTAssertTrue(typeName.waitForExistence(timeout: 5))
+        typeName.tap()
+        typeName.typeText("Focus Route")
+
+        scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
+        XCTAssertTrue(app.buttons["Reverse"].waitForExistence(timeout: 3))
+        app.buttons["Reverse"].tap()
+        let setupName = app.textFields["cardSetupEditor.name"]
+        clearText(in: setupName)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        app.buttons["item-type-studio.save"].tap()
+        XCTAssertTrue(app.alerts["Finish This Item Type"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Card setup name is required."].exists)
+        app.alerts["Finish This Item Type"].buttons["OK"].tap()
+
+        let focusedSetupName = app.textFields["cardSetupEditor.name"]
+        XCTAssertTrue(focusedSetupName.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.keyboards.firstMatch.waitForExistence(timeout: 3),
+            "Validation routed to the Card setup but did not focus its invalid name"
+        )
+    }
+
+    @available(iOS 17.0, *)
+    func testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow() throws {
+        XCUIDevice.shared.orientation = .landscapeRight
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = launchApp(
+            additionalArguments: [
+                "-NeoAnkiUITestingAccessibility",
+            ],
+            environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"]
+        )
+        openItemTypeStudioCatalog(in: app)
+        XCTAssertGreaterThan(app.frame.width, 0)
+
+        let legacy = app.staticTexts["Studio Legacy Fixture"]
+        XCTAssertTrue(legacy.waitForExistence(timeout: 10))
+        legacy.tap()
+        let setup = firstCardSetupButton(in: app)
+        XCTAssertTrue(setup.waitForExistence(timeout: 5))
+        setup.tap()
+
+        let editor = app.descendants(matching: .any)["cardSetupEditor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(editor.frame.minX, app.frame.minX - 1)
+        XCTAssertLessThanOrEqual(editor.frame.maxX, app.frame.maxX + 1)
+        assertAccessibilityTraversalOrder(
+            [
+                (app.textFields["cardSetupEditor.name"], .textField),
+                (app.buttons["cardSetupEditor.answerMethod"], .button),
+            ],
+            in: editor
+        )
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+        for _ in 0..<5 {
+            editor.swipeUp()
+            assertNoHorizontalOverflow(in: editor, viewport: app)
+        }
+        try app.performAccessibilityAudit(
+            for: [.contrast, .hitRegion, .sufficientElementDescription]
+        )
     }
 
     @available(iOS 17.0, *)
