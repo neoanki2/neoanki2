@@ -236,7 +236,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 .identified("itemTypeStudioCardSetupEditor")
                 .waitUntilExists(timeout: 5)
         )
-        let basicEditorScroll = app.scrollViews.identified("cardSetupEditor")
+        let basicEditorScroll = app.descendants(matching: .any).identified("cardSetupEditor")
         let showAnswer = app.buttons.identified("cardSetupEditor.showAnswer")
         let editorWindow = app.windows.firstMatch
         XCTAssertTrue(basicEditorScroll.waitUntilExists(timeout: 3))
@@ -269,7 +269,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         XCTAssertTrue(advancedSettings.waitUntilExists(timeout: 5))
         advancedSettings.click()
         XCTAssertEqual(advancedSettings.value as? String, "Expanded")
-        let editorScroll = advancedApp.scrollViews.identified("cardSetupEditor")
+        let editorScroll = advancedApp.descendants(matching: .any).identified("cardSetupEditor")
         XCTAssertTrue(editorScroll.waitUntilExists(timeout: 3))
         let availability = advancedApp.descendants(matching: .any)
             .identified("cardSetupEditor.availability")
