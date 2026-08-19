@@ -228,6 +228,7 @@ struct ItemTypeStudioMobileView: View {
     @State private var isWorking = false
     @State private var errorTitle = "Could Not Save Item Type"
     @State private var errorMessage: String?
+    @State private var pendingValidationRecovery: ItemTypeStudioValidationTarget?
 
     var body: some View {
         Group {
@@ -335,6 +336,11 @@ struct ItemTypeStudioMobileView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "Please try again.")
+        }
+        .onChange(of: errorMessage) { _, message in
+            guard message == nil, let target = pendingValidationRecovery else { return }
+            pendingValidationRecovery = nil
+            recoverFocus(target)
         }
     }
 
@@ -508,10 +514,14 @@ struct ItemTypeStudioMobileView: View {
     }
 
     private var draftBinding: Binding<ItemTypeStudioDraft>? {
-        guard model.studioDraft != nil else { return nil }
+        guard let fallback = model.studioDraft else { return nil }
         return Binding(
-            get: { model.studioDraft! },
-            set: { model.studioDraft = $0 }
+            get: { model.studioDraft ?? fallback },
+            set: { draft in
+                if model.studioDraft != nil {
+                    model.studioDraft = draft
+                }
+            }
         )
     }
 
@@ -687,12 +697,18 @@ struct ItemTypeStudioMobileView: View {
     }
 
     private func recover(from issue: ItemTypeStudioValidationIssue) {
-        switch issue.target {
+        pendingValidationRecovery = issue.target
+        errorTitle = "Finish This Item Type"
+        errorMessage = issue.message
+    }
+
+    private func recoverFocus(_ target: ItemTypeStudioValidationTarget) {
+        switch target {
         case .itemTypeName:
-            validationFocus = issue.target
+            validationFocus = target
             textFocus = .name
         case let .field(id):
-            validationFocus = issue.target
+            validationFocus = target
             textFocus = .field(id)
         case let .cardSetup(id),
              let .component(cardSetupID: id, componentID: _),
@@ -700,10 +716,8 @@ struct ItemTypeStudioMobileView: View {
              let .answerMethod(cardSetupID: id),
              let .layout(cardSetupID: id),
              let .recipe(cardSetupID: id, purpose: _):
-            routeToSetup(id, focusing: issue.target)
+            routeToSetup(id, focusing: target)
         }
-        errorTitle = "Finish This Item Type"
-        errorMessage = issue.message
     }
 
     /// Navigation and focus are two distinct state transitions. Publishing the
@@ -711,8 +725,10 @@ struct ItemTypeStudioMobileView: View {
     /// observes it even when the invalid control lives in another Card setup.
     private func routeToSetup(_ id: UUID, focusing target: ItemTypeStudioValidationTarget) {
         validationFocus = nil
-        setupRoute = .init(id: id)
+        setupRoute = nil
         Task { @MainActor in
+            await Task.yield()
+            setupRoute = .init(id: id)
             await Task.yield()
             validationFocus = target
         }

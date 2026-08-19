@@ -30,7 +30,11 @@ final class NeoAnki2MobileUITests: XCTestCase {
         // A tab can retain its previous scroll position between launches in the
         // same test host. Return to the top before searching both directions so
         // the first Design destination materializes in compact landscape too.
-        for _ in 0..<8 { app.swipeDown() }
+        let collectionCount = app.collectionViews.count
+        if collectionCount > 0 {
+            let detailCollection = app.collectionViews.element(boundBy: collectionCount - 1)
+            for _ in 0..<8 { detailCollection.swipeDown(velocity: .slow) }
+        }
         let destination = app.buttons["Item Types & Card Setups"]
         scrollToAndTap(destination, in: app)
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
@@ -48,9 +52,23 @@ final class NeoAnki2MobileUITests: XCTestCase {
             if returnKey.exists { returnKey.tap() }
             _ = keyboard.waitForNonExistence(timeout: 2)
         }
-        for _ in 0..<8 where !element.exists || !element.isHittable { app.swipeUp() }
+        func isReachable() -> Bool {
+            guard element.exists, element.isHittable else { return false }
+            let frame = element.frame
+            let navigationBars = app.navigationBars.allElementsBoundByIndex
+            if navigationBars.contains(where: { $0.frame.contains(frame) }) {
+                return true
+            }
+            let contentTop = navigationBars.map(\.frame.maxY).max() ?? app.frame.minY
+            return frame.midY >= contentTop
+                && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+        }
+        let scrollingSurface = app.collectionViews.allElementsBoundByIndex.last ?? app
+        for _ in 0..<8 where !isReachable() {
+            scrollingSurface.swipeUp(velocity: .slow)
+        }
         XCTAssertTrue(element.waitForExistence(timeout: 2), file: file, line: line)
-        XCTAssertTrue(element.isHittable, "Element is not reachable: \(element)", file: file, line: line)
+        XCTAssertTrue(isReachable(), "Element is not reachable: \(element)", file: file, line: line)
         element.tap()
     }
 
@@ -323,9 +341,13 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
         let advanced = app.buttons["cardSetupEditor.advanced"]
         scrollToAndTap(advanced, in: app)
-        let availability = app.switches["Availability rule"]
+        let availability = app.switches["cardSetupEditor.availability"]
         scrollToAndTap(availability, in: app)
-        XCTAssertEqual(availability.value as? String, "1")
+        let enabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"),
+            object: availability
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 3), .completed)
         scrollToAndTap(app.buttons["Add another rule"], in: app)
         XCTAssertTrue(app.segmentedControls.buttons["All rules"].waitForExistence(timeout: 3))
         app.segmentedControls.buttons["Any rule"].tap()
@@ -505,8 +527,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(legacy.waitForExistence(timeout: 10))
         legacy.tap()
         let setup = firstCardSetupButton(in: app)
-        XCTAssertTrue(setup.waitForExistence(timeout: 5))
-        setup.tap()
+        scrollToAndTap(setup, in: app)
 
         let editor = app.descendants(matching: .any)["cardSetupEditor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))

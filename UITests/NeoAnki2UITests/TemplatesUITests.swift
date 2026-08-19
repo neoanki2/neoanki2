@@ -28,7 +28,7 @@ extension FastFunctionalJourneyTests {
 
             app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
             XCTAssertTrue(app.buttons.identified("discardItemTypeStudioSelection").waitUntilExists(timeout: 3))
-            app.buttons["Keep Editing"].click()
+            app.buttons.identified("keepEditingItemTypeStudioSelection").click()
             XCTAssertTrue(app.textFields.identified("itemTypeStudioName").exists)
         }
 

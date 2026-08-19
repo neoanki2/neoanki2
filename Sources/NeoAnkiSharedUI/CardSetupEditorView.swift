@@ -1345,6 +1345,7 @@ public struct CardSetupEditorView: View {
             Toggle("Availability rule", isOn: availabilityEnabledBinding(index))
                 .frame(minHeight: 44)
                 .focused($focusedTarget, equals: .availability(cardSetupID: cardSetupID))
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availability)
             Text("Generate this Card setup only when its content is available.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -1357,7 +1358,6 @@ public struct CardSetupEditorView: View {
                 validationMessages(for: .availability(cardSetupID: cardSetupID))
             }
         }
-        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availability)
     }
 
     private func learningRouteEditor(_ index: Int) -> some View {

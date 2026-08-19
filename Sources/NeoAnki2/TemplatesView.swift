@@ -86,6 +86,7 @@ struct TemplatesView: View {
             }
             .accessibilityIdentifier("discardItemTypeStudioSelection")
             Button("Keep Editing", role: .cancel) { pendingSelectionID = nil }
+                .accessibilityIdentifier("keepEditingItemTypeStudioSelection")
         } message: {
             Text("Fields and Card setup changes have not been saved.")
         }
