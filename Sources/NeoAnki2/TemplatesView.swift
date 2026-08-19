@@ -39,17 +39,30 @@ struct TemplatesView: View {
     }
 
     var body: some View {
-        HSplitView {
-            itemTypesNavigator
-                .frame(
-                    minWidth: DesignSystem.sidebarMin,
-                    idealWidth: DesignSystem.sidebarIdeal,
-                    maxWidth: DesignSystem.sidebarMax
+        GeometryReader { geometry in
+            let dividerWidth: CGFloat = 1
+            let navigatorWidth = min(
+                geometry.size.width,
+                min(
+                    DesignSystem.sidebarMax,
+                    max(DesignSystem.sidebarMin, geometry.size.width * 0.26)
                 )
-                .layoutPriority(1)
+            )
+            let detailWidth = max(0, geometry.size.width - navigatorWidth - dividerWidth)
 
-            detail
-                .frame(minWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 0) {
+                itemTypesNavigator
+                    .frame(width: navigatorWidth, height: geometry.size.height)
+                Divider()
+                    .frame(width: dividerWidth, height: geometry.size.height)
+                detail
+                    .frame(width: detailWidth, height: geometry.size.height)
+            }
+            // A nested AppKit split can publish a post-mount fitting width back
+            // to the host window. Keep both navigator and Studio inside the
+            // finite viewport proposed by the app window instead.
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { await model.load() }

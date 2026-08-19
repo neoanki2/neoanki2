@@ -16,8 +16,12 @@ private struct ImportNotice: Identifiable {
 
 enum ContentLayoutPolicy {
     static func usesLibrarySplitView(for route: AppRoute) -> Bool {
-        if case .study = route { return false }
-        return true
+        switch route {
+        case .study, .itemTypes:
+            return false
+        default:
+            return true
+        }
     }
 }
 
@@ -416,9 +420,9 @@ struct ContentView: View {
                 detail
             }
         } else {
-            // Study owns the full window. Keeping it outside the library split
-            // view prevents AppKit from reopening or reserving space for the
-            // sidebar while the learner is reviewing a card.
+            // Study and Item Types each own the full window. Keeping them
+            // outside the library split prevents AppKit from reopening or
+            // reserving space for a sidebar they do not use.
             detail
         }
     }
