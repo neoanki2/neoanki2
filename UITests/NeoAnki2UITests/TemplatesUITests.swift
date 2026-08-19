@@ -301,6 +301,7 @@ extension FastFunctionalJourneyTests {
                 .identified("itemTypeStudioCardSetupEditor")
                 .waitUntilExists(timeout: 5)
         )
+        assertItemTypeStudioFitsWindow(in: app)
         XCTAssertTrue(
             waitUntil(timeout: 5) { studioFieldRows(in: app).count == 2 },
             "A new Studio must expose its prefilled Front and Back fields"

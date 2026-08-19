@@ -856,6 +856,55 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.waitUntilGone(timeout: 10), "Item type editor did not close after saving")
     }
 
+    func assertItemTypeStudioFitsWindow(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let window = app.windows.firstMatch
+        let outline = app.descendants(matching: .any).identified("itemTypeStudioOutline")
+        let editor = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        let cancel = app.buttons.identified("cancelItemTypeStudio")
+        let save = app.buttons.identified("saveItemTypeStudio")
+
+        XCTAssertTrue(window.waitUntilExists(timeout: 5), file: file, line: line)
+        for element in [outline, editor, cancel, save] {
+            XCTAssertTrue(element.waitUntilExists(timeout: 5), file: file, line: line)
+        }
+
+        XCTAssertLessThanOrEqual(
+            outline.frame.maxX,
+            editor.frame.minX + 1,
+            "Studio columns must not overlap",
+            file: file,
+            line: line
+        )
+        for (name, element) in [
+            ("outline", outline),
+            ("Card setup editor", editor),
+            ("Cancel", cancel),
+            ("Save", save),
+        ] {
+            XCTAssertGreaterThanOrEqual(
+                element.frame.minX,
+                window.frame.minX - 1,
+                "Studio \(name) extends past the window's leading edge",
+                file: file,
+                line: line
+            )
+            XCTAssertLessThanOrEqual(
+                element.frame.maxX,
+                window.frame.maxX + 1,
+                "Studio \(name) extends past the window's trailing edge",
+                file: file,
+                line: line
+            )
+        }
+        XCTAssertTrue(cancel.isHittable, file: file, line: line)
+        XCTAssertTrue(save.isHittable, file: file, line: line)
+    }
+
     /// Asserting absence immediately races the animation that removes the
     /// element, so absence has to be waited for like anything else.
     func waitForDisappearance(of element: XCUIElement, timeout: TimeInterval = 5) -> Bool {

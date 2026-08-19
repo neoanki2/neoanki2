@@ -241,6 +241,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         XCTAssertTrue(basicEditorScroll.waitUntilExists(timeout: 3))
         XCTAssertTrue(showAnswer.waitUntilExists(timeout: 3))
         XCTAssertTrue(editorWindow.waitUntilExists(timeout: 3))
+        assertItemTypeStudioFitsWindow(in: app)
         for _ in 0..<4 where !editorWindow.frame.contains(showAnswer.frame) {
             basicEditorScroll.scroll(byDeltaX: 0, deltaY: -100)
         }
