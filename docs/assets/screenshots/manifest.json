@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-19T03:23:01Z",
+  "capturedAt" : "2026-08-19T04:25:55Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -92,7 +92,7 @@
       "filename" : "item-types.png",
       "height" : 680,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "ba4e09313aa8483109982ed32e1f6d757b7fa4791e7c2e2579cddd49939affbe",
+      "sha256" : "3e7a6fdde6277c5e4282abf759f57a458cfde93a19b21a65759d43211bc3052d",
       "width" : 1024
     },
     {
@@ -215,9 +215,9 @@
       "filename" : "template-editor.png",
       "height" : 696,
       "scenario" : "unified Item Type Studio with Fields, Card setups, and a fillable wireframe",
-      "sha256" : "83ae530644f21595b0f262f3ad7a25b250a5124b88418083132f53f19e9f95b6",
+      "sha256" : "453d8c2d8edeb44ab8adb8f2aa5428a504ce046b971a03964b05f8a50d359af1",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "5ab53e1f21cda03cfba7f3b52842ae73ed7fc9d9"
+  "sourceSHA" : "a549996eea920b3fb5232c1418a9c3ced55f99a0"
 }
