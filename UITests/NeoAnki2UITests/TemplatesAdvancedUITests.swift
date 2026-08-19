@@ -174,7 +174,7 @@ extension FastFunctionalJourneyTests {
 
     func checkTemplatesAdvancedUITestsTemplateAdvancedSettingsExpand() throws {
         let app = launchNewStudio(label: "studio-advanced")
-        let advanced = app.descendants(matching: .any).identified("cardSetupEditor.advanced")
+        let advanced = revealCardSetupAdvanced(in: app)
         advanced.click()
         XCTAssertEqual(advanced.value as? String, "Expanded")
         XCTAssertTrue(app.checkBoxes["Availability rule"].exists)

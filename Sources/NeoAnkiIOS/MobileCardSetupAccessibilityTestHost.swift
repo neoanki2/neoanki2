@@ -1,5 +1,7 @@
 #if os(iOS)
+import NeoAnkiApplication
 import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import SwiftUI
 
 /// A deterministic entry point for the isolated Card setup accessibility
@@ -18,12 +20,21 @@ public struct MobileCardSetupAccessibilityTestHost: View {
     public var body: some View {
         NavigationStack {
             Group {
-                if let studioModel {
-                    ItemTypeStudioMobileView(
-                        model: studioModel,
-                        reloadLibrary: { try await libraryModel.reload() },
-                        initialCardSetupID: MobileItemTypeStudioUITestSeeder.legacyCardSetupID
+                if let studioModel,
+                   let draft = studioModel.studioDraft {
+                    CardSetupEditorView(
+                        draft: Binding(
+                            get: { studioModel.studioDraft ?? draft },
+                            set: { updatedDraft in
+                                if studioModel.studioDraft != nil {
+                                    studioModel.studioDraft = updatedDraft
+                                }
+                            }
+                        ),
+                        cardSetupID: MobileItemTypeStudioUITestSeeder.legacyCardSetupID
                     )
+                    .navigationTitle("Card Setup Accessibility")
+                    .navigationBarTitleDisplayMode(.inline)
                 } else if let errorMessage {
                     ContentUnavailableView(
                         "Card Setup Fixture Unavailable",

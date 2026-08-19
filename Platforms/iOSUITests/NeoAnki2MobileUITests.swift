@@ -128,23 +128,31 @@ final class NeoAnki2MobileUITests: XCTestCase {
     }
 
     /// Use slower native gestures on compact surfaces so tall rows are not
-    /// skipped. Wider iPad surfaces use the system default gesture, which
-    /// settles reliably before the next accessibility snapshot.
+    /// skipped. Wider surfaces use a bounded drag and hold so iPad Forms do
+    /// not retain native swipe momentum while the next AX snapshot begins.
     private func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
-        let usesCompactGesture = surface.frame.width < 600
+        let usesCompactGesture = min(surface.frame.width, surface.frame.height) < 600
+        if !usesCompactGesture {
+            let upper = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.32))
+            let lower = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+            let (start, end) = switch direction {
+            case .towardBottom: (lower, upper)
+            case .towardTop: (upper, lower)
+            }
+            start.press(
+                forDuration: 0.05,
+                thenDragTo: end,
+                withVelocity: .slow,
+                thenHoldForDuration: 0.1
+            )
+            return
+        }
+
         switch direction {
         case .towardBottom:
-            if usesCompactGesture {
-                surface.swipeUp(velocity: .slow)
-            } else {
-                surface.swipeUp()
-            }
+            surface.swipeUp(velocity: .slow)
         case .towardTop:
-            if usesCompactGesture {
-                surface.swipeDown(velocity: .slow)
-            } else {
-                surface.swipeDown()
-            }
+            surface.swipeDown(velocity: .slow)
         }
     }
 
@@ -628,10 +636,37 @@ final class NeoAnki2MobileUITests: XCTestCase {
             in: editor
         )
         assertNoHorizontalOverflow(in: editor, viewport: app)
-        for _ in 0..<5 {
-            editor.swipeUp()
-            assertNoHorizontalOverflow(in: editor, viewport: app)
+
+        let showAnswer = app.buttons["cardSetupEditor.showAnswer"]
+        scrollTo(showAnswer, in: app)
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+
+        let additional = app.buttons["Additional content"]
+        scrollTo(additional, in: app)
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+        additional.tap()
+
+        let moveAdditional = app.buttons["Move into named hole"]
+        scrollTo(moveAdditional, in: app)
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+
+        let advanced = app.buttons["cardSetupEditor.advanced"]
+        scrollTo(advanced, in: app)
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+        advanced.tap()
+
+        let availability = app.switches["cardSetupEditor.availability"]
+        scrollTo(availability, in: app)
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+
+        let learningRoute = app.descendants(matching: .any)["cardSetupEditor.learningRoute"]
+        for _ in 0..<8 where !learningRoute.exists
+            || !learningRoute.frame.intersects(editor.frame) {
+            scrollOneStep(on: editor, direction: .towardBottom)
         }
+        XCTAssertTrue(learningRoute.waitForExistence(timeout: 3))
+        XCTAssertTrue(learningRoute.frame.intersects(editor.frame))
+        assertNoHorizontalOverflow(in: editor, viewport: app)
         for audit: XCUIAccessibilityAuditType in [
             .contrast,
             .hitRegion,

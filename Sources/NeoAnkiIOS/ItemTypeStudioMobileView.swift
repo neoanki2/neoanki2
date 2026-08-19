@@ -234,15 +234,10 @@ struct ItemTypeStudioMobileView: View {
 
     init(
         model: ItemTypesFeatureModel,
-        reloadLibrary: @escaping () async throws -> Void,
-        initialCardSetupID: UUID? = nil
+        reloadLibrary: @escaping () async throws -> Void
     ) {
         self.model = model
         self.reloadLibrary = reloadLibrary
-        _setupRoute = State(
-            initialValue: initialCardSetupID.map(ItemTypeStudioSetupRoute.init(cardSetupID:))
-        )
-        _selectedCardSetupID = State(initialValue: initialCardSetupID)
     }
 
     var body: some View {

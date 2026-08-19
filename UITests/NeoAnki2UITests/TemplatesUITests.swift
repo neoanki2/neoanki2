@@ -101,7 +101,7 @@ extension FastFunctionalJourneyTests {
             XCTAssertTrue(showAnswer.waitUntilExists(timeout: 3))
             showAnswer.click()
 
-            let advanced = app.descendants(matching: .any).identified("cardSetupEditor.advanced")
+            let advanced = revealCardSetupAdvanced(in: app)
             XCTAssertEqual(advanced.value as? String, "Collapsed")
             advanced.click()
             XCTAssertEqual(advanced.value as? String, "Expanded")
@@ -195,7 +195,7 @@ extension FastFunctionalJourneyTests {
     func checkTemplatesUITestsNewTemplateKeepsAdvancedSettingsCollapsedByDefault() throws {
         let app = launchNewStudio(label: "studio-advanced-collapsed")
         XCTAssertEqual(
-            app.descendants(matching: .any).identified("cardSetupEditor.advanced").value as? String,
+            revealCardSetupAdvanced(in: app).value as? String,
             "Collapsed"
         )
     }

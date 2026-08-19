@@ -856,6 +856,19 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.waitUntilGone(timeout: 10), "Item type editor did not close after saving")
     }
 
+    func revealCardSetupAdvanced(in app: XCUIApplication) -> XCUIElement {
+        let editor = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        let advanced = app.descendants(matching: .any)
+            .identified("cardSetupEditor.advanced")
+        XCTAssertTrue(editor.waitUntilExists(timeout: 3))
+        for _ in 0..<8 where !advanced.exists {
+            editor.scroll(byDeltaX: 0, deltaY: -250)
+        }
+        XCTAssertTrue(advanced.waitUntilExists(timeout: 3))
+        return advanced
+    }
+
     func assertItemTypeStudioFitsWindow(
         in app: XCUIApplication,
         file: StaticString = #filePath,
