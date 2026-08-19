@@ -255,6 +255,11 @@ struct ItemTypeStudioMobileView: View {
                     cardSetupID: route.id,
                     validationFocus: $validationFocus
                 )
+                .onDisappear {
+                    if setupRoute?.id == route.id {
+                        setupRoute = nil
+                    }
+                }
             } else {
                 ContentUnavailableView("Card Setup Unavailable", systemImage: "rectangle.slash")
             }
@@ -725,11 +730,10 @@ struct ItemTypeStudioMobileView: View {
     /// observes it even when the invalid control lives in another Card setup.
     private func routeToSetup(_ id: UUID, focusing target: ItemTypeStudioValidationTarget) {
         validationFocus = nil
-        setupRoute = nil
+        setupRoute = .init(id: id)
         Task { @MainActor in
             await Task.yield()
-            setupRoute = .init(id: id)
-            await Task.yield()
+            guard setupRoute?.id == id else { return }
             validationFocus = target
         }
     }

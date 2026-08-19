@@ -27,20 +27,22 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
     private func openItemTypeStudioCatalog(in app: XCUIApplication) {
         open("Create", in: app)
-        // A tab can retain its previous scroll position between launches in the
-        // same test host. Return to the top before searching both directions so
-        // the first Design destination materializes in compact landscape too.
-        let collectionCount = app.collectionViews.count
-        if collectionCount > 0 {
-            let detailCollection = app.collectionViews.element(boundBy: collectionCount - 1)
-            for _ in 0..<8 { detailCollection.swipeDown(velocity: .slow) }
-        }
         let destination = app.buttons["Item Types & Card Setups"]
         scrollToAndTap(destination, in: app)
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
     }
 
     private func scrollToAndTap(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        scrollTo(element, in: app, file: file, line: line)
+        element.tap()
+    }
+
+    private func scrollTo(
         _ element: XCUIElement,
         in app: XCUIApplication,
         file: StaticString = #filePath,
@@ -60,16 +62,87 @@ final class NeoAnki2MobileUITests: XCTestCase {
                 return true
             }
             let contentTop = navigationBars.map(\.frame.maxY).max() ?? app.frame.minY
+            let contentBottom = app.tabBars.allElementsBoundByIndex
+                .map(\.frame.minY)
+                .min() ?? app.frame.maxY
             return frame.midY >= contentTop
+                && frame.midY <= contentBottom
                 && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
         }
-        let scrollingSurface = app.collectionViews.allElementsBoundByIndex.last ?? app
-        for _ in 0..<8 where !isReachable() {
-            scrollingSurface.swipeUp(velocity: .slow)
+        let scrollingSurface = scrollingSurface(for: element, in: app)
+        let navigationBottom = app.navigationBars.allElementsBoundByIndex
+            .map(\.frame.maxY)
+            .max() ?? app.frame.minY
+        let directions: [MobileScrollDirection] = if element.exists
+            && element.frame.midY < navigationBottom {
+            [.towardTop, .towardBottom]
+        } else {
+            [.towardBottom, .towardTop]
+        }
+        for direction in directions {
+            for _ in 0..<14 where !isReachable() {
+                scrollOneStep(on: scrollingSurface, direction: direction)
+            }
         }
         XCTAssertTrue(element.waitForExistence(timeout: 2), file: file, line: line)
         XCTAssertTrue(isReachable(), "Element is not reachable: \(element)", file: file, line: line)
-        element.tap()
+    }
+
+    private enum MobileScrollDirection {
+        case towardTop
+        case towardBottom
+    }
+
+    private func scrollingSurface(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+        let candidates = (
+            app.scrollViews.allElementsBoundByIndex
+                + app.collectionViews.allElementsBoundByIndex
+        ).filter { candidate in
+            candidate.label != "Sidebar"
+                && !candidate.frame.isEmpty
+                && candidate.frame.intersects(app.frame)
+        }
+        guard !candidates.isEmpty else { return app }
+
+        if element.exists {
+            let targetX = element.frame.midX
+            let horizontallyContaining = candidates.filter {
+                $0.frame.minX <= targetX && targetX <= $0.frame.maxX
+            }
+            if let mostSpecific = horizontallyContaining.min(by: {
+                $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height
+            }) {
+                return mostSpecific
+            }
+        }
+
+        // Before a lazy Form row exists there is no target x-position to use.
+        // Prefer the rightmost surface so iPad's navigation sidebar cannot win
+        // merely because it is tall or has no accessibility label.
+        return candidates.max(by: { lhs, rhs in
+            if lhs.frame.maxX != rhs.frame.maxX {
+                return lhs.frame.maxX < rhs.frame.maxX
+            }
+            return lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+        }) ?? app
+    }
+
+    /// Move by less than a page so compact landscape rows cannot be skipped
+    /// between two accessibility snapshots. Trying both directions also makes
+    /// the helper resilient to Form scroll positions retained after a pushed
+    /// editor is dismissed.
+    private func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
+        let offsets: (start: CGFloat, end: CGFloat) = switch direction {
+        case .towardBottom: (0.72, 0.42)
+        case .towardTop: (0.42, 0.72)
+        }
+        surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.start))
+            .press(
+                forDuration: 0.05,
+                thenDragTo: surface.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: offsets.end)
+                )
+            )
     }
 
     private func firstCardSetupButton(in app: XCUIApplication) -> XCUIElement {
@@ -254,8 +327,11 @@ final class NeoAnki2MobileUITests: XCTestCase {
         save.tap()
 
         open("Library", in: app)
-        XCTAssertTrue(app.staticTexts["Capital of France?"].waitForExistence(timeout: 5))
-        app.staticTexts["Capital of France?"].tap()
+        let itemLink = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Capital of France?")
+        ).firstMatch
+        XCTAssertTrue(itemLink.waitForExistence(timeout: 5))
+        itemLink.tap()
         XCTAssertTrue(app.staticTexts["Paris"].waitForExistence(timeout: 5))
 
         open("Home", in: app)
@@ -342,7 +418,8 @@ final class NeoAnki2MobileUITests: XCTestCase {
         let advanced = app.buttons["cardSetupEditor.advanced"]
         scrollToAndTap(advanced, in: app)
         let availability = app.switches["cardSetupEditor.availability"]
-        scrollToAndTap(availability, in: app)
+        scrollTo(availability, in: app)
+        availability.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         let enabled = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", "1"),
             object: availability
@@ -441,11 +518,21 @@ final class NeoAnki2MobileUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let removeNotes = app.buttons["Remove Legacy Notes"]
         scrollToAndTap(removeNotes, in: app)
-        XCTAssertTrue(app.buttons["Remove Field"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts.matching(
+        let fieldRemoval = app.sheets["Remove this field?"]
+        XCTAssertTrue(fieldRemoval.waitForExistence(timeout: 3))
+        XCTAssertTrue(fieldRemoval.buttons["Remove Field"].exists)
+        XCTAssertTrue(fieldRemoval.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@", "clears mappings")
         ).firstMatch.exists)
-        app.buttons["Keep Field"].tap()
+        let keepField = fieldRemoval.buttons["Keep Field"]
+        if keepField.exists {
+            keepField.tap()
+        } else {
+            let dismissRegion = app.otherElements["PopoverDismissRegion"]
+            XCTAssertTrue(dismissRegion.waitForExistence(timeout: 3))
+            dismissRegion.tap()
+        }
+        XCTAssertTrue(fieldRemoval.waitForNonExistence(timeout: 3))
 
         app.buttons["item-type-studio.cancel"].tap()
         XCTAssertTrue(app.buttons["Discard"].waitForExistence(timeout: 3))

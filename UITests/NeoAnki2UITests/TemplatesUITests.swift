@@ -47,11 +47,22 @@ extension FastFunctionalJourneyTests {
         runJourneyActivity("ItemTypeStudio.audioConversionAndRestore") {
             chooseAnswerMethod("Audio Submission", in: app)
             XCTAssertTrue(app.buttons["Remove Answer and Continue"].waitUntilExists(timeout: 3))
-            XCTAssertTrue(app.staticTexts["Responses remain private on this device."].exists)
-            app.buttons["Cancel"].click()
+            XCTAssertTrue(
+                app.staticTexts[
+                    "Audio Submission keeps no expected answer. It will be restored if you switch back before saving."
+                ].waitUntilExists(timeout: 3)
+            )
+            guard let confirmation = modalContainer(in: app) else {
+                XCTFail("Expected the Audio Submission confirmation dialog")
+                return
+            }
+            confirmation.buttons["Cancel"].click()
             chooseAnswerMethod("Audio Submission", in: app)
             app.buttons["Remove Answer and Continue"].click()
             XCTAssertTrue(app.staticTexts["Spoken response"].waitUntilExists(timeout: 3))
+            XCTAssertTrue(
+                app.staticTexts["Responses remain private on this device."].waitUntilExists(timeout: 3)
+            )
             chooseAnswerMethod("Reveal", in: app)
             XCTAssertTrue(app.buttons["Back"].waitUntilExists(timeout: 3))
         }

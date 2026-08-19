@@ -1343,7 +1343,7 @@ public struct CardSetupEditorView: View {
     private func availabilityEditor(_ index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle("Availability rule", isOn: availabilityEnabledBinding(index))
-                .frame(minHeight: 44)
+                .neoAnkiTouchTarget()
                 .focused($focusedTarget, equals: .availability(cardSetupID: cardSetupID))
                 .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availability)
             Text("Generate this Card setup only when its content is available.")
