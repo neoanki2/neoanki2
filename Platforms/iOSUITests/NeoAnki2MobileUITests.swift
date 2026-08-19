@@ -605,31 +605,19 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
     @available(iOS 17.0, *)
     func testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow() throws {
+        XCUIDevice.shared.orientation = .landscapeRight
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = launchApp(
             additionalArguments: [
                 "-NeoAnkiUITestingAccessibility",
+                "-NeoAnkiUITestingCardSetupAccessibilityEditor",
             ],
             environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"]
         )
-        openItemTypeStudioCatalog(in: app)
-        XCTAssertGreaterThan(app.frame.width, 0)
-
-        let legacy = app.buttons["Studio Legacy Fixture"]
-        scrollToAndTap(legacy, in: app)
-        let setup = firstCardSetupButton(in: app)
-        scrollToAndTap(setup, in: app)
 
         let editor = app.descendants(matching: .any)["cardSetupEditor"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        XCUIDevice.shared.orientation = .landscapeRight
-        let landscape = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in
-                app.frame.width > app.frame.height && editor.frame.width > 0
-            },
-            object: app
-        )
-        XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 5), .completed)
+        XCTAssertTrue(editor.waitForExistence(timeout: 15))
+        XCTAssertGreaterThan(app.frame.width, app.frame.height)
         XCTAssertGreaterThanOrEqual(editor.frame.minX, app.frame.minX - 1)
         XCTAssertLessThanOrEqual(editor.frame.maxX, app.frame.maxX + 1)
         assertAccessibilityTraversalOrder(

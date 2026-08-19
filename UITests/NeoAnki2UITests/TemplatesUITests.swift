@@ -84,7 +84,8 @@ extension FastFunctionalJourneyTests {
         }
 
         runJourneyActivity("ItemTypeStudio.layoutsPreviewAndAdvanced") {
-            let editorScroll = app.descendants(matching: .any).identified("cardSetupEditor")
+            let editorScroll = app.descendants(matching: .any)
+                .identified("itemTypeStudioCardSetupEditor")
             for layout in ["focus", "split", "mediaAside", "mediaHero", "actionStage"] {
                 let choice = app.buttons.identified("cardSetupEditor.layout.\(layout)")
                 if !choice.exists {
@@ -391,7 +392,7 @@ extension FastFunctionalJourneyTests {
         let button = app.buttons["Add \(hole) content"]
         XCTAssertTrue(button.waitUntilExists(timeout: 3))
         if !button.isHittable {
-            app.descendants(matching: .any).identified("cardSetupEditor")
+            app.descendants(matching: .any).identified("itemTypeStudioCardSetupEditor")
                 .scroll(byDeltaX: 0, deltaY: -500)
         }
         button.click()

@@ -232,6 +232,19 @@ struct ItemTypeStudioMobileView: View {
     @State private var errorMessage: String?
     @State private var pendingValidationRecovery: ItemTypeStudioValidationTarget?
 
+    init(
+        model: ItemTypesFeatureModel,
+        reloadLibrary: @escaping () async throws -> Void,
+        initialCardSetupID: UUID? = nil
+    ) {
+        self.model = model
+        self.reloadLibrary = reloadLibrary
+        _setupRoute = State(
+            initialValue: initialCardSetupID.map(ItemTypeStudioSetupRoute.init(cardSetupID:))
+        )
+        _selectedCardSetupID = State(initialValue: initialCardSetupID)
+    }
+
     var body: some View {
         Group {
             if model.studioDraft != nil {

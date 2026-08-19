@@ -7,8 +7,11 @@ import NeoAnkiCore
 /// launch argument is required so normal app launches can never seed content.
 enum MobileItemTypeStudioUITestSeeder {
     private static let scenario = "item-type-studio"
-    private static let legacyItemTypeID = UUID(
+    static let legacyItemTypeID = UUID(
         uuidString: "B3000001-0000-4000-8000-000000000001"
+    )!
+    static let legacyCardSetupID = UUID(
+        uuidString: "B3000001-0010-4000-8000-000000000001"
     )!
 
     static func seedIfRequested(library: any LibraryRepository) async throws {
@@ -55,7 +58,7 @@ enum MobileItemTypeStudioUITestSeeder {
             type: .text
         )
         let legacy = Template(
-            id: UUID(uuidString: "B3000001-0010-4000-8000-000000000001")!,
+            id: legacyCardSetupID,
             name: "Legacy Additional",
             layout: .focus,
             components: [
