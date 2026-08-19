@@ -301,8 +301,14 @@ extension FastFunctionalJourneyTests {
                 .identified("itemTypeStudioCardSetupEditor")
                 .waitUntilExists(timeout: 5)
         )
-        XCTAssertEqual(studioFieldRows(in: app).count, 2)
-        XCTAssertEqual(studioCardSetupRows(in: app).count, 1)
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { studioFieldRows(in: app).count == 2 },
+            "A new Studio must expose its prefilled Front and Back fields"
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { studioCardSetupRows(in: app).count == 1 },
+            "A new Studio must expose its prefilled Basic Card setup"
+        )
     }
 
     func studioFieldRows(in app: XCUIApplication) -> XCUIElementQuery {
