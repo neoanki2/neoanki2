@@ -134,7 +134,7 @@ public struct ReviewSchedulePreview: Sendable, Equatable {
         presetID = nil
         parameterSetID = nil
         modelVersion = "unavailable"
-        timingPolicyVersion = "neo-elapsed-24h-v1"
+        timingPolicyVersion = FSRSScheduler.elapsedPolicyIdentifier
         intervalPolicyVersion = "continuous-due-v1"
         finalDueAt = memory.due
         constraintReason = rating == .again ? "immediate-repair-v1" : nil

@@ -111,7 +111,7 @@
     {
       "article": "user/scheduling.md",
       "contains": [
-        "at least **400 usable interday review outcomes**",
+        "at least **400 usable elapsed-review outcomes**",
         "**90%**",
         "**36,500 days**",
         "default is **4:00 AM**",

@@ -89,7 +89,7 @@ struct ReferenceModelTests {
         let histories = (0..<12).flatMap { card in
             DatasetBuilder.examples(cardID: "\(card)", history: [
                 Review(rating: .good, deltaT: 0),
-                Review(rating: card.isMultiple(of: 4) ? .again : .good, deltaT: UInt32(card % 3 + 1)),
+                Review(rating: card.isMultiple(of: 4) ? .again : .good, deltaT: Float(card % 3 + 1)),
             ])
         }
         let evaluation = try FSRS().evaluate(histories)

@@ -5,7 +5,7 @@ public enum StabilityInitializer {
         from examples: [TrainingExample],
         averageRecall: Float
     ) throws -> [Float] {
-        var grouped: [Rating: [UInt32: Aggregate]] = [:]
+        var grouped: [Rating: [Float: Aggregate]] = [:]
         for example in examples where example.item.longTermReviewCount == 1 {
             guard let first = example.item.reviews.first?.rating,
                   let target = example.item.reviews.first(where: { $0.deltaT > 0 })
@@ -89,7 +89,7 @@ public enum StabilityInitializer {
 
     private static func loss(
         _ stability: Double,
-        values: [UInt32: Aggregate],
+        values: [Float: Aggregate],
         averageRecall: Float,
         defaultS: Float
     ) -> Double {

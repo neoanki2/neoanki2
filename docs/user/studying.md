@@ -187,7 +187,10 @@ After eight lapses, the scope home can surface the card's item for attention.
 Marking that item OK does not grade the card or change this history; it only
 hides the warning until the card records another lapse.
 After recall, FSRS keeps fractional-day precision and may choose an intraday
-review when the memory state calls for it. Longer review intervals depend on
+review when the memory state calls for it. Elapsed time comes from the exact
+review timestamps, so multiple reviews on the same calendar day still use
+their real fractional-day gaps instead of being rounded down to zero days.
+Longer review intervals depend on
 the card’s history, elapsed time, scheduler parameters, desired retention, and
 configured maximum interval. Interval fuzz is disabled.
 

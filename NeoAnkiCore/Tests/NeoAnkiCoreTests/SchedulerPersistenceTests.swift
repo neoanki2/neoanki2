@@ -228,6 +228,55 @@ private func seedEligibleOptimizationHistory(
     #expect(log.schedulingAudit?.parameterSetID == candidate.id)
 }
 
+@Test func elapsedPolicyChangeLazilyReplaysLegacyHistoryBeforeNextGrade() async throws {
+    let store = try await schedulerPersistenceStore()
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    var card = try await createSchedulerPersistenceCard(in: store, now: start)
+    let scheduler = LearningScheduler()
+    let first = scheduler.schedule(.new(due: start), rating: .good, now: start)
+    let secondAt = start.addingTimeInterval(21.5 * 3_600)
+
+    var zeroElapsedInput = first
+    zeroElapsedInput.lastReview = secondAt
+    let legacyMemory = scheduler.schedule(zeroElapsedInput, rating: .good, now: secondAt)
+    let continuousMemory = scheduler.schedule(first, rating: .good, now: secondAt)
+    #expect(legacyMemory.stability != continuousMemory.stability)
+
+    card.memory = legacyMemory
+    card.memoryModelVersion = SchedulerPersistenceConstants.memoryModelVersion
+    card.memoryParameterSetID = SchedulerPersistenceConstants.populationDefaultParameterSetID
+    try await store.applySynchronizedCard(card)
+    try await store.applySynchronizedReview(ReviewLog(
+        cardID: card.id,
+        reviewedAt: start,
+        rating: .good,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        phaseBefore: .new,
+        durationMs: 500
+    ))
+    try await store.applySynchronizedReview(ReviewLog(
+        cardID: card.id,
+        reviewedAt: secondAt,
+        rating: .good,
+        elapsedDays: 21.5 / 24,
+        scheduledDays: 21.5 / 24,
+        phaseBefore: .review,
+        durationMs: 500
+    ))
+
+    let thirdAt = secondAt.addingTimeInterval(86_400)
+    let expected = scheduler.schedule(continuousMemory, rating: .good, now: thirdAt)
+    let actual = try await store.submitReview(
+        cardID: card.id,
+        rating: .good,
+        now: thirdAt
+    )
+
+    #expect(actual == expected)
+    #expect((try await store.card(id: card.id)).memory == expected)
+}
+
 @Test func migrationResetPreservesEvidenceAndRollbackRestoresHistoryOrigin() async throws {
     let store = try await schedulerPersistenceStore()
     let start = Date(timeIntervalSince1970: 1_700_000_000)
