@@ -266,20 +266,27 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
         openItemTypeStudio(named: "Basic", in: advancedApp)
-        let advancedSettings = advancedApp.descendants(matching: .any)
-            .identified("cardSetupEditor.advanced")
-        XCTAssertTrue(advancedSettings.waitUntilExists(timeout: 5))
-        advancedSettings.click()
-        XCTAssertEqual(advancedSettings.value as? String, "Expanded")
         let editorScroll = advancedApp.descendants(matching: .any)
             .identified("itemTypeStudioCardSetupEditor")
+        let advancedWindow = advancedApp.windows.firstMatch
         XCTAssertTrue(editorScroll.waitUntilExists(timeout: 3))
+        XCTAssertTrue(advancedWindow.waitUntilExists(timeout: 3))
+        let advancedSettings = advancedApp.descendants(matching: .any)
+            .identified("cardSetupEditor.advanced")
+        for _ in 0..<8 where !advancedSettings.exists
+            || !advancedWindow.frame.contains(advancedSettings.frame) {
+            editorScroll.scroll(byDeltaX: 0, deltaY: -250)
+        }
+        XCTAssertTrue(
+            advancedSettings.waitUntilExists(timeout: 3)
+                && advancedWindow.frame.contains(advancedSettings.frame)
+        )
+        advancedSettings.click()
+        XCTAssertEqual(advancedSettings.value as? String, "Expanded")
         let availability = advancedApp.descendants(matching: .any)
             .identified("cardSetupEditor.availability")
         let learningRoute = advancedApp.descendants(matching: .any)
             .identified("cardSetupEditor.learningRoute")
-        let advancedWindow = advancedApp.windows.firstMatch
-        XCTAssertTrue(advancedWindow.waitUntilExists(timeout: 3))
         for _ in 0..<6 where !availability.exists
             || !learningRoute.exists
             || !availability.frame.intersects(advancedWindow.frame)
