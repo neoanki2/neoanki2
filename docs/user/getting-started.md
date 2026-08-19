@@ -15,6 +15,10 @@ release and simplifies updates. The same official Mac build is also available as
 build the current source checkout for macOS or iOS. There is not yet a public
 App Store or TestFlight download; see the [iPhone and iPad guide](../iphone-ipad/).
 
+The current package supports macOS 14 or newer and iOS 17 or newer, using Swift
+tools 6.0. These deployment targets are shared by release and source builds;
+platform installation and distribution still follow the separate paths below.
+
 ## Install the official Mac release
 
 On macOS 14 or newer with Homebrew installed, run:
