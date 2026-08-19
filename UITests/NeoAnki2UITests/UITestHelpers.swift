@@ -873,6 +873,24 @@ class NeoAnkiUITestCase: XCTestCase {
             XCTAssertTrue(element.waitUntilExists(timeout: 5), file: file, line: line)
         }
 
+        var previousFrames: [CGRect]?
+        var stableSamples = 0
+        XCTAssertTrue(
+            waitUntil(timeout: 3) {
+                let frames = [window, outline, editor, cancel, save].map(\.frame)
+                if frames == previousFrames {
+                    stableSamples += 1
+                } else {
+                    previousFrames = frames
+                    stableSamples = 0
+                }
+                return stableSamples >= 5
+            },
+            "Studio layout did not settle",
+            file: file,
+            line: line
+        )
+
         XCTAssertLessThanOrEqual(
             outline.frame.maxX,
             editor.frame.minX + 1,
