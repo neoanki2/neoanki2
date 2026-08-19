@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-19T05:16:45Z",
+  "capturedAt" : "2026-08-19T05:51:30Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 680,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "838637ba490e34beaa827db0d1f4b4fc2f496f73eea7381764ed2fe794ac22df",
+      "sha256" : "538b4c32b40d548b2929c8d4f54304724cde717087aa8d47001aaf92542977ab",
       "width" : 1024
     },
     {
@@ -92,7 +92,7 @@
       "filename" : "item-types.png",
       "height" : 680,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "3e7a6fdde6277c5e4282abf759f57a458cfde93a19b21a65759d43211bc3052d",
+      "sha256" : "ba4e09313aa8483109982ed32e1f6d757b7fa4791e7c2e2579cddd49939affbe",
       "width" : 1024
     },
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 680,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "f6c02f86985578753f6feeadf075331cfc5a00d0dba946374389445acaeb889f",
+      "sha256" : "5a712f295ee464bcb7e413ea1db4f9ed84a8050ddf850224b8b8c240938ee84f",
       "width" : 1024
     },
     {
@@ -202,7 +202,7 @@
       "filename" : "template-advanced.png",
       "height" : 680,
       "scenario" : "Item Type Studio Advanced Availability and Learning route controls",
-      "sha256" : "4c10572976058666fc0776daaeb5440732f00f3d9fcaa6efeb8dc1f0114df70f",
+      "sha256" : "30735ecacb589cce2e07691f08a7e96a91dfbf15a8cf499ccf6166c2e6821d09",
       "width" : 1024
     },
     {
@@ -215,9 +215,9 @@
       "filename" : "template-editor.png",
       "height" : 680,
       "scenario" : "unified Item Type Studio with Fields, Card setups, and a fillable wireframe",
-      "sha256" : "e24bee618d25ce621b908fbbb87629e406d9db4f6c77dd2044669eef667e5621",
+      "sha256" : "8863655c90ce81095a6fed96fc3379d729ac3a10621f7b3de239b2f4ab64c5e9",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "fad6a1bc6eef9c76e0df570f2a02940d2f634a53"
+  "sourceSHA" : "de54849803dea145227d826b7dfb2b34138f9ac4"
 }
