@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-19T04:25:55Z",
+  "capturedAt" : "2026-08-19T05:16:45Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -9,9 +9,9 @@
         "deckRow-French"
       ],
       "filename" : "decks-nested.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "library sidebar with nested Languages and French decks",
-      "sha256" : "eefb7da36a3207e3aae1ca1f4295ded4a64da835cfe4ee86b67e617a443ec3fb",
+      "sha256" : "31b8a66c8c186e661c57a3b7380db2d0acdd7cab3c2d3be9b9129bf05173a919",
       "width" : 1024
     },
     {
@@ -19,9 +19,9 @@
         "bootstrapError"
       ],
       "filename" : "error-startup.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "database bootstrap failure",
-      "sha256" : "a23c5a192e088ec5e46996ac9684f26414895dd2acf38bf9d9bc25baa29b6955",
+      "sha256" : "b609270ef0320f805551415dbf07766b07b4d463a93ae25a1130c38a27f1609d",
       "width" : 1024
     },
     {
@@ -43,9 +43,9 @@
         "field-Next Line"
       ],
       "filename" : "item-add.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "new item editor using the deck's recommended included type",
-      "sha256" : "d24f5cbcbefd0ed762b3bd9e3518beccf20bc3ab6132ae5e5665886e83456859",
+      "sha256" : "07f74d7df1071d3e3f280fd22af0becc724661e54a9f716976f2edc46bcc767b",
       "width" : 1024
     },
     {
@@ -54,9 +54,9 @@
         "editItem"
       ],
       "filename" : "item-detail.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "basic item detail",
-      "sha256" : "3ba6ed89719e383928b399747702ce4df19e77c6dd95bcd550feaa42b7dcf5f7",
+      "sha256" : "31332dcd7d53339217a427114b0009f85a846890591140f17b4e64140e83ff0f",
       "width" : 1024
     },
     {
@@ -65,9 +65,9 @@
         "field-Image"
       ],
       "filename" : "item-media.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "e338d61ea1b3c074970751c761ee1f2e8aa653112f4ebe4cad07b66fa6a0ac0e",
+      "sha256" : "838637ba490e34beaa827db0d1f4b4fc2f496f73eea7381764ed2fe794ac22df",
       "width" : 1024
     },
     {
@@ -77,9 +77,9 @@
         "saveAddItem"
       ],
       "filename" : "item-rich-text.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "basic item editor with visibly bold front text",
-      "sha256" : "a48cb0d0eabeb337e71dc9b6c8e6c025d1b6d63769176da18573951ae12f9fe9",
+      "sha256" : "e0962e2cb10d50087a1644405f5fe07c131ce02216e1fd50af442551bc31b60c",
       "width" : 1024
     },
     {
@@ -100,9 +100,9 @@
         "emptyLibraryState"
       ],
       "filename" : "library-empty.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "empty library",
-      "sha256" : "dc694cf96108b74c2d22f298498679c37776bb928c4390da2e4dd13e9e5cd00f",
+      "sha256" : "43a6198846d0bb2179c7c0a2d677c29c6a2016ed08b95daa9240626fdd41fbee",
       "width" : 1024
     },
     {
@@ -112,9 +112,9 @@
         "addItemToolbar"
       ],
       "filename" : "library-populated.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "browse mode listing one basic item",
-      "sha256" : "826981adf42944a150a99b151e4f69bcbcc8227f36d0e6d717003a8c5437bd99",
+      "sha256" : "81148f819649f8e49bbd39fa12a3336b9745f5b38494a9d4fb7d8bbc8210747a",
       "width" : 1024
     },
     {
@@ -134,9 +134,9 @@
         "scopeHomeDueHeadline"
       ],
       "filename" : "scheduling-result.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "725276cade5d974cfac78cf1547dce426009dabb085e273d662cf91e99da9f98",
+      "sha256" : "527e6f897cbc2d71fa8a02736180b36e7d12774af7645747a5324614b999b44a",
       "width" : 1024
     },
     {
@@ -145,9 +145,9 @@
         "gradeAgain"
       ],
       "filename" : "study-answer.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "d419562331a3077610525a243ca4cfcaa9dd6174e67061f2cfeb50b763f2bc79",
+      "sha256" : "73766a436a8a8710e1bec9cbb3f99156e62a05508cc4b2e3caf61f9ebb449d93",
       "width" : 1024
     },
     {
@@ -155,9 +155,9 @@
         "studySessionDone"
       ],
       "filename" : "study-complete.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "completed study session",
-      "sha256" : "991bb7f41f4658c80e418502e3c927312bf04f207905fa9ce412a1234362fd6d",
+      "sha256" : "bdd35c27c56a88a226dcf1f85246a241e98c5f9e9d44a1351846935422126bb3",
       "width" : 1024
     },
     {
@@ -166,9 +166,9 @@
         "primaryStudyAction"
       ],
       "filename" : "study-grade-help.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "f93acc24e50988b509fc12ee7736568a6fb4b827a500bfc790853d67ac2d816f",
+      "sha256" : "3a560069e1679da1b0cb97f87abe7883b01a8f844f5596038e8e2768d7062210",
       "width" : 1024
     },
     {
@@ -177,9 +177,9 @@
         "gradeHelp"
       ],
       "filename" : "study-prompt.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "9fe80a4f3d40001f29c492abdb6d91f5fd0e0ab20180467f7583a5f166286a90",
+      "sha256" : "136cd9bad0391fe531819ba04cf912007a199e9ac4f2f2152fc57fb4b8aea7f5",
       "width" : 1024
     },
     {
@@ -187,9 +187,9 @@
         "gradeGood"
       ],
       "filename" : "study-type.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "typed-answer study result",
-      "sha256" : "b994581dcaeaea629ed347a268005dac43d31c1e9903dcf2981dcfd490e5b08d",
+      "sha256" : "9a3462d4dd56aec313d453cc11ce05870bf62112943a5c4d4046f23b9645b24b",
       "width" : 1024
     },
     {
@@ -200,9 +200,9 @@
         "cardSetupEditor.learningRoute"
       ],
       "filename" : "template-advanced.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "Item Type Studio Advanced Availability and Learning route controls",
-      "sha256" : "c115cc0ab27159c2002552e3c43fef038632b3f9e413cbf2c3e554d2dd84f366",
+      "sha256" : "4c10572976058666fc0776daaeb5440732f00f3d9fcaa6efeb8dc1f0114df70f",
       "width" : 1024
     },
     {
@@ -213,11 +213,11 @@
         "cardSetupEditor.showAnswer"
       ],
       "filename" : "template-editor.png",
-      "height" : 696,
+      "height" : 680,
       "scenario" : "unified Item Type Studio with Fields, Card setups, and a fillable wireframe",
-      "sha256" : "453d8c2d8edeb44ab8adb8f2aa5428a504ce046b971a03964b05f8a50d359af1",
+      "sha256" : "e24bee618d25ce621b908fbbb87629e406d9db4f6c77dd2044669eef667e5621",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "a549996eea920b3fb5232c1418a9c3ced55f99a0"
+  "sourceSHA" : "fad6a1bc6eef9c76e0df570f2a02940d2f634a53"
 }
