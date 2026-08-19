@@ -80,7 +80,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
             [.towardBottom, .towardTop]
         }
         for direction in directions {
-            for _ in 0..<14 where !isReachable() {
+            for _ in 0..<8 where !isReachable() {
                 scrollOneStep(on: scrollingSurface, direction: direction)
             }
         }
@@ -127,16 +127,24 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }) ?? app
     }
 
-    /// Move by less than a page so compact landscape rows cannot be skipped
-    /// between two accessibility snapshots. Trying both directions also makes
-    /// the helper resilient to Form scroll positions retained after a pushed
-    /// editor is dismissed.
+    /// Use slower native gestures on compact surfaces so tall rows are not
+    /// skipped. Wider iPad surfaces use the system default gesture, which
+    /// settles reliably before the next accessibility snapshot.
     private func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
+        let usesCompactGesture = surface.frame.width < 600
         switch direction {
         case .towardBottom:
-            surface.swipeUp(velocity: .slow)
+            if usesCompactGesture {
+                surface.swipeUp(velocity: .slow)
+            } else {
+                surface.swipeUp()
+            }
         case .towardTop:
-            surface.swipeDown(velocity: .slow)
+            if usesCompactGesture {
+                surface.swipeDown(velocity: .slow)
+            } else {
+                surface.swipeDown()
+            }
         }
     }
 
@@ -597,7 +605,6 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
     @available(iOS 17.0, *)
     func testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow() throws {
-        XCUIDevice.shared.orientation = .landscapeRight
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = launchApp(
             additionalArguments: [
@@ -615,6 +622,14 @@ final class NeoAnki2MobileUITests: XCTestCase {
 
         let editor = app.descendants(matching: .any)["cardSetupEditor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCUIDevice.shared.orientation = .landscapeRight
+        let landscape = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                app.frame.width > app.frame.height && editor.frame.width > 0
+            },
+            object: app
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 5), .completed)
         XCTAssertGreaterThanOrEqual(editor.frame.minX, app.frame.minX - 1)
         XCTAssertLessThanOrEqual(editor.frame.maxX, app.frame.maxX + 1)
         assertAccessibilityTraversalOrder(
@@ -629,9 +644,13 @@ final class NeoAnki2MobileUITests: XCTestCase {
             editor.swipeUp()
             assertNoHorizontalOverflow(in: editor, viewport: app)
         }
-        try app.performAccessibilityAudit(
-            for: [.contrast, .hitRegion, .sufficientElementDescription]
-        )
+        for audit: XCUIAccessibilityAuditType in [
+            .contrast,
+            .hitRegion,
+            .sufficientElementDescription,
+        ] {
+            try app.performAccessibilityAudit(for: audit)
+        }
     }
 
     @available(iOS 17.0, *)
