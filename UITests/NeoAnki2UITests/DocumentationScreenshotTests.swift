@@ -289,18 +289,18 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 && learningRoute.waitUntilExists(timeout: 3),
             "Expanding Advanced must mount Availability and Learning route controls"
         )
-        for _ in 0..<8 where !availability.frame.intersects(advancedWindow.frame)
-            || !learningRoute.frame.intersects(advancedWindow.frame) {
+        for _ in 0..<8 where !advancedWindow.frame.contains(availability.frame)
+            || !advancedWindow.frame.contains(learningRoute.frame) {
             editorScroll.scroll(byDeltaX: 0, deltaY: -100)
         }
         XCTAssertTrue(
             availability.waitUntilExists(timeout: 3)
-                && availability.frame.intersects(advancedWindow.frame),
+                && advancedWindow.frame.contains(availability.frame),
             "Advanced screenshot must visibly include Availability controls"
         )
         XCTAssertTrue(
             learningRoute.waitUntilExists(timeout: 3)
-                && learningRoute.frame.intersects(advancedWindow.frame),
+                && advancedWindow.frame.contains(learningRoute.frame),
             "Advanced screenshot must visibly include Learning route controls"
         )
         captureDocumentationScreenshot(
