@@ -642,6 +642,7 @@ public struct CardSetupCollectionView: View {
                 .frame(minHeight: 44)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupList)
         .onChange(of: draft.cardSetups.map(\.id)) { _, ids in
             if let selected = selection, !ids.contains(selected) { selection = nil }
