@@ -557,7 +557,11 @@ class NeoAnkiUITestCase: XCTestCase {
         let edit = app.buttons.identified("editItemType")
         XCTAssertTrue(edit.waitUntilExists(timeout: 5))
         activateCompactButton(edit)
-        XCTAssertTrue(app.textFields.identified("itemTypeStudioName").waitUntilExists(timeout: 10))
+        let studioName = app.textFields.identified("itemTypeStudioName")
+        if !studioName.waitUntilExists(timeout: 2) {
+            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+        }
+        XCTAssertTrue(studioName.waitUntilExists(timeout: 10))
         XCTAssertTrue(
             app.descendants(matching: .any)
                 .identified("itemTypeStudioCardSetupEditor")

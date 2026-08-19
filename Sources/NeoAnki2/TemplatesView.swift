@@ -336,6 +336,7 @@ struct TemplatesView: View {
                         _ = model.beginEditingSelectedItemType()
                     }
                     .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("editItemType")
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         Task { await prepareDeleteSelectedItemType() }
