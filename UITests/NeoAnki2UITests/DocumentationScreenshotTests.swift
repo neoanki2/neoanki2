@@ -312,7 +312,6 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 "cardSetupEditor.advanced",
                 "cardSetupEditor.availability",
                 "cardSetupEditor.learningRoute",
-                "saveItemTypeStudio",
             ]
         )
     }
