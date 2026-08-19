@@ -919,6 +919,18 @@ class NeoAnkiUITestCase: XCTestCase {
                 line: line
             )
         }
+        XCTAssertTrue(
+            cancel.waitUntilHittable(timeout: 2),
+            "Studio Cancel must remain visible and reachable on screen",
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            save.waitUntilHittable(timeout: 2),
+            "Studio Save must remain visible and reachable on screen",
+            file: file,
+            line: line
+        )
     }
 
     /// Asserting absence immediately races the animation that removes the
