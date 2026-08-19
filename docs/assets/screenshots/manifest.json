@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-19T05:51:30Z",
+  "capturedAt" : "2026-08-19T06:45:44Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 680,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "538b4c32b40d548b2929c8d4f54304724cde717087aa8d47001aaf92542977ab",
+      "sha256" : "838637ba490e34beaa827db0d1f4b4fc2f496f73eea7381764ed2fe794ac22df",
       "width" : 1024
     },
     {
@@ -92,7 +92,7 @@
       "filename" : "item-types.png",
       "height" : 680,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "ba4e09313aa8483109982ed32e1f6d757b7fa4791e7c2e2579cddd49939affbe",
+      "sha256" : "d1db150bb4561510586ddc99adb83f1510a9406261e09d33cacdf45a7874660b",
       "width" : 1024
     },
     {
@@ -202,7 +202,7 @@
       "filename" : "template-advanced.png",
       "height" : 680,
       "scenario" : "Item Type Studio Advanced Availability and Learning route controls",
-      "sha256" : "30735ecacb589cce2e07691f08a7e96a91dfbf15a8cf499ccf6166c2e6821d09",
+      "sha256" : "963c8570d84340a970040c72a547552ff78f43a53af3bfa0c1b413a4e855d561",
       "width" : 1024
     },
     {
@@ -215,9 +215,9 @@
       "filename" : "template-editor.png",
       "height" : 680,
       "scenario" : "unified Item Type Studio with Fields, Card setups, and a fillable wireframe",
-      "sha256" : "8863655c90ce81095a6fed96fc3379d729ac3a10621f7b3de239b2f4ab64c5e9",
+      "sha256" : "84863590c07f9ed78935e7a1d32e2bdaf0814871739e568fb40cedf54a6eaa9d",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "de54849803dea145227d826b7dfb2b34138f9ac4"
+  "sourceSHA" : "62becdece457244a7bc534df7d09d3ce91805841"
 }
