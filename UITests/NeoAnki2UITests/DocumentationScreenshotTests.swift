@@ -280,7 +280,6 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 && advancedWindow.frame.contains(advancedSettings.frame)
         )
         advancedSettings.click()
-        advancedApp.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
         let availability = advancedApp.descendants(matching: .any)
             .identified("cardSetupEditor.availability")
         let learningRoute = advancedApp.descendants(matching: .any)

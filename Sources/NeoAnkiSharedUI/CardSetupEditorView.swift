@@ -1305,24 +1305,38 @@ public struct CardSetupEditorView: View {
     }
 
     private func advancedSection(_ index: Int) -> some View {
-        return DisclosureGroup(isExpanded: $showsAdvanced) {
-            VStack(alignment: .leading, spacing: 20) {
-                availabilityEditor(index)
-                Divider()
-                learningRouteEditor(index)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                showsAdvanced.toggle()
+            } label: {
+                HStack {
+                    Text("Advanced").font(.headline)
+                    Spacer()
+                    Image(systemName: showsAdvanced ? "chevron.down" : "chevron.right")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
             }
-            .padding(.top, 12)
-        } label: {
-            Text("Advanced").font(.headline)
+            .buttonStyle(.plain)
+            .accessibilityHint("Optional Availability and Learning route settings")
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.advanced)
+            .accessibilityValue(showsAdvanced ? "Expanded" : "Collapsed")
+            .frame(
+                maxWidth: .infinity,
+                minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget,
+                alignment: .leading
+            )
+
+            if showsAdvanced {
+                VStack(alignment: .leading, spacing: 20) {
+                    availabilityEditor(index)
+                    Divider()
+                    learningRouteEditor(index)
+                }
+                .padding(.top, 12)
+            }
         }
-        .accessibilityHint("Optional Availability and Learning route settings")
-        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.advanced)
-        .accessibilityValue(showsAdvanced ? "Expanded" : "Collapsed")
-        .frame(
-            maxWidth: .infinity,
-            minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget,
-            alignment: .leading
-        )
     }
 
     private func availabilityEditor(_ index: Int) -> some View {
