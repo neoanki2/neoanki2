@@ -280,15 +280,19 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 && advancedWindow.frame.contains(advancedSettings.frame)
         )
         advancedSettings.click()
+        advancedApp.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: [])
         let availability = advancedApp.descendants(matching: .any)
             .identified("cardSetupEditor.availability")
         let learningRoute = advancedApp.descendants(matching: .any)
             .identified("cardSetupEditor.learningRoute")
-        for _ in 0..<6 where !availability.exists
-            || !learningRoute.exists
-            || !availability.frame.intersects(advancedWindow.frame)
+        XCTAssertTrue(
+            availability.waitUntilExists(timeout: 3)
+                && learningRoute.waitUntilExists(timeout: 3),
+            "Expanding Advanced must mount Availability and Learning route controls"
+        )
+        for _ in 0..<8 where !availability.frame.intersects(advancedWindow.frame)
             || !learningRoute.frame.intersects(advancedWindow.frame) {
-            editorScroll.scroll(byDeltaX: 0, deltaY: -300)
+            editorScroll.scroll(byDeltaX: 0, deltaY: -100)
         }
         XCTAssertTrue(
             availability.waitUntilExists(timeout: 3)
