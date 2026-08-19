@@ -236,6 +236,19 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
                 .identified("itemTypeStudioCardSetupEditor")
                 .waitUntilExists(timeout: 5)
         )
+        let basicEditorScroll = app.scrollViews.identified("cardSetupEditor")
+        let showAnswer = app.buttons.identified("cardSetupEditor.showAnswer")
+        let editorWindow = app.windows.firstMatch
+        XCTAssertTrue(basicEditorScroll.waitUntilExists(timeout: 3))
+        XCTAssertTrue(showAnswer.waitUntilExists(timeout: 3))
+        XCTAssertTrue(editorWindow.waitUntilExists(timeout: 3))
+        for _ in 0..<4 where !editorWindow.frame.contains(showAnswer.frame) {
+            basicEditorScroll.scroll(byDeltaX: 0, deltaY: -100)
+        }
+        XCTAssertTrue(
+            editorWindow.frame.contains(showAnswer.frame),
+            "Template editor screenshot must fully show the answer-preview control"
+        )
         captureDocumentationScreenshot(
             named: "template-editor",
             of: app,
