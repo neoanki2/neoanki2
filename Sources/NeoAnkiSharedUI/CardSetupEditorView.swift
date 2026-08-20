@@ -1333,7 +1333,9 @@ public struct CardSetupEditorView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+#if !os(macOS)
         .accessibilityElement(children: .ignore)
+#endif
         .accessibilityLabel("Add \(hole.displayName)")
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.hole(hole))
     }
@@ -1371,7 +1373,9 @@ public struct CardSetupEditorView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+#if !os(macOS)
         .accessibilityElement(children: .ignore)
+#endif
         .accessibilityLabel(previewAccessibilityLabel(component, rendering: rendering))
         .accessibilityHint("Edit this content source")
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.component(component.id))
