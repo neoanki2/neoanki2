@@ -438,7 +438,7 @@ extension FastFunctionalJourneyTests {
 
     func addCardSetupStarter(_ name: String, in app: XCUIApplication) {
         let menu = app.menuButtons.identified("itemTypeStudio.addCardSetupMenu")
-        XCTAssertTrue(menu.waitUntilExists(timeout: 3))
+        revealItemTypeStudioCardSetupListElement(menu, in: app)
         menu.click()
         XCTAssertTrue(app.menuItems[name].waitUntilExists(timeout: 3))
         app.menuItems[name].click()
