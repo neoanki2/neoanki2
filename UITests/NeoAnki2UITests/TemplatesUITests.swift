@@ -88,17 +88,14 @@ extension FastFunctionalJourneyTests {
                 .identified("itemTypeStudioCardSetupEditor")
             for layout in ["focus", "split", "mediaAside", "mediaHero", "actionStage"] {
                 let choice = app.buttons.identified("cardSetupEditor.layout.\(layout)")
-                if !choice.exists {
-                    XCTAssertTrue(editorScroll.waitUntilExists(timeout: 3))
-                    editorScroll.scroll(byDeltaX: 0, deltaY: -250)
-                }
-                XCTAssertTrue(choice.waitUntilExists(timeout: 3))
+                XCTAssertTrue(editorScroll.waitUntilExists(timeout: 3))
+                revealCardSetupElement(choice, in: app)
                 choice.click()
                 XCTAssertEqual(choice.value as? String, "Selected")
             }
 
             let showAnswer = app.buttons.identified("cardSetupEditor.showAnswer")
-            XCTAssertTrue(showAnswer.waitUntilExists(timeout: 3))
+            revealCardSetupElement(showAnswer, in: app)
             showAnswer.click()
 
             let advanced = revealCardSetupAdvanced(in: app)
@@ -106,13 +103,14 @@ extension FastFunctionalJourneyTests {
             advanced.click()
             XCTAssertEqual(advanced.value as? String, "Expanded")
             let availability = app.checkBoxes["Availability rule"]
-            XCTAssertTrue(availability.waitUntilExists(timeout: 3))
+            revealCardSetupElement(availability, in: app)
             availability.click()
             let addRule = app.buttons["Add another rule"]
-            XCTAssertTrue(addRule.waitUntilExists(timeout: 3))
+            revealCardSetupElement(addRule, in: app)
             addRule.click()
             XCTAssertTrue(app.segmentedControls.firstMatch.waitUntilExists(timeout: 3))
-            XCTAssertTrue(app.buttons["Use recommendation"].waitUntilExists(timeout: 3))
+            let recommendedRoute = app.buttons["Use recommended route"]
+            revealCardSetupElement(recommendedRoute, in: app)
         }
 
         runJourneyActivity("ItemTypeStudio.fixedTextMediaRevealAndReorder") {
@@ -382,24 +380,28 @@ extension FastFunctionalJourneyTests {
 
     func chooseAnswerMethod(_ name: String, in app: XCUIApplication) {
         let picker = app.popUpButtons.identified("cardSetupEditor.answerMethod")
-        XCTAssertTrue(picker.waitUntilExists(timeout: 3))
+        revealCardSetupElement(picker, in: app)
         picker.click()
         XCTAssertTrue(app.menuItems[name].waitUntilExists(timeout: 3))
         app.menuItems[name].click()
     }
 
     func addFixedText(to hole: String, value: String, in app: XCUIApplication) {
-        let button = app.buttons["Add \(hole) content"]
-        XCTAssertTrue(button.waitUntilExists(timeout: 3))
-        if !button.isHittable {
-            app.descendants(matching: .any).identified("itemTypeStudioCardSetupEditor")
-                .scroll(byDeltaX: 0, deltaY: -500)
-        }
-        button.click()
-        XCTAssertTrue(app.buttons["Fixed text"].waitUntilExists(timeout: 3))
-        app.buttons["Fixed text"].click()
         let textFields = app.textFields.matching(NSPredicate(format: "label == %@", "Fixed text"))
-        let field = textFields.element(boundBy: max(0, textFields.count - 1))
+        let previousFieldCount = textFields.count
+        let button = app.buttons["Add \(hole) content"]
+        revealCardSetupElement(button, in: app)
+        button.click()
+        let fixedTextSource = app.buttons.identified(
+            "cardSetupEditor.sourcePicker.hole.\(hole.lowercased()).fixedText"
+        )
+        XCTAssertTrue(fixedTextSource.waitUntilHittable(timeout: 3))
+        fixedTextSource.click()
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { textFields.count == previousFieldCount + 1 },
+            "Adding fixed text to \(hole) did not create exactly one editor"
+        )
+        let field = textFields.element(boundBy: previousFieldCount)
         XCTAssertTrue(field.waitUntilExists(timeout: 3))
         enterText(value, into: field, app: app)
     }

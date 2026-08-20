@@ -35,16 +35,33 @@ final class NeoAnki2MobileUITests: XCTestCase {
     private func scrollToAndTap(
         _ element: XCUIElement,
         in app: XCUIApplication,
+        preferredDirection: MobileScrollDirection? = nil,
+        maximumSteps: Int = 8,
+        acceptsPartialVisibility: Bool = false,
+        bottomClearance: CGFloat = 0,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        scrollTo(element, in: app, file: file, line: line)
+        scrollTo(
+            element,
+            in: app,
+            preferredDirection: preferredDirection,
+            maximumSteps: maximumSteps,
+            acceptsPartialVisibility: acceptsPartialVisibility,
+            bottomClearance: bottomClearance,
+            file: file,
+            line: line
+        )
         element.tap()
     }
 
     private func scrollTo(
         _ element: XCUIElement,
         in app: XCUIApplication,
+        preferredDirection: MobileScrollDirection? = nil,
+        maximumSteps: Int = 8,
+        acceptsPartialVisibility: Bool = false,
+        bottomClearance: CGFloat = 0,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
@@ -65,22 +82,30 @@ final class NeoAnki2MobileUITests: XCTestCase {
             let contentBottom = app.tabBars.allElementsBoundByIndex
                 .map(\.frame.minY)
                 .min() ?? app.frame.maxY
-            return frame.midY >= contentTop
-                && frame.midY <= contentBottom
-                && app.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+            let usableContent = CGRect(
+                x: app.frame.minX,
+                y: contentTop,
+                width: app.frame.width,
+                height: max(0, contentBottom - bottomClearance - contentTop)
+            )
+            if acceptsPartialVisibility {
+                return frame.intersects(usableContent)
+            }
+            return usableContent.contains(CGPoint(x: frame.midX, y: frame.midY))
         }
         let scrollingSurface = scrollingSurface(for: element, in: app)
         let navigationBottom = app.navigationBars.allElementsBoundByIndex
             .map(\.frame.maxY)
             .max() ?? app.frame.minY
-        let directions: [MobileScrollDirection] = if element.exists
-            && element.frame.midY < navigationBottom {
-            [.towardTop, .towardBottom]
-        } else {
-            [.towardBottom, .towardTop]
-        }
+        let inferredDirection: MobileScrollDirection = if element.exists
+            && element.frame.midY < navigationBottom { .towardTop } else { .towardBottom }
+        let firstDirection = preferredDirection ?? inferredDirection
+        let directions: [MobileScrollDirection] = [
+            firstDirection,
+            firstDirection == .towardBottom ? .towardTop : .towardBottom,
+        ]
         for direction in directions {
-            for _ in 0..<8 where !isReachable() {
+            for _ in 0..<maximumSteps where !isReachable() {
                 scrollOneStep(on: scrollingSurface, direction: direction)
             }
         }
@@ -88,7 +113,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(isReachable(), "Element is not reachable: \(element)", file: file, line: line)
     }
 
-    private enum MobileScrollDirection {
+    private enum MobileScrollDirection: Equatable {
         case towardTop
         case towardBottom
     }
@@ -432,7 +457,8 @@ final class NeoAnki2MobileUITests: XCTestCase {
         let advanced = app.buttons["cardSetupEditor.advanced"]
         scrollToAndTap(advanced, in: app)
         let availability = app.switches["cardSetupEditor.availability"]
-        scrollTo(availability, in: app)
+        scrollTo(availability, in: app, bottomClearance: 80)
+        XCTAssertGreaterThanOrEqual(availability.frame.height, 44)
         availability.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         let enabled = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", "1"),
@@ -444,7 +470,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         app.segmentedControls.buttons["Any rule"].tap()
 
         let answerMethod = app.buttons["cardSetupEditor.answerMethod"]
-        scrollToAndTap(answerMethod, in: app)
+        scrollToAndTap(answerMethod, in: app, preferredDirection: .towardTop)
         XCTAssertTrue(app.buttons["Audio Submission"].waitForExistence(timeout: 3))
         app.buttons["Audio Submission"].tap()
         XCTAssertTrue(app.buttons["Remove Answer and Continue"].waitForExistence(timeout: 3))
@@ -524,7 +550,13 @@ final class NeoAnki2MobileUITests: XCTestCase {
             NSPredicate(format: "label CONTAINS %@", "Legacy Additional")
         ).firstMatch
         scrollToAndTap(legacySetup, in: app)
-        let additional = app.buttons["Additional content"]
+        let additional = app.buttons.matching(
+            NSPredicate(
+                format: "identifier == %@ AND label == %@",
+                "cardSetupEditor.additionalContent",
+                "Additional content"
+            )
+        ).firstMatch
         scrollToAndTap(additional, in: app)
         XCTAssertTrue(app.staticTexts["Legacy Notes"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["Move into named hole"].waitForExistence(timeout: 3))
@@ -637,36 +669,41 @@ final class NeoAnki2MobileUITests: XCTestCase {
         )
         assertNoHorizontalOverflow(in: editor, viewport: app)
 
+        let nextAuditSection = app.buttons["cardSetupAccessibility.nextSection"]
+        XCTAssertTrue(nextAuditSection.waitForExistence(timeout: 5))
+
+        func advance(to element: XCUIElement, description: String) {
+            nextAuditSection.tap()
+            let becameVisible = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in
+                    element.exists && element.frame.intersects(editor.frame)
+                },
+                object: element
+            )
+            XCTAssertEqual(
+                XCTWaiter.wait(for: [becameVisible], timeout: 5),
+                .completed,
+                "Audit navigation did not reveal \(description)"
+            )
+            assertNoHorizontalOverflow(in: editor, viewport: app)
+        }
+
         let showAnswer = app.buttons["cardSetupEditor.showAnswer"]
-        scrollTo(showAnswer, in: app)
-        assertNoHorizontalOverflow(in: editor, viewport: app)
+        advance(to: showAnswer, description: "Preview")
 
-        let additional = app.buttons["Additional content"]
-        scrollTo(additional, in: app)
-        assertNoHorizontalOverflow(in: editor, viewport: app)
-        additional.tap()
-
-        let moveAdditional = app.buttons["Move into named hole"]
-        scrollTo(moveAdditional, in: app)
-        assertNoHorizontalOverflow(in: editor, viewport: app)
+        let legacyAdditional = app.buttons[
+            "cardSetupEditor.additionalSource.B3000001-0022-4000-8000-000000000001"
+        ]
+        advance(to: legacyAdditional, description: "legacy Additional content")
 
         let advanced = app.buttons["cardSetupEditor.advanced"]
-        scrollTo(advanced, in: app)
-        assertNoHorizontalOverflow(in: editor, viewport: app)
-        advanced.tap()
+        advance(to: advanced, description: "Advanced")
 
         let availability = app.switches["cardSetupEditor.availability"]
-        scrollTo(availability, in: app)
-        assertNoHorizontalOverflow(in: editor, viewport: app)
+        advance(to: availability, description: "Availability")
 
         let learningRoute = app.descendants(matching: .any)["cardSetupEditor.learningRoute"]
-        for _ in 0..<8 where !learningRoute.exists
-            || !learningRoute.frame.intersects(editor.frame) {
-            scrollOneStep(on: editor, direction: .towardBottom)
-        }
-        XCTAssertTrue(learningRoute.waitForExistence(timeout: 3))
-        XCTAssertTrue(learningRoute.frame.intersects(editor.frame))
-        assertNoHorizontalOverflow(in: editor, viewport: app)
+        advance(to: learningRoute, description: "Learning route")
         for audit: XCUIAccessibilityAuditType in [
             .contrast,
             .hitRegion,

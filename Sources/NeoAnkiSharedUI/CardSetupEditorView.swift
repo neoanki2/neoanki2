@@ -16,8 +16,11 @@ public enum ItemTypeStudioAccessibilityID {
     public static let showAnswer = "cardSetupEditor.showAnswer"
     public static let layoutPicker = "cardSetupEditor.layoutPicker"
     public static let advanced = "cardSetupEditor.advanced"
+    public static let additionalContent = "cardSetupEditor.additionalContent"
     public static let availability = "cardSetupEditor.availability"
     public static let learningRoute = "cardSetupEditor.learningRoute"
+    public static let auditPreview = "cardSetupEditor.audit.preview"
+    public static let auditNextSection = "cardSetupAccessibility.nextSection"
 
     public static func cardSetup(_ id: UUID) -> String { "itemTypeStudio.cardSetup.\(id)" }
     public static func layout(_ layout: CardLayoutID) -> String {
@@ -39,6 +42,45 @@ public enum ItemTypeStudioAccessibilityID {
     public static func revealRepair(_ id: UUID) -> String {
         "cardSetupEditor.revealRepair.\(id)"
     }
+    public static func sourcePicker(
+        componentID: UUID?,
+        hole: CardWireframeHole
+    ) -> String {
+        if let componentID {
+            return "cardSetupEditor.sourcePicker.component.\(componentID)"
+        }
+        return "cardSetupEditor.sourcePicker.hole.\(hole.rawValue)"
+    }
+    public static func sourcePickerField(
+        componentID: UUID?,
+        hole: CardWireframeHole,
+        fieldID: UUID
+    ) -> String {
+        "\(sourcePicker(componentID: componentID, hole: hole)).field.\(fieldID)"
+    }
+    public static func sourcePickerFixedText(
+        componentID: UUID?,
+        hole: CardWireframeHole
+    ) -> String {
+        "\(sourcePicker(componentID: componentID, hole: hole)).fixedText"
+    }
+    public static func sourcePickerCancel(
+        componentID: UUID?,
+        hole: CardWireframeHole
+    ) -> String {
+        "\(sourcePicker(componentID: componentID, hole: hole)).cancel"
+    }
+}
+
+/// Test-host navigation destinations inside the shared editor's lazy scroll
+/// content. Production platform shells never provide a request, so ordinary
+/// editor interaction and UI journeys continue to use native scrolling.
+public enum CardSetupEditorAuditNavigationTarget: Hashable, Sendable {
+    case preview
+    case additional(componentID: UUID)
+    case advanced
+    case availability
+    case learningRoute
 }
 
 /// A deterministic authoring projection. It feeds the production wireframe and
@@ -459,6 +501,159 @@ public enum CardSetupEditorReducer {
     }
 }
 
+/// ID-scoped bindings used by lazy SwiftUI controls. SwiftUI may invoke a
+/// binding while its row is disappearing; every setter therefore resolves the
+/// stable setup/component identity again and becomes a no-op when that target
+/// has already been removed.
+private struct SendableWritableKeyPath<Root, Value>: @unchecked Sendable {
+    let value: WritableKeyPath<Root, Value>
+}
+
+enum CardSetupEditorBindingFactory {
+    static func setupValue<Value: Sendable>(
+        draft: Binding<ItemTypeStudioDraft>,
+        cardSetupID: UUID,
+        keyPath: WritableKeyPath<CardSetupDraft, Value>,
+        fallback: Value
+    ) -> Binding<Value> {
+        let keyPath = SendableWritableKeyPath(value: keyPath)
+        return Binding(
+            get: {
+                draft.wrappedValue.cardSetups
+                    .first(where: { $0.id == cardSetupID })?[keyPath: keyPath.value]
+                    ?? fallback
+            },
+            set: { value in
+                var current = draft.wrappedValue
+                guard let setupIndex = current.cardSetups.firstIndex(where: {
+                    $0.id == cardSetupID
+                }) else { return }
+                current.cardSetups[setupIndex][keyPath: keyPath.value] = value
+                draft.wrappedValue = current
+            }
+        )
+    }
+
+    static func componentValue<Value: Sendable>(
+        draft: Binding<ItemTypeStudioDraft>,
+        cardSetupID: UUID,
+        componentID: UUID,
+        keyPath: WritableKeyPath<CardSetupComponentDraft, Value>,
+        fallback: Value
+    ) -> Binding<Value> {
+        let keyPath = SendableWritableKeyPath(value: keyPath)
+        return Binding(
+            get: {
+                guard let setup = draft.wrappedValue.cardSetups.first(where: {
+                    $0.id == cardSetupID
+                }) else { return fallback }
+                return setup.components.first(where: { $0.id == componentID })?[keyPath: keyPath.value]
+                    ?? fallback
+            },
+            set: { value in
+                var current = draft.wrappedValue
+                guard let setupIndex = current.cardSetups.firstIndex(where: {
+                    $0.id == cardSetupID
+                }),
+                let componentIndex = current.cardSetups[setupIndex].components.firstIndex(where: {
+                    $0.id == componentID
+                }) else { return }
+                current.cardSetups[setupIndex].components[componentIndex][keyPath: keyPath.value] = value
+                draft.wrappedValue = current
+            }
+        )
+    }
+
+    static func fixedText(
+        draft: Binding<ItemTypeStudioDraft>,
+        cardSetupID: UUID,
+        componentID: UUID,
+        fallback: String
+    ) -> Binding<String> {
+        componentActionValue(
+            draft: draft,
+            cardSetupID: cardSetupID,
+            componentID: componentID,
+            fallback: fallback,
+            value: { component in
+                guard case let .fixedText(text) = component.source else { return nil }
+                return text
+            },
+            action: { .editFixedText(componentID: componentID, value: $0) }
+        )
+    }
+
+    static func reveal(
+        draft: Binding<ItemTypeStudioDraft>,
+        cardSetupID: UUID,
+        componentID: UUID,
+        fallback: RevealMode
+    ) -> Binding<RevealMode> {
+        componentActionValue(
+            draft: draft,
+            cardSetupID: cardSetupID,
+            componentID: componentID,
+            fallback: fallback,
+            value: { $0.reveal },
+            action: { .setReveal(componentID: componentID, $0) }
+        )
+    }
+
+    static func availability(
+        draft: Binding<ItemTypeStudioDraft>,
+        cardSetupID: UUID,
+        fallback: CardSetupAvailabilityDraft
+    ) -> Binding<CardSetupAvailabilityDraft> {
+        Binding(
+            get: {
+                draft.wrappedValue.cardSetups
+                    .first(where: { $0.id == cardSetupID })?.availability
+                    ?? fallback
+            },
+            set: { value in
+                var current = draft.wrappedValue
+                guard current.cardSetups.first(where: { $0.id == cardSetupID })?.availability != nil
+                else { return }
+                guard CardSetupEditorReducer.apply(
+                    .setAvailability(value),
+                    to: &current,
+                    cardSetupID: cardSetupID
+                ) else { return }
+                draft.wrappedValue = current
+            }
+        )
+    }
+
+    private static func componentActionValue<Value: Sendable>(
+        draft: Binding<ItemTypeStudioDraft>,
+        cardSetupID: UUID,
+        componentID: UUID,
+        fallback: Value,
+        value: @escaping @Sendable (CardSetupComponentDraft) -> Value?,
+        action: @escaping @Sendable (Value) -> CardSetupEditorAction
+    ) -> Binding<Value> {
+        Binding(
+            get: {
+                guard let setup = draft.wrappedValue.cardSetups.first(where: {
+                    $0.id == cardSetupID
+                }),
+                let component = setup.components.first(where: { $0.id == componentID })
+                else { return fallback }
+                return value(component) ?? fallback
+            },
+            set: { newValue in
+                var current = draft.wrappedValue
+                guard CardSetupEditorReducer.apply(
+                    action(newValue),
+                    to: &current,
+                    cardSetupID: cardSetupID
+                ) else { return }
+                draft.wrappedValue = current
+            }
+        )
+    }
+}
+
 /// Shared Item Type Studio mutations that have cross-setup consequences.
 /// Platform shells call these only in response to an explicit user edit, so
 /// loading an unusual legacy definition remains a lossless operation.
@@ -481,6 +676,7 @@ public enum ItemTypeStudioDraftReducer {
 public enum CardSetupEditorLayoutMetrics {
     public static let minimumTouchTarget: CGFloat = 44
     public static let maximumAvailabilityIndentation: CGFloat = 16
+    public static let macSourcePickerMinimumDimension: CGFloat = 420
 
     /// The cumulative leading indentation at a recursive Availability depth.
     public static func availabilityIndentation(depth: Int) -> CGFloat {
@@ -499,6 +695,41 @@ public enum CardSetupEditorLayoutMetrics {
         availableWidth: CGFloat?
     ) -> Bool {
         isAccessibilitySize || (availableWidth.map { $0 < 420 } ?? false)
+    }
+}
+
+/// Ephemeral identities for recursive Availability rows. They are deliberately
+/// editor-only so the persisted condition tree remains unchanged, while a row
+/// being torn down cannot accidentally write through the index of its new
+/// neighbor after a first/last removal.
+public struct AvailabilityRuleEditorIdentityState: Equatable, Sendable {
+    public private(set) var childIDs: [UUID]
+
+    public init(childCount: Int) {
+        childIDs = (0..<max(0, childCount)).map { _ in UUID() }
+    }
+
+    @discardableResult
+    public mutating func appendChild() -> UUID {
+        let id = UUID()
+        childIDs.append(id)
+        return id
+    }
+
+    @discardableResult
+    public mutating func removeChild(id: UUID) -> Int? {
+        guard let index = childIDs.firstIndex(of: id) else { return nil }
+        childIDs.remove(at: index)
+        return index
+    }
+
+    public mutating func reconcile(childCount: Int) {
+        let count = max(0, childCount)
+        if childIDs.count > count {
+            childIDs.removeLast(childIDs.count - count)
+        } else {
+            while childIDs.count < count { _ = appendChild() }
+        }
     }
 }
 
@@ -674,6 +905,7 @@ public struct CardSetupEditorView: View {
     @Binding private var draft: ItemTypeStudioDraft
     private let cardSetupID: UUID
     @Binding private var validationFocus: ItemTypeStudioValidationTarget?
+    @Binding private var auditNavigationRequest: CardSetupEditorAuditNavigationTarget?
 
     @State private var isAnswerRevealed = false
     @State private var showsAdvanced = CardSetupEditorAdvancedPolicy.startsExpanded
@@ -685,11 +917,13 @@ public struct CardSetupEditorView: View {
     public init(
         draft: Binding<ItemTypeStudioDraft>,
         cardSetupID: UUID,
-        validationFocus: Binding<ItemTypeStudioValidationTarget?> = .constant(nil)
+        validationFocus: Binding<ItemTypeStudioValidationTarget?> = .constant(nil),
+        auditNavigationRequest: Binding<CardSetupEditorAuditNavigationTarget?> = .constant(nil)
     ) {
         _draft = draft
         self.cardSetupID = cardSetupID
         _validationFocus = validationFocus
+        _auditNavigationRequest = auditNavigationRequest
     }
 
     private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
@@ -697,24 +931,31 @@ public struct CardSetupEditorView: View {
     public var body: some View {
         Group {
             if let setupIndex {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
-                        identitySection(setupIndex)
-                        recipeSection(setupIndex)
-                        layoutSection(setupIndex)
-                        previewSection(setupIndex)
-                        namedContentSection(setupIndex)
-                        advancedSection(setupIndex)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 24) {
+                            identitySection(setupIndex)
+                            recipeSection(setupIndex)
+                            layoutSection(setupIndex)
+                            previewSection(setupIndex)
+                            namedContentSection(setupIndex)
+                            advancedSection(setupIndex)
+                        }
+                        .frame(maxWidth: 860)
+                        .frame(maxWidth: .infinity)
+                        .padding(20)
                     }
-                    .frame(maxWidth: 860)
-                    .frame(maxWidth: .infinity)
-                    .padding(20)
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
+                    .onChange(of: auditNavigationRequest, initial: true) { _, request in
+                        navigateForAudit(to: request, using: proxy)
+                    }
                 }
-                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
                 .sheet(item: $sourceRequest) { request in
                     CardSetupSourcePicker(
                         fields: sourceFields(for: request),
-                        allowsFixedText: request.hole != .media
+                        allowsFixedText: request.hole != .media,
+                        componentID: request.componentID,
+                        hole: request.hole
                     ) { source in
                         apply(source: source, request: request, setupIndex: setupIndex)
                     }
@@ -784,6 +1025,30 @@ public struct CardSetupEditorView: View {
             await Task.yield()
             guard validationFocus == requestedTarget else { return }
             focusedTarget = target
+        }
+    }
+
+    private func navigateForAudit(
+        to request: CardSetupEditorAuditNavigationTarget?,
+        using proxy: ScrollViewProxy
+    ) {
+        guard let request else { return }
+
+        switch request {
+        case .additional:
+            showsAdditionalContent = true
+        case .availability, .learningRoute:
+            showsAdvanced = true
+        case .preview, .advanced:
+            break
+        }
+
+        // Disclosure content is lazy. Yield after changing expansion state so
+        // the requested direct child exists before ScrollViewReader resolves it.
+        Task { @MainActor in
+            await Task.yield()
+            guard auditNavigationRequest == request else { return }
+            proxy.scrollTo(request, anchor: .top)
         }
     }
 
@@ -957,6 +1222,8 @@ public struct CardSetupEditorView: View {
             .padding(16)
             .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 20))
         }
+        .id(CardSetupEditorAuditNavigationTarget.preview)
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditPreview)
     }
 
     private func emptyHole(_ hole: CardWireframeHole, setupIndex: Int) -> some View {
@@ -1055,6 +1322,7 @@ public struct CardSetupEditorView: View {
                     }
                     .padding(.top, 8)
                 }
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.additionalContent)
                 .frame(
                     maxWidth: .infinity,
                     minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget,
@@ -1163,6 +1431,7 @@ public struct CardSetupEditorView: View {
         }
         .padding(10)
         .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
+        .id(CardSetupEditorAuditNavigationTarget.additional(componentID: component.id))
     }
 
     @ViewBuilder
@@ -1323,6 +1592,7 @@ public struct CardSetupEditorView: View {
             .accessibilityHint("Optional Availability and Learning route settings")
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.advanced)
             .accessibilityValue(showsAdvanced ? "Expanded" : "Collapsed")
+            .id(CardSetupEditorAuditNavigationTarget.advanced)
             .frame(
                 maxWidth: .infinity,
                 minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget,
@@ -1346,6 +1616,7 @@ public struct CardSetupEditorView: View {
                 .neoAnkiTouchTarget()
                 .focused($focusedTarget, equals: .availability(cardSetupID: cardSetupID))
                 .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availability)
+                .id(CardSetupEditorAuditNavigationTarget.availability)
             Text("Generate this Card setup only when its content is available.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -1394,6 +1665,7 @@ public struct CardSetupEditorView: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.learningRoute)
+        .id(CardSetupEditorAuditNavigationTarget.learningRoute)
     }
 
     @ViewBuilder
@@ -1419,11 +1691,18 @@ public struct CardSetupEditorView: View {
     }
 
     private func interactionBinding(_ setupIndex: Int) -> Binding<Interaction> {
-        Binding(
-            get: { draft.cardSetups[setupIndex].interaction },
+        let setup = draft.cardSetups[setupIndex]
+        return Binding(
+            get: {
+                draft.cardSetups.first(where: { $0.id == setup.id })?.interaction
+                    ?? setup.interaction
+            },
             set: { interaction in
+                guard let current = draft.cardSetups.first(where: { $0.id == setup.id }) else {
+                    return
+                }
                 if interaction == .audioSubmission,
-                   draft.cardSetups[setupIndex].requiresAudioAnswerRemovalConfirmation {
+                   current.requiresAudioAnswerRemovalConfirmation {
                     pendingAudioSubmission = true
                     return
                 }
@@ -1433,9 +1712,13 @@ public struct CardSetupEditorView: View {
     }
 
     private func availabilityEnabledBinding(_ index: Int) -> Binding<Bool> {
-        Binding(
-            get: { draft.cardSetups[index].availability != nil },
+        let setup = draft.cardSetups[index]
+        return Binding(
+            get: {
+                draft.cardSetups.first(where: { $0.id == setup.id })?.availability != nil
+            },
             set: { enabled in
+                guard draft.cardSetups.contains(where: { $0.id == setup.id }) else { return }
                 apply(.setAvailability(
                     enabled ? .fieldPresent(draft.fields.first?.id) : nil
                 ))
@@ -1444,59 +1727,87 @@ public struct CardSetupEditorView: View {
     }
 
     private func availabilityBinding(_ index: Int) -> Binding<CardSetupAvailabilityDraft> {
-        Binding(
-            get: { draft.cardSetups[index].availability ?? .fieldPresent(nil) },
-            set: { apply(.setAvailability($0)) }
+        let setup = draft.cardSetups[index]
+        return CardSetupEditorBindingFactory.availability(
+            draft: $draft,
+            cardSetupID: setup.id,
+            fallback: setup.availability ?? .fieldPresent(nil)
         )
     }
 
-    private func setupBinding<Value>(_ index: Int, _ keyPath: WritableKeyPath<CardSetupDraft, Value>) -> Binding<Value> {
-        Binding(
-            get: { draft.cardSetups[index][keyPath: keyPath] },
-            set: { draft.cardSetups[index][keyPath: keyPath] = $0 }
+    private func setupBinding<Value: Sendable>(
+        _ index: Int,
+        _ keyPath: WritableKeyPath<CardSetupDraft, Value>
+    ) -> Binding<Value> {
+        let setup = draft.cardSetups[index]
+        return CardSetupEditorBindingFactory.setupValue(
+            draft: $draft,
+            cardSetupID: setup.id,
+            keyPath: keyPath,
+            fallback: setup[keyPath: keyPath]
         )
     }
 
-    private func componentBinding<Value>(
+    private func componentBinding<Value: Sendable>(
         _ componentIndex: Int,
         _ setupIndex: Int,
         _ keyPath: WritableKeyPath<CardSetupComponentDraft, Value>
     ) -> Binding<Value> {
-        Binding(
-            get: { draft.cardSetups[setupIndex].components[componentIndex][keyPath: keyPath] },
-            set: { draft.cardSetups[setupIndex].components[componentIndex][keyPath: keyPath] = $0 }
+        let component = draft.cardSetups[setupIndex].components[componentIndex]
+        return CardSetupEditorBindingFactory.componentValue(
+            draft: $draft,
+            cardSetupID: cardSetupID,
+            componentID: component.id,
+            keyPath: keyPath,
+            fallback: component[keyPath: keyPath]
         )
     }
 
     private func revealBinding(_ componentID: UUID, setupIndex: Int) -> Binding<RevealMode> {
-        Binding(
-            get: {
-                draft.cardSetups[setupIndex].components.first(where: { $0.id == componentID })?.reveal
-                    ?? .hiddenUntilAnswer
-            },
-            set: { apply(.setReveal(componentID: componentID, $0)) }
+        let fallback = draft.cardSetups[setupIndex].components
+            .first(where: { $0.id == componentID })?.reveal ?? .hiddenUntilAnswer
+        return CardSetupEditorBindingFactory.reveal(
+            draft: $draft,
+            cardSetupID: cardSetupID,
+            componentID: componentID,
+            fallback: fallback
         )
     }
 
-    private func skillBinding<Value>(_ setupIndex: Int, _ keyPath: WritableKeyPath<Skill, Value>) -> Binding<Value> {
-        Binding(
-            get: { draft.cardSetups[setupIndex].learningRoute[keyPath: keyPath] },
-            set: { draft.cardSetups[setupIndex].learningRoute[keyPath: keyPath] = $0 }
+    private func skillBinding<Value: Sendable>(
+        _ setupIndex: Int,
+        _ keyPath: WritableKeyPath<Skill, Value>
+    ) -> Binding<Value> {
+        let setup = draft.cardSetups[setupIndex]
+        let fallback = setup.learningRoute[keyPath: keyPath]
+        let keyPath = SendableWritableKeyPath(value: keyPath)
+        return Binding(
+            get: {
+                draft.cardSetups.first(where: { $0.id == setup.id })?
+                    .learningRoute[keyPath: keyPath.value] ?? fallback
+            },
+            set: { value in
+                guard let index = draft.cardSetups.firstIndex(where: { $0.id == setup.id }) else {
+                    return
+                }
+                draft.cardSetups[index].learningRoute[keyPath: keyPath.value] = value
+            }
         )
     }
 
     private func fixedTextBinding(_ componentIndex: Int, setupIndex: Int) -> Binding<String> {
-        Binding(
-            get: {
-                guard case let .fixedText(value) = draft.cardSetups[setupIndex].components[componentIndex].source else {
-                    return ""
-                }
-                return value
-            },
-            set: {
-                let id = draft.cardSetups[setupIndex].components[componentIndex].id
-                apply(.editFixedText(componentID: id, value: $0))
-            }
+        let component = draft.cardSetups[setupIndex].components[componentIndex]
+        let fallback: String
+        if case let .fixedText(value) = component.source {
+            fallback = value
+        } else {
+            fallback = ""
+        }
+        return CardSetupEditorBindingFactory.fixedText(
+            draft: $draft,
+            cardSetupID: cardSetupID,
+            componentID: component.id,
+            fallback: fallback
         )
     }
 
@@ -1505,6 +1816,8 @@ public struct CardSetupEditorView: View {
         request: CardSetupSourceRequest,
         setupIndex: Int
     ) {
+        guard draft.cardSetups.indices.contains(setupIndex),
+              draft.cardSetups[setupIndex].id == cardSetupID else { return }
         if let componentID = request.componentID,
            draft.cardSetups[setupIndex].components.contains(where: { $0.id == componentID }) {
             apply(.changeSource(componentID: componentID, source: source))
@@ -1628,6 +1941,8 @@ private struct CardSetupSourcePicker: View {
     @Environment(\.dismiss) private var dismiss
     let fields: [ItemTypeFieldDraft]
     let allowsFixedText: Bool
+    let componentID: UUID?
+    let hole: CardWireframeHole
     let onSelect: (CardSetupComponentSourceDraft) -> Void
     @State private var query = ""
 
@@ -1643,6 +1958,11 @@ private struct CardSetupSourcePicker: View {
                             LabeledContent(field.name, value: field.type.editorDisplayName)
                                 .frame(minHeight: 44)
                         }
+                        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.sourcePickerField(
+                            componentID: componentID,
+                            hole: hole,
+                            fieldID: field.id
+                        ))
                     }
                 }
                 if allowsFixedText {
@@ -1652,6 +1972,10 @@ private struct CardSetupSourcePicker: View {
                             dismiss()
                         }
                         .frame(minHeight: 44)
+                        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.sourcePickerFixedText(
+                            componentID: componentID,
+                            hole: hole
+                        ))
                     }
                 }
             }
@@ -1659,8 +1983,22 @@ private struct CardSetupSourcePicker: View {
             .navigationTitle("Choose content")
             .toolbar {
                 Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.sourcePickerCancel(
+                        componentID: componentID,
+                        hole: hole
+                    ))
             }
         }
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.sourcePicker(
+            componentID: componentID,
+            hole: hole
+        ))
+#if os(macOS)
+        .frame(
+            minWidth: CardSetupEditorLayoutMetrics.macSourcePickerMinimumDimension,
+            minHeight: CardSetupEditorLayoutMetrics.macSourcePickerMinimumDimension
+        )
+#endif
         .presentationDetents([.medium, .large])
     }
 
@@ -1740,9 +2078,25 @@ private struct AvailabilityRuleEditor: View {
     @Binding var rule: CardSetupAvailabilityDraft
     let fields: [ItemTypeFieldDraft]
     let depth: Int
+    @State private var identityState: AvailabilityRuleEditorIdentityState
 
     private enum Combination: String, CaseIterable {
         case all, any
+    }
+
+    init(
+        rule: Binding<CardSetupAvailabilityDraft>,
+        fields: [ItemTypeFieldDraft],
+        depth: Int
+    ) {
+        _rule = rule
+        self.fields = fields
+        self.depth = depth
+        let childCount: Int = switch rule.wrappedValue {
+        case let .all(children), let .any(children): children.count
+        case .fieldPresent, .fieldAbsent: 0
+        }
+        _identityState = State(initialValue: .init(childCount: childCount))
     }
 
     var body: some View {
@@ -1751,6 +2105,7 @@ private struct AvailabilityRuleEditor: View {
             case .fieldPresent, .fieldAbsent:
                 leafEditor
                 Button("Add another rule", systemImage: "plus") {
+                    identityState = .init(childCount: 2)
                     rule = .all([rule, .fieldPresent(fields.first?.id)])
                 }
                 .frame(
@@ -1759,15 +2114,15 @@ private struct AvailabilityRuleEditor: View {
                 )
             case let .all(children), let .any(children):
                 combinationPicker
-                ForEach(children.indices, id: \.self) { index in
+                ForEach(Array(zip(identityState.childIDs, children)), id: \.0) { childID, child in
                     VStack(alignment: .leading, spacing: 8) {
                         AnyView(AvailabilityRuleEditor(
-                            rule: childBinding(index),
+                            rule: childBinding(childID, fallback: child),
                             fields: fields,
                             depth: depth + 1
                         ))
                         Button("Remove rule", systemImage: "minus.circle", role: .destructive) {
-                            removeChild(index)
+                            removeChild(childID)
                         }
                         .frame(
                             minWidth: CardSetupEditorLayoutMetrics.minimumTouchTarget,
@@ -1787,6 +2142,16 @@ private struct AvailabilityRuleEditor: View {
                         minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget
                     )
             }
+        }
+        .onChange(of: childCount, initial: true) { _, count in
+            identityState.reconcile(childCount: count)
+        }
+    }
+
+    private var childCount: Int {
+        switch rule {
+        case let .all(children), let .any(children): children.count
+        case .fieldPresent, .fieldAbsent: 0
         }
     }
 
@@ -1895,24 +2260,35 @@ private struct AvailabilityRuleEditor: View {
         )
     }
 
-    private func childBinding(_ index: Int) -> Binding<CardSetupAvailabilityDraft> {
+    private func childBinding(
+        _ childID: UUID,
+        fallback: CardSetupAvailabilityDraft
+    ) -> Binding<CardSetupAvailabilityDraft> {
         Binding(
             get: {
+                guard let index = identityState.childIDs.firstIndex(of: childID) else {
+                    return fallback
+                }
                 switch rule {
-                case let .all(children), let .any(children): return children[index]
-                case .fieldPresent, .fieldAbsent: return rule
+                case let .all(children), let .any(children):
+                    return children.indices.contains(index) ? children[index] : fallback
+                case .fieldPresent, .fieldAbsent: return fallback
                 }
             },
             set: { child in
+                guard let index = identityState.childIDs.firstIndex(of: childID) else {
+                    return
+                }
                 switch rule {
                 case var .all(children):
+                    guard children.indices.contains(index) else { return }
                     children[index] = child
                     rule = .all(children)
                 case var .any(children):
+                    guard children.indices.contains(index) else { return }
                     children[index] = child
                     rule = .any(children)
-                case .fieldPresent, .fieldAbsent:
-                    rule = child
+                case .fieldPresent, .fieldAbsent: return
                 }
             }
         )
@@ -1921,22 +2297,28 @@ private struct AvailabilityRuleEditor: View {
     private func appendChild() {
         switch rule {
         case var .all(children):
+            _ = identityState.appendChild()
             children.append(.fieldPresent(fields.first?.id))
             rule = .all(children)
         case var .any(children):
+            _ = identityState.appendChild()
             children.append(.fieldPresent(fields.first?.id))
             rule = .any(children)
         case .fieldPresent, .fieldAbsent:
+            identityState = .init(childCount: 2)
             rule = .all([rule, .fieldPresent(fields.first?.id)])
         }
     }
 
-    private func removeChild(_ index: Int) {
+    private func removeChild(_ childID: UUID) {
+        guard let index = identityState.removeChild(id: childID) else { return }
         switch rule {
         case var .all(children):
+            guard children.indices.contains(index) else { return }
             children.remove(at: index)
             rule = .all(children)
         case var .any(children):
+            guard children.indices.contains(index) else { return }
             children.remove(at: index)
             rule = .any(children)
         case .fieldPresent, .fieldAbsent:

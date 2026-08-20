@@ -13,6 +13,9 @@ enum MobileItemTypeStudioUITestSeeder {
     static let legacyCardSetupID = UUID(
         uuidString: "B3000001-0010-4000-8000-000000000001"
     )!
+    static let legacyAdditionalComponentID = UUID(
+        uuidString: "B3000001-0022-4000-8000-000000000001"
+    )!
 
     static func seedIfRequested(library: any LibraryRepository) async throws {
         let process = ProcessInfo.processInfo
@@ -78,7 +81,7 @@ enum MobileItemTypeStudioUITestSeeder {
                 // Purpose/region is intentionally noncanonical. The Studio must
                 // surface it under Additional content without normalizing it.
                 TemplateComponent(
-                    id: UUID(uuidString: "B3000001-0022-4000-8000-000000000001")!,
+                    id: legacyAdditionalComponentID,
                     region: .secondary,
                     purpose: .supporting,
                     source: .field(notes.id)

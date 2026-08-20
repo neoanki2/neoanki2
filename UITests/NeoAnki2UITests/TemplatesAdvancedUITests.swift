@@ -177,8 +177,8 @@ extension FastFunctionalJourneyTests {
         let advanced = revealCardSetupAdvanced(in: app)
         advanced.click()
         XCTAssertEqual(advanced.value as? String, "Expanded")
-        XCTAssertTrue(app.checkBoxes["Availability rule"].exists)
-        XCTAssertTrue(app.buttons["Use recommendation"].exists)
+        revealCardSetupElement(app.checkBoxes["Availability rule"], in: app)
+        revealCardSetupElement(app.buttons["Use recommended route"], in: app)
     }
 
     func checkTemplatesAdvancedUITestsRepairCorruptedItemType() throws {

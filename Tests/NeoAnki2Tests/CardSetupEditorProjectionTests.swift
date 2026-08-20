@@ -1,8 +1,10 @@
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
-import NeoAnkiSharedUI
+import SwiftUI
 import Testing
+
+@testable import NeoAnkiSharedUI
 
 @Test("Card setup editor projection preserves order and separates noncanonical mappings")
 func cardSetupEditorProjectionPreservesLegacyMappings() {
@@ -669,6 +671,7 @@ func sharedStudyClozeGroupParity() {
 func editorSizingMetrics() {
     #expect(CardSetupEditorLayoutMetrics.minimumTouchTarget == 44)
     #expect(CardSetupEditorLayoutMetrics.maximumAvailabilityIndentation == 16)
+    #expect(CardSetupEditorLayoutMetrics.macSourcePickerMinimumDimension == 420)
     #expect(CardSetupEditorLayoutMetrics.availabilityIndentation(depth: -1) == 0)
     #expect(CardSetupEditorLayoutMetrics.availabilityIndentation(depth: 1) == 8)
     #expect(CardSetupEditorLayoutMetrics.availabilityIndentation(depth: 5) == 16)
@@ -690,6 +693,107 @@ func editorSizingMetrics() {
         isAccessibilitySize: false,
         availableWidth: 600
     ))
+}
+
+@Test("Editor bindings ignore delayed writes after their stable targets disappear")
+@MainActor
+func editorBindingsAreTeardownSafe() throws {
+    let setupBox = EditorDraftBox(ItemTypeStudioDraft.new())
+    let setupID = try #require(setupBox.value.cardSetups.first?.id)
+    let setupName = try #require(setupBox.value.cardSetups.first?.name)
+    let setupBinding = CardSetupEditorBindingFactory.setupValue(
+        draft: setupBox.binding,
+        cardSetupID: setupID,
+        keyPath: \.name,
+        fallback: setupName
+    )
+    setupBox.value.cardSetups.removeAll()
+    setupBinding.wrappedValue = "Delayed setup write"
+    #expect(setupBox.value.cardSetups.isEmpty)
+    #expect(setupBinding.wrappedValue == setupName)
+
+    let componentBox = EditorDraftBox(ItemTypeStudioDraft.new())
+    let componentSetupID = try #require(componentBox.value.cardSetups.first?.id)
+    let component = try #require(componentBox.value.cardSetups.first?.components.first)
+    let mediaBinding = CardSetupEditorBindingFactory.componentValue(
+        draft: componentBox.binding,
+        cardSetupID: componentSetupID,
+        componentID: component.id,
+        keyPath: \.mediaBehavior,
+        fallback: component.mediaBehavior
+    )
+    componentBox.value.cardSetups[0].components.removeAll { $0.id == component.id }
+    mediaBinding.wrappedValue = .autoplay
+    #expect(componentBox.value.cardSetups[0].components.allSatisfy { $0.id != component.id })
+    #expect(mediaBinding.wrappedValue == component.mediaBehavior)
+
+    let fixedTextBox = EditorDraftBox(ItemTypeStudioDraft.new())
+    let fixedTextSetupID = try #require(fixedTextBox.value.cardSetups.first?.id)
+    let fixedText = CardSetupComponentDraft(
+        source: .fixedText("Before"),
+        region: .primary,
+        purpose: .supporting
+    )
+    fixedTextBox.value.cardSetups[0].components.append(fixedText)
+    let fixedTextBinding = CardSetupEditorBindingFactory.fixedText(
+        draft: fixedTextBox.binding,
+        cardSetupID: fixedTextSetupID,
+        componentID: fixedText.id,
+        fallback: "Before"
+    )
+    let fixedTextIndex = fixedTextBox.value.cardSetups[0].components.count - 1
+    fixedTextBox.value.cardSetups[0].components[fixedTextIndex].setSource(.field(
+        fixedTextBox.value.fields.first?.id
+    ))
+    fixedTextBinding.wrappedValue = "Delayed text write"
+    #expect(fixedTextBinding.wrappedValue == "Before")
+    #expect(fixedTextBox.value.cardSetups[0].components[fixedTextIndex].source.fieldID
+        == fixedTextBox.value.fields.first?.id)
+
+    let revealBox = EditorDraftBox(ItemTypeStudioDraft.new())
+    let revealSetupID = try #require(revealBox.value.cardSetups.first?.id)
+    let revealComponent = try #require(revealBox.value.cardSetups.first?.components.first)
+    let revealBinding = CardSetupEditorBindingFactory.reveal(
+        draft: revealBox.binding,
+        cardSetupID: revealSetupID,
+        componentID: revealComponent.id,
+        fallback: revealComponent.reveal
+    )
+    revealBox.value.cardSetups[0].components.removeAll { $0.id == revealComponent.id }
+    revealBinding.wrappedValue = .hiddenUntilAnswer
+    #expect(revealBox.value.cardSetups[0].components.allSatisfy { $0.id != revealComponent.id })
+    #expect(revealBinding.wrappedValue == revealComponent.reveal)
+
+    let availabilityBox = EditorDraftBox(ItemTypeStudioDraft.new())
+    let availabilitySetupID = try #require(availabilityBox.value.cardSetups.first?.id)
+    let originalAvailability = CardSetupAvailabilityDraft.fieldPresent(
+        availabilityBox.value.fields.first?.id
+    )
+    availabilityBox.value.cardSetups[0].availability = originalAvailability
+    let availabilityBinding = CardSetupEditorBindingFactory.availability(
+        draft: availabilityBox.binding,
+        cardSetupID: availabilitySetupID,
+        fallback: originalAvailability
+    )
+    availabilityBox.value.cardSetups[0].availability = nil
+    availabilityBinding.wrappedValue = .fieldAbsent(availabilityBox.value.fields.last?.id)
+    #expect(availabilityBox.value.cardSetups[0].availability == nil)
+    #expect(availabilityBinding.wrappedValue == originalAvailability)
+}
+
+@Test("Availability row identities preserve the surviving neighbor after edge removals")
+func availabilityRowIdentityEdgeRemovals() throws {
+    var removeFirst = AvailabilityRuleEditorIdentityState(childCount: 3)
+    let originalFirstIDs = removeFirst.childIDs
+    let firstID = try #require(originalFirstIDs.first)
+    #expect(removeFirst.removeChild(id: firstID) == 0)
+    #expect(removeFirst.childIDs == Array(originalFirstIDs.dropFirst()))
+
+    var removeLast = AvailabilityRuleEditorIdentityState(childCount: 3)
+    let originalLastIDs = removeLast.childIDs
+    let lastID = try #require(originalLastIDs.last)
+    #expect(removeLast.removeChild(id: lastID) == 2)
+    #expect(removeLast.childIDs == Array(originalLastIDs.dropLast()))
 }
 
 @Test("Mounted editor consumes only its own preexisting validation focus")
@@ -784,8 +888,44 @@ func editorStructuralValidationTargets() throws {
 
 @Test("Studio production controls expose stable Advanced child identifiers")
 func editorAdvancedAccessibilityIdentifiers() {
+    let componentID = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+    let fieldID = UUID(uuidString: "20000000-0000-0000-0000-000000000002")!
     #expect(ItemTypeStudioAccessibilityID.availability == "cardSetupEditor.availability")
     #expect(ItemTypeStudioAccessibilityID.learningRoute == "cardSetupEditor.learningRoute")
+    #expect(ItemTypeStudioAccessibilityID.additionalContent == "cardSetupEditor.additionalContent")
+    #expect(ItemTypeStudioAccessibilityID.sourcePicker(
+        componentID: componentID,
+        hole: .question
+    ) == "cardSetupEditor.sourcePicker.component.\(componentID)")
+    #expect(ItemTypeStudioAccessibilityID.sourcePickerField(
+        componentID: nil,
+        hole: .media,
+        fieldID: fieldID
+    ) == "cardSetupEditor.sourcePicker.hole.media.field.\(fieldID)")
+    #expect(ItemTypeStudioAccessibilityID.sourcePickerFixedText(
+        componentID: nil,
+        hole: .context
+    ) == "cardSetupEditor.sourcePicker.hole.context.fixedText")
+    #expect(ItemTypeStudioAccessibilityID.sourcePickerCancel(
+        componentID: componentID,
+        hole: .answer
+    ) == "cardSetupEditor.sourcePicker.component.\(componentID).cancel")
+}
+
+@MainActor
+private final class EditorDraftBox {
+    var value: ItemTypeStudioDraft
+
+    init(_ value: ItemTypeStudioDraft) {
+        self.value = value
+    }
+
+    var binding: Binding<ItemTypeStudioDraft> {
+        Binding(
+            get: { self.value },
+            set: { self.value = $0 }
+        )
+    }
 }
 
 private func editorMediaRef(kind: MediaKind, altText: String) -> MediaRef {

@@ -26,6 +26,19 @@ enum MacItemTypeStudioFieldRemovalPolicy {
     }
 }
 
+/// Prevents a lazy editor control from resurrecting a draft after Save/Cancel,
+/// or from overwriting a rebased/new draft that happens to occupy the same
+/// presentation slot while the old SwiftUI subtree is tearing down.
+enum MacItemTypeStudioDraftBindingPolicy {
+    static func isSameMountedDraft(
+        _ active: ItemTypeStudioDraft?,
+        as mounted: ItemTypeStudioDraft
+    ) -> Bool {
+        active?.id == mounted.id
+            && active?.originalSnapshot == mounted.originalSnapshot
+    }
+}
+
 /// macOS shell for the shared Item Type Studio authoring state and Card setup
 /// editor. The shell owns document-level actions and confirmations only.
 struct MacItemTypeStudioView: View {
@@ -150,14 +163,22 @@ struct MacItemTypeStudioView: View {
     }
 
     private var draft: Binding<ItemTypeStudioDraft> {
-        Binding(
+        let mountedDraft = model.studioDraft ?? ItemTypeStudioDraft.new()
+        return Binding(
             get: {
-                guard let draft = model.studioDraft else {
-                    preconditionFailure("Studio draft binding used after dismissal")
-                }
-                return draft
+                guard MacItemTypeStudioDraftBindingPolicy.isSameMountedDraft(
+                    model.studioDraft,
+                    as: mountedDraft
+                ) else { return mountedDraft }
+                return model.studioDraft ?? mountedDraft
             },
-            set: { model.studioDraft = $0 }
+            set: { updatedDraft in
+                guard MacItemTypeStudioDraftBindingPolicy.isSameMountedDraft(
+                    model.studioDraft,
+                    as: mountedDraft
+                ) else { return }
+                model.studioDraft = updatedDraft
+            }
         )
     }
 

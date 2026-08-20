@@ -37,3 +37,21 @@ import NeoAnkiApplication
         from: draft
     ) == [setup.name])
 }
+
+@Test func macStudioDraftBindingAcceptsOnlyItsMountedIdentityAndSnapshot() throws {
+    var mounted = ItemTypeStudioDraft.new()
+    mounted.name = "Mounted"
+
+    #expect(MacItemTypeStudioDraftBindingPolicy.isSameMountedDraft(mounted, as: mounted))
+    #expect(!MacItemTypeStudioDraftBindingPolicy.isSameMountedDraft(nil, as: mounted))
+    #expect(!MacItemTypeStudioDraftBindingPolicy.isSameMountedDraft(
+        ItemTypeStudioDraft.new(),
+        as: mounted
+    ))
+
+    let saved = try mounted.candidateItemType()
+    var rebased = mounted
+    rebased.markSaved(as: saved)
+    #expect(rebased.id == mounted.id)
+    #expect(!MacItemTypeStudioDraftBindingPolicy.isSameMountedDraft(rebased, as: mounted))
+}

@@ -857,16 +857,49 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func revealCardSetupAdvanced(in app: XCUIApplication) -> XCUIElement {
-        let editor = app.descendants(matching: .any)
-            .identified("itemTypeStudioCardSetupEditor")
         let advanced = app.descendants(matching: .any)
             .identified("cardSetupEditor.advanced")
-        XCTAssertTrue(editor.waitUntilExists(timeout: 3))
-        for _ in 0..<8 where !advanced.exists {
-            editor.scroll(byDeltaX: 0, deltaY: -250)
-        }
-        XCTAssertTrue(advanced.waitUntilExists(timeout: 3))
+        revealCardSetupElement(advanced, in: app)
         return advanced
+    }
+
+    /// Reveals a control inside the Studio's right-hand editor without relying
+    /// on its lazy children already existing in the accessibility tree. The
+    /// outer editor is the one stable scrolling surface on every supported
+    /// window size; bounded, directional AppKit scrolling avoids both an
+    /// unbounded search and clicks on controls clipped outside that surface.
+    func revealCardSetupElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maximumSteps: Int = 12,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let editor = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        XCTAssertTrue(editor.waitUntilExists(timeout: 3), file: file, line: line)
+
+        func isReachable() -> Bool {
+            element.exists && element.isHittable && element.frame.intersects(editor.frame)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < editor.frame.minY {
+                delta = 250
+            } else {
+                delta = -250
+            }
+            editor.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
+        XCTAssertTrue(
+            isReachable(),
+            "Card setup control is not visible and reachable: \(element)",
+            file: file,
+            line: line
+        )
     }
 
     func assertItemTypeStudioFitsWindow(
