@@ -507,6 +507,11 @@ extension FastFunctionalJourneyTests {
                     .waitUntilExists(timeout: 3)
             )
             riskyApp.typeKey("s", modifierFlags: .command)
+            // At the default compact workspace width, validation routes the
+            // invalid Card setup into its modal Inspector. Close that focused
+            // context before checking the persistent document-level summary,
+            // which is intentionally outside the sheet's accessibility tree.
+            closeCardSetupInspector(in: riskyApp)
             XCTAssertTrue(
                 riskyApp.descendants(matching: .any)
                     .identified("itemTypeStudioValidationSummary")
