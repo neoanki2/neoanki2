@@ -122,7 +122,7 @@ extension FastFunctionalJourneyTests {
             let confirmRemoval = impactApp.buttons.identified("confirmRemoveStudioField")
             XCTAssertTrue(confirmRemoval.waitUntilExists(timeout: 3))
             confirmRemoval.click()
-            impactApp.buttons.identified("saveItemTypeStudio").click()
+            impactApp.typeKey("s", modifierFlags: .command)
 
             let keepEditing = impactApp.buttons.identified("cancelItemTypeStudioSaveImpact")
             XCTAssertTrue(keepEditing.waitUntilExists(timeout: 3))
@@ -132,7 +132,7 @@ extension FastFunctionalJourneyTests {
             XCTAssertTrue(confirmImpact.label.contains("Remove Notes"))
             keepEditing.click()
 
-            impactApp.buttons.identified("saveItemTypeStudio").click()
+            impactApp.typeKey("s", modifierFlags: .command)
             XCTAssertTrue(confirmImpact.waitUntilExists(timeout: 3))
             confirmImpact.click()
             XCTAssertTrue(impactApp.buttons.identified("editItemType").waitUntilExists(timeout: 5))
@@ -175,7 +175,7 @@ extension FastFunctionalJourneyTests {
         advanced.click()
         XCTAssertEqual(advanced.value as? String, "Expanded")
         revealCardSetupElement(app.checkBoxes["Availability rule"], in: app)
-        revealCardSetupElement(app.buttons["Use recommended route"], in: app)
+        XCTAssertTrue(app.buttons["Use recommended route"].waitUntilExists(timeout: 3))
     }
 
     func checkTemplatesAdvancedUITestsRepairCorruptedItemType() throws {

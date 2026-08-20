@@ -15,6 +15,19 @@ private struct InitialLibraryPayload: Sendable {
 
 private let isDocumentationScreenshotCapture =
     ProcessInfo.processInfo.environment["NEOANKI_DOC_SCREENSHOTS"] == "1"
+private let isFunctionalUITestRun =
+    ProcessInfo.processInfo.environment["NEOANKI_TESTING"] == "1"
+// The functional test scene includes a 52-point title/toolbar region. Keeping
+// its content at 588 points produces the intended 640-point outer window while
+// still fitting the smallest macOS CI screen's visible frame.
+private let functionalUITestContentHeight: CGFloat = 588
+
+private let documentationScreenshotColorScheme: ColorScheme? = {
+    guard isDocumentationScreenshotCapture else { return nil }
+    return ProcessInfo.processInfo.environment["NEOANKI_DOC_APPEARANCE"] == "light"
+        ? .light
+        : .dark
+}()
 
 @main
 struct NeoAnki2App: App {
@@ -120,13 +133,19 @@ struct NeoAnki2App: App {
                 }
             }
             .frame(
-                minWidth: isDocumentationScreenshotCapture ? 1_024 : nil,
-                minHeight: isDocumentationScreenshotCapture ? 680 : nil
+                minWidth: isDocumentationScreenshotCapture ? 1_024 : isFunctionalUITestRun ? 960 : nil,
+                maxWidth: isDocumentationScreenshotCapture ? 1_024 : isFunctionalUITestRun ? 960 : nil,
+                minHeight: isDocumentationScreenshotCapture
+                    ? 680
+                    : isFunctionalUITestRun ? functionalUITestContentHeight : nil,
+                maxHeight: isDocumentationScreenshotCapture
+                    ? 680
+                    : isFunctionalUITestRun ? functionalUITestContentHeight : nil
             )
             .task {
                 installUITestControlIfNeeded()
             }
-            .preferredColorScheme(isDocumentationScreenshotCapture ? .dark : nil)
+            .preferredColorScheme(documentationScreenshotColorScheme)
             .alert(
                 "Approve Local API Client?",
                 isPresented: Binding(
@@ -158,6 +177,11 @@ struct NeoAnki2App: App {
         .defaultSize(
             width: isDocumentationScreenshotCapture ? 1_024 : 960,
             height: isDocumentationScreenshotCapture ? 680 : 640
+        )
+        .windowResizability(
+            isDocumentationScreenshotCapture || isFunctionalUITestRun
+                ? .contentSize
+                : .automatic
         )
         .commands {
             LibraryCommands()

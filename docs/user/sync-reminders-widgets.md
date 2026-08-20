@@ -76,6 +76,10 @@ Immutable history is unioned deterministically. Concurrent edits to mutable
 resources accept one version while preserving the other as a conflict copy
 when it can be restored.
 
+Item Type Studio keeps its field and Card setup edits in one draft. **Save**
+commits that complete definition locally so it can sync as one item-type
+change; **Cancel** discards the draft, so no partial Studio edits are uploaded.
+
 These remain local to each device:
 
 - the iCloud opt-in itself;

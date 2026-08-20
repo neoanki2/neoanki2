@@ -10,6 +10,12 @@ public enum ItemTypeStudioAccessibilityID {
     public static let addCardSetupMenu = "itemTypeStudio.addCardSetupMenu"
     public static let undoCardSetupRemoval = "itemTypeStudio.undoCardSetupRemoval"
     public static let cardSetupEditor = "cardSetupEditor"
+    public static let canvas = "cardSetupEditor.canvas"
+    public static let inspector = "cardSetupEditor.inspector"
+    public static let inspectorButton = "cardSetupEditor.inspectorButton"
+    public static let inspectorDone = "cardSetupEditor.inspectorDone"
+    public static let validationSummary = "itemTypeStudioValidationSummary"
+    public static let addContent = "cardSetupEditor.addContent"
     public static let cardSetupName = "cardSetupEditor.name"
     public static let answerMethod = "cardSetupEditor.answerMethod"
     public static let recipeQuestion = "cardSetupEditor.recipe.question"
@@ -335,6 +341,7 @@ public enum CardSetupEditorAction: Equatable, Sendable {
     case addComponent(source: CardSetupComponentSourceDraft, hole: CardWireframeHole)
     case changeSource(componentID: UUID, source: CardSetupComponentSourceDraft)
     case editFixedText(componentID: UUID, value: String)
+    case duplicateComponent(UUID)
     case removeComponent(UUID)
     case moveComponent(UUID, CardSetupEditorMoveDirection)
     case moveAdditionalComponent(UUID, CardSetupEditorMoveDirection)
@@ -389,6 +396,23 @@ public enum CardSetupEditorReducer {
                   case .fixedText = setup.components[index].source
             else { return false }
             setup.components[index].setFixedText(value)
+
+        case let .duplicateComponent(componentID):
+            guard let index = setup.components.firstIndex(where: { $0.id == componentID }) else {
+                return false
+            }
+            let component = setup.components[index]
+            setup.components.insert(
+                CardSetupComponentDraft(
+                    source: component.source,
+                    region: component.region,
+                    purpose: component.purpose,
+                    reveal: component.reveal,
+                    mediaBehavior: component.mediaBehavior
+                ),
+                at: index + 1
+            )
+            setup.refreshRecommendation(fields: fields)
 
         case let .removeComponent(componentID):
             guard let index = setup.components.firstIndex(where: { $0.id == componentID }) else {
@@ -694,6 +718,7 @@ public enum CardSetupEditorLayoutMetrics {
     public static let minimumTouchTarget: CGFloat = 44
     public static let maximumAvailabilityIndentation: CGFloat = 16
     public static let macSourcePickerMinimumDimension: CGFloat = 420
+    public static let workspaceInspectorThreshold: CGFloat = 960
 
     /// The cumulative leading indentation at a recursive Availability depth.
     public static func availabilityIndentation(depth: Int) -> CGFloat {
@@ -847,7 +872,7 @@ public struct CardSetupCollectionView: View {
                     }
 #endif
 
-                    Button("Remove Card Setup", role: .destructive) {
+                    Button("Remove Card Setup", systemImage: "trash", role: .destructive) {
                         remove(setup.id)
                     }
                     .labelStyle(.iconOnly)
@@ -867,8 +892,9 @@ public struct CardSetupCollectionView: View {
             }
 
             HStack(spacing: 8) {
-                Button("Add Card Setup", systemImage: "plus") { add(.basic) }
+                Button("Add", systemImage: "plus") { add(.basic) }
                     .disabled(!CardSetupStarter.basic.isApplicable(to: draft.fields))
+                    .accessibilityLabel("Add Card Setup")
                     .accessibilityIdentifier(ItemTypeStudioAccessibilityID.addBasicCardSetup)
                     .frame(minHeight: 44)
 
@@ -950,6 +976,13 @@ public struct CardSetupCollectionView: View {
     }
 }
 
+/// The shared editor keeps its existing scrolling form on iPhone and iPad,
+/// while macOS can opt into a canvas-led workspace composition.
+public enum CardSetupEditorPresentation: Equatable, Sendable {
+    case stacked
+    case workspace
+}
+
 /// The shared fillable Card setup editor used by both platform shells.
 public struct CardSetupEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
@@ -959,25 +992,34 @@ public struct CardSetupEditorView: View {
     @Binding private var draft: ItemTypeStudioDraft
     private let cardSetupID: UUID
     @Binding private var validationFocus: ItemTypeStudioValidationTarget?
+    @Binding private var validationMessage: String?
     private let auditSection: CardSetupEditorAuditSection?
+    private let presentation: CardSetupEditorPresentation
 
     @State private var isAnswerRevealed = false
     @State private var showsAdvanced = CardSetupEditorAdvancedPolicy.startsExpanded
     @State private var showsAdditionalContent = false
     @State private var pendingAudioSubmission = false
     @State private var sourceRequest: CardSetupSourceRequest?
+    @State private var selectedComponentID: UUID?
+    @State private var isInspectorPresented = false
+    @State private var workspaceUsesInspectorSheet = false
     @FocusState private var focusedTarget: ItemTypeStudioValidationTarget?
 
     public init(
         draft: Binding<ItemTypeStudioDraft>,
         cardSetupID: UUID,
         validationFocus: Binding<ItemTypeStudioValidationTarget?> = .constant(nil),
-        auditSection: CardSetupEditorAuditSection? = nil
+        validationMessage: Binding<String?> = .constant(nil),
+        auditSection: CardSetupEditorAuditSection? = nil,
+        presentation: CardSetupEditorPresentation = .stacked
     ) {
         _draft = draft
         self.cardSetupID = cardSetupID
         _validationFocus = validationFocus
+        _validationMessage = validationMessage
         self.auditSection = auditSection
+        self.presentation = presentation
     }
 
     private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
@@ -985,23 +1027,29 @@ public struct CardSetupEditorView: View {
     public var body: some View {
         Group {
             if let setupIndex {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        if let auditSection {
-                            Group {
-                                auditEditorSection(auditSection, setupIndex: setupIndex)
-                                Divider()
+                Group {
+                    if presentation == .workspace, auditSection == nil {
+                        workspaceEditor(setupIndex)
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 24) {
+                                if let auditSection {
+                                    Group {
+                                        auditEditorSection(auditSection, setupIndex: setupIndex)
+                                        Divider()
+                                    }
+                                }
+                                editorSections(setupIndex)
                             }
+                            .frame(maxWidth: 860)
+                            .frame(maxWidth: .infinity)
+                            .padding(20)
                         }
-                        editorSections(setupIndex)
+                        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
                     }
-                    .frame(maxWidth: 860)
-                    .frame(maxWidth: .infinity)
-                    .padding(20)
                 }
-                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
                 .tint(colorSchemeContrast == .increased ? .primary : .accentColor)
-                .sheet(item: $sourceRequest) { request in
+                .sheet(item: canvasSourceRequest) { request in
                     CardSetupSourcePicker(
                         fields: sourceFields(for: request),
                         allowsFixedText: request.hole != .media,
@@ -1011,9 +1059,12 @@ public struct CardSetupEditorView: View {
                         apply(source: source, request: request, setupIndex: setupIndex)
                     }
                 }
+                .sheet(isPresented: $isInspectorPresented) {
+                    workspaceInspectorSheet(setupIndex)
+                }
                 .confirmationDialog(
                     "Remove the expected answer?",
-                    isPresented: $pendingAudioSubmission,
+                    isPresented: rootAudioSubmissionConfirmation,
                     titleVisibility: .visible
                 ) {
                     Button("Remove Answer and Continue", role: .destructive) {
@@ -1038,6 +1089,306 @@ public struct CardSetupEditorView: View {
             applyValidationFocus(target)
         }
         .onChange(of: focusedTarget) { _, target in validationFocus = target }
+        .onChange(of: cardSetupID) { _, _ in
+            selectedComponentID = nil
+            isAnswerRevealed = false
+            isInspectorPresented = false
+        }
+        .onChange(of: selectedSetupComponentIDs) { _, ids in
+            if let selectedComponentID, !ids.contains(selectedComponentID) {
+                self.selectedComponentID = nil
+            }
+        }
+    }
+
+    private var selectedSetupComponentIDs: [UUID] {
+        guard let setupIndex else { return [] }
+        return draft.cardSetups[setupIndex].components.map(\.id)
+    }
+
+    private var canvasSourceRequest: Binding<CardSetupSourceRequest?> {
+        Binding(
+            get: { isInspectorPresented ? nil : sourceRequest },
+            set: { sourceRequest = $0 }
+        )
+    }
+
+    private var rootAudioSubmissionConfirmation: Binding<Bool> {
+        Binding(
+            get: { pendingAudioSubmission && !isInspectorPresented },
+            set: { isPresented in
+                if !isPresented { pendingAudioSubmission = false }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func workspaceEditor(_ setupIndex: Int) -> some View {
+        GeometryReader { geometry in
+            let usesSheet = geometry.size.width
+                < CardSetupEditorLayoutMetrics.workspaceInspectorThreshold
+
+            HStack(spacing: 0) {
+                workspaceCanvas(setupIndex, showsInspectorButton: usesSheet)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if !usesSheet {
+                    Divider()
+                    workspaceInspector(setupIndex)
+                        .frame(width: 320)
+                        .frame(maxHeight: .infinity)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .onAppear { workspaceUsesInspectorSheet = usesSheet }
+            .onChange(of: usesSheet) { _, newValue in
+                workspaceUsesInspectorSheet = newValue
+                if !newValue { isInspectorPresented = false }
+            }
+        }
+    }
+
+    private func workspaceCanvas(
+        _ setupIndex: Int,
+        showsInspectorButton: Bool
+    ) -> some View {
+        let setup = draft.cardSetups[setupIndex]
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(setup.name.isEmpty ? "Untitled Card setup" : setup.name)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text("Card canvas")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.canvas)
+                }
+                Spacer(minLength: 8)
+                workspaceAddContentMenu(setup)
+                workspaceLayoutMenu(setup)
+                answerVisibilityButton
+                if showsInspectorButton {
+                    Button("Inspector", systemImage: "sidebar.right") {
+                        isInspectorPresented = true
+                    }
+                    .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+                    .accessibilityHint("Opens setup and selected-content controls")
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.inspectorButton)
+                }
+            }
+
+            CardWireframeView(
+                layout: setup.layout,
+                components: projection.resolvedComponents,
+                isAnswerRevealed: isAnswerRevealed,
+                emptyHoleView: { hole in
+                    AnyView(emptyHole(hole, setupIndex: setupIndex))
+                }
+            ) { component, hole in
+                previewComponent(
+                    component,
+                    hole: hole,
+                    setupIndex: setupIndex,
+                    rendering: projection.previewRendering(
+                        for: component,
+                        isAnswerRevealed: isAnswerRevealed
+                    )
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+            .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 20))
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Card canvas")
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditPreview)
+        }
+        .padding(16)
+    }
+
+    private func workspaceLayoutMenu(_ setup: CardSetupDraft) -> some View {
+        Menu {
+            ForEach(CardLayoutID.allCases, id: \.self) { layout in
+                Button {
+                    apply(.chooseLayout(layout))
+                } label: {
+                    Label(
+                        layout.displayName,
+                        systemImage: setup.layout == layout ? "checkmark" : "rectangle"
+                    )
+                }
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.layout(layout))
+            }
+        } label: {
+            Label(setup.layout.displayName, systemImage: "rectangle.3.group")
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.layoutPicker)
+        }
+        .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+        .focused($focusedTarget, equals: .layout(cardSetupID: cardSetupID))
+        .accessibilityLabel("Layout, \(setup.layout.displayName)")
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.layoutPicker)
+    }
+
+    private func workspaceAddContentMenu(_ setup: CardSetupDraft) -> some View {
+        let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
+        return Menu("Add content", systemImage: "plus") {
+            ForEach(descriptor.accessibilityHoles) { holeDescriptor in
+                Button(holeDescriptor.hole.displayName) {
+                    sourceRequest = .init(componentID: nil, hole: holeDescriptor.hole)
+                }
+            }
+        }
+        .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.addContent)
+    }
+
+    private var answerVisibilityButton: some View {
+        Button(
+            isAnswerRevealed ? "Hide Answer" : "Show Answer",
+            systemImage: isAnswerRevealed ? "eye.slash" : "eye"
+        ) {
+            if reduceMotion {
+                isAnswerRevealed.toggle()
+            } else {
+                withAnimation(.easeInOut(duration: 0.2)) { isAnswerRevealed.toggle() }
+            }
+        }
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.showAnswer)
+        .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+    }
+
+    private func workspaceInspector(
+        _ setupIndex: Int,
+        showsTitle: Bool = true
+    ) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                if showsTitle {
+                    Text("Inspector")
+                        .font(.headline)
+                        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.inspector)
+                }
+                identitySection(setupIndex)
+                recipeSection(setupIndex)
+                selectedContentSection(setupIndex)
+                advancedSection(setupIndex)
+            }
+            .padding(16)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Card setup inspector")
+    }
+
+    private func workspaceInspectorSheet(_ setupIndex: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Inspector")
+                    .font(.headline)
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.inspector)
+                Spacer()
+                Button("Done") { isInspectorPresented = false }
+                    .keyboardShortcut(.defaultAction)
+                    .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.inspectorDone)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            Divider()
+            if let validationMessage {
+                Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.red.opacity(0.12))
+                    .accessibilityLabel("Error, \(validationMessage)")
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.validationSummary)
+                Divider()
+            }
+            workspaceInspector(setupIndex, showsTitle: false)
+        }
+        .frame(
+            minWidth: CardSetupEditorLayoutMetrics.macSourcePickerMinimumDimension,
+            minHeight: 520
+        )
+        .sheet(item: $sourceRequest) { request in
+            CardSetupSourcePicker(
+                fields: sourceFields(for: request),
+                allowsFixedText: request.hole != .media,
+                componentID: request.componentID,
+                hole: request.hole
+            ) { source in
+                apply(source: source, request: request, setupIndex: setupIndex)
+            }
+        }
+        .confirmationDialog(
+            "Remove the expected answer?",
+            isPresented: $pendingAudioSubmission,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Answer and Continue", role: .destructive) {
+                apply(.setInteraction(
+                    .audioSubmission,
+                    confirmAudioAnswerRemoval: true
+                ))
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Audio Submission keeps no expected answer. It will be restored if you switch back before saving.")
+        }
+    }
+
+    @ViewBuilder
+    private func selectedContentSection(_ setupIndex: Int) -> some View {
+        let setup = draft.cardSetups[setupIndex]
+        let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        if let selectedComponentID,
+           let componentIndex = setup.components.firstIndex(where: {
+               $0.id == selectedComponentID
+           }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Selected content").font(.headline)
+                    Spacer()
+                    Button("Duplicate", systemImage: "plus.square.on.square") {
+                        duplicateComponent(selectedComponentID, setupIndex: setupIndex)
+                    }
+                    .labelStyle(.iconOnly)
+                    .frame(
+                        minWidth: CardSetupEditorLayoutMetrics.minimumTouchTarget,
+                        minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget
+                    )
+                    .accessibilityLabel("Duplicate selected content")
+                }
+                if projection.isAdditional(selectedComponentID) {
+                    additionalContentRow(
+                        componentIndex,
+                        setupIndex: setupIndex,
+                        descriptor: descriptor
+                    )
+                    Text("Legacy placement stays unchanged until you move it into a named hole.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    componentEditorRow(
+                        componentIndex,
+                        setupIndex: setupIndex,
+                        descriptor: descriptor
+                    )
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Selected content").font(.headline)
+                Label("Select content on the card to edit it here.", systemImage: "cursorarrow.click")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var setupIndex: Int? {
@@ -1066,7 +1417,18 @@ public struct CardSetupEditorView: View {
         if disclosures.showsAdvanced { showsAdvanced = true }
         if disclosures.showsAdditionalContent { showsAdditionalContent = true }
 
-        guard disclosures.showsAdvanced || disclosures.showsAdditionalContent else {
+        if case let .component(_, componentID) = target {
+            selectedComponentID = componentID
+        }
+        let needsInspectorMount = presentation == .workspace
+            && workspaceUsesInspectorSheet
+            && targetUsesWorkspaceInspector(target)
+        if needsInspectorMount { isInspectorPresented = true }
+
+        guard disclosures.showsAdvanced
+                || disclosures.showsAdditionalContent
+                || needsInspectorMount
+        else {
             focusedTarget = target
             return
         }
@@ -1074,8 +1436,20 @@ public struct CardSetupEditorView: View {
         // focus then performs the ScrollView's normal reveal behavior.
         Task { @MainActor in
             await Task.yield()
+            if needsInspectorMount { await Task.yield() }
             guard validationFocus == requestedTarget else { return }
             focusedTarget = target
+        }
+    }
+
+    private func targetUsesWorkspaceInspector(
+        _ target: ItemTypeStudioValidationTarget
+    ) -> Bool {
+        switch target {
+        case .layout, .itemTypeName, .field:
+            return false
+        case .cardSetup, .availability, .answerMethod, .recipe, .component:
+            return true
         }
     }
 
@@ -1265,18 +1639,7 @@ public struct CardSetupEditorView: View {
             HStack {
                 Text("Preview").font(.headline)
                 Spacer()
-                Button(
-                    isAnswerRevealed ? "Hide Answer" : "Show Answer",
-                    systemImage: isAnswerRevealed ? "eye.slash" : "eye"
-                ) {
-                    if reduceMotion {
-                        isAnswerRevealed.toggle()
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.2)) { isAnswerRevealed.toggle() }
-                    }
-                }
-                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.showAnswer)
-                .frame(minHeight: 44)
+                answerVisibilityButton
             }
 
             CardWireframeView(
@@ -1346,10 +1709,16 @@ public struct CardSetupEditorView: View {
         setupIndex: Int,
         rendering: CardSetupEditorPreviewRendering
     ) -> some View {
-        Button {
-            sourceRequest = .init(componentID: component.id, hole: hole)
+        let isSelected = presentation == .workspace && selectedComponentID == component.id
+        return Button {
+            if presentation == .workspace {
+                selectedComponentID = component.id
+                if workspaceUsesInspectorSheet { isInspectorPresented = true }
+            } else {
+                sourceRequest = .init(componentID: component.id, hole: hole)
+            }
         } label: {
-            ZStack {
+            ZStack(alignment: .topTrailing) {
                 Label(
                     component.value.editorPreviewText,
                     systemImage: previewSymbol(for: component.id, setupIndex: setupIndex)
@@ -1366,10 +1735,24 @@ public struct CardSetupEditorView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 }
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .padding(6)
+                        .accessibilityHidden(true)
+                }
             }
             .frame(maxWidth: .infinity, minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
             .padding(.horizontal, 10)
             .background(.background.opacity(0.82), in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(
+                        isSelected ? Color.accentColor : Color.clear,
+                        lineWidth: isSelected ? 2 : 0
+                    )
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1377,7 +1760,12 @@ public struct CardSetupEditorView: View {
         .accessibilityElement(children: .ignore)
 #endif
         .accessibilityLabel(previewAccessibilityLabel(component, rendering: rendering))
-        .accessibilityHint("Edit this content source")
+        .accessibilityHint(
+            presentation == .workspace
+                ? "Selects this content for editing"
+                : "Edit this content source"
+        )
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.component(component.id))
     }
 
@@ -1927,8 +2315,31 @@ public struct CardSetupEditorView: View {
            draft.cardSetups[setupIndex].components.contains(where: { $0.id == componentID }) {
             apply(.changeSource(componentID: componentID, source: source))
         } else {
-            apply(.addComponent(source: source, hole: request.hole))
+            let existingIDs = Set(draft.cardSetups[setupIndex].components.map(\.id))
+            if apply(.addComponent(source: source, hole: request.hole)),
+               let added = draft.cardSetups[setupIndex].components.first(where: {
+                   !existingIDs.contains($0.id)
+               }) {
+                selectedComponentID = added.id
+                if presentation == .workspace && workspaceUsesInspectorSheet {
+                    Task { @MainActor in
+                        await Task.yield()
+                        isInspectorPresented = true
+                    }
+                }
+            }
         }
+    }
+
+    private func duplicateComponent(_ componentID: UUID, setupIndex: Int) {
+        guard draft.cardSetups.indices.contains(setupIndex) else { return }
+        let existingIDs = Set(draft.cardSetups[setupIndex].components.map(\.id))
+        guard apply(.duplicateComponent(componentID)),
+              let duplicate = draft.cardSetups[setupIndex].components.first(where: {
+                  !existingIDs.contains($0.id)
+              })
+        else { return }
+        selectedComponentID = duplicate.id
     }
 
     private func canonicalSiblingIndices(

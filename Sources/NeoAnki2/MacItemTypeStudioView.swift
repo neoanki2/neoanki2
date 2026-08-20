@@ -63,7 +63,7 @@ struct MacItemTypeStudioView: View {
 
             if let errorMessage {
                 ErrorBanner(message: errorMessage)
-                    .accessibilityIdentifier("itemTypeStudioValidationSummary")
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.validationSummary)
             }
             if let repairMessage {
                 HStack(spacing: DesignSystem.Spacing.xs) {
@@ -81,7 +81,7 @@ struct MacItemTypeStudioView: View {
             if model.studioDraft != nil {
                 GeometryReader { geometry in
                     let dividerWidth: CGFloat = 1
-                    let outlineWidth = min(300, max(260, geometry.size.width * 0.4))
+                    let outlineWidth = min(272, max(232, geometry.size.width * 0.25))
                     let editorWidth = max(0, geometry.size.width - outlineWidth - dividerWidth)
 
                     HStack(spacing: 0) {
@@ -211,8 +211,8 @@ struct MacItemTypeStudioView: View {
 
     private var studioOutline: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            List(selection: $selectedCardSetupID) {
+                Section {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                         Text("Item Type Name").font(.caption).foregroundStyle(.secondary)
                         TextField("Item Type Name", text: draft.name)
@@ -220,36 +220,44 @@ struct MacItemTypeStudioView: View {
                             .focused($isNameFocused)
                             .accessibilityIdentifier("itemTypeStudioName")
                     }
+                    .padding(.vertical, DesignSystem.Spacing.rowTight)
+                }
 
-                    HStack {
-                        Text("Fields").font(DesignSystem.Typography.uiTitle)
-                        Spacer()
-                        Button("Add Field", systemImage: "plus") { addField() }
-                            .keyboardShortcut("f", modifiers: [.command, .shift])
-                            .accessibilityIdentifier("addStudioField")
-                    }
+                CardSetupCollectionView(draft: draft, selection: $selectedCardSetupID)
 
-                    VStack(spacing: DesignSystem.Spacing.xs) {
-                        ForEach(draft.wrappedValue.fields) { field in
-                            fieldEditor(field)
-                        }
+                Section("Fields") {
+                    Button("Add Field", systemImage: "plus") { addField() }
+                        .buttonStyle(.borderless)
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget,
+                            alignment: .leading
+                        )
+                        .contentShape(Rectangle())
+                        .keyboardShortcut("f", modifiers: [.command, .shift])
+                        .accessibilityIdentifier("addStudioField")
+                        .accessibilityValue(
+                            draft.wrappedValue.fields.count == 1
+                                ? "1 field"
+                                : "\(draft.wrappedValue.fields.count) fields"
+                        )
+
+                    ForEach(draft.wrappedValue.fields) { field in
+                        fieldEditor(field)
+                            .listRowInsets(EdgeInsets(
+                                top: DesignSystem.Spacing.rowTight,
+                                leading: 0,
+                                bottom: DesignSystem.Spacing.rowTight,
+                                trailing: 0
+                            ))
                     }
                 }
-                .padding(DesignSystem.Spacing.md)
-            }
-            .frame(minHeight: 220, idealHeight: 300)
-            .accessibilityIdentifier("itemTypeStudioOutline")
-
-            Divider()
-
-            List(selection: $selectedCardSetupID) {
-                CardSetupCollectionView(draft: draft, selection: $selectedCardSetupID)
             }
             .listStyle(.sidebar)
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupListScroll)
-            .frame(minHeight: 260, maxHeight: .infinity)
         }
         .background(DesignSystem.sidebarBackground)
+        .accessibilityIdentifier("itemTypeStudioOutline")
     }
 
     private func fieldEditor(_ field: ItemTypeFieldDraft) -> some View {
@@ -265,6 +273,10 @@ struct MacItemTypeStudioView: View {
                 .labelStyle(.iconOnly)
                 .accessibilityLabel("Remove \(field.name)")
                 .accessibilityIdentifier("removeStudioField-\(field.id.uuidString)")
+                .frame(
+                    minWidth: CardSetupEditorLayoutMetrics.minimumTouchTarget,
+                    minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget
+                )
             }
             HStack {
                 Picker("Type", selection: fieldTypeBinding(field.id)) {
@@ -279,6 +291,9 @@ struct MacItemTypeStudioView: View {
                     .toggleStyle(.checkbox)
                     .accessibilityIdentifier("studioFieldRequired-\(field.id.uuidString)")
                 Spacer()
+            }
+            HStack(spacing: 0) {
+                Spacer()
                 Button("Move Up", systemImage: "arrow.up") {
                     moveField(field.id, .up)
                 }
@@ -287,6 +302,10 @@ struct MacItemTypeStudioView: View {
                 .help("Move \(field.name) up")
                 .accessibilityLabel("Move \(field.name) up")
                 .accessibilityIdentifier("moveStudioFieldUp-\(field.id.uuidString)")
+                .frame(
+                    minWidth: CardSetupEditorLayoutMetrics.minimumTouchTarget,
+                    minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget
+                )
                 Button("Move Down", systemImage: "arrow.down") {
                     moveField(field.id, .down)
                 }
@@ -295,6 +314,10 @@ struct MacItemTypeStudioView: View {
                 .help("Move \(field.name) down")
                 .accessibilityLabel("Move \(field.name) down")
                 .accessibilityIdentifier("moveStudioFieldDown-\(field.id.uuidString)")
+                .frame(
+                    minWidth: CardSetupEditorLayoutMetrics.minimumTouchTarget,
+                    minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget
+                )
             }
         }
         .padding(DesignSystem.Spacing.sm)
@@ -310,9 +333,10 @@ struct MacItemTypeStudioView: View {
             CardSetupEditorView(
                 draft: draft,
                 cardSetupID: selectedCardSetupID,
-                validationFocus: $validationFocus
+                validationFocus: $validationFocus,
+                validationMessage: $errorMessage,
+                presentation: .workspace
             )
-            .accessibilityIdentifier("itemTypeStudioCardSetupEditor")
         } else {
             ContentUnavailableView {
                 Label("Select a Card setup", systemImage: "rectangle.on.rectangle")
@@ -413,7 +437,10 @@ struct MacItemTypeStudioView: View {
         pendingFieldRemoval = nil
         if let affectedID = change.affectedCardSetupIDs.first {
             selectedCardSetupID = affectedID
-            validationFocus = .cardSetup(affectedID)
+            // Keep the canvas available for direct repair. Opening the compact
+            // Inspector here would make it modal before validation and prevent
+            // the Studio-level Command-S shortcut from reaching Save.
+            validationFocus = nil
         }
         repairMessage = removal.affectedSetupNames.isEmpty
             ? nil

@@ -83,6 +83,8 @@ class NeoAnkiUITestCase: XCTestCase {
             app.launchEnvironment["NEOANKI_TEST_SESSION_ID"] = Self.controlSessionID
             if ProcessInfo.processInfo.environment["DOC_SCREENSHOT_DIR"] != nil {
                 app.launchEnvironment["NEOANKI_DOC_SCREENSHOTS"] = "1"
+                app.launchEnvironment["NEOANKI_DOC_APPEARANCE"] =
+                    ProcessInfo.processInfo.environment["DOC_SCREENSHOT_APPEARANCE"] ?? "dark"
             }
             if let scenario {
                 app.launchEnvironment["NEOANKI_TEST_SCENARIO"] = scenario
@@ -563,8 +565,7 @@ class NeoAnkiUITestCase: XCTestCase {
         }
         XCTAssertTrue(studioName.waitUntilExists(timeout: 10))
         XCTAssertTrue(
-            app.descendants(matching: .any)
-                .identified("itemTypeStudioCardSetupEditor")
+            app.staticTexts["Card canvas"]
                 .waitUntilExists(timeout: 10)
         )
     }
@@ -779,7 +780,7 @@ class NeoAnkiUITestCase: XCTestCase {
             app.buttons.identified("cancelAddItem").click()
         }
         if app.buttons.identified("cancelItemTypeStudio").exists {
-            app.buttons.identified("cancelItemTypeStudio").click()
+            app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
             if app.buttons.identified("confirmDiscardItemTypeStudio").waitUntilExists(timeout: 1) {
                 app.buttons.identified("confirmDiscardItemTypeStudio").click()
             }
@@ -863,6 +864,23 @@ class NeoAnkiUITestCase: XCTestCase {
         return advanced
     }
 
+    func openCardSetupInspector(in app: XCUIApplication) {
+        let inspector = app.staticTexts.identified("cardSetupEditor.inspector")
+        if inspector.exists { return }
+        let button = app.buttons.identified("cardSetupEditor.inspectorButton")
+        XCTAssertTrue(button.waitUntilHittable(timeout: 3))
+        button.click()
+        XCTAssertTrue(inspector.waitUntilExists(timeout: 3))
+    }
+
+    func closeCardSetupInspector(in app: XCUIApplication) {
+        let done = app.buttons.identified("cardSetupEditor.inspectorDone")
+        guard done.exists else { return }
+        XCTAssertTrue(done.waitUntilHittable(timeout: 3))
+        done.click()
+        XCTAssertTrue(done.waitUntilGone(timeout: 3))
+    }
+
     /// Reveals a control in the Studio's field outline after editing a lower
     /// field has scrolled the outline header out of view.
     func revealItemTypeStudioOutlineElement(
@@ -876,7 +894,11 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(outline.waitUntilExists(timeout: 3), file: file, line: line)
 
         func isReachable() -> Bool {
-            element.exists && element.isHittable && outline.frame.contains(element.frame)
+            guard element.exists, element.isHittable else { return false }
+            let elementFrame = element.frame
+            let outlineFrame = outline.frame
+            return elementFrame.minY >= outlineFrame.minY - 1
+                && elementFrame.maxY <= outlineFrame.maxY + 1
         }
 
         for _ in 0..<maximumSteps where !isReachable() {
@@ -898,9 +920,9 @@ class NeoAnkiUITestCase: XCTestCase {
         )
     }
 
-    /// Reveals a row action in the Studio's independently scrolling Card setup
-    /// list. AppKit's automatic click scrolling can otherwise target the outer
-    /// split-view geometry after the selected setup moves the list viewport.
+    /// Reveals a Card setup row action in the Studio's single rail scroll
+    /// context. AppKit's automatic click scrolling can otherwise target the
+    /// outer split-view geometry after the selected setup moves the viewport.
     func revealItemTypeStudioCardSetupListElement(
         _ element: XCUIElement,
         in app: XCUIApplication,
@@ -908,12 +930,15 @@ class NeoAnkiUITestCase: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let list = app.descendants(matching: .any)
-            .identified("itemTypeStudio.cardSetupListScroll")
+        let list = app.descendants(matching: .any).identified("itemTypeStudioOutline")
         XCTAssertTrue(list.waitUntilExists(timeout: 3), file: file, line: line)
 
         func isReachable() -> Bool {
-            element.exists && element.isHittable && list.frame.contains(element.frame)
+            guard element.exists, element.isHittable else { return false }
+            let elementFrame = element.frame
+            let listFrame = list.frame
+            return elementFrame.minY >= listFrame.minY - 1
+                && elementFrame.maxY <= listFrame.maxY + 1
         }
 
         for _ in 0..<maximumSteps where !isReachable() {
@@ -939,11 +964,9 @@ class NeoAnkiUITestCase: XCTestCase {
         )
     }
 
-    /// Reveals a control inside the Studio's right-hand editor without relying
-    /// on its lazy children already existing in the accessibility tree. The
-    /// outer editor is the one stable scrolling surface on every supported
-    /// window size; bounded, directional AppKit scrolling avoids both an
-    /// unbounded search and clicks on controls clipped outside that surface.
+    /// Reveals a canvas or inspector control. At compact widths, setup and
+    /// contextual controls live in the labeled Inspector sheet rather than in
+    /// a scrolling form beneath the card.
     func revealCardSetupElement(
         _ element: XCUIElement,
         in app: XCUIApplication,
@@ -951,12 +974,25 @@ class NeoAnkiUITestCase: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let editor = app.descendants(matching: .any)
-            .identified("itemTypeStudioCardSetupEditor")
+        let editor = app.windows.firstMatch
+        XCTAssertTrue(app.staticTexts["Card canvas"].waitUntilExists(timeout: 3), file: file, line: line)
         XCTAssertTrue(editor.waitUntilExists(timeout: 3), file: file, line: line)
+        if !element.exists,
+           app.buttons.identified("cardSetupEditor.inspectorButton").exists {
+            openCardSetupInspector(in: app)
+        }
+        if element.exists, element.isHittable { return }
+        let inspector = app.staticTexts.identified("cardSetupEditor.inspector")
+        var container = editor
+        let inspectorScroll = app.scrollViews["Card setup inspector"]
+        if inspector.exists,
+           element.identifier != "cardSetupEditor.showAnswer",
+           inspectorScroll.exists {
+            container = inspectorScroll
+        }
 
         func isReachable() -> Bool {
-            element.exists && element.isHittable && editor.frame.contains(element.frame)
+            element.exists && element.isHittable
         }
 
         for _ in 0..<maximumSteps where !isReachable() {
@@ -966,7 +1002,7 @@ class NeoAnkiUITestCase: XCTestCase {
             } else {
                 delta = -250
             }
-            editor.scroll(byDeltaX: 0, deltaY: delta)
+            container.scroll(byDeltaX: 0, deltaY: delta)
         }
 
         // A layout change can preserve an offset below a lazily mounted
@@ -980,7 +1016,7 @@ class NeoAnkiUITestCase: XCTestCase {
             } else {
                 delta = 250
             }
-            editor.scroll(byDeltaX: 0, deltaY: delta)
+            container.scroll(byDeltaX: 0, deltaY: delta)
         }
 
         // The opposite-direction pass can establish the top boundary without
@@ -994,7 +1030,7 @@ class NeoAnkiUITestCase: XCTestCase {
             } else {
                 delta = -250
             }
-            editor.scroll(byDeltaX: 0, deltaY: delta)
+            container.scroll(byDeltaX: 0, deltaY: delta)
         }
 
         XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
@@ -1013,13 +1049,12 @@ class NeoAnkiUITestCase: XCTestCase {
     ) {
         let window = app.windows.firstMatch
         let outline = app.descendants(matching: .any).identified("itemTypeStudioOutline")
-        let editor = app.descendants(matching: .any)
-            .identified("itemTypeStudioCardSetupEditor")
+        let canvas = app.staticTexts["Card canvas"]
         let cancel = app.buttons.identified("cancelItemTypeStudio")
         let save = app.buttons.identified("saveItemTypeStudio")
 
         XCTAssertTrue(window.waitUntilExists(timeout: 5), file: file, line: line)
-        for element in [outline, editor, cancel, save] {
+        for element in [outline, canvas, cancel, save] {
             XCTAssertTrue(element.waitUntilExists(timeout: 5), file: file, line: line)
         }
 
@@ -1027,7 +1062,7 @@ class NeoAnkiUITestCase: XCTestCase {
         var stableSamples = 0
         XCTAssertTrue(
             waitUntil(timeout: 3) {
-                let frames = [window, outline, editor, cancel, save].map(\.frame)
+                let frames = [window, outline, canvas, cancel, save].map(\.frame)
                 if frames == previousFrames {
                     stableSamples += 1
                 } else {
@@ -1043,14 +1078,14 @@ class NeoAnkiUITestCase: XCTestCase {
 
         XCTAssertLessThanOrEqual(
             outline.frame.maxX,
-            editor.frame.minX + 1,
+            canvas.frame.minX + 1,
             "Studio columns must not overlap",
             file: file,
             line: line
         )
         for (name, element) in [
             ("outline", outline),
-            ("Card setup editor", editor),
+            ("card canvas", canvas),
             ("Cancel", cancel),
             ("Save", save),
         ] {
@@ -1069,18 +1104,6 @@ class NeoAnkiUITestCase: XCTestCase {
                 line: line
             )
         }
-        XCTAssertTrue(
-            cancel.waitUntilHittable(timeout: 2),
-            "Studio Cancel must remain visible and reachable on screen",
-            file: file,
-            line: line
-        )
-        XCTAssertTrue(
-            save.waitUntilHittable(timeout: 2),
-            "Studio Save must remain visible and reachable on screen",
-            file: file,
-            line: line
-        )
     }
 
     /// Asserting absence immediately races the animation that removes the

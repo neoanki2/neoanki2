@@ -132,6 +132,12 @@ These states are informational:
   not a scheduling error.
 - **Session Complete:** all due cards loaded for that session were handled.
 
+While Item Type Studio is open, the outer Item Types list and its **Done**
+button are intentionally hidden so the card canvas can use the full window.
+Choose **Save** or **Cancel** to return to the same list selection. At narrow
+window widths, choose **Inspector** beside the canvas to edit Card setup,
+selected-content, or Advanced properties in a sheet.
+
 **Loading decks…**, **Loading items…**, **Loading item types…**, **Loading due
 cards…**, **Importing…**, and **Transferring deck…** indicate active work. Avoid
 starting another transfer. If a state never completes, quit normally, relaunch,

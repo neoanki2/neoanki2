@@ -102,6 +102,10 @@ Card setups keep their stable card identities, scheduling memory, and normal
 learned-before-new queue priority. Choosing a different static Layout alone does
 not change queue order.
 
+The **Show Answer** control in Item Type Studio is an authoring preview. It
+does not reveal a live study card, write review history, or change scheduling;
+only a grade saved during a study session changes a card's memory state.
+
 ## Card interactions
 
 Every ordinary review interaction ends with self-grading. Automatic feedback is

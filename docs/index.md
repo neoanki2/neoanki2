@@ -25,7 +25,7 @@ nav_order: 1
 
   <figure class="quiet-hero-figure">
     <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the Item Type Studio screenshot at full size">
-      <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="1024" height="708" alt="NeoAnki2 showing a Card setup with structured Question, Answer, Availability, and Learning route settings">
+      <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="1024" height="708" alt="NeoAnki2 showing the Item Type Studio inspector with structured setup and Availability controls">
     </a>
     <figcaption><strong>Knowledge has structure.</strong> Fields hold the material; Card setups decide how you practise it.</figcaption>
   </figure>
@@ -70,7 +70,7 @@ nav_order: 1
     </div>
     <figure class="sequence-figure">
       <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the Item Type Studio screenshot at full size">
-        <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="992" height="688" loading="lazy" alt="NeoAnki2 Item Type Studio mapping structured fields into a Question and Answer">
+        <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="992" height="688" loading="lazy" alt="NeoAnki2 preview-first Item Type Studio with its contextual inspector open">
       </a>
     </figure>
   </article>
