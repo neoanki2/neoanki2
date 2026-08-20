@@ -69,7 +69,8 @@ CloudKit library or change other devices.
 
 ## What syncs
 
-Private CloudKit sync includes decks, item types and templates, items, card
+Private CloudKit sync includes decks, item types and their persisted templates
+(shown as Card setups), items, card
 state, immutable review and revert history, and shared content-addressed media.
 Immutable history is unioned deterministically. Concurrent edits to mutable
 resources accept one version while preserving the other as a conflict copy

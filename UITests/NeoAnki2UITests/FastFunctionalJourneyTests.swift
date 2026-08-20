@@ -75,6 +75,7 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
     func testTemplatesAndItemTypesJourney() throws {
         if !hasActivityFilters {
             try runSharedTemplatesAndItemTypesJourney()
+            try runProtectedItemTypeSafeguardJourneys()
             return
         }
 

@@ -1,4 +1,7 @@
+import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import SwiftUI
 
 private struct PendingItemTypeUnlock {
@@ -7,27 +10,26 @@ private struct PendingItemTypeUnlock {
     let impact: ItemTypeEditingImpact
 }
 
+/// The macOS Item Types navigator. Editing is delegated to one atomic Studio
+/// draft so fields and Card setups are never persisted independently.
 struct TemplatesView: View {
-    @Bindable var model: TemplatesModel
+    @Bindable var model: ItemTypesFeatureModel
     @Binding private var isTemplateEditorPresented: Bool
     var onTemplatesChanged: () async -> Void = {}
 
-    @State private var editingTemplate: Template?
-    @State private var editingItemType: ItemType?
-    @State private var isAddingTemplate = false
-    @State private var isAddingItemType = false
-    @State private var showDeleteItemTypeConfirm = false
-    @State private var canDeleteSelectedItemType = false
-    @State private var definitionToRepair: QuarantinedItemTypeDefinition?
     @State private var expandedIncludedGroupIDs: Set<UUID> = []
+    @State private var definitionToRepair: QuarantinedItemTypeDefinition?
+    @State private var pendingUnlock: PendingItemTypeUnlock?
+    @State private var pendingSelectionID: UUID?
+    @State private var showDiscardForSelection = false
     @State private var showDuplicatePrompt = false
     @State private var duplicateName = ""
-    @State private var pendingUnlock: PendingItemTypeUnlock?
-    @State private var isPreparingUnlock = false
-    @State private var isUnlocking = false
+    @State private var showDeleteConfirmation = false
+    @State private var actionError: String?
+    @State private var isWorking = false
 
     init(
-        model: TemplatesModel,
+        model: ItemTypesFeatureModel,
         isTemplateEditorPresented: Binding<Bool> = .constant(false),
         onTemplatesChanged: @escaping () async -> Void = {}
     ) {
@@ -37,72 +39,70 @@ struct TemplatesView: View {
     }
 
     var body: some View {
-        ZStack {
-            HSplitView {
-                itemTypesSidebar
-                    .frame(
-                        minWidth: DesignSystem.sidebarMin,
-                        idealWidth: DesignSystem.sidebarIdeal,
-                        maxWidth: DesignSystem.sidebarMax
-                    )
-                    .layoutPriority(1)
+        GeometryReader { geometry in
+            let dividerWidth: CGFloat = 1
+            let navigatorWidth = min(
+                geometry.size.width,
+                min(
+                    DesignSystem.sidebarMax,
+                    max(DesignSystem.sidebarMin, geometry.size.width * 0.26)
+                )
+            )
+            let detailWidth = max(0, geometry.size.width - navigatorWidth - dividerWidth)
 
-                itemTypeDetail
-                    .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
-                    .layoutPriority(0)
+            HStack(spacing: 0) {
+                itemTypesNavigator
+                    .frame(width: navigatorWidth, height: geometry.size.height)
+                Divider()
+                    .frame(width: dividerWidth, height: geometry.size.height)
+                detail
+                    .frame(width: detailWidth, height: geometry.size.height)
             }
-            .opacity(isTemplateEditorActive ? 0 : 1)
-            .accessibilityHidden(isTemplateEditorActive)
-            .allowsHitTesting(!isTemplateEditorActive)
-
-            if isTemplateEditorActive, let itemType = model.selectedItemType {
-                NavigationStack {
-                    TemplateEditorView(
-                        model: model,
-                        itemType: itemType,
-                        editingTemplate: editingTemplate,
-                        onDismiss: dismissTemplateEditor
-                    )
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(DesignSystem.detailBackground)
-                .zIndex(1)
-            }
+            // A nested AppKit split can publish a post-mount fitting width back
+            // to the host window. Keep both navigator and Studio inside the
+            // finite viewport proposed by the app window instead.
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            await model.load()
-        }
+        .task { await model.load() }
         .onChange(of: model.selectedItemTypeID) { _, _ in
-            editingItemType = nil
-            editingTemplate = nil
-            isAddingTemplate = false
             if let group = model.selectedIncludedGroup {
                 expandedIncludedGroupIDs.insert(group.id)
             }
-            Task { await refreshDeleteAvailability() }
         }
-        .onChange(of: isTemplateEditorActive, initial: true) { _, active in
+        .onChange(of: model.studioDraft != nil, initial: true) { _, active in
             isTemplateEditorPresented = active
         }
         .confirmationDialog(
+            "Discard unsaved Studio changes?",
+            isPresented: $showDiscardForSelection,
+            titleVisibility: .visible
+        ) {
+            Button("Discard Changes", role: .destructive) {
+                model.discardStudioDraft()
+                model.selectItemType(id: pendingSelectionID)
+                pendingSelectionID = nil
+            }
+            .accessibilityIdentifier("discardItemTypeStudioSelection")
+            Button("Keep Editing", role: .cancel) { pendingSelectionID = nil }
+                .accessibilityIdentifier("keepEditingItemTypeStudioSelection")
+        } message: {
+            Text("Fields and Card setup changes have not been saved.")
+        }
+        .confirmationDialog(
             deleteDialogTitle,
-            isPresented: $showDeleteItemTypeConfirm,
+            isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button("Delete Item Type", role: .destructive) {
-                Task {
-                    if await model.deleteSelectedItemType() {
-                        await onTemplatesChanged()
-                        await refreshDeleteAvailability()
-                    }
-                }
+                Task { await deleteSelectedItemType() }
             }
             .accessibilityIdentifier("confirmDeleteItemType")
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("cancelDeleteItemType")
         } message: {
-            Text("This removes the item type and its templates. Items must be deleted first.")
+            Text("This removes the Item Type and all of its Card setups. This cannot be undone.")
         }
         .confirmationDialog(
             "Repair damaged item type?",
@@ -114,64 +114,70 @@ struct TemplatesView: View {
         ) {
             Button("Archive Original and Repair") {
                 guard let definitionToRepair else { return }
-                Task {
-                    _ = await model.repairDefinition(definitionToRepair)
-                    self.definitionToRepair = nil
-                }
+                Task { await repair(definitionToRepair) }
             }
             .accessibilityIdentifier("confirmRepairItemType")
             Button("Cancel", role: .cancel) { definitionToRepair = nil }
                 .accessibilityIdentifier("cancelRepairItemType")
         } message: {
-            Text("NeoAnki2 will preserve the unreadable definition, then create a minimal editable replacement. Existing items are not deleted.")
+            Text("NeoAnki2 preserves the unreadable definition before creating a minimal editable replacement. Existing items are not deleted.")
         }
         .alert("Duplicate as Item Type", isPresented: $showDuplicatePrompt) {
             TextField("Name", text: $duplicateName)
                 .accessibilityLabel("New Item Type Name")
                 .accessibilityIdentifier("duplicateItemTypeName")
             Button("Cancel", role: .cancel) {}
-            Button("Duplicate") {
-                Task {
-                    if await model.duplicateSelectedItemType(name: duplicateName) {
-                        await onTemplatesChanged()
-                    }
-                }
-            }
-            .disabled(duplicateName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityIdentifier("confirmDuplicateItemType")
+            Button("Duplicate") { Task { await duplicateSelectedItemType() } }
+                .disabled(duplicateName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("confirmDuplicateItemType")
         } message: {
-            Text("The copy will be an independent, editable Item Type.")
+            Text("The copy is an independent, editable Item Type.")
         }
         .confirmationDialog(
             "Unlock \(pendingUnlock?.itemTypeName ?? "item type") for editing?",
             isPresented: Binding(
                 get: { pendingUnlock != nil },
-                set: { if !$0 { clearPendingUnlock() } }
+                set: { if !$0 { pendingUnlock = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("Unlock for Editing") {
-                // Capture the request before dismissing the dialog clears its state.
-                guard let request = pendingUnlock else { return }
-                clearPendingUnlock()
-                Task { await unlockItemType(id: request.itemTypeID) }
+            if let requested = pendingUnlock {
+                Button("Unlock for Editing") { Task { await unlockItemType(requested) } }
+                    .accessibilityIdentifier("confirmUnlockIncludedItemType")
             }
-            .accessibilityIdentifier("confirmUnlockIncludedItemType")
-            Button("Cancel", role: .cancel) { clearPendingUnlock() }
+            Button("Cancel", role: .cancel) { pendingUnlock = nil }
                 .accessibilityIdentifier("cancelUnlockIncludedItemType")
         } message: {
-            if let impact = pendingUnlock?.impact {
-                Text(unlockImpactMessage(impact))
-            }
+            if let impact = pendingUnlock?.impact { Text(unlockImpactMessage(impact)) }
         }
     }
 
-    private var isTemplateEditorActive: Bool {
-        isAddingTemplate || editingTemplate != nil
+    private var selection: Binding<UUID?> {
+        Binding(
+            get: { model.selectedItemTypeID },
+            set: { requestedID in
+                guard requestedID != model.selectedItemTypeID else { return }
+                if hasUnsavedStudioChanges {
+                    pendingSelectionID = requestedID
+                    showDiscardForSelection = true
+                } else {
+                    model.discardStudioDraft()
+                    model.selectItemType(id: requestedID)
+                }
+            }
+        )
+    }
+
+    /// New Studio drafts have no persisted snapshot even before the user types.
+    /// Switching the navigator must therefore offer the same discard safeguard
+    /// as an edited existing definition.
+    private var hasUnsavedStudioChanges: Bool {
+        guard let draft = model.studioDraft else { return false }
+        return draft.originalSnapshot == nil || draft.isDirty
     }
 
     @ViewBuilder
-    private var itemTypesSidebar: some View {
+    private var itemTypesNavigator: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("Item Types")
@@ -179,56 +185,56 @@ struct TemplatesView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("templatesItemTypesHeader")
                 Spacer()
-                Button("Add", systemImage: "plus") {
-                    isAddingItemType = true
-                }
-                .accessibilityIdentifier("addItemTypeToolbar")
+                Button("Add", systemImage: "plus") { model.beginCreatingItemType() }
+                    .disabled(model.studioDraft != nil)
+                    .accessibilityIdentifier("addItemTypeToolbar")
             }
             .padding(.horizontal, DesignSystem.Spacing.md)
-            .padding(.top, DesignSystem.Spacing.sm)
-            .padding(.bottom, DesignSystem.Spacing.xs)
+            .padding(.vertical, DesignSystem.Spacing.sm)
 
-            if let errorMessage = model.errorMessage, !model.isLoading {
-                ErrorBanner(message: errorMessage)
+            if let actionError {
+                ErrorBanner(message: actionError)
+                    .accessibilityIdentifier("itemTypeStudioActionError")
             }
 
             ForEach(model.corruptedDefinitions) { corruption in
                 HStack {
-                    Text(corruption.name)
-                        .lineLimit(1)
+                    Text(corruption.name).lineLimit(1)
                     Spacer()
-                    Button("Repair") {
-                        definitionToRepair = corruption
-                    }
-                    .accessibilityLabel("Repair damaged item type \(corruption.name)")
-                    .accessibilityIdentifier("repairItemType-\(corruption.name)")
+                    Button("Repair") { definitionToRepair = corruption }
+                        .accessibilityIdentifier("repairItemType-\(corruption.name)")
                 }
                 .padding(.horizontal, DesignSystem.Spacing.md)
                 .padding(.vertical, DesignSystem.Spacing.xs)
             }
 
-            Group {
-                if model.isLoading {
-                    ProgressView("Loading item types…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if model.itemTypes.isEmpty && model.includedItemTypeGroups.isEmpty {
+            switch model.loadState {
+            case .loading:
+                ProgressView("Loading item types…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case let .failed(error):
+                ContentUnavailableView {
+                    Label(error.title, systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error.message)
+                }
+            case .ready:
+                if model.itemTypes.isEmpty && model.includedItemTypeGroups.isEmpty {
                     SidebarEmptyState(
                         title: "No Item Types",
-                        message: "Create an item type to define fields and templates.",
+                        message: "Create an Item Type with fields and a ready-to-use Card setup.",
                         systemImage: "square.grid.2x2",
                         actionTitle: "Add Item Type",
-                        action: { isAddingItemType = true },
+                        action: { model.beginCreatingItemType() },
                         actionIdentifier: "addItemTypeEmptyState"
                     )
                 } else {
-                    List(selection: $model.selectedItemTypeID) {
+                    List(selection: selection) {
                         Section {
                             ForEach(model.itemTypes) { itemType in
-                                itemTypeRow(itemType, readOnly: false)
-                                    .tag(itemType.id)
+                                itemTypeRow(itemType, readOnly: false).tag(itemType.id)
                             }
                         }
-
                         if !model.includedItemTypeGroups.isEmpty {
                             Section("From Decks") {
                                 ForEach(model.includedItemTypeGroups) { group in
@@ -247,7 +253,6 @@ struct TemplatesView: View {
                     .listStyle(.sidebar)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(DesignSystem.sidebarBackground)
     }
@@ -255,429 +260,268 @@ struct TemplatesView: View {
     private func itemTypeRow(_ itemType: ItemType, readOnly: Bool) -> some View {
         HStack(spacing: DesignSystem.Spacing.xs) {
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                Text(itemType.name)
-                    .font(DesignSystem.Typography.uiRowTitle)
-                    .lineLimit(1)
-                Text(itemTypeSummary(itemType))
+                Text(itemType.name).font(DesignSystem.Typography.uiRowTitle).lineLimit(1)
+                Text("\(cardSetupCount(itemType.templates.count)) · \(fieldCount(itemType.fields.count))")
                     .font(DesignSystem.Typography.uiRowMeta)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-
             Spacer(minLength: DesignSystem.Spacing.xs)
-
             if readOnly {
-                Image(systemName: "lock")
-                    .font(DesignSystem.Typography.uiRowMeta)
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+                Image(systemName: "lock").foregroundStyle(.secondary).accessibilityHidden(true)
             }
         }
         .padding(.vertical, DesignSystem.Spacing.rowTight)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(itemType.name), \(itemType.templates.count) templates, \(itemType.fields.count) fields"
-        )
+        .accessibilityLabel("\(itemType.name), \(cardSetupCount(itemType.templates.count)), \(fieldCount(itemType.fields.count))")
         .accessibilityValue(readOnly ? "Read-only" : "Editable")
-        .accessibilityIdentifier(
-            readOnly ? "includedItemTypeRow-\(itemType.name)" : "itemTypeRow-\(itemType.name)"
-        )
-    }
-
-    private func itemTypeSummary(_ itemType: ItemType) -> String {
-        let templateNoun = itemType.templates.count == 1 ? "template" : "templates"
-        let fieldNoun = itemType.fields.count == 1 ? "field" : "fields"
-        return "\(itemType.templates.count) \(templateNoun) · \(itemType.fields.count) \(fieldNoun)"
+        .accessibilityIdentifier(readOnly ? "includedItemTypeRow-\(itemType.name)" : "itemTypeRow-\(itemType.name)")
     }
 
     private func includedGroupButton(_ group: IncludedItemTypeGroup) -> some View {
         Button {
-            if expandedIncludedGroupIDs.contains(group.id) {
+            if !expandedIncludedGroupIDs.insert(group.id).inserted {
                 expandedIncludedGroupIDs.remove(group.id)
-            } else {
-                expandedIncludedGroupIDs.insert(group.id)
             }
         } label: {
             HStack(spacing: DesignSystem.Spacing.xs) {
-                Image(
-                    systemName: expandedIncludedGroupIDs.contains(group.id)
-                        ? "chevron.down"
-                        : "chevron.right"
-                )
-                .font(DesignSystem.Typography.sidebarRowMeta)
-                .frame(width: DesignSystem.Spacing.sm)
-                .accessibilityHidden(true)
-
+                Image(systemName: expandedIncludedGroupIDs.contains(group.id) ? "chevron.down" : "chevron.right")
+                    .frame(width: DesignSystem.Spacing.sm)
                 Image(systemName: "folder")
-                    .imageScale(.medium)
-                    .accessibilityHidden(true)
-
-                Text(group.deckPath)
-                    .font(DesignSystem.Typography.sidebarRowTitle)
-                    .lineLimit(1)
-
-                Spacer(minLength: DesignSystem.Spacing.xs)
-
-                Text(includedTypeCount(group.itemTypes.count))
-                    .font(DesignSystem.Typography.sidebarRowMeta)
+                Text(group.deckPath).lineLimit(1)
+                Spacer()
+                Text(group.itemTypes.count == 1 ? "1 type" : "\(group.itemTypes.count) types")
                     .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                    .lineLimit(1)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(group.deckPath), \(includedTypeCount(group.itemTypes.count))")
-        .accessibilityHint("Shows read-only item types provided by this deck")
-        .accessibilityValue(
-            expandedIncludedGroupIDs.contains(group.id) ? "Expanded" : "Collapsed"
-        )
+        .accessibilityLabel("\(group.deckPath), \(group.itemTypes.count) item types")
+        .accessibilityValue(expandedIncludedGroupIDs.contains(group.id) ? "Expanded" : "Collapsed")
         .accessibilityIdentifier("includedDeckGroup-\(group.deckPath)")
     }
 
-    private func includedTypeCount(_ count: Int) -> String {
-        count == 1 ? "1 type" : "\(count) types"
-    }
-
     @ViewBuilder
-    private var itemTypeDetail: some View {
-        if isAddingItemType {
-            NavigationStack {
-                ItemTypeEditorView(model: model, onDismiss: dismissItemTypeEditor)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DesignSystem.detailBackground)
-        } else if let editingItemType {
-            NavigationStack {
-                ItemTypeEditorView(
-                    model: model,
-                    editingItemType: editingItemType,
-                    onDismiss: dismissItemTypeEditor
-                )
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DesignSystem.detailBackground)
-        } else if model.isLoading {
-            ProgressView("Loading item types…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private var detail: some View {
+        if model.studioDraft != nil {
+            MacItemTypeStudioView(model: model, onSaved: onTemplatesChanged)
         } else if let itemType = model.selectedItemType {
-            itemTypeDetailContent(for: itemType)
-                .task(id: itemType.id) {
-                    await refreshDeleteAvailability()
-                }
-        } else {
+            selectedItemTypeOverview(itemType)
+        } else if case .ready = model.loadState {
             ContentUnavailableView {
                 Label("Select an Item Type", systemImage: "square.grid.2x2")
             } description: {
-                Text("Choose an item type to edit its fields and templates.")
+                Text("Choose an Item Type, or create one with a prefilled Basic Card setup.")
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ProgressView()
         }
     }
 
-    @ViewBuilder
-    private func itemTypeDetailContent(for itemType: ItemType) -> some View {
+    private func selectedItemTypeOverview(_ itemType: ItemType) -> some View {
         VStack(spacing: 0) {
             HStack {
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(itemType.name)
                         .font(DesignSystem.Typography.uiSection)
                         .accessibilityIdentifier("templatesDetailTitle-\(itemType.name)")
+                    Text("\(fieldCount(itemType.fields.count)) · \(cardSetupCount(itemType.templates.count))")
+                        .foregroundStyle(.secondary)
                     if let group = model.selectedIncludedGroup {
                         Text("From \(group.deckPath) · Read-only")
-                            .font(DesignSystem.Typography.uiCaption)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("includedItemTypeOwner")
                     }
                 }
                 Spacer()
                 if model.isSelectedItemTypeReadOnly {
-                    Button {
-                        Task { await prepareUnlock(for: itemType) }
-                    } label: {
-                        if isPreparingUnlock || isUnlocking {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(isUnlocking ? "Unlocking…" : "Checking…")
-                        } else {
-                            Label("Unlock for Editing…", systemImage: "lock.open")
-                        }
+                    Button("Unlock for Editing…", systemImage: "lock.open") {
+                        Task { await prepareUnlock(itemType) }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isPreparingUnlock || isUnlocking)
-                    .accessibilityLabel("Unlock \(itemType.name) for editing")
+                    .disabled(isWorking)
                     .accessibilityIdentifier("unlockIncludedItemType")
-
                     Button("Duplicate as Item Type…", systemImage: "plus.square.on.square") {
                         duplicateName = "\(itemType.name) Copy"
                         showDuplicatePrompt = true
                     }
-                    .accessibilityLabel("Duplicate \(itemType.name) as Item Type")
                     .accessibilityIdentifier("duplicateIncludedItemType")
                 } else {
-                    Button("Edit", systemImage: "pencil") {
-                        editingItemType = itemType
+                    Button("Edit in Studio", systemImage: "pencil") {
+                        _ = model.beginEditingSelectedItemType()
                     }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("editItemType")
-                    if canDeleteSelectedItemType {
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            showDeleteItemTypeConfirm = true
-                        }
-                        .accessibilityIdentifier("deleteItemType")
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        Task { await prepareDeleteSelectedItemType() }
                     }
+                    .disabled(isWorking)
+                    .accessibilityIdentifier("deleteItemType")
                 }
             }
-            .padding(.horizontal, DesignSystem.Spacing.md)
-            .padding(.vertical, DesignSystem.Spacing.sm)
+            .padding(DesignSystem.Spacing.md)
 
             Divider()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-                    fieldsSection(for: itemType)
-                    templatesSection(
-                        for: itemType,
-                        readOnly: model.isSelectedItemTypeReadOnly
-                    )
+                    overviewSection("Fields") {
+                        ForEach(itemType.fields) { field in
+                            HStack {
+                                Text(field.name)
+                                Spacer()
+                                Text(field.type.studioDisplayName).foregroundStyle(.secondary)
+                                Text(field.isRequired ? "Required" : "Optional").foregroundStyle(.tertiary)
+                            }
+                            .accessibilityIdentifier("itemTypeFieldRow-\(field.name)")
+                        }
+                    }
+                    overviewSection("Card setups") {
+                        ForEach(itemType.templates) { setup in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(setup.name)
+                                    Text(setup.interaction.studioAnswerMethodName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(setup.layout.displayName).foregroundStyle(.secondary)
+                            }
+                            .accessibilityIdentifier(model.isSelectedItemTypeReadOnly ? "includedCardSetupRow-\(setup.name)" : "cardSetupRow-\(setup.name)")
+                        }
+                    }
                 }
-                .padding(DesignSystem.Spacing.md)
-                .frame(maxWidth: 520, alignment: .leading)
+                .padding(DesignSystem.Spacing.lg)
+                .frame(maxWidth: 680, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.detailBackground)
     }
 
-    private func prepareUnlock(for itemType: ItemType) async {
-        guard !isPreparingUnlock, !isUnlocking else { return }
-        isPreparingUnlock = true
-        defer { isPreparingUnlock = false }
-        guard let impact = await model.editingImpact(itemTypeID: itemType.id) else { return }
-        pendingUnlock = PendingItemTypeUnlock(
-            itemTypeID: itemType.id,
-            itemTypeName: itemType.name,
-            impact: impact
-        )
-    }
-
-    private func unlockItemType(id itemTypeID: UUID) async {
-        guard !isUnlocking else { return }
-        isUnlocking = true
-        defer { isUnlocking = false }
-        if await model.unlockItemType(id: itemTypeID) {
-            await onTemplatesChanged()
-            await refreshDeleteAvailability()
-        }
-    }
-
-    private func clearPendingUnlock() {
-        pendingUnlock = nil
-    }
-
-    private func unlockImpactMessage(_ impact: ItemTypeEditingImpact) -> String {
-        let usage: String
-        if impact.itemCount == 0 {
-            usage = "No existing items currently use it."
-        } else {
-            let items = impact.itemCount == 1 ? "1 existing item" : "\(impact.itemCount) existing items"
-            let decks = impact.deckCount == 1 ? "1 deck" : "\(impact.deckCount) decks"
-            if impact.deckCount == 0 {
-                usage = "It is used by \(items), all currently unassigned."
-            } else if impact.unassignedItemCount == 0 {
-                usage = "It is used by \(items) across \(decks)."
-            } else {
-                let unassigned = impact.unassignedItemCount == 1
-                    ? "1 item is unassigned"
-                    : "\(impact.unassignedItemCount) items are unassigned"
-                usage = "It is used by \(items) across \(decks); \(unassigned)."
-            }
-        }
-        return "\(usage) Unlocking adds this definition to Item Types without making a copy. Changes to its fields and templates will affect every item and deck that uses it."
-    }
-
-    @ViewBuilder
-    private func fieldsSection(for itemType: ItemType) -> some View {
+    private func overviewSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-            Text("Fields")
-                .font(DesignSystem.Typography.uiTitle)
-
-            VStack(spacing: 0) {
-                ForEach(itemType.fields) { field in
-                    HStack {
-                        Text(field.name)
-                            .font(DesignSystem.Typography.uiBody)
-                        Spacer()
-                        if field.isRequired {
-                            Text("Required")
-                                .font(DesignSystem.Typography.uiCaption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("Optional")
-                                .font(DesignSystem.Typography.uiCaption)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .padding(.vertical, DesignSystem.Spacing.xs)
-                    .accessibilityIdentifier("itemTypeFieldRow-\(field.name)")
-
-                    if field.id != itemType.fields.last?.id {
-                        Divider()
-                    }
-                }
-            }
-            .padding(.horizontal, DesignSystem.Spacing.md)
-            .padding(.vertical, DesignSystem.Spacing.xs)
-            .background(DesignSystem.sidebarBackground, in: RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    @ViewBuilder
-    private func templatesSection(for itemType: ItemType, readOnly: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-            HStack {
-                Text("Templates")
-                    .font(DesignSystem.Typography.uiTitle)
-                Spacer()
-                if !readOnly {
-                    Button("Add Template", systemImage: "plus") {
-                        isAddingTemplate = true
-                    }
-                    .accessibilityIdentifier("addTemplateToolbar")
-                }
-            }
-
-            if itemType.templates.isEmpty {
-                ContentUnavailableView {
-                    Label("No Templates", systemImage: "doc.plaintext")
-                } description: {
-                    Text(
-                        readOnly
-                            ? "This deck-provided definition has no templates."
-                            : "Add a template to generate study cards from items."
-                    )
-                } actions: {
-                    if !readOnly {
-                        Button("Add Template") { isAddingTemplate = true }
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier("addTemplateEmptyState")
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(itemType.templates) { template in
-                        HStack {
-                            if readOnly {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                                        Text(template.name)
-                                            .font(DesignSystem.Typography.uiBody.weight(.medium))
-                                            .foregroundStyle(.primary)
-                                        Text(model.templateSummary(template, in: itemType))
-                                            .foregroundStyle(.secondary)
-                                        Text(interactionLabel(template.interaction))
-                                            .font(DesignSystem.Typography.uiCaption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    Spacer()
-                                }
-                                .padding(.vertical, DesignSystem.Spacing.sm)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel(
-                                    "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction)), read-only"
-                                )
-                                .accessibilityIdentifier("includedTemplateRow-\(template.name)")
-                            } else {
-                                Button {
-                                    editingTemplate = template
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.rowTight) {
-                                            Text(template.name)
-                                                .font(DesignSystem.Typography.uiBody.weight(.medium))
-                                                .foregroundStyle(.primary)
-                                            Text(model.templateSummary(template, in: itemType))
-                                                .foregroundStyle(.secondary)
-                                            Text(interactionLabel(template.interaction))
-                                                .font(DesignSystem.Typography.uiCaption)
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(DesignSystem.Typography.uiCaption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    .padding(.vertical, DesignSystem.Spacing.sm)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel(
-                                    "\(template.name), \(model.templateSummary(template, in: itemType)), \(interactionLabel(template.interaction))"
-                                )
-                                .accessibilityIdentifier("templateRow-\(template.name)")
-
-                                Button("Edit", systemImage: "pencil") {
-                                    editingTemplate = template
-                                }
-                                .labelStyle(.iconOnly)
-                                .buttonStyle(.borderless)
-                                .accessibilityLabel("Edit \(template.name)")
-                                .accessibilityIdentifier("editTemplate-\(template.name)")
-                            }
-                        }
-
-                        if template.id != itemType.templates.last?.id {
-                            Divider()
-                        }
-                    }
-                }
-                .padding(.horizontal, DesignSystem.Spacing.md)
-                .background(DesignSystem.sidebarBackground, in: RoundedRectangle(cornerRadius: 8))
-            }
+            Text(title).font(DesignSystem.Typography.uiTitle)
+            VStack(spacing: DesignSystem.Spacing.sm) { content() }
+                .padding(DesignSystem.Spacing.md)
+                .background(DesignSystem.sidebarBackground, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 
     private var deleteDialogTitle: String {
-        if let name = model.selectedItemType?.name {
-            return "Delete \"\(name)\"?"
+        "Delete \(model.selectedItemType?.name ?? "item type")?"
+    }
+
+    private func prepareDeleteSelectedItemType() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let count = try await model.selectedItemTypeDeletionImpact()
+            guard count == 0 else {
+                actionError = "Remove the \(count) existing item\(count == 1 ? "" : "s") before deleting this Item Type."
+                return
+            }
+            showDeleteConfirmation = true
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func deleteSelectedItemType() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await model.deleteSelectedItemType()
+            actionError = nil
+            await onTemplatesChanged()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func repair(_ definition: QuarantinedItemTypeDefinition) async {
+        isWorking = true
+        defer { isWorking = false; definitionToRepair = nil }
+        do {
+            _ = try await model.repairDefinition(definition)
+            actionError = nil
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func prepareUnlock(_ itemType: ItemType) async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            pendingUnlock = PendingItemTypeUnlock(
+                itemTypeID: itemType.id,
+                itemTypeName: itemType.name,
+                impact: try await model.editingImpactForIncludedItemType(id: itemType.id)
+            )
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func unlockItemType(_ requested: PendingItemTypeUnlock) async {
+        isWorking = true
+        defer { isWorking = false; pendingUnlock = nil }
+        do {
+            _ = try await model.unlockItemType(id: requested.itemTypeID)
+            actionError = nil
+            await onTemplatesChanged()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func duplicateSelectedItemType() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            _ = try await model.duplicateSelectedIncludedItemType(name: duplicateName)
+            actionError = nil
+            await onTemplatesChanged()
+        } catch { actionError = error.localizedDescription }
+    }
+
+    private func unlockImpactMessage(_ impact: ItemTypeEditingImpact) -> String {
+        let itemText = impact.itemCount == 1 ? "1 existing item" : "\(impact.itemCount) existing items"
+        let deckText = impact.deckCount == 1 ? "1 deck" : "\(impact.deckCount) decks"
+        return "This definition is used by \(itemText) across \(deckText). Unlocking makes it editable without changing its stable identity."
+    }
+
+    private func cardSetupCount(_ count: Int) -> String {
+        count == 1 ? "1 Card setup" : "\(count) Card setups"
+    }
+
+    private func fieldCount(_ count: Int) -> String {
+        count == 1 ? "1 field" : "\(count) fields"
+    }
+}
+
+extension FieldType {
+    var studioDisplayName: String {
+        switch self {
+        case .text: "Text"
+        case .richText: "Rich Text"
+        case .audio: "Audio"
+        case .image: "Image"
+        case .gif: "GIF"
+        case .video: "Video"
+        case .number: "Number"
+        case .cloze: "Cloze"
         }
-        return "Delete item type?"
     }
+}
 
-    private func dismissItemTypeEditor() {
-        isAddingItemType = false
-        editingItemType = nil
-        Task { await onTemplatesChanged() }
-    }
-
-    private func dismissTemplateEditor() {
-        isAddingTemplate = false
-        editingTemplate = nil
-        Task { await onTemplatesChanged() }
-    }
-
-    private func refreshDeleteAvailability() async {
-        canDeleteSelectedItemType = await model.canDeleteSelectedItemType()
-    }
-
-    private func interactionLabel(_ interaction: Interaction) -> String {
-        switch interaction {
-        case .reveal:
-            "Reveal"
-        case .type:
-            "Type answer"
-        case .choose:
-            "Choose"
-        case .record:
-            "Record"
-        case .audioSubmission:
-            "Audio Submission"
-        case .cloze:
-            "Cloze"
-        case .arrange:
-            "Arrange"
+extension Interaction {
+    var studioAnswerMethodName: String {
+        switch self {
+        case .reveal: "Show answer"
+        case .type: "Type answer"
+        case .choose: "Choose"
+        case .record: "Record"
+        case .audioSubmission: "Audio submission"
+        case .cloze: "Cloze"
+        case .arrange: "Arrange"
         }
     }
 }

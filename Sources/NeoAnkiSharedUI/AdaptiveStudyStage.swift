@@ -24,18 +24,22 @@ public enum StudyStageGeometry {
     }
 
     public static func mediaFraction(for layout: CardLayoutID, width: CGFloat) -> CGFloat {
-        switch layout {
-        case .mediaAside: width < 680 ? 0.38 : 0.44
-        case .mediaHero: 0.58
-        case .focus, .split, .actionStage: 0
+        switch CardWireframeDescriptor.descriptor(for: layout).geometry {
+        case let .mediaAside(compactWidth, compact, regular):
+            width < compactWidth ? compact : regular
+        case let .mediaHero(fraction):
+            fraction
+        case .focus, .split, .actionStage:
+            0
         }
     }
 
     public static func usesVerticalSplit(for layout: CardLayoutID, width: CGFloat) -> Bool {
-        switch layout {
-        case .mediaAside: width < 680
-        case .split: width < 560
-        case .focus, .mediaHero, .actionStage: true
+        switch CardWireframeDescriptor.descriptor(for: layout).geometry {
+        case let .mediaAside(compactWidth, _, _), let .split(compactWidth):
+            width < compactWidth
+        case .focus, .mediaHero, .actionStage:
+            true
         }
     }
 
@@ -43,21 +47,8 @@ public enum StudyStageGeometry {
         for layout: CardLayoutID,
         answerRevealed: Bool
     ) -> [ComponentRegion] {
-        var result: [ComponentRegion]
-        switch layout {
-        case .mediaAside, .mediaHero:
-            result = [.label, .primary, .media, .supporting]
-        case .split:
-            result = [.label, .primary, .secondary, .supporting, .media]
-        case .focus:
-            result = answerRevealed
-                ? [.primary, .secondary, .supporting, .media, .label]
-                : [.label, .primary, .supporting, .media]
-        case .actionStage:
-            result = [.label, .primary, .supporting, .media, .secondary]
-        }
-        if !answerRevealed { result.removeAll(where: { $0 == .secondary }) }
-        return result
+        _ = answerRevealed
+        return CardWireframeDescriptor.descriptor(for: layout).regionOrder
     }
 }
 
@@ -101,6 +92,11 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
                     .clipped()
                     .background {
                         stage
+                            .environment(
+                                \.cardWireframeSizingMode,
+                                .intrinsic(referenceHeight: proxy.size.height)
+                            )
+                            .frame(width: proxy.size.width)
                             .fixedSize(horizontal: false, vertical: true)
                             .background(GeometryReader { measured in
                                 Color.clear.preference(
@@ -136,7 +132,14 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
             NavigationStack {
                 ScrollView {
                     stage
+                        .environment(
+                            \.cardWireframeSizingMode,
+                            .intrinsic(referenceHeight: availableSize.height > 0
+                                ? availableSize.height
+                                : nil)
+                        )
                         .frame(maxWidth: 760)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity)
                         .padding(24)
                 }

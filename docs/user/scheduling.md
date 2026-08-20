@@ -50,7 +50,7 @@ Moving a deck moves its entire subtree. From the next study session onward,
 new cards in that subtree use the limits inherited from the deck's new parents;
 limits saved directly on the moved deck remain with it.
 
-Deck-included item types affect which fields and templates are offered while
+Deck-included item types affect which fields and Card setups are offered while
 authoring; they do not create a separate allowance. New cards generated from
 those types consume the destination deck's existing daily allowance in the
 same way as cards from ordinary Item Types.

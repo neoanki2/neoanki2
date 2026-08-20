@@ -1,6 +1,20 @@
 import NeoAnkiApplication
 import SwiftUI
 
+private struct NeoAnkiAccessibilityReduceMotionOverrideKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+public extension EnvironmentValues {
+    /// Isolated UI tests can exercise motion-sensitive paths without relying
+    /// on undocumented SwiftUI keys. Production leaves this nil and follows
+    /// the user's system Reduce Motion preference.
+    var neoAnkiAccessibilityReduceMotionOverride: Bool? {
+        get { self[NeoAnkiAccessibilityReduceMotionOverrideKey.self] }
+        set { self[NeoAnkiAccessibilityReduceMotionOverrideKey.self] = newValue }
+    }
+}
+
 /// Cross-platform semantic tokens. It intentionally uses system colors and
 /// text styles so Dynamic Type, contrast, and platform appearance remain native.
 public enum SharedDesignSystem {

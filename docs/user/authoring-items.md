@@ -9,7 +9,7 @@ parent: User Guide
 # Authoring items
 
 An item stores one structured fact or prompt. Its item type determines the
-fields you fill in and the templates that generate study cards.
+fields you fill in and the Card setups that generate study cards.
 
 ## Add an item
 

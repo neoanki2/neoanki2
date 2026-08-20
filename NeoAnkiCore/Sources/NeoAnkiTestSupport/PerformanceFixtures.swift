@@ -177,16 +177,31 @@ public enum PerformanceFixtures {
         var reviewCount = 0
         let now = clock.now()
 
-        for entry in cards {
-            _ = try await store.submitReview(cardID: entry.card.id, rating: .again, now: now)
+        let initialRatings = ReviewRating.allCases
+        for (index, entry) in cards.enumerated() {
+            _ = try await store.submitReview(
+                cardID: entry.card.id,
+                rating: initialRatings[index % initialRatings.count],
+                now: now
+            )
             reviewCount += 1
         }
-        let followUp = now.addingTimeInterval(30)
-        clock.advance(by: 30)
-        for entry in cards {
-            _ = try await store.submitReview(cardID: entry.card.id, rating: .good, now: followUp)
+        // Optimizer targets are interday outcomes, and promotion eligibility
+        // deliberately requires representative failures across 30 study days.
+        // Distribute deterministic outcomes instead of weakening production
+        // optimizer or promotion thresholds for a benchmark fixture.
+        let studyDayCount = 30
+        for (index, entry) in cards.enumerated() {
+            let day = index % studyDayCount + 1
+            let followUp = now.addingTimeInterval(TimeInterval(day) * 86_400)
+            _ = try await store.submitReview(
+                cardID: entry.card.id,
+                rating: index.isMultiple(of: 5) ? .again : .good,
+                now: followUp
+            )
             reviewCount += 1
         }
+        clock.advance(by: TimeInterval(studyDayCount) * 86_400)
 
         return reviewCount
     }

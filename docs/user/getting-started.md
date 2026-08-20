@@ -15,6 +15,10 @@ release and simplifies updates. The same official Mac build is also available as
 build the current source checkout for macOS or iOS. There is not yet a public
 App Store or TestFlight download; see the [iPhone and iPad guide](../iphone-ipad/).
 
+The current package supports macOS 14 or newer and iOS 17 or newer, using Swift
+tools 6.0. These deployment targets are shared by release and source builds;
+platform installation and distribution still follow the separate paths below.
+
 ## Install the official Mac release
 
 On macOS 14 or newer with Homebrew installed, run:
@@ -157,13 +161,12 @@ one of its cards lapses again. Choose **Done** to return to the scope home, or
 The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.
 
-NeoAnki2 uses focused, detail-only modes while adding an item, managing item
-types, or editing a template. The sidebar collapses automatically to make room;
-the template builder also hides the Item Types list and outer Done action while
-it is open. Study replaces the library split view with a full-window review
-surface, so sidebar controls are unavailable until the session ends. Leaving
-Study restores the library and its previous sidebar visibility. Reduced Motion
-is respected when columns change.
+NeoAnki2 uses focused, detail-only modes while adding an item or studying. Item
+Types keeps its navigator beside the two-pane Item Type Studio, where fields
+and Card setups are saved together. Study replaces the library split view with
+a full-window review surface, so sidebar controls are unavailable until the
+session ends. Leaving Study restores the library and its previous sidebar
+visibility. Reduced Motion is respected when columns change.
 
 Leaving a study session returns you to the scope home with its counts already
 revised. NeoAnki2 may also retune its scheduler against your review history at

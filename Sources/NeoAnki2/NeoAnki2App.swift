@@ -81,7 +81,7 @@ struct NeoAnki2App: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
+            ZStack {
                 if let itemsModel, let decksModel, let schedulingModel, let vocabularyLibraryModel,
                    let library {
 #if DEBUG
@@ -119,6 +119,10 @@ struct NeoAnki2App: App {
                         .task { await bootstrap() }
                 }
             }
+            .frame(
+                minWidth: isDocumentationScreenshotCapture ? 1_024 : nil,
+                minHeight: isDocumentationScreenshotCapture ? 680 : nil
+            )
             .task {
                 installUITestControlIfNeeded()
             }
@@ -420,7 +424,7 @@ struct NeoAnki2App: App {
         testConfiguration = UITestRuntimeConfiguration(
             sequence: command.sequence,
             databaseDirectory: command.databaseDirectory,
-            scenario: command.scenario?.rawValue,
+            scenario: command.scenario,
             initialRoute: command.initialRoute,
             environment: environment
         )

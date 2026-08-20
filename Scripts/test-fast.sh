@@ -14,6 +14,9 @@ swift test --filter NeoAnki2Tests --skip AppLaunchSmokeTests --parallel
 echo "==> Application and sync policy tests"
 swift test --filter NeoAnkiApplicationTests --parallel
 
+echo "==> Shared feature workflow tests"
+swift test --filter NeoAnkiFeaturesTests --parallel
+
 echo "==> Local API registry and OpenAPI contract tests"
 swift test --filter NeoAnkiAPITests --parallel
 

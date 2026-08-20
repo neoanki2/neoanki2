@@ -202,7 +202,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
         )
     }
 
-    func testItemTypeAndTemplateScreenshots() throws {
+    func testItemTypeAndCardSetupScreenshots() throws {
         let app = launchApp(
             databaseLabel: "docs-templates",
             scenario: "deck-included-item-types"
@@ -228,35 +228,91 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             ]
         )
 
-        app.descendants(matching: .any).identified("itemTypeRow-Basic").click()
-        app.buttons.identified("addTemplateToolbar").click()
-        XCTAssertTrue(app.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
+        openItemTypeStudio(named: "Basic", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .identified("itemTypeStudioCardSetupEditor")
+                .waitUntilExists(timeout: 5)
+        )
+        let basicEditorScroll = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        let showAnswer = app.buttons.identified("cardSetupEditor.showAnswer")
+        let editorWindow = app.windows.firstMatch
+        XCTAssertTrue(basicEditorScroll.waitUntilExists(timeout: 3))
+        XCTAssertTrue(showAnswer.waitUntilExists(timeout: 3))
+        XCTAssertTrue(editorWindow.waitUntilExists(timeout: 3))
+        assertItemTypeStudioFitsWindow(in: app)
+        for _ in 0..<4 where !editorWindow.frame.contains(showAnswer.frame) {
+            basicEditorScroll.scroll(byDeltaX: 0, deltaY: -100)
+        }
+        XCTAssertTrue(
+            editorWindow.frame.contains(showAnswer.frame),
+            "Template editor screenshot must fully show the answer-preview control"
+        )
         captureDocumentationScreenshot(
             named: "template-editor",
             of: app,
-            scenario: "new Study-Stage Builder with Ingredients, Preview, and Inspector",
-            expectedVisibleIdentifiers: ["templateNameField", "templateIngredientsPane", "templateStudyPreviewPane", "templateInspectorPane"]
+            scenario: "unified Item Type Studio with Fields, Card setups, and a fillable wireframe",
+            expectedVisibleIdentifiers: [
+                "itemTypeStudioOutline",
+                "itemTypeStudioCardSetupEditor",
+                "cardSetupEditor.layoutPicker",
+                "cardSetupEditor.showAnswer",
+            ]
         )
 
+        app.terminate()
         let advancedApp = launchApp(databaseLabel: "docs-template-advanced")
         openTemplates(in: advancedApp)
-        openTemplateEditor(named: "Card", in: advancedApp)
-        XCTAssertTrue(advancedApp.textFields.identified("templateNameField").waitUntilExists(timeout: 5))
+        openItemTypeStudio(named: "Basic", in: advancedApp)
+        let editorScroll = advancedApp.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        let advancedWindow = advancedApp.windows.firstMatch
+        XCTAssertTrue(editorScroll.waitUntilExists(timeout: 3))
+        XCTAssertTrue(advancedWindow.waitUntilExists(timeout: 3))
         let advancedSettings = advancedApp.descendants(matching: .any)
-            .identified("templateAdvancedSettings")
-        XCTAssertTrue(advancedSettings.waitUntilExists(timeout: 5))
+            .identified("cardSetupEditor.advanced")
+        for _ in 0..<8 where !advancedSettings.exists
+            || !advancedWindow.frame.contains(advancedSettings.frame) {
+            editorScroll.scroll(byDeltaX: 0, deltaY: -250)
+        }
+        XCTAssertTrue(
+            advancedSettings.waitUntilExists(timeout: 3)
+                && advancedWindow.frame.contains(advancedSettings.frame)
+        )
         advancedSettings.click()
-        let skillInput = advancedApp.popUpButtons.identified("templateSkillInput")
-        XCTAssertTrue(skillInput.waitUntilExists(timeout: 5))
+        let availability = advancedApp.descendants(matching: .any)
+            .identified("cardSetupEditor.availability")
+        let learningRoute = advancedApp.descendants(matching: .any)
+            .identified("cardSetupEditor.learningRoute")
+        XCTAssertTrue(
+            availability.waitUntilExists(timeout: 3)
+                && learningRoute.waitUntilExists(timeout: 3),
+            "Expanding Advanced must mount Availability and Learning route controls"
+        )
+        for _ in 0..<8 where !advancedWindow.frame.contains(availability.frame)
+            || !advancedWindow.frame.contains(learningRoute.frame) {
+            editorScroll.scroll(byDeltaX: 0, deltaY: -100)
+        }
+        XCTAssertTrue(
+            availability.waitUntilExists(timeout: 3)
+                && advancedWindow.frame.contains(availability.frame),
+            "Advanced screenshot must visibly include Availability controls"
+        )
+        XCTAssertTrue(
+            learningRoute.waitUntilExists(timeout: 3)
+                && advancedWindow.frame.contains(learningRoute.frame),
+            "Advanced screenshot must visibly include Learning route controls"
+        )
         captureDocumentationScreenshot(
             named: "template-advanced",
             of: advancedApp,
-            scenario: "Study-Stage Builder Generation and Skill inspector",
+            scenario: "Item Type Studio Advanced Availability and Learning route controls",
             expectedVisibleIdentifiers: [
-                "templateInspectorPane",
-                "templateSkillInput",
-                "templateAdvancedSettings",
-                "saveTemplate",
+                "itemTypeStudioCardSetupEditor",
+                "cardSetupEditor.advanced",
+                "cardSetupEditor.availability",
+                "cardSetupEditor.learningRoute",
             ]
         )
     }

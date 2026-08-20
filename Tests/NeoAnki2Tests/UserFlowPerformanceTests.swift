@@ -1,5 +1,8 @@
 import Foundation
+import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import NeoAnkiTestSupport
 import Testing
 
@@ -20,6 +23,45 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
     try await store.bootstrap()
     return (store, directory)
+}
+
+private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft {
+    let count = max(componentCount, 2)
+    let fields = (0..<count).map { index in
+        FieldDef(name: "Field \(index)", type: .text, isRequired: index < 2)
+    }
+    var components: [TemplateComponent] = [
+        TemplateComponent(
+            region: .primary,
+            purpose: .question,
+            source: .field(fields[0].id)
+        ),
+        TemplateComponent(
+            region: .secondary,
+            purpose: .expectedAnswer,
+            source: .field(fields[1].id),
+            presentation: Presentation(reveal: .hiddenUntilAnswer)
+        ),
+    ]
+    components.reserveCapacity(count)
+    for field in fields.dropFirst(2) {
+        components.append(TemplateComponent(
+            region: .supporting,
+            purpose: .supporting,
+            source: .field(field.id)
+        ))
+    }
+    return ItemTypeStudioDraft(itemType: ItemType(
+        name: "Large Card Setup",
+        fields: fields,
+        templates: [Template(
+            name: "Large Setup",
+            layout: .split,
+            components: components,
+            interaction: .reveal,
+            skill: Skill(input: .text, output: .text, operation: .recall)
+        )]
+    ))
 }
 
 @Test @MainActor func perfItemsModelLoadAtScale() async throws {
@@ -296,8 +338,8 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
 
 @Test @MainActor func perfSchedulingModelOptimize() async throws {
     guard let scale = requirePerformanceScale() else { return }
-    let libraryCount = scale.itemCount
     let fsrsCount = scale.fsrsLibraryItemCount
+    let libraryCount = max(scale.itemCount, fsrsCount)
 
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki-app-perf-scheduling-\(UUID().uuidString)", isDirectory: true)
@@ -333,23 +375,94 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfTemplatesModelLoad() async throws {
+@Test @MainActor func perfItemTypesFeatureLoad() async throws {
     guard let scale = requirePerformanceScale() else { return }
     _ = scale
 
-    let (store, directory) = try await makeAppStore(label: "templates-load")
+    let (store, directory) = try await makeAppStore(label: "item-types-load")
     defer { try? FileManager.default.removeItem(at: directory) }
 
-    let model = TemplatesModel(store: store)
+    let model = ItemTypesFeatureModel(library: SQLiteLibraryRepository(store: store))
 
     _ = try await PerformanceHarness.measure(
-        flow: "templates-model-load",
+        flow: "item-types-feature-load",
         layer: "app"
     ) {
         await model.load()
         #expect(!model.itemTypes.isEmpty)
         return ["item_type_count": "\(model.itemTypes.count)"]
     }
+}
+
+@Test @MainActor func perfCardSetupDraftProjectionValidationLayoutAndSerialization() async throws {
+    guard let scale = requirePerformanceScale() else { return }
+    // Keep the fast baseline meaningfully larger than a typical real type;
+    // slow scales cap memory while still exercising thousands of mappings.
+    let componentCount = max(2_500, min(scale.itemCount, 5_000))
+    let original = makeLargeCardSetupDraft(componentCount: componentCount)
+    let setup = try #require(original.cardSetups.first)
+    let metadata = ["component_count": "\(componentCount)"]
+
+    _ = try await PerformanceHarness.measure(
+        flow: "card-setup-projection",
+        layer: "app",
+        metadata: metadata
+    ) {
+        let projection = CardSetupEditorProjection(setup: setup, fields: original.fields)
+        #expect(projection.resolvedComponents.count == componentCount)
+        return ["additional_count": "\(projection.additionalComponentIDs.count)"]
+    }
+
+    _ = try await PerformanceHarness.measure(
+        flow: "card-setup-validation",
+        layer: "app",
+        metadata: metadata
+    ) {
+        #expect(original.validationIssues.isEmpty)
+        return [:]
+    }
+
+    var layoutDraft = original
+    let layoutMeasurement = try await PerformanceHarness.measure(
+        flow: "card-setup-layout-switch",
+        layer: "app",
+        metadata: metadata
+    ) {
+        #expect(CardSetupEditorReducer.apply(
+            .chooseLayout(.focus),
+            to: &layoutDraft,
+            cardSetupID: setup.id
+        ))
+        #expect(layoutDraft.cardSetups[0].layout == .focus)
+        return ["interactions": "1"]
+    }
+    #expect(layoutMeasurement.durationSeconds < 0.1)
+
+    _ = try await PerformanceHarness.measure(
+        flow: "card-setup-serialization",
+        layer: "app",
+        metadata: metadata
+    ) {
+        let bytes = try JSONEncoder().encode(original.candidateItemType())
+        #expect(!bytes.isEmpty)
+        return ["encoded_bytes": "\(bytes.count)"]
+    }
+
+    var interactionDraft = original
+    let lastComponentID = try #require(interactionDraft.cardSetups[0].components.last?.id)
+    let interactionMeasurement = try await PerformanceHarness.measure(
+        flow: "card-setup-large-draft-local-reorder",
+        layer: "app",
+        metadata: metadata
+    ) {
+        #expect(CardSetupEditorReducer.apply(
+            .moveComponent(lastComponentID, .earlier),
+            to: &interactionDraft,
+            cardSetupID: setup.id
+        ))
+        return ["interactions": "1"]
+    }
+    #expect(interactionMeasurement.durationSeconds < 0.1)
 }
 
 @Test @MainActor func perfStudySupportInteractionPaths() async throws {

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import NeoAnkiCore
 
 public enum PerformanceScale: String, Sendable, CaseIterable {
     case small
@@ -64,10 +65,12 @@ public enum PerformanceScale: String, Sendable, CaseIterable {
         }
     }
 
-    /// Library size for FSRS optimize fixtures (optimizer needs ≥100 two-review histories).
+    /// Outcome histories for FSRS optimize fixtures. Each seeded card produces
+    /// one interday observation, so even the small baseline must meet the
+    /// production optimizer's current minimum without weakening that policy.
     public var fsrsLibraryItemCount: Int {
         switch self {
-        case .small, .medium: itemCount
+        case .small, .medium: max(itemCount, FSRSOptimizer.defaultMinimumObservations)
         case .large: 2_500
         case .stress: 10_000
         }

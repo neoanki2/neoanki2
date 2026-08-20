@@ -24,10 +24,10 @@ nav_order: 1
   </div>
 
   <figure class="quiet-hero-figure">
-    <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the template editor screenshot at full size">
-      <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="1024" height="708" alt="NeoAnki2 showing structured prompt, answer, and skill settings for a study template">
+    <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the Item Type Studio screenshot at full size">
+      <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="1024" height="708" alt="NeoAnki2 showing a Card setup with structured Question, Answer, Availability, and Learning route settings">
     </a>
-    <figcaption><strong>Knowledge has structure.</strong> Fields hold the material; templates decide how you practise it.</figcaption>
+    <figcaption><strong>Knowledge has structure.</strong> Fields hold the material; Card setups decide how you practise it.</figcaption>
   </figure>
 </section>
 
@@ -65,12 +65,12 @@ nav_order: 1
     <div class="sequence-copy">
       <p class="sequence-verb">Shape</p>
       <h3>Model the idea, not its appearance.</h3>
-      <p>Define fields and reusable templates once. One item can produce reveal, typed-answer, choice, arrange, record, or cloze practice without duplicating the underlying knowledge.</p>
+      <p>Define fields and reusable Card setups once. One item can produce reveal, typed-answer, choice, arrange, record, or cloze practice without duplicating the underlying knowledge.</p>
       <a href="{{ '/user/item-types-and-templates/' | relative_url }}">How item types work <span aria-hidden="true">→</span></a>
     </div>
     <figure class="sequence-figure">
-      <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the template editor screenshot at full size">
-        <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="992" height="688" loading="lazy" alt="NeoAnki2 template editor mapping structured fields into a prompt and answer">
+      <a class="screenshot-link" href="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" aria-label="Open the Item Type Studio screenshot at full size">
+        <img src="{{ '/assets/screenshots/template-advanced.png' | relative_url }}" width="992" height="688" loading="lazy" alt="NeoAnki2 Item Type Studio mapping structured fields into a Question and Answer">
       </a>
     </figure>
   </article>

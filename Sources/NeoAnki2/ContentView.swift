@@ -2,6 +2,7 @@ import AppKit
 import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
+import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -15,8 +16,12 @@ private struct ImportNotice: Identifiable {
 
 enum ContentLayoutPolicy {
     static func usesLibrarySplitView(for route: AppRoute) -> Bool {
-        if case .study = route { return false }
-        return true
+        switch route {
+        case .study, .itemTypes:
+            return false
+        default:
+            return true
+        }
     }
 }
 
@@ -34,7 +39,7 @@ struct ContentView: View {
     @State private var itemBrowserFilter: ItemBrowserFilter = .all
     @State private var studyModel: StudyModel?
     @State private var studyScope: StudyScope = .allDecks
-    @State private var templatesModel: TemplatesModel?
+    @State private var templatesModel: ItemTypesFeatureModel?
     @State private var isEditingTemplate = false
     @State private var endSessionTrigger = false
     /// Lives here rather than in `StudyView` because the Study menu opens the
@@ -415,9 +420,9 @@ struct ContentView: View {
                 detail
             }
         } else {
-            // Study owns the full window. Keeping it outside the library split
-            // view prevents AppKit from reopening or reserving space for the
-            // sidebar while the learner is reviewing a card.
+            // Study and Item Types each own the full window. Keeping them
+            // outside the library split prevents AppKit from reopening or
+            // reserving space for a sidebar they do not use.
             detail
         }
     }
@@ -1102,7 +1107,12 @@ struct ContentView: View {
 
     private func openTemplates() {
         if templatesModel == nil {
-            templatesModel = TemplatesModel(library: library)
+            guard let studioLibrary = library as? any LibraryBrowsing
+                & LibraryItemTypeManaging
+                & LibraryItemTypeEditingSafeguarding
+                & LibraryItemTypeStudioSaving
+            else { return }
+            templatesModel = ItemTypesFeatureModel(library: studioLibrary)
         }
         selectedItemID = nil
         isEditingTemplate = false

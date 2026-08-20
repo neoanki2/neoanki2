@@ -22,8 +22,8 @@ Choose what you want to accomplish.
 - **Add, edit, move, or delete an item:** [Authoring items](../authoring-items/)
 - **Create a cloze blank:** [Content and media](../content-and-media/#cloze-blanks)
 - **Add an image, GIF, audio, or video:** [Content and media](../content-and-media/#attach-media)
-- **Create a custom schema:** [Item types and templates](../item-types-and-templates/)
-- **Generate more than one card from an item:** [Item types and templates](../item-types-and-templates/#create-edit-and-delete-templates)
+- **Create a custom schema:** [Item types and Card setups](../item-types-and-templates/)
+- **Generate more than one card from an item:** [Item types and Card setups](../item-types-and-templates/#choose-an-answer-method)
 
 ## Organize the library
 

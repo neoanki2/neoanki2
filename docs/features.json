@@ -70,7 +70,7 @@
       "id": "mobile-shell",
       "name": "Navigate the adaptive iPhone and iPad app",
       "article": "user/iphone-ipad.md",
-      "sources": ["Platforms/iOS/MobilePaths.swift", "Platforms/iOS/NeoAnkiIOSApp.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiIOS/MobileAppModel.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/NeoAnkiIOSApp.swift"],
+      "sources": ["Platforms/iOS/MobilePaths.swift", "Platforms/iOS/NeoAnkiIOSApp.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiIOS/MobileAppModel.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/NeoAnkiIOSApp.swift", "Sources/NeoAnkiSharedUI/SharedDesignSystem.swift"],
       "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiApplicationTests/AppSessionTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
     },
     {
@@ -78,7 +78,7 @@
       "name": "Browse, author, organize, and transfer on iOS",
       "article": "user/iphone-ipad.md",
       "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/ItemTypeEditingFeatureTests.swift"]
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
     },
     {
       "id": "mobile-study",
@@ -175,7 +175,7 @@
       "name": "Cloze fields and blank authoring",
       "article": "user/content-and-media.md",
       "sources": ["Sources/NeoAnki2/ClozeFieldEditor.swift", "Sources/NeoAnki2/ContentValueView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift", "UITests/NeoAnki2UITests/StudyUITests.swift"]
+      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift", "UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/ClozeFieldEditorTests.swift"]
     },
     {
       "id": "content-media",
@@ -276,26 +276,26 @@
     },
     {
       "id": "item-types",
-      "name": "Manage normal and deck-included item types",
+      "name": "Edit item types and Card setups atomically",
       "article": "user/item-types-and-templates.md",
-      "sources": ["Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/TemplatesModel.swift", "Sources/NeoAnki2/ItemTypeEditorView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/TemplatesModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"],
+      "sources": ["Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/MacItemTypeStudioView.swift", "Sources/NeoAnkiApplication/ItemTypeStudioDraft.swift", "Sources/NeoAnkiApplication/LibraryRepository.swift", "Sources/NeoAnkiFeatures/ItemTypesFeatureModel.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/ItemTypeStudioMobileView.swift", "Sources/NeoAnkiIOS/MobileCardSetupAccessibilityTestHost.swift", "Sources/NeoAnkiIOS/MobileItemTypeStudioUITestSeeder.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+ItemTypes.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeUpdateAuthorization.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Study/ItemStore+StudyResponses.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnki2Tests/UITestControlTests.swift", "Tests/NeoAnkiApplicationTests/ItemTypeStudioDraftTests.swift", "Tests/NeoAnkiFeaturesTests/ItemTypesFeatureModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ItemTypeAtomicUpdateTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"],
       "screenshot": "assets/screenshots/item-types.png"
     },
     {
       "id": "templates",
-      "name": "Create, edit, and delete templates",
+      "name": "Fill Card setups in five static layouts",
       "article": "user/item-types-and-templates.md",
-      "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "Sources/NeoAnki2/TemplateEditorState.swift", "Sources/NeoAnki2/TemplatesModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "Tests/NeoAnki2Tests/TemplateEditorStateTests.swift", "Tests/NeoAnki2Tests/TemplatesModelTests.swift", "Tests/NeoAnki2Tests/TemplateItemCoordinationFlowTests.swift"],
+      "sources": ["Sources/NeoAnkiSharedUI/CardSetupEditorView.swift", "Sources/NeoAnkiSharedUI/CardWireframeView.swift", "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift", "Sources/NeoAnki2/StudyCompositionView.swift", "Sources/NeoAnkiIOS/MobileStudyCompositionView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnki2Tests/CardSetupEditorProjectionTests.swift", "Tests/NeoAnki2Tests/StudyCompositionTests.swift", "Tests/NeoAnkiApplicationTests/ItemTypeStudioDraftTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/TemplateCompatibilityTests.swift"],
       "screenshot": "assets/screenshots/template-editor.png"
     },
     {
       "id": "template-advanced",
-      "name": "Advanced slots, skills, reveal, media, and generation",
+      "name": "Configure Availability and Learning routes",
       "article": "user/item-types-and-templates.md",
-      "sources": ["Sources/NeoAnki2/TemplateEditorView.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift"],
+      "sources": ["Sources/NeoAnkiSharedUI/CardSetupEditorView.swift", "Sources/NeoAnkiApplication/ItemTypeStudioDraft.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/Template.swift"],
+      "tests": ["UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnki2Tests/CardSetupEditorProjectionTests.swift", "Tests/NeoAnkiApplicationTests/ItemTypeStudioDraftTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/TemplateCompatibilityTests.swift"],
       "screenshot": "assets/screenshots/template-advanced.png"
     },
     {

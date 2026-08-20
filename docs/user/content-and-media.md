@@ -150,7 +150,7 @@ The authoring form previews images and GIFs. Its compact preview represents
 audio and video with their media label. Item detail resolves the saved content
 in the native reading preview.
 
-During study, templates decide whether media is always shown, hidden until the
+During study, Card setups decide whether media is always shown, hidden until the
 answer, blurred, played on tap, autoplayed, or looped:
 
 - Images scale to the reading column and can be hidden or blurred.
@@ -159,7 +159,7 @@ answer, blurred, played on tap, autoplayed, or looped:
 - Video uses the native video player.
 
 Autoplay and GIF animation are suppressed when macOS Reduce Motion is enabled.
-These behaviors come from the item type's template; they are not selected in
+These behaviors come from the item type's Card setup; they are not selected in
 the item editor.
 
 ## Current compatibility limits

@@ -41,7 +41,7 @@ review.
 5. Choose **Save**.
 
 Expected result: the form closes and an item row titled **Capital of France**
-appears. It reports one generated card. The starter Basic type has one template,
+appears. It reports one generated card. The starter Basic type has one Card setup,
 so saving this item creates one study card; this exact one-item/one-card result
 is covered by the onboarding flow test.
 
@@ -69,7 +69,7 @@ scope because no card is currently due.
 That is a complete learning loop:
 
 1. the item stored the fact;
-2. its Basic template generated a retrieval card;
+2. its Basic Card setup generated a retrieval card;
 3. the session asked you to recall before revealing; and
 4. the Good grade updated that card's memory state and removed it from the
    current due queue.
@@ -88,6 +88,6 @@ add, reveal, Good, complete sequence.
 
 ---
 
-**Next:** [Understand items, templates, cards, and reviews](../concepts/)
+**Next:** [Understand items, Card setups, cards, and reviews](../concepts/)
 
 **Related:** [Studying in detail](../studying/) · [Shortcuts and accessibility](../shortcuts-accessibility/)

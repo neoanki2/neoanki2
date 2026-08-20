@@ -22,6 +22,13 @@ answer appears immediately below it, and supplemental answer details follow.
 This keeps continuations such as poetry in sequence while placing vocabulary
 answers before grammar and example metadata. VoiceOver uses the same order.
 
+All five static Card setup layouts use the same content and accessibility order
+on Mac, iPhone, and iPad. Before reveal, expected-answer content stays concealed
+by purpose even when an imported setup places it in an unusual region. A setup
+may also hide supporting content until reveal or blur compatible image and GIF
+content; **Show Answer** applies those reveal rules together without changing
+the card's place in the session.
+
 NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The Study button shows the number due and is disabled when that count is zero; future cards are not included.
 
 [![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)]({{ site.baseurl }}/assets/screenshots/study-prompt.png)
@@ -88,6 +95,12 @@ The session preserves that queue while you work. If grading places a card back
 into Learning, it returns after the rest of the current queue rather than
 interrupting the next card. Editing an item refreshes its queued cards; deleting
 a card removes it from the session.
+
+Changing an Item Type's Card setups can likewise retire cards that no longer
+generate. A newly opened session uses the reconciled card set, while surviving
+Card setups keep their stable card identities, scheduling memory, and normal
+learned-before-new queue priority. Choosing a different static Layout alone does
+not change queue order.
 
 ## Card interactions
 

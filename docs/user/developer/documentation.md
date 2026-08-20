@@ -40,6 +40,13 @@ until its provenance is current. Follow the full
 [screenshot and claims procedure]({{ '/user/maintaining-documentation/' | relative_url }})
 and never replace provenance metadata by hand.
 
+Screenshot filenames are stable documentation contracts even when the
+interface changes. For example, the Item Type Studio continues to capture
+`item-types.png`, `template-editor.png`, and `template-advanced.png`. Update the
+isolated CI scenarios and expected accessibility identifiers, then let CI
+capture and promote the complete set; never edit PNGs, hashes, or provenance
+manually.
+
 ## Page ownership
 
 Every published Markdown page declares one audience: `user`, `api`,

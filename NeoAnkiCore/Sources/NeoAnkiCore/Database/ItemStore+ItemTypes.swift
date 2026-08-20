@@ -165,6 +165,23 @@ public extension ItemStore {
         )
     }
 
+    /// Captures the exact retired-card, private-response, and stored-field state
+    /// that a Studio confirmation authorizes. Commit recomputes this inside its
+    /// write transaction.
+    func prepareItemTypeUpdateAuthorization(
+        from existing: ItemType,
+        to updated: ItemType
+    ) async throws -> ItemTypeUpdateAuthorization {
+        guard existing.id == updated.id else {
+            throw DatabaseError.invalidItemType("The edited item type identity changed.")
+        }
+        try ItemTypeValidation.validate(updated)
+        return try await database.prepareItemTypeUpdateAuthorization(
+            expectedOriginal: existing,
+            updated: updated
+        )
+    }
+
     @discardableResult
     func deleteItemType(id: UUID) async throws -> Bool {
         guard try await database.fetchItemType(id: id) != nil else { return false }
@@ -181,6 +198,27 @@ public extension ItemStore {
         let previous = try await database.fetchItemType(id: itemType.id)
         try ItemTypeValidation.validate(itemType)
         try await database.updateItemTypeAndSyncCards(previous: previous, updated: itemType, now: now)
+        return itemType
+    }
+
+    /// Atomically compares the persisted definition, retired-card identities,
+    /// private-response impact, and stored-field state with the values confirmed
+    /// by Item Type Studio before reconciling cards.
+    @discardableResult
+    func updateItemType(
+        _ itemType: ItemType,
+        authorization: ItemTypeUpdateAuthorization,
+        now: Date = .now
+    ) async throws -> ItemType {
+        guard itemType.id == authorization.expectedOriginal.id else {
+            throw DatabaseError.invalidItemType("The edited item type identity changed.")
+        }
+        try ItemTypeValidation.validate(itemType)
+        try await database.updateItemTypeAndSyncCards(
+            updated: itemType,
+            authorization: authorization,
+            now: now
+        )
         return itemType
     }
 }

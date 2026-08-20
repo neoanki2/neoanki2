@@ -550,11 +550,23 @@ class NeoAnkiUITestCase: XCTestCase {
         control.click()
     }
 
-    func openTemplateEditor(named name: String, in app: XCUIApplication) {
-        let edit = app.buttons.identified("editTemplate-\(name)")
+    func openItemTypeStudio(named name: String, in app: XCUIApplication) {
+        let row = app.descendants(matching: .any).identified("itemTypeRow-\(name)")
+        XCTAssertTrue(row.waitUntilExists(timeout: 5))
+        row.click()
+        let edit = app.buttons.identified("editItemType")
         XCTAssertTrue(edit.waitUntilExists(timeout: 5))
-        edit.click()
-        XCTAssertTrue(app.textFields.identified("templateNameField").waitUntilExists(timeout: 10))
+        activateCompactButton(edit)
+        let studioName = app.textFields.identified("itemTypeStudioName")
+        if !studioName.waitUntilExists(timeout: 2) {
+            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
+        }
+        XCTAssertTrue(studioName.waitUntilExists(timeout: 10))
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .identified("itemTypeStudioCardSetupEditor")
+                .waitUntilExists(timeout: 10)
+        )
     }
 
     /// Dismissing right after an edit can land while the panel is still
@@ -597,32 +609,6 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(save.isEnabled)
         save.click()
         XCTAssertTrue(save.waitUntilGone(timeout: 10))
-    }
-
-    /// Saves through the visible toolbar control when possible and through its
-    /// documented default-action shortcut when AppKit exposes that control as
-    /// visible but temporarily non-hittable.
-    func saveTemplateEditor(in app: XCUIApplication) {
-        let save = app.buttons.identified("saveTemplate")
-        XCTAssertTrue(save.waitUntilExists(timeout: 5))
-        XCTAssertTrue(save.isEnabled)
-        if save.waitUntilHittable(timeout: 2) {
-            save.click()
-        } else {
-            app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
-        }
-        XCTAssertTrue(save.waitUntilGone(timeout: 10), "Template editor did not close after saving")
-    }
-
-    func showTemplateAnswer(in app: XCUIApplication) {
-        let after = app.buttons["After answer"]
-        if after.waitUntilHittable(timeout: 2) {
-            after.click()
-            return
-        }
-        let radio = app.radioButtons["After answer"]
-        XCTAssertTrue(radio.waitUntilHittable(timeout: 3))
-        radio.click()
     }
 
     /// Activates a visible compact icon control even when XCTest's AppKit
@@ -792,11 +778,14 @@ class NeoAnkiUITestCase: XCTestCase {
         if app.buttons.identified("cancelAddItem").exists {
             app.buttons.identified("cancelAddItem").click()
         }
+        if app.buttons.identified("cancelItemTypeStudio").exists {
+            app.buttons.identified("cancelItemTypeStudio").click()
+            if app.buttons.identified("confirmDiscardItemTypeStudio").waitUntilExists(timeout: 1) {
+                app.buttons.identified("confirmDiscardItemTypeStudio").click()
+            }
+        }
         if app.buttons.identified("templatesDone").exists {
             app.buttons.identified("templatesDone").click()
-        }
-        if app.buttons.identified("cancelTemplateEditor").exists {
-            app.buttons.identified("cancelTemplateEditor").click()
         }
         if isBrowsing(in: app) {
             leaveBrowseMode(in: app)
@@ -856,7 +845,7 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     func saveItemType(in app: XCUIApplication) {
-        let save = app.buttons.identified("saveItemType")
+        let save = app.buttons.identified("saveItemTypeStudio")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
         XCTAssertTrue(save.isEnabled)
         if save.waitUntilHittable(timeout: 2) {
@@ -865,6 +854,233 @@ class NeoAnkiUITestCase: XCTestCase {
             app.typeKey(XCUIKeyboardKey.return, modifierFlags: [])
         }
         XCTAssertTrue(save.waitUntilGone(timeout: 10), "Item type editor did not close after saving")
+    }
+
+    func revealCardSetupAdvanced(in app: XCUIApplication) -> XCUIElement {
+        let advanced = app.descendants(matching: .any)
+            .identified("cardSetupEditor.advanced")
+        revealCardSetupElement(advanced, in: app)
+        return advanced
+    }
+
+    /// Reveals a control in the Studio's field outline after editing a lower
+    /// field has scrolled the outline header out of view.
+    func revealItemTypeStudioOutlineElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maximumSteps: Int = 8,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let outline = app.descendants(matching: .any).identified("itemTypeStudioOutline")
+        XCTAssertTrue(outline.waitUntilExists(timeout: 3), file: file, line: line)
+
+        func isReachable() -> Bool {
+            element.exists && element.isHittable && outline.frame.contains(element.frame)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < outline.frame.minY {
+                delta = 200
+            } else {
+                delta = -200
+            }
+            outline.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
+        XCTAssertTrue(
+            isReachable(),
+            "Studio outline control is not visible and reachable: \(element)",
+            file: file,
+            line: line
+        )
+    }
+
+    /// Reveals a row action in the Studio's independently scrolling Card setup
+    /// list. AppKit's automatic click scrolling can otherwise target the outer
+    /// split-view geometry after the selected setup moves the list viewport.
+    func revealItemTypeStudioCardSetupListElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maximumSteps: Int = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let list = app.descendants(matching: .any)
+            .identified("itemTypeStudio.cardSetupListScroll")
+        XCTAssertTrue(list.waitUntilExists(timeout: 3), file: file, line: line)
+
+        func isReachable() -> Bool {
+            element.exists && element.isHittable && list.frame.contains(element.frame)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < list.frame.minY {
+                delta = 180
+            } else {
+                delta = -180
+            }
+            list.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            list.scroll(byDeltaX: 0, deltaY: 180)
+        }
+
+        XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
+        XCTAssertTrue(
+            isReachable(),
+            "Card setup list control is not visible and reachable: \(element)",
+            file: file,
+            line: line
+        )
+    }
+
+    /// Reveals a control inside the Studio's right-hand editor without relying
+    /// on its lazy children already existing in the accessibility tree. The
+    /// outer editor is the one stable scrolling surface on every supported
+    /// window size; bounded, directional AppKit scrolling avoids both an
+    /// unbounded search and clicks on controls clipped outside that surface.
+    func revealCardSetupElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maximumSteps: Int = 12,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let editor = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        XCTAssertTrue(editor.waitUntilExists(timeout: 3), file: file, line: line)
+
+        func isReachable() -> Bool {
+            element.exists && element.isHittable && editor.frame.contains(element.frame)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < editor.frame.minY {
+                delta = 250
+            } else {
+                delta = -250
+            }
+            editor.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        // A layout change can preserve an offset below a lazily mounted
+        // target. When the target is absent there is no frame to distinguish
+        // that state from one above the viewport, so search the opposite
+        // direction before declaring the bounded reveal unsuccessful.
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY > editor.frame.maxY {
+                delta = -250
+            } else {
+                delta = 250
+            }
+            editor.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        // The opposite-direction pass can establish the top boundary without
+        // materializing a target farther down than the current layout. Finish
+        // with one bounded top-to-bottom scan so every lazy position is
+        // searched regardless of the offset preserved by the preceding edit.
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < editor.frame.minY {
+                delta = 250
+            } else {
+                delta = -250
+            }
+            editor.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
+        XCTAssertTrue(
+            isReachable(),
+            "Card setup control is not visible and reachable: \(element)",
+            file: file,
+            line: line
+        )
+    }
+
+    func assertItemTypeStudioFitsWindow(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let window = app.windows.firstMatch
+        let outline = app.descendants(matching: .any).identified("itemTypeStudioOutline")
+        let editor = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        let cancel = app.buttons.identified("cancelItemTypeStudio")
+        let save = app.buttons.identified("saveItemTypeStudio")
+
+        XCTAssertTrue(window.waitUntilExists(timeout: 5), file: file, line: line)
+        for element in [outline, editor, cancel, save] {
+            XCTAssertTrue(element.waitUntilExists(timeout: 5), file: file, line: line)
+        }
+
+        var previousFrames: [CGRect]?
+        var stableSamples = 0
+        XCTAssertTrue(
+            waitUntil(timeout: 3) {
+                let frames = [window, outline, editor, cancel, save].map(\.frame)
+                if frames == previousFrames {
+                    stableSamples += 1
+                } else {
+                    previousFrames = frames
+                    stableSamples = 0
+                }
+                return stableSamples >= 5
+            },
+            "Studio layout did not settle",
+            file: file,
+            line: line
+        )
+
+        XCTAssertLessThanOrEqual(
+            outline.frame.maxX,
+            editor.frame.minX + 1,
+            "Studio columns must not overlap",
+            file: file,
+            line: line
+        )
+        for (name, element) in [
+            ("outline", outline),
+            ("Card setup editor", editor),
+            ("Cancel", cancel),
+            ("Save", save),
+        ] {
+            XCTAssertGreaterThanOrEqual(
+                element.frame.minX,
+                window.frame.minX - 1,
+                "Studio \(name) extends past the window's leading edge",
+                file: file,
+                line: line
+            )
+            XCTAssertLessThanOrEqual(
+                element.frame.maxX,
+                window.frame.maxX + 1,
+                "Studio \(name) extends past the window's trailing edge",
+                file: file,
+                line: line
+            )
+        }
+        XCTAssertTrue(
+            cancel.waitUntilHittable(timeout: 2),
+            "Studio Cancel must remain visible and reachable on screen",
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            save.waitUntilHittable(timeout: 2),
+            "Studio Save must remain visible and reachable on screen",
+            file: file,
+            line: line
+        )
     }
 
     /// Asserting absence immediately races the animation that removes the
@@ -942,6 +1158,16 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertFalse(
             allDecks.waitUntilHittable(timeout: 1),
             "Sidebar became interactive during study"
+        )
+    }
+
+    func assertSidebarCannotOpenDuringItemTypes(in app: XCUIApplication) {
+        let allDecks = app.descendants(matching: .any).identified("scopeRow-AllDecks")
+        assertSidebarCollapsed(in: app)
+        app.typeKey("0", modifierFlags: [.command])
+        XCTAssertFalse(
+            allDecks.waitUntilHittable(timeout: 1),
+            "Library sidebar became interactive while Item Types owned the window"
         )
     }
 

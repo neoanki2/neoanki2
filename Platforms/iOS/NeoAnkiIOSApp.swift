@@ -13,10 +13,24 @@ struct NeoAnkiIOSApp: App {
         ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingAccessibility")
     }
 
+    private var usesCardSetupAccessibilityTestHost: Bool {
+        let process = ProcessInfo.processInfo
+        return process.arguments.contains("-NeoAnkiUITestingReset")
+            && process.arguments.contains("-NeoAnkiUITestingAccessibility")
+            && process.arguments.contains("-NeoAnkiUITestingCardSetupAccessibilityEditor")
+            && process.environment["NEOANKI_TEST_SCENARIO"] == "item-type-studio"
+    }
+
     init() {
         let paths = MobilePaths()
+        let usesAccessibilityUITestEnvironment = ProcessInfo.processInfo.arguments.contains(
+            "-NeoAnkiUITestingAccessibility"
+        )
         if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") {
-            UIView.setAnimationsEnabled(false)
+            // Keep ordinary UI journeys deterministic, but leave UIKit motion
+            // enabled for the accessibility matrix so the injected SwiftUI
+            // reduced-motion environment remains the behavior under test.
+            UIView.setAnimationsEnabled(usesAccessibilityUITestEnvironment)
             let fileManager = FileManager.default
             for url in [
                 paths.databaseURL,
@@ -45,10 +59,16 @@ struct NeoAnkiIOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if usesAccessibilityUITestEnvironment {
+            if usesAccessibilityUITestEnvironment && usesCardSetupAccessibilityTestHost {
+                MobileCardSetupAccessibilityTestHost(model: model)
+                    .preferredColorScheme(.dark)
+                    .dynamicTypeSize(.accessibility5)
+                    .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
+            } else if usesAccessibilityUITestEnvironment {
                 NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
+                    .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
             } else {
                 NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
             }
