@@ -101,6 +101,12 @@ if [[ -n "${DOC_SCREENSHOT_DIR:-}" ]]; then
   /usr/libexec/PlistBuddy \
     -c "Add :TestConfigurations:0:TestTargets:0:EnvironmentVariables:DOC_SCREENSHOT_DIR string $DOC_SCREENSHOT_DIR" \
     "$XCTESTRUN"
+  /usr/libexec/PlistBuddy \
+    -c "Delete :TestConfigurations:0:TestTargets:0:EnvironmentVariables:DOC_SCREENSHOT_APPEARANCE" \
+    "$XCTESTRUN" 2>/dev/null || true
+  /usr/libexec/PlistBuddy \
+    -c "Add :TestConfigurations:0:TestTargets:0:EnvironmentVariables:DOC_SCREENSHOT_APPEARANCE string ${DOC_SCREENSHOT_APPEARANCE:-dark}" \
+    "$XCTESTRUN"
 fi
 
 TEST_ARGUMENTS=()

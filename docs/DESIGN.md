@@ -252,6 +252,29 @@ The sidebar has one selection model and two clear groups. **Library** contains A
   concrete existing-item and deck counts before moving the same definition into
   the editable list; retain duplication as the secondary isolation path.
 
+### Preview-first Item Type Studio
+
+- **Focused workspace:** While a draft is open, Studio replaces the Item Types
+  navigator and its outer Done action. Save or Cancel restores the previous
+  navigator selection.
+- **Task order:** One compact, independently scrolling rail contains item-type
+  name, Card setups, then Fields. The card canvas occupies the remaining height
+  and is visible without scrolling at the 960×640pt default window size.
+- **Canvas as editor:** Selecting content on the card adds a 2pt accent outline,
+  a checkmark, and the selected accessibility trait. Its source, reveal,
+  playback, placement, local order, duplicate, and remove controls live in one
+  contextual inspector; empty holes remain direct Add targets.
+- **Canvas controls:** Add content, Layout, and Show/Hide Answer stay beside the
+  canvas. They never move below it in a long form.
+- **Adaptive inspector:** At compact Mac widths, keep the rail and card visible
+  and open setup, selected-content, and Advanced controls from a labeled
+  **Inspector** sheet. At wide widths the same inspector becomes a fixed trailing
+  pane. iPhone and iPad retain the shared stacked editor.
+- **Traversal and motion:** Keyboard and VoiceOver order follows rail → canvas →
+  inspector. Interactive targets are at least 44pt, validation mounts the
+  necessary inspector context before focusing it, and answer concealment honors
+  Reduce Motion.
+
 ### Empty states
 
 - **Component:** `ContentUnavailableView` + SF Symbol + one primary action

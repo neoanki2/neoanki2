@@ -47,10 +47,17 @@ Starter types follow the same edit and deletion rules as custom types.
 
 ## Edit fields and Card setups together
 
-On Mac, the navigator remains visible beside a two-pane Studio: **Fields** and
-**Card setups** are on the leading side, and the selected fillable wireframe is
-on the main side. On iPhone and iPad, select a Card setup to push the same
-editor at the device's adaptive width.
+On Mac, Studio takes over the Item Types window while a draft is open. The
+library navigator and its Done action return after Save or Cancel with the
+previous item type still selected. One compact rail contains the item-type
+name, **Card setups**, then **Fields**; the selected card remains visible in the
+main canvas without scrolling.
+
+Select content directly on the card to highlight it and open its contextual
+controls. At the default window width, use the labeled **Inspector** button for
+setup, selected-content, and Advanced settings. On a wide window, the same
+inspector stays open as a trailing pane. On iPhone and iPad, select a Card setup
+to push the existing stacked editor at the device's adaptive width.
 
 For each field, set:
 
@@ -75,9 +82,10 @@ Every Card setup begins with the compact recipe:
 
 **Question → Answer method → Answer**
 
-Choose fields for Question and Answer, then fill any other named holes directly
-in the wireframe: **Instruction**, **Question**, **Media**, **Context**, and
-**Answer**. A source can be a compatible field or **Fixed text**, such as
+Choose fields for Question and Answer in the Inspector, then fill any empty
+named hole directly on the canvas: **Instruction**, **Question**, **Media**,
+**Context**, and **Answer**. Use **Add content** when a filled hole needs another
+entry. A source can be a compatible field or **Fixed text**, such as
 “Translate:” or “Explain why:”. Source pickers are searchable when the type has
 many fields.
 
@@ -95,16 +103,16 @@ silently replace your chosen layout or Learning route.
 
 [![A fillable Card setup wireframe]({{ site.baseurl }}/assets/screenshots/template-editor.png)]({{ site.baseurl }}/assets/screenshots/template-editor.png)
 
-A hole can contain more than one entry. Use the visible move-up and move-down
-controls to set local reading order; dragging is not required. **Show Answer**
-switches the same preview from question to revealed state. Expected answers
-stay concealed before reveal even if an unusual older definition placed them
-in another region.
+A hole can contain more than one entry. Select an entry, then use the Inspector
+to change its source, move it, duplicate it, or remove it; dragging is not
+required. **Show Answer** switches the same canvas from question to revealed
+state. Expected answers stay concealed before reveal even if an unusual older
+definition placed them in another region.
 
 Playback appears only for compatible media. Reveal and blur controls appear
-for content that supports them, and Fixed text can be edited in place. The
-preview uses deterministic placeholders rather than personal item content or
-media and never grades, records, or saves a response.
+for content that supports them, and Fixed text can be edited in the Inspector.
+The canvas uses deterministic placeholders rather than personal item content
+or media and never grades, records, or saves a response.
 
 Older definitions may contain valid placements that do not correspond to a
 named hole. They remain ordered under **Additional content** and round-trip
@@ -133,8 +141,8 @@ answer. If you switch back before Save, the Studio restores the stashed answer.
 
 [![Advanced Card setup settings]({{ site.baseurl }}/assets/screenshots/template-advanced.png)]({{ site.baseurl }}/assets/screenshots/template-advanced.png)
 
-Open **Advanced** only when a setup needs conditional generation or an explicit
-learning route.
+Open **Inspector → Advanced** only when a setup needs conditional generation or
+an explicit learning route.
 
 ### Availability
 

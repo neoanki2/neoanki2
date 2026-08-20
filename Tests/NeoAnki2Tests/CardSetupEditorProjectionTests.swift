@@ -455,6 +455,22 @@ func reducerContentLifecycle() throws {
     ))
     let secondID = try #require(draft.cardSetups[0].components.last?.id)
     #expect(CardSetupEditorReducer.apply(
+        .duplicateComponent(secondID),
+        to: &draft,
+        cardSetupID: setupID
+    ))
+    let duplicate = try #require(draft.cardSetups[0].components.last)
+    #expect(duplicate.id != secondID)
+    #expect(duplicate.source == .fixedText("Second"))
+    #expect(duplicate.region == .supporting)
+    #expect(duplicate.purpose == .supporting)
+    #expect(duplicate.reveal == .always)
+    #expect(CardSetupEditorReducer.apply(
+        .removeComponent(duplicate.id),
+        to: &draft,
+        cardSetupID: setupID
+    ))
+    #expect(CardSetupEditorReducer.apply(
         .moveComponent(secondID, .earlier),
         to: &draft,
         cardSetupID: setupID
@@ -672,6 +688,7 @@ func editorSizingMetrics() {
     #expect(CardSetupEditorLayoutMetrics.minimumTouchTarget == 44)
     #expect(CardSetupEditorLayoutMetrics.maximumAvailabilityIndentation == 16)
     #expect(CardSetupEditorLayoutMetrics.macSourcePickerMinimumDimension == 420)
+    #expect(CardSetupEditorLayoutMetrics.workspaceInspectorThreshold == 960)
     #expect(CardSetupEditorLayoutMetrics.availabilityIndentation(depth: -1) == 0)
     #expect(CardSetupEditorLayoutMetrics.availabilityIndentation(depth: 1) == 8)
     #expect(CardSetupEditorLayoutMetrics.availabilityIndentation(depth: 5) == 16)

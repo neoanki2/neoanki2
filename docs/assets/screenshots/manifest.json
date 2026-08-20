@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-20T11:56:43Z",
+  "capturedAt" : "2026-08-20T15:01:40Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -9,20 +9,20 @@
         "deckRow-French"
       ],
       "filename" : "decks-nested.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "library sidebar with nested Languages and French decks",
-      "sha256" : "4c5afbc180c1d37d0e2b3a01452adfd35cbccf18604806a868e4baaa0e1cddba",
-      "width" : 1024
+      "sha256" : "0b30b0795e786086a02a65b83bc48252ff130f329c9e925accae2d4a46f65e27",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
         "bootstrapError"
       ],
       "filename" : "error-startup.png",
-      "height" : 732,
+      "height" : 1424,
       "scenario" : "database bootstrap failure",
-      "sha256" : "a487336205e21ec36345ff6e3a27194fc3c48574b872ac8ad9d7e807f7ae4d83",
-      "width" : 1024
+      "sha256" : "20dde297c0a52215a7eab0153afb4e13563aa0d07862d9bfda003042c927e7f8",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -30,10 +30,10 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 724,
+      "height" : 1464,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "7c1cd77909be29164d909058c58349878e46e91ddbcdfe925fe776211b21b84c",
-      "width" : 1024
+      "sha256" : "b5870165ff90fb1980b4c82086773baf040c839f457f7f9ee22452c1dd0bbcf6",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -43,10 +43,10 @@
         "field-Next Line"
       ],
       "filename" : "item-add.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "new item editor using the deck's recommended included type",
-      "sha256" : "05a773fb6988405a8a916af509eef23f7163d2e646881d67a114a06cd770576b",
-      "width" : 1024
+      "sha256" : "c93709c9758da7c69dc0603340a0ca46eb98a0b8f4d2de94732416ce8e097590",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -54,10 +54,10 @@
         "editItem"
       ],
       "filename" : "item-detail.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "basic item detail",
-      "sha256" : "24999635564abc3fbe2feaef76258e64b32e71abb2e0498a37257355fdf7312d",
-      "width" : 1024
+      "sha256" : "d5fdfb8d19691a37a329cb06cf1b17dd2b223c36e8e673cb112ead35df074260",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -65,10 +65,10 @@
         "field-Image"
       ],
       "filename" : "item-media.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "ea356dc66b04128434da11c95985006c8a1f877045050dc377b6719a53055d83",
-      "width" : 1024
+      "sha256" : "77df246c60082f2804ff462489b0e4e63f75600cde8ecc7b7e275ece80f1d233",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -77,10 +77,10 @@
         "saveAddItem"
       ],
       "filename" : "item-rich-text.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "basic item editor with visibly bold front text",
-      "sha256" : "d5a4be0f88f9d19a4b5e3856616f743b114e47e32fb8d6aec32c9fd5bda42f1a",
-      "width" : 1024
+      "sha256" : "31e37473431482e5f7ece84c989ef09465c55f3ea8a85b27fde4829816f8e8f1",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -90,20 +90,20 @@
         "duplicateIncludedItemType"
       ],
       "filename" : "item-types.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "507e7c2f53dee7c91a00f7a0718c013af520f1c9112c7144f56af3f8ae2f3e46",
-      "width" : 1024
+      "sha256" : "902412ed8ca1516e154876e969197be6a658dce4620f5698179af52c59c80fa9",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
         "emptyLibraryState"
       ],
       "filename" : "library-empty.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "empty library",
-      "sha256" : "a907f35496fb2cb66f344e4baa843fa6decd44a82be804863d375d267ec73a35",
-      "width" : 1024
+      "sha256" : "176e48938eeb69072e688ddd1c0d676eb2bba9258732b9a37b6b95243fadd2bf",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -112,10 +112,10 @@
         "addItemToolbar"
       ],
       "filename" : "library-populated.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "browse mode listing one basic item",
-      "sha256" : "804fd7b4ec462c778a3f5ea0e257a5d75e2a342ef94f19273106fc0cb0851369",
-      "width" : 1024
+      "sha256" : "d2d28a58615c41bee034ef123a362fc2555bc47b4d492544f7403087e380e1ef",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -123,10 +123,10 @@
         "portableDeckConflictImportNew"
       ],
       "filename" : "portable-conflict.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "28657690d380495e307f917df3eb6e1c8c278961b4d6ad0f29773ecf81f069ad",
-      "width" : 1024
+      "sha256" : "dae61f3f46087683ff2de46e05c71e31ccfac1e61e192dd1863251fab575e743",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -134,10 +134,10 @@
         "scopeHomeDueHeadline"
       ],
       "filename" : "scheduling-result.png",
-      "height" : 732,
+      "height" : 1464,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "5375248573691335cab85cd6638df5643aeb661ef360d8ebfe731240b38c4669",
-      "width" : 1024
+      "sha256" : "11f3a9b7bcc89fbf64833dd2639f9231c346356238a1fb91ff94621229b41fd9",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -145,20 +145,20 @@
         "gradeAgain"
       ],
       "filename" : "study-answer.png",
-      "height" : 732,
+      "height" : 1424,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "e6ee374c686747ba92abbebe970bb2ae0ec09cf69394050a5c754b45d7793047",
-      "width" : 1024
+      "sha256" : "1e77ee626d9512d988dbc271f256489ceb26e6c772623557dc58d6ef512fce74",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
         "studySessionDone"
       ],
       "filename" : "study-complete.png",
-      "height" : 732,
+      "height" : 1424,
       "scenario" : "completed study session",
-      "sha256" : "ba8cb6b4d8044324139e4d71befff4f5dcf6b8ca1ea2394a001ecb8c03c5cce3",
-      "width" : 1024
+      "sha256" : "a03e4db5b90942b1166955a53d5002cdbd79a3a8ebe385693210cdb9c51449d0",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -166,10 +166,10 @@
         "primaryStudyAction"
       ],
       "filename" : "study-grade-help.png",
-      "height" : 732,
+      "height" : 1424,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "e4cdbc14e723ff52b41c30c2d3109bfa6e52f1e7b0c95a9bb1db5e4ea5ae38d2",
-      "width" : 1024
+      "sha256" : "15c92d58ced943f545d3858c02ed03b3bf1c59a42457f908608a04b4671fcfcd",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
@@ -177,47 +177,48 @@
         "gradeHelp"
       ],
       "filename" : "study-prompt.png",
-      "height" : 732,
+      "height" : 1424,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "57c33efc26beb937493643770736ca649d6435669fe6430d78c851e68ab6f799",
-      "width" : 1024
+      "sha256" : "4fd90389dae68a3840848cc71f0ed7421fb3f853fd0b687630004fa8b342b855",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
         "gradeGood"
       ],
       "filename" : "study-type.png",
-      "height" : 732,
+      "height" : 1424,
       "scenario" : "typed-answer study result",
-      "sha256" : "cb74c1adf4b2478587fdb3f127b0e95e30c1369dc1f87ddb2908b0a7a3edbcb3",
-      "width" : 1024
+      "sha256" : "03967fac520bac9e2828dd9710c23b6b4a2cb0f8a602eda8a51959c8cd92a8b2",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
-        "itemTypeStudioCardSetupEditor",
+        "cardSetupEditor.canvas",
+        "cardSetupEditor.inspector",
         "cardSetupEditor.advanced",
-        "cardSetupEditor.availability",
-        "cardSetupEditor.learningRoute"
+        "cardSetupEditor.availability"
       ],
       "filename" : "template-advanced.png",
-      "height" : 732,
-      "scenario" : "Item Type Studio Advanced Availability and Learning route controls",
-      "sha256" : "38e14151e95d3c2298fa93765103204ddafd77ec7356945d5c23fffebf32ea28",
-      "width" : 1024
+      "height" : 1424,
+      "scenario" : "Item Type Studio inspector with Advanced Availability controls",
+      "sha256" : "5c4bc49fcfd601aeda7f51e4f60b3fd8ccc76b4db79b061ff3da8442d5bbd711",
+      "width" : 2048
     },
     {
       "expectedVisibleIdentifiers" : [
         "itemTypeStudioOutline",
-        "itemTypeStudioCardSetupEditor",
+        "cardSetupEditor.canvas",
         "cardSetupEditor.layoutPicker",
-        "cardSetupEditor.showAnswer"
+        "cardSetupEditor.showAnswer",
+        "cardSetupEditor.inspectorButton"
       ],
       "filename" : "template-editor.png",
-      "height" : 732,
-      "scenario" : "unified Item Type Studio with Fields, Card setups, and a fillable wireframe",
-      "sha256" : "3a009406bcedb4b5fa73c47bb88ae12b2d9d1803a0eca7ecbfcb98f3021559d6",
-      "width" : 1024
+      "height" : 1424,
+      "scenario" : "preview-first Item Type Studio with one rail and an always-visible card canvas",
+      "sha256" : "c009ce58984215333259b24f7bfbeb6e27d96d9619408eba96ff3dfe24152f34",
+      "width" : 2048
     }
   ],
-  "sourceSHA" : "386e784fe82dd4dd4f2ba69706382ae15ef328d1"
+  "sourceSHA" : "7ab72b748617796f5658036022a716358f3d703c"
 }

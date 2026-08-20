@@ -162,8 +162,9 @@ The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.
 
 NeoAnki2 uses focused, detail-only modes while adding an item or studying. Item
-Types keeps its navigator beside the two-pane Item Type Studio, where fields
-and Card setups are saved together. Study replaces the library split view with
+Type Studio replaces its navigator with a preview-first workspace where fields
+and Card setups are saved together; Save or Cancel restores the navigator and
+its prior selection. Study replaces the library split view with
 a full-window review surface, so sidebar controls are unavailable until the
 session ends. Leaving Study restores the library and its previous sidebar
 visibility. Reduced Motion is respected when columns change.

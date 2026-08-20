@@ -16,6 +16,13 @@ private struct InitialLibraryPayload: Sendable {
 private let isDocumentationScreenshotCapture =
     ProcessInfo.processInfo.environment["NEOANKI_DOC_SCREENSHOTS"] == "1"
 
+private let documentationScreenshotColorScheme: ColorScheme? = {
+    guard isDocumentationScreenshotCapture else { return nil }
+    return ProcessInfo.processInfo.environment["NEOANKI_DOC_APPEARANCE"] == "light"
+        ? .light
+        : .dark
+}()
+
 @main
 struct NeoAnki2App: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -121,12 +128,14 @@ struct NeoAnki2App: App {
             }
             .frame(
                 minWidth: isDocumentationScreenshotCapture ? 1_024 : nil,
-                minHeight: isDocumentationScreenshotCapture ? 680 : nil
+                maxWidth: isDocumentationScreenshotCapture ? 1_024 : nil,
+                minHeight: isDocumentationScreenshotCapture ? 680 : nil,
+                maxHeight: isDocumentationScreenshotCapture ? 680 : nil
             )
             .task {
                 installUITestControlIfNeeded()
             }
-            .preferredColorScheme(isDocumentationScreenshotCapture ? .dark : nil)
+            .preferredColorScheme(documentationScreenshotColorScheme)
             .alert(
                 "Approve Local API Client?",
                 isPresented: Binding(
@@ -159,6 +168,7 @@ struct NeoAnki2App: App {
             width: isDocumentationScreenshotCapture ? 1_024 : 960,
             height: isDocumentationScreenshotCapture ? 680 : 640
         )
+        .windowResizability(isDocumentationScreenshotCapture ? .contentSize : .automatic)
         .commands {
             LibraryCommands()
             StudyCommands()

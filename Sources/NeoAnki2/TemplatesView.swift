@@ -39,30 +39,36 @@ struct TemplatesView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let dividerWidth: CGFloat = 1
-            let navigatorWidth = min(
-                geometry.size.width,
-                min(
-                    DesignSystem.sidebarMax,
-                    max(DesignSystem.sidebarMin, geometry.size.width * 0.26)
-                )
-            )
-            let detailWidth = max(0, geometry.size.width - navigatorWidth - dividerWidth)
+        Group {
+            if model.studioDraft != nil {
+                // Studio is a focused document task. Removing the library
+                // navigator from the hierarchy also removes it from keyboard
+                // and VoiceOver traversal until Save or Cancel restores it.
+                MacItemTypeStudioView(model: model, onSaved: onTemplatesChanged)
+            } else {
+                GeometryReader { geometry in
+                    let dividerWidth: CGFloat = 1
+                    let navigatorWidth = min(
+                        geometry.size.width,
+                        min(
+                            DesignSystem.sidebarMax,
+                            max(DesignSystem.sidebarMin, geometry.size.width * 0.26)
+                        )
+                    )
+                    let detailWidth = max(0, geometry.size.width - navigatorWidth - dividerWidth)
 
-            HStack(spacing: 0) {
-                itemTypesNavigator
-                    .frame(width: navigatorWidth, height: geometry.size.height)
-                Divider()
-                    .frame(width: dividerWidth, height: geometry.size.height)
-                detail
-                    .frame(width: detailWidth, height: geometry.size.height)
+                    HStack(spacing: 0) {
+                        itemTypesNavigator
+                            .frame(width: navigatorWidth, height: geometry.size.height)
+                        Divider()
+                            .frame(width: dividerWidth, height: geometry.size.height)
+                        detail
+                            .frame(width: detailWidth, height: geometry.size.height)
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                }
             }
-            // A nested AppKit split can publish a post-mount fitting width back
-            // to the host window. Keep both navigator and Studio inside the
-            // finite viewport proposed by the app window instead.
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipped()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { await model.load() }

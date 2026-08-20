@@ -8,10 +8,15 @@ mkdir -p "$OUTPUT_DIR"
 rm -f "$OUTPUT_DIR"/*.png "$OUTPUT_DIR/manifest.json" "$OUTPUT_DIR/.capture-context.json"
 export DOC_SCREENSHOT_DIR="$OUTPUT_DIR"
 export NEOANKI_UI_TEST_PLAN="DocumentationScreenshots"
+export DOC_SCREENSHOT_APPEARANCE="${DOC_SCREENSHOT_APPEARANCE:-dark}"
+if [[ "$DOC_SCREENSHOT_APPEARANCE" != "dark" && "$DOC_SCREENSHOT_APPEARANCE" != "light" ]]; then
+  echo "DOC_SCREENSHOT_APPEARANCE must be dark or light" >&2
+  exit 1
+fi
 DOC_SCREENSHOT_SOURCE_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 DOC_SCREENSHOT_CAPTURED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-printf '{"sourceSHA":"%s","capturedAt":"%s","appearance":"dark"}\n' \
-  "$DOC_SCREENSHOT_SOURCE_SHA" "$DOC_SCREENSHOT_CAPTURED_AT" \
+printf '{"sourceSHA":"%s","capturedAt":"%s","appearance":"%s"}\n' \
+  "$DOC_SCREENSHOT_SOURCE_SHA" "$DOC_SCREENSHOT_CAPTURED_AT" "$DOC_SCREENSHOT_APPEARANCE" \
   > "$OUTPUT_DIR/.capture-context.json"
 "$ROOT/Scripts/run-ui-tests.sh"
 rm -f "$OUTPUT_DIR/.capture-context.json"
@@ -34,7 +39,7 @@ done
 swift "$ROOT/Scripts/normalize-doc-screenshot-corners.swift" \
   "$OUTPUT_DIR" "${EXPECTED[@]}"
 
-python3 - "$OUTPUT_DIR" "$DOC_SCREENSHOT_SOURCE_SHA" "${EXPECTED[@]}" <<'PY'
+python3 - "$OUTPUT_DIR" "$DOC_SCREENSHOT_SOURCE_SHA" "$DOC_SCREENSHOT_APPEARANCE" "${EXPECTED[@]}" <<'PY'
 import datetime
 import hashlib
 import json
@@ -45,7 +50,8 @@ import sys
 
 directory = pathlib.Path(sys.argv[1])
 expected_sha = sys.argv[2]
-expected_files = set(sys.argv[3:])
+expected_appearance = sys.argv[3]
+expected_files = set(sys.argv[4:])
 manifest_path = directory / "manifest.json"
 
 try:
@@ -55,8 +61,8 @@ except (OSError, json.JSONDecodeError) as error:
 
 if manifest.get("schemaVersion") != 1:
     raise SystemExit("Screenshot manifest must use schemaVersion 1")
-if manifest.get("appearance") != "dark":
-    raise SystemExit("Screenshot manifest appearance must be dark")
+if manifest.get("appearance") != expected_appearance:
+    raise SystemExit(f"Screenshot manifest appearance must be {expected_appearance}")
 source_sha = manifest.get("sourceSHA")
 if source_sha != expected_sha or re.fullmatch(r"[0-9a-f]{40}", source_sha or "") is None:
     raise SystemExit("Screenshot manifest sourceSHA is missing or does not match the captured commit")

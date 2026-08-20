@@ -33,7 +33,7 @@ struct GradeGuideView: View {
         }
         .padding(DesignSystem.Spacing.studyHorizontal)
         .frame(width: 360)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilitySummary)
         .accessibilityIdentifier("gradeGuidePanel")
     }
