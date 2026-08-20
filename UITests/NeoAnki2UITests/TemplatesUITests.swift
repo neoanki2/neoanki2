@@ -159,15 +159,9 @@ extension FastFunctionalJourneyTests {
                 "cardSetupEditor.reveal.\(mediaComponentID)"
             )
             revealCardSetupElement(reveal, in: app)
-            reveal.click()
-            let blurUntilReveal = app.menuItems["Blur until reveal"]
-            XCTAssertTrue(blurUntilReveal.waitUntilExists(timeout: 3))
-            blurUntilReveal.click()
+            selectPopUpOption(named: "Blur until reveal", picker: reveal, in: app)
             revealCardSetupElement(playback, in: app)
-            playback.click()
-            let loop = app.menuItems["Loop"]
-            XCTAssertTrue(loop.waitUntilExists(timeout: 3))
-            loop.click()
+            selectPopUpOption(named: "Loop", picker: playback, in: app)
             let selectedMediaPreview = app.buttons.identified(
                 "cardSetupEditor.component.\(mediaComponentID)"
             )
@@ -418,19 +412,53 @@ extension FastFunctionalJourneyTests {
         let fieldNames = app.textFields.matching(
             NSPredicate(format: "identifier BEGINSWITH 'studioFieldName-'")
         )
-        let previousFieldCount = fieldNames.count
         let addField = app.buttons.identified("addStudioField")
+        revealItemTypeStudioOutlineElement(addField, in: app)
+        let countValue = addField.value as? String
+        guard let previousFieldCount = countValue?
+            .split(separator: " ")
+            .first
+            .flatMap({ Int($0) }) else {
+            return XCTFail("Add Field did not expose the current field count")
+        }
+        let outline = app.descendants(matching: .any).identified("itemTypeStudioOutline")
+        var existingFieldIDs = Set(
+            fieldNames.allElementsBoundByIndex.map(\.identifier)
+        )
+        for _ in 0..<8 where existingFieldIDs.count < previousFieldCount {
+            outline.scroll(byDeltaX: 0, deltaY: -200)
+            existingFieldIDs.formUnion(
+                fieldNames.allElementsBoundByIndex.map(\.identifier)
+            )
+        }
+        XCTAssertEqual(
+            existingFieldIDs.count,
+            previousFieldCount,
+            "The Studio did not expose every existing field while scrolling the rail"
+        )
         revealItemTypeStudioOutlineElement(addField, in: app)
         addField.click()
         XCTAssertTrue(
-            waitUntil(timeout: 3) { fieldNames.count == previousFieldCount + 1 },
-            "Adding a field did not create exactly one editor"
+            waitUntil(timeout: 3) {
+                (addField.value as? String) == "\(previousFieldCount + 1) fields"
+            },
+            "Adding a field did not increment the Studio field count"
         )
-        enterText(name, into: fieldNames.element(boundBy: previousFieldCount), app: app)
-        let fieldTypes = app.popUpButtons.matching(
-            NSPredicate(format: "identifier BEGINSWITH 'studioFieldType-'")
-        )
-        let picker = fieldTypes.element(boundBy: previousFieldCount)
+        var newField = fieldNames.allElementsBoundByIndex.first {
+            !existingFieldIDs.contains($0.identifier)
+        }
+        for _ in 0..<8 where newField == nil {
+            outline.scroll(byDeltaX: 0, deltaY: -200)
+            newField = fieldNames.allElementsBoundByIndex.first {
+                !existingFieldIDs.contains($0.identifier)
+            }
+        }
+        guard let newField else {
+            return XCTFail("The newly added field editor never mounted")
+        }
+        enterText(name, into: newField, app: app)
+        let fieldID = String(newField.identifier.dropFirst("studioFieldName-".count))
+        let picker = app.popUpButtons.identified("studioFieldType-\(fieldID)")
         XCTAssertTrue(picker.waitUntilExists(timeout: 3))
         picker.click()
         app.menuItems[type].click()

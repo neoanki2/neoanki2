@@ -17,6 +17,10 @@ private let isDocumentationScreenshotCapture =
     ProcessInfo.processInfo.environment["NEOANKI_DOC_SCREENSHOTS"] == "1"
 private let isFunctionalUITestRun =
     ProcessInfo.processInfo.environment["NEOANKI_TESTING"] == "1"
+// The functional test scene includes a 52-point title/toolbar region. Keeping
+// its content at 588 points produces the intended 640-point outer window while
+// still fitting the smallest macOS CI screen's visible frame.
+private let functionalUITestContentHeight: CGFloat = 588
 
 private let documentationScreenshotColorScheme: ColorScheme? = {
     guard isDocumentationScreenshotCapture else { return nil }
@@ -131,8 +135,12 @@ struct NeoAnki2App: App {
             .frame(
                 minWidth: isDocumentationScreenshotCapture ? 1_024 : isFunctionalUITestRun ? 960 : nil,
                 maxWidth: isDocumentationScreenshotCapture ? 1_024 : isFunctionalUITestRun ? 960 : nil,
-                minHeight: isDocumentationScreenshotCapture ? 680 : isFunctionalUITestRun ? 640 : nil,
-                maxHeight: isDocumentationScreenshotCapture ? 680 : isFunctionalUITestRun ? 640 : nil
+                minHeight: isDocumentationScreenshotCapture
+                    ? 680
+                    : isFunctionalUITestRun ? functionalUITestContentHeight : nil,
+                maxHeight: isDocumentationScreenshotCapture
+                    ? 680
+                    : isFunctionalUITestRun ? functionalUITestContentHeight : nil
             )
             .task {
                 installUITestControlIfNeeded()

@@ -236,6 +236,11 @@ struct MacItemTypeStudioView: View {
                         .contentShape(Rectangle())
                         .keyboardShortcut("f", modifiers: [.command, .shift])
                         .accessibilityIdentifier("addStudioField")
+                        .accessibilityValue(
+                            draft.wrappedValue.fields.count == 1
+                                ? "1 field"
+                                : "\(draft.wrappedValue.fields.count) fields"
+                        )
 
                     ForEach(draft.wrappedValue.fields) { field in
                         fieldEditor(field)

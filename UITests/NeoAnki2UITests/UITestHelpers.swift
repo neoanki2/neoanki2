@@ -894,7 +894,11 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(outline.waitUntilExists(timeout: 3), file: file, line: line)
 
         func isReachable() -> Bool {
-            element.exists && element.isHittable
+            guard element.exists, element.isHittable else { return false }
+            let elementFrame = element.frame
+            let outlineFrame = outline.frame
+            return elementFrame.minY >= outlineFrame.minY - 1
+                && elementFrame.maxY <= outlineFrame.maxY + 1
         }
 
         for _ in 0..<maximumSteps where !isReachable() {
@@ -930,7 +934,11 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(list.waitUntilExists(timeout: 3), file: file, line: line)
 
         func isReachable() -> Bool {
-            element.exists && element.isHittable
+            guard element.exists, element.isHittable else { return false }
+            let elementFrame = element.frame
+            let listFrame = list.frame
+            return elementFrame.minY >= listFrame.minY - 1
+                && elementFrame.maxY <= listFrame.maxY + 1
         }
 
         for _ in 0..<maximumSteps where !isReachable() {
