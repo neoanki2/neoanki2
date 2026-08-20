@@ -1281,35 +1281,41 @@ public struct CardSetupEditorView: View {
         setupIndex: Int,
         rendering: CardSetupEditorPreviewRendering
     ) -> some View {
-        Button {
-            sourceRequest = .init(componentID: component.id, hole: hole)
-        } label: {
-            ZStack {
-                Label(
-                    component.value.editorPreviewText,
-                    systemImage: previewSymbol(for: component.id, setupIndex: setupIndex)
-                )
-                .lineLimit(3)
-                .blur(radius: rendering == .blurred ? 8 : 0)
-                .opacity(rendering == .concealed ? 0 : 1)
+        ZStack {
+            Label(
+                component.value.editorPreviewText,
+                systemImage: previewSymbol(for: component.id, setupIndex: setupIndex)
+            )
+            .lineLimit(3)
+            .blur(radius: rendering == .blurred ? 8 : 0)
+            .opacity(rendering == .concealed ? 0 : 1)
 
-                if rendering != .content {
-                    Label(
-                        rendering == .blurred ? "Blurred until answer" : "Concealed until answer",
-                        systemImage: "eye.slash"
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
+            if rendering != .content {
+                Label(
+                    rendering == .blurred ? "Blurred until answer" : "Concealed until answer",
+                    systemImage: "eye.slash"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
-            .padding(.horizontal, 10)
-            .background(.background.opacity(0.82), in: RoundedRectangle(cornerRadius: 10))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(previewAccessibilityLabel(component, rendering: rendering))
-        .accessibilityHint("Edit this content source")
-        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.component(component.id))
+        .frame(maxWidth: .infinity, minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+        .padding(.horizontal, 10)
+        .background(.background.opacity(0.82), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityHidden(true)
+        .overlay {
+            Button {
+                sourceRequest = .init(componentID: component.id, hole: hole)
+            } label: {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(previewAccessibilityLabel(component, rendering: rendering))
+            .accessibilityHint("Edit this content source")
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.component(component.id))
+        }
     }
 
     private func namedContentSection(_ index: Int) -> some View {
