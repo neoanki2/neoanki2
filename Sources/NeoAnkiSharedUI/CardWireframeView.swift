@@ -509,9 +509,10 @@ public struct CardWireframeView<ComponentView: View>: View {
     private func hole(_ hole: CardWireframeHole) -> some View {
         let renderedComponents = visibleComponents(in: hole)
         let hasAuthoredContent = !authoredComponents(in: hole).isEmpty
+        let emptyContent = emptyHoleView?(hole)
         VStack(spacing: 8) {
             if renderedComponents.isEmpty && !hasAuthoredContent {
-                emptyHoleView?(hole)
+                emptyContent
             } else {
                 ForEach(renderedComponents) { rendered in
                     componentView(rendered.component, hole)
@@ -524,7 +525,7 @@ public struct CardWireframeView<ComponentView: View>: View {
         .accessibilityLabel(hole.displayName)
         .accessibilityHidden(
             renderedComponents.isEmpty
-                && (hasAuthoredContent || emptyHoleView?(hole) == nil)
+                && (hasAuthoredContent || emptyContent == nil)
         )
         .accessibilitySortPriority(accessibilityPriority(for: hole))
     }

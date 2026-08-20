@@ -986,7 +986,7 @@ public struct CardSetupEditorView: View {
         Group {
             if let setupIndex {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 24) {
                         if let auditSection {
                             Group {
                                 auditEditorSection(auditSection, setupIndex: setupIndex)
@@ -1318,28 +1318,24 @@ public struct CardSetupEditorView: View {
             ? foreground
             : Color.accentColor.opacity(0.5)
 
-        Label("Add \(hole.displayName)", systemImage: "plus")
-            .font(.callout)
-            .foregroundStyle(foreground)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(background, in: RoundedRectangle(cornerRadius: 10))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(border, lineWidth: usesIncreasedContrast ? 2 : 1)
-            }
-            .accessibilityHidden(true)
-            .overlay {
-                Button {
-                    sourceRequest = .init(componentID: nil, hole: hole)
-                } label: {
-                    Color.clear
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
+        Button {
+            sourceRequest = .init(componentID: nil, hole: hole)
+        } label: {
+            Label("Add \(hole.displayName)", systemImage: "plus")
+                .font(.callout)
+                .foregroundStyle(foreground)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(background, in: RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(border, lineWidth: usesIncreasedContrast ? 2 : 1)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add \(hole.displayName)")
-                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.hole(hole))
-            }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Add \(hole.displayName)")
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.hole(hole))
     }
 
     private func previewComponent(
@@ -1348,41 +1344,37 @@ public struct CardSetupEditorView: View {
         setupIndex: Int,
         rendering: CardSetupEditorPreviewRendering
     ) -> some View {
-        ZStack {
-            Label(
-                component.value.editorPreviewText,
-                systemImage: previewSymbol(for: component.id, setupIndex: setupIndex)
-            )
-            .lineLimit(3)
-            .blur(radius: rendering == .blurred ? 8 : 0)
-            .opacity(rendering == .concealed ? 0 : 1)
-
-            if rendering != .content {
+        Button {
+            sourceRequest = .init(componentID: component.id, hole: hole)
+        } label: {
+            ZStack {
                 Label(
-                    rendering == .blurred ? "Blurred until answer" : "Concealed until answer",
-                    systemImage: "eye.slash"
+                    component.value.editorPreviewText,
+                    systemImage: previewSymbol(for: component.id, setupIndex: setupIndex)
                 )
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .lineLimit(3)
+                .blur(radius: rendering == .blurred ? 8 : 0)
+                .opacity(rendering == .concealed ? 0 : 1)
+
+                if rendering != .content {
+                    Label(
+                        rendering == .blurred ? "Blurred until answer" : "Concealed until answer",
+                        systemImage: "eye.slash"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                }
             }
+            .frame(maxWidth: .infinity, minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
+            .padding(.horizontal, 10)
+            .background(.background.opacity(0.82), in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
-        .padding(.horizontal, 10)
-        .background(.background.opacity(0.82), in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityHidden(true)
-        .overlay {
-            Button {
-                sourceRequest = .init(componentID: component.id, hole: hole)
-            } label: {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(previewAccessibilityLabel(component, rendering: rendering))
-            .accessibilityHint("Edit this content source")
-            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.component(component.id))
-        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(previewAccessibilityLabel(component, rendering: rendering))
+        .accessibilityHint("Edit this content source")
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.component(component.id))
     }
 
     private func namedContentSection(_ index: Int) -> some View {
