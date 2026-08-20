@@ -1060,7 +1060,7 @@ public struct CardSetupEditorView: View {
                 }
                 .confirmationDialog(
                     "Remove the expected answer?",
-                    isPresented: $pendingAudioSubmission,
+                    isPresented: rootAudioSubmissionConfirmation,
                     titleVisibility: .visible
                 ) {
                     Button("Remove Answer and Continue", role: .destructive) {
@@ -1106,6 +1106,15 @@ public struct CardSetupEditorView: View {
         Binding(
             get: { isInspectorPresented ? nil : sourceRequest },
             set: { sourceRequest = $0 }
+        )
+    }
+
+    private var rootAudioSubmissionConfirmation: Binding<Bool> {
+        Binding(
+            get: { pendingAudioSubmission && !isInspectorPresented },
+            set: { isPresented in
+                if !isPresented { pendingAudioSubmission = false }
+            }
         )
     }
 
@@ -1297,6 +1306,21 @@ public struct CardSetupEditorView: View {
             ) { source in
                 apply(source: source, request: request, setupIndex: setupIndex)
             }
+        }
+        .confirmationDialog(
+            "Remove the expected answer?",
+            isPresented: $pendingAudioSubmission,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Answer and Continue", role: .destructive) {
+                apply(.setInteraction(
+                    .audioSubmission,
+                    confirmAudioAnswerRemoval: true
+                ))
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Audio Submission keeps no expected answer. It will be restored if you switch back before saving.")
         }
     }
 
