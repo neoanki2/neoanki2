@@ -396,6 +396,7 @@ struct ItemTypeStudioMobileView: View {
                     }
                 }
             }
+            .accessibilityIdentifier("item-type-studio.scroll")
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: validationFocus) { _, target in
                 guard let target else { return }

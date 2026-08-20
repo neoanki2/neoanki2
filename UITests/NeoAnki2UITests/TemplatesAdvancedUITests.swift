@@ -126,16 +126,13 @@ extension FastFunctionalJourneyTests {
 
             let keepEditing = impactApp.buttons.identified("cancelItemTypeStudioSaveImpact")
             XCTAssertTrue(keepEditing.waitUntilExists(timeout: 3))
-            XCTAssertTrue(impactApp.staticTexts.matching(
-                NSPredicate(format: "label CONTAINS %@", "Affect 1 populated item")
-            ).firstMatch.exists)
-            XCTAssertTrue(impactApp.staticTexts.matching(
-                NSPredicate(format: "label CONTAINS %@", "Remove Notes")
-            ).firstMatch.exists)
+            let confirmImpact = impactApp.buttons.identified("confirmItemTypeStudioSaveImpact")
+            XCTAssertTrue(confirmImpact.exists)
+            XCTAssertTrue(confirmImpact.label.contains("Affect 1 populated item"))
+            XCTAssertTrue(confirmImpact.label.contains("Remove Notes"))
             keepEditing.click()
 
             impactApp.buttons.identified("saveItemTypeStudio").click()
-            let confirmImpact = impactApp.buttons.identified("confirmItemTypeStudioSaveImpact")
             XCTAssertTrue(confirmImpact.waitUntilExists(timeout: 3))
             confirmImpact.click()
             XCTAssertTrue(impactApp.buttons.identified("editItemType").waitUntilExists(timeout: 5))

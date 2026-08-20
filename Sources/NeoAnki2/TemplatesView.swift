@@ -141,8 +141,10 @@ struct TemplatesView: View {
             ),
             titleVisibility: .visible
         ) {
-            Button("Unlock for Editing") { Task { await unlockSelectedItemType() } }
-                .accessibilityIdentifier("confirmUnlockIncludedItemType")
+            if let requested = pendingUnlock {
+                Button("Unlock for Editing") { Task { await unlockItemType(requested) } }
+                    .accessibilityIdentifier("confirmUnlockIncludedItemType")
+            }
             Button("Cancel", role: .cancel) { pendingUnlock = nil }
                 .accessibilityIdentifier("cancelUnlockIncludedItemType")
         } message: {
@@ -460,8 +462,7 @@ struct TemplatesView: View {
         } catch { actionError = error.localizedDescription }
     }
 
-    private func unlockSelectedItemType() async {
-        guard let requested = pendingUnlock else { return }
+    private func unlockItemType(_ requested: PendingItemTypeUnlock) async {
         isWorking = true
         defer { isWorking = false; pendingUnlock = nil }
         do {

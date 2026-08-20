@@ -119,6 +119,12 @@ final class NeoAnki2MobileUITests: XCTestCase {
     }
 
     private func scrollingSurface(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+        let itemTypeStudioSurface = app.descendants(matching: .any)["item-type-studio.scroll"]
+        if itemTypeStudioSurface.exists,
+           !itemTypeStudioSurface.frame.isEmpty,
+           itemTypeStudioSurface.frame.intersects(app.frame) {
+            return itemTypeStudioSurface
+        }
         let candidates = (
             app.scrollViews.allElementsBoundByIndex
                 + app.collectionViews.allElementsBoundByIndex

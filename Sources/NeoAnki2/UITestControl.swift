@@ -17,27 +17,6 @@ struct UITestRuntimeConfiguration: Codable, Equatable, Sendable {
     let initialRoute: UITestRoute
     let environment: [String: String]
 }
-enum UITestScenario: String, Codable, Sendable {
-    case studyType = "study-type"
-    case studyChoose = "study-choose"
-    case studyArrange = "study-arrange"
-    case studyRecord = "study-record"
-    case studyCloze = "study-cloze"
-    case studyReverse = "study-reverse"
-    case studyEdit = "study-edit"
-    case libraryBrowse = "library-browse"
-    case schedulingHistory = "scheduling-history"
-    case imageMissingDescription = "image-missing-description"
-    case deckWithDueItems = "deck-with-due-items"
-    case deckScoping = "deck-scoping"
-    case portableExportSource = "portable-export-source"
-    case typeConflictLocal = "type-conflict-local"
-    case corruptedItemType = "corrupted-item-type"
-    case importWithMedia = "import-with-media"
-    case alternateImportType = "alternate-import-type"
-    case authoringFields = "authoring-fields"
-}
-
 struct UITestCommand: Codable, Sendable {
     enum Action: String, Codable, Sendable {
         case reset
@@ -51,7 +30,10 @@ struct UITestCommand: Codable, Sendable {
     let sequence: Int
     let action: Action
     let databaseDirectory: String
-    let scenario: UITestScenario?
+    /// Scenario names are interpreted by `UITestScenarioSeeder`. Keeping this
+    /// as the wire-format string prevents the control channel from rejecting a
+    /// newly added seeder before it can return a diagnostic acknowledgement.
+    let scenario: String?
     let initialRoute: UITestRoute
     let path: String?
     let enabled: Bool?
@@ -67,7 +49,7 @@ struct UITestAcknowledgement: Codable, Sendable {
     let sessionID: String
     let sequence: Int
     let state: State
-    let scenario: UITestScenario?
+    let scenario: String?
     let route: UITestRoute
     let message: String?
 }

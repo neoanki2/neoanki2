@@ -420,7 +420,7 @@ struct NeoAnki2App: App {
         testConfiguration = UITestRuntimeConfiguration(
             sequence: command.sequence,
             databaseDirectory: command.databaseDirectory,
-            scenario: command.scenario?.rawValue,
+            scenario: command.scenario,
             initialRoute: command.initialRoute,
             environment: environment
         )

@@ -104,11 +104,22 @@ extension FastFunctionalJourneyTests {
             XCTAssertEqual(advanced.value as? String, "Expanded")
             let availability = app.checkBoxes["Availability rule"]
             revealCardSetupElement(availability, in: app)
-            availability.click()
+            let initialAvailabilityValue = String(describing: availability.value)
+            availability.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)
+            ).click()
+            XCTAssertTrue(
+                waitUntil(timeout: 3) {
+                    String(describing: availability.value) != initialAvailabilityValue
+                },
+                "Availability checkbox did not toggle"
+            )
             let addRule = app.buttons["Add another rule"]
             revealCardSetupElement(addRule, in: app)
             addRule.click()
-            XCTAssertTrue(app.segmentedControls.firstMatch.waitUntilExists(timeout: 3))
+            let combination = app.descendants(matching: .any)
+                .identified("cardSetupEditor.availabilityCombination")
+            revealCardSetupElement(combination, in: app)
             let recommendedRoute = app.buttons["Use recommended route"]
             revealCardSetupElement(recommendedRoute, in: app)
         }
@@ -125,20 +136,35 @@ extension FastFunctionalJourneyTests {
             XCTAssertTrue(moveUp.waitUntilExists(timeout: 3))
             moveUp.click()
 
-            let reveal = app.popUpButtons["Reveal"]
-            XCTAssertTrue(reveal.waitUntilExists(timeout: 3))
+            let playbackPrefix = "cardSetupEditor.playback."
+            let playback = app.popUpButtons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", playbackPrefix)
+            ).firstMatch
+            revealCardSetupElement(playback, in: app)
+            let mediaComponentID = String(playback.identifier.dropFirst(playbackPrefix.count))
+            let reveal = app.popUpButtons.identified(
+                "cardSetupEditor.reveal.\(mediaComponentID)"
+            )
+            revealCardSetupElement(reveal, in: app)
             reveal.click()
-            app.menuItems["Blur until reveal"].click()
-            let playback = app.popUpButtons["Playback"]
-            XCTAssertTrue(playback.waitUntilExists(timeout: 3))
+            let blurUntilReveal = app.menuItems["Blur until reveal"]
+            XCTAssertTrue(blurUntilReveal.waitUntilExists(timeout: 3))
+            blurUntilReveal.click()
+            revealCardSetupElement(playback, in: app)
             playback.click()
-            app.menuItems["Loop"].click()
-            XCTAssertTrue(app.buttons.identified("cardSetupEditor.hole.media").exists)
+            let loop = app.menuItems["Loop"]
+            XCTAssertTrue(loop.waitUntilExists(timeout: 3))
+            loop.click()
+            let mediaPreview = app.buttons.identified(
+                "cardSetupEditor.component.\(mediaComponentID)"
+            )
+            revealCardSetupElement(mediaPreview, in: app)
+            XCTAssertTrue(mediaPreview.exists)
         }
 
         runJourneyActivity("ItemTypeStudio.removeUndoAndAtomicSave") {
             let removeReverse = app.buttons["Remove Reverse Card setup"]
-            XCTAssertTrue(removeReverse.waitUntilExists(timeout: 3))
+            revealItemTypeStudioCardSetupListElement(removeReverse, in: app)
             removeReverse.click()
             let undo = app.buttons.identified("itemTypeStudio.undoCardSetupRemoval")
             XCTAssertTrue(undo.waitUntilExists(timeout: 3))
@@ -188,6 +214,16 @@ extension FastFunctionalJourneyTests {
         let app = launchNewStudio(label: "studio-reverse")
         addCardSetupStarter("Reverse", in: app)
         XCTAssertTrue(app.buttons["Remove Reverse Card setup"].exists)
+        selectStudioCardSetup(named: "Basic", in: app)
+        XCTAssertEqual(
+            app.textFields.identified("cardSetupEditor.name").value as? String,
+            "Basic"
+        )
+        selectStudioCardSetup(named: "Reverse", in: app)
+        XCTAssertEqual(
+            app.textFields.identified("cardSetupEditor.name").value as? String,
+            "Reverse"
+        )
     }
 
     func checkTemplatesUITestsNewTemplateKeepsAdvancedSettingsCollapsedByDefault() throws {
@@ -292,7 +328,12 @@ extension FastFunctionalJourneyTests {
     func checkTemplatesUITestsDeleteTemplateCanBeCancelled() throws {
         let app = launchNewStudio(label: "studio-undo-remove")
         addCardSetupStarter("Reverse", in: app)
-        app.buttons["Remove Reverse Card setup"].click()
+        for _ in 0..<6 {
+            app.buttons.identified("itemTypeStudio.addBasicCardSetup").click()
+        }
+        let removeReverse = app.buttons["Remove Reverse Card setup"]
+        revealItemTypeStudioCardSetupListElement(removeReverse, in: app)
+        removeReverse.click()
         app.buttons.identified("itemTypeStudio.undoCardSetupRemoval").click()
         XCTAssertTrue(app.buttons["Remove Reverse Card setup"].exists)
     }
@@ -346,15 +387,22 @@ extension FastFunctionalJourneyTests {
     }
 
     func addStudioField(named name: String, type: String, in app: XCUIApplication) {
-        app.buttons.identified("addStudioField").click()
         let fieldNames = app.textFields.matching(
             NSPredicate(format: "identifier BEGINSWITH 'studioFieldName-'")
         )
-        enterText(name, into: fieldNames.element(boundBy: fieldNames.count - 1), app: app)
+        let previousFieldCount = fieldNames.count
+        let addField = app.buttons.identified("addStudioField")
+        revealItemTypeStudioOutlineElement(addField, in: app)
+        addField.click()
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { fieldNames.count == previousFieldCount + 1 },
+            "Adding a field did not create exactly one editor"
+        )
+        enterText(name, into: fieldNames.element(boundBy: previousFieldCount), app: app)
         let fieldTypes = app.popUpButtons.matching(
             NSPredicate(format: "identifier BEGINSWITH 'studioFieldType-'")
         )
-        let picker = fieldTypes.element(boundBy: fieldTypes.count - 1)
+        let picker = fieldTypes.element(boundBy: previousFieldCount)
         XCTAssertTrue(picker.waitUntilExists(timeout: 3))
         picker.click()
         app.menuItems[type].click()
@@ -373,9 +421,17 @@ extension FastFunctionalJourneyTests {
         let row = studioCardSetupRows(in: app).matching(
             NSPredicate(format: "label BEGINSWITH[c] %@", name)
         ).firstMatch
-        XCTAssertTrue(row.waitUntilExists(timeout: 3))
-        row.click()
-        XCTAssertTrue(app.textFields.identified("cardSetupEditor.name").waitUntilExists(timeout: 3))
+        XCTAssertTrue(row.waitUntilHittable(timeout: 3))
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).click()
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { row.isSelected },
+            "Selecting the \(name) Card setup did not update the editor selection. "
+                + "Frame: \(row.frame), hittable: \(row.isHittable), element: \(row)"
+        )
+        revealCardSetupElement(
+            app.textFields.identified("cardSetupEditor.name"),
+            in: app
+        )
     }
 
     func chooseAnswerMethod(_ name: String, in app: XCUIApplication) {
@@ -387,9 +443,13 @@ extension FastFunctionalJourneyTests {
     }
 
     func addFixedText(to hole: String, value: String, in app: XCUIApplication) {
-        let textFields = app.textFields.matching(NSPredicate(format: "label == %@", "Fixed text"))
+        let editor = app.descendants(matching: .any)
+            .identified("itemTypeStudioCardSetupEditor")
+        let textFields = editor.descendants(matching: .textField).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'cardSetupEditor.fixedText.'")
+        )
         let previousFieldCount = textFields.count
-        let button = app.buttons["Add \(hole) content"]
+        let button = editor.buttons["Add \(hole) content"]
         revealCardSetupElement(button, in: app)
         button.click()
         let fixedTextSource = app.buttons.identified(
@@ -397,12 +457,12 @@ extension FastFunctionalJourneyTests {
         )
         XCTAssertTrue(fixedTextSource.waitUntilHittable(timeout: 3))
         fixedTextSource.click()
+        let field = textFields.element(boundBy: previousFieldCount)
+        revealCardSetupElement(field, in: app)
         XCTAssertTrue(
-            waitUntil(timeout: 3) { textFields.count == previousFieldCount + 1 },
+            textFields.count == previousFieldCount + 1,
             "Adding fixed text to \(hole) did not create exactly one editor"
         )
-        let field = textFields.element(boundBy: previousFieldCount)
-        XCTAssertTrue(field.waitUntilExists(timeout: 3))
         enterText(value, into: field, app: app)
     }
 
@@ -438,12 +498,9 @@ extension FastFunctionalJourneyTests {
             openItemTypeStudio(named: "Private Responses", in: privacyApp)
             privacyApp.buttons["Remove Spoken Practice Card setup"].click()
             privacyApp.buttons.identified("saveItemTypeStudio").click()
-            XCTAssertTrue(
-                privacyApp.staticTexts.matching(
-                    NSPredicate(format: "label CONTAINS %@", "Permanently delete 1 saved spoken response")
-                ).firstMatch.waitUntilExists(timeout: 3)
-            )
-            XCTAssertTrue(privacyApp.buttons.identified("confirmItemTypeStudioSaveImpact").exists)
+            let confirmImpact = privacyApp.buttons.identified("confirmItemTypeStudioSaveImpact")
+            XCTAssertTrue(confirmImpact.waitUntilExists(timeout: 3))
+            XCTAssertTrue(confirmImpact.label.contains("Permanently delete 1 saved spoken response"))
         }
 
         let corruptedApp = launchApp(databaseLabel: "studio-corrupt", scenario: "corrupted-item-type")

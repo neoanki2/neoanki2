@@ -863,6 +863,82 @@ class NeoAnkiUITestCase: XCTestCase {
         return advanced
     }
 
+    /// Reveals a control in the Studio's field outline after editing a lower
+    /// field has scrolled the outline header out of view.
+    func revealItemTypeStudioOutlineElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maximumSteps: Int = 8,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let outline = app.descendants(matching: .any).identified("itemTypeStudioOutline")
+        XCTAssertTrue(outline.waitUntilExists(timeout: 3), file: file, line: line)
+
+        func isReachable() -> Bool {
+            element.exists && element.isHittable && outline.frame.contains(element.frame)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < outline.frame.minY {
+                delta = 200
+            } else {
+                delta = -200
+            }
+            outline.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
+        XCTAssertTrue(
+            isReachable(),
+            "Studio outline control is not visible and reachable: \(element)",
+            file: file,
+            line: line
+        )
+    }
+
+    /// Reveals a row action in the Studio's independently scrolling Card setup
+    /// list. AppKit's automatic click scrolling can otherwise target the outer
+    /// split-view geometry after the selected setup moves the list viewport.
+    func revealItemTypeStudioCardSetupListElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maximumSteps: Int = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let list = app.descendants(matching: .any)
+            .identified("itemTypeStudio.cardSetupListScroll")
+        XCTAssertTrue(list.waitUntilExists(timeout: 3), file: file, line: line)
+
+        func isReachable() -> Bool {
+            element.exists && element.isHittable && list.frame.contains(element.frame)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < list.frame.minY {
+                delta = 180
+            } else {
+                delta = -180
+            }
+            list.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        for _ in 0..<maximumSteps where !isReachable() {
+            list.scroll(byDeltaX: 0, deltaY: 180)
+        }
+
+        XCTAssertTrue(element.waitUntilExists(timeout: 3), file: file, line: line)
+        XCTAssertTrue(
+            isReachable(),
+            "Card setup list control is not visible and reachable: \(element)",
+            file: file,
+            line: line
+        )
+    }
+
     /// Reveals a control inside the Studio's right-hand editor without relying
     /// on its lazy children already existing in the accessibility tree. The
     /// outer editor is the one stable scrolling surface on every supported
@@ -880,9 +956,37 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(editor.waitUntilExists(timeout: 3), file: file, line: line)
 
         func isReachable() -> Bool {
-            element.exists && element.isHittable && element.frame.intersects(editor.frame)
+            element.exists && element.isHittable && editor.frame.contains(element.frame)
         }
 
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY < editor.frame.minY {
+                delta = 250
+            } else {
+                delta = -250
+            }
+            editor.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        // A layout change can preserve an offset below a lazily mounted
+        // target. When the target is absent there is no frame to distinguish
+        // that state from one above the viewport, so search the opposite
+        // direction before declaring the bounded reveal unsuccessful.
+        for _ in 0..<maximumSteps where !isReachable() {
+            let delta: CGFloat
+            if element.exists, element.frame.midY > editor.frame.maxY {
+                delta = -250
+            } else {
+                delta = 250
+            }
+            editor.scroll(byDeltaX: 0, deltaY: delta)
+        }
+
+        // The opposite-direction pass can establish the top boundary without
+        // materializing a target farther down than the current layout. Finish
+        // with one bounded top-to-bottom scan so every lazy position is
+        // searched regardless of the offset preserved by the preceding edit.
         for _ in 0..<maximumSteps where !isReachable() {
             let delta: CGFloat
             if element.exists, element.frame.midY < editor.frame.minY {

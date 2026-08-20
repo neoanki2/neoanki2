@@ -5,6 +5,7 @@ import SwiftUI
 /// Stable identifiers shared by the macOS and iOS Item Type Studio journeys.
 public enum ItemTypeStudioAccessibilityID {
     public static let cardSetupList = "itemTypeStudio.cardSetups"
+    public static let cardSetupListScroll = "itemTypeStudio.cardSetupListScroll"
     public static let addBasicCardSetup = "itemTypeStudio.addBasicCardSetup"
     public static let addCardSetupMenu = "itemTypeStudio.addCardSetupMenu"
     public static let undoCardSetupRemoval = "itemTypeStudio.undoCardSetupRemoval"
@@ -18,6 +19,7 @@ public enum ItemTypeStudioAccessibilityID {
     public static let advanced = "cardSetupEditor.advanced"
     public static let additionalContent = "cardSetupEditor.additionalContent"
     public static let availability = "cardSetupEditor.availability"
+    public static let availabilityCombination = "cardSetupEditor.availabilityCombination"
     public static let learningRoute = "cardSetupEditor.learningRoute"
     public static let auditPreview = "cardSetupEditor.audit.preview"
 
@@ -32,6 +34,9 @@ public enum ItemTypeStudioAccessibilityID {
         "cardSetupEditor.hole.\(hole.rawValue)"
     }
     public static func component(_ id: UUID) -> String { "cardSetupEditor.component.\(id)" }
+    public static func fixedText(_ id: UUID) -> String { "cardSetupEditor.fixedText.\(id)" }
+    public static func reveal(_ id: UUID) -> String { "cardSetupEditor.reveal.\(id)" }
+    public static func playback(_ id: UUID) -> String { "cardSetupEditor.playback.\(id)" }
     public static func additionalSource(_ id: UUID) -> String {
         "cardSetupEditor.additionalSource.\(id)"
     }
@@ -821,27 +826,17 @@ public struct CardSetupCollectionView: View {
         Section("Card setups") {
             ForEach(draft.cardSetups) { setup in
                 HStack(spacing: 8) {
+#if os(macOS)
+                    setupSummary(setup)
+#else
                     Button {
                         selection = setup.id
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(setup.name.isEmpty ? "Untitled Card setup" : setup.name)
-                                Spacer()
-                                if selection == setup.id {
-                                    Image(systemName: "checkmark")
-                                        .accessibilityHidden(true)
-                                }
-                            }
-                            .font(.body.weight(.medium))
-                            Text("\(setup.layout.displayName) · \(setup.interaction.editorDisplayName)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        setupSummary(setup)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityElement(children: .combine)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel(setupAccessibilityLabel(setup))
                     .accessibilityAddTraits(selection == setup.id ? .isSelected : [])
                     .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetup(setup.id))
                     .contextMenu {
@@ -850,6 +845,7 @@ public struct CardSetupCollectionView: View {
                         }
                         .disabled(draft.cardSetups.count == 1)
                     }
+#endif
 
                     Button("Remove Card Setup", role: .destructive) {
                         remove(setup.id)
@@ -859,6 +855,15 @@ public struct CardSetupCollectionView: View {
                     .disabled(draft.cardSetups.count == 1)
                     .frame(minWidth: 44, minHeight: 44)
                 }
+                .tag(setup.id)
+#if os(macOS)
+                .contextMenu {
+                    Button("Remove Card Setup", role: .destructive) {
+                        remove(setup.id)
+                    }
+                    .disabled(draft.cardSetups.count == 1)
+                }
+#endif
             }
 
             HStack(spacing: 8) {
@@ -898,6 +903,41 @@ public struct CardSetupCollectionView: View {
         }
     }
 
+    private func setupSummary(_ setup: CardSetupDraft) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(setup.name.isEmpty ? "Untitled Card setup" : setup.name)
+#if os(macOS)
+                    .accessibilityLabel(setupAccessibilityLabel(setup))
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAddTraits(selection == setup.id ? .isSelected : [])
+                    .accessibilityAction { selection = setup.id }
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetup(setup.id))
+#endif
+                Spacer()
+                if selection == setup.id {
+                    Image(systemName: "checkmark")
+                        .accessibilityHidden(true)
+                }
+            }
+            .font(.body.weight(.medium))
+            Text("\(setup.layout.displayName) · \(setup.interaction.editorDisplayName)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+#if os(macOS)
+                .accessibilityHidden(true)
+#endif
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func setupAccessibilityLabel(_ setup: CardSetupDraft) -> String {
+        "\(setup.name.isEmpty ? "Untitled Card setup" : setup.name), "
+            + "\(setup.layout.displayName) layout, "
+            + setup.interaction.editorDisplayName
+    }
+
     private func add(_ starter: CardSetupStarter) {
         guard let setup = try? starter.makeCardSetup(fields: draft.fields) else { return }
         draft.cardSetups.append(setup)
@@ -913,6 +953,7 @@ public struct CardSetupCollectionView: View {
 /// The shared fillable Card setup editor used by both platform shells.
 public struct CardSetupEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.neoAnkiAccessibilityReduceMotionOverride) private var reduceMotionOverride
     @Binding private var draft: ItemTypeStudioDraft
@@ -1076,7 +1117,7 @@ public struct CardSetupEditorView: View {
     private func auditSectionMarker(_ section: CardSetupEditorAuditSection) -> some View {
         Text("Accessibility audit: \(section.displayName)")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.primary)
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditSection(section))
     }
 
@@ -1260,19 +1301,45 @@ public struct CardSetupEditorView: View {
             .padding(16)
             .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 20))
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditPreview)
     }
 
+    @ViewBuilder
     private func emptyHole(_ hole: CardWireframeHole, setupIndex: Int) -> some View {
-        Button {
-            sourceRequest = .init(componentID: nil, hole: hole)
-        } label: {
-            Label("Add \(hole.displayName)", systemImage: "plus")
-                .font(.callout)
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .buttonStyle(.bordered)
-        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.hole(hole))
+        let usesIncreasedContrast = colorSchemeContrast == .increased
+        let foreground: Color = usesIncreasedContrast
+            ? (colorScheme == .dark ? .black : .white)
+            : .primary
+        let background: Color = usesIncreasedContrast
+            ? (colorScheme == .dark ? .white : .black)
+            : Color.accentColor.opacity(0.12)
+        let border: Color = usesIncreasedContrast
+            ? foreground
+            : Color.accentColor.opacity(0.5)
+
+        Label("Add \(hole.displayName)", systemImage: "plus")
+            .font(.callout)
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(background, in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(border, lineWidth: usesIncreasedContrast ? 2 : 1)
+            }
+            .accessibilityHidden(true)
+            .overlay {
+                Button {
+                    sourceRequest = .init(componentID: nil, hole: hole)
+                } label: {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add \(hole.displayName)")
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.hole(hole))
+            }
     }
 
     private func previewComponent(
@@ -1482,6 +1549,7 @@ public struct CardSetupEditorView: View {
         if case .fixedText = component.source {
             TextField("Fixed text", text: fixedTextBinding(componentIndex, setupIndex: setupIndex), axis: .vertical)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.fixedText(component.id))
                 .frame(minHeight: 44)
         }
 
@@ -1496,6 +1564,7 @@ public struct CardSetupEditorView: View {
                     Text(mode.editorDisplayName).tag(mode)
                 }
             }
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.reveal(component.id))
             .frame(minHeight: 44)
         } else {
             VStack(alignment: .leading, spacing: 8) {
@@ -1542,6 +1611,7 @@ public struct CardSetupEditorView: View {
                     Text(behavior.editorDisplayName).tag(behavior)
                 }
             }
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.playback(component.id))
             .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
         }
     }
@@ -2183,6 +2253,7 @@ private struct AvailabilityRuleEditor: View {
             }
         }
         .onChange(of: childCount, initial: true) { _, count in
+            guard identityState.childIDs.count != count else { return }
             identityState.reconcile(childCount: count)
         }
     }
@@ -2205,6 +2276,7 @@ private struct AvailabilityRuleEditor: View {
                 Text("Any rule").tag(Combination.any)
             }
             .pickerStyle(.menu)
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availabilityCombination)
             .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
         } else {
             Picker("Match", selection: combinationBinding) {
@@ -2212,23 +2284,17 @@ private struct AvailabilityRuleEditor: View {
                 Text("Any rule").tag(Combination.any)
             }
             .pickerStyle(.segmented)
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availabilityCombination)
             .frame(minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget)
         }
     }
 
     private var leafEditor: some View {
-        Group {
-            if CardSetupEditorLayoutMetrics.usesVerticalAvailabilityControls(
-                isAccessibilitySize: dynamicTypeSize.isAccessibilitySize,
-                availableWidth: nil
-            ) {
-                VStack(alignment: .leading, spacing: 8) { leafControls }
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { leafControls }
-                    VStack(alignment: .leading, spacing: 8) { leafControls }
-                }
-            }
+        AvailabilityControlsLayout(
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize,
+            spacing: 8
+        ) {
+            leafControls
         }
     }
 
@@ -2363,6 +2429,97 @@ private struct AvailabilityRuleEditor: View {
         case .fieldPresent, .fieldAbsent:
             break
         }
+    }
+}
+
+/// Places the two Availability leaf controls without constructing duplicate
+/// bound Pickers. `ViewThatFits` evaluates both candidate branches, which can
+/// keep AppKit picker projections invalidating AttributeGraph while a nested
+/// rule is lazily mounted or scrolled. A custom layout keeps one semantic and
+/// binding identity per control while retaining the same responsive geometry.
+private struct AvailabilityControlsLayout: Layout {
+    let isAccessibilitySize: Bool
+    let spacing: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
+        let horizontalIntrinsicWidth = intrinsicWidth(subviews: subviews, isVertical: false)
+        let width = finiteWidth(proposal.width) ?? horizontalIntrinsicWidth
+        let isVertical = usesVerticalLayout(availableWidth: width)
+
+        if isVertical {
+            let heights = subviews.map {
+                $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+            }
+            return CGSize(
+                width: width,
+                height: heights.reduce(0, +) + spacing * CGFloat(max(0, subviews.count - 1))
+            )
+        }
+
+        let childWidth = max(0, (width - spacing * CGFloat(max(0, subviews.count - 1)))
+            / CGFloat(subviews.count))
+        let height = subviews.map {
+            $0.sizeThatFits(ProposedViewSize(width: childWidth, height: nil)).height
+        }.max() ?? 0
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        guard !subviews.isEmpty else { return }
+        if usesVerticalLayout(availableWidth: bounds.width) {
+            var y = bounds.minY
+            for subview in subviews {
+                let size = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+                subview.place(
+                    at: CGPoint(x: bounds.minX, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(width: bounds.width, height: size.height)
+                )
+                y += size.height + spacing
+            }
+            return
+        }
+
+        let childWidth = max(0, (bounds.width - spacing * CGFloat(max(0, subviews.count - 1)))
+            / CGFloat(subviews.count))
+        for (index, subview) in subviews.enumerated() {
+            subview.place(
+                at: CGPoint(
+                    x: bounds.minX + CGFloat(index) * (childWidth + spacing),
+                    y: bounds.minY
+                ),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: childWidth, height: bounds.height)
+            )
+        }
+    }
+
+    private func usesVerticalLayout(availableWidth: CGFloat?) -> Bool {
+        CardSetupEditorLayoutMetrics.usesVerticalAvailabilityControls(
+            isAccessibilitySize: isAccessibilitySize,
+            availableWidth: availableWidth
+        )
+    }
+
+    private func finiteWidth(_ width: CGFloat?) -> CGFloat? {
+        guard let width, width.isFinite else { return nil }
+        return max(0, width)
+    }
+
+    private func intrinsicWidth(subviews: Subviews, isVertical: Bool) -> CGFloat {
+        let widths = subviews.map { $0.sizeThatFits(.unspecified).width }
+        if isVertical { return widths.max() ?? 0 }
+        return widths.reduce(0, +) + spacing * CGFloat(max(0, subviews.count - 1))
     }
 }
 

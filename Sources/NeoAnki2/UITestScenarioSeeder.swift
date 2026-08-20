@@ -2,6 +2,17 @@ import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
 
+enum UITestScenarioSeederError: Error, Equatable, LocalizedError {
+    case unknownScenario(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .unknownScenario(name):
+            "Unknown UI test scenario: \(name)"
+        }
+    }
+}
+
 enum UITestScenarioSeeder {
     static func seedIfRequested(store: any LibraryScenarioSeeding) async throws {
         guard AppDatabase.isTesting,
@@ -73,7 +84,7 @@ enum UITestScenarioSeeder {
         case "item-type-spoken-response-impact":
             try await seedSpokenResponseItemType(store: store)
         default:
-            break
+            throw UITestScenarioSeederError.unknownScenario(scenario)
         }
     }
 

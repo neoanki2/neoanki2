@@ -133,6 +133,7 @@ struct MacItemTypeStudioView: View {
                 pendingSave = nil
                 Task { await commit(preparation) }
             }
+            .accessibilityLabel(saveImpactConfirmationLabel)
             .accessibilityIdentifier("confirmItemTypeStudioSaveImpact")
             Button("Review Changes", role: .cancel) { pendingSave = nil }
                 .accessibilityIdentifier("cancelItemTypeStudioSaveImpact")
@@ -237,17 +238,18 @@ struct MacItemTypeStudioView: View {
                 .padding(DesignSystem.Spacing.md)
             }
             .frame(minHeight: 220, idealHeight: 300)
+            .accessibilityIdentifier("itemTypeStudioOutline")
 
             Divider()
 
-            List {
+            List(selection: $selectedCardSetupID) {
                 CardSetupCollectionView(draft: draft, selection: $selectedCardSetupID)
             }
             .listStyle(.sidebar)
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupListScroll)
             .frame(minHeight: 260, maxHeight: .infinity)
         }
         .background(DesignSystem.sidebarBackground)
-        .accessibilityIdentifier("itemTypeStudioOutline")
     }
 
     private func fieldEditor(_ field: ItemTypeFieldDraft) -> some View {
@@ -540,5 +542,10 @@ struct MacItemTypeStudioView: View {
         return messages.isEmpty
             ? "Save the complete item type and its Card setups together?"
             : messages.joined(separator: " ")
+    }
+
+    private var saveImpactConfirmationLabel: String {
+        guard let impact = pendingSave?.impact else { return "Save Changes" }
+        return "Save Changes. \(saveImpactMessage(impact))"
     }
 }
