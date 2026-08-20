@@ -14,6 +14,7 @@ public enum ItemTypeStudioAccessibilityID {
     public static let inspector = "cardSetupEditor.inspector"
     public static let inspectorButton = "cardSetupEditor.inspectorButton"
     public static let inspectorDone = "cardSetupEditor.inspectorDone"
+    public static let validationSummary = "itemTypeStudioValidationSummary"
     public static let addContent = "cardSetupEditor.addContent"
     public static let cardSetupName = "cardSetupEditor.name"
     public static let answerMethod = "cardSetupEditor.answerMethod"
@@ -991,6 +992,7 @@ public struct CardSetupEditorView: View {
     @Binding private var draft: ItemTypeStudioDraft
     private let cardSetupID: UUID
     @Binding private var validationFocus: ItemTypeStudioValidationTarget?
+    @Binding private var validationMessage: String?
     private let auditSection: CardSetupEditorAuditSection?
     private let presentation: CardSetupEditorPresentation
 
@@ -1008,12 +1010,14 @@ public struct CardSetupEditorView: View {
         draft: Binding<ItemTypeStudioDraft>,
         cardSetupID: UUID,
         validationFocus: Binding<ItemTypeStudioValidationTarget?> = .constant(nil),
+        validationMessage: Binding<String?> = .constant(nil),
         auditSection: CardSetupEditorAuditSection? = nil,
         presentation: CardSetupEditorPresentation = .stacked
     ) {
         _draft = draft
         self.cardSetupID = cardSetupID
         _validationFocus = validationFocus
+        _validationMessage = validationMessage
         self.auditSection = auditSection
         self.presentation = presentation
     }
@@ -1291,6 +1295,18 @@ public struct CardSetupEditorView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             Divider()
+            if let validationMessage {
+                Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.red.opacity(0.12))
+                    .accessibilityLabel("Error, \(validationMessage)")
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.validationSummary)
+                Divider()
+            }
             workspaceInspector(setupIndex, showsTitle: false)
         }
         .frame(

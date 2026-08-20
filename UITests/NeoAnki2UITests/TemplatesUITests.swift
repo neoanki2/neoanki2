@@ -492,53 +492,66 @@ extension FastFunctionalJourneyTests {
     }
 
     func runStudioRepairAndImpactJourneys() throws {
-        let riskyApp = launchApp(databaseLabel: "studio-risky", scenario: "item-type-risky-edit")
-        runJourneyActivity("ItemTypeStudio.fieldReferenceRepairAndImpact") {
-            openTemplates(in: riskyApp)
-            openItemTypeStudio(named: "Risky Edit", in: riskyApp)
-            let remove = riskyApp.buttons.matching(
-                NSPredicate(format: "identifier BEGINSWITH 'removeStudioField-'")
-            ).element(boundBy: 0)
-            remove.click()
-            riskyApp.buttons.identified("confirmRemoveStudioField").click()
-            XCTAssertTrue(
-                riskyApp.descendants(matching: .any)
-                    .identified("itemTypeStudioRepairRequired")
-                    .waitUntilExists(timeout: 3)
-            )
-            riskyApp.typeKey("s", modifierFlags: .command)
-            // At the default compact workspace width, validation routes the
-            // invalid Card setup into its modal Inspector. Close that focused
-            // context before checking the persistent document-level summary,
-            // which is intentionally outside the sheet's accessibility tree.
-            closeCardSetupInspector(in: riskyApp)
-            XCTAssertTrue(
-                riskyApp.descendants(matching: .any)
-                    .identified("itemTypeStudioValidationSummary")
-                    .waitUntilExists(timeout: 3)
-            )
+        try runJourneyActivity("ItemTypeStudio.fieldReferenceRepairAndImpact") {
+            try runStudioFieldReferenceRepairJourney()
         }
+        try runJourneyActivity("ItemTypeStudio.spokenResponseDeletionPrivacy") {
+            try runStudioSpokenResponseDeletionJourney()
+        }
+        try runJourneyActivity("ItemTypeStudio.corruptedDefinitionRepair") {
+            try runStudioCorruptedDefinitionRepairJourney()
+        }
+    }
 
+    func runStudioFieldReferenceRepairJourney() throws {
+        let riskyApp = launchApp(databaseLabel: "studio-risky", scenario: "item-type-risky-edit")
+        openTemplates(in: riskyApp)
+        openItemTypeStudio(named: "Risky Edit", in: riskyApp)
+        let remove = riskyApp.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'removeStudioField-'")
+        ).element(boundBy: 0)
+        remove.click()
+        riskyApp.buttons.identified("confirmRemoveStudioField").click()
+        XCTAssertTrue(
+            riskyApp.descendants(matching: .any)
+                .identified("itemTypeStudioRepairRequired")
+                .waitUntilExists(timeout: 3)
+        )
+        riskyApp.typeKey("s", modifierFlags: .command)
+        let validationSummary = riskyApp.descendants(matching: .any)
+            .identified("itemTypeStudioValidationSummary")
+        let inspectorDone = riskyApp.buttons.identified("cardSetupEditor.inspectorDone")
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { validationSummary.exists || inspectorDone.exists },
+            "Save did not surface the invalid Card setup"
+        )
+        XCTAssertTrue(validationSummary.waitUntilExists(timeout: 5))
+        // At compact widths the same summary lives inside the routed
+        // Inspector. Close that context before continuing the shared app.
+        if inspectorDone.waitUntilExists(timeout: 2) {
+            closeCardSetupInspector(in: riskyApp)
+        }
+    }
+
+    func runStudioSpokenResponseDeletionJourney() throws {
         let privacyApp = launchApp(
             databaseLabel: "studio-private-response",
             scenario: "item-type-spoken-response-impact"
         )
-        runJourneyActivity("ItemTypeStudio.spokenResponseDeletionPrivacy") {
-            openTemplates(in: privacyApp)
-            openItemTypeStudio(named: "Private Responses", in: privacyApp)
-            privacyApp.buttons["Remove Spoken Practice Card setup"].click()
-            privacyApp.typeKey("s", modifierFlags: .command)
-            let confirmImpact = privacyApp.buttons.identified("confirmItemTypeStudioSaveImpact")
-            XCTAssertTrue(confirmImpact.waitUntilExists(timeout: 3))
-            XCTAssertTrue(confirmImpact.label.contains("Permanently delete 1 saved spoken response"))
-        }
+        openTemplates(in: privacyApp)
+        openItemTypeStudio(named: "Private Responses", in: privacyApp)
+        privacyApp.buttons["Remove Spoken Practice Card setup"].click()
+        privacyApp.typeKey("s", modifierFlags: .command)
+        let confirmImpact = privacyApp.buttons.identified("confirmItemTypeStudioSaveImpact")
+        XCTAssertTrue(confirmImpact.waitUntilExists(timeout: 3))
+        XCTAssertTrue(confirmImpact.label.contains("Permanently delete 1 saved spoken response"))
+    }
 
+    func runStudioCorruptedDefinitionRepairJourney() throws {
         let corruptedApp = launchApp(databaseLabel: "studio-corrupt", scenario: "corrupted-item-type")
-        runJourneyActivity("ItemTypeStudio.corruptedDefinitionRepair") {
-            openTemplates(in: corruptedApp)
-            corruptedApp.buttons.identified("repairItemType-Damaged").click()
-            corruptedApp.buttons.identified("confirmRepairItemType").click()
-            XCTAssertTrue(corruptedApp.descendants(matching: .any)["itemTypeRow-Damaged"].waitUntilExists(timeout: 5))
-        }
+        openTemplates(in: corruptedApp)
+        corruptedApp.buttons.identified("repairItemType-Damaged").click()
+        corruptedApp.buttons.identified("confirmRepairItemType").click()
+        XCTAssertTrue(corruptedApp.descendants(matching: .any)["itemTypeRow-Damaged"].waitUntilExists(timeout: 5))
     }
 }

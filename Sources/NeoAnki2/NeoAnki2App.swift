@@ -15,6 +15,8 @@ private struct InitialLibraryPayload: Sendable {
 
 private let isDocumentationScreenshotCapture =
     ProcessInfo.processInfo.environment["NEOANKI_DOC_SCREENSHOTS"] == "1"
+private let isFunctionalUITestRun =
+    ProcessInfo.processInfo.environment["NEOANKI_TESTING"] == "1"
 
 private let documentationScreenshotColorScheme: ColorScheme? = {
     guard isDocumentationScreenshotCapture else { return nil }
@@ -127,10 +129,10 @@ struct NeoAnki2App: App {
                 }
             }
             .frame(
-                minWidth: isDocumentationScreenshotCapture ? 1_024 : nil,
-                maxWidth: isDocumentationScreenshotCapture ? 1_024 : nil,
-                minHeight: isDocumentationScreenshotCapture ? 680 : nil,
-                maxHeight: isDocumentationScreenshotCapture ? 680 : nil
+                minWidth: isDocumentationScreenshotCapture ? 1_024 : isFunctionalUITestRun ? 960 : nil,
+                maxWidth: isDocumentationScreenshotCapture ? 1_024 : isFunctionalUITestRun ? 960 : nil,
+                minHeight: isDocumentationScreenshotCapture ? 680 : isFunctionalUITestRun ? 640 : nil,
+                maxHeight: isDocumentationScreenshotCapture ? 680 : isFunctionalUITestRun ? 640 : nil
             )
             .task {
                 installUITestControlIfNeeded()
@@ -168,7 +170,11 @@ struct NeoAnki2App: App {
             width: isDocumentationScreenshotCapture ? 1_024 : 960,
             height: isDocumentationScreenshotCapture ? 680 : 640
         )
-        .windowResizability(isDocumentationScreenshotCapture ? .contentSize : .automatic)
+        .windowResizability(
+            isDocumentationScreenshotCapture || isFunctionalUITestRun
+                ? .contentSize
+                : .automatic
+        )
         .commands {
             LibraryCommands()
             StudyCommands()

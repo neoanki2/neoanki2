@@ -63,7 +63,7 @@ struct MacItemTypeStudioView: View {
 
             if let errorMessage {
                 ErrorBanner(message: errorMessage)
-                    .accessibilityIdentifier("itemTypeStudioValidationSummary")
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.validationSummary)
             }
             if let repairMessage {
                 HStack(spacing: DesignSystem.Spacing.xs) {
@@ -329,6 +329,7 @@ struct MacItemTypeStudioView: View {
                 draft: draft,
                 cardSetupID: selectedCardSetupID,
                 validationFocus: $validationFocus,
+                validationMessage: $errorMessage,
                 presentation: .workspace
             )
         } else {
@@ -431,7 +432,10 @@ struct MacItemTypeStudioView: View {
         pendingFieldRemoval = nil
         if let affectedID = change.affectedCardSetupIDs.first {
             selectedCardSetupID = affectedID
-            validationFocus = .cardSetup(affectedID)
+            // Keep the canvas available for direct repair. Opening the compact
+            // Inspector here would make it modal before validation and prevent
+            // the Studio-level Command-S shortcut from reaching Save.
+            validationFocus = nil
         }
         repairMessage = removal.affectedSetupNames.isEmpty
             ? nil
