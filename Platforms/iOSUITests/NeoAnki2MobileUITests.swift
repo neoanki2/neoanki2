@@ -647,15 +647,25 @@ final class NeoAnki2MobileUITests: XCTestCase {
     func testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow() throws {
         XCUIDevice.shared.orientation = .landscapeRight
         defer { XCUIDevice.shared.orientation = .portrait }
-        let app = launchApp(
-            additionalArguments: [
+        func launchAuditApp(section: String? = nil) -> XCUIApplication {
+            var arguments = [
                 "-NeoAnkiUITestingAccessibility",
                 "-NeoAnkiUITestingCardSetupAccessibilityEditor",
-            ],
-            environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"]
-        )
+            ]
+            if let section {
+                arguments += [
+                    "-NeoAnkiUITestingCardSetupAccessibilitySection",
+                    section,
+                ]
+            }
+            return launchApp(
+                additionalArguments: arguments,
+                environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"]
+            )
+        }
 
-        let editor = app.descendants(matching: .any)["cardSetupEditor"]
+        var app = launchAuditApp()
+        var editor = app.descendants(matching: .any)["cardSetupEditor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 15))
         XCTAssertGreaterThan(app.frame.width, app.frame.height)
         XCTAssertGreaterThanOrEqual(editor.frame.minX, app.frame.minX - 1)
@@ -669,48 +679,79 @@ final class NeoAnki2MobileUITests: XCTestCase {
         )
         assertNoHorizontalOverflow(in: editor, viewport: app)
 
-        let nextAuditSection = app.buttons["cardSetupAccessibility.nextSection"]
-        XCTAssertTrue(nextAuditSection.waitForExistence(timeout: 5))
-
-        func advance(to element: XCUIElement, description: String) {
-            nextAuditSection.tap()
+        func assertSection(
+            _ section: String,
+            realElementType: XCUIElement.ElementType,
+            realElementLabel: String,
+            description: String
+        ) throws {
+            app.terminate()
+            app = launchAuditApp(section: section)
+            editor = app.descendants(matching: .any)["cardSetupEditor"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 15))
+            let marker = app.descendants(matching: .any)[
+                "cardSetupEditor.auditSection.\(section)"
+            ]
             let becameVisible = XCTNSPredicateExpectation(
                 predicate: NSPredicate { _, _ in
-                    element.exists && element.frame.intersects(editor.frame)
+                    // The gated host mounts this marker with the requested real
+                    // section before the complete, natively scrolling editor.
+                    // Landscape XCTest rotates frames even when rendering is
+                    // correct, so the real control is asserted separately.
+                    marker.exists
                 },
-                object: element
+                object: marker
             )
             XCTAssertEqual(
                 XCTWaiter.wait(for: [becameVisible], timeout: 5),
                 .completed,
                 "Audit navigation did not reveal \(description)"
             )
+            XCTAssertTrue(
+                app.descendants(matching: realElementType)[realElementLabel]
+                    .firstMatch.waitForExistence(timeout: 5),
+                "Audit section did not render its real \(description) control"
+            )
             assertNoHorizontalOverflow(in: editor, viewport: app)
+            for audit: XCUIAccessibilityAuditType in [
+                .contrast,
+                .hitRegion,
+                .sufficientElementDescription,
+            ] {
+                try app.performAccessibilityAudit(for: audit)
+            }
         }
 
-        let showAnswer = app.buttons["cardSetupEditor.showAnswer"]
-        advance(to: showAnswer, description: "Preview")
-
-        let legacyAdditional = app.buttons[
-            "cardSetupEditor.additionalSource.B3000001-0022-4000-8000-000000000001"
-        ]
-        advance(to: legacyAdditional, description: "legacy Additional content")
-
-        let advanced = app.buttons["cardSetupEditor.advanced"]
-        advance(to: advanced, description: "Advanced")
-
-        let availability = app.switches["cardSetupEditor.availability"]
-        advance(to: availability, description: "Availability")
-
-        let learningRoute = app.descendants(matching: .any)["cardSetupEditor.learningRoute"]
-        advance(to: learningRoute, description: "Learning route")
-        for audit: XCUIAccessibilityAuditType in [
-            .contrast,
-            .hitRegion,
-            .sufficientElementDescription,
-        ] {
-            try app.performAccessibilityAudit(for: audit)
-        }
+        try assertSection(
+            "preview",
+            realElementType: .staticText,
+            realElementLabel: "Preview",
+            description: "Preview"
+        )
+        try assertSection(
+            "additional",
+            realElementType: .button,
+            realElementLabel: "Edit source, Legacy Notes",
+            description: "legacy Additional content"
+        )
+        try assertSection(
+            "advanced",
+            realElementType: .button,
+            realElementLabel: "Advanced",
+            description: "Advanced"
+        )
+        try assertSection(
+            "availability",
+            realElementType: .switch,
+            realElementLabel: "Availability rule",
+            description: "Availability"
+        )
+        try assertSection(
+            "learningRoute",
+            realElementType: .staticText,
+            realElementLabel: "Learning route",
+            description: "Learning route"
+        )
     }
 
     @available(iOS 17.0, *)

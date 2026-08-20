@@ -12,19 +12,18 @@ public struct MobileCardSetupAccessibilityTestHost: View {
     @State private var studioModel: ItemTypesFeatureModel?
     @State private var isPreparing = false
     @State private var errorMessage: String?
-    @State private var auditNavigationRequest: CardSetupEditorAuditNavigationTarget?
-    @State private var nextAuditSectionIndex = 0
-
-    private let auditSections: [CardSetupEditorAuditNavigationTarget] = [
-        .preview,
-        .additional(componentID: MobileItemTypeStudioUITestSeeder.legacyAdditionalComponentID),
-        .advanced,
-        .availability,
-        .learningRoute,
-    ]
+    private let auditSection: CardSetupEditorAuditSection?
 
     public init(model: LibraryFeatureModel) {
         _libraryModel = State(initialValue: model)
+        let arguments = ProcessInfo.processInfo.arguments
+        if let keyIndex = arguments.firstIndex(
+            of: "-NeoAnkiUITestingCardSetupAccessibilitySection"
+        ), arguments.indices.contains(keyIndex + 1) {
+            auditSection = CardSetupEditorAuditSection(rawValue: arguments[keyIndex + 1])
+        } else {
+            auditSection = nil
+        }
     }
 
     public var body: some View {
@@ -42,31 +41,10 @@ public struct MobileCardSetupAccessibilityTestHost: View {
                             }
                         ),
                         cardSetupID: MobileItemTypeStudioUITestSeeder.legacyCardSetupID,
-                        auditNavigationRequest: $auditNavigationRequest
+                        auditSection: auditSection
                     )
                     .navigationTitle("Card Setup Accessibility")
                     .navigationBarTitleDisplayMode(.inline)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        HStack {
-                            Spacer()
-                            Button("Next audit section", systemImage: "arrow.down") {
-                                auditNavigationRequest = auditSections[nextAuditSectionIndex]
-                                nextAuditSectionIndex = min(
-                                    nextAuditSectionIndex + 1,
-                                    auditSections.index(before: auditSections.endIndex)
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .frame(minHeight: 44)
-                            .accessibilityHint("Moves to the next Card setup editor section")
-                            .accessibilityIdentifier(
-                                ItemTypeStudioAccessibilityID.auditNextSection
-                            )
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 4)
-                        .background(Color(uiColor: .systemBackground))
-                    }
                 } else if let errorMessage {
                     ContentUnavailableView(
                         "Card Setup Fixture Unavailable",

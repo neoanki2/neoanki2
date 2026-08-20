@@ -20,9 +20,11 @@ public enum ItemTypeStudioAccessibilityID {
     public static let availability = "cardSetupEditor.availability"
     public static let learningRoute = "cardSetupEditor.learningRoute"
     public static let auditPreview = "cardSetupEditor.audit.preview"
-    public static let auditNextSection = "cardSetupAccessibility.nextSection"
 
     public static func cardSetup(_ id: UUID) -> String { "itemTypeStudio.cardSetup.\(id)" }
+    public static func auditSection(_ section: CardSetupEditorAuditSection) -> String {
+        "cardSetupEditor.auditSection.\(section.rawValue)"
+    }
     public static func layout(_ layout: CardLayoutID) -> String {
         "cardSetupEditor.layout.\(layout.rawValue)"
     }
@@ -72,15 +74,25 @@ public enum ItemTypeStudioAccessibilityID {
     }
 }
 
-/// Test-host navigation destinations inside the shared editor's lazy scroll
-/// content. Production platform shells never provide a request, so ordinary
-/// editor interaction and UI journeys continue to use native scrolling.
-public enum CardSetupEditorAuditNavigationTarget: Hashable, Sendable {
+/// Test-host sections rendered through the shared editor. Production platform
+/// shells never select one, so ordinary editor interaction and UI journeys
+/// continue to use the complete, natively scrolling editor.
+public enum CardSetupEditorAuditSection: String, CaseIterable, Sendable {
     case preview
-    case additional(componentID: UUID)
+    case additional
     case advanced
     case availability
     case learningRoute
+
+    fileprivate var displayName: String {
+        switch self {
+        case .preview: "Preview"
+        case .additional: "Additional content"
+        case .advanced: "Advanced"
+        case .availability: "Availability"
+        case .learningRoute: "Learning route"
+        }
+    }
 }
 
 /// A deterministic authoring projection. It feeds the production wireframe and
@@ -901,11 +913,12 @@ public struct CardSetupCollectionView: View {
 /// The shared fillable Card setup editor used by both platform shells.
 public struct CardSetupEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.neoAnkiAccessibilityReduceMotionOverride) private var reduceMotionOverride
     @Binding private var draft: ItemTypeStudioDraft
     private let cardSetupID: UUID
     @Binding private var validationFocus: ItemTypeStudioValidationTarget?
-    @Binding private var auditNavigationRequest: CardSetupEditorAuditNavigationTarget?
+    private let auditSection: CardSetupEditorAuditSection?
 
     @State private var isAnswerRevealed = false
     @State private var showsAdvanced = CardSetupEditorAdvancedPolicy.startsExpanded
@@ -918,12 +931,12 @@ public struct CardSetupEditorView: View {
         draft: Binding<ItemTypeStudioDraft>,
         cardSetupID: UUID,
         validationFocus: Binding<ItemTypeStudioValidationTarget?> = .constant(nil),
-        auditNavigationRequest: Binding<CardSetupEditorAuditNavigationTarget?> = .constant(nil)
+        auditSection: CardSetupEditorAuditSection? = nil
     ) {
         _draft = draft
         self.cardSetupID = cardSetupID
         _validationFocus = validationFocus
-        _auditNavigationRequest = auditNavigationRequest
+        self.auditSection = auditSection
     }
 
     private var reduceMotion: Bool { reduceMotionOverride ?? systemReduceMotion }
@@ -931,25 +944,22 @@ public struct CardSetupEditorView: View {
     public var body: some View {
         Group {
             if let setupIndex {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 24) {
-                            identitySection(setupIndex)
-                            recipeSection(setupIndex)
-                            layoutSection(setupIndex)
-                            previewSection(setupIndex)
-                            namedContentSection(setupIndex)
-                            advancedSection(setupIndex)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        if let auditSection {
+                            Group {
+                                auditEditorSection(auditSection, setupIndex: setupIndex)
+                                Divider()
+                            }
                         }
-                        .frame(maxWidth: 860)
-                        .frame(maxWidth: .infinity)
-                        .padding(20)
+                        editorSections(setupIndex)
                     }
-                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
-                    .onChange(of: auditNavigationRequest, initial: true) { _, request in
-                        navigateForAudit(to: request, using: proxy)
-                    }
+                    .frame(maxWidth: 860)
+                    .frame(maxWidth: .infinity)
+                    .padding(20)
                 }
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
+                .tint(colorSchemeContrast == .increased ? .primary : .accentColor)
                 .sheet(item: $sourceRequest) { request in
                     CardSetupSourcePicker(
                         fields: sourceFields(for: request),
@@ -1028,28 +1038,56 @@ public struct CardSetupEditorView: View {
         }
     }
 
-    private func navigateForAudit(
-        to request: CardSetupEditorAuditNavigationTarget?,
-        using proxy: ScrollViewProxy
-    ) {
-        guard let request else { return }
-
-        switch request {
+    @ViewBuilder
+    private func auditEditorSection(
+        _ section: CardSetupEditorAuditSection,
+        setupIndex: Int
+    ) -> some View {
+        switch section {
+        case .preview:
+            auditSectionMarker(section)
+            previewSection(setupIndex)
         case .additional:
-            showsAdditionalContent = true
-        case .availability, .learningRoute:
-            showsAdvanced = true
-        case .preview, .advanced:
-            break
+            let setup = draft.cardSetups[setupIndex]
+            let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
+            let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+            if let componentIndex = setup.components.firstIndex(where: {
+                projection.isAdditional($0.id)
+            }) {
+                auditSectionMarker(section)
+                additionalContentRow(
+                    componentIndex,
+                    setupIndex: setupIndex,
+                    descriptor: descriptor
+                )
+            }
+        case .advanced:
+            auditSectionMarker(section)
+            advancedSection(setupIndex)
+        case .availability:
+            auditSectionMarker(section)
+            availabilityEditor(setupIndex)
+        case .learningRoute:
+            auditSectionMarker(section)
+            learningRouteEditor(setupIndex)
         }
+    }
 
-        // Disclosure content is lazy. Yield after changing expansion state so
-        // the requested direct child exists before ScrollViewReader resolves it.
-        Task { @MainActor in
-            await Task.yield()
-            guard auditNavigationRequest == request else { return }
-            proxy.scrollTo(request, anchor: .top)
-        }
+    private func auditSectionMarker(_ section: CardSetupEditorAuditSection) -> some View {
+        Text("Accessibility audit: \(section.displayName)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditSection(section))
+    }
+
+    @ViewBuilder
+    private func editorSections(_ setupIndex: Int) -> some View {
+        identitySection(setupIndex)
+        recipeSection(setupIndex)
+        layoutSection(setupIndex)
+        previewSection(setupIndex)
+        namedContentSection(setupIndex)
+        advancedSection(setupIndex)
     }
 
     private func identitySection(_ index: Int) -> some View {
@@ -1222,7 +1260,6 @@ public struct CardSetupEditorView: View {
             .padding(16)
             .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 20))
         }
-        .id(CardSetupEditorAuditNavigationTarget.preview)
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditPreview)
     }
 
@@ -1431,7 +1468,6 @@ public struct CardSetupEditorView: View {
         }
         .padding(10)
         .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
-        .id(CardSetupEditorAuditNavigationTarget.additional(componentID: component.id))
     }
 
     @ViewBuilder
@@ -1592,7 +1628,6 @@ public struct CardSetupEditorView: View {
             .accessibilityHint("Optional Availability and Learning route settings")
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.advanced)
             .accessibilityValue(showsAdvanced ? "Expanded" : "Collapsed")
-            .id(CardSetupEditorAuditNavigationTarget.advanced)
             .frame(
                 maxWidth: .infinity,
                 minHeight: CardSetupEditorLayoutMetrics.minimumTouchTarget,
@@ -1616,7 +1651,6 @@ public struct CardSetupEditorView: View {
                 .neoAnkiTouchTarget()
                 .focused($focusedTarget, equals: .availability(cardSetupID: cardSetupID))
                 .accessibilityIdentifier(ItemTypeStudioAccessibilityID.availability)
-                .id(CardSetupEditorAuditNavigationTarget.availability)
             Text("Generate this Card setup only when its content is available.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -1665,7 +1699,6 @@ public struct CardSetupEditorView: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.learningRoute)
-        .id(CardSetupEditorAuditNavigationTarget.learningRoute)
     }
 
     @ViewBuilder
