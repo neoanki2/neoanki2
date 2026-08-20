@@ -928,7 +928,7 @@ package enum APIOpenAPI {
                 ["cardId", "reviewedAt", "elapsedSeconds", "elapsedModelDays", "previousMemory", "desiredRetention", "modelIdentifier", "elapsedTimePolicy", "intervalPolicy", "ratings"],
                 ["cardId": uuid, "reviewedAt": timestamp,
                  "elapsedSeconds": ["type": "number", "minimum": 0],
-                 "elapsedModelDays": nonnegative, "previousMemory": reference("Memory"),
+                 "elapsedModelDays": ["type": "number", "minimum": 0], "previousMemory": reference("Memory"),
                  "desiredRetention": ["type": "number", "minimum": 0, "maximum": 1],
                  "modelIdentifier": ["type": "string"], "elapsedTimePolicy": ["type": "string"],
                  "intervalPolicy": ["type": "string"], "presetId": nullableUUID,

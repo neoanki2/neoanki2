@@ -174,9 +174,9 @@ duplicates and new due cards. JSON and CSV rows are placed in **Unassigned**.
 They do not create decks or change the saved order and hierarchy of existing
 decks.
 Import itself is not a scheduling answer and does not become optimizer training
-data. Imported cards begin contributing only after you review them; same-day
-repair answers remain context for FSRS but are not independent supervised
-targets. Because JSON and CSV imports create new cards, those cards begin with
+data. Imported cards begin contributing only after you review them. A later
+answer with positive elapsed time is an independent supervised target, even on
+the same day; an exact-repeat answer remains context only. Because JSON and CSV imports create new cards, those cards begin with
 no repeated-lapse warning or acknowledgement.
 There is currently no bulk move, search, or duplicate-cleanup action; organize
 or remove imported items one at a time, and test large imports with a small

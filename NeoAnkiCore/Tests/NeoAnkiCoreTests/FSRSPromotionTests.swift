@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import NeoAnkiCore
 
-@Test func promotionEligibilityEnforcesDiversityAndIgnoresIntradayTargets() {
+@Test func promotionEligibilityEnforcesDiversityAndIgnoresExactRepeatTargets() {
     let policy = FSRSPromotionPolicy()
     var observations = promotionObservations(count: 400)
     observations.append(FSRSPromotionObservation(
@@ -164,7 +164,7 @@ private func promotionObservations(count: Int) -> [FSRSPromotionObservation] {
             cardID: cards[index % cards.count],
             reviewedAt: start.addingTimeInterval(Double(index) * 86_400),
             studyDay: index % 40,
-            elapsedDays: elapsed,
+            elapsedDays: Double(elapsed),
             recalled: recalled,
             activeProbability: recalled ? 0.82 : 0.55,
             defaultProbability: recalled ? 0.78 : 0.60,

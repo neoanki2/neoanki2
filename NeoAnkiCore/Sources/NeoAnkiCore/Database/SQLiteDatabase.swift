@@ -120,6 +120,11 @@ private enum NewCardLimitShape {
 
 /// Low-level SQLite connection. An actor so callers serialize access.
 actor SQLiteDatabase {
+    struct ActiveReviewTimingPolicy: Sendable {
+        let hasReview: Bool
+        let version: String?
+    }
+
     private nonisolated(unsafe) var handle: OpaquePointer?
     private let databaseURL: URL
     private let encoder = JSONEncoder()
@@ -3456,6 +3461,33 @@ actor SQLiteDatabase {
             else { return nil }
             return log.withSequence(sequence)
         }
+    }
+
+    func fetchLatestActiveReviewTimingPolicy(cardID: UUID) throws -> ActiveReviewTimingPolicy {
+        let rows = try query(
+            """
+            SELECT review_logs.scheduling_audit
+            FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
+            LEFT JOIN review_reverts
+                ON review_reverts.review_log_id = review_logs.id
+            WHERE review_reverts.id IS NULL AND review_logs.card_id = ?
+              AND (cards.scheduling_history_origin IS NULL
+                   OR review_logs.reviewed_at >= cards.scheduling_history_origin)
+            ORDER BY review_logs.reviewed_at DESC, review_logs.sequence DESC
+            LIMIT 1;
+            """,
+            bindings: [.text(cardID.uuidString)]
+        )
+        guard let row = rows.first else {
+            return ActiveReviewTimingPolicy(hasReview: false, version: nil)
+        }
+        guard let data = payload(row, "scheduling_audit"),
+              let audit = try? decoder.decode(ReviewSchedulingAudit.self, from: data)
+        else {
+            return ActiveReviewTimingPolicy(hasReview: true, version: nil)
+        }
+        return ActiveReviewTimingPolicy(hasReview: true, version: audit.timingPolicyVersion)
     }
 
     func fetchReviewLog(id: UUID) throws -> ReviewLog? {

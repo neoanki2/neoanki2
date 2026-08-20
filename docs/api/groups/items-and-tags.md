@@ -2,7 +2,7 @@
 title: Items and tags
 description: Generated NeoAnki local API operations for items and tags.
 audience: api
-contract_digest: sha256:b8d1671781abe659c6515747087c057789606e89c9a5b738c3f7c2468c280ec8
+contract_digest: sha256:1e36292ce4418b256226feee694b72c8fc30c014e7bfdd3a1c464cfb8ce59674
 parent: Local API reference
 permalink: /api/items-and-tags/
 ---
@@ -285,6 +285,6 @@ curl --request DELETE \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:b8d1671781abe659c6515747087c057789606e89c9a5b738c3f7c2468c280ec8`.
+Contract digest: `sha256:1e36292ce4418b256226feee694b72c8fc30c014e7bfdd3a1c464cfb8ce59674`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

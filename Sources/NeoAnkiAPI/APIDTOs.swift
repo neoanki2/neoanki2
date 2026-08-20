@@ -606,7 +606,7 @@ public struct APISchedulingExplanation: Codable, Sendable, Equatable {
     public let cardId: String
     public let reviewedAt: Date
     public let elapsedSeconds: Double
-    public let elapsedModelDays: Int
+    public let elapsedModelDays: Double
     public let previousMemory: APIMemory
     public let desiredRetention: Double
     public let modelIdentifier: String

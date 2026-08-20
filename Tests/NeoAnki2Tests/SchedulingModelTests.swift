@@ -40,7 +40,7 @@ import Testing
 
     // Review volume alone cannot bypass the conservative personalization
     // gates. This fixture has only one card and fewer than 400 eligible
-    // interday targets, so it must neither create mutable parameters nor an
+    // elapsed-review targets, so it must neither create mutable parameters nor an
     // immutable optimization run.
     #expect(await store.schedulingParameters() == before)
     #expect(try await store.schedulingHealthSnapshot().activeParameterSet?.id

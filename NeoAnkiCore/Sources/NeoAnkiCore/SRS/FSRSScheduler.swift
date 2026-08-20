@@ -7,7 +7,7 @@ import NeoAnkiFSRS
 /// `LearningScheduler`.
 public struct FSRSScheduler: Scheduler {
     public static let memoryModelIdentifier = FSRSReference.modelIdentifier
-    public static let elapsedPolicyIdentifier = "neo-elapsed-24h-v1"
+    public static let elapsedPolicyIdentifier = "neo-continuous-elapsed-v2"
     public static let intervalPolicyIdentifier = "continuous-due-v1"
 
     public struct Parameters: Codable, Equatable, Sendable {
@@ -105,7 +105,7 @@ public struct FSRSScheduler: Scheduler {
         guard let result = try? engine.nextStates(
             current: current,
             desiredRetention: Float(params.requestRetention),
-            daysElapsed: elapsed
+            daysElapsed: Float(elapsed)
         )[nativeRating] else {
             return state
         }
@@ -137,7 +137,7 @@ public struct FSRSScheduler: Scheduler {
         )
         return Double(engine.retrievability(
             state: native,
-            daysElapsed: Self.elapsedModelDays(from: state.lastReview, to: now)
+            daysElapsed: Float(Self.elapsedModelDays(from: state.lastReview, to: now))
         ))
     }
 
@@ -160,21 +160,19 @@ public struct FSRSScheduler: Scheduler {
         return raw.isFinite && raw > 0 ? Double(raw) : 1.0 / 86_400.0
     }
 
-    /// Compatibility helper. Elapsed FSRS time is intentionally integral.
     public func retrievability(elapsedDays: Double, stability: Double) -> Double {
         guard elapsedDays.isFinite, stability.isFinite, stability > 0 else { return 0 }
-        let days = UInt32(min(Double(UInt32.max), max(0, floor(elapsedDays))))
         return Double(engine.retrievability(
             state: .init(stability: Float(stability), difficulty: 1),
-            daysElapsed: days
+            daysElapsed: Float(max(0, elapsedDays))
         ))
     }
 
-    public static func elapsedModelDays(from last: Date?, to now: Date) -> UInt32 {
+    public static func elapsedModelDays(from last: Date?, to now: Date) -> Double {
         guard let last else { return 0 }
         let seconds = max(0, now.timeIntervalSince(last))
         guard seconds.isFinite else { return 0 }
-        return UInt32(min(Double(UInt32.max), floor(seconds / 86_400)))
+        return seconds / 86_400
     }
 
     /// Legacy diagnostic helper; the active interval policy never calls it.

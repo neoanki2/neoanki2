@@ -9,7 +9,7 @@ public enum FSRSOptimizationError: Error, Equatable, Sendable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case let .insufficientData(required, available):
-            "At least \(required) usable interday outcomes are needed; \(available) are available."
+            "At least \(required) usable elapsed-review outcomes are needed; \(available) are available."
         case .invalidParameters:
             "The saved scheduling parameters are invalid."
         case .optimizerParityNotVerified:
@@ -83,8 +83,8 @@ public struct FSRSOptimizationSchedule: Sendable, Equatable {
     }
 }
 
-/// NeoAnkiCore history adapter for the native reference optimizer. Intraday
-/// answers remain in each card sequence; only interday reviews become targets.
+/// NeoAnkiCore history adapter for the native optimizer. Every review after
+/// positive elapsed time becomes a target; exact-repeat reviews remain context.
 public struct FSRSOptimizer: Sendable {
     public static let defaultMinimumObservations = 400
     public static let minimumReviewsPerCardForOutcome = 2
@@ -159,7 +159,7 @@ public struct FSRSOptimizer: Sendable {
         return try NeoAnkiFSRS.FSRS(parameters: native).evaluate(examples).logLoss
     }
 
-    private static func examples(from logs: [ReviewLog]) -> [TrainingExample] {
+    static func examples(from logs: [ReviewLog]) -> [TrainingExample] {
         let indexed = logs.enumerated().filter { index, log in
             log.reviewedAt.timeIntervalSinceReferenceDate.isFinite
                 && log.durationMs >= 0
@@ -192,7 +192,7 @@ public struct FSRSOptimizer: Sendable {
                 }
                 return NeoAnkiFSRS.Review(
                     rating: .init(rawValue: UInt32(log.rating.rawValue))!,
-                    deltaT: days
+                    deltaT: Float(days)
                 )
             }
             return zip(
