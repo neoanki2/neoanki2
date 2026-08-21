@@ -44,8 +44,8 @@ isolated macOS CI and commit it to the pull-request branch. The command starts
 or reconciles required checks for that promoted revision, including known bot-owned
 `action_required` runs or dispatches missing exact-head fallbacks. Candidate
 packaging must use the resulting PR head and starts only after documentation
-and the fast macOS UI journey pass. Stale screenshots have no release deferral
-or bypass.
+and every required macOS UI shard passes. Stale screenshots have no release
+deferral or bypass.
 
 Allow the command to wait for CI. Send compact progress updates when waiting;
 do not replace the wait with repeated manual GitHub operations.

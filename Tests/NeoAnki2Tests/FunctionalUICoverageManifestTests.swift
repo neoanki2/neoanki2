@@ -195,6 +195,20 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         XCTAssertTrue(source.contains("merge-base --is-ancestor \"$RESUME_REMOTE_HEAD\" \"$LOCAL_HEAD\""))
         XCTAssertTrue(source.contains("push_release_branch \"$RESUME_BRANCH\""))
         XCTAssertTrue(source.contains("wait_for_pr_head \"$PR_NUMBER\" \"$LOCAL_HEAD\""))
+        for shard in [
+            "library-launch",
+            "decks-study",
+            "transfer-vocabulary",
+            "studio-authoring",
+            "studio-boundaries",
+        ] {
+            XCTAssertTrue(
+                source.contains("macOS UI (\(shard))"),
+                "Candidate gate must follow every checked macOS UI shard"
+            )
+        }
+        XCTAssertTrue(source.contains("trap 'exit 130' INT"))
+        XCTAssertTrue(source.contains("trap 'exit 143' TERM"))
     }
 
     func testPortableImportUIWaitUsesStableCompletionSignal() throws {

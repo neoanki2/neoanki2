@@ -32,6 +32,8 @@ report_release_telemetry() {
   exit "$exit_status"
 }
 trap report_release_telemetry EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 usage() {
   cat >&2 <<'EOF'
@@ -249,7 +251,11 @@ wait_for_candidate_checks() {
   local check_runs_json current_head context state missing pending
   local contexts=(
     "Documentation and screenshot gate"
-    "Fast functional UI journeys"
+    "macOS UI (library-launch)"
+    "macOS UI (decks-study)"
+    "macOS UI (transfer-vocabulary)"
+    "macOS UI (studio-authoring)"
+    "macOS UI (studio-boundaries)"
   )
 
   echo "Waiting for documentation and fast UI checks before candidate packaging..."
