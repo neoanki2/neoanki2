@@ -183,6 +183,13 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             source.contains("for audit: XCUIAccessibilityAuditType"),
             "Pass audit kinds together so XCTest traverses the element tree once"
         )
+
+        let runner = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Scripts/run-ios-ui-tests.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(runner.contains("if [[ \"$PARALLEL_WORKERS\" -eq 1 ]]"))
+        XCTAssertTrue(runner.contains("test_command+=( -parallel-testing-enabled NO )"))
     }
 
     func testReleaseResumePreflightsAheadOnlyLocalCorrections() throws {

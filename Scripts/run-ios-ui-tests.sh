@@ -136,10 +136,19 @@ while [[ $attempt -le 2 ]]; do
     -xctestrun "$XCTESTRUN"
     -destination "platform=iOS Simulator,id=$simulator_id"
     -resultBundlePath "$result_bundle"
-    -parallel-testing-enabled YES
-    -maximum-parallel-testing-workers "$PARALLEL_WORKERS"
     CODE_SIGNING_ALLOWED=NO
   )
+  if [[ "$PARALLEL_WORKERS" -eq 1 ]]; then
+    # Disabling parallel mode avoids XCTest's cloned-simulator provisioning
+    # path. A one-worker clone adds minutes and still competes for AX services
+    # without providing any concurrency.
+    test_command+=( -parallel-testing-enabled NO )
+  else
+    test_command+=(
+      -parallel-testing-enabled YES
+      -maximum-parallel-testing-workers "$PARALLEL_WORKERS"
+    )
+  fi
   if [[ ${#TEST_ARGUMENTS[@]} -gt 0 ]]; then
     test_command+=("${TEST_ARGUMENTS[@]}")
   fi
