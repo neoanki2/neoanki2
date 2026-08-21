@@ -17,8 +17,9 @@ test identifier and invokes its preserved assertion body.
 
 `FunctionalUICoverageManifestTests` derives the legacy identifiers from the
 check declarations and compares them with the activity identifiers. It fails
-for an omitted, duplicated, or renamed mapping, and also enforces exactly six
-functional journeys.
+for an omitted, duplicated, or renamed mapping, enforces exactly seven
+functional journeys, and checks that every macOS and iOS test method appears
+in the required CI shard manifest.
 
 Focused reruns accept one or more journey or legacy activity identifiers:
 

@@ -1,7 +1,7 @@
 import XCTest
 
 @MainActor
-final class NeoAnki2MobileUITests: XCTestCase {
+class NeoAnki2MobileUITestCase: XCTestCase {
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
@@ -10,7 +10,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
     }
 
-    private func launchApp(
+    func launchApp(
         additionalArguments: [String] = [],
         environment: [String: String] = [:]
     ) -> XCUIApplication {
@@ -25,14 +25,14 @@ final class NeoAnki2MobileUITests: XCTestCase {
         return app
     }
 
-    private func openItemTypeStudioCatalog(in app: XCUIApplication) {
+    func openItemTypeStudioCatalog(in app: XCUIApplication) {
         open("Create", in: app)
         let destination = app.buttons["Item Types & Card Setups"]
         scrollToAndTap(destination, in: app)
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 10))
     }
 
-    private func scrollToAndTap(
+    func scrollToAndTap(
         _ element: XCUIElement,
         in app: XCUIApplication,
         preferredDirection: MobileScrollDirection? = nil,
@@ -55,7 +55,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         element.tap()
     }
 
-    private func scrollTo(
+    func scrollTo(
         _ element: XCUIElement,
         in app: XCUIApplication,
         preferredDirection: MobileScrollDirection? = nil,
@@ -113,12 +113,12 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTAssertTrue(isReachable(), "Element is not reachable: \(element)", file: file, line: line)
     }
 
-    private enum MobileScrollDirection: Equatable {
+    enum MobileScrollDirection: Equatable {
         case towardTop
         case towardBottom
     }
 
-    private func scrollingSurface(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+    func scrollingSurface(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
         let itemTypeStudioSurface = app.descendants(matching: .any)["item-type-studio.scroll"]
         if itemTypeStudioSurface.exists,
            !itemTypeStudioSurface.frame.isEmpty,
@@ -161,7 +161,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
     /// Use slower native gestures on compact surfaces so tall rows are not
     /// skipped. Wider surfaces use a bounded drag and hold so iPad Forms do
     /// not retain native swipe momentum while the next AX snapshot begins.
-    private func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
+    func scrollOneStep(on surface: XCUIElement, direction: MobileScrollDirection) {
         let usesCompactGesture = min(surface.frame.width, surface.frame.height) < 600
         if !usesCompactGesture {
             let upper = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.32))
@@ -187,13 +187,13 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
     }
 
-    private func firstCardSetupButton(in app: XCUIApplication) -> XCUIElement {
+    func firstCardSetupButton(in app: XCUIApplication) -> XCUIElement {
         app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "itemTypeStudio.cardSetup.")
         ).firstMatch
     }
 
-    private func clearText(in field: XCUIElement) {
+    func clearText(in field: XCUIElement) {
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         let current = field.value as? String ?? ""
@@ -201,7 +201,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
     }
 
-    private func assertNoHorizontalOverflow(
+    func assertNoHorizontalOverflow(
         in container: XCUIElement,
         viewport: XCUIElement,
         file: StaticString = #filePath,
@@ -234,7 +234,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
     }
 
-    private func assertAccessibilityTraversalOrder(
+    func assertAccessibilityTraversalOrder(
         _ orderedElements: [(XCUIElement, XCUIElement.ElementType)],
         in container: XCUIElement,
         file: StaticString = #filePath,
@@ -287,7 +287,7 @@ final class NeoAnki2MobileUITests: XCTestCase {
         }
     }
 
-    private func open(_ title: String, in app: XCUIApplication) {
+    func open(_ title: String, in app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5), "App navigation unavailable")
         let navigationTitle = title == "Home" ? "NeoAnki2" : title
         let navigationBar = app.navigationBars[navigationTitle]
@@ -314,6 +314,74 @@ final class NeoAnki2MobileUITests: XCTestCase {
         XCTFail("Failed to open \(title) destination")
     }
 
+    @available(iOS 17.0, *)
+    func launchItemTypeStudioAuditApp(section: String? = nil) -> XCUIApplication {
+        XCUIDevice.shared.orientation = .landscapeRight
+        addTeardownBlock {
+            XCUIDevice.shared.orientation = .portrait
+        }
+        var arguments = [
+            "-NeoAnkiUITestingAccessibility",
+            "-NeoAnkiUITestingCardSetupAccessibilityEditor",
+        ]
+        if let section {
+            arguments += [
+                "-NeoAnkiUITestingCardSetupAccessibilitySection",
+                section,
+            ]
+        }
+        return launchApp(
+            additionalArguments: arguments,
+            environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"]
+        )
+    }
+
+    @available(iOS 17.0, *)
+    func assertItemTypeStudioAuditSection(
+        _ section: String,
+        realElementType: XCUIElement.ElementType,
+        realElementLabel: String,
+        description: String
+    ) throws {
+        let app = launchItemTypeStudioAuditApp(section: section)
+        let editor = app.descendants(matching: .any)["cardSetupEditor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 15))
+        let marker = app.descendants(matching: .any)[
+            "cardSetupEditor.auditSection.\(section)"
+        ]
+        let becameVisible = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                // The gated host mounts this marker with the requested real
+                // section before the complete, natively scrolling editor.
+                // Landscape XCTest rotates frames even when rendering is
+                // correct, so the real control is asserted separately.
+                marker.exists
+            },
+            object: marker
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [becameVisible], timeout: 5),
+            .completed,
+            "Audit navigation did not reveal \(description)"
+        )
+        XCTAssertTrue(
+            app.descendants(matching: realElementType)[realElementLabel]
+                .firstMatch.waitForExistence(timeout: 5),
+            "Audit section did not render its real \(description) control"
+        )
+        assertNoHorizontalOverflow(in: editor, viewport: app)
+        for audit: XCUIAccessibilityAuditType in [
+            .contrast,
+            .hitRegion,
+            .sufficientElementDescription,
+        ] {
+            try app.performAccessibilityAudit(for: audit)
+        }
+    }
+}
+
+@MainActor
+final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
     func testTopLevelProductNavigation() throws {
         let app = launchApp()
         for title in ["Home", "Library", "Create", "Settings"] {
@@ -322,7 +390,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars[navigationTitle].waitForExistence(timeout: 3))
         }
     }
+}
 
+@MainActor
+final class MobileDeckUITests: NeoAnki2MobileUITestCase {
     func testDeckCreateRenameAndDeleteJourney() throws {
         let app = launchApp()
         open("Create", in: app)
@@ -354,7 +425,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
             "Deleted deck remained visible"
         )
     }
+}
 
+@MainActor
+final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
     func testCreateBrowseAndStudyBasicCardJourney() throws {
         let app = launchApp()
         open("Create", in: app)
@@ -392,7 +466,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["NeoAnki2"].waitForExistence(timeout: 5))
     }
+}
 
+@MainActor
+final class MobileAuthoringSurfaceUITests: NeoAnki2MobileUITestCase {
     func testAuthoringTransferVocabularyAndSyncConsentSurfaces() throws {
         let app = launchApp()
         open("Create", in: app)
@@ -417,7 +494,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
         cancel.tap()
         XCTAssertTrue(enableSync.waitForExistence(timeout: 3))
     }
+}
 
+@MainActor
+final class MobileStudioAuthoringUITests: NeoAnki2MobileUITestCase {
     func testItemTypeStudioCreatesEditsAndAtomicallySavesCardSetups() throws {
         let app = launchApp()
         openItemTypeStudioCatalog(in: app)
@@ -507,7 +587,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
         let savedTypeAnswer = app.staticTexts["Type Answer"]
         scrollTo(savedTypeAnswer, in: app)
     }
+}
 
+@MainActor
+final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
     func testItemTypeStudioLegacyClozeReadOnlyAndDestructiveConfirmations() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"])
         openItemTypeStudioCatalog(in: app)
@@ -619,7 +702,10 @@ final class NeoAnki2MobileUITests: XCTestCase {
         app.buttons["Discard"].tap()
         XCTAssertTrue(app.navigationBars["Item Types"].waitForExistence(timeout: 5))
     }
+}
 
+@MainActor
+final class MobileStudioValidationUITests: NeoAnki2MobileUITestCase {
     func testItemTypeStudioValidationRoutesToInvalidCardSetupAndFocusesIt() throws {
         let app = launchApp()
         openItemTypeStudioCatalog(in: app)
@@ -648,30 +734,14 @@ final class NeoAnki2MobileUITests: XCTestCase {
             "Validation routed to the Card setup but did not focus its invalid name"
         )
     }
+}
 
+@MainActor
+final class MobileStudioCanvasAccessibilityUITests: NeoAnki2MobileUITestCase {
     @available(iOS 17.0, *)
     func testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow() throws {
-        XCUIDevice.shared.orientation = .landscapeRight
-        defer { XCUIDevice.shared.orientation = .portrait }
-        func launchAuditApp(section: String? = nil) -> XCUIApplication {
-            var arguments = [
-                "-NeoAnkiUITestingAccessibility",
-                "-NeoAnkiUITestingCardSetupAccessibilityEditor",
-            ]
-            if let section {
-                arguments += [
-                    "-NeoAnkiUITestingCardSetupAccessibilitySection",
-                    section,
-                ]
-            }
-            return launchApp(
-                additionalArguments: arguments,
-                environment: ["NEOANKI_TEST_SCENARIO": "item-type-studio"]
-            )
-        }
-
-        var app = launchAuditApp()
-        var editor = app.descendants(matching: .any)["cardSetupEditor"]
+        let app = launchItemTypeStudioAuditApp()
+        let editor = app.descendants(matching: .any)["cardSetupEditor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 15))
         XCTAssertGreaterThan(app.frame.width, app.frame.height)
         XCTAssertGreaterThanOrEqual(editor.frame.minX, app.frame.minX - 1)
@@ -684,82 +754,67 @@ final class NeoAnki2MobileUITests: XCTestCase {
             in: editor
         )
         assertNoHorizontalOverflow(in: editor, viewport: app)
+    }
 
-        func assertSection(
-            _ section: String,
-            realElementType: XCUIElement.ElementType,
-            realElementLabel: String,
-            description: String
-        ) throws {
-            app.terminate()
-            app = launchAuditApp(section: section)
-            editor = app.descendants(matching: .any)["cardSetupEditor"]
-            XCTAssertTrue(editor.waitForExistence(timeout: 15))
-            let marker = app.descendants(matching: .any)[
-                "cardSetupEditor.auditSection.\(section)"
-            ]
-            let becameVisible = XCTNSPredicateExpectation(
-                predicate: NSPredicate { _, _ in
-                    // The gated host mounts this marker with the requested real
-                    // section before the complete, natively scrolling editor.
-                    // Landscape XCTest rotates frames even when rendering is
-                    // correct, so the real control is asserted separately.
-                    marker.exists
-                },
-                object: marker
-            )
-            XCTAssertEqual(
-                XCTWaiter.wait(for: [becameVisible], timeout: 5),
-                .completed,
-                "Audit navigation did not reveal \(description)"
-            )
-            XCTAssertTrue(
-                app.descendants(matching: realElementType)[realElementLabel]
-                    .firstMatch.waitForExistence(timeout: 5),
-                "Audit section did not render its real \(description) control"
-            )
-            assertNoHorizontalOverflow(in: editor, viewport: app)
-            for audit: XCUIAccessibilityAuditType in [
-                .contrast,
-                .hitRegion,
-                .sufficientElementDescription,
-            ] {
-                try app.performAccessibilityAudit(for: audit)
-            }
-        }
-
-        try assertSection(
+    @available(iOS 17.0, *)
+    func testItemTypeStudioPreviewAccessibility() throws {
+        try assertItemTypeStudioAuditSection(
             "preview",
             realElementType: .staticText,
             realElementLabel: "Preview",
             description: "Preview"
         )
-        try assertSection(
+    }
+}
+
+@MainActor
+final class MobileStudioInspectorAccessibilityUITests: NeoAnki2MobileUITestCase {
+    @available(iOS 17.0, *)
+    func testItemTypeStudioAdditionalContentAccessibility() throws {
+        try assertItemTypeStudioAuditSection(
             "additional",
             realElementType: .button,
             realElementLabel: "Edit source, Legacy Notes",
             description: "legacy Additional content"
         )
-        try assertSection(
+    }
+
+    @available(iOS 17.0, *)
+    func testItemTypeStudioAdvancedAccessibility() throws {
+        try assertItemTypeStudioAuditSection(
             "advanced",
             realElementType: .button,
             realElementLabel: "Advanced",
             description: "Advanced"
         )
-        try assertSection(
+    }
+}
+
+@MainActor
+final class MobileStudioAdvancedAccessibilityUITests: NeoAnki2MobileUITestCase {
+    @available(iOS 17.0, *)
+    func testItemTypeStudioAvailabilityAccessibility() throws {
+        try assertItemTypeStudioAuditSection(
             "availability",
             realElementType: .switch,
             realElementLabel: "Availability rule",
             description: "Availability"
         )
-        try assertSection(
+    }
+
+    @available(iOS 17.0, *)
+    func testItemTypeStudioLearningRouteAccessibility() throws {
+        try assertItemTypeStudioAuditSection(
             "learningRoute",
             realElementType: .staticText,
             realElementLabel: "Learning route",
             description: "Learning route"
         )
     }
+}
 
+@MainActor
+final class MobileFirstScreenAccessibilityUITests: NeoAnki2MobileUITestCase {
     @available(iOS 17.0, *)
     func testFirstScreenAccessibilityAudit() throws {
         let app = launchApp()

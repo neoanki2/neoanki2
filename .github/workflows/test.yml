@@ -19,6 +19,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test-plan:
+    name: Validate required UI coverage plan
+    runs-on: ubuntu-latest
+    outputs:
+      macos: ${{ steps.matrix.outputs.macos }}
+      ios: ${{ steps.matrix.outputs.ios }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - id: matrix
+        name: Publish checked UI shards
+        run: |
+          bash -n Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
+            Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh
+          echo "macos=$(bash Scripts/ci-ui-test-plan.sh macos)" >> "$GITHUB_OUTPUT"
+          echo "ios=$(bash Scripts/ci-ui-test-plan.sh ios)" >> "$GITHUB_OUTPUT"
+
   swift-tests:
     name: Swift unit + flow + architecture tests
     runs-on: macos-26
@@ -32,7 +48,9 @@ jobs:
             Scripts/publish-release-candidate.sh \
             Scripts/reconcile-release-workflows.sh Scripts/ship-release.sh \
             Scripts/test-release-workflow-reconciliation.sh \
-            Scripts/watch-release-workflow.sh || failures=1
+            Scripts/watch-release-workflow.sh \
+            Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
+            Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh || failures=1
           bash Scripts/test-release-workflow-reconciliation.sh || failures=1
           bash Scripts/validate-architecture.sh || failures=1
           (cd NeoAnkiCore && swift test --parallel) || failures=1
@@ -109,14 +127,13 @@ jobs:
           retention-days: 2
 
   ios-ui:
-    name: iOS UI + accessibility (${{ matrix.device }})
-    needs: ios-ui-build
+    name: iOS UI (${{ matrix.id }} · ${{ matrix.device }})
+    needs: [test-plan, ios-ui-build]
     runs-on: macos-26
-    timeout-minutes: 35
+    timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        device: [iPhone 17e, iPhone 17 Pro Max, iPad Pro 13-inch (M5)]
+      matrix: ${{ fromJSON(needs.test-plan.outputs.ios) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Download exact-revision UI build
@@ -127,32 +144,63 @@ jobs:
       - name: Run mobile UI journeys
         env:
           DEVICE: ${{ matrix.device }}
+          NEOANKI_IOS_UI_SHARD: ${{ matrix.id }}
+          NEOANKI_IOS_UI_ONLY_TESTING: ${{ matrix.tests }}
+          NEOANKI_IOS_UI_PARALLEL_WORKERS: ${{ matrix.workers }}
         run: bash Scripts/run-ios-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ios-ui-${{ matrix.device }}
+          name: ios-ui-${{ matrix.id }}
           path: .build/ios-ui-results/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
 
-  ui-smoke:
-    name: Fast functional UI journeys
+  macos-ui-build:
+    name: Build macOS UI test bundle
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Build app bundle and run UI tests
-        run: |
-          chmod +x Scripts/build-test-app.sh Scripts/run-ui-tests.sh
-          ./Scripts/run-ui-tests.sh
+      - name: Build once for all functional shards
+        run: bash Scripts/build-macos-ui-tests.sh
+      - name: Upload exact-revision UI build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-ui-build-${{ github.sha }}
+          path: .build/macos-ui-artifact/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 2
+
+  macos-ui:
+    name: macOS UI (${{ matrix.id }})
+    needs: [test-plan, macos-ui-build]
+    runs-on: macos-26
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test-plan.outputs.macos) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Download exact-revision UI build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: macos-ui-build-${{ github.sha }}
+          path: .build/macos-ui-artifact
+      - name: Run functional UI shard
+        env:
+          NEOANKI_UI_SHARD: ${{ matrix.id }}
+          NEOANKI_UI_ONLY_TESTING: ${{ matrix.tests }}
+          NEOANKI_UI_REUSE_BUILD: 1
+        run: bash Scripts/run-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neoanki2-fast-ui-results
+          name: macos-ui-${{ matrix.id }}
           path: .build/ui-results
           if-no-files-found: warn
           retention-days: 7
@@ -164,9 +212,11 @@ jobs:
       - swift-tests
       - shared-platforms
       - ios-build
+      - test-plan
       - ios-ui-build
       - ios-ui
-      - ui-smoke
+      - macos-ui-build
+      - macos-ui
     runs-on: ubuntu-latest
     steps:
       - name: Require every test and build job
@@ -178,7 +228,9 @@ jobs:
             .["swift-tests"].result == "success" and
             .["shared-platforms"].result == "success" and
             .["ios-build"].result == "success" and
+            .["test-plan"].result == "success" and
             .["ios-ui-build"].result == "success" and
             .["ios-ui"].result == "success" and
-            .["ui-smoke"].result == "success"
+            .["macos-ui-build"].result == "success" and
+            .["macos-ui"].result == "success"
           ' >/dev/null

@@ -198,7 +198,6 @@ extension FastFunctionalJourneyTests {
         }
         closeTemplates(in: app)
 
-        try runStudioRepairAndImpactJourneys()
     }
 
     // MARK: Focused activity-filter checks
