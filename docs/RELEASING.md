@@ -87,6 +87,11 @@ Promotion prints complementary `SHIP_*` fields. Preserve these lines when
 auditing a slow or interrupted release; GitHub workflow duration and runner
 consumption are separate measurements because jobs overlap.
 
+When an exact screenshot workflow already ended in a retryable infrastructure
+failure, a resumed transaction starts one new attempt of that same run and
+waits for GitHub to expose it before continuing. Approval-required or otherwise
+unknown conclusions are not retried automatically.
+
 ## Invariants
 
 - `release-candidate.json` is the only source for version, artifact name,

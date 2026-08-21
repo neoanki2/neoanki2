@@ -149,7 +149,8 @@ if [ -z "$PR_NUMBER" ]; then
       "$ROOT/Scripts/publish-release-candidate.sh" \
       "$ROOT/Scripts/reconcile-release-workflows.sh" \
       "$ROOT/Scripts/ship-release.sh" \
-      "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
+      "$ROOT/Scripts/test-release-workflow-reconciliation.sh" \
+      "$ROOT/Scripts/watch-release-workflow.sh"
     (cd "$ROOT" && ./Scripts/test-release-workflow-reconciliation.sh)
     RELEASE_LOCAL_PREFLIGHT_SECONDS="$(($(date +%s) - LOCAL_PREFLIGHT_STARTED_AT))"
 
@@ -278,7 +279,10 @@ if [ "$PR_STATE" = "OPEN" ]; then
       echo "Documentation screenshot capture did not start for $HEAD_SHA." >&2
       exit 1
     fi
-    gh run watch "$SCREENSHOT_RUN_ID" --repo "$REPOSITORY" --exit-status
+    "$ROOT/Scripts/watch-release-workflow.sh" \
+      --repo "$REPOSITORY" \
+      --run "$SCREENSHOT_RUN_ID" \
+      --label "Documentation screenshots"
 
     CAPTURED_HEAD="$HEAD_SHA"
     for _ in $(seq 1 30); do

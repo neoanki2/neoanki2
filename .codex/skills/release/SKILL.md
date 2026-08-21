@@ -60,6 +60,9 @@ After interruption or a corrected check, resume the same transaction:
 
 The command detects and skips completed candidate, merge, publication, tap, and
 installation phases while preserving the full-release default.
+If the exact screenshot run ended in a retryable infrastructure failure, the
+resumed command starts and watches one new attempt. It never retries an
+approval-required run automatically.
 
 ## Guardrails
 

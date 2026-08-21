@@ -30,6 +30,19 @@ case "$1 $2" in
     ;;
   "workflow run")
     ;;
+  "run view")
+    if [ -f "${MOCK_RERUN_MARKER:-/nonexistent}" ]; then
+      printf '2\tin_progress\t\n'
+    else
+      printf '1\tcompleted\t%s\n' "${MOCK_RUN_CONCLUSION:-failure}"
+    fi
+    ;;
+  "run rerun")
+    touch "$MOCK_RERUN_MARKER"
+    ;;
+  "run watch")
+    exit "${MOCK_WATCH_EXIT_STATUS:-0}"
+    ;;
   *)
     echo "Unexpected gh invocation: $*" >&2
     exit 1
@@ -132,5 +145,37 @@ fi
 grep -q 'moved from abc123 to moved456' "$TEST_DIRECTORY/moved.out"
 assert_log_absent '/approve'
 assert_log_absent '^workflow run'
+
+echo "==> Retries a failed exact workflow run before watching it"
+: > "$MOCK_LOG"
+MOCK_RERUN_MARKER="$TEST_DIRECTORY/rerun-started"
+rm -f "$MOCK_RERUN_MARKER"
+export MOCK_RERUN_MARKER MOCK_RUN_CONCLUSION=failure
+PATH="$MOCK_DIRECTORY:$PATH" \
+MOCK_LOG="$MOCK_LOG" \
+RELEASE_WORKFLOW_RERUN_MAX_ATTEMPTS=1 \
+RELEASE_WORKFLOW_RERUN_SLEEP_SECONDS=0 \
+  "$ROOT/Scripts/watch-release-workflow.sh" \
+    --repo neoanki2/neoanki2 --run 123 --label Screenshots >/dev/null
+grep -q '^run rerun 123 --repo neoanki2/neoanki2 --failed$' "$MOCK_LOG"
+grep -q '^run watch 123 --repo neoanki2/neoanki2 --exit-status$' "$MOCK_LOG"
+
+echo "==> Refuses to retry an approval-required workflow run"
+: > "$MOCK_LOG"
+rm -f "$MOCK_RERUN_MARKER"
+export MOCK_RUN_CONCLUSION=action_required
+if PATH="$MOCK_DIRECTORY:$PATH" \
+  MOCK_LOG="$MOCK_LOG" \
+  RELEASE_WORKFLOW_RERUN_MAX_ATTEMPTS=1 \
+  RELEASE_WORKFLOW_RERUN_SLEEP_SECONDS=0 \
+    "$ROOT/Scripts/watch-release-workflow.sh" \
+      --repo neoanki2/neoanki2 --run 124 --label Screenshots \
+      >"$TEST_DIRECTORY/action-required.out" 2>&1; then
+  echo "Expected approval-required workflow retry to fail." >&2
+  exit 1
+fi
+grep -q 'requires approval; refusing an automatic retry' \
+  "$TEST_DIRECTORY/action-required.out"
+assert_log_absent '^run rerun'
 
 echo "Release workflow reconciliation tests passed."

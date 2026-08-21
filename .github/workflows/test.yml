@@ -31,7 +31,8 @@ jobs:
           bash -n Scripts/release.sh Scripts/build-release-candidate.sh \
             Scripts/publish-release-candidate.sh \
             Scripts/reconcile-release-workflows.sh Scripts/ship-release.sh \
-            Scripts/test-release-workflow-reconciliation.sh || failures=1
+            Scripts/test-release-workflow-reconciliation.sh \
+            Scripts/watch-release-workflow.sh || failures=1
           bash Scripts/test-release-workflow-reconciliation.sh || failures=1
           bash Scripts/validate-architecture.sh || failures=1
           (cd NeoAnkiCore && swift test --parallel) || failures=1
