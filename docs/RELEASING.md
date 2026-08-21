@@ -72,6 +72,11 @@ be rerun, resume without repeating completed work:
 ./Scripts/release.sh --pr NUMBER
 ```
 
+If the matching clean local PR branch contains committed corrections after a
+failed gate, resume validates and pushes that ahead-only head before it
+reconciles workflows. A divergent branch is rejected; do not force-push or
+manually recreate release phases.
+
 The command reuses a matching workflow run or draft candidate, waits for
 required checks, reconciles recoverable bot-owned workflow approvals, and skips
 an already completed merge, publication, tap update, or verified installation.

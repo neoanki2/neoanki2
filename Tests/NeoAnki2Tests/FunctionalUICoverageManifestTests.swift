@@ -185,6 +185,18 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         )
     }
 
+    func testReleaseResumePreflightsAheadOnlyLocalCorrections() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Scripts/release.sh"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("run_local_release_preflight"))
+        XCTAssertTrue(source.contains("merge-base --is-ancestor \"$RESUME_REMOTE_HEAD\" \"$LOCAL_HEAD\""))
+        XCTAssertTrue(source.contains("push_release_branch \"$RESUME_BRANCH\""))
+        XCTAssertTrue(source.contains("wait_for_pr_head \"$PR_NUMBER\" \"$LOCAL_HEAD\""))
+    }
+
     func testPortableImportUIWaitUsesStableCompletionSignal() throws {
         let appSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent("Sources/NeoAnki2/ContentView.swift"),
