@@ -72,6 +72,15 @@ summary. When adding coverage, rebalance existing shards before adding another
 macOS job: standard GitHub-hosted plans allow only five concurrent macOS jobs,
 so excess sharding creates queue time instead of faster feedback.
 
+Keep the intrinsic runtime of each required UI shard below five minutes. Use
+stable completion state for async work rather than waiting for transient busy
+indicators, combine accessibility audit kinds into one tree traversal, and use
+short-cadence waits that evaluate the ready state immediately. Put exhaustive
+enum and input combinations in parameterized Swift tests; UI journeys should
+prove that every option is exposed and exercise representative mutations
+through the real control. This preserves behavior coverage without repeating
+the same expensive accessibility snapshots and menu choreography.
+
 ## Documentation checks
 
 ```bash

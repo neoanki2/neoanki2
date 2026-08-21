@@ -1532,32 +1532,25 @@ class NeoAnkiUITestCase: XCTestCase {
         waitForLibrary: Bool = true
     ) -> XCUIApplication {
         var env = environment
+        let completionURL = Self.controlDirectory.appendingPathComponent(
+            "portable-import-\(UUID().uuidString).completed"
+        )
+        defer { try? FileManager.default.removeItem(at: completionURL) }
         env["NEOANKI_TEST_FIXTURE_DIR"] = fixturesDirectory().path
         env["NEOANKI_TEST_PORTABLE_IMPORT_PATH"] = url.path
+        env["NEOANKI_TEST_PORTABLE_IMPORT_COMPLETION_PATH"] = completionURL.path
         let app = launchApp(
             databaseLabel: databaseLabel,
             scenario: scenario,
             environment: env,
             waitForLibrary: waitForLibrary
         )
-        let deadline = Date().addingTimeInterval(30)
-        var sawBusy = false
-        while Date() < deadline {
-            if app.buttons.identified("portableDeckConflictUseLocal").exists {
-                return app
-            }
-            let busy = app.descendants(matching: .any)["portableDeckTransferBusy"]
-            if busy.exists {
-                sawBusy = true
-            } else if sawBusy && libraryIsReady(in: app) {
-                return app
-            }
-            let noticeAction = app.buttons["action-button-1"]
-            if noticeAction.exists, noticeAction.isHittable {
-                return app
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        }
+        XCTAssertTrue(
+            waitUntil(timeout: 30) {
+                FileManager.default.fileExists(atPath: completionURL.path)
+            },
+            "Portable import did not report completion within 30 seconds"
+        )
         return app
     }
 
@@ -1756,8 +1749,12 @@ class NeoAnkiUITestCase: XCTestCase {
     }
 
     @discardableResult
-    func dismissPortableDeckNoticeIfPresent(titled title: String, in app: XCUIApplication) -> Bool {
-        let deadline = Date().addingTimeInterval(15)
+    func dismissPortableDeckNoticeIfPresent(
+        titled title: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let ok = app.buttons["action-button-1"]
             if ok.exists && ok.isHittable {

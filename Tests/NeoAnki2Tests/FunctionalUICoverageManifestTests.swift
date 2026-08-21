@@ -155,6 +155,53 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         }
     }
 
+    func testMobileUIHelpersAvoidKnownIntrinsicSlowPaths() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            source.contains(".waitForExistence(timeout:"),
+            "Use the immediate, short-cadence waitUntilExists helper"
+        )
+        XCTAssertFalse(
+            source.contains(".waitForNonExistence(timeout:"),
+            "Use the immediate, short-cadence waitUntilGone helper"
+        )
+        XCTAssertFalse(
+            source.contains("velocity: .slow"),
+            "Slow XCTest gestures add seconds of idle animation per journey"
+        )
+        XCTAssertFalse(
+            source.contains("for audit: XCUIAccessibilityAuditType"),
+            "Pass audit kinds together so XCTest traverses the element tree once"
+        )
+    }
+
+    func testPortableImportUIWaitUsesStableCompletionSignal() throws {
+        let appSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Sources/NeoAnki2/ContentView.swift"),
+            encoding: .utf8
+        )
+        let helperSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "UITests/NeoAnki2UITests/UITestHelpers.swift"
+            ),
+            encoding: .utf8
+        )
+        let marker = "NEOANKI_TEST_PORTABLE_IMPORT_COMPLETION_PATH"
+
+        XCTAssertTrue(appSource.contains(marker), "The app must acknowledge actual async import completion")
+        XCTAssertTrue(helperSource.contains(marker), "The UI test must wait on the stable completion marker")
+        XCTAssertTrue(
+            helperSource.contains("timeout: TimeInterval = 2"),
+            "An optional notice must not add a long timeout after import completion"
+        )
+    }
+
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
