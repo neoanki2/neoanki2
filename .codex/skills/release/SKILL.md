@@ -44,8 +44,8 @@ isolated macOS CI and commit it to the pull-request branch. The command starts
 or reconciles required checks for that promoted revision, including known bot-owned
 `action_required` runs or dispatches missing exact-head fallbacks. Candidate
 packaging must use the resulting PR head and starts only after documentation
-and the fast macOS UI journey pass. Stale screenshots have no release deferral
-or bypass.
+and every required macOS UI shard passes. Stale screenshots have no release
+deferral or bypass.
 
 Allow the command to wait for CI. Send compact progress updates when waiting;
 do not replace the wait with repeated manual GitHub operations.
@@ -59,7 +59,10 @@ After interruption or a corrected check, resume the same transaction:
 ```
 
 The command detects and skips completed candidate, merge, publication, tap, and
-installation phases while preserving the full-release default.
+installation phases while preserving the full-release default. When the clean
+local branch is the PR branch and contains committed ahead-only corrections,
+resume reruns local preflight, pushes that head, and waits for the PR to expose
+it before reconciling workflows. It refuses divergent local history.
 If the exact screenshot run ended in a retryable infrastructure failure, the
 resumed command starts and watches one new attempt. It never retries an
 approval-required run automatically.

@@ -32,6 +32,8 @@ report_release_telemetry() {
   exit "$exit_status"
 }
 trap report_release_telemetry EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 usage() {
   cat >&2 <<'EOF'
@@ -90,6 +92,51 @@ gh auth status >/dev/null
 
 REPOSITORY="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 
+run_local_release_preflight() {
+  RELEASE_PHASE="local-preflight"
+  local started_at
+  started_at="$(date +%s)"
+  echo "Running local release preflight..."
+  (cd "$ROOT" && swift build)
+  (cd "$ROOT" && ./Scripts/test-fast.sh)
+  bash -n "$ROOT/Scripts/release.sh" \
+    "$ROOT/Scripts/build-release-candidate.sh" \
+    "$ROOT/Scripts/publish-release-candidate.sh" \
+    "$ROOT/Scripts/reconcile-release-workflows.sh" \
+    "$ROOT/Scripts/ship-release.sh" \
+    "$ROOT/Scripts/test-release-workflow-reconciliation.sh" \
+    "$ROOT/Scripts/watch-release-workflow.sh"
+  (cd "$ROOT" && ./Scripts/test-release-workflow-reconciliation.sh)
+  RELEASE_LOCAL_PREFLIGHT_SECONDS="$(($(date +%s) - started_at))"
+}
+
+push_release_branch() {
+  local branch="$1"
+  echo "Pushing $branch with GitHub CLI credentials..."
+  git -C "$ROOT" \
+    -c credential.helper= \
+    -c 'credential.helper=!gh auth git-credential' \
+    push "https://github.com/$REPOSITORY.git" \
+    "HEAD:refs/heads/$branch"
+}
+
+wait_for_pr_head() {
+  local pr_number="$1"
+  local expected_head="$2"
+  local remote_pr_head=""
+  for _ in $(seq 1 30); do
+    remote_pr_head="$(gh pr view "$pr_number" --repo "$REPOSITORY" \
+      --json headRefOid --jq .headRefOid)"
+    if [ "$remote_pr_head" = "$expected_head" ]; then
+      return 0
+    fi
+    echo "Waiting for PR #$pr_number to expose pushed head $expected_head..."
+    sleep 1
+  done
+  echo "PR #$pr_number did not converge to pushed head $expected_head." >&2
+  return 1
+}
+
 if [ -z "$PR_NUMBER" ]; then
   BRANCH="$(git -C "$ROOT" branch --show-current)"
   HEAD_SHA="$(git -C "$ROOT" rev-parse HEAD)"
@@ -139,30 +186,11 @@ if [ -z "$PR_NUMBER" ]; then
   fi
 
   if [ "$NEEDS_PUSH" -eq 1 ] || [ -z "$EXISTING_PR_NUMBER" ]; then
-    RELEASE_PHASE="local-preflight"
-    LOCAL_PREFLIGHT_STARTED_AT="$(date +%s)"
-    echo "Running local release preflight..."
-    (cd "$ROOT" && swift build)
-    (cd "$ROOT" && ./Scripts/test-fast.sh)
-    bash -n "$ROOT/Scripts/release.sh" \
-      "$ROOT/Scripts/build-release-candidate.sh" \
-      "$ROOT/Scripts/publish-release-candidate.sh" \
-      "$ROOT/Scripts/reconcile-release-workflows.sh" \
-      "$ROOT/Scripts/ship-release.sh" \
-      "$ROOT/Scripts/test-release-workflow-reconciliation.sh" \
-      "$ROOT/Scripts/watch-release-workflow.sh"
-    (cd "$ROOT" && ./Scripts/test-release-workflow-reconciliation.sh)
-    RELEASE_LOCAL_PREFLIGHT_SECONDS="$(($(date +%s) - LOCAL_PREFLIGHT_STARTED_AT))"
-
+    run_local_release_preflight
   fi
 
   if [ "$NEEDS_PUSH" -eq 1 ]; then
-    echo "Pushing $BRANCH with GitHub CLI credentials..."
-    git -C "$ROOT" \
-      -c credential.helper= \
-      -c 'credential.helper=!gh auth git-credential' \
-      push "https://github.com/$REPOSITORY.git" \
-      "HEAD:refs/heads/$BRANCH"
+    push_release_branch "$BRANCH"
   else
     echo "Remote branch already matches HEAD; skipping push."
   fi
@@ -174,20 +202,41 @@ if [ -z "$PR_NUMBER" ]; then
     PR_NUMBER="$(gh pr view "$PR_URL" --repo "$REPOSITORY" --json number --jq .number)"
   fi
 
-  PR_HEAD_MATCHES=0
-  for _ in $(seq 1 30); do
-    REMOTE_PR_HEAD="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
-      --json headRefOid --jq .headRefOid)"
-    if [ "$REMOTE_PR_HEAD" = "$HEAD_SHA" ]; then
-      PR_HEAD_MATCHES=1
-      break
+  wait_for_pr_head "$PR_NUMBER" "$HEAD_SHA"
+else
+  RESUME_PR_JSON="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
+    --json state,headRefOid,headRefName)"
+  RESUME_PR_STATE="$(jq -r .state <<<"$RESUME_PR_JSON")"
+  RESUME_REMOTE_HEAD="$(jq -r .headRefOid <<<"$RESUME_PR_JSON")"
+  RESUME_BRANCH="$(jq -r .headRefName <<<"$RESUME_PR_JSON")"
+  LOCAL_BRANCH="$(git -C "$ROOT" branch --show-current)"
+
+  if [ "$RESUME_PR_STATE" = "OPEN" ] && [ "$LOCAL_BRANCH" = "$RESUME_BRANCH" ]; then
+    if [ -n "$(git -C "$ROOT" status --porcelain=v1)" ]; then
+      echo "The worktree must be clean before resuming from its local PR branch." >&2
+      exit 1
     fi
-    echo "Waiting for PR #$PR_NUMBER to expose pushed head $HEAD_SHA..."
-    sleep 1
-  done
-  if [ "$PR_HEAD_MATCHES" -ne 1 ]; then
-    echo "PR #$PR_NUMBER did not converge to pushed head $HEAD_SHA." >&2
-    exit 1
+    LOCAL_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
+    if [ "$LOCAL_HEAD" != "$RESUME_REMOTE_HEAD" ]; then
+      git -C "$ROOT" \
+        -c credential.helper= \
+        -c 'credential.helper=!gh auth git-credential' \
+        fetch --quiet "https://github.com/$REPOSITORY.git" "$RESUME_REMOTE_HEAD"
+      if [ "$(git -C "$ROOT" rev-parse FETCH_HEAD)" != "$RESUME_REMOTE_HEAD" ]; then
+        echo "Fetched PR head does not match GitHub's current revision." >&2
+        exit 1
+      fi
+      if ! git -C "$ROOT" merge-base --is-ancestor "$RESUME_REMOTE_HEAD" "$LOCAL_HEAD"; then
+        echo "Local $RESUME_BRANCH diverged from PR #$PR_NUMBER; refusing to overwrite it." >&2
+        exit 1
+      fi
+      echo "PR #$PR_NUMBER has committed local corrections through $LOCAL_HEAD."
+      run_local_release_preflight
+      push_release_branch "$RESUME_BRANCH"
+      wait_for_pr_head "$PR_NUMBER" "$LOCAL_HEAD"
+    else
+      echo "Local PR branch already matches the remote head; resuming without a push."
+    fi
   fi
 fi
 
@@ -202,7 +251,11 @@ wait_for_candidate_checks() {
   local check_runs_json current_head context state missing pending
   local contexts=(
     "Documentation and screenshot gate"
-    "Fast functional UI journeys"
+    "macOS UI (library-launch)"
+    "macOS UI (decks-study)"
+    "macOS UI (transfer-vocabulary)"
+    "macOS UI (studio-authoring)"
+    "macOS UI (studio-boundaries)"
   )
 
   echo "Waiting for documentation and fast UI checks before candidate packaging..."

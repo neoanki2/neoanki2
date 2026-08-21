@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "macos": [
+    {
+      "id": "library-launch",
+      "tests": [
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testLibraryAndBrowseJourney",
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testLaunchGatingAndAccessibilityJourney"
+      ]
+    },
+    {
+      "id": "decks-study",
+      "tests": [
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testDecksAndAuthoringJourney",
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testStudyAndSchedulingJourney"
+      ]
+    },
+    {
+      "id": "transfer-vocabulary",
+      "tests": [
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testImportAndPortableTransferJourney",
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testVocabularyJourney"
+      ]
+    },
+    {
+      "id": "studio-authoring",
+      "tests": [
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testTemplatesAndItemTypesJourney"
+      ]
+    },
+    {
+      "id": "studio-boundaries",
+      "tests": [
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testTemplatesAndItemTypesRepairAndImpact",
+        "NeoAnki2UITests/FastFunctionalJourneyTests/testTemplatesAndItemTypesSafeguards"
+      ]
+    }
+  ],
+  "ios": [
+    {
+      "id": "phone-navigation-deck",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileNavigationUITests/testTopLevelProductNavigation",
+        "NeoAnki2MobileUITests/MobileDeckUITests/testDeckCreateRenameAndDeleteJourney"
+      ]
+    },
+    {
+      "id": "phone-card-authoring",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileCardJourneyUITests/testCreateBrowseAndStudyBasicCardJourney",
+        "NeoAnki2MobileUITests/MobileAuthoringSurfaceUITests/testAuthoringTransferVocabularyAndSyncConsentSurfaces"
+      ]
+    },
+    {
+      "id": "phone-studio-authoring",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioAuthoringUITests/testItemTypeStudioCreatesEditsAndAtomicallySavesCardSetups"
+      ]
+    },
+    {
+      "id": "phone-studio-boundaries",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioLegacyUITests/testItemTypeStudioLegacyClozeReadOnlyAndDestructiveConfirmations",
+        "NeoAnki2MobileUITests/MobileStudioValidationUITests/testItemTypeStudioValidationRoutesToInvalidCardSetupAndFocusesIt"
+      ]
+    },
+    {
+      "id": "compact-canvas",
+      "device": "iPhone 17e",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow",
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility"
+      ]
+    },
+    {
+      "id": "compact-inspector",
+      "device": "iPhone 17e",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioInspectorAccessibilityUITests/testItemTypeStudioAdditionalContentAccessibility",
+        "NeoAnki2MobileUITests/MobileStudioInspectorAccessibilityUITests/testItemTypeStudioAdvancedAccessibility"
+      ]
+    },
+    {
+      "id": "compact-advanced",
+      "device": "iPhone 17e",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioAdvancedAccessibilityUITests/testItemTypeStudioAvailabilityAccessibility",
+        "NeoAnki2MobileUITests/MobileStudioAdvancedAccessibilityUITests/testItemTypeStudioLearningRouteAccessibility"
+      ]
+    },
+    {
+      "id": "compact-first-screen",
+      "device": "iPhone 17e",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileFirstScreenAccessibilityUITests/testFirstScreenAccessibilityAudit",
+        "NeoAnki2MobileUITests/MobileFirstScreenAccessibilityUITests/testLargestTypeDarkHighContrastReducedMotionInLandscape"
+      ]
+    },
+    {
+      "id": "tablet-canvas",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow",
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility"
+      ]
+    },
+    {
+      "id": "tablet-inspector",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioInspectorAccessibilityUITests/testItemTypeStudioAdditionalContentAccessibility",
+        "NeoAnki2MobileUITests/MobileStudioInspectorAccessibilityUITests/testItemTypeStudioAdvancedAccessibility"
+      ]
+    },
+    {
+      "id": "tablet-advanced",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudioAdvancedAccessibilityUITests/testItemTypeStudioAvailabilityAccessibility",
+        "NeoAnki2MobileUITests/MobileStudioAdvancedAccessibilityUITests/testItemTypeStudioLearningRouteAccessibility"
+      ]
+    },
+    {
+      "id": "tablet-first-screen",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileFirstScreenAccessibilityUITests/testFirstScreenAccessibilityAudit",
+        "NeoAnki2MobileUITests/MobileFirstScreenAccessibilityUITests/testLargestTypeDarkHighContrastReducedMotionInLandscape"
+      ]
+    }
+  ]
+}

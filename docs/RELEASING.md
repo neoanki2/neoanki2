@@ -72,6 +72,15 @@ be rerun, resume without repeating completed work:
 ./Scripts/release.sh --pr NUMBER
 ```
 
+If the matching clean local PR branch contains committed corrections after a
+failed gate, resume validates and pushes that ahead-only head before it
+reconciles workflows. A divergent branch is rejected; do not force-push or
+manually recreate release phases.
+
+Candidate packaging begins only after documentation and all five checked
+macOS UI shards pass. It can then overlap the longer iOS matrix. An interrupted
+transaction reports failure telemetry and is resumed with the same command.
+
 The command reuses a matching workflow run or draft candidate, waits for
 required checks, reconciles recoverable bot-owned workflow approvals, and skips
 an already completed merge, publication, tap update, or verified installation.

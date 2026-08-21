@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEVICE="${DEVICE:?DEVICE must name the required simulator device type}"
+SHARD_ID="${NEOANKI_IOS_UI_SHARD:-all}"
+PARALLEL_WORKERS="${NEOANKI_IOS_UI_PARALLEL_WORKERS:-1}"
 ARTIFACT_DIR="$ROOT/.build/ios-ui-artifact"
 DERIVED_DATA="$ROOT/.build/ios-ui-derived-data"
 RESULT_ROOT="$ROOT/.build/ios-ui-results"
@@ -22,6 +24,22 @@ cleanup_simulators() {
   done < "$SIMULATOR_IDS_FILE"
 }
 trap cleanup_simulators EXIT
+
+if [[ ! "$PARALLEL_WORKERS" =~ ^[1-4]$ ]]; then
+  echo "NEOANKI_IOS_UI_PARALLEL_WORKERS must be an integer from 1 through 4." >&2
+  exit 64
+fi
+
+TEST_ARGUMENTS=()
+EXPECTED_TESTS=0
+if [[ -n "${NEOANKI_IOS_UI_ONLY_TESTING:-}" ]]; then
+  IFS=',' read -r -a only_tests <<< "$NEOANKI_IOS_UI_ONLY_TESTING"
+  for test_identifier in "${only_tests[@]}"; do
+    [[ -n "$test_identifier" ]] || continue
+    TEST_ARGUMENTS+=("-only-testing:$test_identifier")
+    EXPECTED_TESTS=$((EXPECTED_TESTS + 1))
+  done
+fi
 
 for required in "$ARCHIVE" "$METADATA"; do
   if [[ ! -f "$required" ]]; then
@@ -112,14 +130,29 @@ while [[ $attempt -le 2 ]]; do
 
   test_started=$SECONDS
   set +e
-  xcodebuild test-without-building \
-    -quiet \
-    -xctestrun "$XCTESTRUN" \
-    -destination "platform=iOS Simulator,id=$simulator_id" \
-    -resultBundlePath "$result_bundle" \
-    -parallel-testing-enabled NO \
-    CODE_SIGNING_ALLOWED=NO \
-    2>&1 | tee "$raw_log"
+  test_command=(
+    xcodebuild test-without-building
+    -quiet
+    -xctestrun "$XCTESTRUN"
+    -destination "platform=iOS Simulator,id=$simulator_id"
+    -resultBundlePath "$result_bundle"
+    CODE_SIGNING_ALLOWED=NO
+  )
+  if [[ "$PARALLEL_WORKERS" -eq 1 ]]; then
+    # Disabling parallel mode avoids XCTest's cloned-simulator provisioning
+    # path. A one-worker clone adds minutes and still competes for AX services
+    # without providing any concurrency.
+    test_command+=( -parallel-testing-enabled NO )
+  else
+    test_command+=(
+      -parallel-testing-enabled YES
+      -maximum-parallel-testing-workers "$PARALLEL_WORKERS"
+    )
+  fi
+  if [[ ${#TEST_ARGUMENTS[@]} -gt 0 ]]; then
+    test_command+=("${TEST_ARGUMENTS[@]}")
+  fi
+  "${test_command[@]}" 2>&1 | tee "$raw_log"
   status=${PIPESTATUS[0]}
   set -e
   test_seconds=$((SECONDS - test_started))
@@ -137,13 +170,15 @@ while [[ $attempt -le 2 ]]; do
     printf 'result=unknown tests=unknown\n' > "$text_summary"
   fi
 
-  echo "iOS UI timing: device=$DEVICE attempt=$attempt test=${test_seconds}s total_tests=$total_tests"
+  echo "iOS UI timing: shard=$SHARD_ID device=$DEVICE workers=$PARALLEL_WORKERS attempt=$attempt test=${test_seconds}s total_tests=$total_tests"
   cat "$text_summary"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     {
-      echo "### iOS UI — $DEVICE — attempt $attempt"
+      echo "### iOS UI — $SHARD_ID — $DEVICE — attempt $attempt"
       echo
       echo "- Test runtime: ${test_seconds}s"
+      echo "- Maximum parallel workers: $PARALLEL_WORKERS"
+      echo "- Provisioning and test time: $((SECONDS - TOTAL_STARTED))s"
       echo "- Tests recorded: $total_tests"
       echo '```text'
       cat "$text_summary"
@@ -154,8 +189,12 @@ while [[ $attempt -le 2 ]]; do
   xcrun simctl shutdown "$simulator_id" >/dev/null 2>&1 || true
   xcrun simctl delete "$simulator_id" >/dev/null 2>&1 || true
 
+  if [[ $status -eq 0 && $EXPECTED_TESTS -gt 0 && "$total_tests" != "$EXPECTED_TESTS" ]]; then
+    echo "Expected $EXPECTED_TESTS selected iOS UI tests, but XCTest recorded $total_tests." >&2
+    status=1
+  fi
   if [[ $status -eq 0 ]]; then
-    echo "iOS UI total timing: device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
+    echo "iOS UI total timing: shard=$SHARD_ID device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
     exit 0
   fi
   if [[ $attempt -eq 1 && "$total_tests" == "0" ]]; then

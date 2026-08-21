@@ -9,7 +9,8 @@ import Testing
         .appendingPathComponent(".build/debug/NeoAnki2")
 
     guard FileManager.default.fileExists(atPath: buildRoot.path) else {
-        // App binary is built during CI before this test runs in ui-smoke job.
+        // Callers that want this process smoke test build the app first; the
+        // required UI jobs exercise the same binary launch on isolated runners.
         return
     }
 

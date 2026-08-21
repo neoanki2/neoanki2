@@ -21,6 +21,10 @@ policy tests, architecture-boundary checks, Spotlight-safe Xcode path checks,
 release-workflow reconciliation tests, the generated API-reference check, and
 documentation validation.
 
+The fast headless lane is designed to finish inside five minutes on a fresh CI
+runner. The complete protected gate also includes real UI automation and has a
+larger latency budget; it must not be represented as a sub-five-minute check.
+
 ## Focused suites
 
 ```bash
@@ -46,6 +50,40 @@ journeys before the first push:
 
 If local UI automation is unavailable, stop before release rather than using
 remote CI as the first functional UI pass.
+
+## Required CI UI plan
+
+`Config/ci-ui-shards.json` is the executable source of truth for required UI
+coverage. macOS builds the app and test runner once, then runs five balanced
+functional shards from that exact-revision artifact. iOS also builds once:
+behavioral journeys run on the representative large phone, while the complete
+accessibility and responsive-layout matrix runs on both the compact phone and
+iPad. Small iOS shards run concurrently on separate hosted runners, with one
+simulator per shard. Do not use parallel simulator clones inside a job: they
+compete for Accessibility and can turn fast assertions into AX IPC timeouts or
+test-runner bootstrap crashes.
+
+`FunctionalUICoverageManifestTests` compares the manifest with every declared
+macOS and iOS UI test method. Removing, renaming, or failing to schedule a test
+therefore fails the fast test lane. Accessibility tests must remain assigned to
+both compact and regular-width devices. Assertion failures are not retried;
+the mobile runner retries only when XCTest records that no test started.
+
+Each shared build and UI shard writes its elapsed time to the Actions step
+summary. When adding coverage, rebalance existing shards before adding another
+macOS job: standard GitHub-hosted plans allow only five concurrent macOS jobs,
+so excess sharding creates queue time instead of faster feedback.
+
+Keep the intrinsic runtime of each required UI shard below five minutes. Split
+long iOS groups before adding in-process simulator workers; CI-level isolation
+is both faster and more reliable for Accessibility-heavy journeys. Use
+stable completion state for async work rather than waiting for transient busy
+indicators, combine accessibility audit kinds into one tree traversal, and use
+short-cadence waits that evaluate the ready state immediately. Put exhaustive
+enum and input combinations in parameterized Swift tests; UI journeys should
+prove that every option is exposed and exercise representative mutations
+through the real control. This preserves behavior coverage without repeating
+the same expensive accessibility snapshots and menu choreography.
 
 ## Documentation checks
 

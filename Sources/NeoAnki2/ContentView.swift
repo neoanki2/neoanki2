@@ -779,6 +779,19 @@ struct ContentView: View {
         }
 
         if let portablePath = environment["NEOANKI_TEST_PORTABLE_IMPORT_PATH"], !portablePath.isEmpty {
+            defer {
+                if let completionPath = environment[
+                    "NEOANKI_TEST_PORTABLE_IMPORT_COMPLETION_PATH"
+                ] {
+                    // AX snapshots can starve the main-thread state update that
+                    // follows a fast import. A file acknowledgement lets the UI
+                    // test wait for the real async boundary without querying AX.
+                    _ = FileManager.default.createFile(
+                        atPath: completionPath,
+                        contents: Data()
+                    )
+                }
+            }
             let source = URL(fileURLWithPath: portablePath)
             guard let accessible = copyTestingTransferFile(source) else { return }
             if let imported = await portableDeckTransfer.importDeck(from: accessible) {

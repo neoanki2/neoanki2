@@ -75,7 +75,6 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
     func testTemplatesAndItemTypesJourney() throws {
         if !hasActivityFilters {
             try runSharedTemplatesAndItemTypesJourney()
-            try runProtectedItemTypeSafeguardJourneys()
             return
         }
 
@@ -102,6 +101,18 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
         try runLegacyCheck("TemplatesAdvancedUITests.testDeleteTemplateCancel") { try checkTemplatesAdvancedUITestsDeleteTemplateCancel() }
         try runLegacyCheck("TemplatesAdvancedUITests.testCannotDeleteItemTypeWithItems") { try checkTemplatesAdvancedUITestsCannotDeleteItemTypeWithItems() }
         try runLegacyCheck("TemplatesAdvancedUITests.testTemplatesKeyboardShortcut") { try checkTemplatesAdvancedUITestsTemplatesKeyboardShortcut() }
+    }
+
+    /// Independent processes keep the longest Studio coverage below one CI
+    /// shard while preserving the same protected repository scenarios.
+    func testTemplatesAndItemTypesRepairAndImpact() throws {
+        guard !hasActivityFilters else { return }
+        try runStudioRepairAndImpactJourneys()
+    }
+
+    func testTemplatesAndItemTypesSafeguards() throws {
+        guard !hasActivityFilters else { return }
+        try runProtectedItemTypeSafeguardJourneys()
     }
 
     func testStudyAndSchedulingJourney() throws {

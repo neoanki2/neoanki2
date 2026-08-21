@@ -2,6 +2,30 @@ import Foundation
 import XCTest
 
 final class FunctionalUICoverageManifestTests: XCTestCase {
+    private struct CIUIPlan: Decodable {
+        let schemaVersion: Int
+        let macos: [MacShard]
+        let ios: [IOSShard]
+
+        enum CodingKeys: String, CodingKey {
+            case schemaVersion = "schema_version"
+            case macos
+            case ios
+        }
+    }
+
+    private struct MacShard: Decodable {
+        let id: String
+        let tests: [String]
+    }
+
+    private struct IOSShard: Decodable {
+        let id: String
+        let device: String
+        let workers: Int
+        let tests: [String]
+    }
+
     private let functionalSuites = [
         "ScopeHomeAndBrowseUITests",
         "LibraryUITests",
@@ -17,10 +41,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
     ]
 
     func testEveryLegacyUICheckIsMappedExactlyOnce() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        let root = repositoryRoot
         let uiTests = root.appendingPathComponent("UITests/NeoAnki2UITests", isDirectory: true)
         let journeySource = try String(
             contentsOf: uiTests.appendingPathComponent("FastFunctionalJourneyTests.swift"),
@@ -58,6 +79,173 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         XCTAssertEqual(Set(journeys).count, 7)
     }
 
+    func testRequiredCIShardsCoverEveryUITestWithoutBehaviorDuplication() throws {
+        let decoder = JSONDecoder()
+        let plan = try decoder.decode(
+            CIUIPlan.self,
+            from: Data(contentsOf: repositoryRoot.appendingPathComponent("Config/ci-ui-shards.json"))
+        )
+        XCTAssertEqual(plan.schemaVersion, 1)
+        XCTAssertEqual(plan.macos.count, 5)
+        XCTAssertEqual(plan.ios.count, 12)
+
+        let macSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "UITests/NeoAnki2UITests/FastFunctionalJourneyTests.swift"
+            ),
+            encoding: .utf8
+        )
+        let declaredMacTests = Set(captures(
+            pattern: #"func (test[A-Za-z0-9_]+)\(\) throws"#,
+            in: macSource
+        ))
+        let plannedMacTests = plan.macos.flatMap(\.tests).map {
+            $0.replacingOccurrences(
+                of: "NeoAnki2UITests/FastFunctionalJourneyTests/",
+                with: ""
+            )
+        }
+        XCTAssertEqual(Set(plannedMacTests), declaredMacTests)
+        XCTAssertEqual(plannedMacTests.count, Set(plannedMacTests).count)
+        XCTAssertEqual(Set(plan.macos.map(\.id)).count, plan.macos.count)
+
+        let iosSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"
+            ),
+            encoding: .utf8
+        )
+        let declaredIOSTests = Set(captures(
+            pattern: #"func (test[A-Za-z0-9_]+)\(\) throws"#,
+            in: iosSource
+        ))
+        let declaredIOSIdentifiers = Set(iosTestMethodsByClass(in: iosSource).flatMap {
+            testClass, methods in
+            methods.map { "NeoAnki2MobileUITests/\(testClass)/\($0)" }
+        })
+        let plannedIOSIdentifiers = Set(plan.ios.flatMap(\.tests))
+        XCTAssertEqual(plannedIOSIdentifiers, declaredIOSIdentifiers)
+        let plannedIOS = plan.ios.flatMap { shard in
+            shard.tests.map {
+                (
+                    test: String($0.split(separator: "/").last ?? ""),
+                    device: shard.device
+                )
+            }
+        }
+        XCTAssertEqual(Set(plannedIOS.map(\.test)), declaredIOSTests)
+        XCTAssertTrue(plan.ios.allSatisfy { (1...4).contains($0.workers) })
+        XCTAssertTrue(
+            plan.ios.allSatisfy { $0.workers == 1 },
+            "Each iOS shard must own one simulator; parallel clones contend for Accessibility"
+        )
+        XCTAssertEqual(Set(plan.ios.map(\.id)).count, plan.ios.count)
+
+        let crossFormFactorTests = declaredIOSTests.filter {
+            $0.contains("Accessibility")
+                || $0 == "testLargestTypeDarkHighContrastReducedMotionInLandscape"
+        }
+        for test in declaredIOSTests {
+            let assignments = plannedIOS.filter { $0.test == test }
+            if crossFormFactorTests.contains(test) {
+                XCTAssertEqual(
+                    Set(assignments.map(\.device)),
+                    ["iPhone 17e", "iPad Pro 13-inch (M5)"],
+                    "\(test) must cover both compact and regular-width layouts"
+                )
+            } else {
+                XCTAssertEqual(assignments.map(\.device), ["iPhone 17 Pro Max"])
+            }
+        }
+    }
+
+    func testMobileUIHelpersAvoidKnownIntrinsicSlowPaths() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(
+            source.contains(".waitForExistence(timeout:"),
+            "Use the immediate, short-cadence waitUntilExists helper"
+        )
+        XCTAssertFalse(
+            source.contains(".waitForNonExistence(timeout:"),
+            "Use the immediate, short-cadence waitUntilGone helper"
+        )
+        XCTAssertFalse(
+            source.contains("velocity: .slow"),
+            "Slow XCTest gestures add seconds of idle animation per journey"
+        )
+        XCTAssertFalse(
+            source.contains("for audit: XCUIAccessibilityAuditType"),
+            "Pass audit kinds together so XCTest traverses the element tree once"
+        )
+
+        let runner = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Scripts/run-ios-ui-tests.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(runner.contains("if [[ \"$PARALLEL_WORKERS\" -eq 1 ]]"))
+        XCTAssertTrue(runner.contains("test_command+=( -parallel-testing-enabled NO )"))
+    }
+
+    func testReleaseResumePreflightsAheadOnlyLocalCorrections() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Scripts/release.sh"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("run_local_release_preflight"))
+        XCTAssertTrue(source.contains("merge-base --is-ancestor \"$RESUME_REMOTE_HEAD\" \"$LOCAL_HEAD\""))
+        XCTAssertTrue(source.contains("push_release_branch \"$RESUME_BRANCH\""))
+        XCTAssertTrue(source.contains("wait_for_pr_head \"$PR_NUMBER\" \"$LOCAL_HEAD\""))
+        for shard in [
+            "library-launch",
+            "decks-study",
+            "transfer-vocabulary",
+            "studio-authoring",
+            "studio-boundaries",
+        ] {
+            XCTAssertTrue(
+                source.contains("macOS UI (\(shard))"),
+                "Candidate gate must follow every checked macOS UI shard"
+            )
+        }
+        XCTAssertTrue(source.contains("trap 'exit 130' INT"))
+        XCTAssertTrue(source.contains("trap 'exit 143' TERM"))
+    }
+
+    func testPortableImportUIWaitUsesStableCompletionSignal() throws {
+        let appSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Sources/NeoAnki2/ContentView.swift"),
+            encoding: .utf8
+        )
+        let helperSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "UITests/NeoAnki2UITests/UITestHelpers.swift"
+            ),
+            encoding: .utf8
+        )
+        let marker = "NEOANKI_TEST_PORTABLE_IMPORT_COMPLETION_PATH"
+
+        XCTAssertTrue(appSource.contains(marker), "The app must acknowledge actual async import completion")
+        XCTAssertTrue(helperSource.contains(marker), "The UI test must wait on the stable completion marker")
+        XCTAssertTrue(
+            helperSource.contains("timeout: TimeInterval = 2"),
+            "An optional notice must not add a long timeout after import completion"
+        )
+    }
+
+    private var repositoryRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
     private func captures(pattern: String, in source: String) -> [String] {
         let expression = try! NSRegularExpression(pattern: pattern)
         let range = NSRange(source.startIndex..., in: source)
@@ -65,5 +253,31 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             guard let capture = Range(match.range(at: 1), in: source) else { return nil }
             return String(source[capture])
         }
+    }
+
+    private func iosTestMethodsByClass(in source: String) -> [String: [String]] {
+        let expression = try! NSRegularExpression(
+            pattern: #"final class ([A-Za-z0-9_]+): NeoAnki2MobileUITestCase"#
+        )
+        let sourceRange = NSRange(source.startIndex..., in: source)
+        let matches = expression.matches(in: source, range: sourceRange)
+        var result: [String: [String]] = [:]
+        for (index, match) in matches.enumerated() {
+            guard let nameRange = Range(match.range(at: 1), in: source),
+                  let bodyStart = Range(match.range, in: source)?.upperBound
+            else { continue }
+            let bodyEnd: String.Index
+            if index + 1 < matches.count,
+               let nextRange = Range(matches[index + 1].range, in: source) {
+                bodyEnd = nextRange.lowerBound
+            } else {
+                bodyEnd = source.endIndex
+            }
+            result[String(source[nameRange])] = captures(
+                pattern: #"func (test[A-Za-z0-9_]+)\(\) throws"#,
+                in: String(source[bodyStart..<bodyEnd])
+            )
+        }
+        return result
     }
 }

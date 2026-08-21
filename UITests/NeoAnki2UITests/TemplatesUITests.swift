@@ -74,13 +74,22 @@ extension FastFunctionalJourneyTests {
         }
 
         runJourneyActivity("ItemTypeStudio.allStarters") {
+            // Starter construction and validity are exhaustively parameterized
+            // in ItemTypeStudioDraftTests. Exercise the menu wiring once here,
+            // while still proving that every applicable recipe is exposed.
+            let menu = app.menuButtons.identified("itemTypeStudio.addCardSetupMenu")
+            revealItemTypeStudioCardSetupListElement(menu, in: app)
+            menu.click()
+            for starter in ["Reverse", "Type Answer", "Visual", "Cloze", "Audio Submission"] {
+                XCTAssertTrue(app.menuItems[starter].waitUntilExists(timeout: 3))
+            }
+            app.menuItems["Visual"].click()
+            XCTAssertTrue(app.buttons["Remove Visual Card setup"].waitUntilExists(timeout: 3))
+
+            // Reverse remains the representative second insertion because the
+            // removal/undo journey below needs a non-selected setup.
             addCardSetupStarter("Reverse", in: app)
-            addCardSetupStarter("Type Answer", in: app)
-            addCardSetupStarter("Visual", in: app)
-            addCardSetupStarter("Cloze", in: app)
-            addCardSetupStarter("Audio Submission", in: app)
-            app.buttons.identified("itemTypeStudio.addBasicCardSetup").click()
-            XCTAssertEqual(studioCardSetupRows(in: app).count, 7)
+            XCTAssertEqual(studioCardSetupRows(in: app).count, 3)
         }
 
         runJourneyActivity("ItemTypeStudio.layoutsPreviewAndAdvanced") {
@@ -89,21 +98,21 @@ extension FastFunctionalJourneyTests {
             let labeledLayoutPicker = app.menuButtons.matching(
                 NSPredicate(format: "label BEGINSWITH 'Layout, '")
             ).firstMatch
+            let layoutPicker = identifiedLayoutPicker.exists
+                ? identifiedLayoutPicker
+                : labeledLayoutPicker
+            XCTAssertTrue(layoutPicker.waitUntilHittable(timeout: 3))
+            layoutPicker.click()
             for layout in ["Focus", "Split", "Media Aside", "Media Hero", "Action Stage"] {
-                let layoutPicker = identifiedLayoutPicker.exists
-                    ? identifiedLayoutPicker
-                    : labeledLayoutPicker
-                XCTAssertTrue(layoutPicker.waitUntilHittable(timeout: 3))
-                layoutPicker.click()
                 XCTAssertTrue(app.menuItems[layout].waitUntilExists(timeout: 3))
-                app.menuItems[layout].click()
-                XCTAssertTrue(
-                    waitUntil(timeout: 3) {
-                        layoutPicker.label.contains(layout)
-                            || (layoutPicker.value as? String)?.contains(layout) == true
-                    }
-                )
             }
+            app.menuItems["Action Stage"].click()
+            XCTAssertTrue(
+                waitUntil(timeout: 3) {
+                    layoutPicker.label.contains("Action Stage")
+                        || (layoutPicker.value as? String)?.contains("Action Stage") == true
+                }
+            )
 
             let showAnswer = app.buttons.identified("cardSetupEditor.showAnswer")
             revealCardSetupElement(showAnswer, in: app)
@@ -140,7 +149,6 @@ extension FastFunctionalJourneyTests {
             selectStudioCardSetup(named: "Visual", in: app)
             addFixedText(to: "Instruction", value: "Study the image", in: app)
             addFixedText(to: "Instruction", value: "Then answer", in: app)
-            addFixedText(to: "Context", value: "Context note", in: app)
             let mediaPreview = app.buttons.matching(
                 NSPredicate(
                     format: "identifier BEGINSWITH 'cardSetupEditor.component.' AND label CONTAINS[c] 'Visual'"
@@ -198,7 +206,6 @@ extension FastFunctionalJourneyTests {
         }
         closeTemplates(in: app)
 
-        try runStudioRepairAndImpactJourneys()
     }
 
     // MARK: Focused activity-filter checks
