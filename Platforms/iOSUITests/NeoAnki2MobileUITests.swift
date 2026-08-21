@@ -531,7 +531,10 @@ final class MobileStudioAuthoringUITests: NeoAnki2MobileUITestCase {
         let availability = app.switches["cardSetupEditor.availability"]
         scrollTo(availability, in: app, bottomClearance: 80)
         XCTAssertGreaterThanOrEqual(availability.frame.height, 44)
-        availability.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        // Use XCTest's semantic switch activation. Coordinate taps can land
+        // on the row hit region after SwiftUI relayout and leave the value
+        // unchanged even though the control is hittable.
+        availability.tap()
         XCTAssertTrue(waitUntil(timeout: 3, condition: {
             String(describing: availability.value) == "1"
         }))
