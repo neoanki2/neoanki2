@@ -17,8 +17,15 @@ NEOANKI_UI_CLEAN=1 \
 NEOANKI_UI_DERIVED_DATA="$DERIVED_DATA" \
   "$ROOT/Scripts/run-ui-tests.sh"
 
+VOCAB_COMPILER="$ROOT/.build/debug/neoanki-vocab"
+if [[ ! -x "$VOCAB_COMPILER" ]]; then
+  echo "Missing vocabulary fixture compiler: $VOCAB_COMPILER" >&2
+  exit 1
+fi
+
 tar -czf "$ARCHIVE" -C "$ROOT" \
   .build/NeoAnki2.app \
+  .build/debug/neoanki-vocab \
   .build/ui-derived-data/Build/Products
 ARCHIVE_SHA256=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
 XCODE_VERSION=$(xcodebuild -version | paste -sd ';' -)
