@@ -161,13 +161,14 @@ one of its cards lapses again. Choose **Done** to return to the scope home, or
 The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.
 
-NeoAnki2 uses focused, detail-only modes while adding an item or studying. Item
-Type Studio replaces its navigator with a preview-first workspace where fields
-and Card setups are saved together; Save or Cancel restores the navigator and
-its prior selection. Study replaces the library split view with
-a full-window review surface, so sidebar controls are unavailable until the
-session ends. Leaving Study restores the library and its previous sidebar
-visibility. Reduced Motion is respected when columns change.
+NeoAnki2 uses focused, full-window modes while adding an item, editing an item
+type, or studying. Item Type Studio replaces its navigator with a preview-first
+workspace where fields and Card setups are saved together; Save or Cancel
+restores the navigator and its prior selection. Study replaces the library
+split view with a full-window review surface, so sidebar controls are
+unavailable until the session ends. Leaving either task restores the library
+and its previous sidebar visibility. Reduced Motion is respected when columns
+change.
 
 Leaving a study session returns you to the scope home with its counts already
 revised. NeoAnki2 may also retune its scheduler against your review history at
