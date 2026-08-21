@@ -44,7 +44,10 @@ jobs:
           chmod +x Scripts/install-app.sh Scripts/build-release-artifact.sh \
             Scripts/build-release-candidate.sh
           bash -n Scripts/release.sh Scripts/build-release-candidate.sh \
-            Scripts/publish-release-candidate.sh Scripts/ship-release.sh
+            Scripts/publish-release-candidate.sh \
+            Scripts/reconcile-release-workflows.sh Scripts/ship-release.sh \
+            Scripts/test-release-workflow-reconciliation.sh
+          bash Scripts/test-release-workflow-reconciliation.sh
           ./Scripts/build-release-candidate.sh --pr "${{ inputs.pr }}"
       - name: Read candidate tag
         id: manifest

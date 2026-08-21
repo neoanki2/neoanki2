@@ -315,8 +315,30 @@ if [ "$INSTALL" -eq 1 ]; then
     APP_WAS_RUNNING=1
   fi
   stop_neoanki2() {
+    local pid process_command
+    local -a verified_pids=()
+
     /usr/bin/osascript -e 'tell application id "com.neoanki2.app" to quit' \
       >/dev/null 2>&1 || true
+    for _ in $(seq 1 40); do
+      pgrep -x NeoAnki2 >/dev/null 2>&1 || return 0
+      sleep 0.25
+    done
+
+    echo "Graceful quit timed out; sending TERM to verified NeoAnki2 processes..."
+    while IFS= read -r pid; do
+      [ -n "$pid" ] || continue
+      process_command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+      [ -n "$process_command" ] || continue
+      if [[ "$process_command" != */NeoAnki2.app/Contents/MacOS/NeoAnki2* ]]; then
+        echo "Refusing to signal unexpected NeoAnki2 process $pid: $process_command" >&2
+        return 1
+      fi
+      verified_pids+=("$pid")
+    done < <(pgrep -x NeoAnki2 2>/dev/null || true)
+    for pid in "${verified_pids[@]}"; do
+      kill -TERM "$pid" 2>/dev/null || true
+    done
     for _ in $(seq 1 40); do
       pgrep -x NeoAnki2 >/dev/null 2>&1 || return 0
       sleep 0.25
