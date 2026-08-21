@@ -17,4 +17,5 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
 - Do not launch, control, capture, or otherwise interact with the user's desktop or graphical applications.
 - Use headless command-line and test workflows only.
 - If verification requires GUI automation, Accessibility, Screen Recording, or opening a window, report it as blocked instead of attempting a manual fallback.
+- Exception: CLI-only `xcodebuild`/XCTest UI automation may boot, test, and delete a uniquely named, disposable Simulator device. Simulator-contained XCTest screenshots, recordings, and result bundles are allowed, but do not open or control Simulator.app, use an existing or user-managed Simulator device, request host Accessibility or Screen Recording access, or capture or interact with the host desktop. Clean up the disposable device even when verification fails.
 - Exception: when the user explicitly requests installation or an upgrade, NeoAnki2 may be terminated if needed for a safe upgrade and launched exactly once after the upgrade completes. Do not perform any other GUI interaction or relaunch it more than once.
