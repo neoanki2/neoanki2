@@ -98,13 +98,3 @@ jobs:
           git -c credential.helper= \
             -c 'credential.helper=!gh auth git-credential' \
             push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_BRANCH"
-      - name: Start required checks for the promoted revision
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          gh workflow run docs-pages.yml --repo "$REPOSITORY" --ref "$HEAD_BRANCH" \
-            -f "base_ref=$BASE_SHA"
-          gh workflow run test.yml --repo "$REPOSITORY" --ref "$HEAD_BRANCH"

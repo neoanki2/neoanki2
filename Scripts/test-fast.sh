@@ -29,6 +29,9 @@ bash "$ROOT/Scripts/validate-architecture.sh"
 echo "==> Spotlight-safe Xcode build paths"
 bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 
+echo "==> Release workflow reconciliation"
+bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
+
 echo "==> Documentation coverage and links"
 swift "$ROOT/Scripts/validate-docs.swift"
 

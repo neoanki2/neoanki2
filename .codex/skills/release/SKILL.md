@@ -16,6 +16,10 @@ remote steps manually.
 3. Write a concise PR body to `.build/release-pr.md`.
 4. Keep NeoAnki2 running. Local validation, CI, merge, publication, and tap
    refresh do not require downtime.
+5. For UI-bearing changes, run the relevant targeted journey and the complete
+   `./Scripts/run-ui-tests.sh` suite before release. If desktop policy or local
+   permissions prevent UI verification, stop before push and report it as the
+   blocker.
 
 ## Run
 
@@ -36,9 +40,12 @@ narrower outcome.
 
 When screenshot-backed sources changed, the command waits for the
 **Documentation screenshots** workflow to capture and validate the full set on
-isolated macOS CI, commit it to the pull-request branch, and start required
-checks for that promoted revision. Candidate packaging must use the resulting
-PR head. Stale screenshots have no release deferral or bypass.
+isolated macOS CI and commit it to the pull-request branch. The command starts
+or reconciles required checks for that promoted revision, including known bot-owned
+`action_required` runs or dispatches missing exact-head fallbacks. Candidate
+packaging must use the resulting PR head and starts only after documentation
+and the fast macOS UI journey pass. Stale screenshots have no release deferral
+or bypass.
 
 Allow the command to wait for CI. Send compact progress updates when waiting;
 do not replace the wait with repeated manual GitHub operations.
@@ -53,6 +60,9 @@ After interruption or a corrected check, resume the same transaction:
 
 The command detects and skips completed candidate, merge, publication, tap, and
 installation phases while preserving the full-release default.
+If the exact screenshot run ended in a retryable infrastructure failure, the
+resumed command starts and watches one new attempt. It never retries an
+approval-required run automatically.
 
 ## Guardrails
 
@@ -62,9 +72,14 @@ installation phases while preserving the full-release default.
 - Never merge before required checks and the attested candidate succeed.
 - Never package or merge a revision while CI still requires a documentation
   screenshot capture.
+- Never approve an unknown `action_required` workflow manually. The release
+  command may approve only its allowlisted bot-owned workflows for the exact PR
+  head; every other approval request is a blocker.
 - Never run the recovery **Release** workflow alongside the candidate path.
 - Never edit the tap cask by hand.
 - Never quit NeoAnki2 before the release command's just-in-time install phase.
+- Allow the command's verified `SIGTERM` fallback after the normal quit grace
+  period. Never use `SIGKILL` to force installation.
 - Never use `open -a NeoAnki2`; it can select a debug build.
 - Never retry a GUI launch. The script makes at most one absolute-path launch
   and verifies the running executable.
@@ -75,4 +90,6 @@ installation phases while preserving the full-release default.
 Return the PR URL/number, release tag and URL, source revision, tap version,
 installed version and embedded revision when installed, signature result, and
 whether the verified `/Applications` executable is running. If blocked, name
-the exact failed invariant and use the resume command after it is corrected.
+the exact failed invariant and the emitted `RELEASE_PHASE`; preserve the
+`RELEASE_*` and `SHIP_*` timing lines for audit, then use the resume command
+after the invariant is corrected.

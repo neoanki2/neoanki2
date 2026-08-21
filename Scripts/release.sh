@@ -8,6 +8,30 @@ TITLE=""
 BODY_FILE=""
 INSTALL=1
 LAUNCH=1
+RELEASE_STARTED_AT="$(date +%s)"
+RELEASE_PHASE="arguments"
+RELEASE_LOCAL_PREFLIGHT_SECONDS=0
+RELEASE_SCREENSHOT_SECONDS=0
+RELEASE_RECONCILE_SECONDS=0
+RELEASE_CANDIDATE_GATE_SECONDS=0
+RELEASE_CANDIDATE_SECONDS=0
+
+report_release_telemetry() {
+  local exit_status="$?"
+  local finished_at
+  finished_at="$(date +%s)"
+  trap - EXIT
+  echo "RELEASE_STATUS=$([ "$exit_status" -eq 0 ] && echo success || echo failure)"
+  echo "RELEASE_PHASE=$RELEASE_PHASE"
+  echo "RELEASE_LOCAL_PREFLIGHT_SECONDS=$RELEASE_LOCAL_PREFLIGHT_SECONDS"
+  echo "RELEASE_SCREENSHOT_SECONDS=$RELEASE_SCREENSHOT_SECONDS"
+  echo "RELEASE_RECONCILE_SECONDS=$RELEASE_RECONCILE_SECONDS"
+  echo "RELEASE_CANDIDATE_GATE_SECONDS=$RELEASE_CANDIDATE_GATE_SECONDS"
+  echo "RELEASE_CANDIDATE_SECONDS=$RELEASE_CANDIDATE_SECONDS"
+  echo "RELEASE_ELAPSED_SECONDS=$((finished_at - RELEASE_STARTED_AT))"
+  exit "$exit_status"
+}
+trap report_release_telemetry EXIT
 
 usage() {
   cat >&2 <<'EOF'
@@ -21,9 +45,10 @@ Options:
 Without --pr, run this command from a clean feature branch. It validates the
 branch, pushes through gh authentication, creates or reuses a pull request,
 waits for any required CI screenshot promotion, builds an attested candidate
-in parallel with required checks, waits, and then promotes it with safe resume
-support, upgrades Homebrew, and launches the exact installed app. NeoAnki2
-stays open until the replacement is ready.
+after documentation and fast UI checks pass, overlaps it with the remaining
+required checks, and then promotes it with safe resume support, upgrades
+Homebrew, and launches the exact installed app. NeoAnki2 stays open until the
+replacement is ready.
 EOF
 }
 
@@ -114,13 +139,20 @@ if [ -z "$PR_NUMBER" ]; then
   fi
 
   if [ "$NEEDS_PUSH" -eq 1 ] || [ -z "$EXISTING_PR_NUMBER" ]; then
+    RELEASE_PHASE="local-preflight"
+    LOCAL_PREFLIGHT_STARTED_AT="$(date +%s)"
     echo "Running local release preflight..."
     (cd "$ROOT" && swift build)
     (cd "$ROOT" && ./Scripts/test-fast.sh)
     bash -n "$ROOT/Scripts/release.sh" \
       "$ROOT/Scripts/build-release-candidate.sh" \
       "$ROOT/Scripts/publish-release-candidate.sh" \
-      "$ROOT/Scripts/ship-release.sh"
+      "$ROOT/Scripts/reconcile-release-workflows.sh" \
+      "$ROOT/Scripts/ship-release.sh" \
+      "$ROOT/Scripts/test-release-workflow-reconciliation.sh" \
+      "$ROOT/Scripts/watch-release-workflow.sh"
+    (cd "$ROOT" && ./Scripts/test-release-workflow-reconciliation.sh)
+    RELEASE_LOCAL_PREFLIGHT_SECONDS="$(($(date +%s) - LOCAL_PREFLIGHT_STARTED_AT))"
 
   fi
 
@@ -160,13 +192,67 @@ if [ -z "$PR_NUMBER" ]; then
 fi
 
 PR_JSON="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
-  --json state,isDraft,headRefOid,headRefName)"
+  --json state,isDraft,headRefOid,headRefName,baseRefOid)"
 PR_STATE="$(jq -r .state <<<"$PR_JSON")"
 HEAD_SHA="$(jq -r .headRefOid <<<"$PR_JSON")"
 PR_BRANCH="$(jq -r .headRefName <<<"$PR_JSON")"
+BASE_SHA="$(jq -r .baseRefOid <<<"$PR_JSON")"
+
+wait_for_candidate_checks() {
+  local check_runs_json current_head context state missing pending
+  local contexts=(
+    "Documentation and screenshot gate"
+    "Fast functional UI journeys"
+  )
+
+  echo "Waiting for documentation and fast UI checks before candidate packaging..."
+  while true; do
+    current_head="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
+      --json headRefOid --jq .headRefOid)"
+    if [ "$current_head" != "$HEAD_SHA" ]; then
+      echo "PR #$PR_NUMBER moved from $HEAD_SHA to $current_head while waiting for candidate checks." >&2
+      return 1
+    fi
+
+    check_runs_json="$(gh api --paginate \
+      "repos/$REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
+      | jq -s '[.[].check_runs[]]')"
+    missing=0
+    pending=0
+    for context in "${contexts[@]}"; do
+      state="$(jq -r --arg name "$context" '
+        [.[] | select(.name == $name)]
+        | sort_by(.started_at // .created_at)
+        | last
+        | if . == null then "missing"
+          elif .status != "completed" then "pending"
+          else (.conclusion // "pending")
+          end
+      ' <<<"$check_runs_json")"
+      case "$state" in
+        success|neutral|skipped) ;;
+        failure|cancelled|timed_out|action_required|startup_failure|stale)
+          echo "Candidate gate failed: $context ($state)" >&2
+          return 1
+          ;;
+        missing) missing=1 ;;
+        *) pending=1 ;;
+      esac
+    done
+
+    if [ "$missing" -eq 0 ] && [ "$pending" -eq 0 ]; then
+      echo "Documentation and fast UI checks passed; candidate packaging may start."
+      return 0
+    fi
+    echo "Waiting for candidate checks (missing=$missing pending=$pending)..."
+    sleep 10
+  done
+}
 
 if [ "$PR_STATE" = "OPEN" ]; then
-  for capture_attempt in $(seq 1 4); do
+  RELEASE_PHASE="screenshots"
+  SCREENSHOT_STARTED_AT="$(date +%s)"
+  for _ in $(seq 1 4); do
     git -C "$ROOT" \
       -c credential.helper= \
       -c 'credential.helper=!gh auth git-credential' \
@@ -179,7 +265,7 @@ if [ "$PR_STATE" = "OPEN" ]; then
 
     echo "Waiting for CI to capture and promote documentation screenshots for $HEAD_SHA..."
     SCREENSHOT_RUN_ID=""
-    for run_attempt in $(seq 1 30); do
+    for _ in $(seq 1 30); do
       SCREENSHOT_RUN_ID="$(gh run list --repo "$REPOSITORY" \
         --workflow docs-screenshots.yml --branch "$PR_BRANCH" \
         --event pull_request --limit 20 \
@@ -193,10 +279,13 @@ if [ "$PR_STATE" = "OPEN" ]; then
       echo "Documentation screenshot capture did not start for $HEAD_SHA." >&2
       exit 1
     fi
-    gh run watch "$SCREENSHOT_RUN_ID" --repo "$REPOSITORY" --exit-status
+    "$ROOT/Scripts/watch-release-workflow.sh" \
+      --repo "$REPOSITORY" \
+      --run "$SCREENSHOT_RUN_ID" \
+      --label "Documentation screenshots"
 
     CAPTURED_HEAD="$HEAD_SHA"
-    for promotion_attempt in $(seq 1 30); do
+    for _ in $(seq 1 30); do
       HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
         --json headRefOid --jq .headRefOid)"
       [ "$HEAD_SHA" != "$CAPTURED_HEAD" ] && break
@@ -218,11 +307,29 @@ if [ "$PR_STATE" = "OPEN" ]; then
     echo "Documentation screenshots are still stale after CI promotion." >&2
     exit 1
   fi
+  RELEASE_SCREENSHOT_SECONDS="$(($(date +%s) - SCREENSHOT_STARTED_AT))"
 
   if [ "$(jq -r .isDraft <<<"$PR_JSON")" = "true" ]; then
     gh pr ready "$PR_NUMBER" --repo "$REPOSITORY"
   fi
 
+  RELEASE_PHASE="workflow-reconciliation"
+  RECONCILE_STARTED_AT="$(date +%s)"
+  "$ROOT/Scripts/reconcile-release-workflows.sh" \
+    --repo "$REPOSITORY" \
+    --pr "$PR_NUMBER" \
+    --head "$HEAD_SHA" \
+    --branch "$PR_BRANCH" \
+    --base "$BASE_SHA"
+  RELEASE_RECONCILE_SECONDS="$(($(date +%s) - RECONCILE_STARTED_AT))"
+
+  RELEASE_PHASE="candidate-gate"
+  CANDIDATE_GATE_STARTED_AT="$(date +%s)"
+  wait_for_candidate_checks
+  RELEASE_CANDIDATE_GATE_SECONDS="$(($(date +%s) - CANDIDATE_GATE_STARTED_AT))"
+
+  RELEASE_PHASE="candidate"
+  CANDIDATE_STARTED_AT="$(date +%s)"
   LATEST_TAG="$(gh release view --repo "$REPOSITORY" --json tagName --jq .tagName)"
   if [[ ! "$LATEST_TAG" =~ ^v1[.]0[.]([0-9]+)$ ]]; then
     echo "Latest release tag has an unsupported format: $LATEST_TAG" >&2
@@ -296,6 +403,7 @@ if [ "$PR_STATE" = "OPEN" ]; then
   fi
 
   echo "Candidate is ready; required checks are verified during promotion."
+  RELEASE_CANDIDATE_SECONDS="$(($(date +%s) - CANDIDATE_STARTED_AT))"
 elif [ "$PR_STATE" != "MERGED" ]; then
   echo "Pull request #$PR_NUMBER is $PR_STATE; it cannot be released." >&2
   exit 1
@@ -304,4 +412,6 @@ fi
 SHIP_ARGUMENTS=(--pr "$PR_NUMBER")
 [ "$INSTALL" -eq 1 ] && SHIP_ARGUMENTS+=(--install)
 [ "$LAUNCH" -eq 1 ] && SHIP_ARGUMENTS+=(--launch)
+RELEASE_PHASE="promotion"
 "$ROOT/Scripts/ship-release.sh" "${SHIP_ARGUMENTS[@]}"
+RELEASE_PHASE="complete"

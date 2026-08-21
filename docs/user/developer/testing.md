@@ -18,7 +18,8 @@ From the repository root, run:
 
 This runs NeoAnkiCore unit and flow tests, app-model tests, application and sync
 policy tests, architecture-boundary checks, Spotlight-safe Xcode path checks,
-the generated API-reference check, and documentation validation.
+release-workflow reconciliation tests, the generated API-reference check, and
+documentation validation.
 
 ## Focused suites
 
@@ -34,6 +35,17 @@ Use the narrowest relevant suite while iterating, then run `test-fast.sh`
 before proposing a change. UI and performance workflows are slower and have
 dedicated scripts under `Scripts/`; their GitHub Actions jobs remain the source
 of truth for release acceptance.
+
+For a UI-bearing release, run its targeted journey and then all seven local UI
+journeys before the first push:
+
+```bash
+./Scripts/run-ui-tests.sh FastFunctionalJourneyTests/testRelevantJourney
+./Scripts/run-ui-tests.sh
+```
+
+If local UI automation is unavailable, stop before release rather than using
+remote CI as the first functional UI pass.
 
 ## Documentation checks
 
