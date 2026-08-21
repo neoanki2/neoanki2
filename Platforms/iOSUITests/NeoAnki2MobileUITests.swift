@@ -105,9 +105,11 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             firstDirection == .towardBottom ? .towardTop : .towardBottom,
         ]
         for direction in directions {
-            for _ in 0..<maximumSteps where !isReachable() {
+            for _ in 0..<maximumSteps {
+                if isReachable() { break }
                 scrollOneStep(on: scrollingSurface, direction: direction)
             }
+            if isReachable() { break }
         }
         XCTAssertTrue(element.waitUntilExists(timeout: 2), file: file, line: line)
         XCTAssertTrue(isReachable(), "Element is not reachable: \(element)", file: file, line: line)
@@ -536,7 +538,16 @@ final class MobileStudioAuthoringUITests: NeoAnki2MobileUITestCase {
         // unchanged even though the control is hittable.
         availability.tap()
         XCTAssertTrue(waitUntil(timeout: 3, condition: {
-            String(describing: availability.value) == "1"
+            switch availability.value {
+            case let value as Bool:
+                value
+            case let value as NSNumber:
+                value.boolValue
+            case let value as String:
+                value == "1" || value.caseInsensitiveCompare("on") == .orderedSame
+            default:
+                false
+            }
         }))
         scrollToAndTap(app.buttons["Add another rule"], in: app)
         XCTAssertTrue(app.segmentedControls.buttons["All rules"].waitUntilExists(timeout: 3))
