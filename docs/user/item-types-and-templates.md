@@ -57,7 +57,9 @@ Select content directly on the card to highlight it and open its contextual
 controls. At the default window width, use the labeled **Inspector** button for
 setup, selected-content, and Advanced settings. On a wide window, the same
 inspector stays open as a trailing pane. On iPhone and iPad, select a Card setup
-to push the existing stacked editor at the device's adaptive width.
+to push the existing stacked editor at the device's adaptive width. System Back
+returns to the complete item-type draft without saving it; use the draft's
+top-level **Save** or **Cancel** action when the whole definition is ready.
 
 For each field, set:
 
