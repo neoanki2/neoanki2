@@ -125,6 +125,7 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
 
             footer
                 .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
                 .background(.regularMaterial)
         }
         .onPreferenceChange(StudyStageMeasuredSizeKey.self) { measuredSize = $0 }

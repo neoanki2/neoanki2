@@ -1316,6 +1316,12 @@ class NeoAnkiUITestCase: XCTestCase {
         })
     }
 
+    func openStudyActions(in app: XCUIApplication) {
+        let actions = app.descendants(matching: .any).identified("studyActionsMenu")
+        XCTAssertTrue(actions.waitUntilHittable(timeout: 3))
+        actions.click()
+    }
+
     /// Clicks a control, falling back to its keyboard shortcut when a tall
     /// window has pushed it off a short display. Both reach the same action, and
     /// the screenshot is taken from the resulting state either way.

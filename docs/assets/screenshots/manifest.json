@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-21T02:08:09Z",
+  "capturedAt" : "2026-08-26T11:32:55Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 732,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "5961905dff0d146e875e5a8781bad730f447f2c08ba6fac4e0de95a5d775489e",
+      "sha256" : "1de2f63253ab7f35f7ab19d57f80cf2fdd29579fcccce2ca43886e60b274eff4",
       "width" : 1024
     },
     {
@@ -147,7 +147,7 @@
       "filename" : "study-answer.png",
       "height" : 712,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "08e48d8c9d421b3ec780ad8866e7fa473ab50a70d34ea50ee8ba44276f10bf23",
+      "sha256" : "85e28cf49c116803abb030cd31a7100889abf770912dfd0acf12eb4b63dfe5ba",
       "width" : 1024
     },
     {
@@ -168,18 +168,18 @@
       "filename" : "study-grade-help.png",
       "height" : 712,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "c222725d6c347b82d503c396396a3b72bf91b8f51c5a4330639ac32088516f31",
+      "sha256" : "14a93afb7bebae5cc4337db77b2024d4de40393f711d71d3ac1a8743b2c50173",
       "width" : 1024
     },
     {
       "expectedVisibleIdentifiers" : [
         "primaryStudyAction",
-        "gradeHelp"
+        "studyActionsMenu"
       ],
       "filename" : "study-prompt.png",
       "height" : 712,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "85075c08b3c4132b7ddfa940ab50f376c6db1f4d8d1ff20592ebac08d1c2562f",
+      "sha256" : "8c1f2c321ac2d84973b4569b41fbc6b1f86d4dfac47bc9e8d19a1ebc4eab9139",
       "width" : 1024
     },
     {
@@ -189,7 +189,7 @@
       "filename" : "study-type.png",
       "height" : 712,
       "scenario" : "typed-answer study result",
-      "sha256" : "83941d6fa25ddd914ae15350039e9601ef8a515ac019412f0f991fda398e79ce",
+      "sha256" : "d647432356cc049a57a85417e994f25927928c03bdc27ab8a56367f9761d4ac1",
       "width" : 1024
     },
     {
@@ -220,5 +220,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "b3b2bb047f6f064b3a052b6d328758e8e10911dd"
+  "sourceSHA" : "12f81cae5712f1dbc9389c543d7d8761ddf7acf3"
 }

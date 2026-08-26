@@ -101,6 +101,12 @@ The initial recommendation is visible, but choosing another layout is sticky.
 Later Question or Answer changes may produce a new recommendation; they never
 silently replace your chosen layout or Learning route.
 
+Card setups control the content inside the Study Stage, not the surrounding
+session chrome. On Mac, every layout keeps the shared scope/progress header,
+its **Actions** menu, and the fixed primary-action or grading footer. Changing
+a layout therefore cannot move session actions offscreen or embed them in the
+authored card composition.
+
 [![A fillable Card setup wireframe]({{ site.baseurl }}/assets/screenshots/template-editor.png)]({{ site.baseurl }}/assets/screenshots/template-editor.png)
 
 A hole can contain more than one entry. Select an entry, then use the Inspector

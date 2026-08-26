@@ -35,7 +35,8 @@ extension FastFunctionalJourneyTests {
         }
 
         runJourneyActivity("StudyUITests.testStudyGradeHelpPopover") {
-            app.buttons.identified("gradeHelp").click()
+            openStudyActions(in: app)
+            app.menuItems.identified("gradeHelp").click()
             let guide = app.descendants(matching: .any)["gradeGuidePanel"]
             XCTAssertTrue(guide.waitUntilExists(timeout: 3))
             app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
@@ -133,7 +134,8 @@ extension FastFunctionalJourneyTests {
         runJourneyActivity("StudyUITests.testStudyEndSessionWithConfirmation") {
             startStudy(in: endButtonApp)
             revealAndGrade("gradeGood", in: endButtonApp)
-            endButtonApp.buttons.identified("endStudySession").click()
+            openStudyActions(in: endButtonApp)
+            endButtonApp.menuItems.identified("endStudySession").click()
             let confirm = endButtonApp.buttons.identified("confirmEndStudySession")
             XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
             confirm.click()
@@ -293,7 +295,8 @@ extension FastFunctionalJourneyTests {
         let editApp = launchApp(scenario: "study-edit")
         runJourneyActivity("StudyExtendedUITests.testEditCardDuringSessionKeepsStudying") {
             startStudy(in: editApp)
-            editApp.buttons.identified("editStudyCard").click()
+            openStudyActions(in: editApp)
+            editApp.menuItems.identified("editStudyCard").click()
             XCTAssertTrue(editApp.buttons.identified("saveEditItem").waitUntilExists(timeout: 3))
             enterText(
                 "Capital of France",
@@ -377,7 +380,8 @@ extension FastFunctionalJourneyTests {
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
 
-        app.buttons.identified("endStudySession").click()
+        openStudyActions(in: app)
+        app.menuItems.identified("endStudySession").click()
         if app.buttons.identified("confirmEndStudySession").waitUntilExists(timeout: 3) {
             app.buttons.identified("confirmEndStudySession").click()
         } else if let container = modalContainer(in: app) {
@@ -393,7 +397,8 @@ extension FastFunctionalJourneyTests {
         addBasicItem(front: "Help Q", back: "Help A", in: app)
         startStudy(in: app)
 
-        app.buttons.identified("gradeHelp").click()
+        openStudyActions(in: app)
+        app.menuItems.identified("gradeHelp").click()
         XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitUntilExists(timeout: 5))
     }
 

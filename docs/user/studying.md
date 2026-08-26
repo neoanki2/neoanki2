@@ -10,7 +10,10 @@ parent: User Guide
 
 Every active card uses an adaptive **Study Stage**. The card stays within the
 available window instead of becoming a scrolling review page, while the main
-interaction and grading footer remains fixed. Focus, Split, Media Aside, Media
+interaction and grading footer remains fixed with bottom breathing room. On
+Mac, the study window is limited to the visible screen and keeps clearance
+above its bottom edge, so the primary action remains fully visible on short
+displays. Focus, Split, Media Aside, Media
 Hero, and Action Stage compositions rearrange at compact widths and keep media
 aspect-fit. If content cannot fit because of its length, Dynamic Type, or
 localization, choose **View full content** to open the complete card in a
@@ -62,6 +65,9 @@ A session moves through a small set of states:
 The header shows the scope and the number of unresolved cards, such as
 “Biology · 7 cards remaining.” Remembering a card reduces the count; grading
 Again keeps it unchanged because that card moves to a repair round.
+The header's **Actions** menu groups **Edit Card**, **Grade Help**, and **End
+Session**. After a saved grade, the same row shows the rating with **Undo**, so
+feedback does not take space away from the fixed action footer.
 The first card appears as soon as its exact due count and content are ready.
 NeoAnki2 validates the rest of the initial queue in the background; you can read,
 answer, and reveal that first card immediately, while grading, editing, and
@@ -182,7 +188,7 @@ These messages do not choose a rating. Grade based on the quality of your recall
 - **Good (3):** you remembered correctly.
 - **Easy (4):** recall was too easy; allow a longer wait.
 
-Open **Grade Help** from the question-mark button for the same guidance.
+Open **Actions ▸ Grade Help** in the session header for the same guidance.
 
 For a simpler choice, open **Settings → Study** and enable **Use Fail / Pass
 grades**. Study sessions then show only **Fail (1)** and **Pass (2)**. Fail is
@@ -214,7 +220,7 @@ configured maximum interval. Interval fuzz is disabled.
 ## Fix a card during a session
 
 Reviewing is when card problems surface: a typo, a missing detail, a definition
-that needs more context. Choose **Edit Card** in the session header, choose
+that needs more context. Choose **Actions ▸ Edit Card** in the session header, choose
 **Study ▸ Edit Card…**, or press Command-E to open the current card's item in
 the same editor the library uses.
 
@@ -256,11 +262,11 @@ Interaction-specific shortcuts are described above. Shortcuts are enabled only w
 
 ## Undo and ending a session
 
-After a grade is saved, an undo banner identifies the rating. Choose **Undo** or press Command-Z to revert that latest review and return to the same card with its answer revealed. You can dismiss the banner; completing another grade replaces the previous undo opportunity. **Undo Last Grade** also appears on the completion screen when the final grade can still be reverted.
+After a grade is saved, a compact notice in the session header identifies the rating. Choose **Undo** or press Command-Z to revert that latest review and return to the same card with its answer revealed. You can dismiss the notice; completing another grade replaces the previous undo opportunity. **Undo Last Grade** also appears on the completion screen when the final grade can still be reverted.
 
 [![The completed-session summary]({{ site.baseurl }}/assets/screenshots/study-complete.png)]({{ site.baseurl }}/assets/screenshots/study-complete.png)
 
-Choose **End Session** or press Escape to leave early. If you have already reviewed at least one card and more cards remain, NeoAnki2 asks for confirmation and reports the number reviewed. Saved grades remain saved; the current, ungraded card is not saved. Choose **Continue Studying** to cancel. Before any grade, or after the session is complete, leaving does not require that confirmation.
+Choose **Actions ▸ End Session** or press Escape to leave early. If you have already reviewed at least one card and more cards remain, NeoAnki2 asks for confirmation and reports the number reviewed. Saved grades remain saved; the current, ungraded card is not saved. Choose **Continue Studying** to cancel. Before any grade, or after the session is complete, leaving does not require that confirmation.
 
 ## Motion and accessibility
 
