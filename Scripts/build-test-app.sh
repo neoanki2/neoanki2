@@ -16,6 +16,12 @@ mkdir -p "$MACOS" "$RESOURCES"
 cp "$BUILD_DIR/NeoAnki2" "$MACOS/NeoAnki2"
 cp "$ROOT/Packaging/Info.plist" "$CONTENTS/Info.plist"
 cp "$ROOT/Packaging/NeoAnki2.icns" "$RESOURCES/NeoAnki2.icns"
+# UI verification must coexist with an installed NeoAnki2 release. A distinct
+# bundle identifier keeps LaunchServices from attaching XCTest to that running
+# app instead of launching this isolated, disposable test bundle.
+/usr/libexec/PlistBuddy \
+  -c "Set :CFBundleIdentifier ${NEOANKI_UI_APP_BUNDLE_ID:-com.neoanki2.app.uitest}" \
+  "$CONTENTS/Info.plist"
 chmod +x "$MACOS/NeoAnki2"
 xattr -cr "$APP_DIR" 2>/dev/null || true
 codesign --force --deep --sign - --timestamp=none \

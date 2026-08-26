@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-08-26T14:06:59Z",
+  "capturedAt" : "2026-08-26T18:30:50Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -147,7 +147,7 @@
       "filename" : "study-answer.png",
       "height" : 712,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "85e28cf49c116803abb030cd31a7100889abf770912dfd0acf12eb4b63dfe5ba",
+      "sha256" : "8b74cca655ba10392a264bee961753e0117aaab8f226b1d23798123553707f59",
       "width" : 1024
     },
     {
@@ -168,7 +168,7 @@
       "filename" : "study-grade-help.png",
       "height" : 712,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "14a93afb7bebae5cc4337db77b2024d4de40393f711d71d3ac1a8743b2c50173",
+      "sha256" : "962613ca13be1026152b99aa32f2a0e0708e68e0c35e952baa7050a30909184f",
       "width" : 1024
     },
     {
@@ -179,7 +179,7 @@
       "filename" : "study-prompt.png",
       "height" : 712,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "8c1f2c321ac2d84973b4569b41fbc6b1f86d4dfac47bc9e8d19a1ebc4eab9139",
+      "sha256" : "b88acc7709ef53e79c3399f1a4f26a59507eb9b26d34d42ecc0bba90759209c1",
       "width" : 1024
     },
     {
@@ -220,5 +220,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "ca135308aeefaa47879d0208efa5275baf853f1c"
+  "sourceSHA" : "e5be7319ed63be39a8b7b155fd4c4a5e05ac6580"
 }

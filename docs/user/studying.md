@@ -8,16 +8,14 @@ parent: User Guide
 
 # Studying
 
-Every active card uses an adaptive **Study Stage**. The card stays within the
-available window instead of becoming a scrolling review page, while the main
-interaction and grading footer remains fixed with bottom breathing room. On
-Mac, the study window is limited to the visible screen and keeps clearance
-above its bottom edge, so the primary action remains fully visible on short
-displays. Focus, Split, Media Aside, Media
-Hero, and Action Stage compositions rearrange at compact widths and keep media
-aspect-fit. If content cannot fit because of its length, Dynamic Type, or
-localization, choose **View full content** to open the complete card in a
-scrollable detail sheet; closing it returns to the same review state.
+Every active card uses a predefined **Study Stage**. Its flexible card region
+yields space to the response and status region, and the fixed interaction or
+grading footer reserves its full height with bottom breathing room. The stage
+does not scroll or scale. On Mac, the study window is limited to the visible
+screen and keeps clearance above its bottom edge, so every region and the
+primary action remain fully visible on short displays. Focus, Split, Media
+Aside, Media Hero, and Action Stage compositions rearrange at compact widths
+and keep media aspect-fit.
 
 Focus compositions preserve their authored reading order when the answer is
 revealed. The question remains first and keeps its study emphasis, the expected

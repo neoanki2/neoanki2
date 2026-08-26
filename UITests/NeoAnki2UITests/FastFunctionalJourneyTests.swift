@@ -5,6 +5,7 @@ import XCTest
 /// compatible checks share the same app process.
 final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
     func testVocabularyJourney() throws {
+        guard !hasActivityFilters else { return }
         try runSharedVocabularyJourney()
     }
 

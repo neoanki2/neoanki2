@@ -85,8 +85,9 @@ Card setups warns before removing saved spoken responses.
 Use **Create → Item Types & Card Setups** to edit fields and Card setups in one
 Studio save. Selecting a setup pushes its fillable static layout. Layout,
 Answer method, Availability, and Learning route use the same shared editor as
-macOS. Study uses the same non-scrolling adaptive stage and fixed footer;
-overflowing content opens in a separate detail sheet.
+macOS. Study uses the same predefined, non-scrolling stage and fixed footer.
+Its content, response, status, and action regions reserve their space in order,
+so controls and text remain inside the screen.
 Deck-provided item types start read-only. Unlock the original for editing when
 changes should affect its existing items and decks, or duplicate it for an
 independent editable type.
