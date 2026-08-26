@@ -1312,6 +1312,7 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 5) {
             app.buttons.identified("primaryStudyAction").exists
                 || app.buttons.identified("startRecording").exists
+                || app.buttons.identified("startAudioSubmission").exists
                 || app.buttons.identified("studySessionDone").exists
         })
     }

@@ -292,6 +292,12 @@ extension FastFunctionalJourneyTests {
             finishStudySession(in: recordApp)
         }
 
+        let audioSubmissionApp = launchApp(scenario: "study-audio-submission")
+        runJourneyActivity("StudyUITests.testAudioSubmissionUsesSingleFooterAction") {
+            startStudy(in: audioSubmissionApp)
+            assertAudioSubmissionUsesSingleFooterAction(in: audioSubmissionApp)
+        }
+
         let editApp = launchApp(scenario: "study-edit")
         runJourneyActivity("StudyExtendedUITests.testEditCardDuringSessionKeepsStudying") {
             startStudy(in: editApp)
@@ -508,6 +514,28 @@ extension FastFunctionalJourneyTests {
         XCTAssertFalse(app.buttons.identified("primaryStudyAction").exists)
         app.buttons.identified("revealAndSelfGrade").click()
         XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 3))
+    }
+
+    func checkStudyUITestsAudioSubmissionUsesSingleFooterAction() throws {
+        let app = launchApp(scenario: "study-audio-submission")
+        startStudy(in: app)
+
+        assertAudioSubmissionUsesSingleFooterAction(in: app)
+    }
+
+    private func assertAudioSubmissionUsesSingleFooterAction(in app: XCUIApplication) {
+        let start = app.buttons.identified("startAudioSubmission")
+        let status = app.descendants(matching: .any)["audioSubmissionStatus"]
+
+        XCTAssertTrue(start.waitUntilHittable(timeout: 3))
+        XCTAssertTrue(status.waitUntilExists(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "startAudioSubmission").count, 1)
+        XCTAssertFalse(app.buttons.identified("saveAudioSubmission").exists)
+        XCTAssertLessThanOrEqual(status.frame.maxY, start.frame.minY)
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.exists)
+        XCTAssertLessThanOrEqual(start.frame.maxY, window.frame.maxY - 16)
     }
 
     func checkStudyUITestsUndoLastGradeRestoresReviewedCard() throws {

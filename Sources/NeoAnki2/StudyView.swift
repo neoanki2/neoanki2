@@ -405,7 +405,7 @@ struct StudyView: View {
 
     private var audioSubmissionResponse: some View {
         VStack(spacing: DesignSystem.Spacing.sm) {
-            Label("Saved response", systemImage: "lock.fill")
+            Label("Private response", systemImage: "lock.fill")
                 .font(DesignSystem.Typography.uiSecondary)
                 .foregroundStyle(.secondary)
             Text("This recording stays in your local library and is not synced to the cloud.")
@@ -417,47 +417,12 @@ struct StudyView: View {
                 .font(.system(.title2, design: .monospaced).monospacedDigit())
                 .accessibilityLabel("Recording duration \(recordingDurationText)")
 
-            if recording.state == .recording {
-                Button("Stop Recording", systemImage: "stop.circle.fill") { recording.stop() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
-                    .accessibilityHint("Stops the current audio submission recording")
-            } else if recording.hasRecording {
-                HStack(spacing: DesignSystem.Spacing.sm) {
-                    Button(recording.state == .playing ? "Stop Playback" : "Play Recording", systemImage: recording.state == .playing ? "stop.fill" : "play.fill") {
-                        recording.togglePlayback()
-                    }
-                    .controlSize(.large)
-                    .keyboardShortcut("p", modifiers: [.command])
-
-                    Button("Record Again", systemImage: "arrow.counterclockwise") {
-                        Task { await recording.start(persistentSubmission: true) }
-                    }
-                    .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
-
-                    Button("Delete Draft", systemImage: "trash", role: .destructive) {
-                        showDeleteDraftConfirm = true
-                    }
-                    .controlSize(.large)
-                }
-            } else {
-                Button("Start Recording", systemImage: "mic.fill") {
-                    Task { await recording.start(persistentSubmission: true) }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut("r", modifiers: [.command])
-                .disabled(recording.state == .requestingPermission)
-            }
-
-            if case let .failed(message) = recording.state {
-                Label(message, systemImage: "exclamationmark.triangle.fill")
-                    .font(DesignSystem.Typography.uiHint)
-                    .foregroundStyle(.red)
-                    .accessibilityFocused($recordingErrorAccessibilityFocused)
-            }
+            Label(audioSubmissionStatusText, systemImage: recordingStatusIcon)
+                .font(DesignSystem.Typography.uiHint)
+                .foregroundStyle(recordingHasError ? .red : .secondary)
+                .multilineTextAlignment(.center)
+                .accessibilityFocused($recordingErrorAccessibilityFocused)
+                .accessibilityIdentifier("audioSubmissionStatus")
         }
         .frame(maxWidth: 620)
     }
@@ -490,42 +455,10 @@ struct StudyView: View {
                 .multilineTextAlignment(.center)
                 .accessibilityFocused($recordingErrorAccessibilityFocused)
 
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                if recording.state == .recording {
-                    Button("Stop Recording") {
-                        recording.stop()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
-                    .accessibilityIdentifier("stopRecording")
-                } else if recording.hasRecording {
-                    Button("Record Again") {
-                        Task { await recording.start() }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
-                    .disabled(recording.state == .requestingPermission)
-                    .accessibilityIdentifier("startRecording")
-                } else {
-                    Button("Start Recording") {
-                        Task { await recording.start() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
-                    .disabled(recording.state == .requestingPermission)
-                    .accessibilityIdentifier("startRecording")
-                }
-
-                if recording.hasRecording, recording.state != .recording {
-                    Button(recording.state == .playing ? "Stop Playback" : "Play My Recording") {
-                        recording.togglePlayback()
-                    }
-                    .keyboardShortcut("p", modifiers: [.command])
-                    .accessibilityIdentifier("playRecording")
-                }
+            if recording.hasRecording || recording.state == .recording {
+                Text(recordingDurationText)
+                    .font(.system(.title2, design: .monospaced).monospacedDigit())
+                    .accessibilityLabel("Recording duration \(recordingDurationText)")
             }
         }
     }
@@ -601,54 +534,25 @@ struct StudyView: View {
     private func studyFooter(for card: DueCard) -> some View {
         HStack {
             if card.template.interaction == .audioSubmission {
-                if model.isCompletingSubmission {
-                    ProgressView("Saving response…")
-                        .frame(minHeight: 44)
-                } else {
-                    Button("Save & Complete", systemImage: "checkmark.circle.fill") {
-                        guard let draft = recording.submissionDraft(cardID: card.id) else { return }
-                        Task {
-                            if await model.completeAudioSubmission(draft) { recording.reset() }
+                audioSubmissionFooter(for: card)
+            } else if model.isAnswerRevealed {
+                gradeButtons
+            } else if card.template.interaction == .record {
+                recordingStudyFooter
+            } else {
+                HStack(spacing: DesignSystem.Spacing.sm) {
+                    Button(primaryActionTitle(for: card.template.interaction)) {
+                        StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                            model.performPrimaryAction()
                         }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(recording.submissionDraft(cardID: card.id) == nil || model.isPreparingQueue)
-                    .accessibilityHint("Saves this recording locally and completes the card without grading it")
-                    .accessibilityIdentifier("saveAudioSubmission")
-                }
-            } else if model.isAnswerRevealed {
-                gradeButtons
-            } else {
-                HStack(spacing: DesignSystem.Spacing.sm) {
-                    if card.template.interaction != .record || recording.isReadyForComparison {
-                        Button(primaryActionTitle(for: card.template.interaction)) {
-                            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                                model.performPrimaryAction()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .keyboardShortcut(.defaultAction)
-                        .accessibilityIdentifier("primaryStudyAction")
-                    }
+                    .accessibilityIdentifier("primaryStudyAction")
 
                     if card.template.interaction != .reveal, card.template.interaction != .cloze {
-                        Button("Reveal & Self-Grade") {
-                            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                                model.revealAnswer()
-                            }
-                        }
-                        .controlSize(.large)
-                        .keyboardShortcut(.rightArrow, modifiers: [])
-                        .help("Reveal without checking (Right Arrow)")
-                        .disabled(
-                            card.template.interaction == .record
-                                && (recording.state == .recording
-                                    || recording.state == .requestingPermission)
-                        )
-                        .accessibilityIdentifier("revealAndSelfGrade")
+                        revealAndSelfGradeButton
                     }
                 }
             }
@@ -657,6 +561,174 @@ struct StudyView: View {
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.top, DesignSystem.Spacing.sm)
         .padding(.bottom, DesignSystem.Spacing.studyHorizontal)
+    }
+
+    @ViewBuilder
+    private func audioSubmissionFooter(for card: DueCard) -> some View {
+        if model.isCompletingSubmission {
+            ProgressView("Saving response…")
+                .frame(minHeight: 44)
+        } else if recording.state == .requestingPermission {
+            ProgressView("Requesting microphone access…")
+                .frame(minHeight: 44)
+        } else if recording.state == .recording {
+            Button("Stop Recording", systemImage: "stop.circle.fill") {
+                recording.stop()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut("r", modifiers: [.command])
+            .accessibilityHint("Stops the current private-response recording")
+            .accessibilityIdentifier("stopAudioSubmission")
+        } else if recording.submissionDraft(cardID: card.id) != nil {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                Button("Save & Complete", systemImage: "checkmark.circle.fill") {
+                    saveAudioSubmission(for: card)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+                .disabled(model.isPreparingQueue)
+                .accessibilityHint("Saves this recording locally and completes the card without grading it")
+                .accessibilityIdentifier("saveAudioSubmission")
+
+                audioSubmissionActionsMenu
+            }
+        } else {
+            Button("Start Recording", systemImage: "mic.fill") {
+                Task { await recording.start(persistentSubmission: true) }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut("r", modifiers: [.command])
+            .accessibilityHint("Starts a private audio response stored only in the local library")
+            .accessibilityIdentifier("startAudioSubmission")
+        }
+    }
+
+    private var audioSubmissionActionsMenu: some View {
+        Menu {
+            Button(
+                recording.state == .playing ? "Stop Playback" : "Play Recording",
+                systemImage: recording.state == .playing ? "stop.fill" : "play.fill"
+            ) {
+                recording.togglePlayback()
+            }
+            .keyboardShortcut("p", modifiers: [.command])
+            .accessibilityIdentifier("playAudioSubmission")
+
+            Button("Record Again", systemImage: "arrow.counterclockwise") {
+                Task { await recording.start(persistentSubmission: true) }
+            }
+            .keyboardShortcut("r", modifiers: [.command])
+            .accessibilityIdentifier("rerecordAudioSubmission")
+
+            Divider()
+
+            Button("Delete Draft", systemImage: "trash", role: .destructive) {
+                showDeleteDraftConfirm = true
+            }
+            .accessibilityIdentifier("deleteAudioSubmissionDraft")
+        } label: {
+            Label("Recording", systemImage: "waveform")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Playback and recording actions")
+        .accessibilityIdentifier("audioSubmissionActions")
+    }
+
+    @ViewBuilder
+    private var recordingStudyFooter: some View {
+        if recording.state == .requestingPermission {
+            ProgressView("Requesting microphone access…")
+                .frame(minHeight: 44)
+        } else {
+            HStack(spacing: DesignSystem.Spacing.sm) {
+                if recording.state == .recording {
+                    Button("Stop Recording", systemImage: "stop.circle.fill") {
+                        recording.stop()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .accessibilityIdentifier("stopRecording")
+                } else if recording.isReadyForComparison {
+                    Button("Reveal & Compare", systemImage: "arrow.right.circle.fill") {
+                        StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                            model.performPrimaryAction()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("primaryStudyAction")
+
+                    recordingActionsMenu
+                } else {
+                    Button("Start Recording", systemImage: "mic.fill") {
+                        Task { await recording.start() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut("r", modifiers: [.command])
+                    .accessibilityIdentifier("startRecording")
+                }
+
+                revealAndSelfGradeButton
+            }
+        }
+    }
+
+    private var recordingActionsMenu: some View {
+        Menu {
+            Button(
+                recording.state == .playing ? "Stop Playback" : "Play My Recording",
+                systemImage: recording.state == .playing ? "stop.fill" : "play.fill"
+            ) {
+                recording.togglePlayback()
+            }
+            .keyboardShortcut("p", modifiers: [.command])
+            .accessibilityIdentifier("playRecording")
+
+            Button("Record Again", systemImage: "arrow.counterclockwise") {
+                Task { await recording.start() }
+            }
+            .keyboardShortcut("r", modifiers: [.command])
+            .accessibilityIdentifier("startRecording")
+        } label: {
+            Label("Recording", systemImage: "waveform")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Playback and recording actions")
+        .accessibilityIdentifier("recordingActions")
+    }
+
+    private var revealAndSelfGradeButton: some View {
+        Button("Reveal & Self-Grade") {
+            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                model.revealAnswer()
+            }
+        }
+        .controlSize(.large)
+        .keyboardShortcut(.rightArrow, modifiers: [])
+        .help("Reveal without checking (Right Arrow)")
+        .disabled(
+            recording.state == .recording
+                || recording.state == .requestingPermission
+        )
+        .accessibilityIdentifier("revealAndSelfGrade")
+    }
+
+    private func saveAudioSubmission(for card: DueCard) {
+        guard let draft = recording.submissionDraft(cardID: card.id) else { return }
+        if recording.state == .playing {
+            recording.togglePlayback()
+        }
+        Task {
+            if await model.completeAudioSubmission(draft) { recording.reset() }
+        }
     }
 
     private var gradeButtons: some View {
@@ -746,6 +818,17 @@ struct StudyView: View {
     private var recordingHasError: Bool {
         if case .failed = recording.state { return true }
         return false
+    }
+
+    private var audioSubmissionStatusText: String {
+        switch recording.state {
+        case .idle: "Ready to record"
+        case .requestingPermission: "Waiting for microphone permission…"
+        case .recording: "Recording… press Command-R to stop."
+        case .recorded: "Recording ready to save"
+        case .playing: "Playing your recording…"
+        case let .failed(message): message
+        }
     }
 
     private var recordingStatusText: String {
