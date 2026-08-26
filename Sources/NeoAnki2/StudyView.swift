@@ -304,42 +304,52 @@ struct StudyView: View {
 
     @ViewBuilder
     private func studyCardContent(_ card: DueCard) -> some View {
-        VStack(spacing: DesignSystem.Spacing.md) {
+        StudyStageContent(spacing: DesignSystem.Spacing.md) {
             StudyCompositionView(
-            template: card.template,
-            item: card.item,
-            isAnswerRevealed: model.isAnswerRevealed,
-            mediaStore: mediaStore,
-            clozeGroup: card.card.clozeGroup
-        )
+                template: card.template,
+                item: card.item,
+                isAnswerRevealed: model.isAnswerRevealed,
+                mediaStore: mediaStore,
+                clozeGroup: card.card.clozeGroup
+            )
             .accessibilityIdentifier(model.isAnswerRevealed ? "studyAnswer" : "studyPrompt")
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
-
-        if !model.isAnswerRevealed {
-            interactionResponse(for: card)
-                .frame(maxWidth: 640)
-                .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
-        }
-
-        if let message = model.interactionMessage {
-            Text(message)
-                .font(DesignSystem.Typography.uiSecondary)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .accessibilityIdentifier("studyInteractionMessage")
-        }
-
-        if model.isAnswerRevealed {
-            evaluationFeedback
-
-            if card.template.interaction == .record, recording.hasRecording {
-                revealedRecordingPlayback
-            }
-        }
+        } response: {
+            studyResponseRegion(for: card)
         }
         .transition(.opacity)
         .accessibilityFocused($answerAccessibilityFocused)
+    }
+
+    /// The fixed card template has one flexible composition region and one
+    /// intrinsic response region. Keeping every response state in this single
+    /// slot prevents the composition from compressing controls or status text.
+    @ViewBuilder
+    private func studyResponseRegion(for card: DueCard) -> some View {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            if !model.isAnswerRevealed {
+                interactionResponse(for: card)
+                    .frame(maxWidth: 640)
+                    .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
+            }
+
+            if let message = model.interactionMessage {
+                Text(message)
+                    .font(DesignSystem.Typography.uiSecondary)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("studyInteractionMessage")
+            }
+
+            if model.isAnswerRevealed {
+                evaluationFeedback
+
+                if card.template.interaction == .record, recording.hasRecording {
+                    revealedRecordingPlayback
+                }
+            }
+        }
     }
 
     @ViewBuilder

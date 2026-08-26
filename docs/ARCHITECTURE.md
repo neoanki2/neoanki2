@@ -208,10 +208,12 @@ semantic purpose (`question`, `expectedAnswer`, or `supporting`). The preset
 geometry is code-owned. API v1 retains computed prompt/answer projections for
 existing clients, but local definitions persist only layouts and components.
 
-The shared `AdaptiveStudyStage` keeps the active card non-scrolling and the
-action footer fixed on macOS and iOS. It measures overflow and exposes complete
-content in a separate detail sheet. Accessibility order is derived from the
-preset and never includes expected-answer content before reveal.
+The shared `AdaptiveStudyStage` keeps the predefined card stage and action
+footer fixed on macOS and iOS. Within it, `StudyStageContent` makes the card
+composition the only flexible region; intrinsic response, status, and
+evaluation controls reserve their height before the footer reserves its own.
+The study surface does not scroll or scale. Accessibility order is derived from
+the preset and never includes expected-answer content before reveal.
 
 Item-type visibility is separate from schema identity. `library_item_types`
 marks ordinary reusable Item Types. `deck_included_item_types` associates

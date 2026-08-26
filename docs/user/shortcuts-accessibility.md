@@ -164,9 +164,9 @@ study progress is labeled as progress. Choice and arrange controls announce
 their position and selected state.
 
 The active study stage follows the preset's semantic region order and omits
-concealed answer regions from VoiceOver until reveal. It does not scroll; when
-Dynamic Type or long content exceeds the available stage, **View full content**
-opens a scrollable detail sheet while the grading footer remains stable.
+concealed answer regions from VoiceOver until reveal. Its fixed regions reserve
+space for response and status content before the stable grading footer; the
+stage does not scroll or scale.
 For Focus compositions, reveal preserves the authored order: the original
 question remains first, the expected answer follows immediately, and
 supplemental answer details remain last. VoiceOver focus still moves to the

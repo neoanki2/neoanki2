@@ -52,74 +52,59 @@ public enum StudyStageGeometry {
     }
 }
 
-private struct StudyStageMeasuredSizeKey: PreferenceKey {
-    static let defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        let next = nextValue()
-        value = CGSize(width: max(value.width, next.width), height: max(value.height, next.height))
+/// The fixed vertical regions inside every active study template. The card
+/// composition is the only flexible region; response, status, and evaluation
+/// content always keeps its intrinsic height.
+public struct StudyStageContent<Composition: View, Response: View>: View {
+    private let spacing: CGFloat
+    private let composition: Composition
+    private let response: Response
+
+    public init(
+        spacing: CGFloat,
+        @ViewBuilder composition: () -> Composition,
+        @ViewBuilder response: () -> Response
+    ) {
+        self.spacing = spacing
+        self.composition = composition()
+        self.response = response()
+    }
+
+    public var body: some View {
+        VStack(spacing: spacing) {
+            composition
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(0)
+
+            response
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+        }
     }
 }
 
-/// A non-scrolling active study surface with a fixed footer. If Dynamic Type,
-/// localization, or unusually long content cannot fit, the stage offers a
-/// region-aware detail sheet instead of turning review into a scrolling page.
+/// A fixed study surface whose stage receives only the space left after the
+/// footer reserves its intrinsic height. Card templates own their internal
+/// regions; this shell never scrolls, scales, or repositions their content.
 public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
     private let layout: CardLayoutID
-    private let detailTitle: String
     private let stage: Stage
     private let footer: Footer
-    @State private var measuredSize: CGSize = .zero
-    @State private var availableSize: CGSize = .zero
-    @State private var showsFullContent = false
 
     public init(
         layout: CardLayoutID,
-        detailTitle: String = "Full card content",
         @ViewBuilder stage: () -> Stage,
         @ViewBuilder footer: () -> Footer
     ) {
         self.layout = layout
-        self.detailTitle = detailTitle
         self.stage = stage()
         self.footer = footer()
     }
 
     public var body: some View {
         VStack(spacing: 0) {
-            GeometryReader { proxy in
-                stage
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .background {
-                        stage
-                            .environment(
-                                \.cardWireframeSizingMode,
-                                .intrinsic(referenceHeight: proxy.size.height)
-                            )
-                            .frame(width: proxy.size.width)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .background(GeometryReader { measured in
-                                Color.clear.preference(
-                                    key: StudyStageMeasuredSizeKey.self,
-                                    value: measured.size
-                                )
-                            })
-                            .hidden()
-                    }
-                    .overlay(alignment: .bottomTrailing) {
-                        if overflows {
-                            Button("View full content", systemImage: "arrow.up.left.and.arrow.down.right") {
-                                showsFullContent = true
-                            }
-                            .labelStyle(.titleAndIcon)
-                            .buttonStyle(.bordered)
-                            .padding(12)
-                            .accessibilityHint("Opens the complete card in a scrollable sheet")
-                        }
-                    }
-                    .onAppear { availableSize = proxy.size }
-                    .onChange(of: proxy.size) { _, size in availableSize = size }
-            }
+            stage
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
 
@@ -127,37 +112,11 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
                 .background(.regularMaterial)
-        }
-        .onPreferenceChange(StudyStageMeasuredSizeKey.self) { measuredSize = $0 }
-        .sheet(isPresented: $showsFullContent) {
-            NavigationStack {
-                ScrollView {
-                    stage
-                        .environment(
-                            \.cardWireframeSizingMode,
-                            .intrinsic(referenceHeight: availableSize.height > 0
-                                ? availableSize.height
-                                : nil)
-                        )
-                        .frame(maxWidth: 760)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
-                        .padding(24)
-                }
-                .navigationTitle(detailTitle)
-                .toolbar {
-                    Button("Done") { showsFullContent = false }
-                }
-            }
-            .frame(minWidth: 360, minHeight: 420)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("studyFooter")
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(layout.displayName) study layout")
-    }
-
-    private var overflows: Bool {
-        guard availableSize.height > 0 else { return false }
-        return measuredSize.height > availableSize.height + 1
     }
 }
 

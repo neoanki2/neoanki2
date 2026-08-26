@@ -288,7 +288,15 @@ enum UITestScenarioSeeder {
             fields: [
                 FieldValue(
                     fieldID: prompt.id,
-                    value: .text("Explain where your missing things usually turn up.")
+                    value: .text(
+                        """
+                        Explain what you have been listening to lately and what it gives you.
+
+                        Record one unprepared monologue without restarting. Develop two concrete examples, explain when and why you listen, then compare what changes between them.
+
+                        Speak for 8–10 minutes and finish with one clear conclusion.
+                        """
+                    )
                 ),
             ]
         ))

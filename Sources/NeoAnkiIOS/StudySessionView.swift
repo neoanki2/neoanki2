@@ -107,7 +107,7 @@ struct StudySessionView: View {
                 item: card.item
             )
         ) {
-            VStack(spacing: 28) {
+            StudyStageContent(spacing: 28) {
                 MobileStudyCompositionView(
                     template: card.template,
                     item: card.item,
@@ -117,7 +117,7 @@ struct StudySessionView: View {
                 )
                 .frame(maxHeight: .infinity)
                 .accessibilityElement(children: .combine)
-
+            } response: {
                 if !session.isAnswerRevealed {
                     interaction(for: card)
                 } else if let evaluation = session.answerEvaluation {
@@ -125,7 +125,6 @@ struct StudySessionView: View {
                         .font(.headline)
                         .accessibilityAddTraits(.isSummaryElement)
                 }
-
             }
             .multilineTextAlignment(.center)
             .frame(maxWidth: 600)

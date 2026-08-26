@@ -526,15 +526,18 @@ extension FastFunctionalJourneyTests {
     private func assertAudioSubmissionUsesSingleFooterAction(in app: XCUIApplication) {
         let start = app.buttons.identified("startAudioSubmission")
         let status = app.descendants(matching: .any)["audioSubmissionStatus"]
+        let footer = app.descendants(matching: .any)["studyFooter"]
 
         XCTAssertTrue(start.waitUntilHittable(timeout: 3))
         XCTAssertTrue(status.waitUntilExists(timeout: 3))
+        XCTAssertTrue(footer.waitUntilExists(timeout: 3))
         XCTAssertEqual(app.buttons.matching(identifier: "startAudioSubmission").count, 1)
         XCTAssertFalse(app.buttons.identified("saveAudioSubmission").exists)
-        XCTAssertLessThanOrEqual(status.frame.maxY, start.frame.minY)
+        XCTAssertLessThanOrEqual(status.frame.maxY, footer.frame.minY)
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.exists)
+        XCTAssertLessThanOrEqual(footer.frame.maxY, window.frame.maxY)
         XCTAssertLessThanOrEqual(start.frame.maxY, window.frame.maxY - 16)
     }
 
