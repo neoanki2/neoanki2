@@ -406,6 +406,7 @@ private struct ScopeRow: View {
 }
 
 private struct ScopeDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     let scope: MobileScope
     @State private var summary: ScopeSummary?
@@ -444,7 +445,11 @@ private struct ScopeDetailView: View {
         .toolbar {
             if case let .deck(id) = scope {
                 Button("Deck Settings", systemImage: "ellipsis.circle") { showsDeckSettings = true }
-                    .sheet(isPresented: $showsDeckSettings) { DeckSettingsMobileView(model: model, deckID: id) }
+                    .sheet(isPresented: $showsDeckSettings) {
+                        DeckSettingsMobileView(model: model, deckID: id) {
+                            dismiss()
+                        }
+                    }
             }
         }
         .task { await load() }
@@ -469,6 +474,7 @@ private struct DeckSettingsMobileView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     let deckID: UUID
+    let onDeleted: () -> Void
     @State private var name = ""
     @State private var parentID: UUID?
     @State private var limitEnabled = false
@@ -507,14 +513,24 @@ private struct DeckSettingsMobileView: View {
                 Button("Cancel", role: .cancel) {}
             } message: { Text("This removes \(resetImpact?.reviewLogCount ?? 0) review records. The cards become new again.") }
             .confirmationDialog("Delete deck?", isPresented: Binding(get: { deletionImpact != nil }, set: { if !$0 { deletionImpact = nil } }), titleVisibility: .visible) {
-                Button("Delete and Unassign Items", role: .destructive) { Task { try? await model.deleteDeck(id: deckID, policy: .unassignItems); dismiss() } }
+                Button("Delete and Unassign Items", role: .destructive) {
+                    Task { await deleteDeck() }
+                }
                 Button("Cancel", role: .cancel) {}
             } message: { Text("\(deletionImpact?.itemCount ?? 0) items will remain in the library as unassigned. Nested decks are included.") }
-            .alert("Could Not Save Deck", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
+            .alert("Could Not Update Deck", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
         }
     }
     private func load() async { if let deck = try? await model.library.deck(id: deckID) { name = deck.name; parentID = deck.parentID; limitEnabled = deck.newCardsPerDay != nil; newCardLimit = deck.newCardsPerDay ?? 20 } }
     private func save() async { do { try await model.updateDeck(id: deckID, name: name, parentID: parentID, newCardsPerDay: limitEnabled ? newCardLimit : nil); dismiss() } catch { errorMessage = MobileAppModel.message(for: error) } }
+    private func deleteDeck() async {
+        do {
+            try await model.deleteDeck(id: deckID, policy: .unassignItems)
+            onDeleted()
+        } catch {
+            errorMessage = MobileAppModel.message(for: error)
+        }
+    }
 }
 
 private struct NewDeckView: View {
