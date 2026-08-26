@@ -223,7 +223,9 @@ history.
 
 Audio Submission cards are different: the draft stays temporary until you
 choose **Save & Complete**, then it appears under **Library → Saved Responses**.
-If saving fails, use the inline retry while the draft is retained. Submitted
+The footer uses the same location for **Start Recording**, **Stop Recording**,
+and **Save & Complete**; playback, replacement, and deletion are in the adjacent
+**Recording** menu. If saving fails, retry while the draft is retained. Submitted
 responses are persistent on this device but are not uploaded through Cloud sync.
 
 ## Study and scheduling messages

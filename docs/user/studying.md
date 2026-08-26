@@ -145,7 +145,7 @@ For keyboard-only ordering, press Command-1 through Command-9 to select one of t
 
 ### Record
 
-Choose **Start Recording**, speak, and choose **Stop Recording**. You may play the temporary recording or record again. Once the recording is ready, choose **Reveal & Compare** to reveal the answer while keeping **Play My Recording** available. If the answer contains reference audio, play that real recording from the answer; otherwise, NeoAnki2 states that reference audio is unavailable and you compare your recording with the written answer. NeoAnki2 never synthesizes a reference voice. **Reveal & Self-Grade** remains available as a fallback when you do not want to record.
+The footer keeps one primary recording action in a stable location: choose **Start Recording**, speak, and choose **Stop Recording** in the same place. Once the recording is ready, that action becomes **Reveal & Compare**. Use the adjacent **Recording** menu to play the temporary recording or record again. If the answer contains reference audio, play that real recording from the answer; otherwise, NeoAnki2 states that reference audio is unavailable and you compare your recording with the written answer. NeoAnki2 never synthesizes a reference voice. **Reveal & Self-Grade** remains available as a fallback when you do not want to record.
 
 The first recording attempt may trigger the macOS microphone permission prompt. If access is denied or restricted, enable NeoAnki2 in **System Settings → Privacy & Security → Microphone**. Recordings are temporary: NeoAnki2 removes them when the card changes, the study view closes, or a new recording replaces the old one.
 
@@ -153,9 +153,11 @@ Use Command-R to start or stop recording and Command-P to play or stop playback.
 
 ### Audio Submission
 
-Audio Submission cards show only their prompt. Choose **Start Recording**, then
-**Stop**. A ready draft can be played, replaced with **Record Again**, or
-discarded. Choose **Save & Complete** to persist the validated M4A and advance.
+Audio Submission cards show only their prompt. The footer presents one primary
+action that progresses from **Start Recording** to **Stop Recording**, then to
+**Save & Complete** when the draft is ready. Use the adjacent **Recording** menu
+to play, replace, or discard a ready draft. Saving persists the validated M4A
+and advances.
 There is no answer reveal and no grading control; completion creates no review
 log and does not update FSRS. The card is suspended only after persistence
 succeeds, so an abandoned or failed submission remains due.

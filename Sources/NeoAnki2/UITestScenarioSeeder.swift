@@ -45,6 +45,8 @@ enum UITestScenarioSeeder {
             try await seedTextInteraction(.arrange, store: store, answer: "one two three")
         case "study-record":
             try await seedTextInteraction(.record, store: store, answer: "Spoken answer")
+        case "study-audio-submission":
+            try await seedAudioSubmission(store: store)
         case "study-cloze":
             try await seedCloze(store: store)
         case "study-reverse":
@@ -258,6 +260,38 @@ enum UITestScenarioSeeder {
                 ]
             )
         )
+    }
+
+    private static func seedAudioSubmission(
+        store: any LibraryScenarioSeeding
+    ) async throws {
+        let prompt = FieldDef(name: "Prompt", type: .text, isRequired: true)
+        let template = Template(
+            name: "Private Response",
+            layout: .actionStage,
+            components: [TemplateComponent(
+                region: .primary,
+                purpose: .question,
+                source: .field(prompt.id)
+            )],
+            interaction: .audioSubmission,
+            skill: Skill(input: .text, output: .audio, operation: .reproduce)
+        )
+        let itemType = ItemType(
+            name: "UI Audio Submission",
+            fields: [prompt],
+            templates: [template]
+        )
+        _ = try await store.createItemType(itemType)
+        _ = try await store.createItem(Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(
+                    fieldID: prompt.id,
+                    value: .text("Explain where your missing things usually turn up.")
+                ),
+            ]
+        ))
     }
 
     private static func seedCloze(store: any LibraryScenarioSeeding) async throws {

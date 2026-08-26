@@ -94,6 +94,12 @@ Inside a session, the header's labeled **Actions** menu groups **Edit Card**,
 and its **Undo** action appear in that same header row. The primary action or
 grading footer remains fixed with bottom clearance, and the Mac window stays
 within the visible screen so its controls are not clipped on short displays.
+On Record and Audio Submission cards, that footer also owns the recording
+workflow: its primary action changes from **Start Recording** to **Stop
+Recording**, then to **Reveal & Compare** or **Save & Complete**. Playback,
+replacement, and draft deletion move into the adjacent **Recording** menu once
+they are relevant, so a second primary action is not stranded at the lower edge
+of the card content.
 
 ### Scheduling
 
@@ -133,17 +139,22 @@ history warrants it, so there is no menu item to find, enable, or wait on.
 - **Command-Z:** undo the most recent grade when undo is available.
 - **Escape:** request to end the session. If at least one card was reviewed and
   the session is still active, NeoAnki2 asks for confirmation.
-- **Command-R:** start, stop, or redo a recording on record cards.
-- **Command-P:** play or stop your study recording.
+- **Command-R:** start, stop, or redo a recording on Record and Audio
+  Submission cards.
+- **Command-P:** play or stop the current study recording.
 - **Command-1** through **Command-9:** select one of the first nine items on an
   arrange card.
 - **Command-Up Arrow / Command-Down Arrow:** move the selected arrange item.
 
 On a record card, stop the recording before **Reveal & Compare** becomes
-available. After reveal, **Play My Recording** remains available beside the
-written answer. A separate reference-audio control appears only when the card
-contains real answer audio. If it does not, NeoAnki2 says that no reference
-audio is available; it does not synthesize a voice from the answer text.
+available in the footer. Use the adjacent **Recording** menu to play or replace
+your recording before reveal. After reveal, **Play My Recording** remains
+available beside the written answer. A separate reference-audio control appears
+only when the card contains real answer audio. If it does not, NeoAnki2 says
+that no reference audio is available; it does not synthesize a voice from the
+answer text. Audio Submission cards use the same footer position, but replace
+**Reveal & Compare** with **Save & Complete** because they are completed without
+answer reveal or grading.
 
 ## VoiceOver and focus
 

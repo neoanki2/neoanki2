@@ -136,6 +136,7 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
         try runLegacyCheck("StudyUITests.testArrangeUncheckedOrderIsReportedIncorrect") { try checkStudyUITestsArrangeUncheckedOrderIsReportedIncorrect() }
         try runLegacyCheck("StudyUITests.testClozeConcealsThenRevealsBlank") { try checkStudyUITestsClozeConcealsThenRevealsBlank() }
         try runLegacyCheck("StudyUITests.testRecordRequiresRecordingButAllowsSelfGradeFallback") { try checkStudyUITestsRecordRequiresRecordingButAllowsSelfGradeFallback() }
+        try runLegacyCheck("StudyUITests.testAudioSubmissionUsesSingleFooterAction") { try checkStudyUITestsAudioSubmissionUsesSingleFooterAction() }
         try runLegacyCheck("StudyUITests.testUndoLastGradeRestoresReviewedCard") { try checkStudyUITestsUndoLastGradeRestoresReviewedCard() }
         try runLegacyCheck("StudyExtendedUITests.testStartStudyViaMenu") { try checkStudyExtendedUITestsStartStudyViaMenu() }
         try runLegacyCheck("StudyExtendedUITests.testEndStudyViaMenuWithConfirmation") { try checkStudyExtendedUITestsEndStudyViaMenuWithConfirmation() }

@@ -52,7 +52,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             pattern: #"runLegacyCheck\("([^"]+)""#,
             in: journeySource
         )
-        XCTAssertEqual(mapped.count, 126)
+        XCTAssertEqual(mapped.count, 127)
         XCTAssertEqual(Set(mapped).count, mapped.count, "A legacy UI check is mapped more than once")
 
         var declared = Set<String>()
@@ -68,7 +68,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             declared.formUnion(suffixes.map { "\(suite).test\($0)" })
         }
 
-        XCTAssertEqual(declared.count, 126)
+        XCTAssertEqual(declared.count, 127)
         XCTAssertEqual(Set(mapped), declared)
 
         let journeys = captures(

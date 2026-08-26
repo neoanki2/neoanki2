@@ -158,9 +158,16 @@ while [[ $attempt -le 2 ]]; do
   test_seconds=$((SECONDS - test_started))
 
   total_tests="unknown"
+  runner_exit_failure=false
   if [[ -d "$result_bundle" ]] && xcrun xcresulttool get test-results summary \
       --path "$result_bundle" --compact > "$compact_summary"; then
     total_tests=$(jq -r '.totalTestCount' "$compact_summary")
+    if jq -e '
+      [.testFailures] | flatten
+      | any(.[]?; ((.failureText? // "") | contains("test runner exited with code")))
+    ' "$compact_summary" >/dev/null; then
+      runner_exit_failure=true
+    fi
     jq -r '
       "result=\(.result) tests=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests)",
       ([.testFailures] | flatten | .[]? | select(type == "object")
@@ -197,8 +204,12 @@ while [[ $attempt -le 2 ]]; do
     echo "iOS UI total timing: shard=$SHARD_ID device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
     exit 0
   fi
-  if [[ $attempt -eq 1 && "$total_tests" == "0" ]]; then
-    echo "No test started; retrying once with a newly provisioned simulator." >&2
+  if [[ $attempt -eq 1 && ("$total_tests" == "0" || "$runner_exit_failure" == "true") ]]; then
+    if [[ "$runner_exit_failure" == "true" ]]; then
+      echo "The XCTest runner exited before finishing; retrying once with a newly provisioned simulator." >&2
+    else
+      echo "No test started; retrying once with a newly provisioned simulator." >&2
+    fi
     attempt=$((attempt + 1))
     continue
   fi
