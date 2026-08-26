@@ -105,7 +105,8 @@ extension FastFunctionalJourneyTests {
         addBasicItem(front: "Capital of Frnace", back: "Paris", in: app)
         startStudy(in: app)
 
-        app.buttons.identified("editStudyCard").click()
+        openStudyActions(in: app)
+        app.menuItems.identified("editStudyCard").click()
         XCTAssertTrue(app.buttons.identified("saveEditItem").waitUntilExists(timeout: 5))
         enterText("Capital of France", into: field(named: "Front", in: app), app: app)
         app.buttons.identified("saveEditItem").click()

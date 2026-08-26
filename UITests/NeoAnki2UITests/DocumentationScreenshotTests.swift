@@ -157,10 +157,11 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "study-prompt",
             of: app,
             scenario: "study prompt before revealing the answer",
-            expectedVisibleIdentifiers: ["primaryStudyAction", "gradeHelp"]
+            expectedVisibleIdentifiers: ["primaryStudyAction", "studyActionsMenu"]
         )
 
-        app.buttons.identified("gradeHelp").click()
+        openStudyActions(in: app)
+        app.menuItems.identified("gradeHelp").click()
         XCTAssertTrue(app.descendants(matching: .any)["gradeGuidePanel"].waitUntilExists(timeout: 5))
         captureDocumentationScreenshot(
             named: "study-grade-help",

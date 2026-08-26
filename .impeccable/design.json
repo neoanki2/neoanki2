@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-28T09:20:00Z",
+  "generatedAt": "2026-08-26T11:09:59Z",
   "title": "Design System: NeoAnki2",
   "extensions": {
     "colorMeta": {
@@ -58,12 +58,12 @@
         "purpose": "Forms, empty states, descriptions; SwiftUI .body"
       },
       "ui-row-title": {
-        "displayName": "UI Row Title",
-        "purpose": "Sidebar scope row name; SwiftUI .headline"
+        "displayName": "Sidebar Row",
+        "purpose": "Compact sidebar destination or deck name; SwiftUI .body"
       },
       "ui-row-meta": {
-        "displayName": "UI Row Meta",
-        "purpose": "Sidebar scope row counts under the name; SwiftUI .caption"
+        "displayName": "Sidebar Meta",
+        "purpose": "Compact trailing actionable status such as due count; SwiftUI .caption"
       },
       "ui-caption": {
         "displayName": "UI Caption",
@@ -117,7 +117,7 @@
       "name": "Study Reading Column",
       "kind": "custom",
       "refersTo": "study-column-max",
-      "description": "Centered card stage, max 600pt. Prompt, divider, answer — no shadow box.",
+      "description": "Centered non-scrolling adaptive card stage, max 600pt. Named Focus, Split, Media Aside, Media Hero, and Action Stage compositions own responsive geometry; measured overflow opens a separate full-content sheet.",
       "html": "<div class=\"ds-study-column\"><p class=\"ds-prompt\">What is the capital of France?</p><hr class=\"ds-divider\" /><p class=\"ds-answer\">Paris</p></div>",
       "css": ".ds-study-column { max-width: 600px; margin: 0 auto; text-align: center; padding: 24px 32px; } .ds-prompt { font: 400 34px/1.25 -apple-system, 'SF Pro', system-ui; margin: 0 0 24px; } .ds-divider { border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 24px 0; } .ds-answer { font: 400 28px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.85); margin: 0; }"
     },
@@ -136,50 +136,59 @@
       "css": ".ds-browse-row td { padding: 4px 8px; font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; border-bottom: 1px solid rgba(0,0,0,0.06); } .ds-cell-prompt { color: #1d1d1f; } .ds-cell-state { color: rgba(0,0,0,0.55); } .ds-cell-num { color: rgba(0,0,0,0.55); font-variant-numeric: tabular-nums; text-align: right; }"
     },
     {
-      "name": "Sidebar Scope Row",
+      "name": "Sidebar Destination Row",
       "kind": "custom",
-      "description": "Deck or scope row in the sidebar: name over a due/item metadata line. Selection is the system List highlight; no custom row background.",
-      "html": "<div class=\"ds-scope-row\"><div class=\"ds-row-title\">Poetry</div><div class=\"ds-row-sub\">12 items · 9 due</div></div>",
-      "css": ".ds-scope-row { padding: 4px 0; } .ds-row-title { font: 600 13px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-row-sub { font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; color: rgba(0,0,0,0.55); margin-top: 4px; }"
+      "description": "Library destination or deck row: SF Symbol, body-weight name, and compact trailing actionable status. Selection is the system List highlight; the detail pane and accessibility label carry full inventory context.",
+      "html": "<div class=\"ds-scope-row\"><svg class=\"ds-row-icon\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M2 3.5h12v9H2z M4 1.5h8v2H4z\" fill=\"currentColor\"/></svg><span class=\"ds-row-title\">Poetry</span><span class=\"ds-row-meta\">9 due</span></div>",
+      "css": ".ds-scope-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-row-icon { width: 16px; height: 16px; } .ds-row-title { flex: 1; } .ds-row-meta { color: rgba(0,0,0,0.55); font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; }"
+    },
+    {
+      "name": "Study Header",
+      "kind": "nav",
+      "description": "Progress leads the row; transient grade feedback with Undo stays inline; one standard Actions menu groups Edit Card, Grade Help, and End Session so secondary commands never compete with the fixed primary-action footer.",
+      "html": "<div class=\"ds-study-header\"><span class=\"ds-progress\">All Decks · 15 cards remaining</span><span class=\"ds-grade-status\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6\" fill=\"none\" stroke=\"currentColor\"/><path d=\"m5 8 2 2 4-5\" fill=\"none\" stroke=\"currentColor\"/></svg>Graded as Again. <button>Undo</button></span><button class=\"ds-actions\">Actions ···</button></div>",
+      "css": ".ds-study-header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; font: 400 13px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-progress { color: rgba(0,0,0,0.55); margin-right: auto; } .ds-grade-status { display: inline-flex; align-items: center; gap: 8px; color: rgba(0,0,0,0.55); white-space: nowrap; } .ds-grade-status svg { width: 16px; height: 16px; } .ds-grade-status button, .ds-actions { border: 0; background: transparent; color: #4A6FA5; font: inherit; padding: 4px; cursor: pointer; } .ds-grade-status button:focus-visible, .ds-actions:focus-visible { outline: 2px solid #4A6FA5; outline-offset: 2px; }"
     },
     {
       "name": "Error Banner",
       "kind": "custom",
       "description": "Inline study error with icon; never color alone.",
-      "html": "<div class=\"ds-error\"><span class=\"ds-error-icon\">⚠</span> Something went wrong. Try again.</div>",
-      "css": ".ds-error { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: rgba(255, 59, 48, 0.12); font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-error-icon { color: #ff3b30; }"
+      "html": "<div class=\"ds-error\"><svg class=\"ds-error-icon\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M8 1.5 15 14H1L8 1.5Z\" fill=\"currentColor\"/><path d=\"M8 5v4.5M8 12h.01\" stroke=\"white\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>Something went wrong. Try again.</div>",
+      "css": ".ds-error { display: flex; align-items: center; gap: 8px; padding: 8px 20px; background: rgba(255, 59, 48, 0.12); font: 400 11px/1.3 -apple-system, 'SF Pro', system-ui; } .ds-error-icon { width: 16px; height: 16px; color: #ff3b30; flex: none; }"
     }
   ],
   "narrative": {
     "northStar": "The Quiet Desk",
     "overview": "NeoAnki2 should feel like a well-lit desk: one open page (the card), a tidy shelf of decks to the side, and almost nothing else competing for attention. Selecting a scope answers what to study now; enumerating items is a deliberate browse mode you ask for. Platform-native restraint and content-forward layout. The card is the only hero per screen.",
     "keyCharacteristics": [
-      "Content-first study column",
-      "Mac-native NavigationSplitView",
-      "Semantic system colors",
-      "Restrained Study Indigo accent",
-      "Tonal depth without shadows",
-      "No gamification visuals"
+      "Content-first: the selected Focus, Split, Media Aside, Media Hero, or Action Stage composition dominates the detail pane",
+      "The active Study Stage does not scroll; its action/grading footer is fixed. Measured overflow opens a separate full-content sheet.",
+      "Presets own responsive geometry. Authored data selects named regions and semantic purposes but never supplies arbitrary layout or markup.",
+      "Mac-native: NavigationSplitView, menus, keyboard shortcuts, tooltips",
+      "Semantically colored: SwiftUI system colors, not hard-coded grays",
+      "Restrained accent: tint appears on no more than two primary actions per screen",
+      "Tonal depth: sidebar vs detail via system surfaces, not custom shadows",
+      "No gamification visuals: no streak flames, progress rings, or confetti"
     ],
     "rules": [
       {
         "name": "The One Accent Rule",
-        "body": "Custom accent color appears only on primary forward actions (Study, Show Answer, Done on completion, and an empty state's single call to action). Browse mode gets no prominent accent button.",
+        "body": "The system accent appears only on primary forward actions (Study, Show Answer, Done on completion, and an empty state's single call to action). Grade buttons, list rows, browse chrome, and toolbars stay neutral bordered styles.",
         "section": "colors"
       },
       {
         "name": "The No Gamification Palette Rule",
-        "body": "Do not introduce streak orange, achievement gold, or chart rainbow colors.",
+        "body": "Do not introduce streak orange, achievement gold, or chart rainbow colors. Progress is text (8 cards remaining), not rings or bars. The count includes each unresolved card once, so grading Again keeps it stable instead of moving a denominator.",
         "section": "colors"
       },
       {
         "name": "The Card Type Scale Rule",
-        "body": "Only card prompt uses .largeTitle; only card answer uses .title. UI chrome never borrows card sizes — the scope home's due headline earns emphasis from weight and space instead.",
+        "body": "Only card prompt uses .largeTitle; only card answer uses .title. UI chrome never borrows card sizes. Chrome that must lead a pane reaches for uiDisplay's weight and the space around it rather than asking for an exception.",
         "section": "typography"
       },
       {
         "name": "The Dynamic Type Rule",
-        "body": "Use semantic SwiftUI text styles — never hard-coded point sizes in production views.",
+        "body": "Use semantic SwiftUI text styles via DesignSystem.Typography — never hard-coded point sizes in production views.",
         "section": "typography"
       },
       {
@@ -189,7 +198,7 @@
       },
       {
         "name": "The Reading Measure Rule",
-        "body": "Card text and prose live in a centered column capped at 600pt. Dense tables in browse mode take the full detail width.",
+        "body": "Card text lives in a centered column capped at 600pt. Wide windows add margin, not longer line lengths. Dense tables in browse mode take the full detail width.",
         "section": "layout"
       },
       {
@@ -199,35 +208,35 @@
       },
       {
         "name": "The No Answers by Default Rule",
-        "body": "No library surface reveals an item's answer without an explicit request. Browse mode ships the Answer column hidden; row subtitles never carry it. The reveal is a menu command with a shortcut and it persists, so the default is considered rather than a restriction nobody can lift.",
+        "body": "No library surface reveals an item's answer without an explicit request. Browse mode ships the Answer column hidden; row subtitles never carry it. The reveal lives in the menu bar with a shortcut and persists.",
         "section": "layout"
       },
       {
         "name": "The Flat Study Stage Rule",
-        "body": "The study card is not a boxed card with shadow. Divider and typography only.",
+        "body": "The study card is not a Card component with shadow. It is text on the desk — divider and typography hierarchy only.",
         "section": "elevation"
       },
       {
         "name": "The Platform Shape Rule",
-        "body": "Use system control geometry; custom radii only for future media containers.",
+        "body": "If SwiftUI or AppKit provides the control, use its default geometry. Custom radii are only for media containers.",
         "section": "shapes"
       }
     ],
     "dos": [
-      "Do use semantic SwiftUI colors",
-      "Do keep one primary action visible per study phase",
-      "Do expose keyboard paths and document in Grade Help",
-      "Do test Light, Dark, and Increased Contrast",
-      "Do adopt Liquid Glass on sidebar/toolbar for macOS 26 with opaque study content"
+      "Do use semantic SwiftUI colors (.primary, .secondary, .tertiary, and .red for errors with icons).",
+      "Do keep one primary action visible per study phase (Show Answer or grade row, never both prominent).",
+      "Do expose keyboard paths (Space/Return, 1–4, Command-Shift-S) and document them in Grade Help.",
+      "Do test Light, Dark, and Increased Contrast before shipping UI changes.",
+      "Do adopt Liquid Glass on sidebar/toolbar when targeting macOS 26, with opaque study content."
     ],
     "donts": [
-      "Don't gamify with streaks, XP, or progress rings",
-      "Don't use hard-coded grays",
-      "Don't put shadows, gradients, or glass on card content",
-      "Don't use display serifs or cute illustration styles",
-      "Don't copy Anki density or Quizlet game UI",
-      "Don't show scheduling stats during active review — the scope home is where they belong, read before a session rather than during one",
-      "Don't reveal an item's answer anywhere in the library without being asked"
+      "Don't gamify with streaks, XP, leaderboards, celebratory animations, or progress rings.",
+      "Don't use hard-coded #888 grays; they break Dark Mode.",
+      "Don't put custom shadows, gradients, or glass on card content.",
+      "Don't use display serifs, condensed fonts, or flashcard-app-cute illustration styles.",
+      "Don't copy Anki's dense toolbar/grid aesthetic or Quizlet's bright game UI.",
+      "Don't show scheduling statistics during active review; the scope home is where they belong before a session.",
+      "Don't reveal an answer anywhere in the library without being asked."
     ]
   }
 }

@@ -266,7 +266,8 @@ extension FastFunctionalJourneyTests {
         XCTAssertFalse(importItem.isEnabled)
         dismissOpenMenus(in: app)
 
-        app.buttons.identified("endStudySession").click()
+        openStudyActions(in: app)
+        app.menuItems.identified("endStudySession").click()
         if app.buttons.identified("confirmEndStudySession").waitUntilExists(timeout: 2) {
             app.buttons.identified("confirmEndStudySession").click()
         }

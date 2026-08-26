@@ -233,9 +233,6 @@ struct StudyView: View {
                     if let errorMessage = model.errorMessage {
                         ErrorBanner(message: errorMessage)
                     }
-                    if let undo = model.pendingGradeUndo {
-                        gradeUndoBanner(for: undo)
-                    }
                     studyFooter(for: card)
                 }
             }
@@ -258,43 +255,48 @@ struct StudyView: View {
     }
 
     private var studyHeader: some View {
-        HStack {
+        HStack(spacing: DesignSystem.Spacing.md) {
             Text(model.headerLabel)
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
                 .accessibilityLabel("Progress, \(model.headerLabel)")
                 .accessibilityIdentifier("studyProgress")
 
-            Spacer()
+            Spacer(minLength: DesignSystem.Spacing.md)
 
-            Button("Edit Card") {
-                isEditingCard = true
+            if let undo = model.pendingGradeUndo {
+                gradeUndoFeedback(for: undo)
             }
-            .buttonStyle(.borderless)
-            .disabled(model.isGrading || model.isPreparingQueue)
-            .help("Fix or extend this card (Command-E)")
-            .accessibilityIdentifier("editStudyCard")
 
-            Button {
-                showGradeGuide = true
+            Menu {
+                Button("Edit Card", systemImage: "square.and.pencil") {
+                    isEditingCard = true
+                }
+                .disabled(model.isGrading || model.isPreparingQueue)
+                .accessibilityIdentifier("editStudyCard")
+
+                Button("Grade Help", systemImage: "questionmark.circle") {
+                    showGradeGuide = true
+                }
+                .accessibilityIdentifier("gradeHelp")
+
+                Divider()
+
+                Button("End Session", systemImage: "xmark.circle", role: .destructive) {
+                    requestEndSession()
+                }
+                .accessibilityIdentifier("endStudySession")
             } label: {
-                Label("Grade Help", systemImage: "questionmark.circle")
-                    .labelStyle(.iconOnly)
+                Label("Actions", systemImage: "ellipsis.circle")
             }
-            .buttonStyle(.borderless)
-            .help("How grading works")
-            .accessibilityLabel("Grade help")
-            .accessibilityIdentifier("gradeHelp")
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Study actions")
+            .accessibilityIdentifier("studyActionsMenu")
             .popover(isPresented: $showGradeGuide, arrowEdge: .top) {
                 GradeGuideView(gradingMode: gradingMode)
             }
-
-            Button("End Session") {
-                requestEndSession()
-            }
-            .buttonStyle(.borderless)
-            .help("End session (Escape)")
-            .accessibilityIdentifier("endStudySession")
         }
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.sm)
@@ -652,7 +654,9 @@ struct StudyView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(DesignSystem.Spacing.studyHorizontal)
+        .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
+        .padding(.top, DesignSystem.Spacing.sm)
+        .padding(.bottom, DesignSystem.Spacing.studyHorizontal)
     }
 
     private var gradeButtons: some View {
@@ -675,19 +679,21 @@ struct StudyView: View {
         }
     }
 
-    private func gradeUndoBanner(for undo: PendingGradeUndo) -> some View {
+    private func gradeUndoFeedback(for undo: PendingGradeUndo) -> some View {
         HStack(spacing: DesignSystem.Spacing.sm) {
-            Text("Graded as \(gradingMode.title(for: undo.rating)).")
-                .font(DesignSystem.Typography.uiSecondary)
-                .foregroundStyle(.secondary)
+            Label(
+                "Graded as \(gradingMode.title(for: undo.rating)).",
+                systemImage: "checkmark.circle"
+            )
+            .font(DesignSystem.Typography.uiSecondary)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
 
             Button("Undo") {
                 Task { await model.undoLastGrade() }
             }
             .buttonStyle(.borderless)
             .accessibilityIdentifier("undoLastGrade")
-
-            Spacer()
 
             Button {
                 model.dismissGradeUndo()
@@ -700,9 +706,9 @@ struct StudyView: View {
             .accessibilityLabel("Dismiss undo")
             .accessibilityIdentifier("dismissGradeUndo")
         }
-        .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
-        .padding(.vertical, DesignSystem.Spacing.xs)
-        .background(DesignSystem.sidebarBackground)
+        .fixedSize()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Graded as \(gradingMode.title(for: undo.rating)). Undo available")
     }
 
     private var gradingMode: StudyGradingMode {

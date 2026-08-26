@@ -166,12 +166,12 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 | Browse table | Full detail width | Dense state columns; the reading measure governs card text, not tables |
 | Window default | 960×640pt | Comfortable split at launch |
 
-**Spacing rhythm (8pt grid):** 8 / 12 / 16 / 24 / 32pt — padding in study header (12×20), card area (24×32), footer actions (20).
+**Spacing rhythm (8pt grid):** 8 / 12 / 16 / 24 / 32pt — padding in study header (12×20), card area (24×32), and footer actions (12pt top, 20pt horizontal/bottom). Resizable Mac windows remain within the current screen's visible frame with 16pt clearance below the window, keeping the fixed footer clear of the display edge.
 
 **Study pane structure (top → bottom):**
 
-1. Session header — progress + help + end session  
-2. Scrollable card stage — prompt, divider, answer  
+1. Session header — progress + transient grade/Undo feedback + Actions menu
+2. Non-scrolling adaptive card stage — prompt, divider, answer; measured overflow opens a full-content sheet
 3. Optional error banner — full width, subtle fill  
 4. Fixed footer — Show Answer or grade row  
 
@@ -221,7 +221,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 - **Primary:** `.borderedProminent` — Study, Show Answer, Done on completion, and
   the single call to action in an empty state; uses accent tint
 - **Secondary:** `.bordered` — grade buttons (Again/Hard/Good/Easy), Cancel, Skip Card
-- **Tertiary:** `.borderless` — Grade help icon, End Session text in header
+- **Tertiary:** `.borderless` — inline Undo and dismiss controls in the session header
 - **Hover / Focus:** System-default; ensure keyboard focus ring visible
 - **Disabled:** System dimmed state during `isGrading`
 
@@ -230,6 +230,12 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 - **Layout:** Horizontal `HStack`, 12pt spacing, centered in footer
 - **Labels:** Single word only (Again/Hard/Good/Easy) — meaning in tooltip + Help popover
 - **Keyboard:** 1–4 shortcuts; VoiceOver labels include full meaning
+
+### Study header
+
+- **Feedback:** The latest grade, Undo, and dismiss control stay inline with progress instead of consuming a banner above the primary action.
+- **Actions:** One standard borderless `Menu` groups Edit Card, Grade Help, and the destructive End Session command with SF Symbols and accessibility labels.
+- **Hierarchy:** Progress leads, transient feedback follows, and secondary commands remain quiet so the fixed footer is the only primary-action region.
 
 ### Lists (sidebar)
 
@@ -295,7 +301,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 
 - **Split view:** Sidebar title “Items”; window title “NeoAnki2”
 - **Toolbar:** Study (with due badge), Add Item — no icon-only mystery meat
-- **Menus:** Study menu with shortcuts documented in Grade Help
+- **Menus:** The app-level Study menu exposes keyboard commands; the in-session Actions menu groups Edit Card, Grade Help, and End Session without duplicating full-width controls
 
 ### Signature element: Study reading column
 
