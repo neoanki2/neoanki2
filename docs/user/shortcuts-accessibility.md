@@ -89,6 +89,12 @@ Commands become available only in the relevant state. Grades are disabled until
 the answer is revealed, and every study command is disabled while the card
 editor is open.
 
+Inside a session, the header's labeled **Actions** menu groups **Edit Card**,
+**Grade Help**, and **End Session** in one predictable location. A saved grade
+and its **Undo** action appear in that same header row. The primary action or
+grading footer remains fixed with bottom clearance, and the Mac window stays
+within the visible screen so its controls are not clipped on short displays.
+
 ### Scheduling
 
 - **Scheduling Settings…** sets when a new study day begins.
@@ -172,12 +178,13 @@ NeoAnki2 also routes important changes to accessibility focus:
 
 - revealing an answer announces **Answer revealed** and moves focus to the
   answer;
+- saving a grade exposes its rating and **Undo** together in the session header;
 - recording failures announce the recording error and focus its message; and
 - error banners announce **Error** plus the message and receive focus.
 
 Consecutive duplicate announcements are suppressed. Hidden or blurred answer
 media is announced as concealed rather than exposing its description early.
-Use the **Grade Help** button in a study session for the meaning of each grade
+Use **Actions ▸ Grade Help** in a study session for the meaning of each grade
 and a compact shortcut reminder.
 
 ## Text size, contrast, and color
