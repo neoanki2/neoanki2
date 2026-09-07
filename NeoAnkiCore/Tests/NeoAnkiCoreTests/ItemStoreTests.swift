@@ -533,6 +533,15 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
         try await store.fsrsParameterSets().first { $0.id == candidateID }
     )
     #expect(candidate.weights == result.parameters.weights)
+    if run.decision == .promoted {
+        #expect(run.reason == nil)
+        #expect((run.metrics["tuning.stepFraction"] ?? 0) > 0)
+        #expect((run.metrics["tuning.stepFraction"] ?? 1) <= 0.125)
+        #expect(abs(run.metrics["tuning.estimatedWorkloadChange"] ?? 1) <= 0.05)
+        #expect(health.activeParameterSet?.id == candidateID)
+    } else {
+        #expect(health.activeParameterSet?.id != candidateID)
+    }
 
     let reopened = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
     try await reopened.bootstrap()
@@ -541,7 +550,7 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(reopenedHealth.activeParameterSet?.id == health.activeParameterSet?.id)
 }
 
-@Test func automaticOptimizationFitsOnceAndThenWaitsForNewHistory() async throws {
+@Test func automaticOptimizationContinuesOnlyWhenHistoryChanges() async throws {
     let databaseURL = tempDatabaseURL()
     let store = try ItemStore(databaseURL: databaseURL)
     try await store.bootstrap()
@@ -578,6 +587,23 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     // A second call with no new reviews must not refit.
     #expect(try await store.optimizeSchedulingIfNeeded(now: end) == nil)
     #expect(try await store.fsrsOptimizationRuns().count == 1)
+
+    // One new usable outcome is enough to continue the gradual rollout at the
+    // next session boundary; no weekly/monthly cadence gate remains.
+    let database = await store.database
+    let prior = try #require(try await database.fetchActiveReviewLogs().last)
+    let continuedAt = end.addingTimeInterval(86_400)
+    try await store.applySynchronizedReview(ReviewLog(
+        cardID: prior.cardID,
+        reviewedAt: continuedAt,
+        rating: .good,
+        elapsedDays: 1,
+        scheduledDays: 1,
+        phaseBefore: .review,
+        durationMs: 500
+    ))
+    _ = try #require(try await store.optimizeSchedulingIfNeeded(now: continuedAt))
+    #expect(try await store.fsrsOptimizationRuns().count == 2)
 
     // Each profile fits its own weights, so a different profile in the same
     // library starts with no attempt of its own.

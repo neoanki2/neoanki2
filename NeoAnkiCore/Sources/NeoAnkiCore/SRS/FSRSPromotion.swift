@@ -79,6 +79,8 @@ public struct FSRSPromotionEligibility: Sendable, Equatable {
 
 public enum FSRSRefitTrigger: String, Sendable, Equatable {
     case initial
+    case continuous
+    // Retained for decoding/source compatibility with the former cadence.
     case standard
     case dataBurst
     case maximumStale
@@ -171,18 +173,76 @@ public struct FSRSCandidateInvariants: Sendable, Equatable {
 }
 
 public struct FSRSWorkloadProjection: Sendable, Equatable {
+    public let p05GoodIntervalRatio: Double
     public let p95GoodIntervalRatio: Double
-    public let projectedThirtyDayWorkloadChange: Double
+    /// Steady-state review-load estimate derived from inverse interval ratios.
+    /// This is deliberately not presented as a calendar forecast.
+    public let estimatedReviewLoadChange: Double
 
-    public init(p95GoodIntervalRatio: Double, projectedThirtyDayWorkloadChange: Double) {
+    public init(
+        p05GoodIntervalRatio: Double? = nil,
+        p95GoodIntervalRatio: Double,
+        estimatedReviewLoadChange: Double
+    ) {
+        self.p05GoodIntervalRatio = p05GoodIntervalRatio ?? p95GoodIntervalRatio
         self.p95GoodIntervalRatio = p95GoodIntervalRatio
-        self.projectedThirtyDayWorkloadChange = projectedThirtyDayWorkloadChange
+        self.estimatedReviewLoadChange = estimatedReviewLoadChange
     }
 
-    public var requiresManualApproval: Bool {
-        !p95GoodIntervalRatio.isFinite
-            || p95GoodIntervalRatio < 0.5 || p95GoodIntervalRatio > 2
-            || abs(projectedThirtyDayWorkloadChange) > 0.25
+    public var isFinite: Bool {
+        p05GoodIntervalRatio.isFinite && p95GoodIntervalRatio.isFinite
+            && estimatedReviewLoadChange.isFinite
+    }
+}
+
+/// Turns a statistically valid optimizer result into small automatic model
+/// updates. The optimizer can keep learning from all available history while
+/// the active scheduler moves only as far as the next workload-safe step.
+public struct FSRSGradualTuningPolicy: Sendable, Equatable {
+    public var maximumStepFraction = 0.125
+    public var minimumStepFraction = 1.0 / 1_024.0
+    public var minimumP05IntervalRatio = 0.8
+    public var maximumP95IntervalRatio = 1.25
+    public var maximumAbsoluteEstimatedWorkloadChange = 0.05
+
+    public init() {}
+
+    public var candidateFractions: [Double] {
+        var fraction = min(1, max(minimumStepFraction, maximumStepFraction))
+        var result: [Double] = []
+        repeat {
+            result.append(fraction)
+            fraction /= 2
+        } while fraction >= minimumStepFraction
+        return result
+    }
+
+    public func interpolatedParameters(
+        from active: FSRSScheduler.Parameters,
+        toward target: FSRSScheduler.Parameters,
+        fraction: Double
+    ) -> FSRSScheduler.Parameters? {
+        guard active.weights.count == target.weights.count,
+              active.weights.count == FSRSScheduler.Parameters.weightBounds.count
+        else { return nil }
+        let amount = min(1, max(0, fraction))
+        let weights = zip(active.weights, target.weights).map { current, destination in
+            current + (destination - current) * amount
+        }
+        let result = FSRSScheduler.Parameters(
+            weights: weights,
+            requestRetention: active.requestRetention,
+            maximumInterval: active.maximumInterval
+        )
+        return result.weights == active.weights ? nil : result
+    }
+
+    public func accepts(_ workload: FSRSWorkloadProjection) -> Bool {
+        workload.isFinite
+            && workload.p05GoodIntervalRatio >= minimumP05IntervalRatio
+            && workload.p95GoodIntervalRatio <= maximumP95IntervalRatio
+            && abs(workload.estimatedReviewLoadChange)
+                <= maximumAbsoluteEstimatedWorkloadChange
     }
 }
 
@@ -288,26 +348,11 @@ public struct FSRSPromotionPolicy: Sendable {
         now: Date,
         isInitiallyEligible: Bool
     ) -> FSRSRefitTrigger? {
-        guard let last = context.lastCompletedAt else {
+        guard context.lastCompletedAt != nil else {
             return isInitiallyEligible ? .initial : nil
         }
-        let days = max(0, now.timeIntervalSince(last) / 86_400)
-        guard days >= 7 else { return nil }
-        if context.newTargetCount >= 1_000,
-           context.newFailureCount >= 25,
-           context.newDistinctCardCount >= 100 { return .dataBurst }
-        if context.newTargetCount >= 100,
-           (context.rollingCalibrationError > 0.07
-               || context.relativeLogLossRegression >= 0.10) { return .calibrationDrift }
-        if days >= 30,
-           context.newTargetCount >= 200,
-           context.newFailureCount >= 10,
-           context.newDistinctCardCount >= 50 { return .standard }
-        if days >= 90,
-           context.newTargetCount >= 100,
-           context.newFailureCount >= 5,
-           context.newDistinctCardCount >= 25 { return .maximumStale }
-        return nil
+        _ = now
+        return context.newTargetCount > 0 ? .continuous : nil
     }
 
     public func chronologicalFolds(
@@ -365,7 +410,6 @@ public struct FSRSPromotionPolicy: Sendable {
         eligibility: FSRSPromotionEligibility,
         metrics: FSRSPromotionMetrics,
         invariants: FSRSCandidateInvariants,
-        workload: FSRSWorkloadProjection,
         optimizerParityVerified: Bool
     ) -> FSRSPromotionDisposition {
         guard eligibility.eligible else { return .reject(reason: "notEnoughData") }
@@ -402,7 +446,36 @@ public struct FSRSPromotionPolicy: Sendable {
         guard candidate.nearTargetCalibrationError <= 0.05 else {
             return .reject(reason: "targetCalibration")
         }
-        if workload.requiresManualApproval { return .hold(reason: "workloadChange") }
+        return .promote
+    }
+
+    /// A gradual step does not need to clear the full candidate's 1% gain
+    /// again, but it may never regress prediction quality while moving toward
+    /// that already-validated target.
+    public func gradualStepDisposition(
+        metrics: FSRSPromotionMetrics,
+        invariants: FSRSCandidateInvariants,
+        workload: FSRSWorkloadProjection,
+        tuning: FSRSGradualTuningPolicy = FSRSGradualTuningPolicy()
+    ) -> FSRSPromotionDisposition {
+        guard invariants.allSatisfied else { return .reject(reason: "candidateInvariantFailed") }
+        let active = metrics.active
+        let candidate = metrics.candidate
+        guard candidate.logLoss.isFinite, active.logLoss.isFinite,
+              candidate.logLoss <= active.logLoss + 1e-7
+        else { return .reject(reason: "gradualStepLogLossRegression") }
+        guard metrics.logLossRegressionUpper95 <= 0.005 else {
+            return .reject(reason: "logLossConfidenceRegression")
+        }
+        guard candidate.brierScore - active.brierScore <= 0.005 else {
+            return .reject(reason: "brierRegression")
+        }
+        guard candidate.rmseBins - active.rmseBins <= 0.01 else {
+            return .reject(reason: "rmseBinRegression")
+        }
+        guard tuning.accepts(workload) else {
+            return .reject(reason: "automaticChangeBudget")
+        }
         return .promote
     }
 

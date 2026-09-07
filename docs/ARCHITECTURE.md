@@ -364,12 +364,14 @@ to a target retention. `MemoryState` carries `stability` and `difficulty` as
 algorithm-agnostic parameters; `ReviewLog` history feeds FSRS parameter fitting so
 the schedule adapts to the individual learner.
 
-Fitting is a policy decision, not a user action. `FSRSOptimizationSchedule`
-decides whether accumulated history warrants a new fit from one count of active
-review logs against the last attempt, and `ItemStore.optimizeSchedulingIfNeeded`
-runs the fit only when it does. The app calls it at the end of a study session
-and reports nothing: new weights change future scheduling, which is not a result
-the learner asked for or can act on.
+Fitting is a policy decision, not a user action. After the initial eligibility
+gate, `ItemStore.optimizeSchedulingIfNeeded` continues from the active weights
+at the end of every session that adds a usable outcome. Chronological held-out
+validation establishes a safe learning direction; `FSRSGradualTuningPolicy`
+then activates at most one eighth of that change and halves the step until its
+interval distribution and estimated workload stay inside the automatic budget.
+Every step is immutable and cards replay it lazily, so the model learns
+continuously without a global cadence jump or an approval workflow.
 
 ---
 

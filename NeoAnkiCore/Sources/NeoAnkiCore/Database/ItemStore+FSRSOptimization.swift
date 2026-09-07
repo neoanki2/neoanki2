@@ -1,6 +1,18 @@
 import CryptoKit
 import Foundation
 
+private struct FSRSFoldCandidate {
+    let fold: FSRSChronologicalFold
+    let parameters: FSRSScheduler.Parameters
+}
+
+private struct FSRSGradualTuningStep {
+    let parameters: FSRSScheduler.Parameters
+    let fraction: Double
+    let workload: FSRSWorkloadProjection
+    let metrics: FSRSPromotionMetrics
+}
+
 extension ItemStore {
     func runAutomaticFSRSOptimization(
         minimumObservations: Int,
@@ -88,6 +100,7 @@ extension ItemStore {
         // no target is ever scored by parameters trained on itself or later
         // answers.
         var heldOut: [FSRSPromotionObservation] = []
+        var foldCandidates: [FSRSFoldCandidate] = []
         do {
             for fold in folds {
                 guard let lastTrainingIndex = fold.trainingIndices.last else {
@@ -102,6 +115,10 @@ extension ItemStore {
                     logs: prefix,
                     startingAt: context.parameters
                 )
+                foldCandidates.append(FSRSFoldCandidate(
+                    fold: fold,
+                    parameters: foldResult.parameters
+                ))
                 let foldPredictions = Dictionary(uniqueKeysWithValues: promotionObservations(
                     logs: logs,
                     active: context.parameters,
@@ -145,24 +162,6 @@ extension ItemStore {
             throw error
         }
 
-        let candidateID = UUID()
-        let candidateSet = FSRSParameterSet(
-            id: candidateID,
-            weights: result.parameters.weights,
-            modelVersion: SchedulerPersistenceConstants.memoryModelVersion,
-            upstreamCommit: SchedulerPersistenceConstants.upstreamCommit,
-            sourceChecksum: SchedulerPersistenceConstants.sourceChecksum,
-            fixtureChecksum: SchedulerPersistenceConstants.fixtureChecksum,
-            source: .optimized,
-            inputFingerprint: fingerprint,
-            trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
-            metrics: [
-                "training.previousLogLoss": result.previousLoss,
-                "training.candidateLogLoss": result.optimizedLoss,
-            ],
-            previousParameterSetID: context.parameterSet.id,
-            createdAt: now
-        )
         let allObservations = promotionObservations(
             logs: logs,
             active: context.parameters,
@@ -178,31 +177,97 @@ extension ItemStore {
             logs: logs,
             candidateObservations: allObservations
         )
-        let workload = workloadProjection(
-            logs: logs,
-            active: context.parameters,
-            candidate: result.parameters
-        )
         let disposition = policy.disposition(
             eligibility: eligibility,
             metrics: metrics,
             invariants: invariants,
-            workload: workload,
             optimizerParityVerified: optimizerParityVerified
         )
+        let gradualPolicy = FSRSGradualTuningPolicy()
+        var appliedParameters = result.parameters
+        var appliedMetrics = metrics
+        var appliedWorkload = workloadProjection(
+            logs: logs,
+            active: context.parameters,
+            candidate: result.parameters
+        )
+        var appliedFraction = 0.0
         let decision: FSRSOptimizationDecision
         let reason: String?
+        let activate: Bool
         switch disposition {
         case .promote:
-            decision = .promoted
-            reason = nil
+            if let step = gradualTuningStep(
+                policy: policy,
+                tuning: gradualPolicy,
+                logs: logs,
+                baselineObservations: baselineObservations,
+                foldCandidates: foldCandidates,
+                active: context.parameters,
+                defaults: defaults,
+                target: result.parameters
+            ) {
+                appliedParameters = step.parameters
+                appliedMetrics = step.metrics
+                appliedWorkload = step.workload
+                appliedFraction = step.fraction
+                decision = .promoted
+                reason = nil
+                activate = true
+            } else {
+                decision = .rejected
+                reason = "noSafeAutomaticStep"
+                activate = false
+            }
         case let .hold(value):
             decision = .held
             reason = value
+            activate = false
         case let .reject(value):
             decision = .rejected
             reason = value
+            activate = false
         }
+        let appliedLoss = optimizer.logLoss(logs: logs, parameters: appliedParameters)
+        let returnedResult = FSRSOptimizationResult(
+            parameters: appliedParameters,
+            previousLoss: result.previousLoss,
+            optimizedLoss: appliedLoss,
+            observationCount: result.observationCount,
+            improved: activate && appliedLoss + 1e-7 < result.previousLoss
+        )
+        let candidateID = UUID()
+        var parameterMetrics = [
+            "training.previousLogLoss": result.previousLoss,
+            "training.candidateLogLoss": appliedLoss,
+            "tuning.targetLogLoss": result.optimizedLoss,
+            "tuning.stepFraction": appliedFraction,
+            "tuning.p05IntervalRatio": appliedWorkload.p05GoodIntervalRatio,
+            "tuning.p95IntervalRatio": appliedWorkload.p95GoodIntervalRatio,
+            "tuning.estimatedWorkloadChange": appliedWorkload.estimatedReviewLoadChange,
+        ]
+        parameterMetrics = parameterMetrics.filter { $0.value.isFinite }
+        let candidateSet = FSRSParameterSet(
+            id: candidateID,
+            weights: appliedParameters.weights,
+            modelVersion: SchedulerPersistenceConstants.memoryModelVersion,
+            upstreamCommit: SchedulerPersistenceConstants.upstreamCommit,
+            sourceChecksum: SchedulerPersistenceConstants.sourceChecksum,
+            fixtureChecksum: SchedulerPersistenceConstants.fixtureChecksum,
+            source: .optimized,
+            inputFingerprint: fingerprint,
+            trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
+            metrics: parameterMetrics,
+            previousParameterSetID: context.parameterSet.id,
+            createdAt: now
+        )
+        var runMetrics = persistedPromotionMetrics(appliedMetrics)
+        runMetrics["tuning.targetLogLoss"] = metrics.candidate.logLoss
+        runMetrics["tuning.stepFraction"] = appliedFraction
+        runMetrics["tuning.p05IntervalRatio"] = appliedWorkload.p05GoodIntervalRatio
+        runMetrics["tuning.p95IntervalRatio"] = appliedWorkload.p95GoodIntervalRatio
+        runMetrics["tuning.estimatedWorkloadChange"] = appliedWorkload.estimatedReviewLoadChange
+        runMetrics = runMetrics.filter { $0.value.isFinite }
         let run = FSRSOptimizationRun(
             presetID: context.preset.id,
             startedAt: startedAt,
@@ -214,7 +279,7 @@ extension ItemStore {
             failureCount: eligibility.failureCount,
             studyDayCount: eligibility.studyDayCount,
             foldCount: folds.count,
-            metrics: persistedPromotionMetrics(metrics),
+            metrics: runMetrics,
             decision: decision,
             reason: reason,
             candidateParameterSetID: candidateID
@@ -222,13 +287,13 @@ extension ItemStore {
         try await database.persistFSRSOptimizationOutcome(
             parameterSet: candidateSet,
             run: run,
-            activate: disposition.allowsActivation,
+            activate: activate,
             now: now
         )
-        if disposition.allowsActivation {
-            fsrsParameters = result.parameters
+        if activate {
+            fsrsParameters = appliedParameters
         }
-        return result
+        return returnedResult
     }
 
     /// Returns true when probation produced a terminal state and this
@@ -531,17 +596,94 @@ extension ItemStore {
         }
         guard !ratios.isEmpty else {
             return FSRSWorkloadProjection(
+                p05GoodIntervalRatio: .infinity,
                 p95GoodIntervalRatio: .infinity,
-                projectedThirtyDayWorkloadChange: .infinity
+                estimatedReviewLoadChange: .infinity
             )
         }
         ratios.sort()
+        let p05 = ratios[min(ratios.count - 1, Int(Double(ratios.count - 1) * 0.05))]
         let p95 = ratios[min(ratios.count - 1, Int(Double(ratios.count - 1) * 0.95))]
         let workload = ratios.reduce(0) { $0 + (1 / max($1, 1e-9)) } / Double(ratios.count) - 1
         return FSRSWorkloadProjection(
+            p05GoodIntervalRatio: p05,
             p95GoodIntervalRatio: p95,
-            projectedThirtyDayWorkloadChange: workload
+            estimatedReviewLoadChange: workload
         )
+    }
+
+    private func gradualTuningStep(
+        policy: FSRSPromotionPolicy,
+        tuning: FSRSGradualTuningPolicy,
+        logs: [ReviewLog],
+        baselineObservations: [FSRSPromotionObservation],
+        foldCandidates: [FSRSFoldCandidate],
+        active: FSRSScheduler.Parameters,
+        defaults: FSRSScheduler.Parameters,
+        target: FSRSScheduler.Parameters
+    ) -> FSRSGradualTuningStep? {
+        for fraction in tuning.candidateFractions {
+            guard let parameters = tuning.interpolatedParameters(
+                from: active,
+                toward: target,
+                fraction: fraction
+            ) else { continue }
+            let observations = promotionObservations(
+                logs: logs,
+                active: active,
+                defaults: defaults,
+                candidate: parameters
+            ).sorted(by: promotionChronological)
+            let invariants = candidateInvariants(
+                parameters: parameters,
+                logs: logs,
+                candidateObservations: observations
+            )
+            let workload = workloadProjection(
+                logs: logs,
+                active: active,
+                candidate: parameters
+            )
+            guard tuning.accepts(workload) else { continue }
+
+            var heldOut: [FSRSPromotionObservation] = []
+            for candidate in foldCandidates {
+                let foldParameters = tuning.interpolatedParameters(
+                    from: active,
+                    toward: candidate.parameters,
+                    fraction: fraction
+                ) ?? active
+                let predictions = Dictionary(uniqueKeysWithValues: promotionObservations(
+                    logs: logs,
+                    active: active,
+                    defaults: defaults,
+                    candidate: foldParameters
+                ).map { ($0.id, $0) })
+                for index in candidate.fold.validationIndices {
+                    guard index < baselineObservations.count,
+                          let prediction = predictions[baselineObservations[index].id]
+                    else { return nil }
+                    heldOut.append(prediction)
+                }
+            }
+            let metrics = policy.metrics(
+                observations: heldOut,
+                desiredRetention: active.requestRetention
+            )
+            guard policy.gradualStepDisposition(
+                metrics: metrics,
+                invariants: invariants,
+                workload: workload,
+                tuning: tuning
+            ).allowsActivation else { continue }
+            return FSRSGradualTuningStep(
+                parameters: parameters,
+                fraction: fraction,
+                workload: workload,
+                metrics: metrics
+            )
+        }
+        return nil
     }
 
     private func optimizationInputFingerprint(_ logs: [ReviewLog]) -> String {

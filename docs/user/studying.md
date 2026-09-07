@@ -60,6 +60,11 @@ A session moves through a small set of states:
 6. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
+After a session adds usable review evidence, an eligible profile continues
+tuning its scheduling model silently. This maintenance does not reorder the
+finished session or rewrite existing due dates; bounded parameter steps affect
+cards only as later study activity schedules them.
+
 The header shows the scope and the number of unresolved cards, such as
 “Biology · 7 cards remaining.” Remembering a card reduces the count; grading
 Again keeps it unchanged because that card moves to a repair round.

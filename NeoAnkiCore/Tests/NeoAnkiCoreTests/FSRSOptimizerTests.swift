@@ -281,7 +281,7 @@ import Testing
     )
 }
 
-@Test func optimizationScheduleRequiresProportionalGrowthAfterAnAttempt() {
+@Test func optimizationScheduleRunsAfterAnyNewHistory() {
     let schedule = FSRSOptimizationSchedule()
     let attemptedAt = Date(timeIntervalSince1970: 1_700_000_000)
     let attempt = FSRSOptimizationSchedule.Attempt(
@@ -290,19 +290,11 @@ import Testing
     )
     let soon = attemptedAt.addingTimeInterval(86_400)
 
-    // 50 new reviews is the flat floor, but against a 1,000-review history it is
-    // noise: 25% growth is what can move the weights.
-    #expect(!schedule.needsOptimization(reviewLogCount: 1_100, lastAttempt: attempt, now: soon))
-    #expect(schedule.needsOptimization(reviewLogCount: 1_250, lastAttempt: attempt, now: soon))
-
-    // The flat floor governs while the history is small.
-    let small = FSRSOptimizationSchedule.Attempt(reviewLogCount: 120, attemptedAt: attemptedAt)
-    #expect(!schedule.needsOptimization(reviewLogCount: 160, lastAttempt: small, now: soon))
-    #expect(!schedule.needsOptimization(reviewLogCount: 170, lastAttempt: small, now: soon))
-    #expect(schedule.needsOptimization(reviewLogCount: 400, lastAttempt: small, now: soon))
+    #expect(schedule.needsOptimization(reviewLogCount: 1_001, lastAttempt: attempt, now: soon))
+    #expect(!schedule.needsOptimization(reviewLogCount: 1_000, lastAttempt: attempt, now: soon))
 }
 
-@Test func optimizationScheduleRefitsStaleParametersOnceHistoryHasMovedAtAll() {
+@Test func optimizationScheduleNeverRefitsUnchangedOrShrunkenHistory() {
     let schedule = FSRSOptimizationSchedule()
     let attemptedAt = Date(timeIntervalSince1970: 1_700_000_000)
     let attempt = FSRSOptimizationSchedule.Attempt(
@@ -313,11 +305,7 @@ import Testing
         FSRSOptimizationSchedule.defaultStaleInterval + 1
     )
 
-    #expect(schedule.needsOptimization(reviewLogCount: 1_001, lastAttempt: attempt, now: later))
-    // Staleness alone is not a reason: unchanged history cannot produce a
-    // different fit however long ago it was read.
     #expect(!schedule.needsOptimization(reviewLogCount: 1_000, lastAttempt: attempt, now: later))
-    // Reverted reviews can shrink the count; that is not new history either.
     #expect(!schedule.needsOptimization(reviewLogCount: 980, lastAttempt: attempt, now: later))
 }
 

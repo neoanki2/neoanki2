@@ -27,7 +27,10 @@ public struct Optimizer: Sendable {
     public let configuration: TrainingConfiguration
     public init(configuration: TrainingConfiguration = .init()) { self.configuration = configuration }
 
-    public func computeParameters(examples: [TrainingExample]) throws -> OptimizationResult {
+    public func computeParameters(
+        examples: [TrainingExample],
+        startingAt startingParameters: Parameters? = nil
+    ) throws -> OptimizationResult {
         guard !examples.isEmpty else { throw FSRSError.notEnoughData }
         let dataset = DatasetBuilder.prepare(examples.sorted { $0.order < $1.order })
         if dataset.training.count < 8 {
@@ -39,7 +42,11 @@ public struct Optimizer: Sendable {
         let initialStability = try StabilityInitializer.initialize(
             from: dataset.initialization, averageRecall: averageRecall
         )
-        var initialValues = Parameters.defaults
+        var initialValues = startingParameters?.values ?? Parameters.defaults
+        // Initial stability is directly estimated from the first-review
+        // outcomes on every pass. The remaining memory-law weights continue
+        // from the active learner model instead of restarting at population
+        // defaults.
         initialValues.replaceSubrange(0..<4, with: initialStability)
         let initialized = try Parameters(initialValues)
         if dataset.training.count == dataset.initialization.count || dataset.training.count < 64 {
