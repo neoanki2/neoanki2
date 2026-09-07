@@ -122,13 +122,15 @@ update.
 The confirmation states how many generated study cards will also be removed.
 Deleting an item removes the item and its generated cards; it cannot be undone.
 Append-only review logs are retained when items or cards are deleted, for
-history integrity, but no longer belong to an active card. Outcomes that were
-not undone can still contribute to later scheduling optimization.
+history integrity, but no longer belong to an active card. Historical assignment snapshots keep retained outcomes attributable to their original
+item type and Card setup cohort after deletion. Outcomes that were not undone
+can therefore still contribute to global and attributable cohort optimization.
 Database migrations and performance indexes do not change this retention rule. An
 explicit **Reset All Progress** action in Deck Settings starts a new scheduling
 history origin for the selected deck subtree. Earlier immutable review evidence
 is retained for audit and sync integrity but is excluded from replay, previews,
-and future optimizer input after that origin.
+and future optimizer input after that origin, including after the original card
+or item is deleted.
 The deck-order migration only adds a persistent sibling position used by the
 sidebar. It does not rewrite items, cards, or append-only review outcomes.
 Local API token verifiers are stored outside the library database and its snapshots,

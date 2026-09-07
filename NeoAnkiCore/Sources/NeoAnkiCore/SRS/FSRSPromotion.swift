@@ -41,13 +41,13 @@ public struct FSRSPromotionObservation: Sendable, Equatable, Identifiable {
 
 public struct FSRSPromotionThresholds: Sendable, Equatable {
     public var minimumTargets = 400
-    public var minimumCards = 100
+    public var minimumCards = 75
     public var minimumFailures = 30
-    public var minimumStudyDays = 30
+    public var minimumStudyDays = 21
     public var minimumTargetsPerPopulatedBucket = 20
     public var minimumPopulatedBuckets = 2
     public var minimumValidationTargets = 150
-    public var minimumValidationFailures = 15
+    public var minimumValidationFailures = 8
     public var bootstrapSamples = 2_000
 
     public init() {}
@@ -319,7 +319,10 @@ public struct FSRSPromotionPolicy: Sendable {
         let buckets = Dictionary(grouping: observations, by: { FSRSElapsedBucket(days: $0.elapsedDays) })
             .mapValues(\.count)
         let populated = buckets.values.filter { $0 >= thresholds.minimumTargetsPerPopulatedBucket }.count
-        let validationCount = min(observations.count, thresholds.minimumValidationTargets)
+        let validationCount = min(
+            observations.count,
+            max(thresholds.minimumValidationTargets, observations.count / 4)
+        )
         let validation = observations.sorted(by: Self.chronological).suffix(validationCount)
         let validationFailures = validation.lazy.filter { !$0.recalled }.count
         var unmet: [String] = []
@@ -351,8 +354,13 @@ public struct FSRSPromotionPolicy: Sendable {
         guard context.lastCompletedAt != nil else {
             return isInitiallyEligible ? .initial : nil
         }
-        _ = now
-        return context.newTargetCount > 0 ? .continuous : nil
+        if context.newTargetCount >= 100 { return .dataBurst }
+        if context.newTargetCount > 0,
+           let lastCompletedAt = context.lastCompletedAt,
+           now.timeIntervalSince(lastCompletedAt) >= 30 * 86_400 {
+            return .maximumStale
+        }
+        return nil
     }
 
     public func chronologicalFolds(
@@ -487,10 +495,12 @@ public struct FSRSPromotionPolicy: Sendable {
         completedAt: Date,
         trainingCutoff: Date,
         inputFingerprint: String,
-        error: FSRSOptimizationError
+        error: FSRSOptimizationError,
+        cohortID: UUID = SchedulerPersistenceConstants.globalCohortID
     ) -> FSRSOptimizationRun {
         FSRSOptimizationRun(
             presetID: SchedulerPersistenceConstants.sharedPresetID,
+            cohortID: cohortID,
             startedAt: startedAt,
             completedAt: completedAt,
             trainingCutoff: trainingCutoff,

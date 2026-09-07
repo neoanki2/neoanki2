@@ -55,8 +55,8 @@ A session moves through a small set of states:
 2. **Prompt** shows the current card and its interaction.
 3. **Answer** shows the reference answer and, when available, response feedback.
 4. **Grading** saves one rating and advances to the next card.
-5. **Repair rounds** repeat failed cards after the current queue until each is
-   recalled or you end the session.
+5. **Repair** repeats a first failure after the current due queue. Consecutive
+   failures defer to their FSRS-computed time and do not hold the session open.
 6. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
@@ -66,17 +66,19 @@ finished session or rewrite existing due dates; bounded parameter steps affect
 cards only as later study activity schedules them.
 
 The header shows the scope and the number of unresolved cards, such as
-“Biology · 7 cards remaining.” Remembering a card reduces the count; grading
-Again keeps it unchanged because that card moves to a repair round.
+“Biology · 7 cards remaining.” Remembering a card reduces the count. A first
+Again remains in the count for immediate repair; a future deferred repair does
+not.
 The header's **Actions** menu groups **Edit Card**, **Grade Help**, and **End
 Session**. After a saved grade, the same row shows the rating with **Undo**, so
 feedback does not take space away from the fixed action footer.
 The first card appears as soon as its exact due count and content are ready.
 NeoAnki2 validates the rest of the initial queue in the background; you can read,
 answer, and reveal that first card immediately, while grading, editing, and
-skipping become available when queue validation finishes. Failed cards are due immediately
-but move behind cards already waiting. After that queue finishes, each failed
-card appears once per repair round. When no cards are due, the scope home says
+skipping become available when queue validation finishes. A first failed card
+is due immediately but moves behind cards already waiting. A consecutive Again
+uses its computed due time and returns only if it matures while the session is
+still active. When no cards are due, the scope home says
 **You’re caught up** and tells you when the next card returns, and a session
 opened on an empty queue shows **Nothing Due Right Now**.
 
@@ -187,7 +189,8 @@ After reveal, NeoAnki2 may show:
 
 These messages do not choose a rating. Grade based on the quality of your recall:
 
-- **Again (1):** you did not remember. The card moves to the next repair round.
+- **Again (1):** you did not remember. The first failure enters immediate
+  repair; a consecutive failure can be deferred.
 - **Hard (2):** you remembered with difficulty. FSRS may schedule another
   review later the same day.
 - **Good (3):** you remembered correctly.
@@ -206,11 +209,12 @@ scheduler or rewrite earlier reviews.
 NeoAnki2 uses a native Swift implementation pinned to its documented upstream
 FSRS-6 reference. Each saved rating updates the card’s estimated difficulty
 and stability, and the next due date uses the active preset's retention target;
-the shared preset starts at 90% and can be changed in Scheduling Settings. Again
+the product target is fixed at 90%. Again
 marks one lapse when a review card enters relearning; repeated failures during
 that repair sequence do not add more lapses. Hard reduces growth; Easy can
-increase it. Every repair attempt records its actual timestamp and is never
-fuzzed or delayed: failed acquisition returns in the next repair round.
+increase it. The first failure returns for immediate repair; a consecutive
+failure preserves the content cohort's FSRS-computed due time and may be
+deferred to a later session.
 After eight lapses, the scope home can surface the card's item for attention.
 Marking that item OK does not grade the card or change this history; it only
 hides the warning until the card records another lapse.

@@ -32,7 +32,7 @@ import Testing
     ])
 }
 
-@Test func refitCadenceUsesEveryNewUsableOutcome() {
+@Test func refitCadenceUsesOneHundredNewTargetsOrThirtyDays() {
     let policy = FSRSPromotionPolicy()
     let now = Date(timeIntervalSince1970: 10_000_000)
     #expect(policy.refitTrigger(
@@ -40,9 +40,13 @@ import Testing
         now: now, isInitiallyEligible: true
     ) == .initial)
     #expect(policy.refitTrigger(
-        context: .init(lastCompletedAt: now, newTargetCount: 1, newFailureCount: 0, newDistinctCardCount: 1),
+        context: .init(lastCompletedAt: now, newTargetCount: 100, newFailureCount: 0, newDistinctCardCount: 75),
         now: now, isInitiallyEligible: true
-    ) == .continuous)
+    ) == .dataBurst)
+    #expect(policy.refitTrigger(
+        context: .init(lastCompletedAt: now.addingTimeInterval(-30 * 86_400), newTargetCount: 1, newFailureCount: 0, newDistinctCardCount: 1),
+        now: now, isInitiallyEligible: true
+    ) == .maximumStale)
     #expect(policy.refitTrigger(
         context: .init(lastCompletedAt: now.addingTimeInterval(-365 * 86_400), newTargetCount: 0, newFailureCount: 0, newDistinctCardCount: 0),
         now: now, isInitiallyEligible: true

@@ -185,7 +185,7 @@ private struct InteractionFixture {
             await fixture.itemsModel.refreshSchedules(for: studiedItemIDs, asOf: now)
             // Ending a session now also considers refitting, so the budget has
             // to cover the gate that decides against it.
-            await SchedulingModel(store: fixture.store).optimizeIfNeeded()
+            await SchedulingModel(store: fixture.store).requestAutomaticMaintenance()
             return [:]
         }
         #expect(afterStudy.durationSeconds < 0.15)
@@ -201,7 +201,7 @@ private struct InteractionFixture {
             await fixture.itemsModel.refreshSchedules(for: studiedItemIDs, asOf: now)
             // Ending a session now also considers refitting, so the budget has
             // to cover the gate that decides against it.
-            await SchedulingModel(store: fixture.store).optimizeIfNeeded()
+            await SchedulingModel(store: fixture.store).requestAutomaticMaintenance()
             return [:]
         }
     }
@@ -332,7 +332,7 @@ private struct InteractionFixture {
         layer: "app",
         metadata: meta
     ) {
-        await schedulingModel.optimizeIfNeeded()
+        await schedulingModel.requestAutomaticMaintenance()
         return [:]
     }
 

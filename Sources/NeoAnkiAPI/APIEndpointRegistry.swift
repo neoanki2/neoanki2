@@ -64,7 +64,6 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     case duplicateChecks, listTags, renameTag, removeTag
     case listCards, getCard, patchCard, cardContent, reviewPreview, schedulingExplanation, resetCard
     case schedulingHealth, listSchedulingParameterSets, listSchedulingOptimizationRuns
-    case restoreDefaultScheduling, rollbackScheduling
     case createStudySession, getStudySession, endStudySession, nextStudyCard, skipStudyCard
     case submitReview, revertReview
     case listStudyResponses, getStudyResponse, deleteStudyResponse

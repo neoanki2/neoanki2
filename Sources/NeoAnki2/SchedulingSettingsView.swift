@@ -44,74 +44,9 @@ struct SchedulingSettingsView: View {
                     )
                 }
 
-                Section("FSRS") {
-                    if let health = model.health {
-                        LabeledContent("Status") {
-                            Label(schedulerStatus(health), systemImage: schedulerStatusIcon(health))
-                        }
-                        LabeledContent(
-                            "Desired retention",
-                            value: health.desiredRetention.formatted(.percent.precision(.fractionLength(0)))
-                        )
-                        LabeledContent("Maximum interval", value: "\(health.maximumIntervalDays) days")
-                        LabeledContent(
-                            "Automatic optimization",
-                            value: health.automaticOptimizationEnabled
-                                ? (health.optimizerParityVerified ? "On" : "On — activation blocked")
-                                : "Off"
-                        )
-                        LabeledContent("Optimizer status", value: health.optimizerStatus)
-                        LabeledContent("Model") {
-                            Text(health.modelIdentifier)
-                                .font(.caption.monospaced())
-                                .textSelection(.enabled)
-                        }
-                        LabeledContent(
-                            "Parameter set",
-                            value: health.activeParameterSetID?.uuidString.lowercased() ?? "Unavailable"
-                        )
-                        LabeledContent("Migration", value: health.migrationStatus ?? "Unavailable")
-                        LabeledContent(
-                            "Legacy evidence",
-                            value: health.legacyParametersQuarantined ? "Quarantined" : "None reported"
-                        )
-                        if let decision = health.lastOptimizationDecision {
-                            LabeledContent("Last optimization", value: decision)
-                            if let completedAt = health.lastOptimizationCompletedAt {
-                                LabeledContent(
-                                    "Completed",
-                                    value: completedAt.formatted(date: .abbreviated, time: .shortened)
-                                )
-                            }
-                            if let reason = health.lastOptimizationReason {
-                                Text(reason).font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-
-                        HStack {
-                            Button("Restore Defaults") {
-                                Task { await model.restoreDefaults() }
-                            }
-                            .disabled(!health.canRestoreDefaults || model.isRecovering)
-
-                            Button("Rollback") {
-                                Task { await model.rollback() }
-                            }
-                            .disabled(!health.canRollback || model.isRecovering)
-                        }
-
-                        if !health.canRestoreDefaults && !health.canRollback {
-                            Text("Recovery becomes available after an immutable parameter history has been created.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if model.isLoadingSettings {
-                        ProgressView("Loading scheduler health…")
-                    }
-                }
             }
             .formStyle(.grouped)
-            .navigationTitle("Scheduling Settings")
+            .navigationTitle("Study Day Settings")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -127,7 +62,7 @@ struct SchedulingSettingsView: View {
                 }
             }
         }
-        .frame(minWidth: 500, idealWidth: 520, minHeight: 480)
+        .frame(minWidth: 500, idealWidth: 520, minHeight: 260)
         .onChange(of: model.rolloverMinutes) { _, minutes in
             rolloverTime = Self.date(for: minutes)
         }
@@ -145,20 +80,6 @@ struct SchedulingSettingsView: View {
                 dismiss()
             }
         }
-    }
-
-    private func schedulerStatus(_ health: LibrarySchedulingHealth) -> String {
-        guard health.optimizerParityVerified else {
-            return "Personalization unavailable — verification pending"
-        }
-        return health.usesPopulationDefaults ? "Population defaults" : "Personalized"
-    }
-
-    private func schedulerStatusIcon(_ health: LibrarySchedulingHealth) -> String {
-        guard health.optimizerParityVerified else { return "exclamationmark.shield" }
-        return health.usesPopulationDefaults
-            ? "checkmark.shield"
-            : "person.crop.circle.badge.checkmark"
     }
 
     private static func date(for minutes: Int) -> Date {

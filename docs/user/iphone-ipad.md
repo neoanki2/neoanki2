@@ -96,10 +96,11 @@ Deck settings support rename, nesting, daily new-card limits, progress reset,
 and deletion policies. After **Delete and Unassign Items** succeeds, NeoAnki2
 closes Deck Settings and the removed deck's detail screen, returning to the
 previous deck list; its former items remain available under **Unassigned**.
-Scheduling settings expose study-day rollover, desired
-retention, maximum interval, automatic-personalization status, active model
-health, restore-defaults, and rollback controls. Optimization runs locally after
-eligible sessions or idle time; it never runs inline while a grade is saved.
+Study Day settings expose only the local rollover time. Retention, maximum
+interval, content-cohort learning, probation, and fallback are fixed automatic
+behavior with no controls or status surface. Maintenance runs locally after
+eligible sessions, sync, startup, or idle time; it never runs inline while a
+grade is saved.
 
 ## Import, export, and build decks
 

@@ -281,7 +281,7 @@ import Testing
     )
 }
 
-@Test func optimizationScheduleRunsAfterAnyNewHistory() {
+@Test func optimizationScheduleRunsAfterEnoughNewHistoryOrThirtyDays() {
     let schedule = FSRSOptimizationSchedule()
     let attemptedAt = Date(timeIntervalSince1970: 1_700_000_000)
     let attempt = FSRSOptimizationSchedule.Attempt(
@@ -290,7 +290,13 @@ import Testing
     )
     let soon = attemptedAt.addingTimeInterval(86_400)
 
-    #expect(schedule.needsOptimization(reviewLogCount: 1_001, lastAttempt: attempt, now: soon))
+    #expect(!schedule.needsOptimization(reviewLogCount: 1_001, lastAttempt: attempt, now: soon))
+    #expect(schedule.needsOptimization(reviewLogCount: 1_100, lastAttempt: attempt, now: soon))
+    #expect(schedule.needsOptimization(
+        reviewLogCount: 1_001,
+        lastAttempt: attempt,
+        now: attemptedAt.addingTimeInterval(30 * 86_400)
+    ))
     #expect(!schedule.needsOptimization(reviewLogCount: 1_000, lastAttempt: attempt, now: soon))
 }
 

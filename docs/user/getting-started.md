@@ -171,8 +171,10 @@ and its previous sidebar visibility. Reduced Motion is respected when columns
 change.
 
 Leaving a study session returns you to the scope home with its counts already
-revised. NeoAnki2 may also retune its scheduler against your review history at
-that moment; this is silent and changes nothing on screen. See
+revised. NeoAnki2 may also retune its global scheduler and the stable
+item-type-and-Card-setup cohort for the cards you reviewed. This maintenance is
+silent, does not wait on navigation, and adds no scheduler choices or status to
+the interface. See
 [Scheduling](../scheduling/#optimization-happens-on-its-own).
 
 ## Current compatibility limits

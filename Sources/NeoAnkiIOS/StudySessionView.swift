@@ -9,6 +9,7 @@ import SwiftUI
 #if os(iOS)
 struct StudySessionView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.neoAnkiAccessibilityReduceMotionOverride) private var reduceMotionOverride
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
@@ -68,6 +69,13 @@ struct StudySessionView: View {
             }
         }
         .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission || recorder.hasRecording)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                session.resumeReviewTiming()
+            } else {
+                session.pauseReviewTiming()
+            }
+        }
         .confirmationDialog("End this study session?", isPresented: $confirmsEnd) {
             Button("End Session", role: .destructive) { recorder.cleanup(); dismiss() }
             Button("Keep Studying", role: .cancel) {}

@@ -163,6 +163,8 @@ public actor ItemStore {
     private let starterItemTypes: [ItemType]
     private var externalMutationInProgress = false
     private var externalMutationWaiters: [CheckedContinuation<Void, Never>] = []
+    var automaticMaintenanceTask: Task<Void, Never>?
+    var automaticMaintenanceIsRunning = false
 
     /// Serializes adapter-level read/check/write mutation sequences over this
     /// library. The database commands remain the source of validation and
@@ -242,6 +244,8 @@ public actor ItemStore {
         try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
         try await ensureVersionedSchedulingBootstrap(now: bootstrapTime)
         try await migrateLegacyCardSchedulingIfNeeded(now: bootstrapTime)
+        try await database.markStaleSchedulerCohortsDirty(now: bootstrapTime)
+        requestAutomaticSchedulingMaintenance(after: 0)
     }
 
     /// Persists a deck and its learner-local new-card introduction policy.
@@ -467,9 +471,10 @@ public actor ItemStore {
         return true
     }
 
-    /// Returns every card in a deck subtree to its never-reviewed state and
-    /// removes the review history that produced its schedule. Items, deck
-    /// settings, and card suspension state are preserved.
+    /// Returns every card in a deck subtree to its never-reviewed state. The
+    /// prior reviews remain immutable evidence but are excluded from replay by
+    /// the card's new history origin. Items, deck settings, and suspension are
+    /// preserved.
     @discardableResult
     public func resetDeckProgress(id: UUID, now: Date = .now) async throws -> Int {
         guard try await database.fetchDeck(id: id) != nil else {
@@ -478,7 +483,9 @@ public actor ItemStore {
 
         let summaries = try await deckSummaries(asOf: now)
         let descendantIDs = DeckTree.descendantIDs(of: id, in: summaries)
-        return try await database.resetDeckProgress(deckIDs: descendantIDs, now: now)
+        let count = try await database.resetDeckProgress(deckIDs: descendantIDs, now: now)
+        if count > 0 { requestAutomaticSchedulingMaintenance() }
+        return count
     }
 
     /// Deletes every unassigned item and its generated cards.
@@ -533,6 +540,9 @@ public actor ItemStore {
             updatedAt: now,
             mediaDescriptors: mediaDescriptors
         )
+        for card in cards {
+            _ = try await database.ensureSchedulerCardHistory(cardID: card.id, now: now)
+        }
 
         return SavedItemSummary(
             id: item.id,
@@ -777,6 +787,9 @@ public actor ItemStore {
             updatedAt: now,
             mediaDescriptors: mediaDescriptors
         )
+        for card in try await database.fetchCards(for: item.id) {
+            _ = try await database.ensureSchedulerCardHistory(cardID: card.id, now: now)
+        }
         return SavedItemSummary(
             id: item.id,
             itemTypeID: itemType.id,
@@ -795,8 +808,16 @@ public actor ItemStore {
     /// Deletes an item and its generated cards.
     @discardableResult
     public func deleteItem(id: UUID, now: Date = .now) async throws -> Bool {
+        let cardIDs = try await database.fetchCards(for: id).map(\.id)
+        for cardID in cardIDs {
+            _ = try await database.ensureSchedulerCardHistory(cardID: cardID, now: now)
+        }
         let deleted = try await database.deleteItemWithMedia(id: id, deletedAt: now)
         if deleted {
+            for cardID in cardIDs {
+                try await database.markSchedulerCohortsDirty(cardID: cardID, now: now)
+            }
+            requestAutomaticSchedulingMaintenance()
             _ = try? await collectMediaGarbage()
         }
         return deleted
@@ -1025,7 +1046,7 @@ public actor ItemStore {
             elapsedDays: elapsedDays,
             scheduledDays: scheduledDays,
             phaseBefore: phaseBefore,
-            durationMs: durationMs,
+            durationMs: ReviewWorkloadTimingPolicy.clamped(durationMs),
             schedulingAudit: prepared.audit
         )
         let introducedDeckID = phaseBefore == .new ? card.deckID : nil
@@ -1048,12 +1069,19 @@ public actor ItemStore {
             introducedDeckID: introducedDeckID,
             introductionStudyDay: introductionStudyDay
         )
+        try await database.markSchedulerCohortsDirty(cardID: card.id, now: now)
+        requestAutomaticSchedulingMaintenance()
 
         return ReviewSubmission(memory: nextMemory, reviewLogID: log.id)
     }
 
     public func revertReview(reviewLogID: UUID, now: Date = .now) async throws {
+        let cardID = try await database.fetchReviewLog(id: reviewLogID)?.cardID
         try await database.revertReview(reviewLogID: reviewLogID, revertedAt: now)
+        if let cardID {
+            try await database.markSchedulerCohortsDirty(cardID: cardID, now: now)
+            requestAutomaticSchedulingMaintenance()
+        }
     }
 
     private func validateDeckLimit(_ limit: Int?) throws {
@@ -1091,10 +1119,15 @@ public actor ItemStore {
 
     public func applySynchronizedCard(_ card: Card) async throws {
         try await database.upsertSynchronizedCard(card)
+        _ = try await database.ensureSchedulerCardHistory(cardID: card.id, now: .now)
+        try await database.markSchedulerCohortsDirty(cardID: card.id, now: .now)
+        requestAutomaticSchedulingMaintenance()
     }
 
     public func applySynchronizedReview(_ log: ReviewLog) async throws {
         try await database.insertSynchronizedReviewIfMissing(log)
+        try await database.markSchedulerCohortsDirty(cardID: log.cardID, now: .now)
+        requestAutomaticSchedulingMaintenance()
     }
 
     public func schedulingParameters() -> FSRSScheduler.Parameters {
@@ -1106,7 +1139,7 @@ public actor ItemStore {
     /// Only active, decodable review logs participate. The minimum-data gate
     /// is based on repeated-review outcomes rather than raw log rows.
     @discardableResult
-    public func optimizeScheduling(
+    func optimizeScheduling(
         minimumObservations: Int = 100,
         now: Date = .now
     ) async throws -> FSRSOptimizationResult {
@@ -1124,14 +1157,14 @@ public actor ItemStore {
         )
     }
 
-    /// Continues tuning after every session that adds a usable outcome, and
-    /// reports nothing when history is unchanged or not yet eligible.
+    /// Continues tuning after sufficient new evidence or the maintenance
+    /// interval, and reports nothing when history is unchanged or ineligible.
     ///
     /// This is the automatic path: study ends, this runs, and the learner is
     /// never asked to decide when their scheduler should be tuned. A session
     /// that adds no positive-elapsed outcome costs no fit.
     @discardableResult
-    public func optimizeSchedulingIfNeeded(
+    func optimizeSchedulingIfNeeded(
         schedule: FSRSOptimizationSchedule = FSRSOptimizationSchedule(),
         minimumObservations: Int = FSRSOptimizer.defaultMinimumObservations,
         now: Date = .now

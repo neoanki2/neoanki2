@@ -188,7 +188,7 @@ private struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Toggle("Conceal answers while browsing", isOn: $model.concealsAnswers)
-                    NavigationLink("Scheduling") { SchedulingMobileView(model: model) }
+                    NavigationLink("Study Day") { SchedulingMobileView(model: model) }
                 }
                 Section("About") {
                     LabeledContent("Data", value: "Stored on this device")

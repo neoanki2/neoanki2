@@ -364,17 +364,8 @@ private actor LegacyLibraryRepositoryConformer:
     func setStudyDayRolloverMinutes(_ minutes: Int) async throws {
         try await base.setStudyDayRolloverMinutes(minutes)
     }
-    func optimizeSchedulingIfNeeded(asOf: Date) async throws -> FSRSOptimizationResult? {
-        try await base.optimizeSchedulingIfNeeded(asOf: asOf)
-    }
     func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth {
         try await base.schedulingHealthSnapshot()
-    }
-    func restoreDefaultScheduling(now: Date) async throws -> LibrarySchedulingHealth {
-        try await base.restoreDefaultScheduling(now: now)
-    }
-    func rollbackScheduling(to parameterSetID: UUID?, now: Date) async throws -> LibrarySchedulingHealth {
-        try await base.rollbackScheduling(to: parameterSetID, now: now)
     }
     func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet] {
         try await base.fsrsParameterSetHistory()

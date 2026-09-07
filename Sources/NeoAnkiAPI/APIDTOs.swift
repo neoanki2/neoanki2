@@ -575,6 +575,7 @@ public struct APIRatingPreview: Codable, Sendable, Equatable {
     public let memory: APIMemory
     public let predictedRetrievability: Double
     public let presetId: String?
+    public let cohortId: String?
     public let parameterSetId: String?
     public let modelVersion: String
     public let timingPolicyVersion: String
@@ -593,6 +594,7 @@ public struct APIRatingPreview: Codable, Sendable, Equatable {
         memory = memoryAfter
         predictedRetrievability = preview.predictedRetrievability
         presetId = preview.presetID?.uuidString.lowercased()
+        cohortId = preview.cohortID?.uuidString.lowercased()
         parameterSetId = preview.parameterSetID?.uuidString.lowercased()
         modelVersion = preview.modelVersion
         timingPolicyVersion = preview.timingPolicyVersion
@@ -613,6 +615,7 @@ public struct APISchedulingExplanation: Codable, Sendable, Equatable {
     public let elapsedTimePolicy: String
     public let intervalPolicy: String
     public let presetId: String?
+    public let cohortId: String?
     public let parameterSetId: String?
     public let ratings: [APIRatingPreview]
 }
@@ -634,8 +637,11 @@ public struct APISchedulingHealth: Codable, Sendable, Equatable {
     public let lastOptimizationCompletedAt: Date?
     public let migrationStatus: String?
     public let legacyParametersQuarantined: Bool
-    public let canRestoreDefaults: Bool
-    public let canRollback: Bool
+    public let cohortCount: Int
+    public let personalizedCohortCount: Int
+    public let inheritedCohortCount: Int
+    public let pendingMaintenance: Bool
+    public let lastMaintenanceAt: Date?
 
     init(_ health: LibrarySchedulingHealth) {
         modelIdentifier = health.modelIdentifier
@@ -656,8 +662,11 @@ public struct APISchedulingHealth: Codable, Sendable, Equatable {
         lastOptimizationCompletedAt = health.lastOptimizationCompletedAt
         migrationStatus = health.migrationStatus
         legacyParametersQuarantined = health.legacyParametersQuarantined
-        canRestoreDefaults = health.canRestoreDefaults
-        canRollback = health.canRollback
+        cohortCount = health.cohortCount
+        personalizedCohortCount = health.personalizedCohortCount
+        inheritedCohortCount = health.inheritedCohortCount
+        pendingMaintenance = health.pendingMaintenance
+        lastMaintenanceAt = health.lastMaintenanceAt
     }
 }
 
@@ -670,6 +679,7 @@ public struct APIFSRSParameterSet: Codable, Sendable, Equatable, Identifiable {
     public let sourceChecksum: String
     public let fixtureChecksum: String?
     public let scope: String
+    public let cohortId: String?
     public let source: String
     public let inputFingerprint: String?
     public let trainingCutoff: Date?
@@ -686,6 +696,7 @@ public struct APIFSRSParameterSet: Codable, Sendable, Equatable, Identifiable {
         sourceChecksum = value.sourceChecksum
         fixtureChecksum = value.fixtureChecksum
         scope = value.scope
+        cohortId = value.cohortID?.uuidString.lowercased()
         source = value.source
         inputFingerprint = value.inputFingerprint
         trainingCutoff = value.trainingCutoff
@@ -698,6 +709,7 @@ public struct APIFSRSParameterSet: Codable, Sendable, Equatable, Identifiable {
 public struct APIFSRSOptimizationRun: Codable, Sendable, Equatable, Identifiable {
     public let id: String
     public let presetId: String
+    public let cohortId: String?
     public let startedAt: Date
     public let completedAt: Date
     public let trainingCutoff: Date
@@ -716,6 +728,7 @@ public struct APIFSRSOptimizationRun: Codable, Sendable, Equatable, Identifiable
     init(_ value: LibraryFSRSOptimizationRun) {
         id = value.id.uuidString.lowercased()
         presetId = value.presetID.uuidString.lowercased()
+        cohortId = value.cohortID?.uuidString.lowercased()
         startedAt = value.startedAt
         completedAt = value.completedAt
         trainingCutoff = value.trainingCutoff
@@ -731,15 +744,6 @@ public struct APIFSRSOptimizationRun: Codable, Sendable, Equatable, Identifiable
         reason = value.reason
         candidateParameterSetId = value.candidateParameterSetID?.uuidString.lowercased()
     }
-}
-
-struct RestoreDefaultSchedulingInput: Decodable {
-    let confirm: Bool
-}
-
-struct RollbackSchedulingInput: Decodable {
-    let confirm: Bool
-    let parameterSetId: String?
 }
 
 public struct APITag: Codable, Sendable, Equatable, Identifiable {

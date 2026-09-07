@@ -1640,6 +1640,16 @@ private func pairWithAuthority(
     )
     #expect(try jsonObject(retryNext)["id"] as? String == cardID)
 
+    let oversizedDuration = await api.handle(request(
+        .post,
+        "/v1/reviews",
+        headers: auth.merging(["Idempotency-Key": "duration-too-large"]) { _, new in new },
+        body: """
+            {"sessionId":"\(sessionID)","cardId":"\(cardID)","rating":"good","durationMs":1800001}
+            """
+    ))
+    #expect(oversizedDuration.status == 422)
+
     let reviewBody = """
         {"sessionId":"\(sessionID)","cardId":"\(cardID)","rating":"good","durationMs":125}
         """
@@ -1902,6 +1912,7 @@ private func pairWithAuthority(
     #expect(previewRows.allSatisfy { ($0["predictedRetrievability"] as? Double) != nil })
     #expect(previewRows.allSatisfy { ($0["modelVersion"] as? String)?.isEmpty == false })
     #expect(previewRows.allSatisfy { ($0["parameterSetId"] as? String) != nil })
+    #expect(previewRows.allSatisfy { ($0["cohortId"] as? String) != nil })
     #expect(previewRows.allSatisfy {
         $0["timingPolicyVersion"] as? String == "neo-continuous-elapsed-v2"
     })
@@ -1919,6 +1930,7 @@ private func pairWithAuthority(
     let explanationObject = try jsonObject(explanation)
     #expect((explanationObject["ratings"] as? [[String: Any]])?.count == 4)
     #expect(explanationObject["parameterSetId"] as? String == previewRows.first?["parameterSetId"] as? String)
+    #expect(explanationObject["cohortId"] as? String == previewRows.first?["cohortId"] as? String)
     #expect(explanationObject["modelIdentifier"] as? String == previewRows.first?["modelVersion"] as? String)
 
     let schedulingHealth = await api.handle(
@@ -1933,6 +1945,8 @@ private func pairWithAuthority(
     #expect((try jsonObject(schedulingHealth)["activeParameterSetId"] as? String) != nil)
     #expect(try jsonObject(schedulingHealth)["activeParameterSource"] as? String == "populationDefault")
     #expect((try jsonObject(schedulingHealth)["legacyParametersQuarantined"] as? Bool) != nil)
+    #expect(((try jsonObject(schedulingHealth)["cohortCount"] as? Int) ?? 0) >= 2)
+    #expect((try jsonObject(schedulingHealth)["pendingMaintenance"] as? Bool) != nil)
 
     let parameterHistory = await api.handle(
         request(.get, "/v1/scheduling/parameter-sets", headers: auth)
@@ -1943,6 +1957,7 @@ private func pairWithAuthority(
     )
     #expect(parameterRows.isEmpty == false)
     #expect(parameterRows.allSatisfy { ($0["weights"] as? [Double])?.count == 21 })
+    #expect(parameterRows.allSatisfy { ($0["cohortId"] as? String) != nil })
     #expect(parameterRows.filter { $0["isActive"] as? Bool == true }.count == 1)
 
     let optimizationHistory = await api.handle(
@@ -1951,34 +1966,24 @@ private func pairWithAuthority(
     #expect(optimizationHistory.status == 200)
     #expect((try JSONSerialization.jsonObject(with: optimizationHistory.body) as? [Any]) != nil)
 
-    var recoveryHeaders = auth
-    recoveryHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
-    let unconfirmedRestore = await api.handle(request(
+    var removedMutationHeaders = auth
+    removedMutationHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
+    let removedRestore = await api.handle(request(
         .post,
         "/v1/scheduling/default-restores",
-        headers: recoveryHeaders,
-        body: #"{"confirm":false}"#
-    ))
-    #expect(unconfirmedRestore.status == 422)
-
-    recoveryHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
-    let restoredDefaults = await api.handle(request(
-        .post,
-        "/v1/scheduling/default-restores",
-        headers: recoveryHeaders,
+        headers: removedMutationHeaders,
         body: #"{"confirm":true}"#
     ))
-    #expect(restoredDefaults.status == 200)
-    #expect(try jsonObject(restoredDefaults)["parameterSource"] as? String == "populationDefaults")
+    #expect(removedRestore.status == 404)
 
-    recoveryHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
-    let invalidRollback = await api.handle(request(
+    removedMutationHeaders["Idempotency-Key"] = UUID().uuidString.lowercased()
+    let removedRollback = await api.handle(request(
         .post,
         "/v1/scheduling/rollbacks",
-        headers: recoveryHeaders,
-        body: #"{"confirm":true,"parameterSetId":"not-a-uuid"}"#
+        headers: removedMutationHeaders,
+        body: #"{"confirm":true}"#
     ))
-    #expect(invalidRollback.status == 422)
+    #expect(removedRollback.status == 404)
     let cursorAfter = await api.handle(
         request(.get, "/v1/changes", headers: auth)
     ).body
@@ -3061,7 +3066,8 @@ private func pairWithAuthority(
     let resetCard = try await store.card(id: resetCardID)
     #expect(resetCard.memory.phase == .new)
     #expect(resetCard.isSuspended)
-    #expect(try await store.rawReviewLogCount(for: resetCardID) == 0)
+    #expect(try await store.rawReviewLogCount(for: resetCardID) == 1)
+    #expect(try await store.activeReviewLogCount(for: resetCardID) == 0)
     #expect(try await store.itemRecord(id: resetItem.id).item == resetItem)
 }
 

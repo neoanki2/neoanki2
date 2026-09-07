@@ -241,7 +241,7 @@ Scheduling optimization reports nothing, successfully or otherwise: it runs
 automatically at the end of a session and only when review history warrants it.
 If you are looking for an **Optimize Scheduling** command, there isn't one, and
 its absence is not a fault. A library with under 400 usable elapsed-review
-outcomes across at least 100 cards has simply not been fitted yet; keep studying
+outcomes across at least 75 cards has simply not been fitted yet; keep studying
 normally. Optimization counts usable later reviews in card histories, not
 simply every button press. When a fit
 cannot be made or saved, the parameters already in use continue to schedule

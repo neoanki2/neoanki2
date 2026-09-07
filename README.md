@@ -61,8 +61,9 @@ for prerequisite checks, expected output, updates, and removal.
   any subject without touching a single type.
 - **Learning-science first.** The schema encodes the testing effect, encoding
   specificity, desirable difficulties, dual coding, atomicity, and interleaving.
-- **Modern scheduling.** FSRS (Difficulty–Stability–Retrievability) is the
-  scheduler, behind a swappable `Scheduler` protocol. No SM-2, no ease hell.
+- **Modern scheduling.** FSRS (Difficulty–Stability–Retrievability) learns
+  global and item-type-plus-template cohorts automatically. No SM-2, no ease
+  hell, and no scheduler controls to babysit.
 
 ## Layout
 

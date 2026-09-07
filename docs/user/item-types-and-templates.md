@@ -194,9 +194,13 @@ authorization. Existing Card setup and content identities, order, conditions,
 layout, Answer method, and Learning route remain unchanged when you open and
 save without editing them.
 
-Item types and Card setups define how knowledge is presented, not separate
-scheduling models. Their review outcomes contribute to the profile's shared,
-continuously tuned scheduler under the same automatic safety bounds.
+Item types and Card setups define both how knowledge is presented and the
+stable content cohort used by automatic scheduling. Each generated card keeps
+the cohort derived from its item-type and Card-setup identities even when its
+item moves between decks. A cohort with too little evidence silently inherits
+the global model; once its own history passes the optimizer's evidence and
+safety gates, it can use personalized parameters without exposing controls or
+changing existing due dates merely because the cohort was created.
 
 ## Use item types included with decks
 

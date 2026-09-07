@@ -10,7 +10,7 @@ import Foundation
 ///
 /// The remaining fields (`due`, `lastReview`, `reps`, `lapses`, `phase`) are
 /// used directly by the app for queuing and stats. `stepIndex` counts failed
-/// repair rounds while a card is in learning or relearning.
+/// repair attempts while a card is in learning or relearning.
 public struct MemoryState: Codable, Equatable, Sendable {
     public var stability: Double
     public var difficulty: Double

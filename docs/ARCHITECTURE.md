@@ -364,14 +364,16 @@ to a target retention. `MemoryState` carries `stability` and `difficulty` as
 algorithm-agnostic parameters; `ReviewLog` history feeds FSRS parameter fitting so
 the schedule adapts to the individual learner.
 
-Fitting is a policy decision, not a user action. After the initial eligibility
-gate, `ItemStore.optimizeSchedulingIfNeeded` continues from the active weights
-at the end of every session that adds a usable outcome. Chronological held-out
+Fitting is a policy decision, not a user action. `ItemStore` resolves every card
+through a stable item-type-plus-template cohort. A sparse cohort inherits the
+global model; eligible cohorts fit independently from their parent weights.
+The persisted dirty queue is serviced off the grading path after session end,
+sync, startup, and idle time, one full fit per pass. Chronological held-out
 validation establishes a safe learning direction; `FSRSGradualTuningPolicy`
 then activates at most one eighth of that change and halves the step until its
 interval distribution and estimated workload stay inside the automatic budget.
-Every step is immutable and cards replay it lazily, so the model learns
-continuously without a global cadence jump or an approval workflow.
+Every step is immutable and cards replay it lazily, so the hierarchy learns
+without a library-wide cadence jump, a settings surface, or an approval flow.
 
 ---
 

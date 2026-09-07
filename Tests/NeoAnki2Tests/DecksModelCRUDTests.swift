@@ -177,7 +177,8 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     let resetAt = now.addingTimeInterval(2)
     #expect(await model.resetProgress(id: deck.id, now: resetAt) == 1)
     #expect(model.summaries.first?.dueCount == 1)
-    #expect(try await store.rawReviewLogCount(for: card.id) == 0)
+    #expect(try await store.rawReviewLogCount(for: card.id) == 1)
+    #expect(try await store.activeReviewLogCount(for: card.id) == 0)
 }
 
 @Test @MainActor func decksModelClearsSelectionWhenDeckRemovedExternally() async throws {

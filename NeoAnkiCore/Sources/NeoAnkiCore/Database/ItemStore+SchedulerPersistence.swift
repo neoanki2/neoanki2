@@ -26,6 +26,10 @@ public extension ItemStore {
         try await database.fetchFSRSParameterSets()
     }
 
+    func schedulerCohorts() async throws -> [SchedulerCohort] {
+        try await database.fetchSchedulerCohorts()
+    }
+
     func saveFSRSOptimizationRun(_ run: FSRSOptimizationRun) async throws {
         try await database.insertFSRSOptimizationRun(run)
     }
@@ -37,7 +41,7 @@ public extension ItemStore {
     /// Selects the newest immutable population-default record. Scheduling
     /// integration is responsible for inserting that pinned upstream record
     /// during engine bootstrap.
-    func restoreDefaultScheduling(now: Date = .now) async throws {
+    internal func restoreDefaultScheduling(now: Date = .now) async throws {
         guard let defaults = try await database.fetchFSRSParameterSets().first(where: {
             $0.source == .populationDefault
         }) else {
@@ -47,7 +51,7 @@ public extension ItemStore {
         }
         try await database.activateFSRSParameterSet(
             defaults.id,
-            presetID: SchedulerPersistenceConstants.sharedPresetID,
+            cohortID: SchedulerPersistenceConstants.globalCohortID,
             now: now
         )
         fsrsParameters = FSRSScheduler.Parameters(
@@ -59,10 +63,10 @@ public extension ItemStore {
 
     /// Moves only the preset's active pointer. Existing due dates are kept;
     /// callers replay a card lazily before its next model update.
-    func rollbackScheduling(to parameterSetID: UUID, now: Date = .now) async throws {
+    internal func rollbackScheduling(to parameterSetID: UUID, now: Date = .now) async throws {
         try await database.activateFSRSParameterSet(
             parameterSetID,
-            presetID: SchedulerPersistenceConstants.sharedPresetID,
+            cohortID: SchedulerPersistenceConstants.globalCohortID,
             now: now
         )
         guard let selected = try await database.fetchFSRSParameterSet(id: parameterSetID) else {
@@ -112,6 +116,7 @@ public extension ItemStore {
 extension ItemStore {
     struct ActiveSchedulingContext {
         let preset: SchedulerPreset
+        let cohort: SchedulerCohort
         let parameterSet: FSRSParameterSet
         let parameters: FSRSScheduler.Parameters
     }
@@ -137,6 +142,8 @@ extension ItemStore {
                 upstreamCommit: SchedulerPersistenceConstants.upstreamCommit,
                 sourceChecksum: SchedulerPersistenceConstants.sourceChecksum,
                 fixtureChecksum: SchedulerPersistenceConstants.fixtureChecksum,
+                scope: "cohort:\(SchedulerPersistenceConstants.globalCohortID.uuidString.lowercased())",
+                cohortID: SchedulerPersistenceConstants.globalCohortID,
                 source: .populationDefault,
                 createdAt: now
             ))
@@ -155,7 +162,15 @@ extension ItemStore {
         if activeSet == nil {
             try await database.activateFSRSParameterSet(
                 defaultID,
-                presetID: preset.id,
+                cohortID: SchedulerPersistenceConstants.globalCohortID,
+                now: now
+            )
+        } else if try await database.fetchSchedulerCohort(
+            id: SchedulerPersistenceConstants.globalCohortID
+        )?.activeParameterSetID == nil, let activeID = activeSet?.id {
+            try await database.activateFSRSParameterSet(
+                activeID,
+                cohortID: SchedulerPersistenceConstants.globalCohortID,
                 now: now
             )
         }
@@ -163,16 +178,28 @@ extension ItemStore {
         fsrsParameters = context.parameters
     }
 
-    func activeSchedulingContext() async throws -> ActiveSchedulingContext {
+    func activeSchedulingContext(
+        cohortID: UUID = SchedulerPersistenceConstants.globalCohortID
+    ) async throws -> ActiveSchedulingContext {
         guard let preset = try await database.fetchSchedulerPreset(
             id: SchedulerPersistenceConstants.sharedPresetID
-        ), let parameterSetID = preset.activeParameterSetID,
+        ), let requestedCohort = try await database.fetchSchedulerCohort(id: cohortID)
+        else { throw DatabaseError.decodingFailed }
+        let globalCohort = cohortID == SchedulerPersistenceConstants.globalCohortID
+            ? requestedCohort
+            : try await database.fetchSchedulerCohort(
+                id: SchedulerPersistenceConstants.globalCohortID
+            )
+        guard let parameterSetID = requestedCohort.activeParameterSetID
+                ?? globalCohort?.activeParameterSetID
+                ?? preset.activeParameterSetID,
               let parameterSet = try await database.fetchFSRSParameterSet(id: parameterSetID)
         else {
             throw DatabaseError.decodingFailed
         }
         return ActiveSchedulingContext(
             preset: preset,
+            cohort: requestedCohort,
             parameterSet: parameterSet,
             parameters: FSRSScheduler.Parameters(
                 weights: parameterSet.weights,
@@ -180,6 +207,11 @@ extension ItemStore {
                 maximumInterval: preset.maximumIntervalDays
             )
         )
+    }
+
+    func activeSchedulingContext(for card: Card, now: Date) async throws -> ActiveSchedulingContext {
+        let assignment = try await database.ensureSchedulerCardHistory(cardID: card.id, now: now)
+        return try await activeSchedulingContext(cohortID: assignment.cohortID)
     }
 
     /// One-time exact migration for cards whose memory predates versioned
@@ -224,7 +256,7 @@ extension ItemStore {
 
     func cardReplayedForActiveScheduling(_ card: Card, now: Date) async throws -> Card {
         guard schedulerOverride == nil else { return card }
-        let context = try await activeSchedulingContext()
+        let context = try await activeSchedulingContext(for: card, now: now)
         guard try await cardRequiresReplay(card, context: context) else {
             return card
         }
@@ -278,7 +310,7 @@ extension ItemStore {
             )
         }
         let card = try await cardReplayedForActiveScheduling(originalCard, now: now)
-        let context = try await activeSchedulingContext()
+        let context = try await activeSchedulingContext(for: card, now: now)
         fsrsParameters = context.parameters
         let fsrs = FSRSScheduler(parameters: context.parameters)
         let memoryBefore = card.memory
@@ -296,15 +328,24 @@ extension ItemStore {
         let operationalSeconds = max(0, Int(ceil(next.due.timeIntervalSince(now))))
         let constraintReason: String?
         if rating == .again {
-            constraintReason = "immediate-repair-v1"
+            constraintReason = switch memoryBefore.phase {
+            case .new, .review: "immediate-repair-v1"
+            case .learning, .relearning: "deferred-repair-v2"
+            }
         } else if rawIntervalDays >= Double(context.preset.maximumIntervalDays) {
             constraintReason = "maximum-interval"
         } else {
             constraintReason = nil
         }
+        let assignment = try await database.ensureSchedulerCardHistory(cardID: card.id, now: now)
         let audit = ReviewSchedulingAudit(
             presetID: context.preset.id,
             deckIDAtReview: card.deckID,
+            cohortID: context.cohort.id,
+            itemTypeIDAtReview: assignment.itemTypeIDAtAssignment,
+            templateIDAtReview: assignment.templateIDAtAssignment,
+            skillAtReview: card.skill,
+            contentKindVersion: SchedulerPersistenceConstants.cohortPolicyVersion,
             elapsedSeconds: elapsedSeconds,
             elapsedModelDays: FSRSScheduler.elapsedModelDays(
                 from: memoryBefore.lastReview,
@@ -348,6 +389,7 @@ extension ItemStore {
                     desiredRetention: FSRSScheduler.Parameters.defaultRequestRetention,
                     maximumIntervalDays: FSRSScheduler.Parameters.defaultMaximumInterval,
                     presetID: nil,
+                    cohortID: nil,
                     parameterSetID: nil,
                     modelVersion: "scheduler-override",
                     timingPolicyVersion: FSRSScheduler.elapsedPolicyIdentifier,
@@ -357,7 +399,7 @@ extension ItemStore {
                 ))
             })
         }
-        let context = try await activeSchedulingContext()
+        let context = try await activeSchedulingContext(for: card, now: now)
         let memory: MemoryState
         let requiresReplay = try await cardRequiresReplay(card, context: context)
         if !requiresReplay {
@@ -374,7 +416,10 @@ extension ItemStore {
             let next = scheduler.schedule(memory, rating: $0, now: now)
             let raw = fsrs.rawIntervalDays(forStability: next.stability)
             let constraint: String? = if $0 == .again {
-                "immediate-repair-v1"
+                switch memory.phase {
+                case .new, .review: "immediate-repair-v1"
+                case .learning, .relearning: "deferred-repair-v2"
+                }
             } else if raw > Double(context.preset.maximumIntervalDays) {
                 "maximum-interval"
             } else {
@@ -390,6 +435,7 @@ extension ItemStore {
                 desiredRetention: context.preset.desiredRetention,
                 maximumIntervalDays: context.preset.maximumIntervalDays,
                 presetID: context.preset.id,
+                cohortID: context.cohort.id,
                 parameterSetID: context.parameterSet.id,
                 modelVersion: context.parameterSet.modelVersion,
                 timingPolicyVersion: FSRSScheduler.elapsedPolicyIdentifier,

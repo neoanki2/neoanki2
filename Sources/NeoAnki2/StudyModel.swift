@@ -68,6 +68,7 @@ final class StudyModel {
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
     private var repairQueue: [PendingRepeat] = []
+    private var reviewTiming = ReviewTimingTracker()
     private var expectedQueueCount = 0
     private var startGeneration: UInt64 = 0
     private let remainingQueueLoadGate: (@Sendable () async -> Void)?
@@ -95,7 +96,8 @@ final class StudyModel {
         // A failed card waits once in the next repair round while untouched
         // cards remain once in the current queue. Counting both pending groups
         // keeps Again stable without rescanning a potentially large session.
-        return queue.count - index + repairQueue.count
+        let maturedRepairs = repairQueue.lazy.filter { $0.card.memory.due <= .now }.count
+        return queue.count - index + maturedRepairs
     }
 
     var remainingLabel: String {
@@ -207,6 +209,7 @@ final class StudyModel {
             isFinished = false
             isPreparingQueue = true
             prepareCurrentInteraction()
+            reviewTiming.reset()
             isLoading = false
             timing.headPublicationSeconds = headPublicationStart.elapsedSeconds
             timing.firstReadySeconds = start.elapsedSeconds
@@ -401,7 +404,7 @@ final class StudyModel {
                 cardID: card.id,
                 rating: rating,
                 asOf: now,
-                durationMilliseconds: 0
+                durationMilliseconds: reviewTiming.elapsedMilliseconds()
             )
             var repeatedCard = card
             repeatedCard.card.memory = submission.memory
@@ -462,6 +465,7 @@ final class StudyModel {
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
+            reviewTiming.reset()
             isAnswerRevealed = true
             pendingGradeUndo = nil
         } catch {
@@ -472,6 +476,9 @@ final class StudyModel {
     func dismissGradeUndo() {
         pendingGradeUndo = nil
     }
+
+    func pauseReviewTiming() { reviewTiming.pause() }
+    func resumeReviewTiming() { reviewTiming.resume() }
 
     /// Re-reads the item behind the current card after it was edited mid-session,
     /// so the rest of the session shows the correction rather than the copy the
@@ -569,18 +576,21 @@ final class StudyModel {
         guard !isPreparingQueue else { return }
         guard index >= queue.count else {
             isFinished = false
+            reviewTiming.reset()
             prepareCurrentInteraction()
             return
         }
 
-        if !repairQueue.isEmpty {
+        let now = Date.now
+        let maturedRepairs = repairQueue.filter { $0.card.memory.due <= now }
+        if !maturedRepairs.isEmpty {
             var sourceIndexByCardID: [UUID: Int] = [:]
-            sourceIndexByCardID.reserveCapacity(repairQueue.count)
+            sourceIndexByCardID.reserveCapacity(maturedRepairs.count)
             for (sourceIndex, card) in queue.enumerated() {
                 sourceIndexByCardID[card.id] = sourceIndex
             }
-            queue.reserveCapacity(queue.count + repairQueue.count)
-            for repeatEntry in repairQueue {
+            queue.reserveCapacity(queue.count + maturedRepairs.count)
+            for repeatEntry in maturedRepairs {
                 guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
                     continue
                 }
@@ -588,8 +598,10 @@ final class StudyModel {
                 repeatedCard.card = repeatEntry.card
                 queue.append(repeatedCard)
             }
-            repairQueue = []
+            let maturedIDs = Set(maturedRepairs.map { $0.card.id })
+            repairQueue.removeAll { maturedIDs.contains($0.card.id) }
             isFinished = false
+            reviewTiming.reset()
             prepareCurrentInteraction()
             return
         }

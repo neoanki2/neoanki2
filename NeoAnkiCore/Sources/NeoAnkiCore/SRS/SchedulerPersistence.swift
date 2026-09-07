@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import NeoAnkiFSRS
 
@@ -11,6 +12,9 @@ public enum SchedulerPersistenceConstants {
     public static let populationDefaultParameterSetID = UUID(
         uuidString: "00000000-0000-4000-8000-000000000002"
     )!
+    public static let globalCohortID = UUID(
+        uuidString: "00000000-0000-4000-8000-000000000003"
+    )!
     public static let sharedPresetName = "Default"
     public static let desiredRetention = 0.90
     public static let maximumIntervalDays = 36_500
@@ -22,6 +26,111 @@ public enum SchedulerPersistenceConstants {
     public static let fixtureChecksum = "b132b3d6f3ce7bc1292f54001c558acd6230afad6e037dfd1670ef7c93d51a2f"
     public static let timingPolicyVersion = FSRSScheduler.elapsedPolicyIdentifier
     public static let intervalPolicyVersion = "continuous-due-v1"
+    public static let cohortPolicyVersion = "item-type-template-v1"
+
+    public static func cardKindCohortID(itemTypeID: UUID, templateID: UUID) -> UUID {
+        let signature = "neoanki-scheduler-cohort-v1|"
+            + itemTypeID.uuidString.lowercased() + "|"
+            + templateID.uuidString.lowercased()
+        var bytes = Array(SHA256.hash(data: Data(signature.utf8)).prefix(16))
+        bytes[6] = (bytes[6] & 0x0f) | 0x50
+        bytes[8] = (bytes[8] & 0x3f) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+
+    public static func parameterSetID(
+        cohortID: UUID,
+        inputFingerprint: String,
+        parentParameterSetID: UUID,
+        weights: [Double]
+    ) -> UUID {
+        let weightText = weights.map { String(format: "%.17g", $0) }.joined(separator: ",")
+        let signature = "neoanki-parameter-set-v1|\(cohortID.uuidString.lowercased())|"
+            + "\(parentParameterSetID.uuidString.lowercased())|\(inputFingerprint)|\(weightText)|"
+            + memoryModelVersion
+        var bytes = Array(SHA256.hash(data: Data(signature.utf8)).prefix(16))
+        bytes[6] = (bytes[6] & 0x0f) | 0x50
+        bytes[8] = (bytes[8] & 0x3f) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}
+
+public enum ReviewWorkloadTimingPolicy {
+    public static let maximumStoredMilliseconds = 30 * 60 * 1_000
+    public static let minimumUsableMilliseconds = 250
+    public static let maximumUsableMilliseconds = 10 * 60 * 1_000
+
+    public static func clamped(_ milliseconds: Int) -> Int {
+        min(maximumStoredMilliseconds, max(0, milliseconds))
+    }
+
+    public static func isUsable(_ milliseconds: Int) -> Bool {
+        (minimumUsableMilliseconds ... maximumUsableMilliseconds).contains(milliseconds)
+    }
+}
+
+public enum SchedulerCohortKind: String, Codable, Equatable, Sendable {
+    case global
+    case cardKind
+}
+
+public struct SchedulerCohort: Codable, Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public let kind: SchedulerCohortKind
+    public let canonicalSignature: String
+    public let parentCohortID: UUID?
+    public let activeParameterSetID: UUID?
+    public let isDirty: Bool
+    public let dirtyRevision: Int
+    public let lastAttemptAt: Date?
+    public let lastMaintenanceAt: Date?
+    public let createdAt: Date
+    public let updatedAt: Date
+
+    public init(
+        id: UUID,
+        kind: SchedulerCohortKind,
+        canonicalSignature: String,
+        parentCohortID: UUID? = nil,
+        activeParameterSetID: UUID? = nil,
+        isDirty: Bool = true,
+        dirtyRevision: Int = 1,
+        lastAttemptAt: Date? = nil,
+        lastMaintenanceAt: Date? = nil,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.kind = kind
+        self.canonicalSignature = canonicalSignature
+        self.parentCohortID = parentCohortID
+        self.activeParameterSetID = activeParameterSetID
+        self.isDirty = isDirty
+        self.dirtyRevision = dirtyRevision
+        self.lastAttemptAt = lastAttemptAt
+        self.lastMaintenanceAt = lastMaintenanceAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct SchedulerCardHistory: Codable, Equatable, Sendable {
+    public let cardID: UUID
+    public let cohortID: UUID
+    public let itemTypeIDAtAssignment: UUID
+    public let templateIDAtAssignment: UUID
+    public let historyOrigin: Date?
+    public let updatedAt: Date
 }
 
 public struct SchedulerPreset: Codable, Equatable, Sendable, Identifiable {
@@ -72,6 +181,7 @@ public struct FSRSParameterSet: Codable, Equatable, Sendable, Identifiable {
     public let sourceChecksum: String
     public let fixtureChecksum: String?
     public let scope: String
+    public let cohortID: UUID?
     public let source: FSRSParameterSource
     public let inputFingerprint: String?
     public let trainingCutoff: Date?
@@ -87,6 +197,7 @@ public struct FSRSParameterSet: Codable, Equatable, Sendable, Identifiable {
         sourceChecksum: String,
         fixtureChecksum: String? = nil,
         scope: String = "shared",
+        cohortID: UUID? = nil,
         source: FSRSParameterSource,
         inputFingerprint: String? = nil,
         trainingCutoff: Date? = nil,
@@ -101,6 +212,7 @@ public struct FSRSParameterSet: Codable, Equatable, Sendable, Identifiable {
         self.sourceChecksum = sourceChecksum
         self.fixtureChecksum = fixtureChecksum
         self.scope = scope
+        self.cohortID = cohortID
         self.source = source
         self.inputFingerprint = inputFingerprint
         self.trainingCutoff = trainingCutoff
@@ -125,6 +237,7 @@ public enum FSRSOptimizationDecision: String, Codable, Equatable, Sendable {
 public struct FSRSOptimizationRun: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let presetID: UUID
+    public let cohortID: UUID?
     public let startedAt: Date
     public let completedAt: Date
     public let trainingCutoff: Date
@@ -143,6 +256,7 @@ public struct FSRSOptimizationRun: Codable, Equatable, Sendable, Identifiable {
     public init(
         id: UUID = UUID(),
         presetID: UUID,
+        cohortID: UUID? = nil,
         startedAt: Date,
         completedAt: Date,
         trainingCutoff: Date,
@@ -160,6 +274,7 @@ public struct FSRSOptimizationRun: Codable, Equatable, Sendable, Identifiable {
     ) {
         self.id = id
         self.presetID = presetID
+        self.cohortID = cohortID
         self.startedAt = startedAt
         self.completedAt = completedAt
         self.trainingCutoff = trainingCutoff
@@ -182,6 +297,11 @@ public struct FSRSOptimizationRun: Codable, Equatable, Sendable, Identifiable {
 public struct ReviewSchedulingAudit: Codable, Equatable, Sendable {
     public let presetID: UUID?
     public let deckIDAtReview: UUID?
+    public let cohortID: UUID?
+    public let itemTypeIDAtReview: UUID?
+    public let templateIDAtReview: UUID?
+    public let skillAtReview: Skill?
+    public let contentKindVersion: String?
     public let elapsedSeconds: Double
     public let elapsedModelDays: Double
     public let parameterSetID: UUID?
@@ -198,6 +318,11 @@ public struct ReviewSchedulingAudit: Codable, Equatable, Sendable {
     public init(
         presetID: UUID?,
         deckIDAtReview: UUID?,
+        cohortID: UUID? = nil,
+        itemTypeIDAtReview: UUID? = nil,
+        templateIDAtReview: UUID? = nil,
+        skillAtReview: Skill? = nil,
+        contentKindVersion: String? = nil,
         elapsedSeconds: Double,
         elapsedModelDays: Double,
         parameterSetID: UUID?,
@@ -213,6 +338,11 @@ public struct ReviewSchedulingAudit: Codable, Equatable, Sendable {
     ) {
         self.presetID = presetID
         self.deckIDAtReview = deckIDAtReview
+        self.cohortID = cohortID
+        self.itemTypeIDAtReview = itemTypeIDAtReview
+        self.templateIDAtReview = templateIDAtReview
+        self.skillAtReview = skillAtReview
+        self.contentKindVersion = contentKindVersion
         self.elapsedSeconds = elapsedSeconds
         self.elapsedModelDays = elapsedModelDays
         self.parameterSetID = parameterSetID
@@ -238,6 +368,7 @@ public struct ReviewSchedulePreviewDetail: Codable, Equatable, Sendable {
     public let desiredRetention: Double
     public let maximumIntervalDays: Int
     public let presetID: UUID?
+    public let cohortID: UUID?
     public let parameterSetID: UUID?
     public let modelVersion: String
     public let timingPolicyVersion: String
@@ -255,6 +386,7 @@ public struct ReviewSchedulePreviewDetail: Codable, Equatable, Sendable {
         desiredRetention: Double,
         maximumIntervalDays: Int,
         presetID: UUID?,
+        cohortID: UUID? = nil,
         parameterSetID: UUID?,
         modelVersion: String,
         timingPolicyVersion: String,
@@ -271,6 +403,7 @@ public struct ReviewSchedulePreviewDetail: Codable, Equatable, Sendable {
         self.desiredRetention = desiredRetention
         self.maximumIntervalDays = maximumIntervalDays
         self.presetID = presetID
+        self.cohortID = cohortID
         self.parameterSetID = parameterSetID
         self.modelVersion = modelVersion
         self.timingPolicyVersion = timingPolicyVersion
@@ -352,6 +485,11 @@ public struct SchedulingHealthSnapshot: Codable, Equatable, Sendable {
     public let legacyParametersQuarantined: Bool
     public let optimizerParityVerified: Bool
     public let latestMigration: SchedulerMigrationRecord?
+    public let cohortCount: Int
+    public let personalizedCohortCount: Int
+    public let inheritedCohortCount: Int
+    public let pendingMaintenance: Bool
+    public let lastMaintenanceAt: Date?
 
     public var activeModelVersion: String? { activeParameterSet?.modelVersion }
     public var activeSource: FSRSParameterSource? { activeParameterSet?.source }
@@ -368,7 +506,12 @@ public struct SchedulingHealthSnapshot: Codable, Equatable, Sendable {
         rollbackParameterSetIDs: [UUID],
         legacyParametersQuarantined: Bool,
         optimizerParityVerified: Bool = SchedulerPersistenceConstants.optimizerParityVerified,
-        latestMigration: SchedulerMigrationRecord? = nil
+        latestMigration: SchedulerMigrationRecord? = nil,
+        cohortCount: Int = 1,
+        personalizedCohortCount: Int = 0,
+        inheritedCohortCount: Int = 0,
+        pendingMaintenance: Bool = false,
+        lastMaintenanceAt: Date? = nil
     ) {
         self.preset = preset
         self.activeParameterSet = activeParameterSet
@@ -377,5 +520,10 @@ public struct SchedulingHealthSnapshot: Codable, Equatable, Sendable {
         self.legacyParametersQuarantined = legacyParametersQuarantined
         self.optimizerParityVerified = optimizerParityVerified
         self.latestMigration = latestMigration
+        self.cohortCount = cohortCount
+        self.personalizedCohortCount = personalizedCohortCount
+        self.inheritedCohortCount = inheritedCohortCount
+        self.pendingMaintenance = pendingMaintenance
+        self.lastMaintenanceAt = lastMaintenanceAt
     }
 }

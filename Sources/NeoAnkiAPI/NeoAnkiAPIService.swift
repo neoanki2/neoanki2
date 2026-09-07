@@ -349,12 +349,6 @@ public actor NeoAnkiAPIService {
         case (.get, "/v1/scheduling/optimization-runs"):
             try require(grant, scope: .libraryRead)
             return try await schedulingOptimizationRuns(request)
-        case (.post, "/v1/scheduling/default-restores"):
-            try require(grant, scope: .settingsWrite)
-            return try await restoreDefaultScheduling(request)
-        case (.post, "/v1/scheduling/rollbacks"):
-            try require(grant, scope: .settingsWrite)
-            return try await rollbackScheduling(request)
         case (.get, "/v1/item-types"):
             try require(grant, scope: .libraryRead)
             return try await listItemTypes(request)
@@ -1741,9 +1735,10 @@ public actor NeoAnkiAPIService {
             from: request.body,
             allowedKeys: ["sessionId", "cardId", "rating", "durationMs"]
         )
-        guard input.durationMs >= 0 else {
+        guard (0 ... ReviewWorkloadTimingPolicy.maximumStoredMilliseconds).contains(input.durationMs) else {
             throw APIServiceError.validation(
-                "Review duration cannot be negative.", pointer: "/durationMs"
+                "Review duration must be between 0 and 1800000 milliseconds.",
+                pointer: "/durationMs"
             )
         }
         let sessionID = try parseUUID(input.sessionId, pointer: "/sessionId")
@@ -2705,6 +2700,7 @@ public actor NeoAnkiAPIService {
                 ?? FSRSScheduler.elapsedPolicyIdentifier,
             intervalPolicy: firstPreview?.intervalPolicyVersion ?? "continuous-due-v1",
             presetId: firstPreview?.presetID?.uuidString.lowercased(),
+            cohortId: firstPreview?.cohortID?.uuidString.lowercased(),
             parameterSetId: firstPreview?.parameterSetID?.uuidString.lowercased(),
             ratings: names.compactMap { rating, name in
                 previews[rating].map { APIRatingPreview(rating: name, preview: $0) }
@@ -2734,63 +2730,6 @@ public actor NeoAnkiAPIService {
         let limit = try pageLimit(request.query)
         let values = try await store.fsrsOptimizationRunHistory(limit: limit)
         return try .json(values.map(APIFSRSOptimizationRun.init))
-    }
-
-    private func restoreDefaultScheduling(_ request: APIRequest) async throws -> APIResponse {
-        _ = try requiredIdempotencyKey(request)
-        let input = try APIJSON.decodeStrict(
-            RestoreDefaultSchedulingInput.self,
-            from: request.body,
-            allowedKeys: ["confirm"]
-        )
-        guard input.confirm else {
-            throw APIServiceError.validation(
-                "Restoring scheduler defaults requires confirm=true.",
-                pointer: "/confirm"
-            )
-        }
-        do {
-            return try .json(APISchedulingHealth(
-                try await store.restoreDefaultScheduling(now: .now)
-            ))
-        } catch SchedulingRecoveryError.unavailable {
-            throw APIServiceError.problem(
-                status: 409,
-                code: "scheduling_recovery_unavailable",
-                title: "Scheduling recovery unavailable",
-                detail: "No recoverable scheduling parameter version is available."
-            )
-        }
-    }
-
-    private func rollbackScheduling(_ request: APIRequest) async throws -> APIResponse {
-        _ = try requiredIdempotencyKey(request)
-        let input = try APIJSON.decodeStrict(
-            RollbackSchedulingInput.self,
-            from: request.body,
-            allowedKeys: ["confirm", "parameterSetId"]
-        )
-        guard input.confirm else {
-            throw APIServiceError.validation(
-                "Scheduler rollback requires confirm=true.",
-                pointer: "/confirm"
-            )
-        }
-        let parameterSetID = try input.parameterSetId.map {
-            try parseUUID($0, pointer: "/parameterSetId")
-        }
-        do {
-            return try .json(APISchedulingHealth(
-                try await store.rollbackScheduling(to: parameterSetID, now: .now)
-            ))
-        } catch SchedulingRecoveryError.unavailable {
-            throw APIServiceError.problem(
-                status: 409,
-                code: "scheduling_recovery_unavailable",
-                title: "Scheduling recovery unavailable",
-                detail: "The requested scheduling parameter version is not available for rollback."
-            )
-        }
     }
 
     private func patchCard(_ id: UUID, request: APIRequest) async throws -> APIResponse {

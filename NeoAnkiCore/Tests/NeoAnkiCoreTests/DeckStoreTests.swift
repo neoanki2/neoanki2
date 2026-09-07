@@ -162,7 +162,7 @@ private func basicItem(deckID: UUID? = nil) -> Item {
     #expect(try await store.fetchItem(id: childItem.id) == nil)
 }
 
-@Test func resetDeckProgressClearsSubtreeHistoryAndKeepsOtherDecks() async throws {
+@Test func resetDeckProgressRetainsSubtreeEvidenceAndKeepsOtherDecks() async throws {
     let store = try await makeStore()
     let parent = Deck(name: "Languages", newCardsPerDay: 2)
     let child = Deck(name: "French", parentID: parent.id)
@@ -231,8 +231,10 @@ private func basicItem(deckID: UUID? = nil) -> Item {
     #expect(resetCards.allSatisfy { $0.card.memory.phase == .new })
     #expect(resetCards.allSatisfy { $0.card.memory.due < resetAt })
     #expect(resetCards[0].card.memory.due < resetCards[1].card.memory.due)
-    #expect(try await store.rawReviewLogCount(for: parentCard.id) == 0)
-    #expect(try await store.rawReviewLogCount(for: childCard.id) == 0)
+    #expect(try await store.rawReviewLogCount(for: parentCard.id) == 2)
+    #expect(try await store.rawReviewLogCount(for: childCard.id) == 1)
+    #expect(try await store.activeReviewLogCount(for: parentCard.id) == 0)
+    #expect(try await store.activeReviewLogCount(for: childCard.id) == 0)
     #expect(try await store.rawReviewLogCount(for: otherCard.id) == 1)
     #expect(try await store.fetchItem(id: parentItem.id) != nil)
     #expect(try await store.fetchItem(id: childItem.id) != nil)

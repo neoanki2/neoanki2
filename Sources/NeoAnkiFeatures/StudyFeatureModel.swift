@@ -42,7 +42,7 @@ public final class StudyFeatureModel: Identifiable {
     private var reviewedItems: Set<UUID> = []
     private var pendingUndo: (reviewID: UUID, index: Int, rating: ReviewRating, requeuedID: UUID?)?
     private var generation: UInt64 = 0
-    private var cardStartedAt = Date.now
+    private var reviewTiming = ReviewTimingTracker()
 
     public init(
         library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses,
@@ -61,8 +61,14 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public var currentCard: DueCard? { queue.indices.contains(index) ? queue[index] : nil }
-    public var isComplete: Bool { !isLoading && !isPreparingQueue && currentCard == nil && repairQueue.isEmpty }
-    public var remainingCount: Int { max(0, queue.count - index) + repairQueue.count }
+    public var isComplete: Bool {
+        !isLoading && !isPreparingQueue && currentCard == nil
+            && !repairQueue.contains { $0.card.memory.due <= .now }
+    }
+    public var remainingCount: Int {
+        max(0, queue.count - index)
+            + repairQueue.lazy.filter { $0.card.memory.due <= .now }.count
+    }
     public var canUndo: Bool { pendingUndo != nil && !isGrading }
 
     public func start() async {
@@ -85,6 +91,7 @@ public final class StudyFeatureModel: Identifiable {
             isLoading = false
             isPreparingQueue = count > first.count
             prepareInteraction()
+            if !first.isEmpty { reviewTiming.reset() }
             guard isPreparingQueue else { return }
             let all = try await library.dueCards(scope: scope, asOf: .now, limit: nil)
             guard generation == currentGeneration else { return }
@@ -165,7 +172,7 @@ public final class StudyFeatureModel: Identifiable {
         isGrading = true
         defer { isGrading = false }
         do {
-            let duration = max(0, Int(Date.now.timeIntervalSince(cardStartedAt) * 1_000))
+            let duration = reviewTiming.elapsedMilliseconds()
             let receipt = try await library.submitReview(cardID: card.id, rating: rating, asOf: .now, durationMilliseconds: duration)
             var repeated = card.card
             repeated.memory = receipt.memory
@@ -192,6 +199,7 @@ public final class StudyFeatureModel: Identifiable {
             completion = .init(reviews: max(0, completion.reviews - 1), uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count)
             pendingUndo = nil
             isAnswerRevealed = true
+            reviewTiming.reset()
             await onMutation?()
         } catch { self.error = errorMapper.map(error) }
     }
@@ -211,16 +219,21 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func dismissError() { error = nil }
+    public func pauseReviewTiming() { reviewTiming.pause() }
+    public func resumeReviewTiming() { reviewTiming.resume() }
 
     private func advance() {
         isAnswerRevealed = false
-        cardStartedAt = .now
-        if index >= queue.count, !repairQueue.isEmpty {
-            for entry in repairQueue {
+        if index >= queue.count {
+            let now = Date.now
+            let matured = repairQueue.filter { $0.card.memory.due <= now }
+            for entry in matured {
                 if var source = queue.first(where: { $0.id == entry.card.id }) { source.card = entry.card; queue.append(source) }
             }
-            repairQueue = []
+            let maturedIDs = Set(matured.map { $0.card.id })
+            repairQueue.removeAll { maturedIDs.contains($0.card.id) }
         }
+        if currentCard != nil { reviewTiming.reset() }
         prepareInteraction()
     }
 
