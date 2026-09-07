@@ -245,7 +245,9 @@ outcomes across at least 100 cards has simply not been fitted yet; keep studying
 normally. Optimization counts usable later reviews in card histories, not
 simply every button press. When a fit
 cannot be made or saved, the parameters already in use continue to schedule
-normally and a later session tries again.
+normally and a later session with new evidence tries again. Eligible profiles
+tune continuously in bounded steps; no manual approval is required when a full
+fit would imply a large workload change.
 
 All current interaction types—reveal, type, choose, record, audio submission, cloze, and
 arrange—are supported. Automatic correctness checking can still be unavailable

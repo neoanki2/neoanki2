@@ -94,9 +94,9 @@ dates already in the queue are not rewritten in bulk.
 ## Optimization happens on its own
 
 There is no **Optimize Scheduling** command, and you never need to remember to
-run one. NeoAnki2 fits this profile's FSRS 21 parameters to its saved review
-outcomes by itself, at the end of a study session, whenever accumulated history
-has grown enough for a new fit to mean anything. Saved 19-parameter FSRS-5
+run one. Once the library has enough varied history, NeoAnki2 continuously
+tunes this profile's FSRS 21 parameters from its saved review outcomes at the
+end of every study session that added a usable outcome. Saved 19-parameter FSRS-5
 profiles are migrated with the official compatibility mapping: their learned
 weights are preserved, short-term decay starts disabled, and the forgetting
 curve retains FSRS-5's fixed decay until the next optimization.
@@ -111,12 +111,22 @@ valid reviews for a card, beginning with its new-card review. The first review
 establishes state; each later review after positive elapsed time contributes
 one usable outcome. Invalid or incomplete history is excluded.
 
+Each fit begins from the parameters already in use instead of restarting the
+memory model at population defaults. NeoAnki2 validates the learned direction
+on later, held-out reviews, then advances the active model by at most one eighth
+of that distance. It automatically halves the step when necessary until the
+5th-to-95th-percentile interval change stays between **0.8× and 1.25×** and the
+estimated aggregate review-load change is no more than **5%**. There is no
+approval state. A step that cannot meet those bounds remains inactive evidence,
+and new review evidence starts another automatic attempt.
+
 The current app has no retention control: the target remains the built-in
 **90%**, and the maximum interval remains **36,500 days**. Optimization tunes
 FSRS weights only. It does not rewrite cards' existing due dates; new parameters
-take effect as later grades schedule those cards. Existing cards and review
-history remain in place; only the saved scheduling parameters for the profile
-are updated.
+take effect as later previews or grades lazily replay and schedule those cards.
+Existing cards and review history remain in place; every accepted step is an
+immutable scheduling-parameter version with its fit, step size, interval spread,
+and estimated workload effect recorded for diagnostics and rollback.
 
 Review logs are append-only and survive item/card deletion. Unless a grade was
 explicitly undone, outcomes from a deleted studied item can still contribute to
@@ -136,11 +146,10 @@ The eligibility gate also requires enough failures, study days, interval
 diversity, and held-out validation history. Below those gates, sessions end
 without a fit and nothing changes.
 
-Past the first fit, NeoAnki2 refits when review history has grown by **25%**
-since the previous attempt, with a floor of **200 new reviews** so a small
-library is not refitted constantly, and after **30 days** once any new history
-exists. Unchanged history is never refitted: the same reviews cannot produce a
-different answer, however long ago they were read.
+Past the first fit, each session with at least one new usable elapsed-review
+outcome continues tuning. A session containing only exact-repeat answers does
+not produce new optimization evidence. Unchanged history is never refitted: the
+same reviews cannot produce a different answer, however long ago they were read.
 
 Because this is automatic, there is nothing to retry and no benefit to
 fabricating grades. Grade honestly and let cards return over time. If a fit

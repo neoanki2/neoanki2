@@ -32,7 +32,7 @@ import Testing
     ])
 }
 
-@Test func refitCadenceUsesConservativeTriggers() {
+@Test func refitCadenceUsesEveryNewUsableOutcome() {
     let policy = FSRSPromotionPolicy()
     let now = Date(timeIntervalSince1970: 10_000_000)
     #expect(policy.refitTrigger(
@@ -40,21 +40,13 @@ import Testing
         now: now, isInitiallyEligible: true
     ) == .initial)
     #expect(policy.refitTrigger(
-        context: .init(lastCompletedAt: now.addingTimeInterval(-7 * 86_400), newTargetCount: 1_000, newFailureCount: 25, newDistinctCardCount: 100),
+        context: .init(lastCompletedAt: now, newTargetCount: 1, newFailureCount: 0, newDistinctCardCount: 1),
         now: now, isInitiallyEligible: true
-    ) == .dataBurst)
+    ) == .continuous)
     #expect(policy.refitTrigger(
-        context: .init(lastCompletedAt: now.addingTimeInterval(-30 * 86_400), newTargetCount: 200, newFailureCount: 10, newDistinctCardCount: 50),
+        context: .init(lastCompletedAt: now.addingTimeInterval(-365 * 86_400), newTargetCount: 0, newFailureCount: 0, newDistinctCardCount: 0),
         now: now, isInitiallyEligible: true
-    ) == .standard)
-    #expect(policy.refitTrigger(
-        context: .init(lastCompletedAt: now.addingTimeInterval(-90 * 86_400), newTargetCount: 100, newFailureCount: 5, newDistinctCardCount: 25),
-        now: now, isInitiallyEligible: true
-    ) == .maximumStale)
-    #expect(policy.refitTrigger(
-        context: .init(lastCompletedAt: now.addingTimeInterval(-7 * 86_400), newTargetCount: 100, newFailureCount: 1, newDistinctCardCount: 1, rollingCalibrationError: 0.071),
-        now: now, isInitiallyEligible: true
-    ) == .calibrationDrift)
+    ) == nil)
 }
 
 @Test func chronologicalFoldsExpandTrainingAndCoverHeldOutTail() {
@@ -69,7 +61,7 @@ import Testing
     #expect(folds.flatMap(\.validationIndices) == Array(250 ..< 400))
 }
 
-@Test func promotionRequiresParityAndHoldsLargeWorkloadChanges() {
+@Test func fullCandidateRequiresParityAndGradualStepsEnforceAutomaticBudget() {
     let policy = FSRSPromotionPolicy()
     let observations = promotionObservations(count: 400)
     let eligibility = policy.eligibility(observations: observations)
@@ -81,19 +73,50 @@ import Testing
     )
     #expect(policy.disposition(
         eligibility: eligibility, metrics: metrics, invariants: invariants,
-        workload: .init(p95GoodIntervalRatio: 1, projectedThirtyDayWorkloadChange: 0),
         optimizerParityVerified: false
     ) == .hold(reason: "optimizerParityNotVerified"))
     #expect(policy.disposition(
         eligibility: eligibility, metrics: metrics, invariants: invariants,
-        workload: .init(p95GoodIntervalRatio: 1, projectedThirtyDayWorkloadChange: 0),
         optimizerParityVerified: true
     ) == .promote)
-    #expect(policy.disposition(
-        eligibility: eligibility, metrics: metrics, invariants: invariants,
-        workload: .init(p95GoodIntervalRatio: 2.1, projectedThirtyDayWorkloadChange: 0),
-        optimizerParityVerified: true
-    ) == .hold(reason: "workloadChange"))
+    #expect(policy.gradualStepDisposition(
+        metrics: metrics, invariants: invariants,
+        workload: .init(p95GoodIntervalRatio: 1, estimatedReviewLoadChange: 0)
+    ) == .promote)
+    #expect(policy.gradualStepDisposition(
+        metrics: metrics, invariants: invariants,
+        workload: .init(p95GoodIntervalRatio: 1.26, estimatedReviewLoadChange: 0)
+    ) == .reject(reason: "automaticChangeBudget"))
+}
+
+@Test func gradualTuningMovesAtMostOneEighthTowardTarget() throws {
+    let policy = FSRSGradualTuningPolicy()
+    let active = FSRSScheduler.Parameters()
+    var targetWeights = active.weights
+    targetWeights[0] *= 2
+    targetWeights[1] *= 2
+    let target = FSRSScheduler.Parameters(weights: targetWeights)
+    let step = try #require(policy.interpolatedParameters(
+        from: active,
+        toward: target,
+        fraction: policy.candidateFractions[0]
+    ))
+
+    #expect(policy.candidateFractions[0] == 0.125)
+    #expect(abs(step.weights[0] - (active.weights[0] + (target.weights[0] - active.weights[0]) / 8)) < 1e-6)
+    #expect(policy.accepts(.init(
+        p95GoodIntervalRatio: 1.2,
+        estimatedReviewLoadChange: 0.05
+    )))
+    #expect(!policy.accepts(.init(
+        p95GoodIntervalRatio: 1.2,
+        estimatedReviewLoadChange: 0.051
+    )))
+    #expect(!policy.accepts(.init(
+        p05GoodIntervalRatio: 0.79,
+        p95GoodIntervalRatio: 1.2,
+        estimatedReviewLoadChange: 0
+    )))
 }
 
 @Test func bootstrapConfidenceIsDeterministic() {

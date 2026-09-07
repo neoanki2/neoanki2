@@ -108,6 +108,12 @@ private func seedEligibleOptimizationHistory(
     )
     try await store.saveFSRSParameterSet(defaults)
     try await store.saveFSRSParameterSet(optimized)
+    let rejected = parameterSet(
+        source: .optimized,
+        previous: optimized.id,
+        createdAt: now.addingTimeInterval(2)
+    )
+    try await store.saveFSRSParameterSet(rejected)
     try await store.rollbackScheduling(to: optimized.id, now: now)
 
     let run = FSRSOptimizationRun(
@@ -131,6 +137,7 @@ private func seedEligibleOptimizationHistory(
     #expect(health.activeParameterSet?.id == optimized.id)
     #expect(health.lastOptimizationRun?.id == run.id)
     #expect(health.rollbackParameterSetIDs.contains(defaults.id))
+    #expect(!health.rollbackParameterSetIDs.contains(rejected.id))
     #expect(health.desiredRetention == 0.9)
     #expect(health.optimizerParityVerified == SchedulerPersistenceConstants.optimizerParityVerified)
 

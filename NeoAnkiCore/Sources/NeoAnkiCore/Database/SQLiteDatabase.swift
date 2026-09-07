@@ -3746,9 +3746,14 @@ actor SQLiteDatabase {
             try fetchFSRSParameterSet(id: id)
         }
         let allSets = try fetchFSRSParameterSets()
-        let rollbackIDs = allSets.compactMap { candidate -> UUID? in
-            guard candidate.id != active?.id else { return nil }
-            return candidate.id
+        let setsByID = Dictionary(uniqueKeysWithValues: allSets.map { ($0.id, $0) })
+        var rollbackIDs: [UUID] = []
+        var visited = Set<UUID>()
+        var ancestorID = active?.previousParameterSetID
+        while let id = ancestorID, visited.insert(id).inserted,
+              let ancestor = setsByID[id] {
+            rollbackIDs.append(id)
+            ancestorID = ancestor.previousParameterSetID
         }
         let quarantined = try query(
             "SELECT 1 AS found FROM quarantined_scheduler_params LIMIT 1;"

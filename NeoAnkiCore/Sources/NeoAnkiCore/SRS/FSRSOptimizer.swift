@@ -42,9 +42,9 @@ public struct FSRSOptimizationResult: Equatable, Sendable {
 
 public struct FSRSOptimizationSchedule: Sendable, Equatable {
     public static let defaultMinimumReviewLogs = FSRSOptimizer.defaultMinimumObservations
-    public static let defaultMinimumNewReviewLogs = 200
-    public static let defaultGrowthFraction = 0.25
-    public static let defaultStaleInterval: TimeInterval = 30 * 86_400
+    public static let defaultMinimumNewReviewLogs = 1
+    public static let defaultGrowthFraction = 0.0
+    public static let defaultStaleInterval: TimeInterval = 0
 
     public struct Attempt: Sendable, Equatable {
         public let reviewLogCount: Int
@@ -75,11 +75,8 @@ public struct FSRSOptimizationSchedule: Sendable, Equatable {
     public func needsOptimization(reviewLogCount: Int, lastAttempt: Attempt?, now: Date) -> Bool {
         guard reviewLogCount >= minimumReviewLogs else { return false }
         guard let lastAttempt else { return true }
-        let newLogs = reviewLogCount - lastAttempt.reviewLogCount
-        guard newLogs > 0 else { return false }
-        if now >= lastAttempt.attemptedAt.addingTimeInterval(staleInterval) { return true }
-        let proportional = (Double(lastAttempt.reviewLogCount) * growthFraction).rounded(.up)
-        return Double(newLogs) >= max(Double(minimumNewReviewLogs), proportional)
+        _ = now
+        return reviewLogCount > lastAttempt.reviewLogCount
     }
 }
 
@@ -119,7 +116,10 @@ public struct FSRSOptimizer: Sendable {
         guard baseline.isFinite else { throw FSRSOptimizationError.invalidParameters }
         let optimized: NeoAnkiFSRS.OptimizationResult
         do {
-            optimized = try NeoAnkiFSRS.Optimizer().computeParameters(examples: examples)
+            optimized = try NeoAnkiFSRS.Optimizer().computeParameters(
+                examples: examples,
+                startingAt: try NeoAnkiFSRS.Parameters(parameters.weights.map(Float.init))
+            )
         } catch NeoAnkiFSRS.FSRSError.notEnoughData {
             throw FSRSOptimizationError.insufficientData(
                 required: minimumObservations,

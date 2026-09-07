@@ -76,7 +76,8 @@ final class SchedulingModel {
         }
     }
 
-    /// Tunes this profile's weights when accumulated history warrants it.
+    /// Continues tuning this profile's weights after each session that adds a
+    /// usable review outcome.
     ///
     /// Nothing is reported either way. Fitting is maintenance the learner did
     /// not ask for and cannot act on: a better fit changes only future due

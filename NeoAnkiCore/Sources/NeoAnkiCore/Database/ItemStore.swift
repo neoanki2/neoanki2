@@ -1124,13 +1124,12 @@ public actor ItemStore {
         )
     }
 
-    /// Fits weights only when accumulated history warrants it, and reports
-    /// nothing when it does not.
+    /// Continues tuning after every session that adds a usable outcome, and
+    /// reports nothing when history is unchanged or not yet eligible.
     ///
     /// This is the automatic path: study ends, this runs, and the learner is
-    /// never asked to decide when their scheduler should be tuned. The gate is
-    /// one `COUNT` against the last attempt, so a session that adds nothing
-    /// meaningful costs no fit.
+    /// never asked to decide when their scheduler should be tuned. A session
+    /// that adds no positive-elapsed outcome costs no fit.
     @discardableResult
     public func optimizeSchedulingIfNeeded(
         schedule: FSRSOptimizationSchedule = FSRSOptimizationSchedule(),
