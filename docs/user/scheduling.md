@@ -12,8 +12,8 @@ NeoAnki2 uses FSRS-6 (Free Spaced Repetition Scheduler) to decide when each card
 is due. You do not set an interval while studying. Instead, reveal the answer
 and describe your recall:
 
-- **Again (1):** you did not remember. The card remains due immediately and
-  enters the session's repair queue.
+- **Again (1):** you did not remember. The first failure enters immediate
+  repair; another consecutive failure keeps FSRS's computed due time.
 - **Hard (2):** you remembered with difficulty. FSRS may schedule the next
   review later the same day.
 - **Good (3):** you remembered correctly.
@@ -60,7 +60,7 @@ A new card consumes one slot when you grade it for the first time, including
 first grade restores the slot. Learning, relearning, and review cards never
 count toward this limit.
 
-Choose **Scheduling → Scheduling Settings…** to set when a new study day begins
+Choose **Study Day → Study Day Settings…** to set when a new study day begins
 in local time. The default is **4:00 AM**. The app follows the Mac's current
 time zone, and deferred new cards become available at the next rollover.
 
@@ -69,20 +69,21 @@ time zone, and deferred new cards become available at the next rollover.
 Control-click a deck, choose **Deck Settings…**, then choose **Reset All Progress…**
 to return every card in that deck and its subdecks to New. NeoAnki2
 shows a destructive confirmation before committing the reset. Items, deck
-settings, and suspended-card state are preserved; review history and the
-schedule derived from it are permanently removed for the affected cards. The
+settings, and suspended-card state are preserved. Earlier review rows remain as
+append-only statistical evidence, but the reset origin excludes them from the
+card's replay and future schedule. The
 reset also clears any repeated-lapse acknowledgements because those lapse
 counts no longer apply. The
-operation cannot be undone, so back up the library first when that history
-matters.
+operation cannot be undone, so back up the library first when progress matters.
 
-Learning and relearning use criterion-based **repair rounds**, not fixed minute
-intervals. NeoAnki2 finishes the current queue, then shows every failed card
-again. Again moves that card to the end of the next repair round; Hard, Good,
-or Easy lets it graduate. Rounds continue until every card is recalled or you
-end the session. Unfinished cards stay due immediately for the next
-session. Repair rounds are an acquisition policy, not a fixed-time learning
-step: they deliberately do not wait. After successful recall, FSRS-6 chooses
+Learning and relearning use adaptive **repair**. The first Again from New or
+Review is eligible to return immediately after other due cards. If that repair
+also receives Again, NeoAnki2 preserves the due time computed by the cohort's
+FSRS model instead of creating an endless immediate loop. A deferred repair
+returns in the current session only if it matures while other cards are being
+studied; otherwise the session completes normally and the card returns in a
+later due session. Future repairs do not inflate the remaining-card count.
+Hard, Good, or Easy graduates the card. After successful recall, FSRS-6 chooses
 the next due time from the card's stability. That due time keeps fractional-day
 precision, so a weak short-term memory can return in hours while established
 memories normally return in days or longer. The memory-state transition also
@@ -93,10 +94,13 @@ dates already in the queue are not rewritten in bulk.
 
 ## Optimization happens on its own
 
-There is no **Optimize Scheduling** command, and you never need to remember to
-run one. Once the library has enough varied history, NeoAnki2 continuously
-tunes this profile's FSRS 21 parameters from its saved review outcomes at the
-end of every study session that added a usable outcome. Saved 19-parameter FSRS-5
+There is no **Optimize Scheduling** command, scheduler toggle, model selector,
+restore action, or rollback action. Once there is enough varied history,
+NeoAnki2 learns a hierarchy of models automatically: a global model, a model
+for each item-type-and-Card-setup cohort, and each card's own memory state.
+Decks do not define cohorts, so moving a card cannot change the content model
+that learns from it. Sparse cohorts inherit the current global parameters.
+Saved 19-parameter FSRS-5
 profiles are migrated with the official compatibility mapping: their learned
 weights are preserved, short-term decay starts disabled, and the forgetting
 curve retains FSRS-5's fixed decay until the next optimization.
@@ -111,10 +115,13 @@ valid reviews for a card, beginning with its new-card review. The first review
 establishes state; each later review after positive elapsed time contributes
 one usable outcome. Invalid or incomplete history is excluded.
 
-Each fit begins from the parameters already in use instead of restarting the
-memory model at population defaults. NeoAnki2 validates the learned direction
-on later, held-out reviews, then advances the active model by at most one eighth
-of that distance. It automatically halves the step when necessary until the
+Global and content-cohort fits are trained independently. A content fit begins
+from its current parent/global parameters. NeoAnki2 validates the learned
+direction on a chronological held-out tail, requires improvement over both the
+active model and empirical recall base rate, checks calibration and elapsed-time
+slices, and replays scheduling invariants deterministically. It then advances
+the active model by at most one eighth of that distance. It automatically
+halves the step when necessary until the
 5th-to-95th-percentile interval change stays between **0.8× and 1.25×** and the
 estimated aggregate review-load change is no more than **5%**. There is no
 approval state. A step that cannot meet those bounds remains inactive evidence,
@@ -125,8 +132,10 @@ The current app has no retention control: the target remains the built-in
 FSRS weights only. It does not rewrite cards' existing due dates; new parameters
 take effect as later previews or grades lazily replay and schedule those cards.
 Existing cards and review history remain in place; every accepted step is an
-immutable scheduling-parameter version with its fit, step size, interval spread,
-and estimated workload effect recorded for diagnostics and rollback.
+immutable scheduling-parameter version with cohort provenance, fit, step size,
+interval spread, and estimated workload effect recorded for read-only
+diagnostics. Unsafe probation automatically falls back to the previous approved
+set or the global parent.
 
 Review logs are append-only and survive item/card deletion. Unless a grade was
 explicitly undone, outcomes from a deleted studied item can still contribute to
@@ -138,18 +147,24 @@ the optimizer.
 ## When a fit is attempted
 
 Fitting requires at least **400 usable elapsed-review outcomes** across at
-least 100 cards. This is not necessarily the same as 400 button presses: an
+least **75 cards**, including at least **30 failures** over **21 study days**.
+This is not necessarily the same as 400 button presses: an
 answer contributes an outcome only when positive time has elapsed since the
 previous answer for that card. Fractional days are retained, including for
 same-day answers; an exact-repeat answer remains sequence context only.
-The eligibility gate also requires enough failures, study days, interval
-diversity, and held-out validation history. Below those gates, sessions end
-without a fit and nothing changes.
+The gate also requires two elapsed-time buckets with 20 targets each and a
+chronological validation tail with at least 150 targets and 8 failures. Below
+those gates, sessions end without a fit and nothing changes.
 
-Past the first fit, each session with at least one new usable elapsed-review
-outcome continues tuning. A session containing only exact-repeat answers does
-not produce new optimization evidence. Unchanged history is never refitted: the
-same reviews cannot produce a different answer, however long ago they were read.
+After the first fit, a cohort is reconsidered after 100 new usable targets or
+after 30 days when new evidence exists. A session containing only exact-repeat
+answers does not produce new optimization evidence. Unchanged or previously
+failed input is never refitted.
+
+Review work time is measured automatically with a monotonic foreground timer.
+Background time is excluded and stored values are capped at 30 minutes; only
+samples from 250 milliseconds through 10 minutes affect workload safety checks.
+This timing never appears as another study control.
 
 Because this is automatic, there is nothing to retry and no benefit to
 fabricating grades. Grade honestly and let cards return over time. If a fit

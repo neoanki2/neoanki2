@@ -101,9 +101,9 @@ replacement, and draft deletion move into the adjacent **Recording** menu once
 they are relevant, so a second primary action is not stranded at the lower edge
 of the card content.
 
-### Scheduling
+### Study Day
 
-- **Scheduling Settings…** sets when a new study day begins.
+- **Study Day Settings…** sets when a new study day begins.
 
 There is no optimization command. Parameter fitting runs by itself when review
 history warrants it, so there is no menu item to find, enable, or wait on.
@@ -172,8 +172,8 @@ question remains first, the expected answer follows immediately, and
 supplemental answer details remain last. VoiceOver focus still moves to the
 newly revealed answer.
 
-Scheduling health uses text and symbols as well as color, and migration or
-optimization progress remains readable with Dynamic Type.
+Scheduling maintenance has no user-facing status or actions. The Study Day
+rollover control remains readable with Dynamic Type.
 
 Parent deck selection and disclosure remain separate actions. Activating the
 row selects that deck's scope without expanding it; use the disclosure triangle

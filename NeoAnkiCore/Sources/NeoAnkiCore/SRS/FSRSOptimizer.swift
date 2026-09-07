@@ -42,9 +42,9 @@ public struct FSRSOptimizationResult: Equatable, Sendable {
 
 public struct FSRSOptimizationSchedule: Sendable, Equatable {
     public static let defaultMinimumReviewLogs = FSRSOptimizer.defaultMinimumObservations
-    public static let defaultMinimumNewReviewLogs = 1
+    public static let defaultMinimumNewReviewLogs = 100
     public static let defaultGrowthFraction = 0.0
-    public static let defaultStaleInterval: TimeInterval = 0
+    public static let defaultStaleInterval: TimeInterval = 30 * 86_400
 
     public struct Attempt: Sendable, Equatable {
         public let reviewLogCount: Int
@@ -75,8 +75,10 @@ public struct FSRSOptimizationSchedule: Sendable, Equatable {
     public func needsOptimization(reviewLogCount: Int, lastAttempt: Attempt?, now: Date) -> Bool {
         guard reviewLogCount >= minimumReviewLogs else { return false }
         guard let lastAttempt else { return true }
-        _ = now
-        return reviewLogCount > lastAttempt.reviewLogCount
+        let newCount = reviewLogCount - lastAttempt.reviewLogCount
+        guard newCount > 0 else { return false }
+        return newCount >= minimumNewReviewLogs
+            || now.timeIntervalSince(lastAttempt.attemptedAt) >= staleInterval
     }
 }
 

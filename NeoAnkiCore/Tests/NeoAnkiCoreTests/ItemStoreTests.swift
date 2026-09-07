@@ -588,11 +588,11 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(try await store.optimizeSchedulingIfNeeded(now: end) == nil)
     #expect(try await store.fsrsOptimizationRuns().count == 1)
 
-    // One new usable outcome is enough to continue the gradual rollout at the
-    // next session boundary; no weekly/monthly cadence gate remains.
+    // One new usable outcome is reconsidered once the 30-day maintenance
+    // interval has elapsed. Earlier calls wait for 100 new targets.
     let database = await store.database
     let prior = try #require(try await database.fetchActiveReviewLogs().last)
-    let continuedAt = end.addingTimeInterval(86_400)
+    let continuedAt = end.addingTimeInterval(30 * 86_400)
     try await store.applySynchronizedReview(ReviewLog(
         cardID: prior.cardID,
         reviewedAt: continuedAt,

@@ -266,6 +266,7 @@ struct ContentView: View {
             await trackDueCounts()
         }
         .onChange(of: scenePhase) { _, phase in
+            updateForScenePhase(phase)
             // Coming back to the app can cross any amount of time, including a
             // study day rollover, so the counts are re-read before they are read.
             guard phase == .active else { return }
@@ -1004,6 +1005,14 @@ struct ContentView: View {
         Task { await decksModel.refreshCounts() }
     }
 
+    private func updateForScenePhase(_ phase: ScenePhase) {
+        if phase == .active {
+            studyModel?.resumeReviewTiming()
+        } else {
+            studyModel?.pauseReviewTiming()
+        }
+    }
+
     private func reloadScope(asOf now: Date = .now) async {
         let scope = decksModel.studyScope
         itemsModel.setCachedScope(scope)
@@ -1055,7 +1064,7 @@ struct ContentView: View {
         // Last, and only after the visible surfaces are true: fitting is the
         // one thing here the learner is not waiting to see. New parameters
         // affect grades from here on, not any due time already on screen.
-        await schedulingModel.optimizeIfNeeded()
+        await schedulingModel.requestAutomaticMaintenance()
     }
 
     /// Re-reads only what is due, on both surfaces, against one instant. This is

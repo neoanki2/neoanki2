@@ -53,6 +53,8 @@ import Testing
     )
     #expect(!manifest.contains(#""name":"Ліна""#))
     #expect(manifest.contains(#""name":"спини мене отямся і отям""#))
+    #expect(manifest.contains(#""operation":"recall""#))
+    #expect(!manifest.contains(#""operation":"recognize""#))
 
     let records = try jsonLines(
         at: generated.bundleURL.appendingPathComponent("items/poem.jsonl")

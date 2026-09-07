@@ -53,9 +53,9 @@
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/FSRSOptimizer.swift",
     "minimumReviewOutcomes": 400,
     "minimumReviewsPerCardForOutcome": 2,
-    "automaticMinimumNewReviewLogs": 1,
+    "automaticMinimumNewReviewLogs": 100,
     "automaticGrowthPercent": 0,
-    "automaticStaleIntervalDays": 0
+    "automaticStaleIntervalDays": 30
   },
   "dailyNewCards": {
     "article": "user/scheduling.md",
@@ -68,7 +68,7 @@
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/LearningScheduler.swift",
     "model": "FSRS-6",
     "reviewMinimumIntervalDays": 0,
-    "learningPolicy": "repair-rounds",
+    "learningPolicy": "adaptive-repair-v2",
     "defaultRequestRetention": 0.9,
     "defaultMaximumIntervalDays": 36500
   },
@@ -117,7 +117,7 @@
         "default is **4:00 AM**",
         "There is no **Optimize Scheduling** command",
         "Reset All Progress",
-        "each session with at least one new usable elapsed-review",
+        "After the first fit, a cohort is reconsidered after 100 new usable targets",
         "at most one eighth",
         "no more than **5%**"
       ]
@@ -151,9 +151,9 @@
     {
       "article": "user/studying.md",
       "contains": [
-        "repair round",
-        "due immediately",
-        "shared preset starts at 90%",
+        "immediate repair",
+        "future deferred repair",
+        "product target is fixed at 90%",
         "The first card appears as soon as its exact due count and content are ready"
       ]
     },

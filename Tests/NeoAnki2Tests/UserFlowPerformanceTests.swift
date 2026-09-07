@@ -363,15 +363,14 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     let model = SchedulingModel(store: store)
 
     _ = try await PerformanceHarness.measure(
-        flow: "scheduling-model-optimize",
+        flow: "scheduling-model-request-maintenance",
         layer: "app",
         metadata: ["item_count": "\(libraryCount)", "fsrs_seed_count": "\(fsrsCount)"]
     ) {
-        await model.optimizeIfNeeded()
-        // The seeded history warrants a fit, so this measures the fit itself
-        // rather than the cheap gate that decides against one.
-        let attempt = try #require(await store.lastOptimizationAttempt())
-        return ["review_log_count": "\(attempt.reviewLogCount)"]
+        await model.requestAutomaticMaintenance()
+        // Requesting maintenance must stay off the interactive path. The
+        // coordinator performs the fit independently after this returns.
+        return [:]
     }
 }
 

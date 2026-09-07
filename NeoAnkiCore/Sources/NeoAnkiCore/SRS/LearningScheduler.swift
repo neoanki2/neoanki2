@@ -3,18 +3,19 @@ import Foundation
 /// Criterion-based acquisition policy layered over FSRS memory updates.
 ///
 /// The phase/rating contract is explicit:
-/// - New/learning/relearning + Again: update D/S with FSRS, but remain due now
-///   for a non-waiting acquisition repair round.
+/// - New + Again: update D/S with FSRS and remain due now for one repair round.
+/// - Learning/relearning + Again: retain the FSRS due date so repeated failures
+///   do not create an unbounded immediate loop.
 /// - New/learning/relearning + Hard/Good/Easy: graduate and keep FSRS's precise
 ///   (possibly intraday) due date.
 /// - Review + Again: count one lapse and enter immediate relearning repair.
 /// - Review + Hard/Good/Easy: remain in review with the FSRS-selected due date.
 ///
-/// Repeated repair attempts never add lapses or interval fuzz to their
-/// immediate due date. Every attempt still updates FSRS memory state so the
+/// Repeated repair attempts never add lapses or interval fuzz. Every attempt
+/// still updates FSRS memory state and retains its computed due date so the
 /// eventual post-recall interval reflects the complete history.
 public struct LearningScheduler: Scheduler {
-    public static let policyIdentifier = "repair-rounds"
+    public static let policyIdentifier = "adaptive-repair-v2"
 
     private let fsrs: FSRSScheduler
 
@@ -33,7 +34,7 @@ public struct LearningScheduler: Scheduler {
         case .new:
             switch rating {
             case .again:
-                enterRepairRound(&next, phase: .learning, previousStep: nil, now: now)
+                enterRepairRound(&next, phase: .learning, previousStep: nil, dueNow: true, now: now)
             case .hard, .good, .easy:
                 graduate(&next)
             }
@@ -46,6 +47,7 @@ public struct LearningScheduler: Scheduler {
                     &next,
                     phase: .learning,
                     previousStep: state.stepIndex,
+                    dueNow: false,
                     now: now
                 )
             case .hard, .good, .easy:
@@ -54,7 +56,7 @@ public struct LearningScheduler: Scheduler {
 
         case .review:
             if rating == .again {
-                enterRepairRound(&next, phase: .relearning, previousStep: nil, now: now)
+                enterRepairRound(&next, phase: .relearning, previousStep: nil, dueNow: true, now: now)
             } else {
                 graduate(&next)
             }
@@ -67,6 +69,7 @@ public struct LearningScheduler: Scheduler {
                     &next,
                     phase: .relearning,
                     previousStep: state.stepIndex,
+                    dueNow: false,
                     now: now
                 )
             case .hard, .good, .easy:
@@ -81,11 +84,12 @@ public struct LearningScheduler: Scheduler {
         _ state: inout MemoryState,
         phase: Phase,
         previousStep: Int?,
+        dueNow: Bool,
         now: Date
     ) {
         state.phase = phase
         state.stepIndex = previousStep.map { $0 + 1 } ?? 0
-        state.due = now
+        if dueNow { state.due = now }
     }
 
     private func graduate(_ state: inout MemoryState) {

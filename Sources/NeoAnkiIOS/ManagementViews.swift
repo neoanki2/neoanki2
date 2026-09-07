@@ -126,94 +126,23 @@ struct SchedulingMobileView: View {
     @Bindable var model: MobileAppModel
     @State private var rollover = 240
     @State private var message: String?
-    @State private var health: LibrarySchedulingHealth?
-    @State private var isWorking = false
     var body: some View {
         Form {
             Section("Study Day") {
                 Stepper("Rollover: \(rollover / 60):\(String(format: "%02d", rollover % 60))", value: $rollover, in: 0...1439, step: 15)
-                Button("Save") { Task { try? await model.library.setStudyDayRolloverMinutes(rollover); message = "Scheduling updated"; await model.refresh() } }
-            }
-            Section("FSRS") {
-                if let health {
-                    LabeledContent("Status") {
-                        Label(
-                            health.optimizerParityVerified
-                                ? (health.usesPopulationDefaults ? "Population defaults" : "Personalized")
-                                : "Personalization unavailable — verification pending",
-                            systemImage: health.optimizerParityVerified
-                                ? (health.usesPopulationDefaults ? "checkmark.shield" : "person.crop.circle.badge.checkmark")
-                                : "exclamationmark.shield"
-                        )
+                Button("Save") {
+                    Task {
+                        try? await model.library.setStudyDayRolloverMinutes(rollover)
+                        message = "Study day updated"
+                        await model.refresh()
                     }
-                    LabeledContent("Desired retention", value: health.desiredRetention.formatted(.percent.precision(.fractionLength(0))))
-                    LabeledContent("Maximum interval", value: "\(health.maximumIntervalDays) days")
-                    LabeledContent("Automatic optimization", value: health.automaticOptimizationEnabled ? (health.optimizerParityVerified ? "On" : "On — activation blocked") : "Off")
-                    LabeledContent("Optimizer status", value: health.optimizerStatus)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Model")
-                        Text(health.modelIdentifier)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
-                    LabeledContent("Parameter set", value: health.activeParameterSetID?.uuidString.lowercased() ?? "Unavailable")
-                    LabeledContent("Migration", value: health.migrationStatus ?? "Unavailable")
-                    LabeledContent("Legacy evidence", value: health.legacyParametersQuarantined ? "Quarantined" : "None reported")
-                    if let decision = health.lastOptimizationDecision {
-                        LabeledContent("Last optimization", value: decision)
-                        if let completedAt = health.lastOptimizationCompletedAt {
-                            LabeledContent("Completed", value: completedAt.formatted(date: .abbreviated, time: .shortened))
-                        }
-                        if let reason = health.lastOptimizationReason {
-                            Text(reason).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Button("Restore Population Defaults") {
-                        Task { await restoreDefaults() }
-                    }
-                    .disabled(!health.canRestoreDefaults || isWorking)
-                    Button("Rollback to Previous Parameters") {
-                        Task { await rollback() }
-                    }
-                    .disabled(!health.canRollback || isWorking)
-                    if !health.canRestoreDefaults && !health.canRollback {
-                        Text("Recovery becomes available after an immutable parameter history has been created.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    ProgressView("Loading scheduler health…")
                 }
                 if let message { Text(message).foregroundStyle(.secondary) }
             }
         }
-        .navigationTitle("Scheduling")
+        .navigationTitle("Study Day")
         .task {
             rollover = (try? await model.library.studyDayRolloverMinutes()) ?? 240
-            health = try? await model.library.schedulingHealthSnapshot()
-        }
-    }
-
-    private func restoreDefaults() async {
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            health = try await model.library.restoreDefaultScheduling(now: .now)
-            message = "Population defaults restored"
-        } catch {
-            message = MobileAppModel.message(for: error)
-        }
-    }
-
-    private func rollback() async {
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            health = try await model.library.rollbackScheduling(to: nil, now: .now)
-            message = "Previous parameters restored"
-        } catch {
-            message = MobileAppModel.message(for: error)
         }
     }
 }

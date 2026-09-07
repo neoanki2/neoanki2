@@ -5,12 +5,14 @@ extension FastFunctionalJourneyTests {
         let app = launchApp(scenario: "deck-with-due-items")
 
         runJourneyActivity("LibraryUITests.testSchedulingMenuOffersOnlySettings") {
-            app.menuBarItems["Scheduling"].click()
-            let settings = app.menuItems.identified("Scheduling Settings…")
+            app.menuBarItems["Study Day"].click()
+            let settings = app.menuItems.identified("Study Day Settings…")
             XCTAssertTrue(settings.waitUntilExists(timeout: 3))
             XCTAssertTrue(settings.isEnabled)
             XCTAssertFalse(app.menuItems.identified("Optimize Scheduling…").exists)
             XCTAssertFalse(app.menuItems.identified("Optimizing Scheduling…").exists)
+            XCTAssertFalse(app.menuItems.identified("Restore Defaults").exists)
+            XCTAssertFalse(app.menuItems.identified("Rollback").exists)
             app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
         }
 

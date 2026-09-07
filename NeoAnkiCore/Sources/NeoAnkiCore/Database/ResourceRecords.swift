@@ -321,12 +321,26 @@ public extension ItemStore {
 
     func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) async throws {
         try await database.applySynchronizedBatch(mutations)
+        var schedulingChanged = false
         for mutation in mutations {
-            if case let .schedulingSettings(.scheduler(profileID, parameters, _, _, _)) = mutation,
-               profileID == self.profileID {
-                fsrsParameters = parameters
+            let cardID: UUID?
+            switch mutation {
+            case let .card(card): cardID = card.id
+            case let .review(record): cardID = record.log.cardID
+            case let .reviewRevert(record):
+                cardID = try await database.fetchReviewLog(id: record.reviewLogID)?.cardID
+            default: cardID = nil
+            }
+            if let cardID {
+                let hasHistory = try await database.fetchSchedulerCardHistory(cardID: cardID) != nil
+                let hasCard = try await database.fetchCard(id: cardID) != nil
+                if hasHistory || hasCard {
+                    try await database.markSchedulerCohortsDirty(cardID: cardID, now: .now)
+                    schedulingChanged = true
+                }
             }
         }
+        if schedulingChanged { requestAutomaticSchedulingMaintenance() }
     }
     func itemRecord(id: UUID) async throws -> LibraryItemRecord {
         guard let persisted = try await database.fetchItem(id: id) else {
@@ -410,6 +424,8 @@ public extension ItemStore {
     @discardableResult
     func resetCardProgress(id: UUID, now: Date = .now) async throws -> Card {
         try await database.resetCardProgress(id: id, now: now)
+        try await database.markSchedulerCohortsDirty(cardID: id, now: now)
+        requestAutomaticSchedulingMaintenance()
         return try await card(id: id)
     }
 }

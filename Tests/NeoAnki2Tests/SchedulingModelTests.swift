@@ -13,11 +13,10 @@ import Testing
     let model = SchedulingModel(store: store)
     let before = await store.schedulingParameters()
 
-    await model.optimizeIfNeeded()
+    await model.requestAutomaticMaintenance()
 
     // Automatic fitting is maintenance, not an answer to a request: a young
     // library must produce no interruption and no parameter change.
-    #expect(model.isOptimizing == false)
     #expect(await store.schedulingParameters() == before)
     #expect(try await store.lastOptimizationAttempt() == nil)
 }
@@ -36,7 +35,7 @@ import Testing
     let before = await store.schedulingParameters()
     let healthBefore = try await store.schedulingHealthSnapshot()
     let parameterSetsBefore = try await store.fsrsParameterSets()
-    await model.optimizeIfNeeded()
+    await model.requestAutomaticMaintenance()
 
     // Review volume alone cannot bypass the conservative personalization
     // gates. This fixture has only one card and fewer than 400 eligible
@@ -50,7 +49,7 @@ import Testing
     #expect(try await store.lastOptimizationAttempt() == nil)
 
     // A second session end with no new eligible data remains a no-op.
-    await model.optimizeIfNeeded()
+    await model.requestAutomaticMaintenance()
     #expect(await store.schedulingParameters() == before)
     #expect(try await store.fsrsOptimizationRuns().isEmpty)
     #expect(try await store.lastOptimizationAttempt() == nil)

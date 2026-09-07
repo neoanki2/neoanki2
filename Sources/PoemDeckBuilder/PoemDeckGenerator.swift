@@ -168,7 +168,7 @@ public enum PoemDeckGenerator {
                 prompt: [SlotRecord(field: "front")],
                 answer: [SlotRecord(field: "back")],
                 interaction: "reveal",
-                skill: SkillRecord(input: "text", output: "text", operation: "recognize")
+                skill: SkillRecord(input: "text", output: "text", operation: "recall")
             ),
         ]
     )

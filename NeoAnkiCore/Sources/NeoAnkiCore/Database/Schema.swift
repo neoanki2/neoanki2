@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 27
+    static let version = 28
 
     static let createStatements: [String] = [
         """
@@ -312,7 +312,8 @@ enum Schema {
 
     /// Versioned scheduler records are deliberately separate from the legacy
     /// mutable `scheduler_params` row. Parameter sets and completed optimizer
-    /// runs are insert-only; activation is an update to the shared preset.
+    /// runs are insert-only; activation updates a local cohort pointer (and the
+    /// legacy shared preset pointer only for the global cohort).
     static let schedulerPersistenceStatements: [String] = [
         """
         CREATE TABLE IF NOT EXISTS fsrs_parameter_sets (
@@ -323,6 +324,7 @@ enum Schema {
             source_checksum TEXT NOT NULL,
             fixture_checksum TEXT,
             scope TEXT NOT NULL,
+            cohort_id TEXT,
             source TEXT NOT NULL,
             input_fingerprint TEXT,
             training_cutoff REAL,
@@ -365,9 +367,48 @@ enum Schema {
         );
         """,
         """
+        CREATE TABLE IF NOT EXISTS scheduler_cohorts (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK(kind IN ('global', 'cardKind')),
+            canonical_signature TEXT NOT NULL UNIQUE,
+            parent_cohort_id TEXT REFERENCES scheduler_cohorts(id),
+            active_parameter_set_id TEXT REFERENCES fsrs_parameter_sets(id),
+            is_dirty INTEGER NOT NULL DEFAULT 1 CHECK(is_dirty IN (0, 1)),
+            dirty_revision INTEGER NOT NULL DEFAULT 1 CHECK(dirty_revision >= 0),
+            last_attempt_at REAL,
+            last_maintenance_at REAL,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        """,
+        """
+        INSERT OR IGNORE INTO scheduler_cohorts (
+            id, kind, canonical_signature, parent_cohort_id,
+            active_parameter_set_id, is_dirty, dirty_revision,
+            created_at, updated_at
+        ) VALUES (
+            '00000000-0000-4000-8000-000000000003', 'global', 'global', NULL,
+            (SELECT active_parameter_set_id FROM scheduler_presets
+             WHERE id = '00000000-0000-4000-8000-000000000001'),
+            0, 0, CAST(strftime('%s', 'now') AS REAL),
+            CAST(strftime('%s', 'now') AS REAL)
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_card_history (
+            card_id TEXT PRIMARY KEY NOT NULL,
+            cohort_id TEXT NOT NULL REFERENCES scheduler_cohorts(id),
+            item_type_id_at_assignment TEXT NOT NULL,
+            template_id_at_assignment TEXT NOT NULL,
+            history_origin REAL,
+            updated_at REAL NOT NULL
+        );
+        """,
+        """
         CREATE TABLE IF NOT EXISTS fsrs_optimization_runs (
             id TEXT PRIMARY KEY NOT NULL,
             preset_id TEXT NOT NULL REFERENCES scheduler_presets(id),
+            cohort_id TEXT,
             started_at REAL NOT NULL,
             completed_at REAL NOT NULL,
             training_cutoff REAL NOT NULL,
@@ -427,6 +468,14 @@ enum Schema {
         """
         CREATE INDEX IF NOT EXISTS idx_fsrs_optimization_runs_completed_at
         ON fsrs_optimization_runs(completed_at DESC, id DESC);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_scheduler_cohorts_dirty
+        ON scheduler_cohorts(is_dirty, last_attempt_at, id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_scheduler_card_history_cohort
+        ON scheduler_card_history(cohort_id, card_id);
         """,
     ]
 
@@ -573,8 +622,6 @@ enum Schema {
             compoundTrackedTableStatements(table: table, resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'included:' || NEW.root_deck_id || ':' || NEW.item_type_id", oldIDExpression: "'included:' || OLD.root_deck_id || ':' || OLD.item_type_id")
         case "deck_item_type_policy_entries":
             compoundTrackedTableStatements(table: table, resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'policy:' || NEW.deck_id || ':' || NEW.item_type_id", oldIDExpression: "'policy:' || OLD.deck_id || ':' || OLD.item_type_id")
-        case "scheduler_params":
-            compoundTrackedTableStatements(table: table, resourceType: "schedulingSettings", eventStem: "schedulingSettings", newIDExpression: "'profile:' || NEW.profile_id", oldIDExpression: "'profile:' || OLD.profile_id")
         case "portable_item_type_mappings":
             compoundTrackedTableStatements(table: table, resourceType: "portableTypeMapping", eventStem: "portableTypeMapping", newIDExpression: "NEW.origin_library_id || ':' || NEW.origin_type_id || ':' || NEW.schema_digest", oldIDExpression: "OLD.origin_library_id || ':' || OLD.origin_type_id || ':' || OLD.schema_digest")
         case "app_metadata":
@@ -605,13 +652,6 @@ enum Schema {
             eventStem: "itemTypeMembership",
             newIDExpression: "'policy:' || NEW.deck_id || ':' || NEW.item_type_id",
             oldIDExpression: "'policy:' || OLD.deck_id || ':' || OLD.item_type_id"
-        )
-        + compoundTrackedTableStatements(
-            table: "scheduler_params",
-            resourceType: "schedulingSettings",
-            eventStem: "schedulingSettings",
-            newIDExpression: "'profile:' || NEW.profile_id",
-            oldIDExpression: "'profile:' || OLD.profile_id"
         )
         + compoundTrackedTableStatements(
             table: "portable_item_type_mappings",
@@ -1393,6 +1433,42 @@ enum Schema {
             acknowledged_lapses INTEGER NOT NULL CHECK(acknowledged_lapses >= 0),
             acknowledged_at REAL NOT NULL
         );
+        """,
+    ]
+
+    static let migrationV28Statements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_cohorts (
+            id TEXT PRIMARY KEY NOT NULL,
+            kind TEXT NOT NULL CHECK(kind IN ('global', 'cardKind')),
+            canonical_signature TEXT NOT NULL UNIQUE,
+            parent_cohort_id TEXT REFERENCES scheduler_cohorts(id),
+            active_parameter_set_id TEXT REFERENCES fsrs_parameter_sets(id),
+            is_dirty INTEGER NOT NULL DEFAULT 1 CHECK(is_dirty IN (0, 1)),
+            dirty_revision INTEGER NOT NULL DEFAULT 1 CHECK(dirty_revision >= 0),
+            last_attempt_at REAL,
+            last_maintenance_at REAL,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS scheduler_card_history (
+            card_id TEXT PRIMARY KEY NOT NULL,
+            cohort_id TEXT NOT NULL REFERENCES scheduler_cohorts(id),
+            item_type_id_at_assignment TEXT NOT NULL,
+            template_id_at_assignment TEXT NOT NULL,
+            history_origin REAL,
+            updated_at REAL NOT NULL
+        );
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_scheduler_cohorts_dirty
+        ON scheduler_cohorts(is_dirty, last_attempt_at, id);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_scheduler_card_history_cohort
+        ON scheduler_card_history(cohort_id, card_id);
         """,
     ]
 

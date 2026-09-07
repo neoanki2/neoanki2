@@ -7,8 +7,8 @@ struct SchedulingCommands: Commands {
         // Parameter fitting is not here on purpose: it happens on its own when
         // history warrants it. What remains is the one scheduling decision that
         // is the learner's to make.
-        CommandMenu("Scheduling") {
-            Button("Scheduling Settings…") {
+        CommandMenu("Study Day") {
+            Button("Study Day Settings…") {
                 model?.openSettings()
             }
             .disabled(model == nil)

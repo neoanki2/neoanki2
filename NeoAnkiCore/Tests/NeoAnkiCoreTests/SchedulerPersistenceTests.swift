@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import NeoAnkiCore
 
@@ -15,6 +16,18 @@ private func schedulerPersistenceStoreWithURL() async throws -> (store: ItemStor
     let store = try ItemStore(databaseURL: url)
     try await store.bootstrap()
     return (store, url)
+}
+
+private func executeSchedulerMigrationSQL(_ sql: String, at url: URL) throws {
+    var connection: OpaquePointer?
+    guard sqlite3_open(url.path(percentEncoded: false), &connection) == SQLITE_OK,
+          let connection else {
+        throw DatabaseError.openFailed("Could not open scheduler migration fixture.")
+    }
+    defer { sqlite3_close(connection) }
+    guard sqlite3_exec(connection, sql, nil, nil, nil) == SQLITE_OK else {
+        throw DatabaseError.executeFailed(String(cString: sqlite3_errmsg(connection)))
+    }
 }
 
 private func createSchedulerPersistenceCard(
@@ -165,6 +178,134 @@ private func seedEligibleOptimizationHistory(
     let loaded = try await store.card(id: card.id)
     #expect(loaded.memoryModelVersion == SchedulerPersistenceConstants.memoryModelVersion)
     #expect(loaded.memoryParameterSetID == parameterID)
+}
+
+@Test func contentCohortIdentityIsDeterministicAndSeparatesCardKinds() {
+    let itemTypeID = UUID(uuidString: "10000000-0000-4000-8000-000000000001")!
+    let firstTemplateID = UUID(uuidString: "20000000-0000-4000-8000-000000000001")!
+    let secondTemplateID = UUID(uuidString: "20000000-0000-4000-8000-000000000002")!
+
+    let first = SchedulerPersistenceConstants.cardKindCohortID(
+        itemTypeID: itemTypeID,
+        templateID: firstTemplateID
+    )
+    #expect(first == SchedulerPersistenceConstants.cardKindCohortID(
+        itemTypeID: itemTypeID,
+        templateID: firstTemplateID
+    ))
+    #expect(first != SchedulerPersistenceConstants.cardKindCohortID(
+        itemTypeID: itemTypeID,
+        templateID: secondTemplateID
+    ))
+
+    let parentID = SchedulerPersistenceConstants.populationDefaultParameterSetID
+    let weights = FSRSScheduler.Parameters.defaultWeights
+    let parameterID = SchedulerPersistenceConstants.parameterSetID(
+        cohortID: first,
+        inputFingerprint: "history-v1",
+        parentParameterSetID: parentID,
+        weights: weights
+    )
+    #expect(parameterID == SchedulerPersistenceConstants.parameterSetID(
+        cohortID: first,
+        inputFingerprint: "history-v1",
+        parentParameterSetID: parentID,
+        weights: weights
+    ))
+    #expect(parameterID != SchedulerPersistenceConstants.parameterSetID(
+        cohortID: first,
+        inputFingerprint: "history-v2",
+        parentParameterSetID: parentID,
+        weights: weights
+    ))
+}
+
+@Test func cardContentCohortSurvivesDeckMovesAndIsAudited() async throws {
+    let store = try await schedulerPersistenceStore()
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let firstDeck = try await store.createDeck(Deck(name: "First"))
+    let secondDeck = try await store.createDeck(Deck(name: "Second"))
+    let itemType = try await store.defaultItemType()
+    let item = Item(
+        itemTypeID: itemType.id,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
+        ],
+        deckID: firstDeck.id
+    )
+    _ = try await store.createItem(item, now: now)
+    let card = try #require(try await store.fetchDueCards(asOf: now).first?.card)
+    let expected = SchedulerPersistenceConstants.cardKindCohortID(
+        itemTypeID: itemType.id,
+        templateID: card.templateID
+    )
+    let before = try #require(
+        try await store.reviewPreviewDetails(cardID: card.id, now: now)[.good]
+    )
+    #expect(before.cohortID == expected)
+
+    #expect(try await store.updateItemDeck(itemID: item.id, deckID: secondDeck.id))
+    let after = try #require(
+        try await store.reviewPreviewDetails(cardID: card.id, now: now)[.good]
+    )
+    #expect(after.cohortID == expected)
+
+    let receipt = try await store.submitReviewWithReceipt(
+        cardID: card.id,
+        rating: .good,
+        now: now,
+        durationMs: 500
+    )
+    let audit = try #require(try await store.reviewLog(id: receipt.reviewLogID).schedulingAudit)
+    #expect(audit.cohortID == expected)
+    #expect(audit.itemTypeIDAtReview == itemType.id)
+    #expect(audit.templateIDAtReview == card.templateID)
+    let cohort = try #require(try await store.schedulerCohorts().first { $0.id == expected })
+    #expect(cohort.parentCohortID == SchedulerPersistenceConstants.globalCohortID)
+}
+
+@Test func versionTwentyEightAdoptsSharedModelWithoutReschedulingCards() async throws {
+    let fixture = try await schedulerPersistenceStoreWithURL()
+    let store = fixture.store
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let card = try await createSchedulerPersistenceCard(in: store, now: now)
+    _ = try await store.submitReview(cardID: card.id, rating: .good, now: now)
+    let before = try await store.card(id: card.id)
+    let presetBefore = try await store.schedulerPreset()
+    let database = await store.database
+
+    try executeSchedulerMigrationSQL(
+        """
+        DROP TABLE scheduler_card_history;
+        DROP TABLE scheduler_cohorts;
+        DROP TRIGGER IF EXISTS fsrs_parameter_sets_immutable_update;
+        UPDATE fsrs_parameter_sets SET cohort_id = NULL, scope = 'shared';
+        UPDATE schema_version SET version = 27;
+        """,
+        at: fixture.url
+    )
+
+    try await database.migrate()
+
+    let after = try await store.card(id: card.id)
+    #expect(after.memory == before.memory)
+    #expect(after.memory.due == before.memory.due)
+    #expect(after.memoryParameterSetID == before.memoryParameterSetID)
+    #expect(try await store.rawReviewLogCount(for: card.id) == 1)
+    let global = try #require(try await database.fetchSchedulerCohort(
+        id: SchedulerPersistenceConstants.globalCohortID
+    ))
+    #expect(global.activeParameterSetID == presetBefore.activeParameterSetID)
+    let history = try #require(try await database.fetchSchedulerCardHistory(cardID: card.id))
+    #expect(history.cohortID == SchedulerPersistenceConstants.cardKindCohortID(
+        itemTypeID: history.itemTypeIDAtAssignment,
+        templateID: history.templateIDAtAssignment
+    ))
+    let adopted = try #require(try await database.fetchFSRSParameterSet(
+        id: SchedulerPersistenceConstants.populationDefaultParameterSetID
+    ))
+    #expect(adopted.cohortID == SchedulerPersistenceConstants.globalCohortID)
 }
 
 @Test func bootstrapActivatesPinnedDefaultsAndGradeWritesCompleteAudit() async throws {

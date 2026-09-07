@@ -152,6 +152,7 @@ public extension ItemStore {
 
     func endStudySession(id: UUID, now: Date = .now) async throws {
         try await database.endStudySession(id: id, now: now)
+        requestAutomaticSchedulingMaintenance(after: 0)
     }
 
     func submitReservedReview(
@@ -162,8 +163,10 @@ public extension ItemStore {
         now: Date = .now,
         durationMs: Int = 0
     ) async throws -> ReviewSubmission {
-        guard durationMs >= 0 else {
-            throw DatabaseError.studyConflict("Review duration cannot be negative.")
+        guard (0 ... ReviewWorkloadTimingPolicy.maximumStoredMilliseconds).contains(durationMs) else {
+            throw DatabaseError.studyConflict(
+                "Review duration must be between 0 and 1800000 milliseconds."
+            )
         }
         guard let persistedCard = try await database.fetchCard(id: cardID) else {
             throw DatabaseError.cardNotFound(cardID)
@@ -212,6 +215,8 @@ public extension ItemStore {
             introductionStudyDay: introductionStudyDay,
             now: now
         )
+        try await database.markSchedulerCohortsDirty(cardID: cardID, now: now)
+        requestAutomaticSchedulingMaintenance()
         return ReviewSubmission(memory: nextMemory, reviewLogID: log.id)
     }
 }

@@ -1,5 +1,5 @@
 import Foundation
-import NeoAnkiCore
+@testable import NeoAnkiCore
 import NeoAnkiTestSupport
 import Testing
 

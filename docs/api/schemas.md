@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:1e36292ce4418b256226feee694b72c8fc30c014e7bfdd3a1c464cfb8ce59674
+contract_digest: sha256:31b97e8e00631e5e4a719deca63927dd28acbdc87b9122760004199d918752af
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -402,6 +402,7 @@ Type: **object**.
 ### Properties
 
 - `candidateParameterSetId` — string or null; optional
+- `cohortId` — string or null; optional
 - `completedAt` — string; required
 - `decision` — string; required
 - `distinctCardCount` — integer; required
@@ -428,6 +429,7 @@ Type: **object**.
 
 ### Properties
 
+- `cohortId` — string or null; optional
 - `createdAt` — string; required
 - `fixtureChecksum` — string or null; optional
 - `id` — string; required
@@ -756,6 +758,7 @@ Type: **object**.
 
 ### Properties
 
+- `cohortId` — string or null; optional
 - `constraintReason` — string or null; optional
 - `finalDueAt` — string; required
 - `intervalPolicyVersion` — string; required
@@ -859,6 +862,7 @@ Type: **object**.
 ### Properties
 
 - `cardId` — string; required
+- `cohortId` — string or null; optional
 - `desiredRetention` — number; required
 - `elapsedModelDays` — number; required
 - `elapsedSeconds` — number; required
@@ -880,9 +884,10 @@ Type: **object**.
 - `activeParameterSetId` — string or null; optional
 - `activeParameterSource` — string or null; optional
 - `automaticOptimizationEnabled` — boolean; required
-- `canRestoreDefaults` — boolean; required
-- `canRollback` — boolean; required
+- `cohortCount` — integer; required
 - `desiredRetention` — number; required
+- `inheritedCohortCount` — integer; required
+- `lastMaintenanceAt` — string or null; optional
 - `lastOptimizationCompletedAt` — string or null; optional
 - `lastOptimizationDecision` — string or null; optional
 - `lastOptimizationReason` — string or null; optional
@@ -894,16 +899,9 @@ Type: **object**.
 - `optimizerStatus` — string; required
 - `parameterCount` — integer; required
 - `parameterSource` — string; required
+- `pendingMaintenance` — boolean; required
 - `personalizationStatus` — string; required
-
-## SchedulingRollbackInput {#schema-schedulingrollbackinput}
-
-Type: **object**.
-
-### Properties
-
-- `confirm` — boolean; required
-- `parameterSetId` — string or null; optional
+- `personalizedCohortCount` — integer; required
 
 ## Skill {#schema-skill}
 
@@ -1178,6 +1176,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:1e36292ce4418b256226feee694b72c8fc30c014e7bfdd3a1c464cfb8ce59674`.
+Contract digest: `sha256:31b97e8e00631e5e4a719deca63927dd28acbdc87b9122760004199d918752af`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

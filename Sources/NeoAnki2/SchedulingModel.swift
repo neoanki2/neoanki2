@@ -5,12 +5,9 @@ import NeoAnkiCore
 @MainActor
 @Observable
 final class SchedulingModel {
-    private(set) var isOptimizing = false
     private(set) var rolloverMinutes = StudyDay.defaultRolloverMinutes
     private(set) var isLoadingSettings = false
     private(set) var isSavingSettings = false
-    private(set) var health: LibrarySchedulingHealth?
-    private(set) var isRecovering = false
     var isShowingSettings = false
     var settingsError: String?
 
@@ -31,31 +28,6 @@ final class SchedulingModel {
         defer { isLoadingSettings = false }
         do {
             rolloverMinutes = try await library.studyDayRolloverMinutes()
-            health = try await library.schedulingHealthSnapshot()
-        } catch {
-            settingsError = UserFacingError.message(from: error)
-        }
-    }
-
-    func restoreDefaults() async {
-        guard !isRecovering else { return }
-        isRecovering = true
-        settingsError = nil
-        defer { isRecovering = false }
-        do {
-            health = try await library.restoreDefaultScheduling(now: .now)
-        } catch {
-            settingsError = UserFacingError.message(from: error)
-        }
-    }
-
-    func rollback() async {
-        guard !isRecovering else { return }
-        isRecovering = true
-        settingsError = nil
-        defer { isRecovering = false }
-        do {
-            health = try await library.rollbackScheduling(to: nil, now: .now)
         } catch {
             settingsError = UserFacingError.message(from: error)
         }
@@ -83,10 +55,7 @@ final class SchedulingModel {
     /// not ask for and cannot act on: a better fit changes only future due
     /// times, and a failure leaves the working parameters in place. Interrupting
     /// the end of a session to say so would be noise.
-    func optimizeIfNeeded() async {
-        guard !isOptimizing else { return }
-        isOptimizing = true
-        defer { isOptimizing = false }
-        _ = try? await library.optimizeSchedulingIfNeeded()
+    func requestAutomaticMaintenance() async {
+        await library.requestAutomaticSchedulingMaintenance(asOf: .now)
     }
 }

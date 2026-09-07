@@ -14,16 +14,66 @@ private struct FSRSGradualTuningStep {
 }
 
 extension ItemStore {
+    public func requestAutomaticSchedulingMaintenance(after delay: TimeInterval = 30) {
+        guard !automaticMaintenanceIsRunning else { return }
+        automaticMaintenanceTask?.cancel()
+        automaticMaintenanceTask = Task { [weak self] in
+            if delay > 0 {
+                try? await Task.sleep(
+                    nanoseconds: UInt64(min(delay, 3_600) * 1_000_000_000)
+                )
+            }
+            guard !Task.isCancelled else { return }
+            await self?.performAutomaticSchedulingMaintenance()
+        }
+    }
+
+    func runAutomaticSchedulingMaintenance(now: Date = .now) async {
+        automaticMaintenanceTask?.cancel()
+        automaticMaintenanceTask = nil
+        await performAutomaticSchedulingMaintenance(now: now)
+    }
+
+    private func performAutomaticSchedulingMaintenance(now: Date = .now) async {
+        guard !automaticMaintenanceIsRunning else { return }
+        automaticMaintenanceIsRunning = true
+        automaticMaintenanceTask = nil
+        guard let cohort = try? await database.nextDirtySchedulerCohort() else {
+            automaticMaintenanceIsRunning = false
+            return
+        }
+        do {
+            _ = try await runAutomaticFSRSOptimization(
+                minimumObservations: FSRSOptimizer.defaultMinimumObservations,
+                now: now,
+                cohortID: cohort.id
+            )
+        } catch {
+            // Maintenance is deliberately silent. The active model remains in
+            // place and a later review creates a new dirty revision.
+        }
+        try? await database.finishSchedulerCohortMaintenance(
+            id: cohort.id,
+            observedDirtyRevision: cohort.dirtyRevision,
+            attemptedAt: now
+        )
+        automaticMaintenanceIsRunning = false
+        if (try? await database.nextDirtySchedulerCohort()) != nil {
+            requestAutomaticSchedulingMaintenance(after: 1)
+        }
+    }
+
     func runAutomaticFSRSOptimization(
         minimumObservations: Int,
         now: Date,
+        cohortID: UUID = SchedulerPersistenceConstants.globalCohortID,
         enforceCadence: Bool = true,
         optimizerParityVerified: Bool = SchedulerPersistenceConstants.optimizerParityVerified,
         probationEvidenceOverride: FSRSProbationEvidence? = nil
     ) async throws -> FSRSOptimizationResult? {
         let policy = FSRSPromotionPolicy()
-        let logs = try await database.fetchActiveReviewLogs()
-        let context = try await activeSchedulingContext()
+        let logs = try await optimizationLogs(cohortID: cohortID)
+        let context = try await activeSchedulingContext(cohortID: cohortID)
         if enforceCadence,
            try await evaluateActiveFSRSProbation(
                policy: policy,
@@ -34,10 +84,12 @@ extension ItemStore {
            ) {
             return nil
         }
-        let defaults = FSRSScheduler.Parameters(
-            requestRetention: context.preset.desiredRetention,
-            maximumInterval: context.preset.maximumIntervalDays
-        )
+        let defaults = cohortID == SchedulerPersistenceConstants.globalCohortID
+            ? FSRSScheduler.Parameters(
+                requestRetention: context.preset.desiredRetention,
+                maximumInterval: context.preset.maximumIntervalDays
+            )
+            : try await activeSchedulingContext().parameters
         let baselineObservations = promotionObservations(
             logs: logs,
             active: context.parameters,
@@ -45,7 +97,8 @@ extension ItemStore {
             candidate: context.parameters
         )
         let eligibility = policy.eligibility(observations: baselineObservations)
-        let previousRun = try await database.fetchFSRSOptimizationRuns(limit: 1).first
+        let previousRun = try await database.fetchFSRSOptimizationRuns(limit: nil)
+            .first { ($0.cohortID ?? SchedulerPersistenceConstants.globalCohortID) == cohortID }
         let newObservations = previousRun.map { run in
             baselineObservations.filter { $0.reviewedAt > run.trainingCutoff }
         } ?? baselineObservations
@@ -72,7 +125,8 @@ extension ItemStore {
                 completedAt: now,
                 trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
                 inputFingerprint: fingerprint,
-                error: error
+                error: error,
+                cohortID: cohortID
             ))
             throw error
         }
@@ -90,7 +144,8 @@ extension ItemStore {
                 logs: logs,
                 fingerprint: fingerprint,
                 foldCount: folds.count,
-                reason: "chronologicalValidationUnavailable.\(error.localizedDescription)"
+                reason: "chronologicalValidationUnavailable.\(error.localizedDescription)",
+                cohortID: cohortID
             ))
             throw error
         }
@@ -140,7 +195,8 @@ extension ItemStore {
                 logs: logs,
                 fingerprint: fingerprint,
                 foldCount: folds.count,
-                reason: "chronologicalFoldFitFailed.\(error.localizedDescription)"
+                reason: "chronologicalFoldFitFailed.\(error.localizedDescription)",
+                cohortID: cohortID
             ))
             throw error
         }
@@ -156,7 +212,8 @@ extension ItemStore {
                 completedAt: now,
                 trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
                 inputFingerprint: fingerprint,
-                error: error
+                error: error,
+                cohortID: cohortID
             )
             try await database.insertFSRSOptimizationRun(run)
             throw error
@@ -236,7 +293,17 @@ extension ItemStore {
             observationCount: result.observationCount,
             improved: activate && appliedLoss + 1e-7 < result.previousLoss
         )
-        let candidateID = UUID()
+        let libraryLogs = cohortID == SchedulerPersistenceConstants.globalCohortID
+            ? logs
+            : try await database.fetchActiveReviewLogs()
+        let estimatedLibraryWorkloadChange = appliedWorkload.estimatedReviewLoadChange
+            * workloadShare(cohortLogs: logs, libraryLogs: libraryLogs)
+        let candidateID = SchedulerPersistenceConstants.parameterSetID(
+            cohortID: cohortID,
+            inputFingerprint: fingerprint,
+            parentParameterSetID: context.parameterSet.id,
+            weights: appliedParameters.weights
+        )
         var parameterMetrics = [
             "training.previousLogLoss": result.previousLoss,
             "training.candidateLogLoss": appliedLoss,
@@ -245,6 +312,7 @@ extension ItemStore {
             "tuning.p05IntervalRatio": appliedWorkload.p05GoodIntervalRatio,
             "tuning.p95IntervalRatio": appliedWorkload.p95GoodIntervalRatio,
             "tuning.estimatedWorkloadChange": appliedWorkload.estimatedReviewLoadChange,
+            "tuning.estimatedLibraryWorkloadChange": estimatedLibraryWorkloadChange,
         ]
         parameterMetrics = parameterMetrics.filter { $0.value.isFinite }
         let candidateSet = FSRSParameterSet(
@@ -254,6 +322,8 @@ extension ItemStore {
             upstreamCommit: SchedulerPersistenceConstants.upstreamCommit,
             sourceChecksum: SchedulerPersistenceConstants.sourceChecksum,
             fixtureChecksum: SchedulerPersistenceConstants.fixtureChecksum,
+            scope: "cohort:\(cohortID.uuidString.lowercased())",
+            cohortID: cohortID,
             source: .optimized,
             inputFingerprint: fingerprint,
             trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
@@ -267,9 +337,11 @@ extension ItemStore {
         runMetrics["tuning.p05IntervalRatio"] = appliedWorkload.p05GoodIntervalRatio
         runMetrics["tuning.p95IntervalRatio"] = appliedWorkload.p95GoodIntervalRatio
         runMetrics["tuning.estimatedWorkloadChange"] = appliedWorkload.estimatedReviewLoadChange
+        runMetrics["tuning.estimatedLibraryWorkloadChange"] = estimatedLibraryWorkloadChange
         runMetrics = runMetrics.filter { $0.value.isFinite }
         let run = FSRSOptimizationRun(
             presetID: context.preset.id,
+            cohortID: cohortID,
             startedAt: startedAt,
             completedAt: now,
             trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
@@ -291,9 +363,21 @@ extension ItemStore {
             now: now
         )
         if activate {
-            fsrsParameters = appliedParameters
+            if cohortID == SchedulerPersistenceConstants.globalCohortID {
+                fsrsParameters = appliedParameters
+            }
         }
         return returnedResult
+    }
+
+    private func optimizationLogs(cohortID: UUID) async throws -> [ReviewLog] {
+        let logs = try await database.fetchActiveReviewLogs()
+        guard cohortID != SchedulerPersistenceConstants.globalCohortID else { return logs }
+        let histories = try await database.fetchSchedulerCardHistories()
+        return logs.filter { log in
+            if let audited = log.schedulingAudit?.cohortID { return audited == cohortID }
+            return histories[log.cardID]?.cohortID == cohortID
+        }
     }
 
     /// Returns true when probation produced a terminal state and this
@@ -311,7 +395,9 @@ extension ItemStore {
               let previousSet = try await database.fetchFSRSParameterSet(id: previousID)
         else { return false }
 
-        let runs = try await database.fetchFSRSOptimizationRuns(limit: nil)
+        let runs = try await database.fetchFSRSOptimizationRuns(limit: nil).filter {
+            ($0.cohortID ?? SchedulerPersistenceConstants.globalCohortID) == context.cohort.id
+        }
         if runs.contains(where: {
             $0.candidateParameterSetID == activeSet.id
                 && ($0.decision == .probationCompleted || $0.decision == .rolledBack)
@@ -324,7 +410,10 @@ extension ItemStore {
             requestRetention: context.preset.desiredRetention,
             maximumInterval: context.preset.maximumIntervalDays
         )
-        let probationStartedAt = max(activeSet.createdAt, context.preset.updatedAt)
+        // Cohort.updatedAt also changes whenever evidence marks the cohort
+        // dirty, so it cannot define probation. Optimized sets are created at
+        // activation and remain immutable, making this timestamp stable.
+        let probationStartedAt = activeSet.createdAt
         let allComparison = promotionObservations(
             logs: logs,
             active: context.parameters,
@@ -365,11 +454,11 @@ extension ItemStore {
         let probationDays = max(1, Set(probation.map(\.studyDay)).count)
         let priorDays = max(1, Set(prior.map(\.studyDay)).count)
         let probationSecondsPerDay = Double(logs.lazy.filter {
-            probationIDs.contains($0.id)
-        }.reduce(0) { $0 + max(0, $1.durationMs) }) / 1_000 / Double(probationDays)
+            probationIDs.contains($0.id) && ReviewWorkloadTimingPolicy.isUsable($0.durationMs)
+        }.reduce(0) { $0 + $1.durationMs }) / 1_000 / Double(probationDays)
         let priorSecondsPerDay = Double(logs.lazy.filter {
-            priorIDs.contains($0.id)
-        }.reduce(0) { $0 + max(0, $1.durationMs) }) / 1_000 / Double(priorDays)
+            priorIDs.contains($0.id) && ReviewWorkloadTimingPolicy.isUsable($0.durationMs)
+        }.reduce(0) { $0 + $1.durationMs }) / 1_000 / Double(priorDays)
         let reviewTimeRatio = priorSecondsPerDay > 0
             ? probationSecondsPerDay / priorSecondsPerDay
             : 1
@@ -418,6 +507,7 @@ extension ItemStore {
         }
         let run = FSRSOptimizationRun(
             presetID: context.preset.id,
+            cohortID: context.cohort.id,
             startedAt: now,
             completedAt: now,
             trainingCutoff: logs.map(\.reviewedAt).max() ?? now,
@@ -441,7 +531,9 @@ extension ItemStore {
                 previousParameterSetID: previousID,
                 now: now
             )
-            fsrsParameters = previous
+            if context.cohort.id == SchedulerPersistenceConstants.globalCohortID {
+                fsrsParameters = previous
+            }
         case .continueProbation:
             break
         }
@@ -466,10 +558,12 @@ extension ItemStore {
         logs: [ReviewLog],
         fingerprint: String,
         foldCount: Int,
-        reason: String
+        reason: String,
+        cohortID: UUID = SchedulerPersistenceConstants.globalCohortID
     ) -> FSRSOptimizationRun {
         FSRSOptimizationRun(
             presetID: SchedulerPersistenceConstants.sharedPresetID,
+            cohortID: cohortID,
             startedAt: startedAt,
             completedAt: completedAt,
             trainingCutoff: logs.map(\.reviewedAt).max() ?? completedAt,
@@ -575,6 +669,8 @@ extension ItemStore {
     ) -> FSRSWorkloadProjection {
         let grouped = Dictionary(grouping: logs, by: \.cardID)
         var ratios: [Double] = []
+        var weightedLoad = 0.0
+        var totalWeight = 0.0
         for history in grouped.values {
             let sorted = history.sorted(by: promotionLogChronological)
             guard sorted.first?.phaseBefore == .new else { continue }
@@ -591,7 +687,16 @@ extension ItemStore {
             let candidateInterval = FSRSScheduler(parameters: candidate)
                 .rawIntervalDays(forStability: candidateMemory.stability)
             if activeInterval > 0, activeInterval.isFinite, candidateInterval.isFinite {
-                ratios.append(candidateInterval / activeInterval)
+                let ratio = candidateInterval / activeInterval
+                ratios.append(ratio)
+                let validDurations = sorted.lazy.map(\.durationMs).filter(
+                    ReviewWorkloadTimingPolicy.isUsable
+                )
+                let durationWeight = validDurations.reduce(0) { $0 + Double($1) }
+                if durationWeight > 0 {
+                    weightedLoad += durationWeight / max(ratio, 1e-9)
+                    totalWeight += durationWeight
+                }
             }
         }
         guard !ratios.isEmpty else {
@@ -604,12 +709,27 @@ extension ItemStore {
         ratios.sort()
         let p05 = ratios[min(ratios.count - 1, Int(Double(ratios.count - 1) * 0.05))]
         let p95 = ratios[min(ratios.count - 1, Int(Double(ratios.count - 1) * 0.95))]
-        let workload = ratios.reduce(0) { $0 + (1 / max($1, 1e-9)) } / Double(ratios.count) - 1
+        let workload = totalWeight > 0
+            ? weightedLoad / totalWeight - 1
+            : ratios.reduce(0) { $0 + (1 / max($1, 1e-9)) } / Double(ratios.count) - 1
         return FSRSWorkloadProjection(
             p05GoodIntervalRatio: p05,
             p95GoodIntervalRatio: p95,
             estimatedReviewLoadChange: workload
         )
+    }
+
+    private func workloadShare(cohortLogs: [ReviewLog], libraryLogs: [ReviewLog]) -> Double {
+        func validDuration(_ logs: [ReviewLog]) -> Double {
+            logs.lazy.map(\.durationMs).filter(ReviewWorkloadTimingPolicy.isUsable)
+                .reduce(0) { $0 + Double($1) }
+        }
+        let libraryDuration = validDuration(libraryLogs)
+        if libraryDuration > 0 {
+            return min(1, validDuration(cohortLogs) / libraryDuration)
+        }
+        guard !libraryLogs.isEmpty else { return 1 }
+        return min(1, Double(cohortLogs.count) / Double(libraryLogs.count))
     }
 
     private func gradualTuningStep(

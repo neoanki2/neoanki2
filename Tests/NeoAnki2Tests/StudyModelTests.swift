@@ -668,7 +668,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     #expect(model.isAnswerRevealed)
 }
 
-@Test @MainActor func failedCardRepeatsAcrossRepairRoundsUntilRemembered() async throws {
+@Test @MainActor func repeatedFailureDefersRepairAndLetsSessionFinish() async throws {
     let (model, store) = try await makeStudyModel()
     let itemType = try await store.defaultItemType()
     _ = try await store.createItem(
@@ -691,18 +691,16 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
 
     model.revealAnswer()
     await model.grade(.again)
-    #expect(model.currentCard?.id == cardID)
-    #expect(model.currentCard?.card.memory.stepIndex == 1)
-    #expect(model.remainingLabel == "1 card remaining")
-
-    model.revealAnswer()
-    await model.grade(.good)
-
     #expect(model.isFinished)
+    #expect(model.currentCard == nil)
     #expect(model.remainingLabel.isEmpty)
-    #expect(model.cardsReviewed == 3)
+    #expect(model.cardsReviewed == 2)
     #expect(model.reviewedCardIDs == [cardID])
-    #expect(try await store.reviewLogCount(for: cardID) == 3)
+    #expect(try await store.reviewLogCount(for: cardID) == 2)
+    let deferred = try await store.card(id: cardID)
+    #expect(deferred.memory.phase == .learning)
+    #expect(deferred.memory.stepIndex == 1)
+    #expect(deferred.memory.due > Date.now)
 }
 
 @Test @MainActor func studyModelUndoLastGradeRestoresCard() async throws {

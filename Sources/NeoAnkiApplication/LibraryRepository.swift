@@ -112,6 +112,7 @@ public struct ReviewSchedulePreview: Sendable, Equatable {
     public let rawIntervalDays: Double
     public let operationalIntervalSeconds: Int
     public let presetID: UUID?
+    public let cohortID: UUID?
     public let parameterSetID: UUID?
     public let modelVersion: String
     public let timingPolicyVersion: String
@@ -128,6 +129,7 @@ public struct ReviewSchedulePreview: Sendable, Equatable {
         rawIntervalDays = value.rawIntervalDays
         operationalIntervalSeconds = value.operationalIntervalSeconds
         presetID = value.presetID
+        cohortID = value.cohortID
         parameterSetID = value.parameterSetID
         modelVersion = value.modelVersion
         timingPolicyVersion = value.timingPolicyVersion
@@ -147,6 +149,7 @@ public struct ReviewSchedulePreview: Sendable, Equatable {
         rawIntervalDays = max(0, memory.due.timeIntervalSince(reviewedAt) / 86_400)
         operationalIntervalSeconds = max(0, Int(ceil(memory.due.timeIntervalSince(reviewedAt))))
         presetID = nil
+        cohortID = nil
         parameterSetID = nil
         modelVersion = "unavailable"
         timingPolicyVersion = FSRSScheduler.elapsedPolicyIdentifier
@@ -184,20 +187,10 @@ public protocol LibraryStudyResponses: Sendable {
 public protocol LibraryScheduling: Sendable {
     func studyDayRolloverMinutes() async throws -> Int
     func setStudyDayRolloverMinutes(_ minutes: Int) async throws
-    func optimizeSchedulingIfNeeded(asOf: Date) async throws -> FSRSOptimizationResult?
+    func requestAutomaticSchedulingMaintenance(asOf: Date) async
     func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth
-    func restoreDefaultScheduling(now: Date) async throws -> LibrarySchedulingHealth
-    func rollbackScheduling(to parameterSetID: UUID?, now: Date) async throws -> LibrarySchedulingHealth
     func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet]
     func fsrsOptimizationRunHistory(limit: Int?) async throws -> [LibraryFSRSOptimizationRun]
-}
-
-public enum SchedulingRecoveryError: LocalizedError, Sendable, Equatable {
-    case unavailable
-
-    public var errorDescription: String? {
-        "No recoverable scheduling parameter version is available."
-    }
 }
 
 public struct LibrarySchedulingHealth: Sendable, Equatable {
@@ -215,8 +208,11 @@ public struct LibrarySchedulingHealth: Sendable, Equatable {
     public let lastOptimizationCompletedAt: Date?
     public let migrationStatus: String?
     public let legacyParametersQuarantined: Bool
-    public let canRestoreDefaults: Bool
-    public let canRollback: Bool
+    public let cohortCount: Int
+    public let personalizedCohortCount: Int
+    public let inheritedCohortCount: Int
+    public let pendingMaintenance: Bool
+    public let lastMaintenanceAt: Date?
 
     public var optimizerStatus: String {
         if !optimizerParityVerified { return "parityVerificationPending" }
@@ -238,8 +234,11 @@ public struct LibrarySchedulingHealth: Sendable, Equatable {
         lastOptimizationCompletedAt: Date? = nil,
         migrationStatus: String? = nil,
         legacyParametersQuarantined: Bool = false,
-        canRestoreDefaults: Bool,
-        canRollback: Bool
+        cohortCount: Int = 1,
+        personalizedCohortCount: Int = 0,
+        inheritedCohortCount: Int = 0,
+        pendingMaintenance: Bool = false,
+        lastMaintenanceAt: Date? = nil
     ) {
         self.modelIdentifier = modelIdentifier
         self.desiredRetention = desiredRetention
@@ -255,8 +254,11 @@ public struct LibrarySchedulingHealth: Sendable, Equatable {
         self.lastOptimizationCompletedAt = lastOptimizationCompletedAt
         self.migrationStatus = migrationStatus
         self.legacyParametersQuarantined = legacyParametersQuarantined
-        self.canRestoreDefaults = canRestoreDefaults
-        self.canRollback = canRollback
+        self.cohortCount = cohortCount
+        self.personalizedCohortCount = personalizedCohortCount
+        self.inheritedCohortCount = inheritedCohortCount
+        self.pendingMaintenance = pendingMaintenance
+        self.lastMaintenanceAt = lastMaintenanceAt
     }
 }
 
@@ -269,6 +271,7 @@ public struct LibraryFSRSParameterSet: Sendable, Equatable, Identifiable {
     public let sourceChecksum: String
     public let fixtureChecksum: String?
     public let scope: String
+    public let cohortID: UUID?
     public let source: String
     public let inputFingerprint: String?
     public let trainingCutoff: Date?
@@ -285,6 +288,7 @@ public struct LibraryFSRSParameterSet: Sendable, Equatable, Identifiable {
         sourceChecksum = value.sourceChecksum
         fixtureChecksum = value.fixtureChecksum
         scope = value.scope
+        cohortID = value.cohortID
         source = value.source.rawValue
         inputFingerprint = value.inputFingerprint
         trainingCutoff = value.trainingCutoff
@@ -297,6 +301,7 @@ public struct LibraryFSRSParameterSet: Sendable, Equatable, Identifiable {
 public struct LibraryFSRSOptimizationRun: Sendable, Equatable, Identifiable {
     public let id: UUID
     public let presetID: UUID
+    public let cohortID: UUID?
     public let startedAt: Date
     public let completedAt: Date
     public let trainingCutoff: Date
@@ -315,6 +320,7 @@ public struct LibraryFSRSOptimizationRun: Sendable, Equatable, Identifiable {
     public init(_ value: FSRSOptimizationRun) {
         id = value.id
         presetID = value.presetID
+        cohortID = value.cohortID
         startedAt = value.startedAt
         completedAt = value.completedAt
         trainingCutoff = value.trainingCutoff
@@ -511,9 +517,7 @@ public extension LibraryStudyResponses {
 }
 
 public extension LibraryScheduling {
-    func optimizeSchedulingIfNeeded(asOf: Date = .now) async throws -> FSRSOptimizationResult? {
-        try await optimizeSchedulingIfNeeded(asOf: asOf)
-    }
+    func requestAutomaticSchedulingMaintenance(asOf: Date = .now) async {}
 
     func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth {
         LibrarySchedulingHealth(
@@ -522,21 +526,8 @@ public extension LibraryScheduling {
             maximumIntervalDays: SchedulerPersistenceConstants.maximumIntervalDays,
             automaticOptimizationEnabled: false,
             parameterCount: 0,
-            usesPopulationDefaults: true,
-            canRestoreDefaults: false,
-            canRollback: false
+            usesPopulationDefaults: true
         )
-    }
-
-    func restoreDefaultScheduling(now: Date = .now) async throws -> LibrarySchedulingHealth {
-        throw SchedulingRecoveryError.unavailable
-    }
-
-    func rollbackScheduling(
-        to parameterSetID: UUID? = nil,
-        now: Date = .now
-    ) async throws -> LibrarySchedulingHealth {
-        throw SchedulingRecoveryError.unavailable
     }
 
     func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet] { [] }
@@ -783,8 +774,8 @@ public actor SQLiteLibraryRepository:
     public func setStudyDayRolloverMinutes(_ minutes: Int) async throws {
         try await store.setStudyDayRolloverMinutes(minutes)
     }
-    public func optimizeSchedulingIfNeeded(asOf: Date) async throws -> FSRSOptimizationResult? {
-        try await store.optimizeSchedulingIfNeeded(now: asOf)
+    public func requestAutomaticSchedulingMaintenance(asOf: Date) async {
+        await store.requestAutomaticSchedulingMaintenance(after: 0)
     }
     public func schedulingHealthSnapshot() async throws -> LibrarySchedulingHealth {
         let snapshot = try await store.schedulingHealthSnapshot()
@@ -804,33 +795,17 @@ public actor SQLiteLibraryRepository:
             lastOptimizationCompletedAt: snapshot.lastOptimizationRun?.completedAt,
             migrationStatus: snapshot.latestMigration?.status.rawValue,
             legacyParametersQuarantined: snapshot.legacyParametersQuarantined,
-            canRestoreDefaults: snapshot.activeSource != .populationDefault,
-            canRollback: snapshot.rollbackAvailable
+            cohortCount: snapshot.cohortCount,
+            personalizedCohortCount: snapshot.personalizedCohortCount,
+            inheritedCohortCount: snapshot.inheritedCohortCount,
+            pendingMaintenance: snapshot.pendingMaintenance,
+            lastMaintenanceAt: snapshot.lastMaintenanceAt
         )
     }
-    public func restoreDefaultScheduling(now: Date) async throws -> LibrarySchedulingHealth {
-        try await store.restoreDefaultScheduling(now: now)
-        return try await schedulingHealthSnapshot()
-    }
-    public func rollbackScheduling(
-        to parameterSetID: UUID?,
-        now: Date
-    ) async throws -> LibrarySchedulingHealth {
-        let snapshot = try await store.schedulingHealthSnapshot()
-        guard let target = parameterSetID ?? snapshot.rollbackParameterSetIDs.first else {
-            throw SchedulingRecoveryError.unavailable
-        }
-        guard snapshot.rollbackParameterSetIDs.contains(target) else {
-            throw SchedulingRecoveryError.unavailable
-        }
-        try await store.rollbackScheduling(to: target, now: now)
-        return try await schedulingHealthSnapshot()
-    }
     public func fsrsParameterSetHistory() async throws -> [LibraryFSRSParameterSet] {
-        let snapshot = try await store.schedulingHealthSnapshot()
-        let activeID = snapshot.activeParameterSet?.id
+        let activeIDs = Set(try await store.schedulerCohorts().compactMap(\.activeParameterSetID))
         return try await store.fsrsParameterSets().map {
-            LibraryFSRSParameterSet($0, isActive: $0.id == activeID)
+            LibraryFSRSParameterSet($0, isActive: activeIDs.contains($0.id))
         }
     }
     public func fsrsOptimizationRunHistory(

@@ -461,12 +461,187 @@ actor SQLiteDatabase {
                 }
             }
 
+            if current < 28 {
+                try migrateSchedulerCohortsV28(now: .now)
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
             )
         }
         changeTrackingReady = true
+    }
+
+    private func migrateSchedulerCohortsV28(now: Date) throws {
+        for suffix in ["insert", "update", "delete"] {
+            try execute("DROP TRIGGER IF EXISTS api_track_scheduler_params_\(suffix);")
+        }
+        if try tableExists("api_changes") {
+            try execute(
+                "DELETE FROM api_changes WHERE resource_type = 'schedulingSettings' AND resource_id LIKE 'profile:%';"
+            )
+        }
+        if try tableExists("resource_revisions") {
+            try execute(
+                "DELETE FROM resource_revisions WHERE resource_type = 'schedulingSettings' AND resource_id LIKE 'profile:%';"
+            )
+        }
+        for sql in Schema.migrationV28Statements {
+            try execute(sql)
+        }
+
+        if try tableExists("fsrs_parameter_sets"),
+           !(try columnExists("cohort_id", in: "fsrs_parameter_sets")) {
+            try execute("DROP TRIGGER IF EXISTS fsrs_parameter_sets_immutable_update;")
+            try execute("ALTER TABLE fsrs_parameter_sets ADD COLUMN cohort_id TEXT;")
+        }
+        if try tableExists("fsrs_optimization_runs"),
+           !(try columnExists("cohort_id", in: "fsrs_optimization_runs")) {
+            try execute("DROP TRIGGER IF EXISTS fsrs_optimization_runs_immutable_update;")
+            try execute("ALTER TABLE fsrs_optimization_runs ADD COLUMN cohort_id TEXT;")
+        }
+
+        let globalID = SchedulerPersistenceConstants.globalCohortID.uuidString
+        let hasParameterSets = try tableExists("fsrs_parameter_sets")
+        if hasParameterSets, try tableExists("scheduler_presets") {
+            try execute(
+                """
+                INSERT OR IGNORE INTO scheduler_cohorts (
+                    id, kind, canonical_signature, parent_cohort_id,
+                    active_parameter_set_id, is_dirty, dirty_revision,
+                    created_at, updated_at
+                ) VALUES (
+                    ?, 'global', 'global', NULL,
+                    (SELECT active_parameter_set_id FROM scheduler_presets WHERE id = ?),
+                    1, 1, ?, ?
+                );
+                """,
+                bindings: [
+                    .text(globalID),
+                    .text(SchedulerPersistenceConstants.sharedPresetID.uuidString),
+                    .double(now.timeIntervalSince1970),
+                    .double(now.timeIntervalSince1970),
+                ]
+            )
+        } else if hasParameterSets {
+            try execute(
+                """
+                INSERT OR IGNORE INTO scheduler_cohorts (
+                    id, kind, canonical_signature, parent_cohort_id,
+                    active_parameter_set_id, is_dirty, dirty_revision,
+                    created_at, updated_at
+                ) VALUES (?, 'global', 'global', NULL, NULL, 1, 1, ?, ?);
+                """,
+                bindings: [
+                    .text(globalID), .double(now.timeIntervalSince1970),
+                    .double(now.timeIntervalSince1970),
+                ]
+            )
+        }
+        if try tableExists("fsrs_parameter_sets") {
+            try execute(
+                "UPDATE fsrs_parameter_sets SET cohort_id = ? WHERE cohort_id IS NULL;",
+                bindings: [.text(globalID)]
+            )
+        }
+        if try tableExists("fsrs_optimization_runs") {
+            try execute(
+                "UPDATE fsrs_optimization_runs SET cohort_id = ? WHERE cohort_id IS NULL;",
+                bindings: [.text(globalID)]
+            )
+        }
+        if try tableExists("scheduler_presets") {
+            try execute(
+                """
+                UPDATE scheduler_cohorts
+                SET active_parameter_set_id = COALESCE(
+                    active_parameter_set_id,
+                    (SELECT active_parameter_set_id FROM scheduler_presets WHERE id = ?)
+                )
+                WHERE id = ?;
+                """,
+                bindings: [
+                    .text(SchedulerPersistenceConstants.sharedPresetID.uuidString),
+                    .text(globalID),
+                ]
+            )
+        }
+
+        if try tableExists("cards"), try tableExists("items"),
+           try columnExists("item_id", in: "cards"),
+           try columnExists("template_id", in: "cards"),
+           try columnExists("scheduling_history_origin", in: "cards"),
+           try columnExists("item_type_id", in: "items") {
+            let rows = try query(
+                """
+                SELECT cards.id AS card_id, cards.template_id AS template_id,
+                       cards.scheduling_history_origin AS history_origin,
+                       items.item_type_id AS item_type_id
+                FROM cards JOIN items ON items.id = cards.item_id;
+                """
+            )
+            for row in rows {
+                guard let cardText = row["card_id"] as? String,
+                      let cardID = UUID(uuidString: cardText),
+                      let typeText = row["item_type_id"] as? String,
+                      let itemTypeID = UUID(uuidString: typeText),
+                      let templateText = row["template_id"] as? String,
+                      let templateID = UUID(uuidString: templateText)
+                else { continue }
+                let cohortID = SchedulerPersistenceConstants.cardKindCohortID(
+                    itemTypeID: itemTypeID,
+                    templateID: templateID
+                )
+                let signature = itemTypeID.uuidString.lowercased() + "|"
+                    + templateID.uuidString.lowercased()
+                try execute(
+                    """
+                    INSERT OR IGNORE INTO scheduler_cohorts (
+                        id, kind, canonical_signature, parent_cohort_id,
+                        is_dirty, dirty_revision, created_at, updated_at
+                    ) VALUES (?, 'cardKind', ?, ?, 1, 1, ?, ?);
+                    """,
+                    bindings: [
+                        .text(cohortID.uuidString), .text(signature), .text(globalID),
+                        .double(now.timeIntervalSince1970), .double(now.timeIntervalSince1970),
+                    ]
+                )
+                try execute(
+                    """
+                    INSERT OR IGNORE INTO scheduler_card_history (
+                        card_id, cohort_id, item_type_id_at_assignment,
+                        template_id_at_assignment, history_origin, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?);
+                    """,
+                    bindings: [
+                        .text(cardID.uuidString), .text(cohortID.uuidString),
+                        .text(itemTypeID.uuidString), .text(templateID.uuidString),
+                        (row["history_origin"] as? Double).map(Binding.double) ?? .null,
+                        .double(now.timeIntervalSince1970),
+                    ]
+                )
+            }
+        }
+
+        if try tableExists("fsrs_parameter_sets") {
+            try execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS fsrs_parameter_sets_immutable_update
+                BEFORE UPDATE ON fsrs_parameter_sets
+                BEGIN SELECT RAISE(ABORT, 'FSRS parameter sets are immutable'); END;
+                """
+            )
+        }
+        if try tableExists("fsrs_optimization_runs") {
+            try execute(
+                """
+                CREATE TRIGGER IF NOT EXISTS fsrs_optimization_runs_immutable_update
+                BEFORE UPDATE ON fsrs_optimization_runs
+                BEGIN SELECT RAISE(ABORT, 'FSRS optimization runs are immutable'); END;
+                """
+            )
+        }
     }
 
     func ensureTemplateDefinitionFormat() throws {
@@ -2467,9 +2642,13 @@ actor SQLiteDatabase {
     func resetCardProgress(id: UUID, now: Date) throws {
         try inTransaction {
             guard var card = try fetchCard(id: id) else { throw DatabaseError.cardNotFound(id) }
-            try deleteReviewHistory(cardIDs: [id])
             card.memory = .new(due: now)
             try updateCardMemory(id, memory: card.memory)
+            try setCardSchedulingHistoryOrigin(id, origin: now)
+            try execute(
+                "DELETE FROM new_card_introductions WHERE review_log_id IN (SELECT id FROM review_logs WHERE card_id = ?);",
+                bindings: [.text(id.uuidString)]
+            )
             try execute(
                 "DELETE FROM card_attention_acknowledgements WHERE card_id = ?;",
                 bindings: [.text(id.uuidString)]
@@ -3371,6 +3550,14 @@ actor SQLiteDatabase {
             "DELETE FROM card_attention_acknowledgements WHERE card_id = ?;",
             bindings: [.text(cardID.uuidString)]
         )
+        try execute(
+            "UPDATE scheduler_card_history SET history_origin = ?, updated_at = ? WHERE card_id = ?;",
+            bindings: [
+                .double(historyOrigin.timeIntervalSince1970),
+                .double(historyOrigin.timeIntervalSince1970),
+                .text(cardID.uuidString),
+            ]
+        )
     }
 
     private func setCardSchedulingHistoryOrigin(_ cardID: UUID, origin: Date?) throws {
@@ -3378,6 +3565,14 @@ actor SQLiteDatabase {
             "UPDATE cards SET scheduling_history_origin = ? WHERE id = ?;",
             bindings: [
                 origin.map { .double($0.timeIntervalSince1970) } ?? .null,
+                .text(cardID.uuidString),
+            ]
+        )
+        try execute(
+            "UPDATE scheduler_card_history SET history_origin = ?, updated_at = ? WHERE card_id = ?;",
+            bindings: [
+                origin.map { .double($0.timeIntervalSince1970) } ?? .null,
+                .double(Date.now.timeIntervalSince1970),
                 .text(cardID.uuidString),
             ]
         )
@@ -3421,12 +3616,18 @@ actor SQLiteDatabase {
             """
             SELECT review_logs.log, review_logs.sequence
             FROM review_logs
-            JOIN cards ON cards.id = review_logs.card_id
+            LEFT JOIN cards ON cards.id = review_logs.card_id
+            LEFT JOIN scheduler_card_history
+                ON scheduler_card_history.card_id = review_logs.card_id
             LEFT JOIN review_reverts
                 ON review_reverts.review_log_id = review_logs.id
             WHERE review_reverts.id IS NULL
-              AND (cards.scheduling_history_origin IS NULL
-                   OR review_logs.reviewed_at >= cards.scheduling_history_origin)
+              AND (COALESCE(scheduler_card_history.history_origin,
+                            cards.scheduling_history_origin) IS NULL
+                   OR review_logs.reviewed_at >= COALESCE(
+                       scheduler_card_history.history_origin,
+                       cards.scheduling_history_origin
+                   ))
             ORDER BY review_logs.reviewed_at ASC, review_logs.sequence ASC;
             """
         )
@@ -3570,9 +3771,9 @@ actor SQLiteDatabase {
             """
             INSERT INTO fsrs_parameter_sets (
                 id, weights, model_version, upstream_commit, source_checksum,
-                fixture_checksum, scope, source, input_fingerprint,
+                fixture_checksum, scope, cohort_id, source, input_fingerprint,
                 training_cutoff, metrics, previous_parameter_set_id, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             bindings: [
                 .text(parameterSet.id.uuidString),
@@ -3582,6 +3783,7 @@ actor SQLiteDatabase {
                 .text(parameterSet.sourceChecksum),
                 parameterSet.fixtureChecksum.map(Binding.text) ?? .null,
                 .text(parameterSet.scope),
+                parameterSet.cohortID.map { .text($0.uuidString) } ?? .null,
                 .text(parameterSet.source.rawValue),
                 parameterSet.inputFingerprint.map(Binding.text) ?? .null,
                 parameterSet.trainingCutoff.map { .double($0.timeIntervalSince1970) } ?? .null,
@@ -3604,6 +3806,172 @@ actor SQLiteDatabase {
         try query(
             "SELECT * FROM fsrs_parameter_sets ORDER BY created_at DESC, id DESC;"
         ).map(decodeFSRSParameterSet)
+    }
+
+    func fetchSchedulerCohort(id: UUID) throws -> SchedulerCohort? {
+        try query(
+            "SELECT * FROM scheduler_cohorts WHERE id = ? LIMIT 1;",
+            bindings: [.text(id.uuidString)]
+        ).first.flatMap(decodeSchedulerCohort)
+    }
+
+    func fetchSchedulerCohorts() throws -> [SchedulerCohort] {
+        try query("SELECT * FROM scheduler_cohorts ORDER BY kind ASC, id ASC;")
+            .compactMap(decodeSchedulerCohort)
+    }
+
+    func ensureSchedulerCardHistory(cardID: UUID, now: Date) throws -> SchedulerCardHistory {
+        if let existing = try fetchSchedulerCardHistory(cardID: cardID) { return existing }
+        let rows = try query(
+            """
+            SELECT cards.template_id, cards.scheduling_history_origin, items.item_type_id
+            FROM cards JOIN items ON items.id = cards.item_id
+            WHERE cards.id = ? LIMIT 1;
+            """,
+            bindings: [.text(cardID.uuidString)]
+        )
+        guard let row = rows.first,
+              let typeText = row["item_type_id"] as? String,
+              let itemTypeID = UUID(uuidString: typeText),
+              let templateText = row["template_id"] as? String,
+              let templateID = UUID(uuidString: templateText)
+        else { throw DatabaseError.cardNotFound(cardID) }
+        let cohortID = SchedulerPersistenceConstants.cardKindCohortID(
+            itemTypeID: itemTypeID,
+            templateID: templateID
+        )
+        let signature = itemTypeID.uuidString.lowercased() + "|"
+            + templateID.uuidString.lowercased()
+        try execute(
+            """
+            INSERT OR IGNORE INTO scheduler_cohorts (
+                id, kind, canonical_signature, parent_cohort_id,
+                is_dirty, dirty_revision, created_at, updated_at
+            ) VALUES (?, 'cardKind', ?, ?, 0, 0, ?, ?);
+            """,
+            bindings: [
+                .text(cohortID.uuidString), .text(signature),
+                .text(SchedulerPersistenceConstants.globalCohortID.uuidString),
+                .double(now.timeIntervalSince1970), .double(now.timeIntervalSince1970),
+            ]
+        )
+        try execute(
+            """
+            INSERT OR IGNORE INTO scheduler_card_history (
+                card_id, cohort_id, item_type_id_at_assignment,
+                template_id_at_assignment, history_origin, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            bindings: [
+                .text(cardID.uuidString), .text(cohortID.uuidString),
+                .text(itemTypeID.uuidString), .text(templateID.uuidString),
+                (row["scheduling_history_origin"] as? Double).map(Binding.double) ?? .null,
+                .double(now.timeIntervalSince1970),
+            ]
+        )
+        guard let history = try fetchSchedulerCardHistory(cardID: cardID) else {
+            throw DatabaseError.decodingFailed
+        }
+        return history
+    }
+
+    func fetchSchedulerCardHistory(cardID: UUID) throws -> SchedulerCardHistory? {
+        try query(
+            "SELECT * FROM scheduler_card_history WHERE card_id = ? LIMIT 1;",
+            bindings: [.text(cardID.uuidString)]
+        ).first.flatMap(decodeSchedulerCardHistory)
+    }
+
+    func fetchSchedulerCardHistories() throws -> [UUID: SchedulerCardHistory] {
+        let values = try query("SELECT * FROM scheduler_card_history;")
+            .compactMap(decodeSchedulerCardHistory)
+        return Dictionary(uniqueKeysWithValues: values.map { ($0.cardID, $0) })
+    }
+
+    func markSchedulerCohortsDirty(cardID: UUID, now: Date) throws {
+        let history: SchedulerCardHistory
+        if let existing = try fetchSchedulerCardHistory(cardID: cardID) {
+            history = existing
+        } else {
+            history = try ensureSchedulerCardHistory(cardID: cardID, now: now)
+        }
+        try execute(
+            """
+            UPDATE scheduler_cohorts
+            SET is_dirty = 1, dirty_revision = dirty_revision + 1, updated_at = ?
+            WHERE id IN (?, ?);
+            """,
+            bindings: [
+                .double(now.timeIntervalSince1970),
+                .text(SchedulerPersistenceConstants.globalCohortID.uuidString),
+                .text(history.cohortID.uuidString),
+            ]
+        )
+    }
+
+    func nextDirtySchedulerCohort() throws -> SchedulerCohort? {
+        try query(
+            """
+            SELECT * FROM scheduler_cohorts WHERE is_dirty = 1
+            ORDER BY CASE WHEN last_attempt_at IS NULL THEN 0 ELSE 1 END,
+                     last_attempt_at ASC, id ASC LIMIT 1;
+            """
+        ).first.flatMap(decodeSchedulerCohort)
+    }
+
+    func markStaleSchedulerCohortsDirty(now: Date) throws {
+        let cutoff = now.addingTimeInterval(-30 * 86_400).timeIntervalSince1970
+        try execute(
+            """
+            UPDATE scheduler_cohorts
+            SET is_dirty = 1, dirty_revision = dirty_revision + 1, updated_at = ?
+            WHERE is_dirty = 0
+              AND COALESCE(last_maintenance_at, created_at) <= ?;
+            """,
+            bindings: [.double(now.timeIntervalSince1970), .double(cutoff)]
+        )
+    }
+
+    func finishSchedulerCohortMaintenance(
+        id: UUID,
+        observedDirtyRevision: Int,
+        attemptedAt: Date
+    ) throws {
+        try execute(
+            """
+            UPDATE scheduler_cohorts
+            SET is_dirty = CASE WHEN dirty_revision = ? THEN 0 ELSE 1 END,
+                last_attempt_at = ?, last_maintenance_at = ?, updated_at = ?
+            WHERE id = ?;
+            """,
+            bindings: [
+                .int(Int64(observedDirtyRevision)),
+                .double(attemptedAt.timeIntervalSince1970),
+                .double(attemptedAt.timeIntervalSince1970),
+                .double(attemptedAt.timeIntervalSince1970),
+                .text(id.uuidString),
+            ]
+        )
+    }
+
+    func activateFSRSParameterSet(_ parameterSetID: UUID, cohortID: UUID, now: Date) throws {
+        guard try fetchFSRSParameterSet(id: parameterSetID) != nil else {
+            throw DatabaseError.executeFailed("FSRS parameter set does not exist.")
+        }
+        try execute(
+            "UPDATE scheduler_cohorts SET active_parameter_set_id = ?, updated_at = ? WHERE id = ?;",
+            bindings: [
+                .text(parameterSetID.uuidString), .double(now.timeIntervalSince1970),
+                .text(cohortID.uuidString),
+            ]
+        )
+        if cohortID == SchedulerPersistenceConstants.globalCohortID {
+            try activateFSRSParameterSet(
+                parameterSetID,
+                presetID: SchedulerPersistenceConstants.sharedPresetID,
+                now: now
+            )
+        }
     }
 
     func fetchSchedulerPreset(id: UUID) throws -> SchedulerPreset? {
@@ -3670,14 +4038,15 @@ actor SQLiteDatabase {
         try execute(
             """
             INSERT INTO fsrs_optimization_runs (
-                id, preset_id, started_at, completed_at, training_cutoff,
+                id, preset_id, cohort_id, started_at, completed_at, training_cutoff,
                 input_fingerprint, eligible_target_count, distinct_card_count,
                 failure_count, study_day_count, excluded_counts, fold_count,
                 metrics, decision, reason, candidate_parameter_set_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             bindings: [
                 .text(run.id.uuidString), .text(run.presetID.uuidString),
+                run.cohortID.map { .text($0.uuidString) } ?? .null,
                 .double(run.startedAt.timeIntervalSince1970),
                 .double(run.completedAt.timeIntervalSince1970),
                 .double(run.trainingCutoff.timeIntervalSince1970),
@@ -3703,7 +4072,7 @@ actor SQLiteDatabase {
             if activate {
                 try activateFSRSParameterSet(
                     parameterSet.id,
-                    presetID: run.presetID,
+                    cohortID: run.cohortID ?? SchedulerPersistenceConstants.globalCohortID,
                     now: now
                 )
             }
@@ -3719,7 +4088,7 @@ actor SQLiteDatabase {
             try insertFSRSOptimizationRun(run)
             try activateFSRSParameterSet(
                 previousParameterSetID,
-                presetID: run.presetID,
+                cohortID: run.cohortID ?? SchedulerPersistenceConstants.globalCohortID,
                 now: now
             )
         }
@@ -3758,6 +4127,8 @@ actor SQLiteDatabase {
         let quarantined = try query(
             "SELECT 1 AS found FROM quarantined_scheduler_params LIMIT 1;"
         ).first != nil
+        let cohorts = try fetchSchedulerCohorts()
+        let cardKindCohorts = cohorts.filter { $0.kind == .cardKind }
         return SchedulingHealthSnapshot(
             preset: preset,
             activeParameterSet: active,
@@ -3765,7 +4136,22 @@ actor SQLiteDatabase {
             rollbackParameterSetIDs: rollbackIDs,
             legacyParametersQuarantined: quarantined,
             optimizerParityVerified: SchedulerPersistenceConstants.optimizerParityVerified,
-            latestMigration: try fetchLatestSchedulerMigration()
+            latestMigration: try fetchLatestSchedulerMigration(),
+            cohortCount: cohorts.count,
+            personalizedCohortCount: cardKindCohorts.lazy.filter {
+                guard let activeID = $0.activeParameterSetID,
+                      let set = setsByID[activeID]
+                else { return false }
+                return set.cohortID == $0.id && set.source == .optimized
+            }.count,
+            inheritedCohortCount: cardKindCohorts.lazy.filter {
+                guard let activeID = $0.activeParameterSetID,
+                      let set = setsByID[activeID]
+                else { return true }
+                return set.cohortID != $0.id || set.source != .optimized
+            }.count,
+            pendingMaintenance: cohorts.contains(where: \.isDirty),
+            lastMaintenanceAt: cohorts.compactMap(\.lastMaintenanceAt).max()
         )
     }
 
@@ -4354,7 +4740,16 @@ actor SQLiteDatabase {
                 )
             }
 
-            try updateCardMemory(cardID, memory: memoryAfter)
+            if let audit = log.schedulingAudit {
+                try updateCardSchedulingMemory(
+                    cardID,
+                    memory: memoryAfter,
+                    modelVersion: audit.modelVersion,
+                    parameterSetID: audit.parameterSetID
+                )
+            } else {
+                try updateCardMemory(cardID, memory: memoryAfter)
+            }
             try insertReviewLog(log, memoryBefore: memoryBefore)
             if let introducedDeckID, let introductionStudyDay {
                 try execute(
@@ -6011,6 +6406,60 @@ actor SQLiteDatabase {
         )
     }
 
+    private func decodeSchedulerCohort(from row: [String: Any?]) -> SchedulerCohort? {
+        guard let idText = row["id"] as? String,
+              let id = UUID(uuidString: idText),
+              let kindText = row["kind"] as? String,
+              let kind = SchedulerCohortKind(rawValue: kindText),
+              let signature = row["canonical_signature"] as? String,
+              let dirty = row["is_dirty"] as? Int64,
+              let revision = row["dirty_revision"] as? Int64,
+              let createdAt = row["created_at"] as? Double,
+              let updatedAt = row["updated_at"] as? Double
+        else { return nil }
+        return SchedulerCohort(
+            id: id,
+            kind: kind,
+            canonicalSignature: signature,
+            parentCohortID: (row["parent_cohort_id"] as? String)
+                .flatMap(UUID.init(uuidString:)),
+            activeParameterSetID: (row["active_parameter_set_id"] as? String)
+                .flatMap(UUID.init(uuidString:)),
+            isDirty: dirty != 0,
+            dirtyRevision: Int(revision),
+            lastAttemptAt: (row["last_attempt_at"] as? Double)
+                .map(Date.init(timeIntervalSince1970:)),
+            lastMaintenanceAt: (row["last_maintenance_at"] as? Double)
+                .map(Date.init(timeIntervalSince1970:)),
+            createdAt: Date(timeIntervalSince1970: createdAt),
+            updatedAt: Date(timeIntervalSince1970: updatedAt)
+        )
+    }
+
+    private func decodeSchedulerCardHistory(
+        from row: [String: Any?]
+    ) -> SchedulerCardHistory? {
+        guard let cardText = row["card_id"] as? String,
+              let cardID = UUID(uuidString: cardText),
+              let cohortText = row["cohort_id"] as? String,
+              let cohortID = UUID(uuidString: cohortText),
+              let typeText = row["item_type_id_at_assignment"] as? String,
+              let itemTypeID = UUID(uuidString: typeText),
+              let templateText = row["template_id_at_assignment"] as? String,
+              let templateID = UUID(uuidString: templateText),
+              let updatedAt = row["updated_at"] as? Double
+        else { return nil }
+        return SchedulerCardHistory(
+            cardID: cardID,
+            cohortID: cohortID,
+            itemTypeIDAtAssignment: itemTypeID,
+            templateIDAtAssignment: templateID,
+            historyOrigin: (row["history_origin"] as? Double)
+                .map(Date.init(timeIntervalSince1970:)),
+            updatedAt: Date(timeIntervalSince1970: updatedAt)
+        )
+    }
+
     private func decodeFSRSParameterSet(from row: [String: Any?]) throws -> FSRSParameterSet {
         guard let idText = row["id"] as? String,
               let id = UUID(uuidString: idText),
@@ -6033,6 +6482,7 @@ actor SQLiteDatabase {
             sourceChecksum: sourceChecksum,
             fixtureChecksum: row["fixture_checksum"] as? String,
             scope: scope,
+            cohortID: (row["cohort_id"] as? String).flatMap(UUID.init(uuidString:)),
             source: source,
             inputFingerprint: row["input_fingerprint"] as? String,
             trainingCutoff: (row["training_cutoff"] as? Double)
@@ -6068,6 +6518,7 @@ actor SQLiteDatabase {
         return FSRSOptimizationRun(
             id: id,
             presetID: presetID,
+            cohortID: (row["cohort_id"] as? String).flatMap(UUID.init(uuidString:)),
             startedAt: Date(timeIntervalSince1970: startedAt),
             completedAt: Date(timeIntervalSince1970: completedAt),
             trainingCutoff: Date(timeIntervalSince1970: trainingCutoff),
@@ -6250,18 +6701,10 @@ actor SQLiteDatabase {
                 return id
             }
 
-            // These child records reference review_logs without cascade rules,
-            // so remove them before their parent history rows.
+            // Introduction accounting resets, while immutable reviews remain
+            // available as evidence before the new history origin.
             try execute(
                 "DELETE FROM new_card_introductions WHERE review_log_id IN (\(cardLogIDs));",
-                bindings: deckBindings
-            )
-            try execute(
-                "DELETE FROM review_reverts WHERE review_log_id IN (\(cardLogIDs));",
-                bindings: deckBindings
-            )
-            try execute(
-                "DELETE FROM review_logs WHERE id IN (\(cardLogIDs));",
                 bindings: deckBindings
             )
 
@@ -6271,7 +6714,8 @@ actor SQLiteDatabase {
             let updateStatement = try prepareStatement(
                 """
                 UPDATE cards
-                SET memory = ?, due_at = ?, phase = ?, lapses = ?
+                SET memory = ?, due_at = ?, phase = ?, lapses = ?,
+                    scheduling_history_origin = ?
                 WHERE id = ?;
                 """
             )
@@ -6287,6 +6731,7 @@ actor SQLiteDatabase {
                         .double(memory.due.timeIntervalSince1970),
                         .text(memory.phase.rawValue),
                         .int(Int64(memory.lapses)),
+                        .double(now.timeIntervalSince1970),
                         .text(cardID.uuidString),
                     ]
                 )
@@ -6299,6 +6744,35 @@ actor SQLiteDatabase {
                 );
                 """,
                 bindings: deckBindings
+            )
+            try execute(
+                """
+                UPDATE scheduler_card_history
+                SET history_origin = ?, updated_at = ?
+                WHERE card_id IN (
+                    SELECT id FROM cards WHERE deck_id IN (\(placeholders))
+                );
+                """,
+                bindings: [
+                    .double(now.timeIntervalSince1970),
+                    .double(now.timeIntervalSince1970),
+                ] + deckBindings
+            )
+            try execute(
+                """
+                UPDATE scheduler_cohorts
+                SET is_dirty = 1, dirty_revision = dirty_revision + 1, updated_at = ?
+                WHERE id = ? OR id IN (
+                    SELECT cohort_id FROM scheduler_card_history
+                    WHERE card_id IN (
+                        SELECT id FROM cards WHERE deck_id IN (\(placeholders))
+                    )
+                );
+                """,
+                bindings: [
+                    .double(now.timeIntervalSince1970),
+                    .text(SchedulerPersistenceConstants.globalCohortID.uuidString),
+                ] + deckBindings
             )
 
             return orderedCardIDs.count
@@ -6664,7 +7138,21 @@ actor SQLiteDatabase {
                         guard StudyDay.validRolloverMinutes.contains(minutes) else { throw DatabaseError.invalidDeck("Study day rollover must be a valid local time.") }
                         try setMetadataValue(String(minutes), forKey: ItemStore.studyDayRolloverMetadataKeyForSync)
                     case let .scheduler(profileID, parameters, optimizedAt, sampleCount, logLoss):
-                        try saveSchedulerParameters(parameters, profileID: profileID, optimizedAt: optimizedAt, sampleCount: sampleCount, logLoss: logLoss)
+                        try execute(
+                            """
+                            INSERT OR REPLACE INTO quarantined_scheduler_params (
+                                profile_id, parameters, optimized_at, sample_count,
+                                log_loss, archived_at, reason
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                            """,
+                            bindings: [
+                                .text(profileID), .blob(try encode(parameters)),
+                                .double(optimizedAt.timeIntervalSince1970),
+                                .int(Int64(sampleCount)), .double(logLoss),
+                                .double(Date.now.timeIntervalSince1970),
+                                .text("Ignored legacy scheduler parameters received from sync"),
+                            ]
+                        )
                     }
                 case let .portableTypeMapping(record):
                     try persistPortableItemTypeMapping(originLibraryID: record.originLibraryID, originTypeID: record.originTypeID, schemaDigest: record.schemaDigest, localTypeID: record.localTypeID)
