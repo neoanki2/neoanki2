@@ -194,6 +194,10 @@ authorization. Existing Card setup and content identities, order, conditions,
 layout, Answer method, and Learning route remain unchanged when you open and
 save without editing them.
 
+Item types and Card setups define how knowledge is presented, not separate
+scheduling models. Their review outcomes contribute to the profile's shared,
+continuously tuned scheduler under the same automatic safety bounds.
+
 ## Use item types included with decks
 
 Imported deck-specific schemas appear under **From Decks**, grouped by owning
