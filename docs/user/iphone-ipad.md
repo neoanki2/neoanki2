@@ -59,7 +59,10 @@ Reveal, Type Answer, Choose, Arrange, Record, Audio Submission, and Cloze.
 Reveal or check the response, then grade it when the interaction uses FSRS. The
 default choices are Again, Hard, Good, and Easy. In **Settings → Study**, enable
 **Use Fail / Pass grades** to show only Fail and Pass; they schedule as Again
-and Good, respectively. Edit updates the current item and the remaining queued
+and Good, respectively. Every Again keeps the card in the current session and
+returns it after the cards already waiting, including after consecutive
+failures. The card remains in the remaining count until it is remembered or
+you end the session. Edit updates the current item and the remaining queued
 cards generated from it. End asks for confirmation; completion reports reviews
 and saved submissions separately.
 
