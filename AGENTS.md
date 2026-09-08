@@ -12,6 +12,20 @@
 Preserve unrelated working-tree changes. API changes must update the typed
 endpoint registry, tests, and generated `docs/api/` artifacts together.
 
+## Release workflow
+
+- A user request to `release` runs `./Scripts/release.sh` directly. The command
+  treats current local changes as release input and owns committing, local
+  verification, packaging, PR creation and administrative merge, publication,
+  official-tap update, Homebrew installation, and exact-path launch.
+- The default release has a 300-second SLO. Do not run the full UI suite or wait
+  for GitHub checks on its critical path; the merge starts exhaustive Test and
+  Documentation workflows automatically.
+- Use `./Scripts/release.sh --verified ...` only when the user explicitly waives
+  the five-minute requirement in favor of pre-publication hosted checks and an
+  attested GitHub candidate.
+- Preserve and report the emitted `FAST_RELEASE_*` telemetry.
+
 ## Desktop isolation
 
 - Do not launch, control, capture, or otherwise interact with the user's desktop or graphical applications.

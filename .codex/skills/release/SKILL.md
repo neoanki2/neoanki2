@@ -1,98 +1,68 @@
 ---
 name: release
-description: Release NeoAnki2 end to end through its authenticated GitHub CLI, attested candidate, protected checks, GitHub Release, official Homebrew tap, verified app upgrade, and exact-path launch. Use when asked to release, ship, publish, merge-and-release, update the Homebrew cask, install the new NeoAnki2 version, or resume an interrupted NeoAnki2 release.
+description: Release current NeoAnki2 local changes to GitHub and the official Homebrew tap, install and verify the app, and launch the exact installed path within a five-minute SLO. Use when asked to release, ship, publish, merge-and-release, update the Homebrew cask, install a new NeoAnki2 version, or resume a release.
 ---
 
 # Release NeoAnki2
 
-Use the repository's single resumable release command. Do not reconstruct its
-remote steps manually.
+Use the repository command; do not reconstruct its GitHub, tap, or installation
+steps manually.
 
-## Prepare
+## Default: local changes to Brew in five minutes
 
-1. Work from a clean `codex/*` feature branch based on current `main`; preserve
-   unrelated changes and stop if the worktree is dirty.
-2. Confirm the intended change is committed and `gh auth status` succeeds.
-3. Write a concise PR body to `.build/release-pr.md`.
-4. Keep NeoAnki2 running. Local validation, CI, merge, publication, and tap
-   refresh do not require downtime.
-5. For UI-bearing changes, run the relevant targeted journey and the complete
-   `./Scripts/run-ui-tests.sh` suite before release. If desktop policy or local
-   permissions prevent UI verification, stop before push and report it as the
-   blocker.
-
-## Run
-
-Run the complete release transaction:
+When the user says `release`, immediately run:
 
 ```bash
-./Scripts/release.sh \
+./Scripts/release.sh
+```
+
+The dirty working tree is intentional release input. Do not ask for a title,
+body, confirmation, clean tree, or advance preparation. The command stages and
+commits all non-ignored local changes, includes already committed work ahead of
+`main`, and creates a release branch automatically when invoked on `main`.
+
+The command runs the complete headless fast suite and universal artifact build
+in parallel. It pushes with authenticated `gh`, creates or reuses a PR,
+administratively merges the exact locally verified revision, publishes the
+DMG/checksum/manifest, updates `neoanki2/homebrew-tap`, upgrades the cask,
+verifies the installed version/revision/signature, and performs at most one
+exact-path launch. The merge automatically starts exhaustive Test and
+Documentation workflows after publication; never wait for those hosted jobs on
+the five-minute critical path and do not run the full UI suite locally.
+
+Keep NeoAnki2 running until the command's just-in-time Homebrew replacement.
+Do not separately stop, install, or launch the app.
+
+## Explicit slower recovery
+
+Only when the user explicitly waives the five-minute requirement and requests
+pre-publication hosted validation, run the legacy path:
+
+```bash
+./Scripts/release.sh --verified \
   --title "Concise release title" \
   --body-file .build/release-pr.md
 ```
 
-For this project, “release” always means push, PR, CI, attested candidate,
-merge, GitHub publication, tap update, Homebrew upgrade, signature and revision
-verification, and one exact-path launch. The command stops a running app only
-immediately before replacement and launches `/Applications/NeoAnki2.app` once.
-Use `--no-install` or `--no-launch` only when the user explicitly requests that
-narrower outcome.
-
-When screenshot-backed sources changed, the command waits for the
-**Documentation screenshots** workflow to capture and validate the full set on
-isolated macOS CI and commit it to the pull-request branch. The command starts
-or reconciles required checks for that promoted revision, including known bot-owned
-`action_required` runs or dispatches missing exact-head fallbacks. Candidate
-packaging must use the resulting PR head and starts only after documentation
-and every required macOS UI shard passes. Stale screenshots have no release
-deferral or bypass.
-
-Allow the command to wait for CI. Send compact progress updates when waiting;
-do not replace the wait with repeated manual GitHub operations.
-
-## Resume
-
-After interruption or a corrected check, resume the same transaction:
-
-```bash
-./Scripts/release.sh --pr NUMBER
-```
-
-The command detects and skips completed candidate, merge, publication, tap, and
-installation phases while preserving the full-release default. When the clean
-local branch is the PR branch and contains committed ahead-only corrections,
-resume reruns local preflight, pushes that head, and waits for the PR to expose
-it before reconciling workflows. It refuses divergent local history.
-If the exact screenshot run ended in a retryable infrastructure failure, the
-resumed command starts and watches one new attempt. It never retries an
-approval-required run automatically.
+Resume it with `./Scripts/release.sh --verified --pr NUMBER`. That path may wait
+for protected checks, screenshot promotion, hosted UI matrices, and the
+GitHub-attested candidate.
 
 ## Guardrails
 
 - Use authenticated `gh` only; never use a GitHub connector.
-- Treat `release-candidate.json` as authoritative for version, revision,
-  artifact, and SHA-256. Never type or infer a checksum.
-- Never merge before required checks and the attested candidate succeed.
-- Never package or merge a revision while CI still requires a documentation
-  screenshot capture.
-- Never approve an unknown `action_required` workflow manually. The release
-  command may approve only its allowlisted bot-owned workflows for the exact PR
-  head; every other approval request is a blocker.
-- Never run the recovery **Release** workflow alongside the candidate path.
-- Never edit the tap cask by hand.
-- Never quit NeoAnki2 before the release command's just-in-time install phase.
-- Allow the command's verified `SIGTERM` fallback after the normal quit grace
-  period. Never use `SIGKILL` to force installation.
-- Never use `open -a NeoAnki2`; it can select a debug build.
-- Never retry a GUI launch. The script makes at most one absolute-path launch
-  and verifies the running executable.
-- Never report failure solely because a valid release took longer than a target.
+- Do not manually edit the Homebrew tap or infer a checksum.
+- Do not bypass either local fast gate even when the build artifact succeeds.
+- Do not start publication when the command reports insufficient remaining
+  budget.
+- Never use `SIGKILL`, `open -a NeoAnki2`, or a second launch attempt.
+- If a local gate fails, correct the branch and run the default command again.
+- If a remote phase partially completes, inspect the emitted phase and resume
+  without deleting a valid release or overwriting a divergent branch.
 
 ## Report
 
-Return the PR URL/number, release tag and URL, source revision, tap version,
-installed version and embedded revision when installed, signature result, and
-whether the verified `/Applications` executable is running. If blocked, name
-the exact failed invariant and the emitted `RELEASE_PHASE`; preserve the
-`RELEASE_*` and `SHIP_*` timing lines for audit, then use the resume command
-after the invariant is corrected.
+Return the PR URL, release tag and URL, source revision, official tap version,
+installed version and embedded revision, signature result, exact running app
+path when launched, and the `FAST_RELEASE_*` timing fields. If blocked, name
+the exact phase and invariant that stopped the command.

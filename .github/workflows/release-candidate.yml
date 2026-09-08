@@ -43,7 +43,7 @@ jobs:
         run: |
           chmod +x Scripts/install-app.sh Scripts/build-release-artifact.sh \
             Scripts/build-release-candidate.sh
-          bash -n Scripts/release.sh Scripts/build-release-candidate.sh \
+          bash -n Scripts/release.sh Scripts/release-fast.sh Scripts/build-release-candidate.sh \
             Scripts/publish-release-candidate.sh \
             Scripts/reconcile-release-workflows.sh Scripts/ship-release.sh \
             Scripts/test-release-workflow-reconciliation.sh \
