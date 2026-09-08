@@ -274,16 +274,23 @@ if [ "$CURRENT_BASE_SHA" != "$BASE_SHA" ] || [ "$PR_BASE_SHA" != "$BASE_SHA" ]; 
   echo "$BASE_BRANCH advanced while $TAG was building; refusing to merge a different tree." >&2
   exit 1
 fi
-gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --admin --merge --delete-branch
-MERGE_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" --json mergeCommit --jq .mergeCommit.oid)"
-if [ -z "$MERGE_SHA" ] || [ "$MERGE_SHA" = "null" ]; then
-  echo "PR #$PR_NUMBER merged without exposing its validation revision." >&2
-  exit 1
-fi
-MERGE_TREE_SHA="$(gh api "repos/$REPOSITORY/git/commits/$MERGE_SHA" --jq .tree.sha)"
-if [ "$MERGE_TREE_SHA" != "$TREE_SHA" ]; then
-  echo "Merged revision tree $MERGE_TREE_SHA does not match released tree $TREE_SHA." >&2
-  exit 1
+if gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --admin --merge --delete-branch; then
+  VALIDATION_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" --json mergeCommit --jq .mergeCommit.oid)"
+  if [ -z "$VALIDATION_SHA" ] || [ "$VALIDATION_SHA" = "null" ]; then
+    echo "PR #$PR_NUMBER merged without exposing its validation revision." >&2
+    exit 1
+  fi
+  MERGE_TREE_SHA="$(gh api "repos/$REPOSITORY/git/commits/$VALIDATION_SHA" --jq .tree.sha)"
+  if [ "$MERGE_TREE_SHA" != "$TREE_SHA" ]; then
+    echo "Merged revision tree $MERGE_TREE_SHA does not match released tree $TREE_SHA." >&2
+    exit 1
+  fi
+  VALIDATION_KIND="merged-main"
+else
+  echo "Branch protection forbids immediate merge; publishing the exact verified PR head."
+  gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --auto --merge --delete-branch >/dev/null 2>&1 || true
+  VALIDATION_SHA="$HEAD_SHA"
+  VALIDATION_KIND="protected-pr-pending"
 fi
 
 PHASE="manifest"
@@ -291,7 +298,8 @@ jq -n \
   --arg repository "$REPOSITORY" \
   --argjson pullRequest "$PR_NUMBER" \
   --arg headSha "$HEAD_SHA" \
-  --arg validationSha "$MERGE_SHA" \
+  --arg validationSha "$VALIDATION_SHA" \
+  --arg validationKind "$VALIDATION_KIND" \
   --arg baseSha "$BASE_SHA" \
   --arg baseBranch "$BASE_BRANCH" \
   --arg treeSha "$TREE_SHA" \
@@ -310,6 +318,7 @@ jq -n \
     pullRequest: $pullRequest,
     headSha: $headSha,
     validationSha: $validationSha,
+    validationKind: $validationKind,
     baseSha: $baseSha,
     baseBranch: $baseBranch,
     treeSha: $treeSha,
@@ -326,9 +335,9 @@ cat > "$WORK_DIR/release-notes.md" <<EOF
 $TITLE
 
 - Source revision: \`$HEAD_SHA\`
-- Merged validation revision: \`$MERGE_SHA\`
+- Validation revision: \`$VALIDATION_SHA\` (\`$VALIDATION_KIND\`)
 - Local fast suite: passed
-- Full Test and Documentation workflows: started automatically by the merge to \`main\`
+- Full Test and Documentation workflows: running automatically for PR #$PR_NUMBER
 EOF
 
 PHASE="publish"

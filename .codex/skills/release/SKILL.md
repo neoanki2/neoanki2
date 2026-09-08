@@ -23,11 +23,11 @@ commits all non-ignored local changes, includes already committed work ahead of
 
 The command runs the complete headless fast suite and universal artifact build
 in parallel. It pushes with authenticated `gh`, creates or reuses a PR,
-administratively merges the exact locally verified revision, publishes the
+attempts to merge the exact locally verified revision, publishes the
 DMG/checksum/manifest, updates `neoanki2/homebrew-tap`, upgrades the cask,
 verifies the installed version/revision/signature, and performs at most one
 exact-path launch. The merge automatically starts exhaustive Test and
-Documentation workflows after publication; never wait for those hosted jobs on
+Documentation workflows in the background; never wait for those hosted jobs on
 the five-minute critical path and do not run the full UI suite locally.
 
 Keep NeoAnki2 running until the command's just-in-time Homebrew replacement.

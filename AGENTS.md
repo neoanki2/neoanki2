@@ -16,7 +16,7 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
 
 - A user request to `release` runs `./Scripts/release.sh` directly. The command
   treats current local changes as release input and owns committing, local
-  verification, packaging, PR creation and administrative merge, publication,
+  verification, packaging, PR creation and non-blocking merge, publication,
   official-tap update, Homebrew installation, and exact-path launch.
 - The default release has a 300-second SLO. Do not run the full UI suite or wait
   for GitHub checks on its critical path; the merge starts exhaustive Test and

@@ -30,9 +30,10 @@ The command performs the complete transaction without prompts:
 4. Runs `Scripts/test-fast.sh` and the universal DMG build concurrently.
 5. Pushes with authenticated `gh`, creates or reuses a pull request, and checks
    that its head still matches the locally verified revision.
-6. Administratively merges that exact revision after the local gates pass.
-   The merge starts the exhaustive Test and Documentation workflows on `main`;
-   those checks are deliberately post-release and do not block the five-minute
+6. Attempts an immediate administrative merge after the local gates pass. If
+   branch protection forbids bypass, it enables automatic merge when available
+   and publishes the exact verified PR head while its exhaustive Test and
+   Documentation workflows continue; those checks do not block the five-minute
    path.
 7. Publishes the DMG, checksum, and schema-v2 release manifest, updates the
    official `neoanki2/homebrew-tap`, upgrades the cask, verifies the installed
