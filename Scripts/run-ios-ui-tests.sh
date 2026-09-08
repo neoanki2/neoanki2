@@ -159,6 +159,7 @@ while [[ $attempt -le 2 ]]; do
 
   total_tests="unknown"
   runner_exit_failure=false
+  accessibility_audit_timeout=false
   if [[ -d "$result_bundle" ]] && xcrun xcresulttool get test-results summary \
       --path "$result_bundle" --compact > "$compact_summary"; then
     total_tests=$(jq -r '.totalTestCount' "$compact_summary")
@@ -167,6 +168,12 @@ while [[ $attempt -le 2 ]]; do
       | any(.[]?; ((.failureText? // "") | contains("test runner exited with code")))
     ' "$compact_summary" >/dev/null; then
       runner_exit_failure=true
+    fi
+    if jq -e '
+      [.testFailures] | flatten
+      | any(.[]?; ((.failureText? // "") | contains("Audit failed to complete in time")))
+    ' "$compact_summary" >/dev/null; then
+      accessibility_audit_timeout=true
     fi
     jq -r '
       "result=\(.result) tests=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests)",
@@ -204,9 +211,11 @@ while [[ $attempt -le 2 ]]; do
     echo "iOS UI total timing: shard=$SHARD_ID device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
     exit 0
   fi
-  if [[ $attempt -eq 1 && ("$total_tests" == "0" || "$runner_exit_failure" == "true") ]]; then
+  if [[ $attempt -eq 1 && ("$total_tests" == "0" || "$runner_exit_failure" == "true" || "$accessibility_audit_timeout" == "true") ]]; then
     if [[ "$runner_exit_failure" == "true" ]]; then
       echo "The XCTest runner exited before finishing; retrying once with a newly provisioned simulator." >&2
+    elif [[ "$accessibility_audit_timeout" == "true" ]]; then
+      echo "The XCTest accessibility audit timed out; retrying once with a newly provisioned simulator." >&2
     else
       echo "No test started; retrying once with a newly provisioned simulator." >&2
     fi
@@ -214,7 +223,7 @@ while [[ $attempt -le 2 ]]; do
     continue
   fi
 
-  echo "iOS UI tests failed; assertion, app, and accessibility failures are never retried." >&2
+  echo "iOS UI tests failed; assertions, app failures, and completed accessibility findings are never retried." >&2
   exit "$status"
 done
 
