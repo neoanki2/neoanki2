@@ -195,6 +195,11 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             "An XCTest accessibility-audit timeout is infrastructure failure and gets one fresh-simulator retry"
         )
         XCTAssertTrue(runner.contains("Audit failed to complete in time"))
+        XCTAssertTrue(
+            runner.contains("app_launch_progress_timeout=true"),
+            "An XCTest app-launch progress timeout is infrastructure failure and gets one fresh-simulator retry"
+        )
+        XCTAssertTrue(runner.contains("Failed to get launch progress"))
     }
 
     func testReleaseResumePreflightsAheadOnlyLocalCorrections() throws {
