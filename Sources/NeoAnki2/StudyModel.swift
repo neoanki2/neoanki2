@@ -96,8 +96,7 @@ final class StudyModel {
         // A failed card waits once in the next repair round while untouched
         // cards remain once in the current queue. Counting both pending groups
         // keeps Again stable without rescanning a potentially large session.
-        let maturedRepairs = repairQueue.lazy.filter { $0.card.memory.due <= .now }.count
-        return queue.count - index + maturedRepairs
+        return queue.count - index + repairQueue.count
     }
 
     var remainingLabel: String {
@@ -581,16 +580,14 @@ final class StudyModel {
             return
         }
 
-        let now = Date.now
-        let maturedRepairs = repairQueue.filter { $0.card.memory.due <= now }
-        if !maturedRepairs.isEmpty {
+        if !repairQueue.isEmpty {
             var sourceIndexByCardID: [UUID: Int] = [:]
-            sourceIndexByCardID.reserveCapacity(maturedRepairs.count)
+            sourceIndexByCardID.reserveCapacity(repairQueue.count)
             for (sourceIndex, card) in queue.enumerated() {
                 sourceIndexByCardID[card.id] = sourceIndex
             }
-            queue.reserveCapacity(queue.count + maturedRepairs.count)
-            for repeatEntry in maturedRepairs {
+            queue.reserveCapacity(queue.count + repairQueue.count)
+            for repeatEntry in repairQueue {
                 guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
                     continue
                 }
@@ -598,8 +595,7 @@ final class StudyModel {
                 repeatedCard.card = repeatEntry.card
                 queue.append(repeatedCard)
             }
-            let maturedIDs = Set(maturedRepairs.map { $0.card.id })
-            repairQueue.removeAll { maturedIDs.contains($0.card.id) }
+            repairQueue = []
             isFinished = false
             reviewTiming.reset()
             prepareCurrentInteraction()

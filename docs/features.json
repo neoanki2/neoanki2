@@ -198,7 +198,7 @@
       "name": "Prioritize due learned cards before new material",
       "article": "user/studying.md",
       "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnkiFeatures/StudyFeatureModel.swift"],
-      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift"]
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudyRepairFeatureTests.swift"]
     },
     {
       "id": "study-reveal",

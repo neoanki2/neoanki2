@@ -190,6 +190,16 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         )
         XCTAssertTrue(runner.contains("if [[ \"$PARALLEL_WORKERS\" -eq 1 ]]"))
         XCTAssertTrue(runner.contains("test_command+=( -parallel-testing-enabled NO )"))
+        XCTAssertTrue(
+            runner.contains("accessibility_audit_timeout=true"),
+            "An XCTest accessibility-audit timeout is infrastructure failure and gets one fresh-simulator retry"
+        )
+        XCTAssertTrue(runner.contains("Audit failed to complete in time"))
+        XCTAssertTrue(
+            runner.contains("app_launch_progress_timeout=true"),
+            "An XCTest app-launch progress timeout is infrastructure failure and gets one fresh-simulator retry"
+        )
+        XCTAssertTrue(runner.contains("Failed to get launch progress"))
     }
 
     func testReleaseResumePreflightsAheadOnlyLocalCorrections() throws {

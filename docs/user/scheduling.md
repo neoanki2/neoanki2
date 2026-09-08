@@ -12,8 +12,8 @@ NeoAnki2 uses FSRS-6 (Free Spaced Repetition Scheduler) to decide when each card
 is due. You do not set an interval while studying. Instead, reveal the answer
 and describe your recall:
 
-- **Again (1):** you did not remember. The first failure enters immediate
-  repair; another consecutive failure keeps FSRS's computed due time.
+- **Again (1):** you did not remember. The card remains unresolved and returns
+  at the end of the current session queue, including after repeated failures.
 - **Hard (2):** you remembered with difficulty. FSRS may schedule the next
   review later the same day.
 - **Good (3):** you remembered correctly.
@@ -76,13 +76,13 @@ reset also clears any repeated-lapse acknowledgements because those lapse
 counts no longer apply. The
 operation cannot be undone, so back up the library first when progress matters.
 
-Learning and relearning use adaptive **repair**. The first Again from New or
-Review is eligible to return immediately after other due cards. If that repair
-also receives Again, NeoAnki2 preserves the due time computed by the cohort's
-FSRS model instead of creating an endless immediate loop. A deferred repair
-returns in the current session only if it matures while other cards are being
-studied; otherwise the session completes normally and the card returns in a
-later due session. Future repairs do not inflate the remaining-card count.
+Learning and relearning use immediate **repair**. Every Again keeps the card in
+the current session and moves it behind cards already waiting. If the card
+receives Again repeatedly, it repeats again in the same session; the session
+does not complete until the card is remembered or you explicitly end it. The
+repair card remains in the remaining-card count. Repeated failures in the same
+repair sequence do not add extra lapses, but every attempt still updates the
+card's FSRS memory state.
 Hard, Good, or Easy graduates the card. After successful recall, FSRS-6 chooses
 the next due time from the card's stability. That due time keeps fractional-day
 precision, so a weak short-term memory can return in hours while established

@@ -50,7 +50,7 @@ func rememberedNewCardGraduatesToReview(rating: ReviewRating) {
 
     #expect(next.phase == .learning)
     #expect(next.stepIndex == 1)
-    #expect(next.due > now)
+    #expect(next.due == now)
     #expect(next.lapses == 0)
 }
 
@@ -92,7 +92,7 @@ func rememberedNewCardGraduatesToReview(rating: ReviewRating) {
     #expect(next.phase == .relearning)
     #expect(next.lapses == 2)
     #expect(next.stepIndex == 1)
-    #expect(next.due > now)
+    #expect(next.due == now)
 }
 
 @Test(arguments: [Phase.learning, .relearning])
@@ -162,11 +162,7 @@ func goodGraduatesIntradayStep(phase: Phase) {
             let reviewLapse = phase == .review && rating == .again
 
             if failedAcquisition || reviewLapse {
-                if phase == .learning || phase == .relearning {
-                    #expect(next.due > now)
-                } else {
-                    #expect(next.due == now)
-                }
+                #expect(next.due == now)
                 #expect(next.phase == (phase == .new ? .learning : reviewLapse ? .relearning : phase))
                 #expect(next.stepIndex != nil)
             } else {
