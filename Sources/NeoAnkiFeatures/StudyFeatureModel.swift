@@ -62,12 +62,10 @@ public final class StudyFeatureModel: Identifiable {
 
     public var currentCard: DueCard? { queue.indices.contains(index) ? queue[index] : nil }
     public var isComplete: Bool {
-        !isLoading && !isPreparingQueue && currentCard == nil
-            && !repairQueue.contains { $0.card.memory.due <= .now }
+        !isLoading && !isPreparingQueue && currentCard == nil && repairQueue.isEmpty
     }
     public var remainingCount: Int {
-        max(0, queue.count - index)
-            + repairQueue.lazy.filter { $0.card.memory.due <= .now }.count
+        max(0, queue.count - index) + repairQueue.count
     }
     public var canUndo: Bool { pendingUndo != nil && !isGrading }
 
@@ -194,7 +192,14 @@ public final class StudyFeatureModel: Identifiable {
         defer { isGrading = false }
         do {
             try await library.revertReview(id: undo.reviewID, asOf: .now)
-            if let id = undo.requeuedID { repairQueue.removeAll { $0.card.id == id } }
+            if let id = undo.requeuedID {
+                repairQueue.removeAll { $0.card.id == id }
+                if let queuedRepeat = queue.indices.last(where: {
+                    $0 > undo.index && queue[$0].id == id
+                }) {
+                    queue.remove(at: queuedRepeat)
+                }
+            }
             index = undo.index
             completion = .init(reviews: max(0, completion.reviews - 1), uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count)
             pendingUndo = nil
@@ -225,13 +230,10 @@ public final class StudyFeatureModel: Identifiable {
     private func advance() {
         isAnswerRevealed = false
         if index >= queue.count {
-            let now = Date.now
-            let matured = repairQueue.filter { $0.card.memory.due <= now }
-            for entry in matured {
+            for entry in repairQueue {
                 if var source = queue.first(where: { $0.id == entry.card.id }) { source.card = entry.card; queue.append(source) }
             }
-            let maturedIDs = Set(matured.map { $0.card.id })
-            repairQueue.removeAll { maturedIDs.contains($0.card.id) }
+            repairQueue = []
         }
         if currentCard != nil { reviewTiming.reset() }
         prepareInteraction()

@@ -1715,6 +1715,58 @@ private func pairWithAuthority(
     #expect(ended.status == 204)
 }
 
+@Test func studySessionReservesCardAgainAfterEveryAgainRating() async throws {
+    let (api, store) = try await makeAPIAndStore()
+    let token = try await pair(api, scopes: ["study.review"])
+    let auth = ["Authorization": "Bearer \(token)"]
+    _ = try await store.createItem(Item(
+        itemTypeID: BuiltInItemTypes.basicID,
+        fields: [
+            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
+            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+        ]
+    ))
+
+    let created = await api.handle(request(
+        .post,
+        "/v1/study-sessions",
+        headers: auth,
+        body: #"{"scope":{"kind":"allDecks"}}"#
+    ))
+    let sessionID = try #require(try jsonObject(created)["id"] as? String)
+    let first = await api.handle(request(
+        .post,
+        "/v1/study-sessions/\(sessionID)/next",
+        headers: auth
+    ))
+    let cardID = try #require(try jsonObject(first)["id"] as? String)
+
+    for attempt in 1 ... 2 {
+        let reviewed = await api.handle(request(
+            .post,
+            "/v1/reviews",
+            headers: auth.merging(["Idempotency-Key": "again-\(attempt)"]) { _, new in new },
+            body: """
+                {"sessionId":"\(sessionID)","cardId":"\(cardID)","rating":"again","durationMs":250}
+                """
+        ))
+        #expect(reviewed.status == 201)
+
+        let repeated = await api.handle(request(
+            .post,
+            "/v1/study-sessions/\(sessionID)/next",
+            headers: auth
+        ))
+        #expect(repeated.status == 200)
+        #expect(try jsonObject(repeated)["id"] as? String == cardID)
+    }
+
+    let memory = try await store.card(id: UUID(uuidString: cardID)!).memory
+    #expect(memory.phase == .learning)
+    #expect(memory.stepIndex == 1)
+    #expect(memory.due <= Date.now)
+}
+
 @Test func concurrentRevisionsAndOneHundredIdempotentReviewReplaysAreLinearizable() async throws {
     let store = try ItemStore(databaseURL: apiTestDatabaseURL())
     try await store.bootstrap()

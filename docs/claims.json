@@ -68,7 +68,7 @@
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/SRS/LearningScheduler.swift",
     "model": "FSRS-6",
     "reviewMinimumIntervalDays": 0,
-    "learningPolicy": "adaptive-repair-v2",
+    "learningPolicy": "repair-rounds",
     "defaultRequestRetention": 0.9,
     "defaultMaximumIntervalDays": 36500
   },
@@ -153,7 +153,7 @@
       "article": "user/studying.md",
       "contains": [
         "immediate repair",
-        "future deferred repair",
+        "Every Again remains in the count",
         "product target is fixed at 90%",
         "The first card appears as soon as its exact due count and content are ready"
       ]
