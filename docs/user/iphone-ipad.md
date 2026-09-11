@@ -63,7 +63,7 @@ and Good, respectively. Every Again keeps the card in the current session and
 returns it after the cards already waiting, including after consecutive
 failures. The card remains in the remaining count until it is remembered or
 you end the session. Edit updates the current item and the remaining queued
-cards generated from it. End asks for confirmation; completion reports reviews
+cards generated from it. **End** leaves immediately; completion reports reviews
 and saved submissions separately.
 
 The mobile study view supports native images, audio, video, rich text, cloze

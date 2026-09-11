@@ -173,6 +173,7 @@
     },
     {
       "expectedVisibleIdentifiers" : [
+        "endStudySession",
         "primaryStudyAction",
         "studyActionsMenu"
       ],
