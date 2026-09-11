@@ -157,7 +157,7 @@ final class DocumentationScreenshotTests: NeoAnkiUITestCase {
             named: "study-prompt",
             of: app,
             scenario: "study prompt before revealing the answer",
-            expectedVisibleIdentifiers: ["primaryStudyAction", "studyActionsMenu"]
+            expectedVisibleIdentifiers: ["primaryStudyAction", "studyActionsMenu", "endStudySession"]
         )
 
         openStudyActions(in: app)

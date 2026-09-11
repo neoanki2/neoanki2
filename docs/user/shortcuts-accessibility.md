@@ -89,9 +89,9 @@ Commands become available only in the relevant state. Grades are disabled until
 the answer is revealed, and every study command is disabled while the card
 editor is open.
 
-Inside a session, the header's labeled **Actions** menu groups **Edit Card**,
-**Grade Help**, and **End Session** in one predictable location. A saved grade
-and its **Undo** action appear in that same header row. The primary action or
+Inside a session, the header keeps **End Session** visible beside a labeled
+**More** menu for **Edit Card** and **Grade Help**. A saved grade and its
+**Undo** action appear in that same header row. The primary action or
 grading footer remains fixed with bottom clearance, and the Mac window stays
 within the visible screen so its controls are not clipped on short displays.
 On Record and Audio Submission cards, that footer also owns the recording
@@ -137,8 +137,7 @@ history warrants it, so there is no menu item to find, enable, or wait on.
 - **Command-E:** edit the item behind the current card, then **Return** to save
   or **Escape** to cancel.
 - **Command-Z:** undo the most recent grade when undo is available.
-- **Escape:** request to end the session. If at least one card was reviewed and
-  the session is still active, NeoAnki2 asks for confirmation.
+- **Escape:** end the session immediately.
 - **Command-R:** start, stop, or redo a recording on Record and Audio
   Submission cards.
 - **Command-P:** play or stop the current study recording.
@@ -195,7 +194,7 @@ NeoAnki2 also routes important changes to accessibility focus:
 
 Consecutive duplicate announcements are suppressed. Hidden or blurred answer
 media is announced as concealed rather than exposing its description early.
-Use **Actions ▸ Grade Help** in a study session for the meaning of each grade
+Use **More ▸ Grade Help** in a study session for the meaning of each grade
 and a compact shortcut reminder.
 
 ## Text size, contrast, and color

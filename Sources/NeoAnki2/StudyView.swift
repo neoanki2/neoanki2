@@ -17,7 +17,6 @@ struct StudyView: View {
     let onEndSession: () -> Void
 
     @State private var showGradeGuide = false
-    @State private var showEndSessionConfirm = false
     @State private var showDeleteDraftConfirm = false
     @State private var recording = StudyRecordingController()
     @AccessibilityFocusState private var answerAccessibilityFocused: Bool
@@ -45,28 +44,7 @@ struct StudyView: View {
         .onChange(of: endSessionTrigger) { _, triggered in
             guard triggered else { return }
             endSessionTrigger = false
-            requestEndSession()
-        }
-        .confirmationDialog(
-            "End study session?",
-            isPresented: $showEndSessionConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("End Session", role: .destructive) {
-                recording.reset()
-                onEndSession()
-            }
-            .accessibilityIdentifier("confirmEndStudySession")
-            Button("Continue Studying", role: .cancel) {}
-                .accessibilityIdentifier("cancelEndStudySession")
-        } message: {
-            if model.currentCard?.template.interaction == .audioSubmission, recording.hasRecording {
-                Text("The unsaved audio draft will be permanently discarded.")
-            } else if model.cardsReviewed > 0 {
-                Text("You've completed \(model.cardsReviewed) reviews. The current card won't be saved.")
-            } else {
-                Text("The current card won't be saved.")
-            }
+            endSession()
         }
         .confirmationDialog(
             "Delete this audio draft?",
@@ -238,7 +216,7 @@ struct StudyView: View {
             }
         }
         .onExitCommand {
-            requestEndSession()
+            endSession()
         }
         .onChange(of: card.id) {
             recording.reset()
@@ -280,23 +258,24 @@ struct StudyView: View {
                     showGradeGuide = true
                 }
                 .accessibilityIdentifier("gradeHelp")
-
-                Divider()
-
-                Button("End Session", systemImage: "xmark.circle", role: .destructive) {
-                    requestEndSession()
-                }
-                .accessibilityIdentifier("endStudySession")
             } label: {
-                Label("Actions", systemImage: "ellipsis.circle")
+                Label("More", systemImage: "ellipsis.circle")
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("Study actions")
+            .help("Edit the current card or open grade help")
             .accessibilityIdentifier("studyActionsMenu")
             .popover(isPresented: $showGradeGuide, arrowEdge: .top) {
                 GradeGuideView(gradingMode: gradingMode)
             }
+
+            Button("End Session", systemImage: "stop.fill") {
+                endSession()
+            }
+            .buttonStyle(.borderless)
+            .fixedSize()
+            .help("End this study session")
+            .accessibilityIdentifier("endStudySession")
         }
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.sm)
@@ -797,16 +776,9 @@ struct StudyView: View {
         StudyGradingMode(usesPassFailGrades: usesPassFailGrades)
     }
 
-    private func requestEndSession() {
-        if !model.isFinished,
-           (model.cardsReviewed > 0
-               || (model.currentCard?.template.interaction == .audioSubmission
-                   && recording.hasRecording)) {
-            showEndSessionConfirm = true
-        } else {
-            recording.reset()
-            onEndSession()
-        }
+    private func endSession() {
+        recording.reset()
+        onEndSession()
     }
 
     private func primaryActionTitle(for interaction: Interaction) -> String {

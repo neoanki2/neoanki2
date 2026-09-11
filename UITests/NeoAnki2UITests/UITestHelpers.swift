@@ -1830,13 +1830,6 @@ class NeoAnkiUITestCase: XCTestCase {
         let end = app.menuItems.identified("End Session")
         XCTAssertTrue(end.waitUntilExists(timeout: 3))
         end.click()
-
-        let confirm = app.buttons.identified("confirmEndStudySession")
-        if confirm.exists {
-            confirm.click()
-        } else if let container = modalContainer(in: app, timeout: 0.5) {
-            container.buttons.identified("End Session").click()
-        }
         waitForLibraryReady(in: app)
     }
 

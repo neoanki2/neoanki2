@@ -9,7 +9,7 @@ extension FastFunctionalJourneyTests {
         finishStudySession(in: app)
     }
 
-    func checkStudyExtendedUITestsEndStudyViaMenuWithConfirmation() throws {
+    func checkStudyExtendedUITestsEndStudyViaMenuImmediately() throws {
         let app = launchApp()
         addBasicItem(front: "End Menu Q1", back: "A1", in: app)
         addBasicItem(front: "End Menu Q2", back: "A2", in: app)

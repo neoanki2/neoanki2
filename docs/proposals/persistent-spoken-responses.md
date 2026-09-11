@@ -52,7 +52,7 @@ macOS and iOS share the observable feature state while keeping AVFoundation reco
 - Recording shows live elapsed time and Stop.
 - Ready shows duration, Play, Record Again, Delete Draft, and primary Save & Complete.
 - Saving disables duplicate actions and shows progress. A retryable inline error retains the draft.
-- Leaving with an unsaved draft requires discard confirmation.
+- Leaving ends the session immediately and discards any unsaved draft.
 - Successful save removes the temporary file best-effort and advances without grading controls.
 
 Library includes **Saved Responses**, newest first, with source title, submission time, duration, playback, refresh/error/empty states, and confirmed deletion. Deleting a response does not unsuspend its card. Record Again replaces only the current draft.

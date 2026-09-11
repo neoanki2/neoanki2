@@ -68,9 +68,9 @@ cards only as later study activity schedules them.
 The header shows the scope and the number of unresolved cards, such as
 “Biology · 7 cards remaining.” Remembering a card reduces the count.
 Every Again remains in the count until the card is remembered or you end the session.
-The header's **Actions** menu groups **Edit Card**, **Grade Help**, and **End
-Session**. After a saved grade, the same row shows the rating with **Undo**, so
-feedback does not take space away from the fixed action footer.
+The header keeps **End Session** visible beside a **More** menu for **Edit Card**
+and **Grade Help**. After a saved grade, the same row shows the rating with
+**Undo**, so feedback does not take space away from the fixed action footer.
 The first card appears as soon as its exact due count and content are ready.
 NeoAnki2 validates the rest of the initial queue in the background; you can read,
 answer, and reveal that first card immediately, while grading, editing, and
@@ -194,7 +194,7 @@ These messages do not choose a rating. Grade based on the quality of your recall
 - **Good (3):** you remembered correctly.
 - **Easy (4):** recall was too easy; allow a longer wait.
 
-Open **Actions ▸ Grade Help** in the session header for the same guidance.
+Open **More ▸ Grade Help** in the session header for the same guidance.
 
 For a simpler choice, open **Settings → Study** and enable **Use Fail / Pass
 grades**. Study sessions then show only **Fail (1)** and **Pass (2)**. Fail is
@@ -226,7 +226,7 @@ configured maximum interval. Interval fuzz is disabled.
 ## Fix a card during a session
 
 Reviewing is when card problems surface: a typo, a missing detail, a definition
-that needs more context. Choose **Actions ▸ Edit Card** in the session header, choose
+that needs more context. Choose **More ▸ Edit Card** in the session header, choose
 **Study ▸ Edit Card…**, or press Command-E to open the current card's item in
 the same editor the library uses.
 
@@ -262,7 +262,7 @@ The **Study** menu mirrors the main actions:
 - Right Arrow: reveal without checking for Type, Choose, Arrange, or Record.
 - Command-E: edit the card you are reviewing.
 - Command-Z: undo the last saved grade while undo is available.
-- Escape: request the end of the session.
+- Escape: end the session immediately.
 
 Interaction-specific shortcuts are described above. Shortcuts are enabled only when their corresponding action is valid, which prevents grading before reveal or comparing a Record card before recording.
 
@@ -272,7 +272,9 @@ After a grade is saved, a compact notice in the session header identifies the ra
 
 [![The completed-session summary]({{ site.baseurl }}/assets/screenshots/study-complete.png)]({{ site.baseurl }}/assets/screenshots/study-complete.png)
 
-Choose **Actions ▸ End Session** or press Escape to leave early. If you have already reviewed at least one card and more cards remain, NeoAnki2 asks for confirmation and reports the number reviewed. Saved grades remain saved; the current, ungraded card is not saved. Choose **Continue Studying** to cancel. Before any grade, or after the session is complete, leaving does not require that confirmation.
+Choose the visible **End Session** button or press Escape to leave immediately.
+Saved grades remain saved, and the current ungraded card stays due. If a Record
+or Audio Submission draft has not been saved, ending discards that draft.
 
 ## Motion and accessibility
 

@@ -2,6 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [ "${1:-}" != "--verified" ]; then
+  exec "$ROOT/Scripts/release-fast.sh" "$@"
+fi
+shift
+
 BASE_BRANCH="main"
 PR_NUMBER=""
 TITLE=""
@@ -37,14 +42,19 @@ trap 'exit 143' TERM
 
 usage() {
   cat >&2 <<'EOF'
-Usage: Scripts/release.sh [--pr NUMBER | --title TITLE --body-file FILE] [options]
+Usage: Scripts/release.sh [fast-release options]
+       Scripts/release.sh --verified [--pr NUMBER | --title TITLE --body-file FILE] [options]
 
 Options:
   --base BRANCH     Pull-request base branch (default: main)
   --no-install      Publish and update the tap without upgrading this Mac
   --no-launch       Install but leave NeoAnki2 closed when it began closed
 
-Without --pr, run this command from a clean feature branch. It validates the
+The default path releases the current local changes through Homebrew within a
+five-minute SLO. --verified selects the legacy pre-publication protected-check
+path below.
+
+Without --pr, the verified path requires a clean feature branch. It validates the
 branch, pushes through gh authentication, creates or reuses a pull request,
 waits for any required CI screenshot promotion, builds an attested candidate
 after documentation and fast UI checks pass, overlaps it with the remaining
@@ -100,6 +110,7 @@ run_local_release_preflight() {
   (cd "$ROOT" && swift build)
   (cd "$ROOT" && ./Scripts/test-fast.sh)
   bash -n "$ROOT/Scripts/release.sh" \
+    "$ROOT/Scripts/release-fast.sh" \
     "$ROOT/Scripts/build-release-candidate.sh" \
     "$ROOT/Scripts/publish-release-candidate.sh" \
     "$ROOT/Scripts/reconcile-release-workflows.sh" \

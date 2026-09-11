@@ -105,7 +105,7 @@ silently replace your chosen layout or Learning route.
 
 Card setups control the content inside the Study Stage, not the surrounding
 session chrome. On Mac, every layout keeps the shared scope/progress header,
-its **Actions** menu, a fixed response/status region, and the fixed
+its visible **End Session** control and **More** menu, a fixed response/status region, and the fixed
 primary-action or grading footer. The Study Stage reserves those regions and
 its bottom padding before giving the remaining space to the static card
 composition; it does not scroll or scale the template. Changing a layout
