@@ -1,0 +1,204 @@
+name: Promote documentation screenshots
+
+# This privileged workflow is loaded only from the default branch. It never
+# executes pull-request code; it treats the capture artifact as untrusted data.
+on:
+  workflow_run:
+    workflows: [Documentation screenshots]
+    types: [completed]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: docs-screenshot-promotion-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    name: Promote validated screenshot artifact
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    steps:
+      - id: metadata
+        name: Resolve the exact open pull request and artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          owner="${REPOSITORY%%/*}"
+          pulls="$(gh api --method GET "repos/$REPOSITORY/pulls" \
+            -f state=open -f head="$owner:$HEAD_BRANCH" -f per_page=100)"
+          matches="$(jq --arg sha "$HEAD_SHA" --arg repo "$REPOSITORY" '
+            [.[] | select(.head.sha == $sha and .head.repo.full_name == $repo)]
+          ' <<<"$pulls")"
+          if [ "$(jq length <<<"$matches")" -ne 1 ]; then
+            echo "Expected one open pull request at $HEAD_SHA; refusing promotion." >&2
+            exit 1
+          fi
+
+          artifact_name="neoanki2-documentation-screenshots-$HEAD_SHA"
+          artifacts="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/artifacts")"
+          artifact_count="$(jq --arg name "$artifact_name" '
+            [.artifacts[] | select(.name == $name and .expired == false)] | length
+          ' <<<"$artifacts")"
+          if [ "$artifact_count" -eq 0 ]; then
+            echo "No screenshot artifact was produced; capture was not required."
+            echo "promote=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$artifact_count" -ne 1 ]; then
+            echo "Expected one non-expired screenshot artifact, found $artifact_count." >&2
+            exit 1
+          fi
+          {
+            echo "artifact=$artifact_name"
+            echo "branch=$HEAD_BRANCH"
+            echo "head=$HEAD_SHA"
+            echo "pr=$(jq -r '.[0].number' <<<"$matches")"
+            echo "promote=true"
+          } >> "$GITHUB_OUTPUT"
+      - name: Download the exact capture artifact
+        if: steps.metadata.outputs.promote == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ steps.metadata.outputs.artifact }}
+          path: ${{ runner.temp }}/neoanki2-doc-screenshots
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Check out the exact pull-request head without credentials
+        if: steps.metadata.outputs.promote == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.metadata.outputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate and commit the screenshot data
+        if: steps.metadata.outputs.promote == 'true'
+        env:
+          CAPTURE_DIR: ${{ runner.temp }}/neoanki2-doc-screenshots
+          EXPECTED_SHA: ${{ steps.metadata.outputs.head }}
+        run: |
+          python3 - <<'PY'
+          import datetime
+          import hashlib
+          import json
+          import os
+          import re
+          import shutil
+          import struct
+          from pathlib import Path
+
+          source = Path(os.environ["CAPTURE_DIR"])
+          if any(path.is_symlink() or not path.is_file() for path in source.iterdir()):
+              raise SystemExit("Screenshot artifact must contain regular files only")
+
+          manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+          if manifest.get("schemaVersion") != 1 or manifest.get("appearance") != "dark":
+              raise SystemExit("Screenshot manifest metadata is invalid")
+          if manifest.get("sourceSHA") != os.environ["EXPECTED_SHA"]:
+              raise SystemExit("Screenshot artifact does not match the pull-request revision")
+          try:
+              datetime.datetime.strptime(manifest.get("capturedAt"), "%Y-%m-%dT%H:%M:%SZ")
+          except (TypeError, ValueError):
+              raise SystemExit("Screenshot manifest capturedAt is invalid")
+
+          entries = manifest.get("screenshots")
+          if not isinstance(entries, list) or not 1 <= len(entries) <= 100:
+              raise SystemExit("Screenshot manifest must contain 1 through 100 entries")
+          by_name = {
+              entry.get("filename"): entry for entry in entries if isinstance(entry, dict)
+          }
+          expected = set(by_name)
+          if len(by_name) != len(entries) or any(
+              not isinstance(name, str)
+              or re.fullmatch(r"[a-z0-9][a-z0-9-]*[.]png", name) is None
+              for name in expected
+          ):
+              raise SystemExit("Screenshot manifest contains unsafe or duplicate filenames")
+
+          features = json.loads(Path("docs/features.json").read_text(encoding="utf-8"))
+          feature_files = {
+              Path(entry["screenshot"]).name
+              for entry in features.get("features", [])
+              if isinstance(entry, dict) and isinstance(entry.get("screenshot"), str)
+          }
+          if expected != feature_files:
+              raise SystemExit("Screenshot manifest does not match feature coverage")
+          actual = {path.name for path in source.iterdir()}
+          if actual != expected | {"manifest.json"}:
+              raise SystemExit(f"Unexpected screenshot artifact contents: {sorted(actual)}")
+
+          for filename in expected:
+              path = source / filename
+              if path.stat().st_size > 25 * 1024 * 1024:
+                  raise SystemExit(f"Generated screenshot is too large: {filename}")
+              with path.open("rb") as image:
+                  header = image.read(24)
+              if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"Invalid PNG: {filename}")
+              width, height = struct.unpack(">II", header[16:24])
+              entry = by_name[filename]
+              if entry.get("width") != width or entry.get("height") != height:
+                  raise SystemExit(f"Manifest dimensions do not match {filename}")
+              if width < 1024 or height < 674:
+                  raise SystemExit(f"Generated screenshot is too small: {filename}")
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if entry.get("sha256") != digest:
+                  raise SystemExit(f"Manifest checksum does not match {filename}")
+              if not isinstance(entry.get("scenario"), str) or not entry["scenario"].strip():
+                  raise SystemExit(f"Manifest scenario is missing for {filename}")
+              identifiers = entry.get("expectedVisibleIdentifiers")
+              if not isinstance(identifiers, list) or not identifiers or any(
+                  not isinstance(value, str) or not value.strip() for value in identifiers
+              ):
+                  raise SystemExit(f"Visible identifiers are missing for {filename}")
+
+          destination = Path("docs/assets/screenshots")
+          destination.mkdir(parents=True, exist_ok=True)
+          for filename in expected | {"manifest.json"}:
+              shutil.copyfile(source / filename, destination / filename)
+          PY
+          git add -- docs/assets/screenshots
+          if git diff --cached --quiet; then
+            echo "Capture produced no repository changes." >&2
+            exit 1
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Refresh documentation screenshots for ${EXPECTED_SHA:0:12}"
+      - name: Push only if the pull request still has the captured head
+        if: steps.metadata.outputs.promote == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ steps.metadata.outputs.branch }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ steps.metadata.outputs.head }}
+        run: |
+          current_head="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
+            --json headRefOid --jq .headRefOid)"
+          if [ "$current_head" != "$SOURCE_SHA" ]; then
+            echo "Pull request moved from $SOURCE_SHA to $current_head; refusing a stale screenshot commit." >&2
+            exit 1
+          fi
+          remote="https://github.com/$REPOSITORY.git"
+          git -c credential.helper= \
+            -c 'credential.helper=!gh auth git-credential' \
+            push "$remote" "HEAD:refs/heads/$HEAD_BRANCH"

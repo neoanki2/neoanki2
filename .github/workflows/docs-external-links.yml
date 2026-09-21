@@ -8,12 +8,21 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   links:
     name: Check external links
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Test external-link validation
+        run: python3 -m unittest discover -s Scripts/tests -p 'test_*.py'
       - name: Check external documentation links
         run: python3 Scripts/check-docs-external-links.py

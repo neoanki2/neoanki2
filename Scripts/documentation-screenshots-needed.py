@@ -11,10 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CAPTURE_INPUT_FILES = {
-    ".github/workflows/docs-screenshots.yml",
     "Scripts/build-test-app.sh",
     "Scripts/capture-doc-screenshots.sh",
-    "Scripts/documentation-screenshots-needed.py",
     "Scripts/normalize-doc-screenshot-corners.swift",
     "Scripts/run-ui-tests.sh",
     "UITests/DocumentationScreenshots.xctestplan",

@@ -101,6 +101,7 @@ done
 gh auth status >/dev/null
 
 REPOSITORY="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+TRUSTED_WORKFLOW_REF="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 
 run_local_release_preflight() {
   RELEASE_PHASE="local-preflight"
@@ -430,30 +431,50 @@ if [ "$PR_STATE" = "OPEN" ]; then
   fi
 
   if [ "$CANDIDATE_READY" -ne 1 ]; then
-    STALE_RUN_IDS="$(gh run list --repo "$REPOSITORY" \
+    CANDIDATE_RUN_PREFIX="Release candidate for PR #$PR_NUMBER at "
+    CANDIDATE_RUN_TITLE="$CANDIDATE_RUN_PREFIX$HEAD_SHA"
+    CANDIDATE_RUNS="$(gh run list --repo "$REPOSITORY" \
       --workflow release-candidate.yml --limit 50 \
-      --json databaseId,headBranch,headSha,status \
-      --jq ".[] | select(.headBranch == \"$PR_BRANCH\" and .headSha != \"$HEAD_SHA\" and .status != \"completed\") | .databaseId")"
+      --json databaseId,displayTitle,headBranch,status)"
+    STALE_RUN_IDS="$(jq -r \
+      --arg branch "$TRUSTED_WORKFLOW_REF" \
+      --arg prefix "$CANDIDATE_RUN_PREFIX" \
+      --arg title "$CANDIDATE_RUN_TITLE" '
+        .[]
+        | select(.headBranch == $branch)
+        | select(.displayTitle | startswith($prefix))
+        | select(.displayTitle != $title and .status != "completed")
+        | .databaseId
+      ' <<<"$CANDIDATE_RUNS")"
     while IFS= read -r stale_run_id; do
       [ -n "$stale_run_id" ] || continue
       echo "Cancelling stale candidate workflow $stale_run_id for the previous PR head."
       gh run cancel "$stale_run_id" --repo "$REPOSITORY"
     done <<<"$STALE_RUN_IDS"
 
-    RUN_ID="$(gh run list --repo "$REPOSITORY" \
-      --workflow release-candidate.yml --limit 50 \
-      --json databaseId,headBranch,headSha,status \
-      --jq ".[] | select(.headBranch == \"$PR_BRANCH\" and .headSha == \"$HEAD_SHA\" and .status != \"completed\") | .databaseId" \
-      | head -n 1)"
+    RUN_ID="$(jq -r \
+      --arg branch "$TRUSTED_WORKFLOW_REF" \
+      --arg title "$CANDIDATE_RUN_TITLE" '
+        [.[] | select(
+          .headBranch == $branch and
+          .displayTitle == $title and
+          .status != "completed"
+        )]
+        | max_by(.databaseId).databaseId // empty
+      ' <<<"$CANDIDATE_RUNS")"
     if [ -z "$RUN_ID" ]; then
       gh workflow run release-candidate.yml --repo "$REPOSITORY" \
-        --ref "$PR_BRANCH" -f "pr=$PR_NUMBER" -f "head=$HEAD_SHA"
+        --ref "$TRUSTED_WORKFLOW_REF" -f "pr=$PR_NUMBER" -f "head=$HEAD_SHA"
       for _ in $(seq 1 20); do
-        RUN_ID="$(gh run list --repo "$REPOSITORY" \
+        CANDIDATE_RUNS="$(gh run list --repo "$REPOSITORY" \
           --workflow release-candidate.yml --limit 20 \
-          --json databaseId,headBranch,headSha \
-          --jq ".[] | select(.headBranch == \"$PR_BRANCH\" and .headSha == \"$HEAD_SHA\") | .databaseId" \
-          | head -n 1)"
+          --json databaseId,displayTitle,headBranch,status)"
+        RUN_ID="$(jq -r \
+          --arg branch "$TRUSTED_WORKFLOW_REF" \
+          --arg title "$CANDIDATE_RUN_TITLE" '
+            [.[] | select(.headBranch == $branch and .displayTitle == $title)]
+            | max_by(.databaseId).databaseId // empty
+          ' <<<"$CANDIDATE_RUNS")"
         [ -n "$RUN_ID" ] && break
         sleep 1
       done

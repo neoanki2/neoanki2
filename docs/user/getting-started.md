@@ -166,9 +166,10 @@ type, or studying. Item Type Studio replaces its navigator with a preview-first
 workspace where fields and Card setups are saved together; Save or Cancel
 restores the navigator and its prior selection. Study replaces the library
 split view with a full-window review surface, so sidebar controls are
-unavailable until the session ends. Leaving either task restores the library
-and its previous sidebar visibility. Reduced Motion is respected when columns
-change.
+unavailable until the session ends. Use the visible **End Session** control or
+press Escape to return immediately; saved grades remain saved and the current
+ungraded card stays due. Leaving either task restores the library and its
+previous sidebar visibility. Reduced Motion is respected when columns change.
 
 Leaving a study session returns you to the scope home with its counts already
 revised. NeoAnki2 may also retune its global scheduler and the stable
