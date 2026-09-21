@@ -55,9 +55,11 @@ A session moves through a small set of states:
 2. **Prompt** shows the current card and its interaction.
 3. **Answer** shows the reference answer and, when available, response feedback.
 4. **Grading** saves one rating and advances to the next card.
-5. **Repair** repeats every failed card after the cards already waiting.
+5. **Skip** moves the current card behind every card already waiting without
+   grading it or changing its schedule.
+6. **Repair** repeats every failed card after the cards already waiting.
    Consecutive failures remain unresolved and repeat in the same session.
-6. **Session Complete** reports reviews and unique cards, then offers **Undo
+7. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
 After a session adds usable review evidence, an eligible profile continues
@@ -68,9 +70,10 @@ cards only as later study activity schedules them.
 The header shows the scope and the number of unresolved cards, such as
 “Biology · 7 cards remaining.” Remembering a card reduces the count.
 Every Again remains in the count until the card is remembered or you end the session.
-The header keeps **End Session** visible beside a **More** menu for **Edit Card**
-and **Grade Help**. After a saved grade, the same row shows the rating with
-**Undo**, so feedback does not take space away from the fixed action footer.
+The header keeps **Skip** and **End Session** visible beside a **More** menu for
+**Edit Card** and **Grade Help**. After a saved grade, the same row shows the
+rating with **Undo**, so feedback does not take space away from the fixed action
+footer.
 The first card appears as soon as its exact due count and content are ready.
 NeoAnki2 validates the rest of the initial queue in the background; you can read,
 answer, and reveal that first card immediately, while grading, editing, and
@@ -102,8 +105,9 @@ queue snapshot it started with.
 
 The session preserves that queue while you work. If grading places a card back
 into Learning, it returns after the rest of the current queue rather than
-interrupting the next card. Editing an item refreshes its queued cards; deleting
-a card removes it from the session.
+interrupting the next card. **Skip** also moves the current card to the end, but
+does not save a review or remove the card from the remaining count. Editing an
+item refreshes its queued cards; deleting a card removes it from the session.
 
 Changing an Item Type's Card setups can likewise retire cards that no longer
 generate. A newly opened session uses the reconciled card set, while surviving

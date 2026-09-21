@@ -118,6 +118,14 @@ struct StudyView: View {
             && !model.isPreparingQueue
     }
 
+    private var canSkip: Bool {
+        model.currentCard != nil
+            && !model.isGrading
+            && !model.isCompletingSubmission
+            && !model.isPreparingQueue
+            && !isEditingCard
+    }
+
     private var loadingView: some View {
         VStack(spacing: DesignSystem.Spacing.sm) {
             ProgressView()
@@ -246,6 +254,16 @@ struct StudyView: View {
             if let undo = model.pendingGradeUndo {
                 gradeUndoFeedback(for: undo)
             }
+
+            Button("Skip", systemImage: "forward") {
+                skipCurrentCard()
+            }
+            .buttonStyle(.borderless)
+            .fixedSize()
+            .help("Move this card to the end of the current session queue")
+            .disabled(!canSkip)
+            .accessibilityHint("Moves this card to the end without grading it")
+            .accessibilityIdentifier("skipStudyCard")
 
             Menu {
                 Button("Edit Card", systemImage: "square.and.pencil") {
@@ -779,6 +797,11 @@ struct StudyView: View {
     private func endSession() {
         recording.reset()
         onEndSession()
+    }
+
+    private func skipCurrentCard() {
+        recording.reset()
+        model.skipCurrentCard()
     }
 
     private func primaryActionTitle(for interaction: Interaction) -> String {

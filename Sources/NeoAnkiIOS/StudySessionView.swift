@@ -58,8 +58,11 @@ struct StudySessionView: View {
                 if !session.isComplete {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
+                        Button("Skip", systemImage: "forward") { skipCurrentCard() }
+                            .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
+                            .accessibilityHint("Moves this card to the end without grading it")
+                            .accessibilityIdentifier("skipStudyCard")
                         Menu("More", systemImage: "ellipsis.circle") {
-                            Button("Skip Card", systemImage: "forward") { session.skip() }
                             Button("Edit Current Item", systemImage: "pencil") { Task { await openEditor() } }
                         }
                     }
@@ -294,6 +297,11 @@ struct StudySessionView: View {
         guard let itemID = session.currentCard?.item.id else { return }
         loadedItem = try? await model.item(id: itemID)
         isEditing = loadedItem != nil
+    }
+
+    private func skipCurrentCard() {
+        recorder.cleanup()
+        session.skip()
     }
 
     private func gradeButton(_ choice: StudyGradeChoice) -> some View {

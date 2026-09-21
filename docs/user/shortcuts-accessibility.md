@@ -89,8 +89,8 @@ Commands become available only in the relevant state. Grades are disabled until
 the answer is revealed, and every study command is disabled while the card
 editor is open.
 
-Inside a session, the header keeps **End Session** visible beside a labeled
-**More** menu for **Edit Card** and **Grade Help**. A saved grade and its
+Inside a session, the header keeps **Skip** and **End Session** visible beside a
+labeled **More** menu for **Edit Card** and **Grade Help**. A saved grade and its
 **Undo** action appear in that same header row. The primary action or
 grading footer remains fixed with bottom clearance, and the Mac window stays
 within the visible screen so its controls are not clipped on short displays.

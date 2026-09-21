@@ -519,12 +519,14 @@ final class StudyModel {
     }
 
     func skipCurrentCard() {
-        guard !isPreparingQueue else { return }
+        guard !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
         errorMessage = nil
         pendingGradeUndo = nil
-        guard currentCard != nil else { return }
+        guard queue.indices.contains(index) else { return }
 
-        index += 1
+        materializePendingRepeats()
+        let skippedCard = queue.remove(at: index)
+        queue.append(skippedCard)
         isAnswerRevealed = false
         advanceSession()
     }
@@ -581,21 +583,7 @@ final class StudyModel {
         }
 
         if !repairQueue.isEmpty {
-            var sourceIndexByCardID: [UUID: Int] = [:]
-            sourceIndexByCardID.reserveCapacity(repairQueue.count)
-            for (sourceIndex, card) in queue.enumerated() {
-                sourceIndexByCardID[card.id] = sourceIndex
-            }
-            queue.reserveCapacity(queue.count + repairQueue.count)
-            for repeatEntry in repairQueue {
-                guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
-                    continue
-                }
-                var repeatedCard = queue[sourceIndex]
-                repeatedCard.card = repeatEntry.card
-                queue.append(repeatedCard)
-            }
-            repairQueue = []
+            materializePendingRepeats()
             isFinished = false
             reviewTiming.reset()
             prepareCurrentInteraction()
@@ -604,6 +592,29 @@ final class StudyModel {
 
         isFinished = true
         prepareCurrentInteraction()
+    }
+
+    /// Makes the deferred repair round concrete before another action changes
+    /// queue order. This lets Skip move a card behind every card already waiting
+    /// without creating a duplicate skipped entry.
+    private func materializePendingRepeats() {
+        guard !repairQueue.isEmpty else { return }
+
+        var sourceIndexByCardID: [UUID: Int] = [:]
+        sourceIndexByCardID.reserveCapacity(repairQueue.count)
+        for (sourceIndex, card) in queue.enumerated() {
+            sourceIndexByCardID[card.id] = sourceIndex
+        }
+        queue.reserveCapacity(queue.count + repairQueue.count)
+        for repeatEntry in repairQueue {
+            guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
+                continue
+            }
+            var repeatedCard = queue[sourceIndex]
+            repeatedCard.card = repeatEntry.card
+            queue.append(repeatedCard)
+        }
+        repairQueue = []
     }
 
     private func loadCompleteQueue(
