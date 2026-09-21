@@ -60,6 +60,135 @@ private struct BulkCardIdentity: Hashable {
 }
 
 public extension ItemStore {
+    /// Reconciles a compatible item-type extension and its affected items in
+    /// one revision-tracked transaction. This is intentionally narrower than
+    /// Item Type Studio: existing fields and card-template identities must be
+    /// preserved so learned cards keep their schedules and review histories.
+    func reconcileItemTypeAndItems(
+        expectedItemType: ItemType,
+        updatedItemType: ItemType,
+        replacements: [Item],
+        now: Date = .now
+    ) async throws -> [ItemBulkOperationResult] {
+        guard expectedItemType.id == updatedItemType.id else {
+            throw DatabaseError.invalidItemType("The reconciled item type identity changed.")
+        }
+        guard !replacements.isEmpty, replacements.count <= 500 else {
+            throw DatabaseError.invalidItem("A reconciliation must contain between 1 and 500 items.")
+        }
+        try ItemTypeValidation.validate(updatedItemType)
+
+        let updatedFields = Dictionary(
+            uniqueKeysWithValues: updatedItemType.fields.map { ($0.id, $0) }
+        )
+        guard expectedItemType.fields.allSatisfy({ updatedFields[$0.id] == $0 }) else {
+            throw DatabaseError.invalidItemType(
+                "Reconciliation may add optional fields but cannot change or remove existing fields."
+            )
+        }
+        let addedFields = updatedItemType.fields.filter { field in
+            !expectedItemType.fields.contains { $0.id == field.id }
+        }
+        guard addedFields.allSatisfy({ !$0.isRequired }) else {
+            throw DatabaseError.invalidItemType("Reconciliation may add only optional fields.")
+        }
+        guard expectedItemType.templates.map(\.id) == updatedItemType.templates.map(\.id) else {
+            throw DatabaseError.invalidItemType(
+                "Reconciliation cannot add, remove, or reorder card templates."
+            )
+        }
+        let addedFieldIDs = Set(addedFields.map(\.id))
+        for (expected, updated) in zip(expectedItemType.templates, updatedItemType.templates) {
+            guard expected.name == updated.name,
+                  expected.layout == updated.layout,
+                  expected.interaction == updated.interaction,
+                  expected.skill == updated.skill,
+                  expected.generateWhen == updated.generateWhen
+            else {
+                throw DatabaseError.invalidItemType(
+                    "Reconciliation cannot change existing card-template behavior."
+                )
+            }
+            let expectedComponentIDs = Set(expected.components.map(\.id))
+            guard updated.components.filter({ expectedComponentIDs.contains($0.id) })
+                == expected.components
+            else {
+                throw DatabaseError.invalidItemType(
+                    "Reconciliation cannot change or reorder existing card components."
+                )
+            }
+            let additions = updated.components.filter { !expectedComponentIDs.contains($0.id) }
+            guard additions.allSatisfy({ component in
+                guard component.purpose == .expectedAnswer,
+                      component.presentation.reveal == .hiddenUntilAnswer,
+                      case let .field(fieldID) = component.source
+                else { return false }
+                return addedFieldIDs.contains(fieldID)
+            }) else {
+                throw DatabaseError.invalidItemType(
+                    "New reconciliation fields must be revealed only with the expected answer."
+                )
+            }
+        }
+
+        var seen: Set<UUID> = []
+        var mutations: [ItemBulkDatabaseMutation] = []
+        var results: [ItemBulkOperationResult] = []
+        for (index, source) in replacements.enumerated() {
+            guard source.itemTypeID == expectedItemType.id,
+                  seen.insert(source.id).inserted
+            else {
+                throw DatabaseError.invalidItem(
+                    "Every replacement must be unique and retain the reconciled item type."
+                )
+            }
+            guard let previous = try await database.fetchItem(id: source.id) else {
+                throw DatabaseError.itemNotFound(source.id)
+            }
+            let planned = try await planBulkItem(
+                source,
+                previous: previous.item,
+                itemType: updatedItemType,
+                now: now
+            )
+            let existing = try await database.fetchCards(for: source.id)
+            let existingByIdentity = Dictionary(
+                existing.map {
+                    (BulkCardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup), $0)
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let finalCardIDs = planned.cards.map { card in
+                existingByIdentity[
+                    BulkCardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+                ]?.id ?? card.id
+            }
+            mutations.append(.replace(
+                item: planned.item,
+                cards: planned.cards,
+                descriptors: planned.descriptors,
+                updatedAt: now
+            ))
+            results.append(.init(
+                operationID: "reconcile-\(index)",
+                action: "replace",
+                itemID: source.id,
+                cardIDs: finalCardIDs
+            ))
+        }
+
+        try await database.applyItemTypeAndItemReconciliation(
+            expectedOriginal: expectedItemType,
+            updated: updatedItemType,
+            mutations: mutations,
+            now: now
+        )
+        for cardID in results.flatMap(\.cardIDs) {
+            _ = try await database.ensureSchedulerCardHistory(cardID: cardID, now: now)
+        }
+        return results
+    }
+
     /// Fully plans the batch before opening its single write transaction. This
     /// makes validation, media lookup, and generated-card planning identical
     /// for dry runs and commits and prevents a late member failure from
@@ -181,6 +310,7 @@ public extension ItemStore {
     private func planBulkItem(
         _ source: Item,
         previous: Item?,
+        itemType itemTypeOverride: ItemType? = nil,
         now: Date
     ) async throws -> (
         item: Item,
@@ -194,8 +324,17 @@ public extension ItemStore {
             tags: try normalizedTags(source.tags),
             deckID: source.deckID
         )
-        guard let itemType = try await database.fetchItemType(id: item.itemTypeID) else {
-            throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+        let itemType: ItemType
+        if let itemTypeOverride {
+            guard itemTypeOverride.id == item.itemTypeID else {
+                throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+            }
+            itemType = itemTypeOverride
+        } else {
+            guard let stored = try await database.fetchItemType(id: item.itemTypeID) else {
+                throw DatabaseError.itemTypeNotFound(item.itemTypeID)
+            }
+            itemType = stored
         }
         if let deckID = item.deckID,
            try await database.fetchDeck(id: deckID) == nil {

@@ -119,9 +119,11 @@ public struct PoemDeckBuilderView: View {
     }
 
     private var lineSummary: String {
-        let count = PoemDeckGenerator.usableLines(in: input.text).count
+        let poem = PoemDeckGenerator.parse(input.text)
+        let count = poem.lines.count
         let cards = max(0, count - 1)
-        return "\(count) lines · \(cards) cards"
+        let stanzaCount = poem.stanzas.count
+        return "\(count) lines · \(stanzaCount) \(stanzaCount == 1 ? "stanza" : "stanzas") · \(cards) cards"
     }
 
     private func generate() {

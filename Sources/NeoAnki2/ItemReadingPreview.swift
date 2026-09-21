@@ -168,17 +168,36 @@ struct ItemDetailView: View {
         }
         .sheet(isPresented: $isEditing) {
             if let item, let itemType {
-                NavigationStack {
-                    AddItemView(
-                        model: model,
-                        decksModel: decksModel,
-                        editingItem: item,
-                        editingItemType: itemType
-                    ) {
-                        isEditing = false
-                        Task {
-                            await load()
-                            onSaved()
+                if itemType.name == "Poem Line",
+                   let deckID = item.deckID,
+                   let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
+                    PoemDeckEditorView(
+                        library: model.library,
+                        deckID: deckID,
+                        itemTypeID: itemType.id,
+                        deckName: deckName,
+                        onSaved: {
+                            isEditing = false
+                            Task {
+                                await load()
+                                onSaved()
+                            }
+                        },
+                        onCancel: { isEditing = false }
+                    )
+                } else {
+                    NavigationStack {
+                        AddItemView(
+                            model: model,
+                            decksModel: decksModel,
+                            editingItem: item,
+                            editingItemType: itemType
+                        ) {
+                            isEditing = false
+                            Task {
+                                await load()
+                                onSaved()
+                            }
                         }
                     }
                 }

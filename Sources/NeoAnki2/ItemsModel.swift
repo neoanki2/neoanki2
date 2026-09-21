@@ -110,11 +110,13 @@ final class ItemsModel {
         await searchTask?.value
     }
 
-    let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging & LibraryStudyResponses
+    let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
+        & LibraryStudyResponses & LibraryCoordinatedItemEditing
     let mediaStore: MediaStore?
 
     init(
-        library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging & LibraryStudyResponses,
+        library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
+            & LibraryStudyResponses & LibraryCoordinatedItemEditing,
         mediaStore: MediaStore?
     ) {
         self.library = library

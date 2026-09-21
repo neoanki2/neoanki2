@@ -2415,6 +2415,57 @@ actor SQLiteDatabase {
         }
     }
 
+    func applyItemTypeAndItemReconciliation(
+        expectedOriginal: ItemType,
+        updated: ItemType,
+        mutations: [ItemBulkDatabaseMutation],
+        now: Date
+    ) throws {
+        try inTransaction {
+            guard let current = try fetchItemType(id: updated.id) else {
+                throw DatabaseError.itemTypeNotFound(updated.id)
+            }
+            guard current == expectedOriginal else {
+                throw ItemTypeUpdateError.staleDefinition(updated.id)
+            }
+            let persistedItems = try fetchItems(itemTypeID: current.id).map(\.item)
+            let retirementPlan = try generatedCardRetirementPlan(
+                from: current,
+                to: updated,
+                items: persistedItems
+            )
+            guard retirementPlan.cardIDs.isEmpty else {
+                throw DatabaseError.invalidItemType(
+                    "Reconciliation cannot retire generated cards or their history."
+                )
+            }
+
+            if updated != current {
+                try updateItemType(updated)
+                try syncCards(
+                    from: current,
+                    to: updated,
+                    now: now,
+                    retirementPlan: retirementPlan
+                )
+            }
+            for mutation in mutations {
+                guard case let .replace(item, cards, descriptors, updatedAt) = mutation else {
+                    throw DatabaseError.invalidItem(
+                        "Item-type reconciliation accepts replacement mutations only."
+                    )
+                }
+                try updateItemWithMediaWithoutTransaction(
+                    item,
+                    desiredCards: cards,
+                    updatedAt: updatedAt,
+                    mediaDescriptors: descriptors
+                )
+            }
+            try refreshBrowseProjection(itemTypeID: updated.id)
+        }
+    }
+
     func deleteItemWithMedia(id: UUID, deletedAt: Date) throws -> Bool {
         try inTransaction {
             try deleteItemWithMediaWithoutTransaction(id: id, deletedAt: deletedAt)
