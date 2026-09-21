@@ -105,7 +105,7 @@ public enum PoemDeckGenerator {
 
         var manifestData = Data()
         try append(
-            ManifestRecord(kind: "neoanki", version: 3, root: "poem", parts: ["items/poem.jsonl"]),
+            ManifestRecord(kind: "neoanki", version: 5, root: "poem", parts: ["items/poem.jsonl"]),
             to: &manifestData
         )
         try append(poemTypeRecord, to: &manifestData)
@@ -126,6 +126,7 @@ public enum PoemDeckGenerator {
         )
 
         var itemData = Data()
+        let attribution = "\(title) · \(author)"
         for answerIndex in 1 ..< lines.count {
             let promptStart = max(0, answerIndex - 2)
             let prompt = lines[promptStart ..< answerIndex].joined(separator: "\n")
@@ -136,6 +137,7 @@ public enum PoemDeckGenerator {
                 fields: [
                     "front": TextValue(text: prompt),
                     "back": TextValue(text: lines[answerIndex]),
+                    "attribution": TextValue(text: attribution),
                 ],
                 tags: ["author:\(author)"]
             )
@@ -161,12 +163,37 @@ public enum PoemDeckGenerator {
         fields: [
             FieldRecord(id: "front", name: "Front", type: "text", required: true),
             FieldRecord(id: "back", name: "Back", type: "text", required: true),
+            FieldRecord(id: "attribution", name: "Attribution", type: "text", required: true),
         ],
         templates: [
             TemplateRecord(
                 name: "Card",
-                prompt: [SlotRecord(field: "front")],
-                answer: [SlotRecord(field: "back")],
+                layout: "focus",
+                components: [
+                    ComponentRecord(
+                        region: "label",
+                        purpose: "supporting",
+                        field: "attribution",
+                        reveal: "always"
+                    ),
+                    ComponentRecord(
+                        region: "primary",
+                        purpose: "question",
+                        field: "front",
+                        reveal: "always"
+                    ),
+                    ComponentRecord(
+                        region: "secondary",
+                        purpose: "expectedAnswer",
+                        field: "back",
+                        reveal: "hiddenUntilAnswer"
+                    ),
+                ],
+                prompt: [
+                    SlotRecord(field: "attribution"),
+                    SlotRecord(field: "front"),
+                ],
+                answer: [SlotRecord(field: "back", reveal: "hiddenUntilAnswer")],
                 interaction: "reveal",
                 skill: SkillRecord(input: "text", output: "text", operation: "recall")
             ),
@@ -207,6 +234,8 @@ private struct FieldRecord: Encodable {
 
 private struct TemplateRecord: Encodable {
     let name: String
+    let layout: String
+    let components: [ComponentRecord]
     let prompt: [SlotRecord]
     let answer: [SlotRecord]
     let interaction: String
@@ -215,6 +244,19 @@ private struct TemplateRecord: Encodable {
 
 private struct SlotRecord: Encodable {
     let field: String
+    let reveal: String?
+
+    init(field: String, reveal: String? = nil) {
+        self.field = field
+        self.reveal = reveal
+    }
+}
+
+private struct ComponentRecord: Encodable {
+    let region: String
+    let purpose: String
+    let field: String
+    let reveal: String
 }
 
 private struct SkillRecord: Encodable {

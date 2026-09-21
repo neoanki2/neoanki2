@@ -53,14 +53,39 @@ import Testing
     )
     #expect(!manifest.contains(#""name":"Ліна""#))
     #expect(manifest.contains(#""name":"спини мене отямся і отям""#))
+    #expect(manifest.contains(#""version":5"#))
     #expect(manifest.contains(#""operation":"recall""#))
     #expect(!manifest.contains(#""operation":"recognize""#))
+
+    let manifestRecords = try jsonLines(
+        at: generated.bundleURL.appendingPathComponent("deck.jsonl")
+    )
+    let typeRecord = try #require(manifestRecords.first { $0["kind"] as? String == "type" })
+    let fields = try #require(typeRecord["fields"] as? [[String: Any]])
+    #expect(fields.map { $0["id"] as? String } == ["front", "back", "attribution"])
+    #expect(fields.last?["name"] as? String == "Attribution")
+    #expect(fields.last?["required"] as? Bool == true)
+    let templates = try #require(typeRecord["templates"] as? [[String: Any]])
+    let template = try #require(templates.first)
+    #expect(template["layout"] as? String == "focus")
+    let components = try #require(template["components"] as? [[String: Any]])
+    #expect(components.map { $0["region"] as? String } == ["label", "primary", "secondary"])
+    #expect(components.map { $0["purpose"] as? String } == [
+        "supporting", "question", "expectedAnswer",
+    ])
+    #expect(components.map { $0["field"] as? String } == ["attribution", "front", "back"])
+    #expect(components.map { $0["reveal"] as? String } == [
+        "always", "always", "hiddenUntilAnswer",
+    ])
 
     let records = try jsonLines(
         at: generated.bundleURL.appendingPathComponent("items/poem.jsonl")
     )
     #expect(records.count == 3)
     #expect(records.allSatisfy { ($0["tags"] as? [String]) == ["author:Ліна"] })
+    #expect(records.allSatisfy {
+        textField("attribution", in: $0) == "спини мене отямся і отям · Ліна"
+    })
     #expect(textField("front", in: records[0]) == "line one")
     #expect(textField("back", in: records[0]) == #"line "two""#)
     #expect(textField("front", in: records[1]) == "line one\nline \"two\"")
@@ -139,6 +164,16 @@ import Testing
     })
     let loaded = try #require(await store.fetchItem(id: items[0].id))
     #expect(loaded.item.tags == ["author:Ліна"])
+    let attribution = try #require(loaded.itemType.field(named: "Attribution"))
+    #expect(loaded.item.value(for: attribution.id) == .text("спини мене отямся і отям · Ліна"))
+    let template = try #require(loaded.itemType.templates.first)
+    #expect(template.layout == .focus)
+    let resolved = SideContent.resolvedComponents(for: template, from: loaded.item)
+    #expect(resolved.map(\.region) == [.label, .primary, .secondary])
+    #expect(resolved.map(\.purpose) == [.supporting, .question, .expectedAnswer])
+    #expect(resolved.first?.value == .text("спини мене отямся і отям · Ліна"))
+    #expect(resolved.first?.presentation.reveal == .always)
+    #expect(resolved.last?.presentation.reveal == .hiddenUntilAnswer)
     #expect(due.count == 3)
     #expect(due.map { ItemDisplay.subtitle(for: $0.item, in: $0.itemType) } == [
         "така любов буває раз в ніколи",

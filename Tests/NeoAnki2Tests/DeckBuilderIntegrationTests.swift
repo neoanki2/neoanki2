@@ -127,6 +127,21 @@ import VocabularyDeckBuilder
     #expect(decksModel.deckTree.first?.children.first?.summary.name == "Title")
     #expect(itemsModel.items.count == 2)
     #expect(itemsModel.dueCount == 2)
+    let importedItems = try await store.listItems(
+        scope: .deck(poem.id, includeDescendants: false)
+    )
+    #expect(importedItems.count == 2)
+    for summary in importedItems {
+        let loaded = try #require(await store.fetchItem(id: summary.id))
+        let attribution = try #require(loaded.itemType.field(named: "Attribution"))
+        #expect(loaded.item.value(for: attribution.id) == .text("Title · Author"))
+        let template = try #require(loaded.itemType.templates.first)
+        let resolved = SideContent.resolvedComponents(for: template, from: loaded.item)
+        #expect(resolved.first?.region == .label)
+        #expect(resolved.first?.purpose == .supporting)
+        #expect(resolved.first?.value == .text("Title · Author"))
+        #expect(resolved.first?.presentation.reveal == .always)
+    }
 }
 
 @Test func generatedBundleCleanupRemovesOnlyItsOwnedWorkspace() throws {
