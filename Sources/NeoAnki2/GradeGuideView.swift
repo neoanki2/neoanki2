@@ -27,7 +27,7 @@ struct GradeGuideView: View {
                 }
             }
 
-            Text("Keyboard: Space or Return to reveal; \(gradeShortcutSummary) to grade; ⌘Z to undo the last grade; Escape to end session; → to skip unsupported cards; ⌘⇧S to start study.")
+            Text("Keyboard: Space or Return to reveal; Space for Good after reveal; \(gradeShortcutSummary) to grade; ⌘Z to undo the last grade; Escape to end session; → to skip unsupported cards; ⌘⇧S to start study.")
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.tertiary)
         }
@@ -45,6 +45,6 @@ struct GradeGuideView: View {
     private var accessibilitySummary: String {
         let choices = gradingMode.choices.map(\.title).joined(separator: ", ")
         let keys = gradingMode == .passFail ? "1 and 2" : "1 through 4"
-        return "How to grade. After you reveal your answer, pick \(choices). Keyboard shortcuts: Space or Return to reveal, \(keys) to grade, Command Z to undo the last grade, Escape to end session, Right Arrow to skip unsupported cards, Command Shift S to start study."
+        return "How to grade. After you reveal your answer, pick \(choices). Keyboard shortcuts: Space or Return to reveal, Space for Good after reveal, \(keys) to grade, Command Z to undo the last grade, Escape to end session, Right Arrow to skip unsupported cards, Command Shift S to start study."
     }
 }

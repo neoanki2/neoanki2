@@ -13,6 +13,18 @@ struct StudyCommandHandlers {
     var canEditCurrentCard = false
     var canGrade = false
     var canUndoLastGrade = false
+
+    func canUseSpace(primaryAction: StudyPrimaryActionHandler?) -> Bool {
+        canGrade || (primaryAction?.isEnabled ?? false)
+    }
+
+    func useSpace(primaryAction: StudyPrimaryActionHandler?) {
+        if canGrade {
+            grade?(.good)
+        } else {
+            primaryAction?.invoke()
+        }
+    }
 }
 
 struct StudyPrimaryActionHandler {
@@ -75,11 +87,11 @@ struct StudyCommands: Commands {
 
             Divider()
 
-            Button("Continue") {
-                primaryAction?.invoke()
+            Button(handlers?.canGrade == true ? "Grade: Good with Space" : "Continue") {
+                handlers?.useSpace(primaryAction: primaryAction)
             }
             .keyboardShortcut(.space, modifiers: [])
-            .disabled(!(primaryAction?.isEnabled ?? false))
+            .disabled(!(handlers?.canUseSpace(primaryAction: primaryAction) ?? false))
 
             Divider()
 

@@ -59,7 +59,7 @@ available. Grades cannot be used before reveal.
 
 ## 3. Record the result
 
-Choose **Good** or press `3` if you recalled Paris correctly without unusual
+Choose **Good** or press Space or `3` if you recalled Paris correctly without unusual
 difficulty.
 
 Expected result: NeoAnki2 shows **Session Complete** with one card reviewed.

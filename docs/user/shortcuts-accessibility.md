@@ -77,8 +77,9 @@ with the controls in the sidebar.
 - **Start Study** — **Command-Shift-S**
 - **End Session**
 - **Edit Card…** — **Command-E** — opens the current card's item editor.
-- **Continue** — **Space** from the Study menu; **Return** also activates the
+- **Continue** — **Space** before reveal; **Return** also activates the
   in-view default action.
+- **Grade: Good with Space** — **Space** after reveal.
 - **Grade: Again** — **1**
 - **Grade: Hard** — **2**
 - **Grade: Good** — **3**
@@ -127,7 +128,7 @@ history warrants it, so there is no menu item to find, enable, or wait on.
 ### Study
 
 - **Space** or **Return:** reveal the answer or run the current interaction's
-  primary check action.
+  primary check action. After reveal, **Space** grades Good.
 - **Right Arrow:** reveal without automatic checking and self-grade on typed,
   choice, record, and arrange cards.
 - **1–4:** select Again, Hard, Good, or Easy after reveal. With Fail / Pass
