@@ -50,7 +50,8 @@ install new native code after the app ships.
 root deck, and the host places the generated poem beneath it after import. The
 builder stores the author as an `author:<name>` item tag and creates one Basic
 card for each line after the first. Each prompt contains the preceding one or
-two nonblank lines.
+two nonblank lines, extending backward when the same context occurs more than
+once. Blank lines in that context preserve stanza separation.
 
 `VocabularyDeckBuilder` supplies a domain-neutral generated-item editor rather
 than a registered deck builder. NeoAnki imports `.neovocab` packages into

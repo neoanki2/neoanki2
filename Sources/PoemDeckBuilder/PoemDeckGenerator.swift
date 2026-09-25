@@ -180,19 +180,16 @@ public enum PoemDeckGenerator {
         var itemData = Data()
         let attribution = "\(title) · \(author)"
         let lines = poem.lines
+        let prompts = PoemPromptPlanner.prompts(for: poem)
         for answerIndex in 1 ..< lines.count {
-            let promptStart = max(0, answerIndex - 2)
-            let prompt = lines[promptStart ..< answerIndex]
-                .map(\.text)
-                .joined(separator: "\n")
-            var fields = [
-                "front": TextValue(text: prompt),
-                "back": TextValue(text: lines[answerIndex].text),
+            let answer = lines[answerIndex]
+            let fields = [
+                "front": TextValue(text: prompts[answerIndex - 1]),
+                // A leading blank line carries stanza separation as whitespace
+                // within the answer rather than as visible instructional text.
+                "back": TextValue(text: answer.startsStanza ? "\n\(answer.text)" : answer.text),
                 "attribution": TextValue(text: attribution),
             ]
-            if lines[answerIndex].startsStanza {
-                fields["stanza-break"] = TextValue(text: "Stanza break")
-            }
             let item = ItemRecord(
                 kind: "item",
                 deck: "poem",
@@ -223,7 +220,6 @@ public enum PoemDeckGenerator {
             FieldRecord(id: "front", name: "Front", type: "text", required: true),
             FieldRecord(id: "back", name: "Back", type: "text", required: true),
             FieldRecord(id: "attribution", name: "Attribution", type: "text", required: true),
-            FieldRecord(id: "stanza-break", name: "Stanza Break", type: "text", required: false),
         ],
         templates: [
             TemplateRecord(
@@ -245,12 +241,6 @@ public enum PoemDeckGenerator {
                     ComponentRecord(
                         region: "secondary",
                         purpose: "expectedAnswer",
-                        field: "stanza-break",
-                        reveal: "hiddenUntilAnswer"
-                    ),
-                    ComponentRecord(
-                        region: "secondary",
-                        purpose: "expectedAnswer",
                         field: "back",
                         reveal: "hiddenUntilAnswer"
                     ),
@@ -260,7 +250,6 @@ public enum PoemDeckGenerator {
                     SlotRecord(field: "front"),
                 ],
                 answer: [
-                    SlotRecord(field: "stanza-break", reveal: "hiddenUntilAnswer"),
                     SlotRecord(field: "back", reveal: "hiddenUntilAnswer"),
                 ],
                 interaction: "reveal",

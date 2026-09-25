@@ -4,10 +4,12 @@ import NeoAnkiCore
 public struct PoemDeckItemRecord: Sendable, Equatable {
     public let item: Item
     public let itemType: ItemType
+    public let createdAt: Date?
 
-    public init(item: Item, itemType: ItemType) {
+    public init(item: Item, itemType: ItemType, createdAt: Date? = nil) {
         self.item = item
         self.itemType = itemType
+        self.createdAt = createdAt
     }
 }
 
@@ -80,7 +82,7 @@ public enum PoemDeckReconciliationError: LocalizedError, Sendable, Equatable {
         case .brokenChain:
             "The stored prompts do not form one complete poem sequence."
         case .ambiguousChain:
-            "Repeated lines make the stored poem order ambiguous. Paste the canonical source into a newly built deck instead."
+            "The stored poem order is ambiguous. Open a generated deck with reliable creation order or rebuild it from its source."
         case let .lineCountChanged(existing, proposed):
             "This edit has \(proposed) lines; the existing poem has \(existing). Adding or removing lines is not supported yet."
         }
@@ -89,7 +91,6 @@ public enum PoemDeckReconciliationError: LocalizedError, Sendable, Equatable {
 
 public enum PoemDeckReconciler {
     public static let stanzaBreakFieldName = "Stanza Break"
-    public static let stanzaBreakText = "Stanza break"
 
     public static func snapshot(records: [PoemDeckItemRecord]) throws -> PoemDeckSnapshot {
         guard !records.isEmpty else { throw PoemDeckReconciliationError.emptyDeck }
@@ -102,9 +103,19 @@ public enum PoemDeckReconciler {
         guard itemType.name.caseInsensitiveCompare("Poem Line") == .orderedSame else {
             throw PoemDeckReconciliationError.unsupportedItemType
         }
+        guard itemType.templates.count == 1 else {
+            throw PoemDeckReconciliationError.missingTemplate
+        }
         let front = try requiredTextField(named: "Front", in: itemType)
         let back = try requiredTextField(named: "Back", in: itemType)
+        let attribution = try requiredTextField(named: "Attribution", in: itemType)
         let marker = field(named: stanzaBreakFieldName, in: itemType)
+        let captions = try Set(records.map {
+            try text($0.item.value(for: attribution.id), fieldName: attribution.name)
+        })
+        guard captions.count == 1, captions.first?.isEmpty == false else {
+            throw PoemDeckReconciliationError.brokenChain
+        }
 
         struct Candidate {
             let record: PoemDeckItemRecord
@@ -117,7 +128,11 @@ public enum PoemDeckReconciler {
             let prompt = try text(record.item.value(for: front.id), fieldName: front.name)
                 .split(separator: "\n", omittingEmptySubsequences: true)
                 .map { normalize(String($0)) }
-            let answer = normalize(try text(record.item.value(for: back.id), fieldName: back.name))
+            let rawAnswer = try text(record.item.value(for: back.id), fieldName: back.name)
+            let answer = normalizeAnswer(rawAnswer)
+            guard !answer.isEmpty, !answer.contains("\n") else {
+                throw PoemDeckReconciliationError.brokenChain
+            }
             let markerText = try marker.map {
                 try text(record.item.value(for: $0.id), fieldName: $0.name, permitsMissing: true)
             } ?? ""
@@ -126,55 +141,57 @@ public enum PoemDeckReconciler {
                 prompt: prompt,
                 answer: answer,
                 startsStanza: !markerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || rawAnswer.hasPrefix("\n")
             )
         }
 
-        let starts = candidates.filter { $0.prompt.count == 1 }
-        guard starts.count == 1, let start = starts.first else {
+        let ordered: [Candidate]
+        let dates = candidates.compactMap { $0.record.createdAt }
+        if dates.count == candidates.count, Set(dates).count == candidates.count {
+            ordered = candidates.sorted { $0.record.createdAt! < $1.record.createdAt! }
+        } else {
+            let starts = candidates.filter { $0.prompt.count == 1 }
+            guard starts.count == 1, let start = starts.first else {
+                throw PoemDeckReconciliationError.ambiguousStart
+            }
+            var chain = [start]
+            var used: Set<UUID> = [start.record.item.id]
+            var sourceLines = [try requiredLast(start.prompt), start.answer]
+            while chain.count < candidates.count {
+                let possible = candidates.filter {
+                    !used.contains($0.record.item.id) && $0.prompt.last == sourceLines.last
+                }
+                let selected: Candidate
+                if possible.count == 1, let only = possible.first {
+                    selected = only
+                } else if possible.count > 1 {
+                    let exact = possible.filter {
+                        Array($0.prompt.suffix(min(2, $0.prompt.count)))
+                            == Array(sourceLines.suffix(min(2, $0.prompt.count)))
+                    }
+                    guard exact.count == 1, let only = exact.first else {
+                        throw PoemDeckReconciliationError.ambiguousChain
+                    }
+                    selected = only
+                } else {
+                    throw PoemDeckReconciliationError.brokenChain
+                }
+                chain.append(selected)
+                used.insert(selected.record.item.id)
+                sourceLines.append(selected.answer)
+            }
+            ordered = chain
+        }
+
+        guard ordered[0].prompt.count == 1 else {
             throw PoemDeckReconciliationError.ambiguousStart
         }
-
-        var ordered: [Candidate] = [start]
-        var used: Set<UUID> = [start.record.item.id]
-        var sourceLines = [try requiredLast(start.prompt), start.answer]
-
-        while ordered.count < candidates.count {
-            let previousAnswer = sourceLines[sourceLines.count - 1]
-            let possible = candidates.filter {
-                !used.contains($0.record.item.id) && $0.prompt.last == previousAnswer
-            }
-            let selected: Candidate
-            if possible.count == 1, let only = possible.first {
-                selected = only
-            } else if possible.count > 1 {
-                let expectedContext = Array(sourceLines.suffix(2))
-                let exact = possible.filter { Array($0.prompt.suffix(2)) == expectedContext }
-                guard exact.count == 1, let only = exact.first else {
-                    throw PoemDeckReconciliationError.ambiguousChain
-                }
-                selected = only
-            } else {
+        for index in 1 ..< ordered.count {
+            guard ordered[index].prompt.last == ordered[index - 1].answer else {
                 throw PoemDeckReconciliationError.brokenChain
             }
-            ordered.append(selected)
-            used.insert(selected.record.item.id)
-            sourceLines.append(selected.answer)
         }
-
-        var mismatches: [PoemSequenceMismatch] = []
-        for (index, candidate) in ordered.enumerated() {
-            let answerIndex = index + 1
-            let expected = sourceLines[max(0, answerIndex - 2) ..< answerIndex]
-                .joined(separator: "\n")
-            let actual = candidate.prompt.joined(separator: "\n")
-            if actual != expected {
-                mismatches.append(.init(
-                    itemID: candidate.record.item.id,
-                    expectedPrompt: expected,
-                    actualPrompt: actual
-                ))
-            }
-        }
+        let sourceLines = [try requiredLast(ordered[0].prompt)] + ordered.map(\.answer)
 
         var sourceParts: [String] = []
         for index in sourceLines.indices {
@@ -183,9 +200,17 @@ public enum PoemDeckReconciler {
             }
             sourceParts.append(sourceLines[index])
         }
+        let sourceText = sourceParts.joined(separator: "\n")
+        let expectedPrompts = PoemPromptPlanner.prompts(for: PoemDeckGenerator.parse(sourceText))
+        let mismatches = try ordered.enumerated().compactMap { index, candidate -> PoemSequenceMismatch? in
+            let expected = expectedPrompts[index]
+            let actual = try text(candidate.record.item.value(for: front.id), fieldName: front.name)
+            guard normalizeMultiline(actual) != normalizeMultiline(expected) else { return nil }
+            return .init(itemID: candidate.record.item.id, expectedPrompt: expected, actualPrompt: actual)
+        }
         return PoemDeckSnapshot(
             orderedRecords: ordered.map(\.record),
-            sourceText: sourceParts.joined(separator: "\n"),
+            sourceText: sourceText,
             mismatches: mismatches
         )
     }
@@ -206,51 +231,50 @@ public enum PoemDeckReconciler {
         }
 
         let originalType = snapshot.orderedRecords[0].itemType
-        let needsStanzaSupport = proposedLines.contains(where: \.startsStanza)
-            || field(named: stanzaBreakFieldName, in: originalType) != nil
-        let updatedType = needsStanzaSupport
-            ? try itemTypeWithStanzaFeedback(originalType)
-            : originalType
+        // Legacy stanza components remain in the schema so learned card identities
+        // survive reconciliation. An empty marker value is not rendered.
+        let updatedType = originalType
         let front = try requiredTextField(named: "Front", in: updatedType)
         let back = try requiredTextField(named: "Back", in: updatedType)
         let marker = field(named: stanzaBreakFieldName, in: updatedType)
+        let plannedPrompts = PoemPromptPlanner.prompts(for: poem)
 
         var replacements: [Item] = []
         var changes: [PoemDeckReconciliationChange] = []
         for (index, record) in snapshot.orderedRecords.enumerated() {
             let answerIndex = index + 1
-            let newPrompt = proposedLines[max(0, answerIndex - 2) ..< answerIndex]
-                .map(\.text)
-                .joined(separator: "\n")
-            let newAnswer = proposedLines[answerIndex].text
-            let needsMarker = proposedLines[answerIndex].startsStanza
+            let newPrompt = plannedPrompts[index]
+            let stanzaStarts = proposedLines[answerIndex].startsStanza
+            let newAnswer = (stanzaStarts ? "\n" : "") + proposedLines[answerIndex].text
+            let needsStanzaSpacing = proposedLines[answerIndex].startsStanza
             let oldPrompt = try text(record.item.value(for: front.id), fieldName: front.name)
             let oldAnswer = try text(record.item.value(for: back.id), fieldName: back.name)
-            let hadMarker = try marker.map {
+            let hadLegacyMarker = try marker.map {
                 !(try text(
                     record.item.value(for: $0.id),
                     fieldName: $0.name,
                     permitsMissing: true
                 )).isEmpty
             } ?? false
+            let hadStanzaBreak = hadLegacyMarker || oldAnswer.hasPrefix("\n")
 
             var replacement = record.item
             setText(newPrompt, field: front, in: &replacement)
             setText(newAnswer, field: back, in: &replacement)
             if let marker {
-                setText(needsMarker ? stanzaBreakText : "", field: marker, in: &replacement)
+                setText("", field: marker, in: &replacement)
             }
             replacements.append(replacement)
 
-            if oldPrompt != newPrompt || oldAnswer != newAnswer || hadMarker != needsMarker {
+            if oldPrompt != newPrompt || oldAnswer != newAnswer || hadLegacyMarker {
                 changes.append(.init(
                     itemID: record.item.id,
                     oldPrompt: oldPrompt,
                     newPrompt: newPrompt,
                     oldAnswer: oldAnswer,
                     newAnswer: newAnswer,
-                    addsStanzaBreak: !hadMarker && needsMarker,
-                    removesStanzaBreak: hadMarker && !needsMarker
+                    addsStanzaBreak: !hadStanzaBreak && needsStanzaSpacing,
+                    removesStanzaBreak: hadStanzaBreak && !needsStanzaSpacing
                 ))
             }
         }
@@ -272,60 +296,30 @@ public enum PoemDeckReconciler {
         guard !items.isEmpty else { throw PoemDeckReconciliationError.emptyDeck }
         var source = [normalize(try text(items[0].value(for: front.id), fieldName: front.name))]
         guard !source[0].contains("\n") else { throw PoemDeckReconciliationError.brokenChain }
-        for (index, item) in items.enumerated() {
-            let expected = source[max(0, source.count - 2) ..< source.count]
-                .joined(separator: "\n")
-            let actual = normalizeMultiline(try text(item.value(for: front.id), fieldName: front.name))
-            guard actual == expected else { throw PoemDeckReconciliationError.brokenChain }
-            let answer = normalize(try text(item.value(for: back.id), fieldName: back.name))
+        var stanzaStarts = [false]
+        for item in items {
+            let rawAnswer = try text(item.value(for: back.id), fieldName: back.name)
+            let answer = normalizeAnswer(rawAnswer)
             guard !answer.isEmpty, !answer.contains("\n") else {
                 throw PoemDeckReconciliationError.brokenChain
             }
             source.append(answer)
-            guard index + 1 == source.count - 1 else {
+            stanzaStarts.append(rawAnswer.hasPrefix("\n"))
+        }
+        var sourceParts: [String] = []
+        for index in source.indices {
+            if stanzaStarts[index] { sourceParts.append("") }
+            sourceParts.append(source[index])
+        }
+        let expected = PoemPromptPlanner.prompts(
+            for: PoemDeckGenerator.parse(sourceParts.joined(separator: "\n"))
+        )
+        for (index, item) in items.enumerated() {
+            let actual = try text(item.value(for: front.id), fieldName: front.name)
+            guard normalizeMultiline(actual) == normalizeMultiline(expected[index]) else {
                 throw PoemDeckReconciliationError.brokenChain
             }
         }
-    }
-
-    private static func itemTypeWithStanzaFeedback(_ source: ItemType) throws -> ItemType {
-        guard source.templates.count == 1 else { throw PoemDeckReconciliationError.missingTemplate }
-        let back = try requiredTextField(named: "Back", in: source)
-        var result = source
-        let marker: FieldDef
-        if let existing = field(named: stanzaBreakFieldName, in: result) {
-            guard existing.type == .text else {
-                throw PoemDeckReconciliationError.nonTextField(stanzaBreakFieldName)
-            }
-            marker = existing
-        } else {
-            marker = FieldDef(name: stanzaBreakFieldName, type: .text, isRequired: false)
-            result.fields.append(marker)
-        }
-
-        var template = result.templates[0]
-        let existingComponent = template.components.first { component in
-            if case let .field(fieldID) = component.source { return fieldID == marker.id }
-            return false
-        }
-        template.components.removeAll { component in
-            if case let .field(fieldID) = component.source { return fieldID == marker.id }
-            return false
-        }
-        let markerComponent = TemplateComponent(
-            id: existingComponent?.id ?? UUID(),
-            region: .secondary,
-            purpose: .expectedAnswer,
-            source: .field(marker.id),
-            presentation: Presentation(reveal: .hiddenUntilAnswer)
-        )
-        let backIndex = template.components.firstIndex { component in
-            if case let .field(fieldID) = component.source { return fieldID == back.id }
-            return false
-        } ?? template.components.endIndex
-        template.components.insert(markerComponent, at: backIndex)
-        result.templates[0] = template
-        return result
     }
 
     private static func field(named name: String, in itemType: ItemType) -> FieldDef? {
@@ -373,10 +367,14 @@ public enum PoemDeckReconciler {
             .precomposedStringWithCanonicalMapping
     }
 
+    private static func normalizeAnswer(_ value: String) -> String {
+        normalize(value.hasPrefix("\n") ? String(value.dropFirst()) : value)
+    }
+
     private static func normalizeMultiline(_ value: String) -> String {
         value.replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
-            .split(separator: "\n", omittingEmptySubsequences: true)
+            .split(separator: "\n", omittingEmptySubsequences: false)
             .map { normalize(String($0)) }
             .joined(separator: "\n")
     }

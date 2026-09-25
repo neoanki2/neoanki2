@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiSharedUI
+import PoemDeckBuilder
 import SwiftUI
 
 struct StudyView: View {

@@ -65,26 +65,22 @@ import Testing
     )
     let typeRecord = try #require(manifestRecords.first { $0["kind"] as? String == "type" })
     let fields = try #require(typeRecord["fields"] as? [[String: Any]])
-    #expect(fields.map { $0["id"] as? String } == [
-        "front", "back", "attribution", "stanza-break",
-    ])
-    #expect(fields.last?["name"] as? String == "Stanza Break")
-    #expect(fields.last?["required"] as? Bool == false)
+    #expect(fields.map { $0["id"] as? String } == ["front", "back", "attribution"])
     let templates = try #require(typeRecord["templates"] as? [[String: Any]])
     let template = try #require(templates.first)
     #expect(template["layout"] as? String == "focus")
     let components = try #require(template["components"] as? [[String: Any]])
     #expect(components.map { $0["region"] as? String } == [
-        "label", "primary", "secondary", "secondary",
+        "label", "primary", "secondary",
     ])
     #expect(components.map { $0["purpose"] as? String } == [
-        "supporting", "question", "expectedAnswer", "expectedAnswer",
+        "supporting", "question", "expectedAnswer",
     ])
     #expect(components.map { $0["field"] as? String } == [
-        "attribution", "front", "stanza-break", "back",
+        "attribution", "front", "back",
     ])
     #expect(components.map { $0["reveal"] as? String } == [
-        "always", "always", "hiddenUntilAnswer", "hiddenUntilAnswer",
+        "always", "always", "hiddenUntilAnswer",
     ])
 
     let records = try jsonLines(
@@ -103,7 +99,7 @@ import Testing
     #expect(textField("back", in: records[2]) == "line four")
 }
 
-@Test func poemBuilderMarksStanzaStartsOnlyAfterReveal() throws {
+@Test func poemBuilderStoresStanzaBreaksAsWhitespace() throws {
     let generated = try PoemDeckGenerator.generate(
         input: PoemDeckInput(
             destinationDeckID: UUID(),
@@ -119,10 +115,124 @@ import Testing
     )
     #expect(records.count == 3)
     #expect(textField("front", in: records[1]) == "one\ntwo")
-    #expect(textField("back", in: records[1]) == "three")
+    #expect(textField("back", in: records[1]) == "\nthree")
     #expect(textField("stanza-break", in: records[0]) == nil)
-    #expect(textField("stanza-break", in: records[1]) == "Stanza break")
+    #expect(textField("stanza-break", in: records[1]) == nil)
     #expect(textField("stanza-break", in: records[2]) == nil)
+}
+
+@Test func repeatedPoemContextExpandsUntilEveryPromptIsDistinct() throws {
+    let poem = PoemDeckGenerator.parse("Start\nA\nB\nC\nA\nB\nD")
+    let prompts = PoemPromptPlanner.prompts(for: poem)
+    #expect(prompts.count == 6)
+    #expect(Set(prompts).count == prompts.count)
+    #expect(prompts[2] == "Start\nA\nB")
+    #expect(prompts[5] == "C\nA\nB")
+
+    let stanzaPoem = PoemDeckGenerator.parse("one\ntwo\n\nthree\nfour")
+    #expect(PoemPromptPlanner.prompts(for: stanzaPoem)[2] == "two\n\nthree")
+}
+
+@Test func repeatedPoemDeckUsesCreationOrderAndRepairsLegacyPrompts() throws {
+    let lines = ["Start", "A", "B", "C", "A", "B", "D"]
+    let fixture = poemFixture(lines: lines)
+    let origin = Date(timeIntervalSince1970: 1_000)
+    let orderedRecords = fixture.records.enumerated().map { index, record in
+        PoemDeckItemRecord(
+            item: record.item,
+            itemType: record.itemType,
+            createdAt: origin.addingTimeInterval(Double(index))
+        )
+    }
+    let snapshot = try PoemDeckReconciler.snapshot(records: orderedRecords.reversed())
+    #expect(snapshot.sourceText == lines.joined(separator: "\n"))
+    #expect(snapshot.mismatches.count == 2)
+    let preview = try PoemDeckReconciler.preview(
+        sourceText: snapshot.sourceText,
+        records: orderedRecords.reversed()
+    )
+    #expect(preview.changes.count == 2)
+    try PoemDeckReconciler.validateGeneratedChain(
+        items: preview.replacements,
+        itemType: preview.updatedItemType
+    )
+    #expect(throws: PoemDeckReconciliationError.ambiguousChain) {
+        try PoemDeckReconciler.snapshot(records: fixture.records)
+    }
+}
+
+@Test func poemReconciliationRejectsMixedContentDecks() throws {
+    let fixture = poemFixture(lines: ["one", "two", "three"])
+    let otherType = ItemType(
+        name: "Basic",
+        fields: fixture.itemType.fields,
+        templates: fixture.itemType.templates
+    )
+    let unrelated = Item(
+        itemTypeID: otherType.id,
+        fields: fixture.records[0].item.fields
+    )
+    #expect(throws: PoemDeckReconciliationError.mixedItemTypes) {
+        try PoemDeckReconciler.snapshot(records: fixture.records + [
+            PoemDeckItemRecord(item: unrelated, itemType: otherType),
+        ])
+    }
+}
+
+@Test func legacyStanzaMarkerIsClearedWithoutChangingItsCardTemplate() async throws {
+    let fixture = poemFixture(lines: ["one", "two", "three"])
+    let marker = FieldDef(name: "Stanza Break", type: .text, isRequired: false)
+    var type = fixture.itemType
+    type.fields.append(marker)
+    var template = type.templates[0]
+    template.components.append(TemplateComponent(
+        region: .secondary,
+        purpose: .expectedAnswer,
+        source: .field(marker.id),
+        presentation: Presentation(reveal: .hiddenUntilAnswer)
+    ))
+    type.templates[0] = template
+    let records = fixture.records.enumerated().map { index, record in
+        var item = record.item
+        if index == 1 {
+            item.fields.append(.init(fieldID: marker.id, value: .text("Stanza break")))
+        }
+        return PoemDeckItemRecord(item: item, itemType: type)
+    }
+    let preview = try PoemDeckReconciler.preview(
+        sourceText: "one\ntwo\n\nthree",
+        records: records
+    )
+    #expect(preview.updatedItemType == type)
+    #expect(preview.changes.count == 1)
+    #expect(preview.replacements[1].value(for: marker.id) == nil)
+
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("poem-legacy-marker-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    _ = try await store.createItemType(type)
+    let deck = try await store.createDeck(Deck(name: "Poem"))
+    for record in records {
+        var item = record.item
+        item.deckID = deck.id
+        _ = try await store.createItem(item)
+    }
+    let before = try await store.fetchDueCards(scope: .deck(deck.id), asOf: .now)
+    var replacement = preview.replacements[1]
+    replacement.deckID = deck.id
+    _ = try await store.reconcileItemTypeAndItems(
+        expectedItemType: type,
+        updatedItemType: type,
+        replacements: [replacement]
+    )
+    let after = try await store.fetchDueCards(scope: .deck(deck.id), asOf: .now)
+    #expect(Set(before.map(\.id)) == Set(after.map(\.id)))
+    let updated = try #require(await store.fetchItem(id: replacement.id))
+    let back = try #require(type.field(named: "Back"))
+    #expect(updated.item.value(for: back.id) == .text("\nthree"))
+    #expect(updated.itemType == type)
 }
 
 @Test func poemBuilderCleansWorkspaceWhenAuthoredValidationFails() throws {
@@ -234,17 +344,9 @@ import Testing
     #expect(preview.poem.stanzas.count == 2)
     #expect(preview.repairedMismatchCount == 1)
     #expect(preview.changes.count == 2)
-    #expect(preview.updatedItemType.fields.contains {
-        $0.name == PoemDeckReconciler.stanzaBreakFieldName && !$0.isRequired
-    })
-    let marker = try #require(preview.updatedItemType.field(
-        named: PoemDeckReconciler.stanzaBreakFieldName
-    ))
-    let markerComponent = try #require(preview.updatedItemType.templates[0].components.first {
-        $0.source == .field(marker.id)
-    })
-    #expect(markerComponent.purpose == .expectedAnswer)
-    #expect(markerComponent.presentation.reveal == .hiddenUntilAnswer)
+    #expect(preview.updatedItemType == preview.originalItemType)
+    let back = try #require(preview.updatedItemType.field(named: "Back"))
+    #expect(preview.replacements[1].value(for: back.id) == .text("\nthree"))
     try PoemDeckReconciler.validateGeneratedChain(
         items: preview.replacements,
         itemType: preview.updatedItemType

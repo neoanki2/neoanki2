@@ -325,7 +325,7 @@
       "id": "deck-builders",
       "name": "Build poem decks from guided input",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/DeckBuilderSheet.swift", "Sources/NeoAnki2/PoemDeckEditorView.swift", "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift", "Sources/PoemDeckBuilder/PoemDeckBuilderView.swift", "Sources/PoemDeckBuilder/PoemDeckGenerator.swift", "Sources/PoemDeckBuilder/PoemDeckReconciler.swift"],
+      "sources": ["Sources/NeoAnki2/DeckBuilderSheet.swift", "Sources/PoemDeckBuilder/PoemDeckEditorView.swift", "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift", "Sources/PoemDeckBuilder/PoemDeckBuilderView.swift", "Sources/PoemDeckBuilder/PoemDeckGenerator.swift", "Sources/PoemDeckBuilder/PoemDeckReconciler.swift", "Sources/PoemDeckBuilder/PoemPromptPlanner.swift", "Tools/NeoAnkiPoemRepair/main.swift"],
       "tests": ["Tests/NeoAnki2Tests/DeckBuilderIntegrationTests.swift", "Tests/PoemDeckBuilderTests/PoemDeckBuilderTests.swift"]
     },
     {

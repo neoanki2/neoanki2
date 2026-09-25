@@ -29,6 +29,7 @@ let package = Package(
             name: "neoanki-template-migrator",
             targets: ["NeoAnkiTemplateMigrator"]
         ),
+        .executable(name: "neoanki-poem-repair", targets: ["NeoAnkiPoemRepair"]),
         .library(
             name: "NeoAnkiTemplateMigration",
             targets: ["NeoAnkiTemplateMigration"]
@@ -158,9 +159,15 @@ let package = Package(
             dependencies: ["NeoAnkiTemplateMigration"],
             path: "Tools/NeoAnkiTemplateMigrator"
         ),
+        .executableTarget(
+            name: "NeoAnkiPoemRepair",
+            dependencies: ["NeoAnkiAPI", "PoemDeckBuilder"],
+            path: "Tools/NeoAnkiPoemRepair"
+        ),
         .target(
             name: "PoemDeckBuilder",
             dependencies: [
+                "NeoAnkiApplication",
                 "NeoAnkiDeckBuilderKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],

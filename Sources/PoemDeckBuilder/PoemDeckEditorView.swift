@@ -1,6 +1,5 @@
 import NeoAnkiApplication
 import NeoAnkiCore
-import PoemDeckBuilder
 import SwiftUI
 
 @MainActor
@@ -49,13 +48,20 @@ final class PoemDeckEditorModel {
                 sort: .createdAscending,
                 search: ""
             )
+            guard summaries.allSatisfy({ $0.itemTypeID == itemTypeID }) else {
+                throw PoemDeckReconciliationError.mixedItemTypes
+            }
             var loaded: [PoemDeckItemRecord] = []
             loaded.reserveCapacity(summaries.count)
-            for summary in summaries where summary.itemTypeID == itemTypeID {
+            for summary in summaries {
                 guard let record = try await library.item(id: summary.id) else {
                     throw PoemDeckReconciliationError.brokenChain
                 }
-                loaded.append(.init(item: record.item, itemType: record.itemType))
+                loaded.append(.init(
+                    item: record.item,
+                    itemType: record.itemType,
+                    createdAt: summary.createdAt
+                ))
             }
             let snapshot = try PoemDeckReconciler.snapshot(records: loaded)
             records = loaded
@@ -64,7 +70,7 @@ final class PoemDeckEditorModel {
             preview = nil
             previewedSourceText = nil
         } catch {
-            errorMessage = UserFacingError.message(from: error)
+            errorMessage = error.localizedDescription
         }
         isLoading = false
     }
@@ -87,7 +93,7 @@ final class PoemDeckEditorModel {
         } catch {
             preview = nil
             previewedSourceText = nil
-            errorMessage = UserFacingError.message(from: error)
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -106,15 +112,15 @@ final class PoemDeckEditorModel {
     }
 }
 
-struct PoemDeckEditorView: View {
-    let deckName: String
-    let onSaved: () -> Void
-    let onCancel: () -> Void
+public struct PoemDeckEditorView: View {
+    public let deckName: String
+    public let onSaved: () -> Void
+    public let onCancel: () -> Void
 
     @State private var model: PoemDeckEditorModel
     @AccessibilityFocusState private var errorFocused: Bool
 
-    init(
+    public init(
         library: any LibraryBrowsing & LibraryCoordinatedItemEditing,
         deckID: UUID,
         itemTypeID: UUID,
@@ -132,7 +138,7 @@ struct PoemDeckEditorView: View {
         ))
     }
 
-    var body: some View {
+    public var body: some View {
         NavigationStack {
             Group {
                 if model.isLoading {
@@ -150,7 +156,9 @@ struct PoemDeckEditorView: View {
                 }
             }
         }
+        #if os(macOS)
         .frame(minWidth: 620, idealWidth: 720, minHeight: 620, idealHeight: 760)
+        #endif
         .interactiveDismissDisabled(model.isSaving)
         .task { await model.load() }
     }
@@ -240,7 +248,7 @@ struct PoemDeckEditorView: View {
                             try await model.save()
                             onSaved()
                         } catch {
-                            model.errorMessage = UserFacingError.message(from: error)
+                            model.errorMessage = error.localizedDescription
                             errorFocused = true
                         }
                     }
@@ -267,9 +275,9 @@ private struct PoemReconciliationChangeView: View {
                 changePair(label: "Answer", old: change.oldAnswer, new: change.newAnswer)
             }
             if change.addsStanzaBreak {
-                Label("Add revealed stanza break", systemImage: "text.append")
+                Label("Add stanza spacing", systemImage: "text.append")
             } else if change.removesStanzaBreak {
-                Label("Remove revealed stanza break", systemImage: "text.badge.minus")
+                Label("Remove stanza spacing", systemImage: "text.badge.minus")
             }
         }
         .padding(.vertical, 4)

@@ -269,7 +269,19 @@ private struct PoemBuilderMobileHost: View {
                 Task {
                     defer { generated.cleanup() }
                     do {
-                        _ = try await model.importAuthoredBundle(from: generated.bundleURL)
+                        let result = try await model.importAuthoredBundle(from: generated.bundleURL)
+                        guard let parentID = generated.destinationDeckID,
+                              let poemID = result.deckIDs.first,
+                              let poem = model.decks.first(where: { $0.id == poemID })
+                        else {
+                            throw PoemDeckReconciliationError.brokenChain
+                        }
+                        try await model.updateDeck(
+                            id: poemID,
+                            name: poem.name,
+                            parentID: parentID,
+                            newCardsPerDay: poem.newCardsPerDay
+                        )
                         dismiss()
                     } catch {
                         errorMessage = MobileAppModel.message(for: error)
