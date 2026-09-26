@@ -104,6 +104,8 @@ public protocol LocalAPILibrary: LibraryRepository {
 
     func cards() async throws -> [Card]
     func card(id: UUID) async throws -> Card
+    func cardMaturityStatus(id: UUID) async throws -> CardMaturityStatus
+    func cardMaturityStatuses(ids: [UUID]) async throws -> [UUID: CardMaturityStatus]
     func reviewLog(id: UUID) async throws -> ReviewLog
     func hydratedCard(id: UUID) async throws -> DueCard
     func reviewPreviews(cardID: UUID, asOf: Date) async throws -> [ReviewRating: MemoryState]
@@ -125,6 +127,18 @@ public protocol LocalAPILibrary: LibraryRepository {
 }
 
 public extension LocalAPILibrary {
+    func cardMaturityStatus(id: UUID) async throws -> CardMaturityStatus {
+        let card = try await card(id: id)
+        if card.isSuspended { return .inactive }
+        return card.memory.phase == .new ? .notStarted : .learning
+    }
+
+    func cardMaturityStatuses(ids: [UUID]) async throws -> [UUID: CardMaturityStatus] {
+        var statuses: [UUID: CardMaturityStatus] = [:]
+        for id in ids { statuses[id] = try await cardMaturityStatus(id: id) }
+        return statuses
+    }
+
     func claimIdempotency(
         clientID: UUID,
         route: String,
@@ -456,6 +470,12 @@ extension SQLiteLibraryRepository: LocalAPILibrary {
 
     public func cards() async throws -> [Card] { try await store.cards() }
     public func card(id: UUID) async throws -> Card { try await store.card(id: id) }
+    public func cardMaturityStatus(id: UUID) async throws -> CardMaturityStatus {
+        try await store.cardMaturityStatus(id: id)
+    }
+    public func cardMaturityStatuses(ids: [UUID]) async throws -> [UUID: CardMaturityStatus] {
+        try await store.cardMaturityStatuses(ids: ids)
+    }
     public func reviewLog(id: UUID) async throws -> ReviewLog { try await store.reviewLog(id: id) }
     public func hydratedCard(id: UUID) async throws -> DueCard { try await store.hydratedCard(id: id) }
     public func reviewPreviews(

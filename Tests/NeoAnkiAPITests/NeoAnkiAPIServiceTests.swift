@@ -1471,6 +1471,9 @@ private func pairWithAuthority(
     #expect(created.body == replayed.body)
     #expect(created.headers["ETag"] == "\"revision-1\"")
     #expect(try jsonObject(created)["id"] as? String == deckID)
+    let createdMaturity = try #require(try jsonObject(created)["maturity"] as? [String: Any])
+    #expect(createdMaturity["status"] as? String == "noActiveCards")
+    #expect(createdMaturity["activeCardCount"] as? Int == 0)
 
     let listed = await api.handle(
         request(.get, "/v1/decks", headers: authorization)
@@ -1941,6 +1944,7 @@ private func pairWithAuthority(
     let cards = await api.handle(request(.get, "/v1/cards", headers: auth))
     let cardData = try #require(try jsonObject(cards)["data"] as? [[String: Any]])
     #expect(cardData.map { $0["id"] as? String }.contains(cardID))
+    #expect(cardData.first { $0["id"] as? String == cardID }?["maturityStatus"] as? String == "notStarted")
 
     let content = await api.handle(request(.get, "/v1/cards/\(cardID)/content", headers: auth))
     #expect(content.status == 200)
@@ -2053,6 +2057,7 @@ private func pairWithAuthority(
     )
     #expect(suspended.status == 200)
     #expect(try jsonObject(suspended)["isSuspended"] as? Bool == true)
+    #expect(try jsonObject(suspended)["maturityStatus"] as? String == "inactive")
 
     let updateBody = createBody
         .replacingOccurrences(of: "\"id\":\"\(itemID)\",", with: "")

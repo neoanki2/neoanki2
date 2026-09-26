@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 
 /// The default detail pane: what this scope owes you right now, and one way to
@@ -111,6 +112,7 @@ struct ScopeHomeView: View {
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
                 cardStateSection
+                maturitySection
                 if summary.leechCount > 0 {
                     leechCallout
                 }
@@ -237,6 +239,23 @@ struct ScopeHomeView: View {
     private var cardStateAccessibilityLabel: String {
         let parts = cardStates.map { "\($0.count) \($0.label.lowercased())" }
         return "Cards: " + parts.joined(separator: ", ")
+    }
+
+    private var maturitySection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+            Text("Maturity")
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+            Text(summary.maturity.displayName)
+                .font(DesignSystem.Typography.uiBody.weight(.semibold))
+            if summary.maturity.activeCardCount > 0 {
+                Text(summary.maturity.progressText)
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("scopeHomeMaturity")
     }
 
     private var leechCallout: some View {
