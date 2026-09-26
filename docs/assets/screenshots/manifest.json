@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-09-26T08:42:40Z",
+  "capturedAt" : "2026-09-26T20:54:58Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 732,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "57deee4bc9392d5ad87f32c445d1f445ed337c1effdf86aa96e54f6f91a32123",
+      "sha256" : "c6e8f854adaf130a0e3cce6214c9c120d34e06efa7e2bf91980a81fd2d3b433b",
       "width" : 1024
     },
     {
@@ -136,7 +136,7 @@
       "filename" : "scheduling-result.png",
       "height" : 732,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "fa39aa88f320311b1ac6a97dc38332a83d2310a7a744da2dea99cf57e127289c",
+      "sha256" : "4341f43b59126dd0dae16082dbc5c9576f44dcf76716e64489e3e2ecce93224c",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "12a95653e9181c6370bf439d22e81d4493196e3b"
+  "sourceSHA" : "55a4e728af7a266ae51ac079b7ee90269df99684"
 }
