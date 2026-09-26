@@ -135,7 +135,7 @@ if [ -z "$BRANCH" ]; then
   exit 1
 fi
 if [ "$BRANCH" = "$BASE_BRANCH" ]; then
-  BRANCH="codex/release-$(date -u +%Y%m%d-%H%M%S)"
+  BRANCH="release/$(date -u +%Y%m%d-%H%M%S)"
   git -C "$ROOT" switch -c "$BRANCH"
 fi
 

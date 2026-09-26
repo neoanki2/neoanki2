@@ -23,7 +23,7 @@ Run this from the repository:
 The command performs the complete transaction without prompts:
 
 1. Fetches and automatically integrates the current `main`, creating a
-   `codex/release-*` branch when invoked on `main`.
+   `release/*` branch when invoked on `main`.
 2. Stages every tracked and untracked, non-ignored local change and commits the
    exact tree. Existing local commits ahead of `main` are included too.
 3. Derives the next `1.0.N` version from the latest published release.
