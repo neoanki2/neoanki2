@@ -170,6 +170,9 @@ unavailable until the session ends. Leaving either task restores the library
 and its previous sidebar visibility. Reduced Motion is respected when columns
 change.
 
+Choose **End Session** in the study header or Study menu whenever you want to
+return to the selected scope without grading the current card.
+
 Leaving a study session returns you to the scope home with its counts already
 revised. NeoAnki2 may also retune its global scheduler and the stable
 item-type-and-Card-setup cohort for the cards you reviewed. This maintenance is
