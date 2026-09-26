@@ -117,6 +117,13 @@
       "screenshot": "assets/screenshots/decks-nested.png"
     },
     {
+      "id": "card-maturity",
+      "name": "See when cards and decks are ready for maintenance",
+      "article": "user/library-and-decks.md",
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Models/CardMaturity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift", "Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemReadingPreview.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/LibraryView.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/CardMaturityTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
+    },
+    {
       "id": "deck-management",
       "name": "Create, nest, rename, and delete decks",
       "article": "user/library-and-decks.md",

@@ -13,6 +13,7 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
     public let itemCount: Int
     /// Due cards in this deck and all descendant decks.
     public let dueCount: Int
+    public let maturity: MaturitySummary
 
     public init(
         id: UUID,
@@ -21,7 +22,8 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
         newCardsPerDay: Int? = nil,
         sortPosition: Int64 = 0,
         itemCount: Int,
-        dueCount: Int
+        dueCount: Int,
+        maturity: MaturitySummary = .empty
     ) {
         self.id = id
         self.name = name
@@ -30,5 +32,6 @@ public struct DeckSummary: Sendable, Identifiable, Equatable {
         self.sortPosition = sortPosition
         self.itemCount = itemCount
         self.dueCount = dueCount
+        self.maturity = maturity
     }
 }

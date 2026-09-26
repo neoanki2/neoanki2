@@ -22,6 +22,9 @@ and describe your recall:
 Each grade updates that card's memory state and appends a review outcome. A new
 or newly imported card starts never-reviewed and is due immediately. Portable
 and authored deck imports do not carry scheduling history.
+The separate [maturity status](../library-and-decks/#read-the-scope-home) uses
+spaced successful recalls and estimated stability to show when a card is in
+maintenance. It never changes FSRS intervals or the due queue.
 
 Upgrading legacy template definitions to study compositions changes presentation
 only. Card identities, memory state, due dates, and append-only review outcomes

@@ -712,13 +712,23 @@ package enum APIOpenAPI {
             ]),
             "Deck": object(
                 ["id", "revision", "name", "directItemCount",
-                 "recursiveItemCount", "dueCount", "childIds"],
+                 "recursiveItemCount", "dueCount", "maturity", "childIds"],
                 [
                     "id": uuid, "revision": revision, "name": ["type": "string"],
                     "parentId": nullableUUID,
                     "newCardsPerDay": ["type": ["integer", "null"], "minimum": 0],
                     "directItemCount": nonnegative, "recursiveItemCount": nonnegative,
-                    "dueCount": nonnegative, "childIds": array(uuid),
+                    "dueCount": nonnegative, "maturity": reference("Maturity"),
+                    "childIds": array(uuid),
+                ]
+            ),
+            "Maturity": object(
+                ["status", "activeCardCount", "maintainingCardCount", "notStartedCardCount"],
+                [
+                    "status": ["type": "string", "enum": ["noActiveCards", "notStarted", "learning", "maintaining"]],
+                    "activeCardCount": nonnegative,
+                    "maintainingCardCount": nonnegative,
+                    "notStartedCardCount": nonnegative,
                 ]
             ),
             "DeckCollection": collection("Deck"),
@@ -882,10 +892,11 @@ package enum APIOpenAPI {
                  "stepIndex": ["type": ["integer", "null"]]]
             ),
             "Card": object(
-                ["id", "revision", "itemId", "templateId", "skill", "isSuspended", "memory"],
+                ["id", "revision", "itemId", "templateId", "skill", "isSuspended", "maturityStatus", "memory"],
                 ["id": uuid, "revision": revision, "itemId": uuid, "templateId": uuid,
                  "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]],
                  "skill": reference("Skill"), "isSuspended": ["type": "boolean"],
+                 "maturityStatus": ["type": "string", "enum": ["notStarted", "learning", "maintaining", "inactive"]],
                  "memory": reference("Memory")]
             ),
             "CardCollection": collection("Card"),

@@ -17,6 +17,9 @@ app's interface.
 Open **Item Types** on Mac, or **Create → Item Types & Card Setups** on iPhone
 and iPad. The Item Type Studio edits fields and Card setups together and saves
 the complete definition as one change.
+Each generated card has its own maturity status. Editing a Card setup preserves
+that status when the card identity survives reconciliation; a newly generated
+card starts Not started.
 
 [![The Item Types manager]({{ site.baseurl }}/assets/screenshots/item-types.png)]({{ site.baseurl }}/assets/screenshots/item-types.png)
 

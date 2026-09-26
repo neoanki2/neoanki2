@@ -151,6 +151,9 @@ to study right now?
   button left sitting there without explanation.
 - **Cards** breaks the scope down into **New**, **Learning**, and **Review**.
   Relearning cards count as learning, because relearning is a repair round.
+- **Maturity** shows whether the scope is Not started, Learning, or Maintaining,
+  plus how many active cards are maintaining. A deck includes its subdecks and
+  reaches Maintaining only when every active card qualifies.
 - When a daily limit defers new cards, a note separates today's available new
   cards from the deferred backlog and reports when more become available.
 - If cards in the scope have lapsed at least eight times, a note says how many
@@ -162,6 +165,15 @@ to study right now?
 - **Browse *n* Items** opens browse mode.
 
 The scope home never shows an item's answer.
+
+Maturity describes demonstrated long-term recall, not the scheduler phase shown
+under Cards or in Browse. A card qualifies after two Good or Easy recalls that
+each follow a gap of at least seven days since the previous review, and when
+its estimated stability reaches 30 days. An Again clears that evidence; Hard
+preserves it unless stability falls below 30 days. New cards are Not started,
+and suspended cards are Inactive and excluded from deck progress. Becoming due
+or overdue does not by itself change maturity, and maturity never changes the
+review schedule. Item details show the status of each generated card.
 
 ## Browse and search items
 

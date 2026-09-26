@@ -2668,6 +2668,13 @@ actor SQLiteDatabase {
         return try rows.map { try decodeCard(from: $0) }
     }
 
+    /// One consistent read of the inputs used by the derived maturity projection.
+    func fetchMaturityInputs() throws -> (cards: [Card], reviews: [ReviewLog]) {
+        try inReadTransaction {
+            (try fetchAllCards(), try fetchActiveReviewLogs())
+        }
+    }
+
     func supportsVersionedCardReplay() throws -> Bool {
         guard try tableExists("cards") else { return false }
         for column in [

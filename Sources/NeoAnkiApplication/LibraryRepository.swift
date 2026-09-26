@@ -22,9 +22,14 @@ public protocol LibraryBrowsing: Sendable {
         search: String
     ) async throws -> [SavedItemSummary]
     func item(id: UUID) async throws -> (item: Item, itemType: ItemType)?
+    func cardMaturityDetails(itemID: UUID) async throws -> [CardMaturityDetail]
     func itemBrowseSchedules(itemIDs: [UUID]) async throws -> [UUID: ItemBrowseSchedule]
     func scopeSummary(scope: DeckScope, asOf: Date) async throws -> ScopeSummary
     func itemRecordsPage(offset: Int, limit: Int) async throws -> [LibraryItemRecord]
+}
+
+public extension LibraryBrowsing {
+    func cardMaturityDetails(itemID: UUID) async throws -> [CardMaturityDetail] { [] }
 }
 
 /// Item commands exposed as application operations, not persistence primitives.
@@ -611,6 +616,9 @@ public actor SQLiteLibraryRepository:
     }
     public func item(id: UUID) async throws -> (item: Item, itemType: ItemType)? {
         try await store.fetchItem(id: id)
+    }
+    public func cardMaturityDetails(itemID: UUID) async throws -> [CardMaturityDetail] {
+        try await store.cardMaturityDetails(itemID: itemID)
     }
     public func itemBrowseSchedules(itemIDs: [UUID]) async throws -> [UUID: ItemBrowseSchedule] {
         try await store.fetchItemBrowseSchedules(itemIDs: itemIDs)
