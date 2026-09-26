@@ -114,6 +114,8 @@ generate. A newly opened session uses the reconciled card set, while surviving
 Card setups keep their stable card identities, scheduling memory, and normal
 learned-before-new queue priority. Choosing a different static Layout alone does
 not change queue order.
+Card maturity is shown in the library as a separate progress signal. Becoming
+Maintaining does not move a card in this queue or alter its due time.
 
 The **Show Answer** control in Item Type Studio is an authoring preview. It
 does not reveal a live study card, write review history, or change scheduling;
