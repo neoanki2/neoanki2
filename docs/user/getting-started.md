@@ -67,6 +67,9 @@ Source builds, toolchain checks, headless commands, shared-library cautions, and
 platform builds are maintained in the
 [Developer Guide](../developer/setup/). They are not required to install or use
 the official Mac release.
+The source checkout also provides `neoanki-poem-repair` for inspecting and
+repairing existing generated poem decks through the local API; see the
+[deck authoring CLI guide](../cli/#repair-local-poem-decks).
 
 ## Update
 
