@@ -77,6 +77,8 @@ item, managing item types, showing another import sheet, or while a deck
 transfer is active. It is also disabled while the library is loading or no item
 types exist. An item edit sheet does not disable the menu. Deck import/export
 waits for item and deck loading but can supply its own item types.
+Newly imported JSON and CSV cards show **Not started** maturity until they have
+review history; the import itself does not count as a recall.
 
 [![JSON import sheet showing the selected file and duplicate warning]({{ site.baseurl }}/assets/screenshots/import-sheet.png)]({{ site.baseurl }}/assets/screenshots/import-sheet.png)
 

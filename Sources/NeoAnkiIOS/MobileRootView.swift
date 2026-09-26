@@ -433,6 +433,10 @@ private struct ScopeDetailView: View {
                     LabeledContent("New", value: summary.newCount.formatted())
                     LabeledContent("Learning", value: summary.inLearningCount.formatted())
                     LabeledContent("Review", value: summary.reviewCount.formatted())
+                    LabeledContent("Maturity", value: summary.maturity.displayName)
+                    if summary.maturity.activeCardCount > 0 {
+                        LabeledContent("Progress", value: summary.maturity.progressText)
+                    }
                 }
             } else if let errorMessage {
                 ContentUnavailableView("Could Not Load Deck", systemImage: "exclamationmark.triangle", description: Text(errorMessage))

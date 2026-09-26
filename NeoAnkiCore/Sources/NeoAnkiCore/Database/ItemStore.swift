@@ -151,6 +151,24 @@ public actor ItemStore {
         }
     }
 
+    private struct CachedMaturitySnapshot {
+        let token: DatabaseCacheToken
+        let statuses: [UUID: CardMaturityStatus]
+        let detailsByItem: [UUID: [CardMaturityDetail]]
+        let directCounts: [UUID?: MaturitySummary]
+
+        func summary(scope: CardScope) -> MaturitySummary {
+            switch scope {
+            case .all:
+                return directCounts.values.reduce(.empty) { $0.adding($1) }
+            case .unassigned:
+                return directCounts[nil] ?? .empty
+            case let .decks(ids):
+                return ids.reduce(.empty) { $0.adding(directCounts[$1] ?? .empty) }
+            }
+        }
+    }
+
     let database: SQLiteDatabase
     let schedulerOverride: (any Scheduler)?
     let profileID: String
@@ -160,6 +178,7 @@ public actor ItemStore {
     private var itemListCache: [DeckScope: CachedItemList] = [:]
     private var scopeSummaryCache: [DeckScope: CachedScopeSummary] = [:]
     private var deckSummariesCache: CachedDeckSummaries?
+    private var maturitySnapshotCache: CachedMaturitySnapshot?
     private let starterItemTypes: [ItemType]
     private var externalMutationInProgress = false
     private var externalMutationWaiters: [CheckedContinuation<Void, Never>] = []
@@ -297,6 +316,72 @@ public actor ItemStore {
     }
 
     /// Returns deck metadata with direct item counts and due counts including subdecks.
+    private func maturitySnapshot() async throws -> CachedMaturitySnapshot {
+        let token = try await database.cacheToken()
+        if let cached = maturitySnapshotCache, cached.token == token { return cached }
+
+        let inputs = try await database.fetchMaturityInputs()
+        var evidenceByCard: [UUID: CardMaturityEvidence] = [:]
+        for review in inputs.reviews {
+            evidenceByCard[review.cardID, default: CardMaturityEvidence()].observe(review)
+        }
+
+        var statuses: [UUID: CardMaturityStatus] = [:]
+        var detailsByItem: [UUID: [CardMaturityDetail]] = [:]
+        var directCounts: [UUID?: MaturitySummary] = [:]
+        statuses.reserveCapacity(inputs.cards.count)
+        for card in inputs.cards {
+            let status = CardMaturityStatus.evaluate(
+                card: card,
+                evidence: evidenceByCard[card.id] ?? CardMaturityEvidence()
+            )
+            statuses[card.id] = status
+            detailsByItem[card.itemID, default: []].append(
+                CardMaturityDetail(
+                    id: card.id,
+                    templateID: card.templateID,
+                    clozeGroup: card.clozeGroup,
+                    status: status
+                )
+            )
+            directCounts[card.deckID, default: .empty] = directCounts[
+                card.deckID, default: .empty
+            ].adding(.one(status))
+        }
+        for itemID in detailsByItem.keys {
+            detailsByItem[itemID]?.sort { $0.id.uuidString < $1.id.uuidString }
+        }
+
+        let snapshot = CachedMaturitySnapshot(
+            token: token,
+            statuses: statuses,
+            detailsByItem: detailsByItem,
+            directCounts: directCounts
+        )
+        if try await database.cacheToken() == token {
+            maturitySnapshotCache = snapshot
+        }
+        return snapshot
+    }
+
+    public func cardMaturityStatus(id: UUID) async throws -> CardMaturityStatus {
+        guard let status = try await maturitySnapshot().statuses[id] else {
+            throw DatabaseError.cardNotFound(id)
+        }
+        return status
+    }
+
+    public func cardMaturityStatuses(ids: [UUID]) async throws -> [UUID: CardMaturityStatus] {
+        let statuses = try await maturitySnapshot().statuses
+        var selected: [UUID: CardMaturityStatus] = [:]
+        for id in ids { selected[id] = statuses[id] }
+        return selected
+    }
+
+    public func cardMaturityDetails(itemID: UUID) async throws -> [CardMaturityDetail] {
+        try await maturitySnapshot().detailsByItem[itemID] ?? []
+    }
+
     public func deckSummaries(asOf now: Date = .now) async throws -> [DeckSummary] {
         let initialToken = try await database.cacheToken()
         if let cached = deckSummariesCache,
@@ -313,6 +398,7 @@ public actor ItemStore {
             asOf: now,
             studyDay: studyDay
         )
+        let maturity = try await maturitySnapshot()
 
         let summaries = decks.map { deck in
             let scope = DeckTree.descendantIDs(of: deck.id, in: tree)
@@ -322,6 +408,7 @@ public actor ItemStore {
             let dueCount = scope.reduce(0) { partial, deckID in
                 partial + directDueCounts[deckID, default: 0]
             }
+            let maturitySummary = maturity.summary(scope: .decks(Set(scope)))
             return DeckSummary(
                 id: deck.id,
                 name: deck.name,
@@ -329,7 +416,8 @@ public actor ItemStore {
                 newCardsPerDay: deck.newCardsPerDay,
                 sortPosition: sortPositions[deck.id, default: 0],
                 itemCount: itemCount,
-                dueCount: dueCount
+                dueCount: dueCount,
+                maturity: maturitySummary
             )
         }
         let rollover = try await studyDayRolloverMinutes()
@@ -893,6 +981,7 @@ public actor ItemStore {
         )
         let itemCount = try await database.countItems(scope: resolved)
         let rollover = try await studyDayRolloverMinutes()
+        let maturity = try await maturitySnapshot().summary(scope: resolved)
 
         let summary = ScopeSummary(
             itemCount: itemCount,
@@ -908,7 +997,8 @@ public actor ItemStore {
             nextDueAt: totals.nextDueAt,
             nextNewCardsAt: totals.hiddenNewCount > 0
                 ? StudyDay.nextRollover(after: now, rolloverMinutes: rollover)
-                : nil
+                : nil,
+            maturity: maturity
         )
         let finalToken = try await database.cacheToken()
         scopeSummaryCache[scope] = CachedScopeSummary(

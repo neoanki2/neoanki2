@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:31b97e8e00631e5e4a719deca63927dd28acbdc87b9122760004199d918752af
+contract_digest: sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -79,6 +79,7 @@ Type: **object**.
 - `id` — string; required
 - `isSuspended` — boolean; required
 - `itemId` — string; required
+- `maturityStatus` — string; required
 - `memory` — Memory; required
 - `revision` — integer; required
 - `skill` — Skill; required
@@ -251,6 +252,7 @@ Type: **object**.
 - `directItemCount` — integer; required
 - `dueCount` — integer; required
 - `id` — string; required
+- `maturity` — Maturity; required
 - `name` — string; required
 - `newCardsPerDay` — integer or null; optional
 - `parentId` — string or null; optional
@@ -625,6 +627,17 @@ Type: **object**.
 
 - `language` — string or null; optional
 - `value` — string; required
+
+## Maturity {#schema-maturity}
+
+Type: **object**.
+
+### Properties
+
+- `activeCardCount` — integer; required
+- `maintainingCardCount` — integer; required
+- `notStartedCardCount` — integer; required
+- `status` — string; required
 
 ## MediaMetadata {#schema-mediametadata}
 
@@ -1176,6 +1189,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:31b97e8e00631e5e4a719deca63927dd28acbdc87b9122760004199d918752af`.
+Contract digest: `sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

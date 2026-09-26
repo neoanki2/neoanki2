@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import PoemDeckBuilder
 import SwiftUI
 
@@ -73,6 +74,7 @@ struct ItemDetailView: View {
 
     @State private var item: Item?
     @State private var itemType: ItemType?
+    @State private var cardMaturityDetails: [CardMaturityDetail] = []
     @State private var selectedDeckID: UUID?
     @State private var isLoading = true
     @State private var isDeleting = false
@@ -124,6 +126,24 @@ struct ItemDetailView: View {
                             .font(DesignSystem.Typography.uiCaption)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity)
+
+                        if !cardMaturityDetails.isEmpty {
+                            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                                Text("Card maturity")
+                                    .font(DesignSystem.Typography.uiCaption)
+                                    .foregroundStyle(.secondary)
+                                ForEach(cardMaturityDetails) { detail in
+                                    HStack {
+                                        Text(cardMaturityName(detail, itemType: itemType))
+                                        Spacer()
+                                        Text(detail.status.displayName)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .font(DesignSystem.Typography.uiCaption)
+                                }
+                            }
+                            .accessibilityIdentifier("itemCardMaturity")
+                        }
                     }
                     .readingColumnLayout()
                 }
@@ -238,8 +258,10 @@ struct ItemDetailView: View {
             if let loaded = try await model.library.item(id: summary.id) {
                 item = loaded.item
                 itemType = loaded.itemType
+                cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: summary.id)
                 selectedDeckID = loaded.item.deckID
             } else {
+                cardMaturityDetails = []
                 errorMessage = "This item could not be found."
             }
         } catch {
@@ -247,6 +269,12 @@ struct ItemDetailView: View {
         }
 
         isLoading = false
+    }
+
+    private func cardMaturityName(_ detail: CardMaturityDetail, itemType: ItemType) -> String {
+        let setup = itemType.templates.first(where: { $0.id == detail.templateID })?.name ?? "Card"
+        if let group = detail.clozeGroup { return "\(setup) · blank \(group)" }
+        return setup
     }
 
     @MainActor

@@ -52,7 +52,22 @@ public struct APIDeck: Codable, Sendable, Equatable, Identifiable {
     public let directItemCount: Int
     public let recursiveItemCount: Int
     public let dueCount: Int
+    public let maturity: APIMaturity
     public let childIds: [String]
+}
+
+public struct APIMaturity: Codable, Sendable, Equatable {
+    public let status: String
+    public let activeCardCount: Int
+    public let maintainingCardCount: Int
+    public let notStartedCardCount: Int
+
+    init(_ summary: MaturitySummary) {
+        status = summary.status.rawValue
+        activeCardCount = summary.activeCardCount
+        maintainingCardCount = summary.maintainingCardCount
+        notStartedCardCount = summary.notStartedCardCount
+    }
 }
 
 struct CreateDeckInput: Decodable {
@@ -541,9 +556,10 @@ public struct APICard: Codable, Sendable, Equatable, Identifiable {
     public let clozeGroup: Int?
     public let skill: Skill
     public let isSuspended: Bool
+    public let maturityStatus: String
     public let memory: APIMemory
 
-    init(_ card: Card, revision: Int) {
+    init(_ card: Card, revision: Int, maturityStatus: CardMaturityStatus) {
         id = card.id.uuidString.lowercased()
         self.revision = revision
         itemId = card.itemID.uuidString.lowercased()
@@ -552,6 +568,7 @@ public struct APICard: Codable, Sendable, Equatable, Identifiable {
         clozeGroup = card.clozeGroup
         skill = card.skill
         isSuspended = card.isSuspended
+        self.maturityStatus = maturityStatus.rawValue
         memory = APIMemory(card.memory)
     }
 }

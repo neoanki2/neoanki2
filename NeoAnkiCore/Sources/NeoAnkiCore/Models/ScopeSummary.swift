@@ -21,6 +21,7 @@ public struct ScopeSummary: Sendable, Equatable {
     public let learningCount: Int
     public let relearningCount: Int
     public let reviewCount: Int
+    public let maturity: MaturitySummary
     /// Cards lapsed at least `leechThreshold` times — the ones worth rewriting
     /// rather than drilling.
     public let leechCount: Int
@@ -45,7 +46,8 @@ public struct ScopeSummary: Sendable, Equatable {
         reviewCount: Int,
         leechCount: Int,
         nextDueAt: Date?,
-        nextNewCardsAt: Date? = nil
+        nextNewCardsAt: Date? = nil,
+        maturity: MaturitySummary = .empty
     ) {
         self.itemCount = itemCount
         self.cardCount = cardCount
@@ -56,6 +58,7 @@ public struct ScopeSummary: Sendable, Equatable {
         self.learningCount = learningCount
         self.relearningCount = relearningCount
         self.reviewCount = reviewCount
+        self.maturity = maturity
         self.leechCount = leechCount
         self.nextDueAt = nextDueAt
         self.nextNewCardsAt = nextNewCardsAt

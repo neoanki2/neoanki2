@@ -38,8 +38,9 @@ widgets, and TestFlight.
 On iPhone, four labeled tabs stay available at the bottom:
 
 - **Home** shows All Decks, Unassigned, individual deck scopes, current due
-  counts, and the primary Study action.
+  counts, maturity progress, and the primary Study action.
 - **Library** browses, searches, selects, moves, edits, and deletes items.
+  Item details show the maturity of each generated card.
 - **Create** adds items and decks, manages item types and Card setups, transfers
   files, opens deck builders, and manages offline vocabulary packs.
 - **Settings** contains iCloud sync, reminders, browsing privacy, grading, and

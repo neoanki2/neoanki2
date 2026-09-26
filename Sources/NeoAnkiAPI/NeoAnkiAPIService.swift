@@ -2632,10 +2632,13 @@ public actor NeoAnkiAPIService {
         guard offset <= cards.count else { throw invalidCursor() }
         let end = min(offset + limit, cards.count)
         var data: [APICard] = []
-        for card in cards[offset ..< end] {
+        let pageCards = Array(cards[offset ..< end])
+        let maturityStatuses = try await store.cardMaturityStatuses(ids: pageCards.map(\.id))
+        for card in pageCards {
             data.append(APICard(
                 card,
-                revision: try await revision(resourceType: "card", resourceID: card.id.uuidString)
+                revision: try await revision(resourceType: "card", resourceID: card.id.uuidString),
+                maturityStatus: maturityStatuses[card.id] ?? .notStarted
             ))
         }
         let next = end < cards.count ? try await encodedCursor(route: routeKey, offset: end) : nil
@@ -2645,7 +2648,10 @@ public actor NeoAnkiAPIService {
     private func getCard(_ id: UUID) async throws -> APIResponse {
         let card = try await store.card(id: id)
         let revision = try await revision(resourceType: "card", resourceID: id.uuidString)
-        return try .json(APICard(card, revision: revision), headers: ["ETag": etag(revision)])
+        return try .json(
+            APICard(card, revision: revision, maturityStatus: try await store.cardMaturityStatus(id: id)),
+            headers: ["ETag": etag(revision)]
+        )
     }
 
     private func cardContent(_ id: UUID) async throws -> APIResponse {
@@ -2743,7 +2749,11 @@ public actor NeoAnkiAPIService {
         let card = try await store.setCardSuspended(id: id, isSuspended: input.isSuspended)
         let updatedRevision = try await self.revision(resourceType: "card", resourceID: id.uuidString)
         return try .json(
-            APICard(card, revision: updatedRevision),
+            APICard(
+                card,
+                revision: updatedRevision,
+                maturityStatus: try await store.cardMaturityStatus(id: id)
+            ),
             headers: ["ETag": etag(updatedRevision)]
         )
     }
@@ -2796,7 +2806,11 @@ public actor NeoAnkiAPIService {
         }
         let card = try await store.resetCardProgress(id: id)
         let updatedRevision = try await self.revision(resourceType: "card", resourceID: id.uuidString)
-        let representation = APICard(card, revision: updatedRevision)
+        let representation = APICard(
+            card,
+            revision: updatedRevision,
+            maturityStatus: try await store.cardMaturityStatus(id: id)
+        )
         let body = try APIJSON.encoder.encode(representation)
         try await store.completeIdempotency(
             clientID: grant.id,
@@ -4162,6 +4176,7 @@ public actor NeoAnkiAPIService {
                     directItemCount: directCounts[Optional(deck.id), default: 0],
                     recursiveItemCount: summary?.itemCount ?? 0,
                     dueCount: summary?.dueCount ?? 0,
+                    maturity: APIMaturity(summary?.maturity ?? .empty),
                     childIds: (children[deck.id] ?? [])
                         .map { $0.id.uuidString.lowercased() }
                         .sorted()

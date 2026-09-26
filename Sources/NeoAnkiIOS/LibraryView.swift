@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import PoemDeckBuilder
 import PhotosUI
 import SwiftUI
@@ -509,6 +510,7 @@ private struct ItemDetailView: View {
     @Bindable var model: MobileAppModel
     let itemID: UUID
     @State private var loaded: (item: Item, itemType: ItemType)?
+    @State private var cardMaturityDetails: [CardMaturityDetail] = []
     @State private var errorMessage: String?
     @State private var isEditing = false
     @State private var confirmsDelete = false
@@ -526,6 +528,16 @@ private struct ItemDetailView: View {
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
+                        }
+                    }
+                    if !cardMaturityDetails.isEmpty {
+                        Section("Card maturity") {
+                            ForEach(cardMaturityDetails) { detail in
+                                LabeledContent(
+                                    cardMaturityName(detail, itemType: loaded.itemType),
+                                    value: detail.status.displayName
+                                )
+                            }
                         }
                     }
                 }
@@ -547,6 +559,7 @@ private struct ItemDetailView: View {
         .task {
             do {
                 loaded = try await model.item(id: itemID)
+                cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
                 if loaded == nil { errorMessage = "This card no longer exists." }
             } catch {
                 errorMessage = MobileAppModel.message(for: error)
@@ -566,6 +579,7 @@ private struct ItemDetailView: View {
                             Task {
                                 await model.refresh()
                                 self.loaded = try? await model.item(id: itemID)
+                                self.cardMaturityDetails = (try? await model.library.cardMaturityDetails(itemID: itemID)) ?? []
                             }
                         },
                         onCancel: { isEditing = false }
@@ -579,6 +593,12 @@ private struct ItemDetailView: View {
             Button("Delete", role: .destructive) { Task { try? await model.deleteItems([itemID]) } }
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    private func cardMaturityName(_ detail: CardMaturityDetail, itemType: ItemType) -> String {
+        let setup = itemType.templates.first(where: { $0.id == detail.templateID })?.name ?? "Card"
+        if let group = detail.clozeGroup { return "\(setup) · blank \(group)" }
+        return setup
     }
 }
 
