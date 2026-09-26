@@ -29,6 +29,41 @@ private func repairFeatureFixture() async throws -> (
     return (root, repository, card.id)
 }
 
+@Test @MainActor func sharedStudyFeatureMovesSkippedCardToSessionEnd() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-feature-skip-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = try SQLiteLibraryRepository(
+        databaseURL: root.appendingPathComponent("library.sqlite")
+    )
+    try await repository.bootstrap()
+    for index in 1...3 {
+        _ = try await repository.createItem(Item(
+            itemTypeID: BuiltInItemTypes.basicID,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question \(index)")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer \(index)")),
+            ]
+        ))
+    }
+    let model = StudyFeatureModel(
+        library: repository,
+        scope: .allDecks,
+        title: "All Decks"
+    )
+
+    await model.start()
+    let originalOrder = model.queue.map(\.id)
+    model.skip()
+
+    #expect(model.queue.map(\.id) == [originalOrder[1], originalOrder[2], originalOrder[0]])
+    #expect(model.currentCard?.id == originalOrder[1])
+    #expect(model.remainingCount == 3)
+    #expect(model.completion.reviews == 0)
+    #expect(!model.isComplete)
+}
+
 @Test @MainActor func sharedStudyFeatureRepeatsEveryAgainInCurrentSession() async throws {
     let fixture = try await repairFeatureFixture()
     defer { try? FileManager.default.removeItem(at: fixture.root) }

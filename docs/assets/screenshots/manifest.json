@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-09-11T12:10:03Z",
+  "capturedAt" : "2026-09-21T12:29:30Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -30,9 +30,9 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 724,
+      "height" : 732,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "f74701111584cb98fc7966d06a6ae336fb3ac1d8700f18a5f484ecbbff4bc03d",
+      "sha256" : "f7f3e58c6b8722b4f6a57bd0e79320901b32c08ff2e295c2654fde575eeef91e",
       "width" : 1024
     },
     {
@@ -147,7 +147,7 @@
       "filename" : "study-answer.png",
       "height" : 712,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "482efcf68e4cd25e4b3c83e76ad2fc7501f91db2c5e575053623c30fa28a125e",
+      "sha256" : "0939a0f53220dc3ab7fa32e7337eefb26f9215d1b37a127c19158f771d2396b7",
       "width" : 1024
     },
     {
@@ -168,7 +168,7 @@
       "filename" : "study-grade-help.png",
       "height" : 712,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "b4855bc6226b6cd71ded9f4e5f4a1014fab7b922809f901b7af49ed91d9b347b",
+      "sha256" : "e32b8fd65202c8a6b1a8197d9ac91bfa5804d69781fa5a4764dd204e7b062706",
       "width" : 1024
     },
     {
@@ -180,7 +180,7 @@
       "filename" : "study-prompt.png",
       "height" : 712,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "ddb28e468c230b69ee96c6d4599d81e8c31160d0584ca1c6dc69c77662959cda",
+      "sha256" : "67b2beca058a2abeb73212e5bb80d6e95ee037c4c2b4b3f284debeeaeb01be7a",
       "width" : 1024
     },
     {
@@ -190,7 +190,7 @@
       "filename" : "study-type.png",
       "height" : 712,
       "scenario" : "typed-answer study result",
-      "sha256" : "7de4ea94618bf145ff05279e01e12e2df627c2b8697311c898d95ec959e0bbd1",
+      "sha256" : "c6124eb0824dcdc23036c253e40373cd55511b5c2f465362cc069937eb53ecdc",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "6078a33abd666f569cee9b32516b0c5af35ab941"
+  "sourceSHA" : "42347654fc45446bb16bb989cb80059377bb2282"
 }

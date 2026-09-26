@@ -467,22 +467,80 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     #expect(model.arrangedItems == initial)
 }
 
-@Test @MainActor func studyModelSkipsUnsupportedCard() async throws {
+@Test @MainActor func studyModelMovesSkippedCardToEndWithoutReviewingIt() async throws {
     let (model, store) = try await makeStudyModel()
     let itemType = try await store.defaultItemType()
-    let item = Item(
+    for index in 1...3 {
+        _ = try await store.createItem(Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q\(index)")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A\(index)")),
+            ]
+        ))
+    }
+
+    await model.startSession()
+    let originalOrder = model.queue.map(\.id)
+    model.skipCurrentCard()
+
+    #expect(model.queue.map(\.id) == [originalOrder[1], originalOrder[2], originalOrder[0]])
+    #expect(model.currentCard?.id == originalOrder[1])
+    #expect(model.remainingCardCount == 3)
+    #expect(model.cardsReviewed == 0)
+    #expect(model.isFinished == false)
+    #expect(try await store.reviewLogCount(for: originalOrder[0]) == 0)
+}
+
+@Test @MainActor func studyModelKeepsOnlySkippedCardInSession() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    _ = try await store.createItem(Item(
         itemTypeID: itemType.id,
         fields: [
             FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q")),
             FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A")),
         ]
-    )
-    _ = try await store.createItem(item)
+    ))
 
     await model.startSession()
+    let cardID = try #require(model.currentCard?.id)
+    model.revealAnswer()
     model.skipCurrentCard()
 
-    #expect(model.isFinished == true)
+    #expect(model.currentCard?.id == cardID)
+    #expect(model.remainingCardCount == 1)
+    #expect(model.isAnswerRevealed == false)
+    #expect(model.isFinished == false)
+    #expect(try await store.reviewLogCount(for: cardID) == 0)
+}
+
+@Test @MainActor func studyModelMovesSkipBehindPendingRepairCards() async throws {
+    let (model, store) = try await makeStudyModel()
+    let itemType = try await store.defaultItemType()
+    for index in 1...2 {
+        _ = try await store.createItem(Item(
+            itemTypeID: itemType.id,
+            fields: [
+                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Q\(index)")),
+                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("A\(index)")),
+            ]
+        ))
+    }
+
+    await model.startSession()
+    let firstCardID = try #require(model.currentCard?.id)
+    let skippedCardID = model.queue[1].id
+    model.revealAnswer()
+    await model.grade(.again)
+    #expect(model.currentCard?.id == skippedCardID)
+
+    model.skipCurrentCard()
+
+    #expect(model.currentCard?.id == firstCardID)
+    #expect(model.queue.last?.id == skippedCardID)
+    #expect(model.remainingCardCount == 2)
+    #expect(try await store.reviewLogCount(for: skippedCardID) == 0)
 }
 
 @Test @MainActor func studyModelGradesAllRatings() async throws {

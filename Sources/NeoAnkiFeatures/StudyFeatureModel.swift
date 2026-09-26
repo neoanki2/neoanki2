@@ -209,7 +209,14 @@ public final class StudyFeatureModel: Identifiable {
         } catch { self.error = errorMapper.map(error) }
     }
 
-    public func skip() { guard currentCard != nil, !isPreparingQueue else { return }; pendingUndo = nil; index += 1; advance() }
+    public func skip() {
+        guard queue.indices.contains(index), !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
+        pendingUndo = nil
+        materializePendingRepeats()
+        let skippedCard = queue.remove(at: index)
+        queue.append(skippedCard)
+        advance()
+    }
 
     public func reloadCurrentItem() async {
         guard let itemID = currentCard?.item.id, let loaded = try? await library.item(id: itemID) else { return }
@@ -230,13 +237,21 @@ public final class StudyFeatureModel: Identifiable {
     private func advance() {
         isAnswerRevealed = false
         if index >= queue.count {
-            for entry in repairQueue {
-                if var source = queue.first(where: { $0.id == entry.card.id }) { source.card = entry.card; queue.append(source) }
-            }
-            repairQueue = []
+            materializePendingRepeats()
         }
         if currentCard != nil { reviewTiming.reset() }
         prepareInteraction()
+    }
+
+    private func materializePendingRepeats() {
+        guard !repairQueue.isEmpty else { return }
+        for entry in repairQueue {
+            if var source = queue.last(where: { $0.id == entry.card.id }) {
+                source.card = entry.card
+                queue.append(source)
+            }
+        }
+        repairQueue = []
     }
 
     private func prepareInteraction() {
