@@ -65,6 +65,24 @@ NeoAnki2 also reuses this authored-bundle validation and atomic import boundary
 when an installed offline vocabulary pack generates items for an existing
 deck. That app workflow does not change the CLI command or its diagnostics.
 
+## Repair local poem decks
+
+With NeoAnki2's local API enabled, set `NEOANKI_API_TOKEN` to an approved token
+with `library.read` and `items.write` scopes. The repair command uses the API
+and never opens the database directly:
+
+```bash
+swift run neoanki-poem-repair --dry-run
+swift run neoanki-poem-repair --apply
+```
+
+Set `NEOANKI_API_PORT` if the app uses a port other than `8766`. The command
+checks generated poem decks in the current Mac library, reports cards whose
+prompts or stanza spacing need repair, and skips decks whose source order is
+uncertain. Apply uses atomic API batches and verifies that card IDs remain the
+same. For poems exceeding one API batch, an interrupted run can be resumed by
+running the command again.
+
 ## Migrate a version-1 template library
 
 The one-shot `neoanki-template-migrator` upgrades a local library from stored

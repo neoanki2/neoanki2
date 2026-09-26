@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiSharedUI
+import PoemDeckBuilder
 import SwiftUI
 
 struct StudyView: View {
@@ -74,15 +75,31 @@ struct StudyView: View {
     @ViewBuilder
     private var cardEditor: some View {
         if let card = model.currentCard {
-            NavigationStack {
-                AddItemView(
-                    model: itemsModel,
-                    decksModel: decksModel,
-                    editingItem: card.item,
-                    editingItemType: card.itemType
-                ) {
-                    isEditingCard = false
-                    Task { await model.reloadCurrentItem() }
+            if card.itemType.name == "Poem Line",
+               let deckID = card.item.deckID,
+               let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
+                PoemDeckEditorView(
+                    library: itemsModel.library,
+                    deckID: deckID,
+                    itemTypeID: card.itemType.id,
+                    deckName: deckName,
+                    onSaved: {
+                        isEditingCard = false
+                        Task { await model.reloadCurrentItem() }
+                    },
+                    onCancel: { isEditingCard = false }
+                )
+            } else {
+                NavigationStack {
+                    AddItemView(
+                        model: itemsModel,
+                        decksModel: decksModel,
+                        editingItem: card.item,
+                        editingItemType: card.itemType
+                    ) {
+                        isEditingCard = false
+                        Task { await model.reloadCurrentItem() }
+                    }
                 }
             }
         }

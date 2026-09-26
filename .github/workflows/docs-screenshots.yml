@@ -4,11 +4,14 @@ on:
   pull_request:
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 env:
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: docs-screenshots-${{ github.event.pull_request.head.repo.full_name }}-${{ github.head_ref }}
@@ -18,14 +21,16 @@ jobs:
   detect:
     name: Detect screenshot capture requirement
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       needed: ${{ steps.freshness.outputs.needed }}
     steps:
-      - name: Check out the pull-request head
+      - name: Check out the pull-request head without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - id: freshness
         name: Detect screenshot inputs changed since capture
         run: |
@@ -36,25 +41,20 @@ jobs:
           fi
 
   capture:
-    name: Capture and promote documentation screenshots
+    name: Capture and validate documentation screenshots
     needs: detect
     if: needs.detect.outputs.needed == 'true'
     runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - name: Require a writable project branch
-        env:
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          BASE_REPOSITORY: ${{ github.repository }}
-        run: |
-          if [ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]; then
-            echo "Screenshot-backed changes must include CI-generated assets from a writable project branch." >&2
-            exit 1
-          fi
-      - name: Check out the pull-request head
+      - name: Check out the pull-request head without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Pin macOS appearance
         run: |
           defaults write -g AppleInterfaceStyle -string Dark
@@ -76,25 +76,7 @@ jobs:
       - name: Upload exact-revision screenshot artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neoanki2-documentation-screenshots
-          path: ${{ runner.temp }}/neoanki2-doc-screenshots/
+          name: neoanki2-documentation-screenshots-${{ github.event.pull_request.head.sha }}
+          path: docs/assets/screenshots/
           if-no-files-found: error
           retention-days: 14
-      - name: Commit screenshots to the pull-request branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-          REPOSITORY: ${{ github.repository }}
-          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          git add docs/assets/screenshots
-          if git diff --cached --quiet; then
-            echo "Capture produced no repository changes." >&2
-            exit 1
-          fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git commit -m "Refresh documentation screenshots for ${SOURCE_SHA:0:12}"
-          git -c credential.helper= \
-            -c 'credential.helper=!gh auth git-credential' \
-            push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_BRANCH"

@@ -39,8 +39,10 @@ Choose an existing root deck for the poem. NeoAnki2 creates the poem as its
 child and stores the entered author as an `author:<name>` tag on each generated
 item. Each card shows `Title · Author` as a small, always-visible caption above
 the poem text. Every nonblank line after the first becomes one Basic card
-answer. Its prompt contains the preceding one or two lines, matching a moving
-recitation window. For example, a 12-line poem creates 11 cards. Generated cards
+answer. Its prompt starts with the preceding one or two lines. When that context
+repeats, the prompt includes earlier lines until it identifies one place in the
+poem. Blank lines within that context preserve stanza spacing. For example, a
+12-line poem creates 11 cards. Generated cards
 retain the poem's line order in both Browse and their initial Study queue.
 
 The builder first writes a temporary `.neoanki` bundle, validates the complete

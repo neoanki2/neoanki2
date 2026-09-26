@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: release-main
@@ -16,7 +17,13 @@ concurrency:
 jobs:
   release:
     name: Publish app release
+    if: github.ref == 'refs/heads/main'
     runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       RELEASE_SHA: ${{ github.sha }}
@@ -27,6 +34,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_SHA }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Derive immutable release identifiers
         id: release

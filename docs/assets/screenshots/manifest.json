@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-09-21T12:29:30Z",
+  "capturedAt" : "2026-09-25T14:36:14Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -30,9 +30,9 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 732,
+      "height" : 724,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "f7f3e58c6b8722b4f6a57bd0e79320901b32c08ff2e295c2654fde575eeef91e",
+      "sha256" : "f74701111584cb98fc7966d06a6ae336fb3ac1d8700f18a5f484ecbbff4bc03d",
       "width" : 1024
     },
     {
@@ -56,7 +56,7 @@
       "filename" : "item-detail.png",
       "height" : 732,
       "scenario" : "basic item detail",
-      "sha256" : "2ee344fbbee3954b98634ba5d179781758bdcdcb623cd6847eefd7902aa82090",
+      "sha256" : "bdd36cf4e99e9f01e6e01ea5f2f6de3552f7ce9937f2bd6f7857582f693b900e",
       "width" : 1024
     },
     {
@@ -168,7 +168,7 @@
       "filename" : "study-grade-help.png",
       "height" : 712,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "e32b8fd65202c8a6b1a8197d9ac91bfa5804d69781fa5a4764dd204e7b062706",
+      "sha256" : "4d67cb9dc6d36ac6b939f5a199cadac5796a15cd24d36262b30b5c583c6a492b",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "42347654fc45446bb16bb989cb80059377bb2282"
+  "sourceSHA" : "a555f0993007c2e734e9224fae2e4a10c0fb485f"
 }

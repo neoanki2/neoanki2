@@ -4,6 +4,7 @@ import ImageIO
 import NeoAnkiCore
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
+import PoemDeckBuilder
 import SwiftUI
 
 #if os(iOS)
@@ -90,9 +91,28 @@ struct StudySessionView: View {
         }
         .sheet(isPresented: $isEditing) {
             if let loadedItem {
-                ItemEditMobileView(model: model, loaded: loadedItem) { updated in
-                    self.loadedItem = updated
-                    Task { await session.reloadCurrentItem() }
+                if loadedItem.itemType.name == "Poem Line",
+                   let deckID = loadedItem.item.deckID {
+                    PoemDeckEditorView(
+                        library: model.library,
+                        deckID: deckID,
+                        itemTypeID: loadedItem.itemType.id,
+                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Poem",
+                        onSaved: {
+                            isEditing = false
+                            Task {
+                                await model.refresh()
+                                self.loadedItem = try? await model.item(id: loadedItem.item.id)
+                                await session.reloadCurrentItem()
+                            }
+                        },
+                        onCancel: { isEditing = false }
+                    )
+                } else {
+                    ItemEditMobileView(model: model, loaded: loadedItem) { updated in
+                        self.loadedItem = updated
+                        Task { await session.reloadCurrentItem() }
+                    }
                 }
             }
         }

@@ -260,7 +260,8 @@ grade keys type into the form instead of grading the card behind it.
 The **Study** menu mirrors the main actions:
 
 - Command-Shift-S: start studying the current scope.
-- Space or Return: continue with the primary action when it is available.
+- Space or Return: continue with the primary action before reveal. After reveal,
+  Space grades Good.
 - 1, 2, 3, 4: grade Again, Hard, Good, or Easy after reveal. With Fail / Pass
   grades enabled, 1 selects Fail (Again) and 2 selects Pass (Good).
 - Right Arrow: reveal without checking for Type, Choose, Arrange, or Record.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewedAt": "2026-08-19",
+  "lastReviewedAt": "2026-09-26",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
@@ -128,7 +128,8 @@
         "macOS 14 or newer",
         "~/Library/Application Support/neoanki2/",
         "An iCloud container requires a separately provisioned and signed build",
-        "The Home summary is prepared while the app window opens"
+        "The Home summary is prepared while the app window opens",
+        "neoanki-poem-repair"
       ]
     },
     {

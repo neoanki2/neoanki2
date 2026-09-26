@@ -39,6 +39,17 @@ public protocol LibraryItemMutating: Sendable {
     func reserveMedia(data: Data, kind: MediaKind, altText: String, asOf: Date) async throws -> ReservedMediaAsset
 }
 
+/// Narrow capability for workflows that must extend an item type and rewrite
+/// its dependent items as one atomic, history-preserving transaction.
+public protocol LibraryCoordinatedItemEditing: Sendable {
+    func reconcileItemTypeAndItems(
+        expectedItemType: ItemType,
+        updatedItemType: ItemType,
+        replacements: [Item],
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult]
+}
+
 public protocol LibraryDeckManaging: Sendable {
     func deck(id: UUID) async throws -> Deck
     func deckSummaries(asOf: Date) async throws -> [DeckSummary]
@@ -388,6 +399,7 @@ public protocol LibraryRepository:
     LibraryBootstrapping,
     LibraryBrowsing,
     LibraryItemMutating,
+    LibraryCoordinatedItemEditing,
     LibraryDeckManaging,
     LibraryItemTypeManaging,
     LibraryStudying,
@@ -397,6 +409,19 @@ public protocol LibraryRepository:
     LibraryTransferring,
     LibraryChangePersisting
 {}
+
+public extension LibraryCoordinatedItemEditing {
+    func reconcileItemTypeAndItems(
+        expectedItemType _: ItemType,
+        updatedItemType _: ItemType,
+        replacements _: [Item],
+        asOf _: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        throw DatabaseError.invalidItem(
+            "This library does not support atomic item reconciliation."
+        )
+    }
+}
 
 /// Debug fixture operations used to seed deterministic UI scenarios without
 /// giving the executable direct access to the persistence actor.
@@ -543,6 +568,7 @@ public extension LibraryScheduling {
 /// synchronization code receive application capabilities instead of the store.
 public actor SQLiteLibraryRepository:
     LibraryRepository,
+    LibraryCoordinatedItemEditing,
     LibraryItemTypeEditingSafeguarding,
     LibraryItemTypeStudioSaving
 {
@@ -598,6 +624,19 @@ public actor SQLiteLibraryRepository:
     }
     public func updateItem(_ item: Item, asOf: Date) async throws -> SavedItemSummary {
         try await store.updateItem(item, now: asOf)
+    }
+    public func reconcileItemTypeAndItems(
+        expectedItemType: ItemType,
+        updatedItemType: ItemType,
+        replacements: [Item],
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        try await store.reconcileItemTypeAndItems(
+            expectedItemType: expectedItemType,
+            updatedItemType: updatedItemType,
+            replacements: replacements,
+            now: asOf
+        )
     }
     public func deleteItem(id: UUID, asOf: Date) async throws -> Bool {
         try await store.deleteItem(id: id, now: asOf)

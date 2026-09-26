@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiFeatures
+import PoemDeckBuilder
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -552,7 +553,27 @@ private struct ItemDetailView: View {
             }
         }
         .sheet(isPresented: $isEditing) {
-            if let loaded { ItemEditMobileView(model: model, loaded: loaded) { self.loaded = $0 } }
+            if let loaded {
+                if loaded.itemType.name == "Poem Line",
+                   let deckID = loaded.item.deckID {
+                    PoemDeckEditorView(
+                        library: model.library,
+                        deckID: deckID,
+                        itemTypeID: loaded.itemType.id,
+                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Poem",
+                        onSaved: {
+                            isEditing = false
+                            Task {
+                                await model.refresh()
+                                self.loaded = try? await model.item(id: itemID)
+                            }
+                        },
+                        onCancel: { isEditing = false }
+                    )
+                } else {
+                    ItemEditMobileView(model: model, loaded: loaded) { self.loaded = $0 }
+                }
+            }
         }
         .confirmationDialog("Delete this item?", isPresented: $confirmsDelete) {
             Button("Delete", role: .destructive) { Task { try? await model.deleteItems([itemID]) } }

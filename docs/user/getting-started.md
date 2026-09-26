@@ -67,6 +67,9 @@ Source builds, toolchain checks, headless commands, shared-library cautions, and
 platform builds are maintained in the
 [Developer Guide](../developer/setup/). They are not required to install or use
 the official Mac release.
+The source checkout also provides `neoanki-poem-repair` for inspecting and
+repairing existing generated poem decks through the local API; see the
+[deck authoring CLI guide](../cli/#repair-local-poem-decks).
 
 ## Update
 
@@ -166,9 +169,10 @@ type, or studying. Item Type Studio replaces its navigator with a preview-first
 workspace where fields and Card setups are saved together; Save or Cancel
 restores the navigator and its prior selection. Study replaces the library
 split view with a full-window review surface, so sidebar controls are
-unavailable until the session ends. Leaving either task restores the library
-and its previous sidebar visibility. Reduced Motion is respected when columns
-change.
+unavailable until the session ends. Use the visible **End Session** control or
+press Escape to return immediately; saved grades remain saved and the current
+ungraded card stays due. Leaving either task restores the library and its
+previous sidebar visibility. Reduced Motion is respected when columns change.
 
 Choose **End Session** in the study header or Study menu whenever you want to
 return to the selected scope without grading the current card.
