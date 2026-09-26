@@ -44,6 +44,8 @@ NeoAnki2 also creates ordinary Basic and Cloze starter types on first run.
 Basic uses Front → Back Reveal. Cloze stores marked blanks in a Cloze field and
 generates an independently scheduled card for each distinct blank group.
 Starter types follow the same edit and deletion rules as custom types.
+Generated Poem Line items are edited as one poem on iPhone and iPad, so changing
+line order also updates the generated Card setups and their sequence together.
 
 ## Edit fields and Card setups together
 
