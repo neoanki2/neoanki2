@@ -112,7 +112,6 @@ struct ScopeHomeView: View {
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
                 cardStateSection
-                maturitySection
                 if summary.leechCount > 0 {
                     leechCallout
                 }
@@ -177,10 +176,11 @@ struct ScopeHomeView: View {
 
     private var cardStateSection: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-            // A group label, not a peer of the headline.
-            Text("Cards")
+            Text("Card progress")
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
+
+            cardProgressBar
 
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .firstTextBaseline, spacing: DesignSystem.Spacing.xl) {
@@ -211,6 +211,38 @@ struct ScopeHomeView: View {
         }
     }
 
+    /// Shows how the active cards are distributed across their learning life.
+    /// Counts stay visible below the bar so color is never the only signal.
+    @ViewBuilder
+    private var cardProgressBar: some View {
+        let total = cardStates.reduce(0) { $0 + $1.count }
+        if total > 0 {
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    ForEach(cardStates, id: \.label) { state in
+                        if state.count > 0 {
+                            Rectangle()
+                                .fill(state.color)
+                                .frame(width: geometry.size.width * CGFloat(state.count) / CGFloat(total))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 10)
+                .background(Color.secondary.opacity(0.12))
+                .clipShape(Capsule())
+            }
+            .frame(height: 10)
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("scopeHomeCardProgressBar")
+        } else {
+            Text("No active cards")
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("scopeHomeCardProgressEmpty")
+        }
+    }
+
     private func cardStateValue(_ state: CardStateValue) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("\(state.count)")
@@ -226,36 +258,25 @@ struct ScopeHomeView: View {
     private struct CardStateValue {
         let label: String
         let count: Int
+        let color: Color
     }
 
     private var cardStates: [CardStateValue] {
-        [
-            CardStateValue(label: "New", count: summary.newCount),
-            CardStateValue(label: "Learning", count: summary.inLearningCount),
-            CardStateValue(label: "Review", count: summary.reviewCount),
+        let maturity = summary.maturity
+        let learningCount = max(
+            0,
+            maturity.activeCardCount - maturity.notStartedCardCount - maturity.maintainingCardCount
+        )
+        return [
+            CardStateValue(label: "New", count: maturity.notStartedCardCount, color: .secondary),
+            CardStateValue(label: "Learning", count: learningCount, color: .orange),
+            CardStateValue(label: "Mature", count: maturity.maintainingCardCount, color: .green),
         ]
     }
 
     private var cardStateAccessibilityLabel: String {
         let parts = cardStates.map { "\($0.count) \($0.label.lowercased())" }
         return "Cards: " + parts.joined(separator: ", ")
-    }
-
-    private var maturitySection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-            Text("Maturity")
-                .font(DesignSystem.Typography.uiCaption)
-                .foregroundStyle(.secondary)
-            Text(summary.maturity.displayName)
-                .font(DesignSystem.Typography.uiBody.weight(.semibold))
-            if summary.maturity.activeCardCount > 0 {
-                Text(summary.maturity.progressText)
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("scopeHomeMaturity")
     }
 
     private var leechCallout: some View {
