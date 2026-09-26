@@ -15,7 +15,6 @@ struct StudySessionView: View {
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var session: StudyFeatureModel
     @Bindable var model: MobileAppModel
-    @State private var confirmsEnd = false
     @State private var isEditing = false
     @State private var loadedItem: (item: Item, itemType: ItemType)?
     @State private var recorder = MobileStudyRecorder()
@@ -43,7 +42,11 @@ struct StudySessionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("End") { confirmsEnd = true }
+                    Button("End") {
+                        recorder.cleanup()
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("endStudySession")
                 }
                 if !session.isComplete {
                     ToolbarItem(placement: .principal) {
@@ -68,21 +71,13 @@ struct StudySessionView: View {
                 Text(session.error?.message ?? "Please try again.")
             }
         }
-        .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission || recorder.hasRecording)
+        .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 session.resumeReviewTiming()
             } else {
                 session.pauseReviewTiming()
             }
-        }
-        .confirmationDialog("End this study session?", isPresented: $confirmsEnd) {
-            Button("End Session", role: .destructive) { recorder.cleanup(); dismiss() }
-            Button("Keep Studying", role: .cancel) {}
-        } message: {
-            Text(recorder.hasRecording
-                ? "The unsaved audio draft will be permanently discarded. Completed work is already saved."
-                : "Your completed work is already saved.")
         }
         .confirmationDialog("Delete this audio draft?", isPresented: $confirmsDeleteDraft) {
             Button("Delete Draft", role: .destructive) { recorder.cleanup() }

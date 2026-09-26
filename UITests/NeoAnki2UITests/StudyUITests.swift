@@ -133,20 +133,19 @@ extension FastFunctionalJourneyTests {
         }
 
         let endButtonApp = launchApp(scenario: "deck-with-due-items")
-        runJourneyActivity("StudyUITests.testStudyEndSessionWithConfirmation") {
+        runJourneyActivity("StudyUITests.testStudyEndSessionImmediately") {
             startStudy(in: endButtonApp)
             revealAndGrade("gradeGood", in: endButtonApp)
-            openStudyActions(in: endButtonApp)
-            endButtonApp.menuItems.identified("endStudySession").click()
-            let confirm = endButtonApp.buttons.identified("confirmEndStudySession")
-            XCTAssertTrue(confirm.waitUntilExists(timeout: 3))
-            confirm.click()
+            let end = endButtonApp.buttons.identified("endStudySession")
+            XCTAssertTrue(end.waitUntilHittable(timeout: 3))
+            end.click()
+            XCTAssertFalse(endButtonApp.buttons.identified("confirmEndStudySession").exists)
             waitForLibraryReady(in: endButtonApp)
             assertDueCardsAvailable(in: endButtonApp)
         }
 
         let endMenuApp = launchApp(scenario: "scheduling-history")
-        runJourneyActivity("StudyExtendedUITests.testEndStudyViaMenuWithConfirmation") {
+        runJourneyActivity("StudyExtendedUITests.testEndStudyViaMenuImmediately") {
             startStudy(in: endMenuApp)
             revealAndGrade("gradeGood", in: endMenuApp)
             endStudyViaMenu(in: endMenuApp)
@@ -381,20 +380,17 @@ extension FastFunctionalJourneyTests {
         assertNothingDue(in: app)
     }
 
-    func checkStudyUITestsStudyEndSessionWithConfirmation() throws {
+    func checkStudyUITestsStudyEndSessionImmediately() throws {
         let app = launchApp()
         addBasicItem(front: "End Q1", back: "A1", in: app)
         addBasicItem(front: "End Q2", back: "A2", in: app)
         startStudy(in: app)
         revealAndGrade("gradeGood", in: app)
 
-        openStudyActions(in: app)
-        app.menuItems.identified("endStudySession").click()
-        if app.buttons.identified("confirmEndStudySession").waitUntilExists(timeout: 3) {
-            app.buttons.identified("confirmEndStudySession").click()
-        } else if let container = modalContainer(in: app) {
-            container.buttons.identified("End Session").click()
-        }
+        let end = app.buttons.identified("endStudySession")
+        XCTAssertTrue(end.waitUntilHittable(timeout: 3))
+        end.click()
+        XCTAssertFalse(app.buttons.identified("confirmEndStudySession").exists)
 
         waitForLibraryReady(in: app)
         assertDueCardsAvailable(in: app)

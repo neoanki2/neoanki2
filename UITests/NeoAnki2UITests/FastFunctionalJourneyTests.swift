@@ -128,7 +128,7 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
         try runLegacyCheck("StudyUITests.testStudyHardGrade") { try checkStudyUITestsStudyHardGrade() }
         try runLegacyCheck("StudyUITests.testStudyEasyGrade") { try checkStudyUITestsStudyEasyGrade() }
         try runLegacyCheck("StudyUITests.testStudyMultiCardSession") { try checkStudyUITestsStudyMultiCardSession() }
-        try runLegacyCheck("StudyUITests.testStudyEndSessionWithConfirmation") { try checkStudyUITestsStudyEndSessionWithConfirmation() }
+        try runLegacyCheck("StudyUITests.testStudyEndSessionImmediately") { try checkStudyUITestsStudyEndSessionImmediately() }
         try runLegacyCheck("StudyUITests.testStudyGradeHelpPopover") { try checkStudyUITestsStudyGradeHelpPopover() }
         try runLegacyCheck("StudyUITests.testStudyReverseTemplate") { try checkStudyUITestsStudyReverseTemplate() }
         try runLegacyCheck("StudyUITests.testTypedAnswerRequiresInputThenAcceptsCorrectAnswer") { try checkStudyUITestsTypedAnswerRequiresInputThenAcceptsCorrectAnswer() }
@@ -140,7 +140,7 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
         try runLegacyCheck("StudyUITests.testAudioSubmissionUsesSingleFooterAction") { try checkStudyUITestsAudioSubmissionUsesSingleFooterAction() }
         try runLegacyCheck("StudyUITests.testUndoLastGradeRestoresReviewedCard") { try checkStudyUITestsUndoLastGradeRestoresReviewedCard() }
         try runLegacyCheck("StudyExtendedUITests.testStartStudyViaMenu") { try checkStudyExtendedUITestsStartStudyViaMenu() }
-        try runLegacyCheck("StudyExtendedUITests.testEndStudyViaMenuWithConfirmation") { try checkStudyExtendedUITestsEndStudyViaMenuWithConfirmation() }
+        try runLegacyCheck("StudyExtendedUITests.testEndStudyViaMenuImmediately") { try checkStudyExtendedUITestsEndStudyViaMenuImmediately() }
         try runLegacyCheck("StudyExtendedUITests.testGradeViaKeyboardShortcuts") { try checkStudyExtendedUITestsGradeViaKeyboardShortcuts() }
         try runLegacyCheck("StudyExtendedUITests.testContinueViaSpace") { try checkStudyExtendedUITestsContinueViaSpace() }
         try runLegacyCheck("StudyExtendedUITests.testUndoLastGradeViaCommandZ") { try checkStudyExtendedUITestsUndoLastGradeViaCommandZ() }

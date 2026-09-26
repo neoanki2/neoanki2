@@ -268,7 +268,7 @@
     },
     {
       "id": "study-undo-end",
-      "name": "Undo, end confirmation, and session completion",
+      "name": "Undo, immediate session ending, and session completion",
       "article": "user/studying.md",
       "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyCommands.swift"],
       "tests": ["UITests/NeoAnki2UITests/StudyExtendedUITests.swift"],

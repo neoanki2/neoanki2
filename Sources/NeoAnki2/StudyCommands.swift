@@ -4,7 +4,7 @@ import SwiftUI
 
 struct StudyCommandHandlers {
     var startStudy: (() -> Void)?
-    var requestEndSession: (() -> Void)?
+    var endSession: (() -> Void)?
     var editCurrentCard: (() -> Void)?
     var grade: ((ReviewRating) -> Void)?
     var undoLastGrade: (() -> Void)?
@@ -61,7 +61,7 @@ struct StudyCommands: Commands {
             .disabled(!(handlers?.canStartStudy ?? false))
 
             Button("End Session") {
-                handlers?.requestEndSession?()
+                handlers?.endSession?()
             }
             .disabled(!(handlers?.canEndSession ?? false))
 

@@ -568,7 +568,7 @@ struct ContentView: View {
         if isStudying, let studyModel {
             return StudyCommandHandlers(
                 startStudy: nil,
-                requestEndSession: { endSessionTrigger = true },
+                endSession: { endSessionTrigger = true },
                 editCurrentCard: { isEditingStudyCard = true },
                 grade: { rating in
                     Task { await studyModel.grade(rating) }
@@ -591,7 +591,7 @@ struct ContentView: View {
 
         return StudyCommandHandlers(
             startStudy: { startStudy() },
-            requestEndSession: nil,
+            endSession: nil,
             editCurrentCard: nil,
             grade: nil,
             undoLastGrade: nil,

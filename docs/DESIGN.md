@@ -170,7 +170,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 
 **Study pane structure (top → bottom):**
 
-1. Session header — progress + transient grade/Undo feedback + Actions menu
+1. Session header — progress + transient grade/Undo feedback + visible End Session control
 2. Non-scrolling adaptive card stage — prompt, divider, answer; measured overflow opens a full-content sheet
 3. Optional error banner — full width, subtle fill  
 4. Fixed footer — Show Answer or grade row  
@@ -234,7 +234,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 ### Study header
 
 - **Feedback:** The latest grade, Undo, and dismiss control stay inline with progress instead of consuming a banner above the primary action.
-- **Actions:** One standard borderless `Menu` groups Edit Card, Grade Help, and the destructive End Session command with SF Symbols and accessibility labels.
+- **Actions:** End Session is a visible, neutral borderless button and ends immediately. A standard borderless More menu groups Edit Card and Grade Help with SF Symbols and accessibility labels.
 - **Hierarchy:** Progress leads, transient feedback follows, and secondary commands remain quiet so the fixed footer is the only primary-action region.
 
 ### Lists (sidebar)
@@ -301,7 +301,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 
 - **Split view:** Sidebar title “Items”; window title “NeoAnki2”
 - **Toolbar:** Study (with due badge), Add Item — no icon-only mystery meat
-- **Menus:** The app-level Study menu exposes keyboard commands; the in-session Actions menu groups Edit Card, Grade Help, and End Session without duplicating full-width controls
+- **Menus:** The app-level Study menu exposes keyboard commands; the in-session More menu holds Edit Card and Grade Help, while End Session remains visible beside it
 
 ### Signature element: Study reading column
 
