@@ -54,6 +54,7 @@ The app adds these commands to the standard macOS menu bar.
 - **Import Vocabulary Pack…** validates and installs a local `.neovocab`
   directory.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
+- **Build Deck…** opens the catalog containing Poem Deck and Prose Deck.
 
 There is no **New Window** or **New Tab**; NeoAnki2 has one library. Create decks
 with the controls in the sidebar.
@@ -89,6 +90,8 @@ with the controls in the sidebar.
 Commands become available only in the relevant state. Grades are disabled until
 the answer is revealed, and every study command is disabled while the card
 editor is open.
+The Prose Deck preview presents each cue and answer in reading order and uses
+labeled **Split here** and **Join with next unit** buttons for boundary edits.
 
 Inside a session, the header keeps **Skip** and **End Session** visible beside a
 labeled **More** menu for **Edit Card** and **Grade Help**. A saved grade and its

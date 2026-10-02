@@ -1,6 +1,7 @@
 import NeoAnkiCore
 import NeoAnkiSharedUI
 import PoemDeckBuilder
+import ProseDeckBuilder
 import SwiftUI
 
 struct StudyView: View {
@@ -79,6 +80,20 @@ struct StudyView: View {
                let deckID = card.item.deckID,
                let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
                 PoemDeckEditorView(
+                    library: itemsModel.library,
+                    deckID: deckID,
+                    itemTypeID: card.itemType.id,
+                    deckName: deckName,
+                    onSaved: {
+                        isEditingCard = false
+                        Task { await model.reloadCurrentItem() }
+                    },
+                    onCancel: { isEditingCard = false }
+                )
+            } else if card.itemType.name == "Prose Unit",
+                      let deckID = card.item.deckID,
+                      let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
+                ProseDeckEditorView(
                     library: itemsModel.library,
                     deckID: deckID,
                     itemTypeID: card.itemType.id,

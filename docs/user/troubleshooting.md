@@ -23,6 +23,9 @@ requirement, or unavailable action.
 - **The app looks empty, loading, or caught up:** see [Empty and loading
   states](#empty-and-loading-states).
 - **Import or export failed:** see [Import and export errors](#import-and-export-errors).
+- **A Prose Deck cannot be imported or an edit cannot be saved:** check the
+  passage size and reload the editor if another change was saved meanwhile;
+  see [Build a prose deck](../import-export/#build-a-prose-deck).
 - **An item, cloze, or media file cannot be saved:** see [Item and media
   errors](#item-and-media-errors).
 - **Recording is unavailable:** see [Microphone and recording](#microphone-and-recording).

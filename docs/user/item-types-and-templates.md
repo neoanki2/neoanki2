@@ -49,6 +49,9 @@ generates an independently scheduled card for each distinct blank group.
 Starter types follow the same edit and deletion rules as custom types.
 Generated Poem Line items are edited as one poem on iPhone and iPad, so changing
 line order also updates the generated Card setups and their sequence together.
+The Prose Deck builder includes a **Prose Unit** type with one Reveal card per
+unit. Its stored order and separators reconstruct the passage in the whole-text
+editor; changing a unit's cue or answer retires that card and creates a new one.
 
 ## Edit fields and Card setups together
 

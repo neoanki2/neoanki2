@@ -22,6 +22,7 @@ Anki template markup are not supported.
 **On this page**
 
 - [Build a poem deck](#build-a-poem-deck)
+- [Build a prose deck](#build-a-prose-deck)
 - [Import and use a vocabulary pack](#import-and-use-a-vocabulary-pack)
 - [Import JSON or CSV](#import-json-or-csv)
 - [Export a portable deck](#export-a-portable-deck)
@@ -33,7 +34,7 @@ Anki template markup are not supported.
 
 Choose **File → Build Deck…** to open the deck-builder catalog, then select
 **Poem Deck**. Enter the author, title, and poem text, then choose **Add to
-Library**. Other bundled builders can appear alongside it in future releases.
+Library**.
 
 Choose an existing root deck for the poem. NeoAnki2 creates the poem as its
 child and stores the entered author as an `author:<name>` tag on each generated
@@ -48,6 +49,28 @@ retain the poem's line order in both Browse and their initial Study queue.
 The builder first writes a temporary `.neoanki` bundle, validates the complete
 bundle with the same rules as an imported authored deck, imports it atomically,
 and removes the temporary files. It does not write directly to the library.
+
+## Build a prose deck
+
+Choose **File → Build Deck… → Prose Deck** on Mac, or **Deck Builders → Prose
+Deck** on iPhone or iPad. Choose a root deck, enter a title and optional author,
+and paste the passage. Blank lines mark paragraphs. Choose **Review Cards** to
+see the cues, answers, paragraph count, and card count before importing. Use
+**Adjust boundary** on a card to split an awkward unit or join it with the next
+unit in the same paragraph.
+
+The builder makes one card for every prose unit, including the opening words.
+The first cue asks you to begin the passage; later cues show preceding prose.
+Repeated context is extended or given a position cue so each prompt identifies
+one continuation. The generated deck is a child of the selected root deck and
+inherits its daily new-card limit. Very large passages must fit the authored
+deck format limits; divide a passage into separate decks if validation reports
+a size limit.
+
+During study, say or write the next unit before choosing **Show Answer**, then
+compare the exact words and order and grade yourself. These short continuation
+cards support verbatim practice but do not test an uninterrupted recitation of
+the whole passage. For that goal, occasionally recite the passage independently.
 
 ## Import and use a vocabulary pack
 

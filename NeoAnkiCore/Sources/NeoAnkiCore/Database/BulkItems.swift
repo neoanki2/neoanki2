@@ -30,6 +30,20 @@ public struct ItemBulkOperationResult: Sendable, Equatable {
     }
 }
 
+/// The complete item order expected before and after an atomic generated-deck edit.
+public struct OrderedDeckItemReconciliation: Sendable, Equatable {
+    public let deckID: UUID
+    public let expectedItems: [Item]
+    public let orderedItemIDs: [UUID]
+    public var expectedItemIDs: [UUID] { expectedItems.map(\.id) }
+
+    public init(deckID: UUID, expectedItems: [Item], orderedItemIDs: [UUID]) {
+        self.deckID = deckID
+        self.expectedItems = expectedItems
+        self.orderedItemIDs = orderedItemIDs
+    }
+}
+
 public struct ItemBulkOperationError: Error, Sendable, Equatable, LocalizedError {
     public let operationID: String
     public let pointer: String
@@ -60,6 +74,49 @@ private struct BulkCardIdentity: Hashable {
 }
 
 public extension ItemStore {
+    /// Reconciles an ordered generated deck in one transaction. Only New cards
+    /// receive reordered due times; reviewed cards retain their schedules.
+    func reconcileOrderedDeckItems(
+        _ operations: [ItemBulkOperation],
+        order: OrderedDeckItemReconciliation,
+        now: Date = .now
+    ) async throws -> [ItemBulkOperationResult] {
+        guard !order.expectedItemIDs.isEmpty,
+              !order.orderedItemIDs.isEmpty,
+              Set(order.expectedItemIDs).count == order.expectedItemIDs.count,
+              Set(order.orderedItemIDs).count == order.orderedItemIDs.count,
+              order.expectedItems.allSatisfy({ $0.deckID == order.deckID })
+        else {
+            throw DatabaseError.invalidItem("The ordered deck must have unique, nonempty item lists.")
+        }
+        let before = Set(order.expectedItemIDs)
+        let after = Set(order.orderedItemIDs)
+        for operation in operations {
+            switch operation.action {
+            case let .create(item):
+                guard item.deckID == order.deckID,
+                      !before.contains(item.id), after.contains(item.id) else {
+                    throw DatabaseError.invalidItem("A created item must belong to the edited deck.")
+                }
+            case let .replace(item):
+                guard item.deckID == order.deckID,
+                      before.contains(item.id), after.contains(item.id) else {
+                    throw DatabaseError.invalidItem("A replacement must stay in the edited deck.")
+                }
+            case let .delete(id):
+                guard before.contains(id), !after.contains(id) else {
+                    throw DatabaseError.invalidItem("A retired item must leave the edited deck.")
+                }
+            }
+        }
+        return try await executeItemBulk(
+            operations,
+            dryRun: false,
+            now: now,
+            orderedDeck: order
+        )
+    }
+
     /// Reconciles a compatible item-type extension and its affected items in
     /// one revision-tracked transaction. This is intentionally narrower than
     /// Item Type Studio: existing fields and card-template identities must be
@@ -196,10 +253,14 @@ public extension ItemStore {
     func executeItemBulk(
         _ operations: [ItemBulkOperation],
         dryRun: Bool,
-        now: Date = .now
+        now: Date = .now,
+        orderedDeck: OrderedDeckItemReconciliation? = nil
     ) async throws -> [ItemBulkOperationResult] {
-        guard !operations.isEmpty, operations.count <= 500 else {
-            throw DatabaseError.invalidItem("A bulk request must contain between 1 and 500 operations.")
+        let maximumOperations = orderedDeck == nil ? 500 : 100_000
+        guard !operations.isEmpty, operations.count <= maximumOperations else {
+            throw DatabaseError.invalidItem(
+                "A bulk request must contain between 1 and \(maximumOperations) operations."
+            )
         }
 
         var operationIDs: Set<String> = []
@@ -302,7 +363,7 @@ public extension ItemStore {
         }
 
         if !dryRun {
-            try await database.applyItemBulk(mutations)
+            try await database.applyItemBulk(mutations, orderedDeck: orderedDeck, now: now)
         }
         return results
     }

@@ -117,9 +117,10 @@ a portable `.neodeck` bundle for the selected deck and presents the system save
 sheet. The same [format and conflict rules](../import-export/) apply on Mac and
 iOS.
 
-**Deck Builders** contains guided poem and installed-vocabulary builders. A
-created poem is placed in its selected parent deck; editing a generated poem
-line from item details opens the same whole-poem editor.
+**Deck Builders** contains guided poem, prose, and installed-vocabulary
+builders. Created poems and prose passages are placed in their selected parent
+decks. Editing a generated unit from item details opens the whole source
+editor for that passage.
 **Vocabulary Packs** imports and removes local `.neovocab` directories. Packs
 and generated previews stay on the device until you explicitly import their
 result into the library.

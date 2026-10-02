@@ -18,6 +18,8 @@ App Store or TestFlight download; see the [iPhone and iPad guide](../iphone-ipad
 The current package supports macOS 14 or newer and iOS 17 or newer, using Swift
 tools 6.0. These deployment targets are shared by release and source builds;
 platform installation and distribution still follow the separate paths below.
+The Prose Deck builder is included in the same app targets; it adds no platform
+requirement.
 
 ## Install the official Mac release
 
@@ -163,6 +165,10 @@ one of its cards lapses again. Choose **Done** to return to the scope home, or
 
 The Home summary is prepared while the app window opens, so its counts and
 primary study action are ready with the rest of the library view.
+
+To build a passage deck on Mac, choose **File → Build Deck… → Prose Deck**.
+The builder opens beside Poem Deck and imports the result beneath a selected
+root deck. See [Build a prose deck](../import-export/#build-a-prose-deck).
 
 NeoAnki2 uses focused, full-window modes while adding an item, editing an item
 type, or studying. Item Type Studio replaces its navigator with a preview-first

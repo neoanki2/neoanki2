@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewedAt": "2026-09-26",
+  "lastReviewedAt": "2026-10-02",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
@@ -129,7 +129,8 @@
         "~/Library/Application Support/neoanki2/",
         "An iCloud container requires a separately provisioned and signed build",
         "The Home summary is prepared while the app window opens",
-        "neoanki-poem-repair"
+        "neoanki-poem-repair",
+        "The Prose Deck builder is included in the same app targets"
       ]
     },
     {

@@ -1,3 +1,4 @@
+import Charts
 import NeoAnkiCore
 import NeoAnkiSharedUI
 import SwiftUI
@@ -15,6 +16,7 @@ struct ScopeHomeView: View {
     let onDeleteAllUnassigned: () -> Void
 
     @State private var showDeleteAllUnassignedConfirm = false
+    @ScaledMetric(relativeTo: .body) private var chartDiameter: CGFloat = 144
 
     private var summary: ScopeSummary { itemsModel.scopeSummary }
 
@@ -112,7 +114,6 @@ struct ScopeHomeView: View {
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
                 cardStateSection
-                maturitySection
                 if summary.leechCount > 0 {
                     leechCallout
                 }
@@ -177,26 +178,27 @@ struct ScopeHomeView: View {
 
     private var cardStateSection: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-            // A group label, not a peer of the headline.
-            Text("Cards")
+            Text("Card progress")
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)
 
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: DesignSystem.Spacing.xl) {
-                    ForEach(cardStates, id: \.label) { state in
-                        cardStateValue(state)
+            if activeCardCount > 0 {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: DesignSystem.Spacing.lg) {
+                        cardProgressChart
+                        cardStateLegend
+                    }
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                        cardProgressChart
+                        cardStateLegend
                     }
                 }
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                    ForEach(cardStates, id: \.label) { state in
-                        cardStateValue(state)
-                    }
-                }
+            } else {
+                Text("No active cards")
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("scopeHomeCardProgressEmpty")
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(cardStateAccessibilityLabel)
-            .accessibilityIdentifier("scopeHomeCardStates")
 
             if summary.hiddenNewCount > 0 {
                 let noun = summary.hiddenNewCount == 1 ? "card" : "cards"
@@ -211,51 +213,90 @@ struct ScopeHomeView: View {
         }
     }
 
-    private func cardStateValue(_ state: CardStateValue) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("\(state.count)")
-                .font(DesignSystem.Typography.uiBody.weight(.semibold))
-                .foregroundStyle(.primary)
-                .monospacedDigit()
-            Text(state.label)
-                .font(DesignSystem.Typography.uiCaption)
-                .foregroundStyle(.secondary)
+    /// A part-to-whole chart for active cards. Exact counts stay alongside it,
+    /// so small slices and color differences never carry the meaning alone.
+    private var cardProgressChart: some View {
+        Chart(chartStates, id: \.label) { state in
+            SectorMark(
+                angle: .value("Cards", state.count),
+                innerRadius: .ratio(0.67),
+                angularInset: chartStates.count > 1 ? 1.5 : 0
+            )
+            .foregroundStyle(state.color)
         }
+        .chartLegend(.hidden)
+        .frame(width: chartDiameter, height: chartDiameter)
+        .overlay {
+            VStack(spacing: 0) {
+                Text("\(maturePercent)%")
+                    .font(DesignSystem.Typography.uiSection)
+                    .monospacedDigit()
+                Text("mature")
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+            }
+            .allowsHitTesting(false)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(maturePercent) percent mature")
+        .accessibilityIdentifier("scopeHomeCardProgressChart")
+    }
+
+    private var cardStateLegend: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+            ForEach(cardStates, id: \.label) { state in
+                HStack(spacing: DesignSystem.Spacing.xs) {
+                    Circle()
+                        .fill(state.color)
+                        .frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
+                    Text(state.label)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: DesignSystem.Spacing.md)
+                    Text("\(state.count)")
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                }
+                .font(DesignSystem.Typography.uiBody)
+            }
+        }
+        .frame(minWidth: 150, maxWidth: 220)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cardStateAccessibilityLabel)
+        .accessibilityIdentifier("scopeHomeCardStates")
+    }
+
+    private var activeCardCount: Int { cardStates.reduce(0) { $0 + $1.count } }
+
+    private var chartStates: [CardStateValue] { cardStates.filter { $0.count > 0 } }
+
+    private var maturePercent: Int {
+        guard activeCardCount > 0 else { return 0 }
+        return Int((Double(summary.maturity.maintainingCardCount) * 100 / Double(activeCardCount)).rounded())
     }
 
     private struct CardStateValue {
         let label: String
         let count: Int
+        let color: Color
     }
 
     private var cardStates: [CardStateValue] {
-        [
-            CardStateValue(label: "New", count: summary.newCount),
-            CardStateValue(label: "Learning", count: summary.inLearningCount),
-            CardStateValue(label: "Review", count: summary.reviewCount),
+        let maturity = summary.maturity
+        let learningCount = max(
+            0,
+            maturity.activeCardCount - maturity.notStartedCardCount - maturity.maintainingCardCount
+        )
+        return [
+            CardStateValue(label: "New", count: maturity.notStartedCardCount, color: .secondary),
+            CardStateValue(label: "Learning", count: learningCount, color: .orange),
+            CardStateValue(label: "Mature", count: maturity.maintainingCardCount, color: .green),
         ]
     }
 
     private var cardStateAccessibilityLabel: String {
         let parts = cardStates.map { "\($0.count) \($0.label.lowercased())" }
         return "Cards: " + parts.joined(separator: ", ")
-    }
-
-    private var maturitySection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-            Text("Maturity")
-                .font(DesignSystem.Typography.uiCaption)
-                .foregroundStyle(.secondary)
-            Text(summary.maturity.displayName)
-                .font(DesignSystem.Typography.uiBody.weight(.semibold))
-            if summary.maturity.activeCardCount > 0 {
-                Text(summary.maturity.progressText)
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("scopeHomeMaturity")
     }
 
     private var leechCallout: some View {

@@ -79,6 +79,9 @@ when it can be restored.
 Item Type Studio keeps its field and Card setup edits in one draft. **Save**
 commits that complete definition locally so it can sync as one item-type
 change; **Cancel** discards the draft, so no partial Studio edits are uploaded.
+Generated prose units and their cards use the same library sync path as other
+items. A whole-passage edit is committed locally as one change before its
+resulting items and card state are eligible to sync.
 
 These remain local to each device:
 

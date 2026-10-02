@@ -35,6 +35,7 @@ let package = Package(
             targets: ["NeoAnkiTemplateMigration"]
         ),
         .library(name: "PoemDeckBuilder", targets: ["PoemDeckBuilder"]),
+        .library(name: "ProseDeckBuilder", targets: ["ProseDeckBuilder"]),
     ],
     dependencies: [
         .package(path: "NeoAnkiCore"),
@@ -58,6 +59,7 @@ let package = Package(
                 "NeoAnkiDeckBuilderKit",
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
+                "ProseDeckBuilder",
                 "VocabularyDeckBuilder",
             ],
             path: "Sources/NeoAnkiIOS"
@@ -74,6 +76,7 @@ let package = Package(
                 "NeoAnkiDeckBuilderKit",
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
+                "ProseDeckBuilder",
                 "VocabularyDeckBuilder",
             ],
             path: "Sources/NeoAnki2"
@@ -174,6 +177,15 @@ let package = Package(
             path: "Sources/PoemDeckBuilder"
         ),
         .target(
+            name: "ProseDeckBuilder",
+            dependencies: [
+                "NeoAnkiApplication",
+                "NeoAnkiDeckBuilderKit",
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+            ],
+            path: "Sources/ProseDeckBuilder"
+        ),
+        .target(
             name: "VocabularyDeckBuilder",
             dependencies: [
                 "NeoAnkiVocabularyKit",
@@ -214,6 +226,7 @@ let package = Package(
                 "NeoAnkiDeckBuilderKit",
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
+                "ProseDeckBuilder",
                 "VocabularyDeckBuilder",
                 "NeoAnkiTemplateMigration",
             ],
@@ -238,6 +251,15 @@ let package = Package(
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
             path: "Tests/PoemDeckBuilderTests"
+        ),
+        .testTarget(
+            name: "ProseDeckBuilderTests",
+            dependencies: [
+                "ProseDeckBuilder",
+                "NeoAnkiApplication",
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+            ],
+            path: "Tests/ProseDeckBuilderTests"
         ),
         .testTarget(
             name: "NeoAnkiVocabularyKitTests",

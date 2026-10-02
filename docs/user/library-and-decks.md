@@ -92,6 +92,9 @@ cards throughout its subtree while continuing scheduled learning and reviews.
 Daily limits are local study preferences. They are not included in portable or
 authored deck files. See [Scheduling](../scheduling/) for first-grade accounting,
 undo behavior, and the configurable study-day rollover.
+Poem and Prose Deck builders create child decks with no separate limit, so
+their new cards use the selected parent's allowance unless you later set a
+stricter limit on the child.
 
 ## Rename a deck
 
@@ -138,6 +141,9 @@ only with unrelated decks never appear.
 
 The **Unassigned** empty state intentionally has no Add Item button; use the
 toolbar's **Add Item** action instead.
+Generated **Prose Unit** items stay together in their passage deck. Opening one
+for editing opens the whole source passage, where you can preview changed cues
+before saving.
 
 ## Read the scope home
 

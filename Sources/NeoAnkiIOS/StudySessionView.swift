@@ -5,6 +5,7 @@ import NeoAnkiCore
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import PoemDeckBuilder
+import ProseDeckBuilder
 import SwiftUI
 
 #if os(iOS)
@@ -98,6 +99,23 @@ struct StudySessionView: View {
                         deckID: deckID,
                         itemTypeID: loadedItem.itemType.id,
                         deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Poem",
+                        onSaved: {
+                            isEditing = false
+                            Task {
+                                await model.refresh()
+                                self.loadedItem = try? await model.item(id: loadedItem.item.id)
+                                await session.reloadCurrentItem()
+                            }
+                        },
+                        onCancel: { isEditing = false }
+                    )
+                } else if loadedItem.itemType.name == "Prose Unit",
+                          let deckID = loadedItem.item.deckID {
+                    ProseDeckEditorView(
+                        library: model.library,
+                        deckID: deckID,
+                        itemTypeID: loadedItem.itemType.id,
+                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Prose",
                         onSaved: {
                             isEditing = false
                             Task {

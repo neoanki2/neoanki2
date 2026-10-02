@@ -20,7 +20,7 @@ and keep media aspect-fit.
 Focus compositions preserve their authored reading order when the answer is
 revealed. The question remains first and keeps its study emphasis, the expected
 answer appears immediately below it, and supplemental answer details follow.
-This keeps continuations such as poetry in sequence while placing vocabulary
+This keeps poetry and prose continuations in sequence while placing vocabulary
 answers before grammar and example metadata. VoiceOver uses the same order.
 
 All five static Card setup layouts use the same content and accessibility order

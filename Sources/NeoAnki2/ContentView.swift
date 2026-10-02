@@ -930,7 +930,7 @@ struct ContentView: View {
                 } catch {
                     portableDeckTransfer.notice = PortableDeckTransferNotice(
                         title: "Deck Imported at Top Level",
-                        message: "The poem was imported, but its selected parent deck was unavailable."
+                        message: "The deck was imported, but its selected parent deck was unavailable."
                     )
                 }
             }
