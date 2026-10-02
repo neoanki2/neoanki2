@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-09-26T20:54:58Z",
+  "capturedAt" : "2026-10-02T10:47:37Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 732,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "69f21e2169ca2a7443d07546d18545d9a16225b93f6e4ead4251a561d1d512d4",
+      "sha256" : "68a2c5daa21b0163b924818aa48aeefb14089cede35b77e59996dfb066a5434c",
       "width" : 1024
     },
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 732,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "c6e8f854adaf130a0e3cce6214c9c120d34e06efa7e2bf91980a81fd2d3b433b",
+      "sha256" : "5e8459443bc149994604f3fa6d64e29a34106a0341272c012680a20cc3a04a8c",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "55a4e728af7a266ae51ac079b7ee90269df99684"
+  "sourceSHA" : "3025f517649da0913b2b6a469f771b4d5a357481"
 }
