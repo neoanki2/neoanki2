@@ -2387,8 +2387,30 @@ actor SQLiteDatabase {
         try consumeMediaReservations(ids: mediaReservationIDs(in: item))
     }
 
-    func applyItemBulk(_ mutations: [ItemBulkDatabaseMutation]) throws {
+    func applyItemBulk(
+        _ mutations: [ItemBulkDatabaseMutation],
+        orderedDeck: OrderedDeckItemReconciliation? = nil,
+        now: Date = .now
+    ) throws {
         try inTransaction {
+            if let orderedDeck {
+                let existing = try query(
+                    "SELECT id FROM items WHERE deck_id = ?;",
+                    bindings: [.text(orderedDeck.deckID.uuidString)]
+                )
+                let currentIDs = Set(existing.compactMap { ($0["id"] as? String).flatMap(UUID.init(uuidString:)) })
+                guard currentIDs == Set(orderedDeck.expectedItemIDs),
+                      currentIDs.count == existing.count else {
+                    throw DatabaseError.invalidItem("This deck changed while it was being edited. Reload and preview again.")
+                }
+                for expected in orderedDeck.expectedItems {
+                    guard try fetchItem(id: expected.id)?.item == expected else {
+                        throw DatabaseError.invalidItem(
+                            "This passage changed while it was being edited. Reload and preview again."
+                        )
+                    }
+                }
+            }
             for mutation in mutations {
                 switch mutation {
                 case let .create(item, cards, descriptors, createdAt):
@@ -2410,6 +2432,40 @@ actor SQLiteDatabase {
                     guard try deleteItemWithMediaWithoutTransaction(id: id, deletedAt: deletedAt) else {
                         throw DatabaseError.itemNotFound(id)
                     }
+                }
+            }
+            if let orderedDeck {
+                let current = try query(
+                    "SELECT id FROM items WHERE deck_id = ?;",
+                    bindings: [.text(orderedDeck.deckID.uuidString)]
+                )
+                let currentIDs = Set(current.compactMap { ($0["id"] as? String).flatMap(UUID.init(uuidString:)) })
+                guard currentIDs == Set(orderedDeck.orderedItemIDs),
+                      currentIDs.count == current.count else {
+                    throw DatabaseError.invalidItem("The edited deck no longer matches its planned order.")
+                }
+                for (index, itemID) in orderedDeck.orderedItemIDs.enumerated() {
+                    let rows = try query(
+                        "SELECT id, phase FROM cards WHERE item_id = ?;",
+                        bindings: [.text(itemID.uuidString)]
+                    )
+                    guard rows.count == 1 else {
+                        throw DatabaseError.invalidItem("Each prose unit must have exactly one card.")
+                    }
+                    guard rows[0]["phase"] as? String == "new",
+                          let cardID = rows[0]["id"] as? String else { continue }
+                    let due = now.addingTimeInterval(
+                        -Double(orderedDeck.orderedItemIDs.count - index) / 1_000
+                    )
+                    let memory = MemoryState.new(due: due)
+                    try execute(
+                        "UPDATE cards SET memory = ?, due_at = ? WHERE id = ?;",
+                        bindings: [
+                            .blob(try encode(memory)),
+                            .double(due.timeIntervalSince1970),
+                            .text(cardID),
+                        ]
+                    )
                 }
             }
         }

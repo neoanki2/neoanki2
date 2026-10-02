@@ -4,6 +4,7 @@ import NeoAnkiCore
 import NeoAnkiDeckBuilderCore
 import NeoAnkiFeatures
 import PoemDeckBuilder
+import ProseDeckBuilder
 import NeoAnkiSharedUI
 import VocabularyDeckBuilder
 import SwiftUI
@@ -190,6 +191,11 @@ struct BuilderToolsView: View {
                 Label("Poem Deck", systemImage: "text.quote")
             }
             NavigationLink {
+                ProseBuilderMobileHost(model: model)
+            } label: {
+                Label("Prose Deck", systemImage: "text.book.closed")
+            }
+            NavigationLink {
                 VocabularyBuilderMobileHost(model: model, vocabularyLibrary: vocabularyLibrary)
             } label: {
                 Label("Vocabulary Deck", systemImage: "character.book.closed")
@@ -293,6 +299,52 @@ private struct PoemBuilderMobileHost: View {
         .alert("Could Not Add Deck", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(errorMessage ?? "Please try again.") }
+    }
+}
+
+private struct ProseBuilderMobileHost: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var model: MobileAppModel
+    @State private var errorMessage: String?
+
+    var body: some View {
+        ProseDeckBuilderView(
+            rootDecks: model.decks.filter { $0.parentID == nil }.map {
+                DeckBuilderDeckOption(id: $0.id, name: $0.name)
+            },
+            onGenerated: { generated in
+                Task {
+                    defer { generated.cleanup() }
+                    do {
+                        let result = try await model.importAuthoredBundle(from: generated.bundleURL)
+                        guard let parentID = generated.destinationDeckID,
+                              let proseID = result.deckIDs.first,
+                              let prose = model.decks.first(where: { $0.id == proseID })
+                        else {
+                            throw ProseDeckEditError.mixedContent
+                        }
+                        try await model.updateDeck(
+                            id: proseID,
+                            name: prose.name,
+                            parentID: parentID,
+                            newCardsPerDay: prose.newCardsPerDay
+                        )
+                        dismiss()
+                    } catch {
+                        errorMessage = MobileAppModel.message(for: error)
+                    }
+                }
+            },
+            onCancel: { dismiss() }
+        )
+        .alert("Could Not Add Deck", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "Please try again.")
+        }
     }
 }
 

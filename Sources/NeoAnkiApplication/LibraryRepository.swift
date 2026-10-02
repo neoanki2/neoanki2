@@ -53,6 +53,11 @@ public protocol LibraryCoordinatedItemEditing: Sendable {
         replacements: [Item],
         asOf: Date
     ) async throws -> [ItemBulkOperationResult]
+    func reconcileOrderedDeckItems(
+        _ operations: [ItemBulkOperation],
+        order: OrderedDeckItemReconciliation,
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult]
 }
 
 public protocol LibraryDeckManaging: Sendable {
@@ -426,6 +431,14 @@ public extension LibraryCoordinatedItemEditing {
             "This library does not support atomic item reconciliation."
         )
     }
+
+    func reconcileOrderedDeckItems(
+        _: [ItemBulkOperation],
+        order _: OrderedDeckItemReconciliation,
+        asOf _: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        throw DatabaseError.invalidItem("This library does not support ordered deck reconciliation.")
+    }
 }
 
 /// Debug fixture operations used to seed deterministic UI scenarios without
@@ -645,6 +658,13 @@ public actor SQLiteLibraryRepository:
             replacements: replacements,
             now: asOf
         )
+    }
+    public func reconcileOrderedDeckItems(
+        _ operations: [ItemBulkOperation],
+        order: OrderedDeckItemReconciliation,
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        try await store.reconcileOrderedDeckItems(operations, order: order, now: asOf)
     }
     public func deleteItem(id: UUID, asOf: Date) async throws -> Bool {
         try await store.deleteItem(id: id, now: asOf)

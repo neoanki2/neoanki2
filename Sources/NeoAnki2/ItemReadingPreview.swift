@@ -1,6 +1,7 @@
 import NeoAnkiCore
 import NeoAnkiSharedUI
 import PoemDeckBuilder
+import ProseDeckBuilder
 import SwiftUI
 
 /// Renders item field content in the study reading column typography.
@@ -193,6 +194,23 @@ struct ItemDetailView: View {
                    let deckID = item.deckID,
                    let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
                     PoemDeckEditorView(
+                        library: model.library,
+                        deckID: deckID,
+                        itemTypeID: itemType.id,
+                        deckName: deckName,
+                        onSaved: {
+                            isEditing = false
+                            Task {
+                                await load()
+                                onSaved()
+                            }
+                        },
+                        onCancel: { isEditing = false }
+                    )
+                } else if itemType.name == "Prose Unit",
+                          let deckID = item.deckID,
+                          let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
+                    ProseDeckEditorView(
                         library: model.library,
                         deckID: deckID,
                         itemTypeID: itemType.id,

@@ -115,6 +115,12 @@ Changes** to inspect every prompt, answer, and stanza-spacing update, then
 The preview also reports inconsistent stored context that the save will repair.
 Changing the poem's line count is not supported yet.
 
+For a generated **Prose Unit** item, **Edit Card** opens the whole passage.
+Review the updated cues before saving. You may insert, remove, or revise units;
+cards with unchanged cues and answers keep their review history. New or changed
+units receive new cards, and unused cards are retired. The editor keeps
+manually adjusted boundaries in paragraphs whose text did not change.
+
 For other item types, editing preserves the item's type, tags, and deck
 assignment while rebuilding field values from the form. Generated cards are reconciled: cards whose
 generation conditions or cloze groups still exist preserve their identity and

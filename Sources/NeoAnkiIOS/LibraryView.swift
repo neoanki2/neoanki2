@@ -2,6 +2,7 @@ import NeoAnkiCore
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import PoemDeckBuilder
+import ProseDeckBuilder
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -580,6 +581,24 @@ private struct ItemDetailView: View {
                                 await model.refresh()
                                 self.loaded = try? await model.item(id: itemID)
                                 self.cardMaturityDetails = (try? await model.library.cardMaturityDetails(itemID: itemID)) ?? []
+                            }
+                        },
+                        onCancel: { isEditing = false }
+                    )
+                } else if loaded.itemType.name == "Prose Unit",
+                          let deckID = loaded.item.deckID {
+                    ProseDeckEditorView(
+                        library: model.library,
+                        deckID: deckID,
+                        itemTypeID: loaded.itemType.id,
+                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Prose",
+                        onSaved: {
+                            isEditing = false
+                            Task {
+                                await model.refresh()
+                                self.loaded = try? await model.item(id: itemID)
+                                self.cardMaturityDetails =
+                                    (try? await model.library.cardMaturityDetails(itemID: itemID)) ?? []
                             }
                         },
                         onCancel: { isEditing = false }

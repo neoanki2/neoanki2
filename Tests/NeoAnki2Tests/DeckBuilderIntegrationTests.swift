@@ -2,18 +2,21 @@ import Foundation
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import PoemDeckBuilder
+import ProseDeckBuilder
 import Testing
 import VocabularyDeckBuilder
 
 @testable import NeoAnki2
 
-@Test @MainActor func productionStyleRegistryKeepsIncrementalVocabularyOutOfDeckBuilders() {
+@Test @MainActor func productionStyleRegistryHasPoemAndProseBuilders() {
     let registry = DeckBuilderRegistry([
         PoemDeckBuilderFeature.makeFeature(),
+        ProseDeckBuilderFeature.makeFeature(),
     ])
 
-    #expect(registry.features.map(\.id) == ["poem"])
+    #expect(registry.features.map(\.id) == ["poem", "prose"])
     #expect(registry.feature(id: "poem")?.descriptor.title == "Poem Deck")
+    #expect(registry.feature(id: "prose")?.descriptor.title == "Prose Deck")
     #expect(registry.feature(id: "vocabulary") == nil)
     #expect(registry.feature(id: "missing") == nil)
 }
