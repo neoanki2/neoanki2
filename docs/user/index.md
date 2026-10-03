@@ -38,6 +38,7 @@ goal or explanation you need.
 
 - [App symptoms and recovery](troubleshooting/)
 - [Build, launch, and issue-report support](support/)
+- [Privacy policy](privacy/)
 - [Shortcuts and accessibility scope](shortcuts-accessibility/)
 
 ## Advanced

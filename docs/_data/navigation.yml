@@ -56,6 +56,8 @@ primary:
         url: /user/troubleshooting/
       - title: Support and issue reporting
         url: /user/support/
+      - title: Privacy policy
+        url: /user/privacy/
   - title: Advanced authoring
     url: /user/item-types-and-templates/
     children:
