@@ -50,7 +50,8 @@ the selected time and scope and whether iOS allows NeoAnki2 notifications.
 
 Do not delete and reinstall the app as a troubleshooting step without first
 exporting your library. A reinstall can remove on-device study data and saved
-spoken responses.
+spoken responses. Portable deck exports do not include those personal
+recordings, so keep the app installed if you need to preserve them.
 
 ### Mac and source builds
 
