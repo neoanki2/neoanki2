@@ -12,6 +12,8 @@ For NeoAnki2 support, contact Oleksii Grachov at
 [grachov.alexey@gmail.com](mailto:grachov.alexey@gmail.com). Include your app
 version, device model, iOS/iPadOS or macOS version, and steps to reproduce the
 problem. See the [privacy policy](../privacy/) for data-handling information.
+The [third-party software notices](../third-party-notices/) reproduce the
+upstream scheduling-code copyright notices and licenses.
 
 Start with the [troubleshooting guide](../troubleshooting/) for startup,
 library, import, media, recording, study, and scheduling symptoms. Preserve the
