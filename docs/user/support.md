@@ -26,22 +26,46 @@ Open a [GitHub issue](https://github.com/neoanki2/neoanki2/issues) with:
 
 1. a short symptom and what you expected;
 2. exact steps starting from launch;
-3. whether you installed with Homebrew, a direct DMG, or built from source;
-4. macOS and NeoAnki version information; for a source build also include:
+3. your device model, iOS/iPadOS or macOS version, and NeoAnki2 app version;
+4. whether you installed from the App Store, TestFlight, Homebrew, a direct
+   DMG, or built from source;
+5. the exact visible error message and, for a command failure, the relevant
+   output; and
+6. whether the problem also occurs after closing the app normally and opening
+   it again once.
 
-   ```bash
-   sw_vers -productVersion
-   swift --version
-   git rev-parse HEAD
-   ```
+### iPhone and iPad
 
-5. the first relevant error and enough surrounding output to show which
-   command failed; and
-6. whether the problem also occurs after quitting normally and retrying once.
+Find your device model and iOS/iPadOS version in **Settings → General → About**.
+For TestFlight builds, include the version and build number shown in TestFlight.
+For App Store installations, include the installed app version shown in
+**Settings → General → iPhone Storage** or **iPad Storage → NeoAnki2**.
+
+For optional iCloud sync, include the status shown in **NeoAnki2 → Settings →
+iCloud Sync** and whether sync is enabled on each affected device. Do not send
+your Apple Account password or private study content. For reminders, report
+the selected time and scope and whether iOS allows NeoAnki2 notifications.
+
+Do not delete and reinstall the app as a troubleshooting step without first
+exporting your library. A reinstall can remove on-device study data and saved
+spoken responses.
+
+### Mac and source builds
+
+For a source build, also include the output of:
+
+```bash
+sw_vers -productVersion
+swift --version
+git rev-parse HEAD
+```
+
+These commands run on the Mac used to build the app; iPhone and iPad users do
+not need to run them.
 
 Before posting, redact:
 
-- your macOS account name and home-directory path;
+- your account name, Apple Account address, and home-directory path;
 - item prompts, answers, tags, deck names, and media descriptions;
 - screenshots containing private study material or filenames;
 - imported source content and absolute paths;
