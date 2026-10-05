@@ -117,6 +117,13 @@ depend on CloudKit. If the current executable lacks the required signed
 container entitlement, NeoAnki2 clears that opt-in, keeps the library local,
 and reports **Unavailable in this build** in iCloud settings.
 
+Once the local library opens, iCloud startup continues while the library view
+is visible. An **Offline** status does not prevent local study or editing.
+NeoAnki2 retries synchronization automatically, and the Mac iCloud settings
+update as the status changes; reopening Settings or toggling sync is not
+required. See [iCloud recovery](../sync-reminders-widgets/#troubleshoot-icloud)
+if an account or transfer problem remains visible.
+
 ## Empty and loading states
 
 These states are informational:
