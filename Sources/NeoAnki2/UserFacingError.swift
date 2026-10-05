@@ -42,6 +42,8 @@ enum UserFacingError {
 
     private static func databaseMessage(_ error: DatabaseError) -> String {
         switch error {
+        case .staleOrderedDeck:
+            "This deck changed while it was being edited. Reload and preview again."
         case .openFailed:
             "NeoAnki2 couldn't open your library. Check that its folder is available, then try again."
         case .executeFailed, .encodingFailed:

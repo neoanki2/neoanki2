@@ -364,6 +364,7 @@ public struct CardWireframeDescriptor: Equatable, Identifiable, Sendable {
 public struct CardWireframeView<ComponentView: View>: View {
     @Environment(\.cardWireframeSizingMode) private var sizingMode
 
+    private let mobileReading: Bool
     private let descriptor: CardWireframeDescriptor
     private let components: [ResolvedTemplateComponent]
     private let isAnswerRevealed: Bool
@@ -375,11 +376,13 @@ public struct CardWireframeView<ComponentView: View>: View {
         components: [ResolvedTemplateComponent],
         isAnswerRevealed: Bool,
         emptyHoleView: ((CardWireframeHole) -> AnyView?)? = nil,
+        mobileReading: Bool = false,
         @ViewBuilder componentView: @escaping (
             ResolvedTemplateComponent,
             CardWireframeHole
         ) -> ComponentView
     ) {
+        self.mobileReading = mobileReading
         descriptor = .descriptor(for: layout)
         self.components = components
         self.isAnswerRevealed = isAnswerRevealed
@@ -393,7 +396,7 @@ public struct CardWireframeView<ComponentView: View>: View {
                 maxWidth: .infinity,
                 maxHeight: sizingMode.fillsAvailableHeight ? .infinity : nil
             )
-        .multilineTextAlignment(.center)
+        .multilineTextAlignment(mobileReading ? .leading : .center)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(descriptor.layout.displayName) card layout")
     }
@@ -404,10 +407,14 @@ public struct CardWireframeView<ComponentView: View>: View {
         case .focus:
             centeredContent(spacing: 24)
         case let .split(compactWidth):
+            if mobileReading {
+                VStack(alignment: .leading, spacing: 24) { questionPanel; answerPanel }
+            } else {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 24) { questionPanel; answerPanel }
                     .frame(minWidth: compactWidth)
                 VStack(spacing: 24) { questionPanel; answerPanel }
+            }
             }
         case let .mediaAside(compactWidth, _, regularMediaFraction):
             ViewThatFits(in: .horizontal) {
@@ -448,14 +455,14 @@ public struct CardWireframeView<ComponentView: View>: View {
     }
 
     private func centeredContent(spacing: CGFloat) -> some View {
-        VStack(spacing: spacing) {
-            Spacer(minLength: 0)
+        VStack(alignment: mobileReading ? .leading : .center, spacing: spacing) {
+            if sizingMode.fillsAvailableHeight { Spacer(minLength: 0) }
             hole(.instruction)
             hole(.question)
             hole(.media)
             hole(.context)
             hole(.answer)
-            Spacer(minLength: 0)
+            if sizingMode.fillsAvailableHeight { Spacer(minLength: 0) }
         }
     }
 
@@ -466,15 +473,17 @@ public struct CardWireframeView<ComponentView: View>: View {
             hole(.media)
             hole(.context)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: sizingMode.fillsAvailableHeight ? .infinity : nil)
     }
 
+    @ViewBuilder
     private var answerPanel: some View {
         let projection = descriptor.answerPanelProjection(
             from: components,
             answerRevealed: isAnswerRevealed
         )
-        return VStack(spacing: 12) {
+        if !mobileReading || !projection.visibleComponents.isEmpty || projection.hasConcealedExpectedAnswer {
+        VStack(spacing: 12) {
             hole(.answer)
             if projection.hasConcealedExpectedAnswer {
                 Label("Answer concealed", systemImage: "eye.slash")
@@ -484,9 +493,11 @@ public struct CardWireframeView<ComponentView: View>: View {
                     .accessibilityLabel("Answer concealed")
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: sizingMode.fillsAvailableHeight ? .infinity : nil)
+        .padding(.vertical, 16)
+        .padding(.horizontal, mobileReading ? 0 : 16)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 18))
+        }
     }
 
     private var mediaAsideContent: some View {
@@ -496,7 +507,7 @@ public struct CardWireframeView<ComponentView: View>: View {
             hole(.context)
             hole(.answer)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: sizingMode.fillsAvailableHeight ? .infinity : nil)
     }
 
     private var mediaPanel: some View {
@@ -510,7 +521,8 @@ public struct CardWireframeView<ComponentView: View>: View {
         let renderedComponents = visibleComponents(in: hole)
         let hasAuthoredContent = !authoredComponents(in: hole).isEmpty
         let emptyContent = emptyHoleView?(hole)
-        VStack(spacing: 8) {
+        if !mobileReading || !renderedComponents.isEmpty || (!hasAuthoredContent && emptyContent != nil) {
+        VStack(alignment: mobileReading ? .leading : .center, spacing: 8) {
             if renderedComponents.isEmpty && !hasAuthoredContent {
                 emptyContent
             } else {
@@ -520,7 +532,7 @@ public struct CardWireframeView<ComponentView: View>: View {
             }
         }
         .font(font(for: hole))
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: mobileReading ? .leading : .center)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(hole.displayName)
         .accessibilityHidden(
@@ -528,6 +540,7 @@ public struct CardWireframeView<ComponentView: View>: View {
                 && (hasAuthoredContent || emptyContent == nil)
         )
         .accessibilitySortPriority(accessibilityPriority(for: hole))
+        }
     }
 
     private func visibleComponents(
@@ -558,10 +571,10 @@ public struct CardWireframeView<ComponentView: View>: View {
     private func font(for hole: CardWireframeHole) -> Font? {
         switch hole {
         case .instruction: .caption
-        case .question: .largeTitle
+        case .question: mobileReading ? .title2 : .largeTitle
         case .media: nil
         case .context: .body
-        case .answer: .title
+        case .answer: mobileReading ? .body : .title
         }
     }
 }
@@ -589,6 +602,13 @@ extension EnvironmentValues {
     var cardWireframeSizingMode: CardWireframeSizingMode {
         get { self[CardWireframeSizingModeKey.self] }
         set { self[CardWireframeSizingModeKey.self] = newValue }
+    }
+}
+
+public extension View {
+    /// Allows a complete card to take its natural height in a scrolling reader.
+    func cardWireframeIntrinsicSizing(referenceHeight: CGFloat? = nil) -> some View {
+        environment(\.cardWireframeSizingMode, .intrinsic(referenceHeight: referenceHeight))
     }
 }
 

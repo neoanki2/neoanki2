@@ -42,13 +42,21 @@ struct NeoAnkiIOSApp: App {
             ] {
                 try? fileManager.removeItem(at: url)
             }
+            UserDefaults.standard.removeObject(forKey: "mobile-conceals-answers")
+            UserDefaults.standard.removeObject(forKey: "usesPassFailGrades")
             UserDefaults.standard.removeObject(forKey: "cloud-sync-enabled-v1")
             UserDefaults.standard.removeObject(forKey: "reminder-settings-v1")
         }
         let repository = try! SQLiteLibraryRepository(databaseURL: paths.databaseURL)
+        let usesSyncFixture = ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset")
+            && ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-sync-recovery"
+        if usesSyncFixture { UserDefaults.standard.set(true, forKey: "cloud-sync-enabled-v1") }
+        let syncService: any SyncService = usesSyncFixture
+            ? MobileSyncRecoveryUITestService(repository: repository)
+            : MobileSyncCoordinator(repository: repository, paths: paths)
         let model = LibraryFeatureModel(
             library: repository,
-            syncService: MobileSyncCoordinator(repository: repository, paths: paths),
+            syncService: syncService,
             notifier: IOSNotificationScheduler(),
             widgetPublisher: AppGroupWidgetPublisher(),
             settingsStore: IOSMobileSettingsStore()
@@ -69,6 +77,11 @@ struct NeoAnkiIOSApp: App {
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
                     .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
+            } else if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset")
+                        && ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingLargeText") {
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+                    .preferredColorScheme(.dark)
+                    .dynamicTypeSize(.xxxLarge)
             } else {
                 NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
             }

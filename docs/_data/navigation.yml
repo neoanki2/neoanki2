@@ -58,6 +58,8 @@ primary:
         url: /user/support/
       - title: Privacy policy
         url: /user/privacy/
+      - title: Third-party software notices
+        url: /user/third-party-notices/
   - title: Advanced authoring
     url: /user/item-types-and-templates/
     children:

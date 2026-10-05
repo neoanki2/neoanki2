@@ -3,8 +3,17 @@ import NeoAnkiCore
 import SwiftUI
 import UIKit
 
+struct MobileTextEditorHeight: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 96
+
+    func body(content: Content) -> some View { content.frame(minHeight: height) }
+}
+
 struct RichSpanTextEditor: UIViewRepresentable {
     @Binding var spans: [Span]
+    private static let spanColorKey = NSAttributedString.Key("NeoAnki.span.textColor")
+    private static let spanSizeKey = NSAttributedString.Key("NeoAnki.span.textSize")
+    private static let codeKey = NSAttributedString.Key("NeoAnki.span.code")
 
     func makeCoordinator() -> Coordinator { Coordinator(spans: $spans) }
     func makeUIView(context: Context) -> UITextView {
@@ -20,31 +29,49 @@ struct RichSpanTextEditor: UIViewRepresentable {
         return view
     }
     func updateUIView(_ view: UITextView, context: Context) {
+        context.coordinator.updateBinding($spans)
         guard !context.coordinator.isPublishing else { return }
-        let incoming = spans.map(\.text).joined()
-        if view.text != incoming { view.attributedText = Self.attributed(spans) }
+        if Self.spans(from: view.attributedText) != spans {
+            context.coordinator.isPublishing = true
+            defer { context.coordinator.isPublishing = false }
+            view.attributedText = Self.attributed(spans)
+        }
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
         @Binding var spans: [Span]
         var isPublishing = false
         init(spans: Binding<[Span]>) { _spans = spans }
+        func updateBinding(_ value: Binding<[Span]>) { _spans = value }
         func textViewDidChange(_ textView: UITextView) {
+            guard !isPublishing else { return }
             isPublishing = true
             spans = RichSpanTextEditor.spans(from: textView.attributedText)
             isPublishing = false
         }
     }
 
-    private static func attributed(_ spans: [Span]) -> NSAttributedString {
+    static func attributed(_ spans: [Span]) -> NSAttributedString {
         let result = NSMutableAttributedString()
         for span in spans {
             var traits: UIFontDescriptor.SymbolicTraits = []
             if span.styles.contains(.bold) { traits.insert(.traitBold) }
             if span.styles.contains(.italic) { traits.insert(.traitItalic) }
             let base = UIFont.preferredFont(forTextStyle: span.textSize == .large ? .title3 : span.textSize == .small ? .footnote : .body)
-            let font = base.fontDescriptor.withSymbolicTraits(traits).map { UIFont(descriptor: $0, size: 0) } ?? base
+            let descriptor = span.styles.contains(.code)
+                ? base.fontDescriptor.withDesign(.monospaced) ?? base.fontDescriptor
+                : base.fontDescriptor
+            let font = descriptor.withSymbolicTraits(traits).map { UIFont(descriptor: $0, size: 0) } ?? base
             var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color(span.textColor)]
+            // UIKit preserves custom run attributes while editing. Keep the
+            // portable semantics instead of trying to infer them from RGB or
+            // scaled point sizes when rebuilding persisted spans.
+            if let value = span.textColor { attributes[spanColorKey] = value.rawValue }
+            if let value = span.textSize { attributes[spanSizeKey] = value.rawValue }
+            if span.styles.contains(.code) {
+                attributes[codeKey] = true
+                attributes[.backgroundColor] = UIColor.tertiarySystemFill
+            }
             if span.styles.contains(.underline) { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
             if span.styles.contains(.strikethrough) { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
             if span.styles.contains(.highlight) { attributes[.backgroundColor] = UIColor.systemYellow.withAlphaComponent(0.3) }
@@ -56,7 +83,7 @@ struct RichSpanTextEditor: UIViewRepresentable {
         return result
     }
 
-    private static func spans(from value: NSAttributedString) -> [Span] {
+    static func spans(from value: NSAttributedString) -> [Span] {
         guard value.length > 0 else { return [] }
         var output: [Span] = []
         value.enumerateAttributes(in: NSRange(location: 0, length: value.length)) { attributes, range, _ in
@@ -67,15 +94,19 @@ struct RichSpanTextEditor: UIViewRepresentable {
                 if traits.contains(.traitBold) { styles.insert(.bold) }
                 if traits.contains(.traitItalic) { styles.insert(.italic) }
             }
-            if attributes[.underlineStyle] != nil { styles.insert(.underline) }
-            if attributes[.strikethroughStyle] != nil { styles.insert(.strikethrough) }
-            if attributes[.backgroundColor] != nil { styles.insert(.highlight) }
+            if let value = attributes[.underlineStyle] as? NSNumber, value.intValue != 0 { styles.insert(.underline) }
+            if let value = attributes[.strikethroughStyle] as? NSNumber, value.intValue != 0 { styles.insert(.strikethrough) }
+            let isCode = (attributes[codeKey] as? NSNumber)?.boolValue == true
+            if isCode { styles.insert(.code) }
+            else if attributes[.backgroundColor] != nil { styles.insert(.highlight) }
             if let offset = attributes[.baselineOffset] as? NSNumber {
                 if offset.doubleValue > 0 { styles.insert(.superscript) }
                 if offset.doubleValue < 0 { styles.insert(.subscriptText) }
             }
-            let link = (attributes[.link] as? URL)?.absoluteString
-            let span = Span(text, styles: styles, link: link)
+            let link = (attributes[.link] as? URL)?.absoluteString ?? attributes[.link] as? String
+            let textColor = (attributes[spanColorKey] as? String).flatMap(Span.TextColor.init(rawValue:))
+            let textSize = (attributes[spanSizeKey] as? String).flatMap(Span.TextSize.init(rawValue:))
+            let span = Span(text, styles: styles, textColor: textColor, textSize: textSize, link: link)
             if let last = output.last, last.hasSameFormatting(as: span) {
                 output[output.count - 1].text += text
             } else { output.append(span) }

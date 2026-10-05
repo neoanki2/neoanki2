@@ -40,6 +40,38 @@ before proposing a change. UI and performance workflows are slower and have
 dedicated scripts under `Scripts/`; their GitHub Actions jobs remain the source
 of truth for release acceptance.
 
+### Headless sync regression and stress tests
+
+```bash
+./Scripts/test-sync.sh
+./Scripts/test-sync.sh --stress
+NEOANKI_SYNC_FUZZ_SEED=99 NEOANKI_SYNC_FUZZ_STEPS=200 ./Scripts/test-sync.sh
+```
+
+The default run includes eight fixed state-machine seeds and focused regression
+tests. Stress mode uses 32 seeds with 200 actions per seed; set
+`NEOANKI_SYNC_FUZZ_SEEDS` and `NEOANKI_SYNC_FUZZ_STEPS` to adjust it, up to 128
+seeds and 1,000 actions. A failure reports its seed, operation trace, and differing
+resources. Replay the seed with the same step count. Mutation choices, input IDs,
+timestamps, injected failures, and delivery shuffles are seeded; persistence
+still generates its own library, card, and review IDs.
+
+Three real temporary SQLite libraries synchronize through an in-process server
+with independent change tags. The model checks convergence, exact item/review
+counts, expected edits, preserved scheduling data, and a quiet journal after
+settling. It injects offline starts/fetches, failed sends, partial commits with
+lost acknowledgments, duplicate deliveries, reordered dependencies, and process
+restarts. Separate tests cover initial library collisions, persistent type
+aliases, edit/delete conflict recovery, corrupt payloads/assets, durable inboxes
+and upload queues, legacy metadata, stopping in-flight sync, acknowledgment races,
+and merge permutation/idempotence properties.
+
+These tests run in the normal application test lane of `test-fast.sh`. They do
+not touch the installed apps, user library, iPhone, Apple account, or live iCloud
+container. They verify the repository and transport decisions headlessly;
+Apple provisioning, push delivery, and SDK/server integration remain platform
+acceptance checks rather than claims made by the simulated server.
+
 For a UI-bearing release, run its targeted journey and then all seven local UI
 journeys before the first push:
 
@@ -84,6 +116,35 @@ enum and input combinations in parameterized Swift tests; UI journeys should
 prove that every option is exposed and exercise representative mutations
 through the real control. This preserves behavior coverage without repeating
 the same expensive accessibility snapshots and menu choreography.
+
+## Mobile visual acceptance
+
+The redesign journeys assert actual navigation destinations, default answer
+concealment, scoped Library triage, both grading modes, undo/skip, local recording
+persistence, all seven interactions and five layouts, builders, transfer, and
+focused authoring. The inventory journeys retain named screenshots and matching
+accessibility trees in the XCTest result bundle. The authoring journey also
+covers rich text, cloze clearing, media removal, and native picker cancellation.
+It checks that editing mixed rich-text runs preserves semantic formatting,
+including color, size, code, and links. Text editor heights scale with Dynamic
+Type; media status labels wrap within their rows.
+
+Use uniquely named disposable devices for headless `xcodebuild`/XCTest runs and
+always shut down and delete them in a cleanup trap. Never open Simulator.app or
+use an existing user-managed device. Run the complete phone suite, then cover
+compact phone and iPad with light/dark inventory, largest Dynamic Type, Increased
+Contrast, Reduce Motion, rotation, keyboard, and long-content cases. Compare the
+rendered screenshots; passing accessibility audits alone is insufficient.
+Physical-device media capture and signed CloudKit checks remain separate
+acceptance work. Reset-only recovery fixtures exercise the real SQLite conflict
+restore adapter, failed restores, resolution, malformed import parsing, and the
+shared startup error presentation with Retry. The startup fixture injects an
+error message; it does not simulate database corruption. Contrast audits scroll
+target text into view and retain diagnostic attachments for fixture text clipped
+vertically by a scroll viewport. Controls, visible text, horizontal overflow, hit
+regions, and descriptions remain strict.
+Horizontal bounds checks measure controls, text, images, and named groups;
+unlabeled native Form backgrounds may draw beyond the scrolling content bounds.
 
 ## Documentation checks
 

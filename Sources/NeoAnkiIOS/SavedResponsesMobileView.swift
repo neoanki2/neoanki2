@@ -26,7 +26,7 @@ struct SavedResponsesMobileView: View {
                     Text(error.message)
                 } actions: {
                     Button("Try Again") { Task { await model.load() } }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
                         .controlSize(.large)
                 }
             case .ready where model.responses.isEmpty:
@@ -45,7 +45,7 @@ struct SavedResponsesMobileView: View {
                             .foregroundStyle(.secondary)
                         Text("Saved locally · Not synced")
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                         HStack(spacing: 12) {
                             Button {
                                 Task {
@@ -65,10 +65,10 @@ struct SavedResponsesMobileView: View {
                             }
                             .buttonStyle(.bordered)
                             Spacer()
-                            Button("Delete", systemImage: "trash", role: .destructive) {
+                            Button(role: .destructive) {
                                 responseToDelete = response
-                            }
-                            .frame(minHeight: 44)
+                            } label: { Label("Delete", systemImage: "trash").frame(minHeight: 44) }
+                            .buttonStyle(.borderless)
                             .disabled(model.deletingIDs.contains(response.id))
                         }
                     }

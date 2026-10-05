@@ -2,7 +2,7 @@
 title: API errors
 description: Shared problem-details response format and recovery categories for the NeoAnki local API.
 audience: api
-contract_digest: sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc
+contract_digest: sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271
 parent: Local API reference
 permalink: /api/errors/
 ---
@@ -25,4 +25,4 @@ Every unsuccessful operation returns `application/problem+json` using the
 See the [API design requirements]({{ '/LOCAL_API/#64-errors' | relative_url }})
 for normative security and retry semantics.
 
-Contract digest: `sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc`.
+Contract digest: `sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271`.

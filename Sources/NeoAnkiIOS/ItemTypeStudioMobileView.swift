@@ -148,7 +148,7 @@ struct ItemTypeStudioCatalogMobileView: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("\(itemType.fields.count) fields · \(itemType.templates.count) Card setups")
+                    Text("\(itemType.fields.count) \(itemType.fields.count == 1 ? "field" : "fields") · \(itemType.templates.count) \(itemType.templates.count == 1 ? "Card setup" : "Card setups")")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -198,6 +198,11 @@ private struct ItemTypeStudioSetupRoute: Identifiable, Hashable {
     let cardSetupID: UUID
 }
 
+private struct ItemTypeStudioFieldRoute: Identifiable, Hashable {
+    let id = UUID()
+    let fieldID: UUID
+}
+
 private struct PendingFieldRemoval: Identifiable {
     let id: UUID
     let name: String
@@ -218,6 +223,7 @@ struct ItemTypeStudioMobileView: View {
 
     @FocusState private var textFocus: ItemTypeStudioTextFocus?
     @State private var validationFocus: ItemTypeStudioValidationTarget?
+    @State private var fieldRoute: ItemTypeStudioFieldRoute?
     @State private var setupRoute: ItemTypeStudioSetupRoute?
     @State private var selectedCardSetupID: UUID?
     @State private var pendingFieldRemoval: PendingFieldRemoval?
@@ -241,52 +247,10 @@ struct ItemTypeStudioMobileView: View {
     }
 
     var body: some View {
-        Group {
-            if model.studioDraft != nil {
-                studio
-            } else {
-                ContentUnavailableView(
-                    "Item Type Unavailable",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("Return to Item Types and choose the definition again.")
-                )
-            }
-        }
-        .navigationTitle(studioTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden()
-        .toolbar { studioToolbar }
-        .interactiveDismissDisabled(hasUnsavedStudioChanges)
-        .navigationDestination(item: $setupRoute) { route in
-            if let draftBinding,
-               draftBinding.wrappedValue.cardSetups.contains(where: { $0.id == route.cardSetupID }) {
-                CardSetupEditorView(
-                    draft: draftBinding,
-                    cardSetupID: route.cardSetupID,
-                    validationFocus: $validationFocus
-                )
-                .onDisappear {
-                    if selectedCardSetupID == route.cardSetupID {
-                        selectedCardSetupID = nil
-                    }
-                }
-            } else {
-                ContentUnavailableView("Card Setup Unavailable", systemImage: "rectangle.slash")
-            }
-        }
-        .confirmationDialog(
-            "Remove this field?",
-            isPresented: Binding(
-                get: { pendingFieldRemoval != nil },
-                set: { if !$0 { pendingFieldRemoval = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Remove Field", role: .destructive) { confirmFieldRemoval() }
-            Button("Keep Field", role: .cancel) { pendingFieldRemoval = nil }
-        } message: {
-            if let pendingFieldRemoval {
-                Text(fieldRemovalMessage(pendingFieldRemoval))
+        studioNavigation
+        .navigationDestination(item: $fieldRoute) { route in
+            if let draftBinding, let field = draftBinding.wrappedValue.fields.first(where: { $0.id == route.fieldID }) {
+                fieldEditor(field, draft: draftBinding)
             }
         }
         .confirmationDialog(
@@ -359,9 +323,56 @@ struct ItemTypeStudioMobileView: View {
         }
     }
 
+    private var studioNavigation: some View {
+        Group {
+            if model.studioDraft != nil {
+                studio
+            } else {
+                ContentUnavailableView(
+                    "Item Type Unavailable",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("Return to Item Types and choose the definition again.")
+                )
+            }
+        }
+        .navigationTitle(studioTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
+        .toolbar { studioToolbar }
+        .interactiveDismissDisabled(hasUnsavedStudioChanges)
+        .navigationDestination(item: $setupRoute) { route in
+            if let draftBinding,
+               draftBinding.wrappedValue.cardSetups.contains(where: { $0.id == route.cardSetupID }) {
+                MobileCardSetupDraftEditor(model: model, draft: draftBinding.wrappedValue,
+                                           cardSetupID: route.cardSetupID, validationFocus: $validationFocus)
+                .navigationTitle("Card Setup")
+                .navigationBarTitleDisplayMode(.inline)
+                .onDisappear {
+                    if selectedCardSetupID == route.cardSetupID {
+                        selectedCardSetupID = nil
+                    }
+                }
+            } else {
+                ContentUnavailableView("Card Setup Unavailable", systemImage: "rectangle.slash")
+            }
+        }
+    }
+
     private var studio: some View {
         ScrollViewReader { proxy in
-            Form {
+            studioForm
+            .accessibilityIdentifier("item-type-studio.scroll")
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: validationFocus) { _, target in
+                guard let target else { return }
+                withOptionalMotion { proxy.scrollTo(target, anchor: .center) }
+                focus(target)
+            }
+        }
+    }
+
+    private var studioForm: some View {
+        Form {
                 if isDraftReadOnly {
                     readOnlySection
                 }
@@ -396,14 +407,6 @@ struct ItemTypeStudioMobileView: View {
                     }
                 }
             }
-            .accessibilityIdentifier("item-type-studio.scroll")
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: validationFocus) { _, target in
-                guard let target else { return }
-                withOptionalMotion { proxy.scrollTo(target, anchor: .center) }
-                focus(target)
-            }
-        }
     }
 
     private var readOnlySection: some View {
@@ -462,50 +465,69 @@ struct ItemTypeStudioMobileView: View {
         _ field: ItemTypeFieldDraft,
         draft: Binding<ItemTypeStudioDraft>
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                TextField("Field name", text: fieldNameBinding(field.id, draft: draft))
-                    .focused($textFocus, equals: .field(field.id))
-                    .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).name")
-                Spacer(minLength: 4)
-                Button("Remove \(field.name)", systemImage: "trash", role: .destructive) {
-                    prepareFieldRemoval(field.id)
-                }
-                .labelStyle(.iconOnly)
-                .neoAnkiTouchTarget()
-                .accessibilityHint("Shows affected Card setups before removing the field")
-                .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).remove")
-            }
-            Picker("Type", selection: fieldTypeBinding(field.id, draft: draft)) {
-                ForEach(FieldType.allCases, id: \.self) { type in
-                    Text(fieldTypeName(type)).tag(type)
-                }
-            }
-            .pickerStyle(.menu)
-            .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).type")
-            Toggle("Required", isOn: fieldRequiredBinding(field.id, draft: draft))
-                .neoAnkiTouchTarget()
-            HStack(spacing: 8) {
-                Button("Move Up", systemImage: "arrow.up") {
-                    moveField(field.id, .up, draft: draft)
-                }
-                .frame(maxWidth: .infinity)
-                .neoAnkiTouchTarget()
-                .disabled(!canMoveField(field.id, .up, draft: draft.wrappedValue))
-                .accessibilityLabel("Move \(field.name) up")
-                .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).move-up")
+        Button { textFocus = nil; fieldRoute = .init(fieldID: field.id) } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack { Text(field.name).font(.body); Spacer(); Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary) }
+                Text(fieldTypeName(field.type) + (field.isRequired ? " · Required" : " · Optional"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).summary")
+        .accessibilityAction(named: "Move Up") { moveField(field.id, .up, draft: draft) }
+        .accessibilityAction(named: "Move Down") { moveField(field.id, .down, draft: draft) }
+        .contextMenu {
+            Button("Move Up") { moveField(field.id, .up, draft: draft) }.disabled(!canMoveField(field.id, .up, draft: draft.wrappedValue))
+            Button("Move Down") { moveField(field.id, .down, draft: draft) }.disabled(!canMoveField(field.id, .down, draft: draft.wrappedValue))
+        }
+    }
 
-                Button("Move Down", systemImage: "arrow.down") {
-                    moveField(field.id, .down, draft: draft)
+    private func fieldEditor(_ field: ItemTypeFieldDraft, draft: Binding<ItemTypeStudioDraft>) -> some View {
+            Form {
+                Section("Field") {
+                    TextField("Field name", text: fieldNameBinding(field.id, draft: draft))
+                        .focused($textFocus, equals: .field(field.id))
+                        .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).name")
+                    Picker("Type", selection: fieldTypeBinding(field.id, draft: draft)) {
+                        ForEach(FieldType.allCases, id: \.self) { Text(fieldTypeName($0)).tag($0) }
+                    }.accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).type")
+                    Toggle("Required", isOn: fieldRequiredBinding(field.id, draft: draft))
                 }
-                .frame(maxWidth: .infinity)
-                .neoAnkiTouchTarget()
-                .disabled(!canMoveField(field.id, .down, draft: draft.wrappedValue))
-                .accessibilityLabel("Move \(field.name) down")
-                .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).move-down")
+                Section("Order") {
+                    Button("Move Up", systemImage: "arrow.up") { moveField(field.id, .up, draft: draft) }
+                        .disabled(!canMoveField(field.id, .up, draft: draft.wrappedValue))
+                        .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).move-up")
+                    Button("Move Down", systemImage: "arrow.down") { moveField(field.id, .down, draft: draft) }
+                        .disabled(!canMoveField(field.id, .down, draft: draft.wrappedValue))
+                        .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).move-down")
+                }
+                Section {
+                    Button("Remove Field", role: .destructive) { prepareFieldRemoval(field.id) }
+                        .accessibilityIdentifier("item-type-studio.field.\(field.id.uuidString).remove")
+                }
+            }
+            .navigationTitle("Edit Field")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if validationFocus == .field(field.id) { textFocus = .field(field.id) }
+            }
+        .confirmationDialog(
+            "Remove this field?",
+            isPresented: Binding(
+                get: { pendingFieldRemoval != nil },
+                set: { if !$0 { pendingFieldRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove Field", role: .destructive) { confirmFieldRemoval() }
+            Button("Keep Field", role: .cancel) { pendingFieldRemoval = nil }
+        } message: {
+            if let pendingFieldRemoval {
+                Text(fieldRemovalMessage(pendingFieldRemoval))
             }
         }
-        .padding(.vertical, 4)
+
     }
 
     @ToolbarContentBuilder
@@ -513,7 +535,6 @@ struct ItemTypeStudioMobileView: View {
         ToolbarItem(placement: .cancellationAction) {
             Button("Cancel") { requestCancel() }
                 .disabled(isWorking)
-                .neoAnkiTouchTarget()
                 .accessibilityIdentifier("item-type-studio.cancel")
         }
         if !isDraftReadOnly {
@@ -522,7 +543,6 @@ struct ItemTypeStudioMobileView: View {
                     Task { await prepareSave() }
                 }
                 .disabled(isWorking)
-                .neoAnkiTouchTarget()
                 .accessibilityIdentifier("item-type-studio.save")
             }
         }
@@ -665,6 +685,7 @@ struct ItemTypeStudioMobileView: View {
         _ = draft.removeField(id: pendingFieldRemoval.id)
         model.studioDraft = draft
         self.pendingFieldRemoval = nil
+        fieldRoute = nil
         validationFocus = draft.validationIssues.first?.target
     }
 
@@ -730,7 +751,8 @@ struct ItemTypeStudioMobileView: View {
             textFocus = .name
         case let .field(id):
             validationFocus = target
-            textFocus = .field(id)
+            if fieldRoute?.fieldID != id { fieldRoute = .init(fieldID: id) }
+            Task { @MainActor in await Task.yield(); textFocus = .field(id) }
         case let .cardSetup(id),
              let .component(cardSetupID: id, componentID: _),
              let .availability(cardSetupID: id),
@@ -763,7 +785,9 @@ struct ItemTypeStudioMobileView: View {
     private func focus(_ target: ItemTypeStudioValidationTarget) {
         switch target {
         case .itemTypeName: textFocus = .name
-        case let .field(id): textFocus = .field(id)
+        case let .field(id):
+            if fieldRoute?.fieldID != id { fieldRoute = .init(fieldID: id) }
+            Task { @MainActor in await Task.yield(); textFocus = .field(id) }
         case let .cardSetup(id),
              let .component(cardSetupID: id, componentID: _),
              let .availability(cardSetupID: id),
@@ -925,4 +949,38 @@ struct ItemTypeStudioMobileView: View {
         }
     }
 }
+/// Back the focused editor with SwiftUI state, writing each mutation through to
+/// the Studio draft. Computed bindings to an observable optional do not publish
+/// every nested draft mutation to a mounted navigation destination.
+private struct MobileCardSetupDraftEditor: View {
+    @Bindable var model: ItemTypesFeatureModel
+    @State private var stagedDraft: ItemTypeStudioDraft
+    let cardSetupID: UUID
+    @Binding var validationFocus: ItemTypeStudioValidationTarget?
+
+    init(model: ItemTypesFeatureModel, draft: ItemTypeStudioDraft, cardSetupID: UUID,
+         validationFocus: Binding<ItemTypeStudioValidationTarget?>) {
+        self.model = model
+        _stagedDraft = State(initialValue: draft)
+        self.cardSetupID = cardSetupID
+        _validationFocus = validationFocus
+    }
+
+    var body: some View {
+        CardSetupEditorView(draft: Binding(
+            get: { stagedDraft },
+            set: {
+                guard model.studioDraft != nil else { return }
+                stagedDraft = $0; model.studioDraft = $0
+            }
+        ), cardSetupID: cardSetupID, validationFocus: $validationFocus, presentation: .mobile)
+        .onChange(of: stagedDraft) { _, value in
+            if model.studioDraft != nil, model.studioDraft != value { model.studioDraft = value }
+        }
+        .onChange(of: model.studioDraft) { _, value in
+            if let value, value != stagedDraft { stagedDraft = value }
+        }
+    }
+}
+
 #endif

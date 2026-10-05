@@ -143,6 +143,73 @@
         "NeoAnki2MobileUITests/MobileFirstScreenAccessibilityUITests/testFirstScreenAccessibilityAudit",
         "NeoAnki2MobileUITests/MobileFirstScreenAccessibilityUITests/testLargestTypeDarkHighContrastReducedMotionInLandscape"
       ]
+    },
+    {
+      "id": "phone-redesign",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileVisualRedesignUITests/testManagementScreenInventory",
+        "NeoAnki2MobileUITests/MobileVisualRedesignUITests/testStudyAndStudioScreenInventory",
+        "NeoAnki2MobileUITests/MobileAppStoreScreenshotUITests/testCaptureAppStoreScreenshots",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testAllFieldAuthoringMediaRemovalAndPickerCancellation"
+      ]
+    },
+    {
+      "id": "compact-redesign",
+      "device": "iPhone 17e",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargestTypeStudyAccessibilityRotationAndKeyboard"
+      ]
+    },
+    {
+      "id": "tablet-redesign",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargestTypeStudyAccessibilityRotationAndKeyboard"
+      ]
+    },
+    {
+      "id": "phone-study-redesign",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileStudyModesRedesignUITests/testStudyModesLayoutsAndFullContentConcealment",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testScopedBrowseSelectionAttentionAndSavedRecordingPersistence",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTransferPreviewImportAndConcealment",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testNavigationRetentionBothGradingModesUndoAndSkip",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargeTextGradesReflowWithoutBreakingLabels"
+      ]
+    },
+    {
+      "id": "phone-builders-redesign",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testBuildersPreviewImportAndValidation",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testProsePreviewImportAndEditing",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testVocabularySearchPreviewImportAndPackPersistence",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testSyncConflictRecoveryAndImportFailure",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLibraryRecoveryPresentationAndRetry"
+      ]
+    },
+    {
+      "id": "phone-production-review",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures"
+      ]
+    },
+    {
+      "id": "tablet-production-review",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures"
+      ]
     }
   ]
 }

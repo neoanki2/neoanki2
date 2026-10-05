@@ -39,6 +39,7 @@ jobs:
         run: |
           bash -n Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh
+          python3 Scripts/test-ios-ui-retry.py
           echo "macos=$(bash Scripts/ci-ui-test-plan.sh macos)" >> "$GITHUB_OUTPUT"
           echo "ios=$(bash Scripts/ci-ui-test-plan.sh ios)" >> "$GITHUB_OUTPUT"
 

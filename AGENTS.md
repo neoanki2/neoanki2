@@ -26,6 +26,35 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   attested GitHub candidate.
 - Preserve and report the emitted `FAST_RELEASE_*` telemetry.
 
+## iOS App Store review
+
+- App Store releases use `Scripts/release-ios.sh`, separately from the Mac and
+  Homebrew release workflow.
+- Before submission or resubmission, complete the mandatory internal review
+  described in `docs/IOS_RELEASE.md`. Review the exact candidate's ordinary
+  Release first launch, iPhone/iPad journeys, listing, screenshots, privacy,
+  support, and reviewer instructions. Preserve independent findings and evidence.
+- Retrieve Apple's written rejection and attachments before claiming a rejected
+  issue is fixed. Map each issue to a verified correction and regression evidence;
+  do not substitute an API status or speculative checklist for the message.
+- A passed internal review reduces known rejection risks; it never guarantees
+  Apple approval. Report uploaded, submitted, approved, and publicly available
+  states separately, and never bypass a failed review gate.
+
+## iPhone deployment
+
+- A request to deploy, install, or update NeoAnki2 on a physical iPhone runs
+  `./Scripts/deploy-iphone.sh` directly; see `.codex/skills/deploy-iphone/SKILL.md`.
+- Current local changes are deployment input. The command builds, signs using
+  saved local certificate/key material in a disposable Keychain, installs as
+  an update, and launches once. It does not publish or reset app data.
+- Do not ask for Mac, Apple ID, or Keychain passwords or unlock the existing
+  `NeoAnki2-signing` Keychain. The command owns temporary signing and cleanup.
+- If there are multiple available iPhones and the user did not select one,
+  ask for the target; report other genuine device/signing blockers directly.
+- Use `--prepare-only` when validating this workflow without another install.
+- Preserve and report the emitted `IPHONE_DEPLOY_*` telemetry.
+
 ## Desktop isolation
 
 - Do not launch, control, capture, or otherwise interact with the user's desktop or graphical applications.

@@ -123,17 +123,17 @@ import VocabularyDeckBuilder
     await decksModel.load()
     await itemsModel.load()
 
-    #expect(result.itemCount == 2)
+    #expect(result.itemCount == 3)
     #expect(transfer.notice?.title == "Deck Imported")
     #expect(decksModel.deckTree.count == 1)
     #expect(decksModel.deckTree.first?.summary.name == "Poetry")
     #expect(decksModel.deckTree.first?.children.first?.summary.name == "Title")
-    #expect(itemsModel.items.count == 2)
-    #expect(itemsModel.dueCount == 2)
+    #expect(itemsModel.items.count == 3)
+    #expect(itemsModel.dueCount == 3)
     let importedItems = try await store.listItems(
         scope: .deck(poem.id, includeDescendants: false)
     )
-    #expect(importedItems.count == 2)
+    #expect(importedItems.count == 3)
     for summary in importedItems {
         let loaded = try #require(await store.fetchItem(id: summary.id))
         let attribution = try #require(loaded.itemType.field(named: "Attribution"))

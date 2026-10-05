@@ -17,6 +17,10 @@ struct StudySessionView: View {
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var session: StudyFeatureModel
     @Bindable var model: MobileAppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var footerWidth: CGFloat = 0
+    @State private var showsFullContent = false
     @State private var isEditing = false
     @State private var loadedItem: (item: Item, itemType: ItemType)?
     @State private var recorder = MobileStudyRecorder()
@@ -27,46 +31,57 @@ struct StudySessionView: View {
         NavigationStack {
             Group {
                 if session.isComplete {
-                    ContentUnavailableView {
-                        Label("Session Complete", systemImage: "checkmark.circle")
-                    } description: {
-                        Text("\(session.completion.reviews) reviews · \(session.completion.uniqueCards) cards · \(session.completion.uniqueItems) items")
-                    } actions: {
-                        Button("Done") { dismiss() }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
+                            Text("Session Complete").font(.title.weight(.semibold))
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(session.completion.reviews) \(session.completion.reviews == 1 ? "review" : "reviews")")
+                                Text("\(session.completion.uniqueCards) \(session.completion.uniqueCards == 1 ? "card" : "cards") · \(session.completion.uniqueItems) \(session.completion.uniqueItems == 1 ? "item" : "items")")
+                                if session.completion.savedSubmissions > 0 {
+                                    Text("\(session.completion.savedSubmissions) saved \(session.completion.savedSubmissions == 1 ? "response" : "responses")")
+                                }
+                            }
+                        }.frame(maxWidth: 600, alignment: .leading).frame(maxWidth: .infinity).padding(24)
+                    }
+                    .safeAreaInset(edge: .bottom) {
+                        Button { dismiss() } label: { Text("Done").frame(maxWidth: .infinity, minHeight: 44) }
+                            .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().padding(16).background(.bar)
                     }
                 } else if let card = session.currentCard {
                     studyCard(card)
                 }
             }
-            .navigationTitle(session.title)
+            .navigationTitle(session.isComplete ? session.title : "\(session.remainingCount) left")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("End") {
                         recorder.cleanup()
                         dismiss()
                     }
+                    .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
                     .accessibilityIdentifier("endStudySession")
-                }
-                if !session.isComplete {
-                    ToolbarItem(placement: .principal) {
-                        Text("\(session.remainingCount) remaining")
-                            .font(.subheadline.weight(.semibold))
-                            .accessibilityLabel("\(session.remainingCount) cards remaining")
-                    }
                 }
                 if !session.isComplete {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
-                        Button("Skip", systemImage: "forward") { skipCurrentCard() }
-                            .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
-                            .accessibilityHint("Moves this card to the end without grading it")
-                            .accessibilityIdentifier("skipStudyCard")
                         Menu("More", systemImage: "ellipsis.circle") {
+                            Button("Skip", systemImage: "forward") { skipCurrentCard() }
+                                .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
+                                .accessibilityHint("Moves this card to the end without grading it")
+                                .accessibilityIdentifier("skipStudyCard")
+                            Button("Read Full Card", systemImage: "doc.text") { showsFullContent = true }
                             Button("Edit Current Item", systemImage: "pencil") { Task { await openEditor() } }
+                            Menu("Grade Help", systemImage: "questionmark.circle") {
+                                ForEach(gradingMode.choices, id: \.rating) { choice in
+                                    Text("\(choice.title) — \(choice.guidance)")
+                                }
+                            }
                         }
+                        .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
                     }
                 }
             }
@@ -76,6 +91,7 @@ struct StudySessionView: View {
                 Text(session.error?.message ?? "Please try again.")
             }
         }
+        .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -89,6 +105,21 @@ struct StudySessionView: View {
             Button("Keep Draft", role: .cancel) {}
         } message: {
             Text("This recording has not been saved and cannot be recovered.")
+        }
+        .sheet(isPresented: $showsFullContent) {
+            NavigationStack {
+                ScrollView {
+                    if let card = session.currentCard {
+                        MobileStudyCompositionView(template: card.template, item: card.item,
+                            mediaStore: session.mediaStore, isAnswerRevealed: session.isAnswerRevealed,
+                            clozeGroup: card.card.clozeGroup)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(24)
+                    }
+                }
+                .navigationTitle("Full Card").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsFullContent = false } } }
+            }
         }
         .sheet(isPresented: $isEditing) {
             if let loadedItem {
@@ -151,32 +182,31 @@ struct StudySessionView: View {
                 item: card.item
             )
         ) {
-            StudyStageContent(spacing: 28) {
-                MobileStudyCompositionView(
-                    template: card.template,
-                    item: card.item,
-                    mediaStore: session.mediaStore,
-                    isAnswerRevealed: session.isAnswerRevealed,
-                    clozeGroup: card.card.clozeGroup
-                )
-                .frame(maxHeight: .infinity)
-                .accessibilityElement(children: .combine)
-            } response: {
-                if !session.isAnswerRevealed {
-                    interaction(for: card)
-                } else if let evaluation = session.answerEvaluation {
-                    Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
-                        .font(.headline)
-                        .accessibilityAddTraits(.isSummaryElement)
+            ScrollView {
+                VStack(spacing: 24) {
+                    MobileStudyCompositionView(
+                        template: card.template, item: card.item, mediaStore: session.mediaStore,
+                        isAnswerRevealed: session.isAnswerRevealed, clozeGroup: card.card.clozeGroup
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    if !session.isAnswerRevealed {
+                        interaction(for: card)
+                    } else if let evaluation = session.answerEvaluation {
+                        Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
+                            .font(.headline).accessibilityAddTraits(.isSummaryElement)
+                    }
                 }
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 24)
+                .accessibilityFocused($answerFocused)
             }
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: 600)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-            .accessibilityFocused($answerFocused)
+            .scrollDismissesKeyboard(.interactively)
+            .id(card.id)
         } footer: {
             studyActions
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { footerWidth = $0 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
@@ -205,7 +235,7 @@ struct StudySessionView: View {
                     Label("Save & Complete", systemImage: "checkmark.circle.fill")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
                 .controlSize(.large)
                 .disabled(recorder.submissionDraft(cardID: card.id) == nil)
                 .accessibilityHint("Saves this recording locally and completes the card without grading it")
@@ -216,14 +246,9 @@ struct StudySessionView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             } else {
                 VStack(spacing: 8) {
-                    HStack(spacing: 8) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: gradeColumnCount), spacing: 8) {
                         ForEach(gradingMode.choices, id: \.rating) { choice in
                             gradeButton(choice)
-                        }
-                    }
-                    Menu("Grade Help", systemImage: "questionmark.circle") {
-                        ForEach(gradingMode.choices, id: \.rating) { choice in
-                            Text("\(choice.title) — \(choice.guidance)")
                         }
                     }
                 }
@@ -235,7 +260,7 @@ struct StudySessionView: View {
                 Label(primaryActionLabel, systemImage: "arrow.right.circle")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
             .controlSize(.large)
         }
     }
@@ -262,9 +287,15 @@ struct StudySessionView: View {
             VStack(spacing: 8) {
                 ForEach(Array(session.arrangedItems.enumerated()), id: \.offset) { index, value in
                     HStack {
-                        Button(value) { session.selectArrangementItem(at: index) }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        Button("Up", systemImage: "chevron.up") { session.selectArrangementItem(at: index); session.moveSelectedArrangementItem(by: -1) }.labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44).disabled(index == 0)
-                        Button("Down", systemImage: "chevron.down") { session.selectArrangementItem(at: index); session.moveSelectedArrangementItem(by: 1) }.labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44).disabled(index == session.arrangedItems.count - 1)
+                        Button { session.selectArrangementItem(at: index) } label: {
+                            Text(value).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                        }
+                        Button { session.selectArrangementItem(at: index); session.moveSelectedArrangementItem(by: -1) } label: {
+                            Image(systemName: "chevron.up").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                        }.accessibilityLabel("Up").disabled(index == 0)
+                        Button { session.selectArrangementItem(at: index); session.moveSelectedArrangementItem(by: 1) } label: {
+                            Image(systemName: "chevron.down").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                        }.accessibilityLabel("Down").disabled(index == session.arrangedItems.count - 1)
                     }
                 }
             }.frame(maxWidth: 560)
@@ -272,8 +303,10 @@ struct StudySessionView: View {
             VStack(spacing: 10) {
                 Button(recorder.isRecording ? "Stop Recording" : "Record Answer", systemImage: recorder.isRecording ? "stop.circle" : "mic") {
                     Task { if recorder.isRecording { recorder.stop(); session.performPrimaryAction() } else { await recorder.start() } }
-                }.buttonStyle(.borderedProminent).controlSize(.large)
-                if recorder.hasRecording { Button("Play My Recording", systemImage: "play") { recorder.play() } }
+                }.buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().controlSize(.large)
+                if recorder.hasRecording {
+                    Button { recorder.play() } label: { Label("Play My Recording", systemImage: "play").frame(minHeight: 44) }
+                }
                 if let message = recorder.errorMessage { Text(message).foregroundStyle(.secondary) }
             }
         case .audioSubmission:
@@ -288,23 +321,22 @@ struct StudySessionView: View {
                     .accessibilityLabel("Recording duration \(recorder.durationLabel)")
 
                 if recorder.isRecording {
-                    Button("Stop Recording", systemImage: "stop.circle.fill") { recorder.stop() }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
+                    Button { recorder.stop() } label: { Label("Stop Recording", systemImage: "stop.circle.fill").frame(minHeight: 44) }
+                        .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().controlSize(.large)
                         .frame(minHeight: 44)
                 } else if recorder.hasRecording {
-                    Button(recorder.isPlaying ? "Stop Playback" : "Play Recording", systemImage: recorder.isPlaying ? "stop.fill" : "play.fill") { recorder.togglePlayback() }
-                        .frame(minHeight: 44)
-                    Button("Record Again", systemImage: "arrow.counterclockwise") {
-                        Task { await recorder.start(persistentSubmission: true) }
+                    Button { recorder.togglePlayback() } label: {
+                        Label(recorder.isPlaying ? "Stop Playback" : "Play Recording", systemImage: recorder.isPlaying ? "stop.fill" : "play.fill").frame(minHeight: 44)
                     }
-                    .frame(minHeight: 44)
-                    Button("Delete Draft", systemImage: "trash", role: .destructive) { confirmsDeleteDraft = true }
-                        .frame(minHeight: 44)
+                    Button {
+                        Task { await recorder.start(persistentSubmission: true) }
+                    } label: { Label("Record Again", systemImage: "arrow.counterclockwise").frame(minHeight: 44) }
+                    Button(role: .destructive) { confirmsDeleteDraft = true } label: { Label("Delete Draft", systemImage: "trash").frame(minHeight: 44) }
                 } else {
-                    Button("Start Recording", systemImage: "mic.fill") {
+                    Button {
                         Task { await recorder.start(persistentSubmission: true) }
-                    }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    } label: { Label("Start Recording", systemImage: "mic.fill").frame(minHeight: 44) }
+                    .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().controlSize(.large)
                     .frame(minHeight: 44)
                 }
                 if let message = recorder.errorMessage {
@@ -343,17 +375,58 @@ struct StudySessionView: View {
     }
 
     private func gradeButton(_ choice: StudyGradeChoice) -> some View {
-        Button(choice.title) {
+        Button {
             Task { await session.grade(choice.rating) }
+        } label: {
+            Text(choice.title).fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .overlay { RoundedRectangle(cornerRadius: 12).stroke(.primary.opacity(0.45), lineWidth: 1) }
         }
-        .buttonStyle(.bordered)
-        .frame(maxWidth: .infinity, minHeight: 44)
-            .disabled(session.isGrading)
+        .buttonStyle(.plain)
+        .disabled(session.isGrading)
         .accessibilityHint(choice.guidance)
     }
 
     private var gradingMode: StudyGradingMode {
         StudyGradingMode(usesPassFailGrades: usesPassFailGrades)
+    }
+
+    private var gradeContentSizeCategory: UIContentSizeCategory {
+        switch dynamicTypeSize {
+        case .xSmall: .extraSmall
+        case .small: .small
+        case .medium: .medium
+        case .large: .large
+        case .xLarge: .extraLarge
+        case .xxLarge: .extraExtraLarge
+        case .xxxLarge: .extraExtraExtraLarge
+        case .accessibility1: .accessibilityMedium
+        case .accessibility2: .accessibilityLarge
+        case .accessibility3: .accessibilityExtraLarge
+        case .accessibility4: .accessibilityExtraExtraLarge
+        case .accessibility5: .accessibilityExtraExtraExtraLarge
+        @unknown default: .large
+        }
+    }
+
+    private var gradeColumnCount: Int {
+        // Preserve whole words at the user's text size, even on a 375-point
+        // phone. Wider accessibility layouts keep the familiar two rows.
+        let font = UIFont.preferredFont(forTextStyle: .body, compatibleWith:
+            UITraitCollection(preferredContentSizeCategory: gradeContentSizeCategory))
+        let textWidth = gradingMode.choices.map {
+            ($0.title as NSString).size(withAttributes: [.font: font]).width
+        }.max() ?? 44
+        // Reserve 32 points for the button's horizontal insets and 8 for the
+        // grid gap. Measure the actual labels rather than scaling a guess.
+        let capacity = max(1, Int((footerWidth + 8) / (textWidth + 40)))
+        let preferred = dynamicTypeSize.isAccessibilitySize ? min(2, gradingMode.choices.count) : gradingMode.choices.count
+        if preferred > 2, capacity < preferred { return capacity >= 2 ? 2 : 1 }
+        return min(preferred, capacity)
     }
 }
 

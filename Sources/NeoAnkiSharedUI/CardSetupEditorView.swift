@@ -976,11 +976,17 @@ public struct CardSetupCollectionView: View {
     }
 }
 
-/// The shared editor keeps its existing scrolling form on iPhone and iPad,
-/// while macOS can opt into a canvas-led workspace composition.
+/// Platform shells choose a stacked form, a canvas workspace, or focused mobile pages.
 public enum CardSetupEditorPresentation: Equatable, Sendable {
     case stacked
     case workspace
+    case mobile
+}
+
+private enum MobileCardSetupValidationRoute: Hashable, Identifiable {
+    case layout, recipe, content, availability, learningRoute, additional
+    case hole(CardWireframeHole)
+    var id: Self { self }
 }
 
 /// The shared fillable Card setup editor used by both platform shells.
@@ -988,6 +994,7 @@ public struct CardSetupEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.neoAnkiAccessibilityReduceMotionOverride) private var reduceMotionOverride
     @Binding private var draft: ItemTypeStudioDraft
     private let cardSetupID: UUID
@@ -996,6 +1003,8 @@ public struct CardSetupEditorView: View {
     private let auditSection: CardSetupEditorAuditSection?
     private let presentation: CardSetupEditorPresentation
 
+    private var mobilePage: MobileCardSetupValidationRoute?
+    @State private var mobileValidationRoute: MobileCardSetupValidationRoute?
     @State private var isAnswerRevealed = false
     @State private var showsAdvanced = CardSetupEditorAdvancedPolicy.startsExpanded
     @State private var showsAdditionalContent = false
@@ -1030,16 +1039,17 @@ public struct CardSetupEditorView: View {
                 Group {
                     if presentation == .workspace, auditSection == nil {
                         workspaceEditor(setupIndex)
+                    } else if presentation == .mobile, auditSection == nil {
+                        if let mobilePage { mobilePageContent(mobilePage, index: setupIndex) }
+                        else { mobileEditor(setupIndex) }
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 24) {
                                 if let auditSection {
-                                    Group {
-                                        auditEditorSection(auditSection, setupIndex: setupIndex)
-                                        Divider()
-                                    }
+                                    auditEditorSection(auditSection, setupIndex: setupIndex)
+                                } else {
+                                    editorSections(setupIndex)
                                 }
-                                editorSections(setupIndex)
                             }
                             .frame(maxWidth: 860)
                             .frame(maxWidth: .infinity)
@@ -1048,7 +1058,7 @@ public struct CardSetupEditorView: View {
                         .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
                     }
                 }
-                .tint(colorSchemeContrast == .increased ? .primary : .accentColor)
+                .tint(presentation == .mobile ? SharedDesignSystem.mobileTint(for: colorScheme) : colorSchemeContrast == .increased ? .primary : .accentColor)
                 .sheet(item: canvasSourceRequest) { request in
                     CardSetupSourcePicker(
                         fields: sourceFields(for: request),
@@ -1086,7 +1096,9 @@ public struct CardSetupEditorView: View {
             }
         }
         .onChange(of: validationFocus, initial: true) { _, target in
-            applyValidationFocus(target)
+            // Focus reported by a mounted mobile control is already local.
+            // Only an external validation request should push a destination.
+            if presentation != .mobile || target != focusedTarget { applyValidationFocus(target) }
         }
         .onChange(of: focusedTarget) { _, target in validationFocus = target }
         .onChange(of: cardSetupID) { _, _ in
@@ -1405,10 +1417,8 @@ public struct CardSetupEditorView: View {
             return
         }
 
-        let projection = CardSetupEditorProjection(
-            setup: draft.cardSetups[setupIndex],
-            fields: draft.fields
-        )
+        let setup = draft.cardSetups[setupIndex]
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
         let disclosures = CardSetupEditorFocusPolicy.disclosures(
             for: target,
             cardSetupID: cardSetupID,
@@ -1420,6 +1430,21 @@ public struct CardSetupEditorView: View {
         if case let .component(_, componentID) = target {
             selectedComponentID = componentID
         }
+        if presentation == .mobile, mobilePage == nil {
+            switch target {
+            case .layout: mobileValidationRoute = .layout
+            case .recipe: mobileValidationRoute = .recipe
+            case let .component(_, componentID):
+                if projection.isAdditional(componentID) {
+                    mobileValidationRoute = .additional
+                } else if let component = setup.components.first(where: { $0.id == componentID }) {
+                    mobileValidationRoute = .hole(CardWireframeDescriptor.descriptor(for: setup.layout).hole(for: component.region))
+                }
+            case .availability: mobileValidationRoute = .availability
+            default: mobileValidationRoute = nil
+            }
+        }
+        let needsMobileMount = presentation == .mobile && mobilePage == nil && mobileValidationRoute != nil
         let needsInspectorMount = presentation == .workspace
             && workspaceUsesInspectorSheet
             && targetUsesWorkspaceInspector(target)
@@ -1428,6 +1453,7 @@ public struct CardSetupEditorView: View {
         guard disclosures.showsAdvanced
                 || disclosures.showsAdditionalContent
                 || needsInspectorMount
+                || needsMobileMount
         else {
             focusedTarget = target
             return
@@ -1436,7 +1462,7 @@ public struct CardSetupEditorView: View {
         // focus then performs the ScrollView's normal reveal behavior.
         Task { @MainActor in
             await Task.yield()
-            if needsInspectorMount { await Task.yield() }
+            if needsInspectorMount || needsMobileMount { await Task.yield() }
             guard validationFocus == requestedTarget else { return }
             focusedTarget = target
         }
@@ -1493,6 +1519,118 @@ public struct CardSetupEditorView: View {
             .font(.caption)
             .foregroundStyle(.primary)
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.auditSection(section))
+    }
+
+    private func mobileEditor(_ index: Int) -> some View {
+        Form {
+            Section { previewSection(index) }
+            Section("Card Setup") {
+                TextField("Name", text: setupBinding(index, \.name))
+                    .focused($focusedTarget, equals: .cardSetup(cardSetupID))
+                    .accessibilityLabel("Card setup name")
+                    .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupName)
+                NavigationLink {
+                    focusedMobileEditor(.layout)
+                } label: { LabeledContent("Layout", value: draft.cardSetups[index].layout.displayName) }
+                Picker("Answer Method", selection: interactionBinding(index)) {
+                    ForEach(Interaction.allCases, id: \.self) { Text($0.editorDisplayName).tag($0) }
+                }.focused($focusedTarget, equals: .answerMethod(cardSetupID: cardSetupID))
+                .accessibilityIdentifier(ItemTypeStudioAccessibilityID.answerMethod)
+            }
+            Section("Content") {
+                NavigationLink("Question & Answer") {
+                    focusedMobileEditor(.recipe)
+                }
+                NavigationLink("Edit Content") {
+                    focusedMobileEditor(.content)
+                }
+            }
+            Section("Rules") {
+                NavigationLink("Availability") {
+                    focusedMobileEditor(.availability)
+                }
+                NavigationLink("Learning Route") {
+                    focusedMobileEditor(.learningRoute)
+                }
+            }
+            if !draft.validationIssues.isEmpty {
+                Section("Needs Attention") {
+                    ForEach(draft.validationIssues) { issue in
+                        Label(issue.message, systemImage: "exclamationmark.circle").foregroundStyle(.red)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.cardSetupEditor)
+        .navigationDestination(item: $mobileValidationRoute) { route in
+            focusedMobileEditor(route)
+        }
+    }
+
+    private func focusedMobileEditor(_ page: MobileCardSetupValidationRoute) -> Self {
+        var editor = Self(draft: $draft, cardSetupID: cardSetupID,
+                          validationFocus: .constant(validationFocus),
+                          validationMessage: $validationMessage, presentation: .mobile)
+        editor.mobilePage = page
+        return editor
+    }
+
+    @ViewBuilder
+    private func mobilePageContent(_ page: MobileCardSetupValidationRoute, index: Int) -> some View {
+        switch page {
+        case .layout: ScrollView { layoutSection(index).padding(16) }.navigationTitle("Layout")
+        case .recipe: ScrollView { recipeSection(index).padding(16) }.navigationTitle("Question & Answer")
+        case .content: mobileContentOverview(index)
+        case let .hole(hole):
+            ScrollView { namedHoleContent(hole, index: index).padding(16) }
+                .buttonStyle(.borderless)
+                .navigationTitle(hole.displayName)
+        case .additional:
+            ScrollView {
+                let setup = draft.cardSetups[index]
+                let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
+                let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Legacy placement stays unchanged until you explicitly move it into a named hole.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    ForEach(setup.components.indices.filter { projection.isAdditional(setup.components[$0].id) }, id: \.self) {
+                        additionalContentRow($0, setupIndex: index, descriptor: descriptor)
+                    }
+                }.padding(16)
+            }.buttonStyle(.borderless).navigationTitle("Additional Content")
+        case .availability: Form { availabilityEditor(index).buttonStyle(.borderless) }.navigationTitle("Availability")
+        case .learningRoute: Form { learningRouteEditor(index) }.navigationTitle("Learning Route")
+        }
+    }
+
+    private func mobileContentOverview(_ index: Int) -> some View {
+        let setup = draft.cardSetups[index]
+        let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        return List {
+            Section("Named Content") {
+                ForEach(descriptor.accessibilityHoles) { hole in
+                    let sources = setup.components.filter {
+                        descriptor.hole(for: $0.region) == hole.hole && !projection.isAdditional($0.id)
+                    }.map { sourceLabel($0.source) }
+                    NavigationLink {
+                        focusedMobileEditor(.hole(hole.hole))
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(hole.hole.displayName)
+                            Text(sources.isEmpty ? "No content" : sources.joined(separator: ", "))
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }.padding(.vertical, 4)
+                    }
+                }
+            }
+            if !projection.additionalComponentIDs.isEmpty {
+                Section {
+                    NavigationLink("Additional content") { focusedMobileEditor(.additional) }
+                        .accessibilityIdentifier(ItemTypeStudioAccessibilityID.additionalContent)
+                }
+            }
+        }.navigationTitle("Content")
     }
 
     @ViewBuilder
@@ -1632,23 +1770,35 @@ public struct CardSetupEditorView: View {
         }
     }
 
+    private var previewUsesVerticalHeader: Bool {
+#if os(iOS)
+        dynamicTypeSize.isAccessibilitySize
+#else
+        false
+#endif
+    }
+
     private func previewSection(_ index: Int) -> some View {
         let setup = draft.cardSetups[index]
         let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Preview").font(.headline)
-                Spacer()
-                answerVisibilityButton
+            if previewUsesVerticalHeader {
+                VStack(alignment: .leading, spacing: 8) { Text("Preview").font(.headline); answerVisibilityButton }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack { Text("Preview").font(.headline); Spacer(); answerVisibilityButton }
+                    VStack(alignment: .leading, spacing: 8) { Text("Preview").font(.headline); answerVisibilityButton }
+                }
             }
 
             CardWireframeView(
                 layout: setup.layout,
                 components: projection.resolvedComponents,
                 isAnswerRevealed: isAnswerRevealed,
-                emptyHoleView: { hole in
+                emptyHoleView: presentation == .mobile ? nil : { hole in
                     AnyView(emptyHole(hole, setupIndex: index))
-                }
+                },
+                mobileReading: presentation == .mobile
             ) { component, hole in
                 previewComponent(
                     component,
@@ -1660,7 +1810,7 @@ public struct CardSetupEditorView: View {
                     )
                 )
             }
-            .frame(maxWidth: .infinity, minHeight: 360)
+            .frame(maxWidth: .infinity, minHeight: presentation == .mobile ? 240 : 360)
             .padding(16)
             .background(.quaternary.opacity(0.24), in: RoundedRectangle(cornerRadius: 20))
         }
@@ -1776,33 +1926,9 @@ public struct CardSetupEditorView: View {
         return VStack(alignment: .leading, spacing: 16) {
             Text("Content").font(.headline)
             ForEach(descriptor.accessibilityHoles) { holeDescriptor in
-                let componentIndices = setup.components.indices.filter { componentIndex in
-                    let component = setup.components[componentIndex]
-                    return descriptor.hole(for: component.region) == holeDescriptor.hole
-                        && !projection.isAdditional(component.id)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(holeDescriptor.hole.displayName).font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Button("Add", systemImage: "plus") {
-                            sourceRequest = .init(componentID: nil, hole: holeDescriptor.hole)
-                        }
-                        .labelStyle(.iconOnly)
-                        .accessibilityLabel("Add \(holeDescriptor.hole.displayName) content")
-                        .frame(minWidth: 44, minHeight: 44)
-                    }
-                    if componentIndices.isEmpty {
-                        Text("No content")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(componentIndices, id: \.self) { componentIndex in
-                        componentEditorRow(componentIndex, setupIndex: index, descriptor: descriptor)
-                    }
-                }
-                .padding(12)
-                .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 14))
+                namedHoleContent(holeDescriptor.hole, index: index)
+                    .padding(12)
+                    .background(.quaternary.opacity(0.18), in: RoundedRectangle(cornerRadius: 14))
             }
 
             if !projection.additionalComponentIDs.isEmpty {
@@ -1829,6 +1955,35 @@ public struct CardSetupEditorView: View {
         }
     }
 
+    private func namedHoleContent(_ hole: CardWireframeHole, index: Int) -> some View {
+        let setup = draft.cardSetups[index]
+        let descriptor = CardWireframeDescriptor.descriptor(for: setup.layout)
+        let projection = CardSetupEditorProjection(setup: setup, fields: draft.fields)
+        let indices = setup.components.indices.filter {
+            descriptor.hole(for: setup.components[$0].region) == hole && !projection.isAdditional(setup.components[$0].id)
+        }
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                if presentation != .mobile { Text(hole.displayName).font(.subheadline.weight(.semibold)) }
+                Spacer()
+                Button { sourceRequest = .init(componentID: nil, hole: hole) } label: {
+                    if presentation == .mobile {
+                        Label("Add Content", systemImage: "plus").frame(minHeight: 44)
+                    } else { Image(systemName: "plus") }
+                }.accessibilityLabel("Add \(hole.displayName) content")
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            if indices.isEmpty { Text("No content").font(.footnote).foregroundStyle(.secondary) }
+            ForEach(indices, id: \.self) { componentEditorRow($0, setupIndex: index, descriptor: descriptor) }
+        }
+    }
+
+    private func contentActionIcon(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .frame(minWidth: presentation == .mobile ? 44 : nil, minHeight: presentation == .mobile ? 44 : nil)
+            .contentShape(Rectangle())
+    }
+
     private func componentEditorRow(
         _ componentIndex: Int,
         setupIndex: Int,
@@ -1837,11 +1992,16 @@ public struct CardSetupEditorView: View {
         let component = draft.cardSetups[setupIndex].components[componentIndex]
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button(sourceLabel(component.source)) {
+                Button {
                     sourceRequest = .init(
                         componentID: component.id,
                         hole: descriptor.hole(for: component.region)
                     )
+                } label: {
+                    Text(sourceLabel(component.source))
+                        .frame(maxWidth: presentation == .mobile ? .infinity : nil,
+                               minHeight: presentation == .mobile ? 44 : nil, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1856,9 +2016,9 @@ public struct CardSetupEditorView: View {
                     descriptor: descriptor
                 )
 
-                Button("Remove", systemImage: "trash", role: .destructive) {
+                Button(role: .destructive) {
                     apply(.removeComponent(component.id))
-                }
+                } label: { contentActionIcon("trash") }
                 .labelStyle(.iconOnly)
                 .accessibilityLabel("Remove \(sourceLabel(component.source))")
                 .frame(minWidth: 44, minHeight: 44)
@@ -1881,11 +2041,16 @@ public struct CardSetupEditorView: View {
         let component = draft.cardSetups[setupIndex].components[componentIndex]
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button(sourceLabel(component.source)) {
+                Button {
                     sourceRequest = .init(
                         componentID: component.id,
                         hole: descriptor.hole(for: component.region)
                     )
+                } label: {
+                    Text(sourceLabel(component.source))
+                        .frame(maxWidth: presentation == .mobile ? .infinity : nil,
+                               minHeight: presentation == .mobile ? 44 : nil, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1896,9 +2061,9 @@ public struct CardSetupEditorView: View {
 
                 placementMoveButtons(componentIndex, setupIndex: setupIndex)
 
-                Button("Remove", systemImage: "trash", role: .destructive) {
+                Button(role: .destructive) {
                     apply(.removeComponent(component.id))
-                }
+                } label: { contentActionIcon("trash") }
                 .labelStyle(.iconOnly)
                 .accessibilityLabel("Remove \(sourceLabel(component.source))")
                 .frame(minWidth: 44, minHeight: 44)
@@ -2012,26 +2177,26 @@ public struct CardSetupEditorView: View {
         )
         let localIndex = siblings.firstIndex(of: componentIndex)
         return HStack(spacing: 0) {
-            Button("Move Up", systemImage: "chevron.up") {
+            Button {
                 moveWithinHole(
                     componentIndex,
                     by: -1,
                     setupIndex: setupIndex,
                     descriptor: descriptor
                 )
-            }
+            } label: { contentActionIcon("chevron.up") }
             .labelStyle(.iconOnly)
             .accessibilityLabel("Move content up")
             .disabled(localIndex == nil || localIndex == siblings.startIndex)
             .frame(minWidth: 44, minHeight: 44)
-            Button("Move Down", systemImage: "chevron.down") {
+            Button {
                 moveWithinHole(
                     componentIndex,
                     by: 1,
                     setupIndex: setupIndex,
                     descriptor: descriptor
                 )
-            }
+            } label: { contentActionIcon("chevron.down") }
             .labelStyle(.iconOnly)
             .accessibilityLabel("Move content down")
             .disabled(localIndex == nil || localIndex == siblings.index(before: siblings.endIndex))
@@ -2047,9 +2212,9 @@ public struct CardSetupEditorView: View {
         let localIndex = siblings.firstIndex(of: componentIndex)
         let componentID = draft.cardSetups[setupIndex].components[componentIndex].id
         return HStack(spacing: 0) {
-            Button("Move Up", systemImage: "chevron.up") {
+            Button {
                 apply(.moveAdditionalComponent(componentID, .earlier))
-            }
+            } label: { contentActionIcon("chevron.up") }
             .labelStyle(.iconOnly)
             .accessibilityLabel("Move content up")
             .accessibilityIdentifier(
@@ -2057,9 +2222,9 @@ public struct CardSetupEditorView: View {
             )
             .disabled(localIndex == nil || localIndex == siblings.startIndex)
             .frame(minWidth: 44, minHeight: 44)
-            Button("Move Down", systemImage: "chevron.down") {
+            Button {
                 apply(.moveAdditionalComponent(componentID, .later))
-            }
+            } label: { contentActionIcon("chevron.down") }
             .labelStyle(.iconOnly)
             .accessibilityLabel("Move content down")
             .accessibilityIdentifier(

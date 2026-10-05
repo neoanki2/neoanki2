@@ -13,6 +13,10 @@ public actor OfflineFirstSyncService: SyncService {
     private let backupURL: @Sendable () -> URL
     private var currentStatus: SyncStatus = .offline
     private var currentIssues: [SyncIssue] = []
+    private var isSynchronizing = false
+    private var automaticSyncTask: Task<Void, Never>?
+    private var transportStarted = false
+    private var lifecycle = 0
 
     public init(
         repository: any LibraryChangePersisting,
@@ -29,25 +33,32 @@ public actor OfflineFirstSyncService: SyncService {
     }
 
     public func start() async {
-        do {
-            try await transport.start()
-            var metadata = try await metadataStore.load()
-            if !metadata.stagedInbound.isEmpty {
-                let recovered = metadata.stagedInbound
-                try await consumeIncoming(recovered, metadata: &metadata)
-                await metadataStore.removeStagedAssets(in: recovered)
-                metadata.stagedInbound = []
-                try await metadataStore.save(metadata)
+        let generation = lifecycle
+        await synchronize()
+        guard generation == lifecycle else { return }
+        if automaticSyncTask == nil {
+            automaticSyncTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(10)) }
+                    catch { return }
+                    await self?.synchronize()
+                }
             }
-            await synchronize()
-        } catch {
-            currentStatus = cloudStatus(for: error) ?? .accountUnavailable
         }
     }
 
     public func synchronize() async {
+        guard !isSynchronizing else { return }
+        isSynchronizing = true
+        defer { isSynchronizing = false }
         currentStatus = .syncing
+        let generation = lifecycle
         do {
+            if !transportStarted {
+                try await transport.start()
+                try checkLifecycle(generation)
+                transportStarted = true
+            }
             var metadata = try await metadataStore.load()
             currentIssues = metadata.issues
             if metadata.didCreateInitialBackup != true {
@@ -57,38 +68,95 @@ public actor OfflineFirstSyncService: SyncService {
                 metadata.didCreateInitialBackup = true
                 try await metadataStore.save(metadata)
             }
-            let local = try await repository.changes(after: metadata.outboundCursor, limit: 1_000)
-            let outbound = try await adapter.encode(changes: local, deviceID: metadata.deviceID)
-            if !outbound.isEmpty {
-                try await transport.enqueue(outbound)
-                if let cursor = local.last?.cursor {
-                    metadata.outboundCursor = cursor
-                    try await metadataStore.save(metadata)
-                }
+            try checkLifecycle(generation)
+            // A cursor may advance only after its payloads are durably queued.
+            // A process restart must not depend on CKSyncEngine's in-memory
+            // records or on an adapter's consumed echo suppression entries.
+            try await flushOutbound(metadata: &metadata, generation: generation)
+            if metadata.didCompleteInitialMerge == true {
+                try await stageLocalChanges(metadata: &metadata)
+                try await flushOutbound(metadata: &metadata, generation: generation)
             }
 
             let incoming = try await transport.fetchPendingChanges()
-            if !incoming.isEmpty {
-                let stagedIncoming = try await metadataStore.stageAssets(in: incoming)
-                metadata.stagedInbound = stagedIncoming
-                try await metadataStore.save(metadata)
-                try await consumeIncoming(stagedIncoming, metadata: &metadata)
-                await metadataStore.removeStagedAssets(in: stagedIncoming)
+            try checkLifecycle(generation)
+            if !incoming.isEmpty { try await metadataStore.receive(incoming) }
+            // The transport can durably stage callbacks while an awaited send
+            // or fetch is in flight. Reload, never overwrite that newer inbox.
+            metadata = try await metadataStore.load()
+            currentIssues = metadata.issues
+            // An empty cloud still requires the complete initial snapshot;
+            // uploading a local journal first can overwrite colliding identities.
+            if metadata.didCompleteInitialMerge != true || !metadata.stagedInbound.isEmpty {
+                let recovered = metadata.stagedInbound
+                let beforeMergeCursor = try await repository.currentChangeCursor()
+                let firstMerge = metadata.didCompleteInitialMerge != true
+                try await consumeIncoming(recovered, metadata: &metadata)
+                if firstMerge { metadata.outboundCursor = beforeMergeCursor }
                 metadata.stagedInbound = []
+                metadata.issues = currentIssues
+                metadata = try await metadataStore.completeIncoming(recovered, metadata: metadata)
             }
+            try await flushOutbound(metadata: &metadata, generation: generation)
+            try await stageLocalChanges(metadata: &metadata)
+            try await flushOutbound(metadata: &metadata, generation: generation)
 
+            try checkLifecycle(generation)
+            metadata = try await metadataStore.load()
+            currentIssues = metadata.issues
+            currentIssues.removeAll { $0.resourceID == "sync-batch" && $0.conflictCopy == nil }
             metadata.issues = currentIssues
             try await metadataStore.save(metadata)
-            currentStatus = currentIssues.isEmpty
-                ? .current(lastSync: .now)
-                : .needsAttention(issueCount: currentIssues.count)
+            try checkLifecycle(generation)
+            currentStatus = !currentIssues.isEmpty ? .needsAttention(issueCount: currentIssues.count)
+                : !metadata.stagedInbound.isEmpty || !(metadata.pendingOutbound ?? []).isEmpty ? .syncing
+                : .current(lastSync: .now)
+        } catch is CancellationError {
+            currentStatus = .offline
         } catch {
-            await preserveFailure(error)
+            if generation == lifecycle { await preserveFailure(error) }
         }
     }
 
+    private func stageLocalChanges(metadata: inout SyncMetadata) async throws {
+        var latest: [String: LibraryChange] = [:]
+        var cursor = metadata.outboundCursor
+        while true {
+            let page = try await repository.changes(after: cursor, limit: 1_000)
+            guard let last = page.last else { break }
+            for change in page { latest["\(change.resourceType):\(change.resourceID)"] = change }
+            cursor = last.cursor
+            if page.count < 1_000 { break }
+        }
+        let changes = latest.values.sorted { $0.cursor < $1.cursor }
+        let outbound = try await adapter.encode(changes: changes, deviceID: metadata.deviceID)
+        metadata.pendingOutbound = (metadata.pendingOutbound ?? []) + (try await metadataStore.stageOutbound(outbound))
+        metadata.outboundCursor = cursor
+        try await metadataStore.save(metadata)
+    }
+
+    private func checkLifecycle(_ generation: Int) throws {
+        guard generation == lifecycle, !Task.isCancelled else { throw CancellationError() }
+    }
+
+    private func flushOutbound(metadata: inout SyncMetadata, generation: Int) async throws {
+        try checkLifecycle(generation)
+        guard let pending = metadata.pendingOutbound, !pending.isEmpty else { return }
+        try await transport.enqueue(pending)
+        try checkLifecycle(generation)
+        metadata = try await metadataStore.load()
+        currentIssues = metadata.issues
+        metadata.pendingOutbound = []
+        try await metadataStore.save(metadata)
+        await metadataStore.removeStagedAssets(in: pending)
+    }
+
     public func stop() async {
+        lifecycle += 1
+        automaticSyncTask?.cancel()
+        automaticSyncTask = nil
         await transport.stop()
+        transportStarted = false
         currentStatus = .offline
     }
 
@@ -97,6 +165,7 @@ public actor OfflineFirstSyncService: SyncService {
 
     public func retryIssue(id: UUID) async {
         currentIssues.removeAll { $0.id == id }
+        await persistIssues()
         await synchronize()
     }
 
@@ -155,7 +224,7 @@ public actor OfflineFirstSyncService: SyncService {
                     conflictCopy: copy
                 ))
             }
-            if !merged.isEmpty { try await transport.enqueue(merged) }
+            metadata.pendingOutbound = (metadata.pendingOutbound ?? []) + (try await metadataStore.stageOutbound(merged))
             metadata.didCompleteInitialMerge = true
         } else {
             try await adapter.applyRemote(records, origin: .cloud)
@@ -175,6 +244,7 @@ public actor OfflineFirstSyncService: SyncService {
             resourceID: "sync-batch",
             summary: "A sync batch was preserved for recovery: \(String(describing: error))"
         )
+        currentIssues.removeAll { $0.resourceID == "sync-batch" && $0.conflictCopy == nil }
         currentIssues.append(issue)
         do {
             var metadata = try await metadataStore.load()

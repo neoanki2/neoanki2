@@ -225,3 +225,19 @@ private extension Array {
         return output
     }
 }
+
+@Test func singleUnitProseAlreadyHasExactlyOneOpeningCard() throws {
+    let units = [ProseUnit(text: "One sentence.", separator: "")]
+    #expect(ProsePromptPlanner.prompts(for: units) == ["Begin the passage."])
+    let generated = try ProseDeckGenerator.generate(
+        input: .init(destinationDeckID: UUID(), title: "One sentence.", text: "One sentence."),
+        reviewedUnits: units
+    )
+    defer { generated.cleanup() }
+    let lines = try String(contentsOf: generated.bundleURL.appendingPathComponent("items/prose.jsonl"), encoding: .utf8)
+        .split(separator: "\n")
+    #expect(lines.count == 1)
+    let record = try #require(JSONSerialization.jsonObject(with: Data(lines[0].utf8)) as? [String: Any])
+    let fields = try #require(record["fields"] as? [String: [String: String]])
+    #expect(fields["back"]?["text"] == "One sentence.")
+}

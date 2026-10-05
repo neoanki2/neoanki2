@@ -24,11 +24,14 @@ public enum SyncMergePolicy {
         var conflicts: [SyncConflictCopy] = []
 
         for record in local where immutableKinds.contains(record.resourceKind) {
-            acceptedByKey[immutableKey(record)] = record
+            let key = immutableKey(record)
+            acceptedByKey[key] = acceptedByKey[key].map { deterministicWinner($0, record) } ?? record
         }
-        for record in server where immutableKinds.contains(record.resourceKind) {
-            acceptedByKey[immutableKey(record)] = record
-        }
+        let immutableServer = Dictionary(
+            server.filter { immutableKinds.contains($0.resourceKind) }.map { (immutableKey($0), $0) },
+            uniquingKeysWith: deterministicWinner
+        )
+        acceptedByKey.merge(immutableServer, uniquingKeysWith: { _, server in server })
 
         let mutableLocal = Dictionary(
             local.filter { !immutableKinds.contains($0.resourceKind) }.map { (mutableKey($0), $0) },
@@ -79,8 +82,19 @@ public enum SyncMergePolicy {
         _ first: SyncRecordEnvelope,
         _ second: SyncRecordEnvelope
     ) -> SyncRecordEnvelope {
-        (first.revision, first.deviceID, first.order) >= (second.revision, second.deviceID, second.order)
-            ? first
-            : second
+        let lhs = (first.revision, first.deviceID, first.order)
+        let rhs = (second.revision, second.deviceID, second.order)
+        if lhs != rhs { return lhs > rhs ? first : second }
+        if first.isTombstone != second.isTombstone { return first.isTombstone ? first : second }
+        // Equal clocks can occur after recovery. Payload ordering provides a
+        // stable tie break rather than depending on dictionary/delivery order.
+        if first.payload != second.payload {
+            return first.payload.lexicographicallyPrecedes(second.payload) ? second : first
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let firstAsset = (try? encoder.encode(first.asset)) ?? Data()
+        let secondAsset = (try? encoder.encode(second.asset)) ?? Data()
+        return firstAsset.lexicographicallyPrecedes(secondAsset) ? second : first
     }
 }

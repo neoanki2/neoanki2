@@ -83,9 +83,12 @@ import Testing
         "always", "always", "hiddenUntilAnswer",
     ])
 
-    let records = try jsonLines(
+    let allRecords = try jsonLines(
         at: generated.bundleURL.appendingPathComponent("items/poem.jsonl")
     )
+    #expect(allRecords.count == 4)
+    #expect((allRecords[0]["tags"] as? [String])?.contains(PoemCardPlanner.openingTag) == true)
+    let records = Array(allRecords.dropFirst())
     #expect(records.count == 3)
     #expect(records.allSatisfy { ($0["tags"] as? [String]) == ["author:Ліна"] })
     #expect(records.allSatisfy {
@@ -110,9 +113,12 @@ import Testing
     )
     defer { generated.cleanup() }
 
-    let records = try jsonLines(
+    let allRecords = try jsonLines(
         at: generated.bundleURL.appendingPathComponent("items/poem.jsonl")
     )
+    #expect(allRecords.count == 4)
+    #expect((allRecords[0]["tags"] as? [String])?.contains(PoemCardPlanner.openingTag) == true)
+    let records = Array(allRecords.dropFirst())
     #expect(records.count == 3)
     #expect(textField("front", in: records[1]) == "one\ntwo")
     #expect(textField("back", in: records[1]) == "\nthree")
@@ -579,5 +585,154 @@ private struct FixedWorkspaceProvider: DeckBuildWorkspaceProviding {
         return GeneratedDeckBundle(bundleURL: bundleURL) {
             try? FileManager.default.removeItem(at: rootURL)
         }
+    }
+}
+
+@Test(arguments: [
+    ("Напитись голосу твого", "Напитись голосу твого,", false),
+    ("  FIRST   LINE!", "first line", false),
+    ("Café", "Cafe\u{301}.", false),
+    ("Cafe", "Café", true),
+    ("Кавказ", "За горами гори, хмарою повиті,", true),
+    ("…", "!", true),
+    ("First", "First line", true),
+])
+func poemOpeningPolicyPreservesWordsAndAccents(title: String, line: String, needed: Bool) {
+    #expect(PoemCardPlanner.needsOpeningCard(title: title, firstLine: line) == needed)
+}
+
+@Test func poemOpeningPlanLeavesContinuationPromptsAndStanzasUnchanged() {
+    let poem = PoemDeckGenerator.parse("Start\nA\nB\n\nC\nA\nB\nD")
+    let cards = PoemCardPlanner.cards(for: poem, title: "A different title")
+    #expect(cards.count == poem.lines.count)
+    #expect(cards.first?.prompt == PoemCardPlanner.openingPrompt)
+    #expect(cards.first?.answer == "Start")
+    #expect(cards.dropFirst().map(\.prompt) == PoemPromptPlanner.prompts(for: poem))
+    #expect(cards[3].answer == "\nC")
+    #expect(PoemCardPlanner.cards(for: poem, title: "START!") == Array(cards.dropFirst()))
+}
+
+private func storedPoemRecords(_ store: ItemStore, deckID: UUID) async throws -> [PoemDeckItemRecord] {
+    let summaries = try await store.listItems(scope: .deck(deckID, includeDescendants: false), sort: .createdAscending)
+    var records: [PoemDeckItemRecord] = []
+    for summary in summaries {
+        let loaded = try #require(await store.fetchItem(id: summary.id))
+        records.append(.init(item: loaded.item, itemType: loaded.itemType, createdAt: summary.createdAt))
+    }
+    return records
+}
+
+@Test func openingUpgradePreservesLearnedCardsAndIsRepeatSafe() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("poem-opening-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await store.bootstrap()
+    let fixture = poemFixture(lines: ["one", "two", "three", "four"])
+    _ = try await store.createItemType(fixture.itemType)
+    let deck = try await store.createDeck(Deck(name: "Different title"))
+    for record in fixture.records {
+        var item = record.item
+        item.deckID = deck.id
+        _ = try await store.createItem(item)
+    }
+    let originalRecords = try await storedPoemRecords(store, deckID: deck.id)
+    let due = try await store.fetchDueCards(scope: .deck(deck.id, includeDescendants: false), asOf: .now, limit: nil)
+    let learned = try #require(due.first)
+    _ = try await store.submitReview(cardID: learned.id, rating: .good, now: .now)
+    let learnedCard = try await store.card(id: learned.id)
+    let preview = try PoemDeckReconciler.preview(
+        sourceText: "one\ntwo\nthree\nfour", records: originalRecords, title: deck.name, deckID: deck.id
+    )
+    #expect(preview.addedCount == 1)
+    #expect(preview.changes.isEmpty)
+    let order = try #require(preview.order)
+    let cursor = try await store.currentChangeCursor()
+    _ = try await store.executeItemBulk(preview.operations, dryRun: true, orderedDeck: order)
+    #expect(try await store.currentChangeCursor() == cursor)
+    #expect(try await storedPoemRecords(store, deckID: deck.id) == originalRecords)
+    _ = try await store.reconcileOrderedDeckItems(preview.operations, order: order)
+    let upgraded = try await storedPoemRecords(store, deckID: deck.id)
+    #expect(upgraded.count == originalRecords.count + 1)
+    #expect(upgraded.first?.item.id == preview.openingCard?.id)
+    #expect(Array(upgraded.dropFirst()) == originalRecords)
+    #expect(try await store.card(id: learned.id) == learnedCard)
+    #expect(try await store.reviewLogCount(for: learned.id) == 1)
+    let newQueue = try await store.fetchDueCards(scope: .deck(deck.id, includeDescendants: false), asOf: .now, limit: nil)
+    #expect(newQueue.first?.item.id == preview.openingCard?.id)
+    #expect(Set(newQueue.map(\.id)).isSuperset(of: Set(due.dropFirst().map(\.id))))
+    let snapshot = try PoemDeckReconciler.snapshot(records: upgraded.reversed())
+    #expect(snapshot.sourceText == "one\ntwo\nthree\nfour")
+    #expect(snapshot.orderedRecords.map(\.item) == originalRecords.map(\.item))
+    #expect(snapshot.openingRecord?.item.id == preview.openingCard?.id)
+    let repeated = try PoemDeckReconciler.preview(
+        sourceText: snapshot.sourceText, records: upgraded, title: deck.name, deckID: deck.id
+    )
+    #expect(!repeated.hasChanges)
+
+    // Portable decks retain the discriminator, so opening answers do not
+    // become an extra source line after a content-only round trip.
+    let exportURL = directory.appendingPathComponent("poem.neodeck")
+    try await PortableDeck.export(deckID: deck.id, from: store, to: exportURL)
+    let target = try ItemStore(databaseURL: directory.appendingPathComponent("target.sqlite"))
+    try await target.bootstrap()
+    let imported = try await PortableDeck.importDeck(from: exportURL, into: target)
+    let importedDeck = try #require(imported.deckIDs.first)
+    let importedSnapshot = try PoemDeckReconciler.snapshot(records: await storedPoemRecords(target, deckID: importedDeck))
+    #expect(importedSnapshot.openingRecord != nil)
+    #expect(importedSnapshot.sourceText == snapshot.sourceText)
+
+    let openingInfo = try await store.itemRecord(id: #require(preview.openingCard?.id))
+    let openingCardID = try #require(openingInfo.cardIDs.first)
+    _ = try await store.submitReview(cardID: openingCardID, rating: .good, now: .now)
+    let learnedOpening = try await store.card(id: openingCardID)
+    let edit = try PoemDeckReconciler.preview(
+        sourceText: "new first\ntwo\nthree\nfour", records: upgraded, title: deck.name, deckID: deck.id
+    )
+    _ = try await store.reconcileOrderedDeckItems(edit.operations, order: #require(edit.order))
+    #expect(try await store.card(id: openingCardID) == learnedOpening)
+    #expect(try await store.card(id: learned.id) == learnedCard)
+    let edited = try await storedPoemRecords(store, deckID: deck.id)
+    let retirement = try PoemDeckReconciler.preview(
+        sourceText: "new first\ntwo\nthree\nfour", records: edited, title: "NEW FIRST!", deckID: deck.id
+    )
+    #expect(retirement.retiredOpeningCard?.id == openingInfo.item.id)
+    _ = try await store.reconcileOrderedDeckItems(retirement.operations, order: #require(retirement.order))
+    let retired = try await storedPoemRecords(store, deckID: deck.id)
+    #expect(retired.count == originalRecords.count)
+    #expect(retired.map { $0.item.id } == originalRecords.map { $0.item.id })
+    #expect(try await store.card(id: learned.id) == learnedCard)
+    #expect(try PoemDeckReconciler.snapshot(records: retired).sourceText == "new first\ntwo\nthree\nfour")
+}
+
+@Test func poemOpeningCanBeUpdatedOrExplicitlyRetired() throws {
+    let fixture = poemFixture(lines: ["one", "two", "three"])
+    let deckID = UUID()
+    let records = fixture.records.map { record in
+        var item = record.item
+        item.deckID = deckID
+        return PoemDeckItemRecord(item: item, itemType: record.itemType)
+    }
+    let added = try PoemDeckReconciler.preview(sourceText: "one\ntwo\nthree", records: records, title: "Poem", deckID: deckID)
+    let opening = try #require(added.openingCard)
+    let upgraded = [PoemDeckItemRecord(item: opening, itemType: fixture.itemType)] + records
+    let updated = try PoemDeckReconciler.preview(sourceText: "new first\ntwo\nthree", records: upgraded, title: "Poem", deckID: deckID)
+    #expect(updated.openingCard?.id == opening.id)
+    #expect(updated.addedCount == 0)
+    #expect(updated.retiredCount == 0)
+    #expect(updated.changes.contains { $0.itemID == opening.id && $0.newAnswer == "new first" })
+    let retired = try PoemDeckReconciler.preview(sourceText: "one\ntwo\nthree", records: upgraded, title: "ONE!", deckID: deckID)
+    #expect(retired.openingCard == nil)
+    #expect(retired.retiredCount == 1)
+    #expect(retired.retiredOpeningCard?.id == opening.id)
+    #expect(retired.order?.orderedItemIDs == records.map { $0.item.id })
+    #expect(throws: PoemDeckReconciliationError.invalidOpeningCard) {
+        try PoemDeckReconciler.snapshot(records: upgraded + [upgraded[0]])
+    }
+    let back = try #require(fixture.itemType.field(named: "Back"))
+    var corrupt = opening
+    corrupt.fields.removeAll { $0.fieldID == back.id }
+    corrupt.fields.append(.init(fieldID: back.id, value: .text("wrong line")))
+    #expect(throws: PoemDeckReconciliationError.invalidOpeningCard) {
+        try PoemDeckReconciler.snapshot(records: [PoemDeckItemRecord(item: corrupt, itemType: fixture.itemType)] + records)
     }
 }

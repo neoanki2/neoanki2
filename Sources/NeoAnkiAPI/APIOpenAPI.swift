@@ -100,7 +100,8 @@ package enum APIOpenAPI {
             var operation: [String: Any] = [
                 "operationId": operationID,
                 "summary": summary(for: operationID),
-                "description": "\(summary(for: operationID)) through the loopback-only NeoAnki API.",
+                "description": "\(summary(for: operationID)) through the loopback-only NeoAnki API."
+                    + (handler.additionalDescription.map { " " + $0 } ?? ""),
                 "tags": [group(for: path).rawValue],
                 "responses": operationResponses,
                 "security": scope == nil ? publicSecurity : [["bearerAuth": []]],
@@ -855,9 +856,16 @@ package enum APIOpenAPI {
                 "action": ["type": "string", "enum": ["create", "replace", "delete"]],
                 "item": reference("CreateItemInput"), "itemId": uuid,
             ]),
+            "OrderedItemSnapshot": object(["id", "itemTypeId", "deckId", "fields", "tags"], itemInputProperties),
+            "OrderedItemsInput": object(["deckId", "expectedItems", "orderedItemIds"], [
+                "deckId": uuid,
+                "expectedItems": array(reference("OrderedItemSnapshot"), min: 1, max: 100_000),
+                "orderedItemIds": array(uuid, min: 1, max: 100_000),
+            ]),
             "BulkItemsInput": object(["atomic", "dryRun", "operations"], [
                 "atomic": ["type": "boolean", "const": true], "dryRun": ["type": "boolean"],
                 "operations": array(reference("BulkItemOperation"), min: 1, max: 500),
+                "order": reference("OrderedItemsInput"),
             ]),
             "BulkItemsResult": object(["dryRun", "results", "impact"], [
                 "dryRun": ["type": "boolean"], "results": array(reference("BulkItemResult")),

@@ -22,8 +22,10 @@ send your study data to servers operated by the developer.
 
 iCloud sync is off until you enable it. Before its first upload, the app creates
 a local backup. When enabled, library content and associated media synchronize
-through your private CloudKit database in your Apple iCloud account. The
-developer does not have access to that private database. Apple provides this
+through your private CloudKit database in your Apple iCloud account. Saved
+spoken responses and their private recording files stay on the device and are
+not uploaded through this sync feature. The developer does not have access to
+your private database. Apple provides this
 service under its [privacy policy](https://www.apple.com/legal/privacy/).
 
 Disabling sync stops future synchronization on that device. It does not delete
@@ -34,10 +36,13 @@ any app data.
 ## Camera, microphone, photos, and notifications
 
 Camera, microphone, and photo access let you add media to study items or record
-answers. Media remains in your library and is included in private iCloud sync
-when you enable it. The app requests notification access only when you enable
-study reminders. Due Cards widgets use shared on-device storage to show
-aggregate due information. You can revoke permissions in device Settings.
+answers. Media attached to study items remains in your library and is included
+in private iCloud sync when you enable it. Temporary comparison recordings are
+removed when the card changes or the study session closes. Saved spoken
+responses remain on the device and are excluded from private iCloud sync.
+The app requests notification access only when you enable study reminders.
+Due Cards widgets use shared on-device storage to show aggregate due
+information. You can revoke permissions in device Settings.
 
 ## Imports, exports, and support
 

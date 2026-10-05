@@ -77,6 +77,15 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     case createImport, getImport, deleteImport, uploadImportFile, validateImport, commitImport
     case createExport, getExport, deleteExport, exportContent
     case changes, events
+
+    package var additionalDescription: String? {
+        switch self {
+        case .bulkItems:
+            "Optional order atomically reconciles one generated deck against complete expected item snapshots. Both dry runs and commits reject stale snapshots; only New-card introduction times are reordered."
+        default:
+            nil
+        }
+    }
 }
 
 package struct APIEndpointParameter: Sendable, Equatable {

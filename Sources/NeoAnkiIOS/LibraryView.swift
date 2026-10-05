@@ -9,201 +9,203 @@ import UniformTypeIdentifiers
 
 #if os(iOS)
 import UIKit
+// Mobile direction: calm native lists, prompt-led browsing, deliberate selection,
+// focused authoring, and a single blue forward action. Native toolbar sizing is
+// retained; reading content stays within a comfortable iPad measure.
 struct LibraryView: View {
     @Bindable var model: MobileAppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    var scope: DeckScope = .allDecks
+    var embedsNavigation = true
+    var navigationPath: Binding<NavigationPath>? = nil
     @State private var searchText = ""
     @State private var isAddingItem = false
     @State private var path = NavigationPath()
+    @State private var items: [SavedItemSummary] = []
+    @State private var sort: ItemSortOrder = .createdAscending
+    @State private var attentionOnly = false
+    @State private var selecting = false
+    @State private var selection: Set<UUID> = []
     @State private var pendingDeletion: Set<UUID> = []
     @State private var affectedResponseCount = 0
     @State private var showDeleteConfirmation = false
-    @State private var deletionError: String?
+    @State private var errorMessage: String?
 
     private var visibleItems: [SavedItemSummary] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return model.items }
-        return model.items.filter {
-            $0.title.localizedCaseInsensitiveContains(query)
-                || $0.subtitle.localizedCaseInsensitiveContains(query)
-                || $0.itemTypeName.localizedCaseInsensitiveContains(query)
-        }
+        ItemBrowsing.arrange(attentionOnly ? items.filter { $0.schedule?.needsAttention == true } : items,
+                             sort: sort, search: searchText)
     }
+    private var deckID: UUID? { if case let .deck(id, _) = scope { id } else { nil } }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            VStack(spacing: 0) {
-                NavigationLink {
-                    SavedResponsesMobileView(library: model.library)
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "waveform")
-                            .frame(width: 28)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Saved Responses")
-                                .font(.headline)
-                            Text("Persistent spoken responses · Local only")
-                                .font(.caption)
-                                .foregroundStyle(.primary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                            .accessibilityHidden(true)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 58)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens recordings saved from Audio Submission cards")
-                Divider()
+        Group {
+            if embedsNavigation { NavigationStack(path: navigationPath ?? $path) { browser.modifier(MobileTabBarVisibility()) } }
+            else { browser }
+        }
+        .sheet(isPresented: $isAddingItem, onDismiss: { Task { await load() } }) {
+            AddItemView(model: model, deckID: deckID)
+        }
+        .task { await load() }
+        .onChange(of: model.items) { _, _ in Task { await load() } }
+        .onChange(of: model.route, initial: true) { _, route in
+            guard embedsNavigation else { return }
+            if case let .itemDetail(id) = route {
+                if let navigationPath { navigationPath.wrappedValue = NavigationPath([id]) } else { path = NavigationPath([id]) }
+            }
+        }
+        .confirmationDialog(pendingDeletion.count == 1 ? "Delete this item?" : "Delete these items?",
+                            isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                let ids = pendingDeletion
+                Task { await perform { try await model.deleteItems(ids) } }
+            }
+            Button("Cancel", role: .cancel) { pendingDeletion = [] }
+        } message: {
+            Text(affectedResponseCount > 0
+                 ? "This also permanently deletes \(affectedResponseCount) saved spoken responses."
+                 : "This permanently deletes the selected items and their study cards.")
+        }
+        .alert("Could Not Update Library", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(errorMessage ?? "Please try again.") }
+    }
 
-                Group {
-                    if model.items.isEmpty {
-                        ScrollView {
-                            ContentUnavailableView {
-                                Label("Build Your Library", systemImage: "rectangle.stack.badge.plus")
-                            } description: {
-                                Text("Add a question and answer. NeoAnki2 will turn them into cards and schedule each review.")
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                            } actions: {
-                                Button("Add First Card") { isAddingItem = true }
-                                    .buttonStyle(.plain)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color(uiColor: .systemBackground))
-                                    .padding(.horizontal, 20)
-                                    .frame(minHeight: 44)
-                                    .background(Color.primary, in: Capsule())
-                                    .contentShape(Capsule())
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                        }
-                        .accessibilityIdentifier("emptyLibraryScroll")
-                    } else if visibleItems.isEmpty {
-                        ContentUnavailableView.search(text: searchText)
-                    } else {
-                        List(visibleItems, selection: $model.selectedItemIDs) { item in
-                        NavigationLink(value: item.id) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.title.isEmpty ? "Untitled" : item.title)
-                                    .font(.headline)
-                                    .lineLimit(2)
-                                if !item.subtitle.isEmpty {
-                                    Text(item.subtitle)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
+    private var browser: some View {
+        List {
+            if embedsNavigation {
+                Section {
+                    NavigationLink { SavedResponsesMobileView(library: model.library) } label: {
+                        Label("Saved Responses", systemImage: "waveform")
+                    }
+                }
+            }
+            Section {
+                if items.isEmpty {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Image(systemName: "rectangle.stack.badge.plus").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
+                        Text("Build Your Library").font(.title2.weight(.semibold))
+                        Text("Add something you want to remember.")
+                        Button { isAddingItem = true } label: { Text("Add First Item").frame(minHeight: 44) }
+                            .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 24)
+                    .accessibilityIdentifier("emptyLibraryScroll")
+                    .listRowBackground(Color.clear)
+                } else if visibleItems.isEmpty {
+                    ContentUnavailableView(attentionOnly ? "Nothing Needs Attention" : "No Matching Items",
+                                           systemImage: attentionOnly ? "checkmark.circle" : "magnifyingglass")
+                } else {
+                    ForEach(visibleItems) { item in
+                        Group {
+                            if selecting {
+                                Button {
+                                    if !selection.insert(item.id).inserted { selection.remove(item.id) }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: selection.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                                        itemRow(item)
+                                    }.contentShape(Rectangle())
                                 }
-                                Text("\(item.itemTypeName) · \(item.cardCount) \(item.cardCount == 1 ? "card" : "cards")")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(selection.contains(item.id) ? .isSelected : [])
+                                .accessibilityIdentifier("library-select-\(item.id)")
+                            } else {
+                                NavigationLink { ItemDetailView(model: model, itemID: item.id) } label: { itemRow(item) }
                             }
-                            .padding(.vertical, 3)
                         }
                         .swipeActions {
                             Button("Delete", role: .destructive) { requestDeletion([item.id]) }
-                        }
-                    }
-                        .refreshable { await model.refresh() }
-                    }
-                }
-            }
-            .navigationTitle("Library")
-            .modifier(ConditionalLibrarySearch(text: $searchText, isEnabled: !model.items.isEmpty))
-            .navigationDestination(for: UUID.self) { itemID in
-                ItemDetailView(model: model, itemID: itemID)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { EditButton() }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add Card", systemImage: "plus") {
-                        isAddingItem = true
-                    }
-                }
-                if !model.selectedItemIDs.isEmpty {
-                    ToolbarItem(placement: .bottomBar) {
-                        Menu("Move \(model.selectedItemIDs.count) Items", systemImage: "folder") {
-                            Button("Unassigned") { Task { try? await model.moveItems(model.selectedItemIDs, to: nil) } }
-                            ForEach(model.decks) { deck in Button(deck.name) { Task { try? await model.moveItems(model.selectedItemIDs, to: deck.id) } } }
-                        }
-                    }
-                    ToolbarItem(placement: .bottomBar) {
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            requestDeletion(model.selectedItemIDs)
+                            if item.schedule?.needsAttention == true {
+                                Button("Mark OK") { Task { await markOK([item.id]) } }
+                            }
                         }
                     }
                 }
-            }
-            .sheet(isPresented: $isAddingItem) {
-                AddItemView(model: model)
-            }
-            .onChange(of: model.route) { _, route in
-                if case let .itemDetail(id) = route { path = NavigationPath([id]) }
-            }
-            .task {
-                if case let .itemDetail(id) = model.route { path = NavigationPath([id]) }
-            }
-            .confirmationDialog(
-                pendingDeletion.count == 1 ? "Delete this item?" : "Delete \(pendingDeletion.count) items?",
-                isPresented: $showDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    let ids = pendingDeletion
-                    Task {
-                        do { try await model.deleteItems(ids) }
-                        catch { deletionError = MobileAppModel.message(for: error) }
+            } header: { Text(attentionOnly ? "Repeatedly Forgotten" : "Items") }
+        }
+        .navigationTitle(embedsNavigation ? "Library" : "Browse Items")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationDestination(for: UUID.self) { ItemDetailView(model: model, itemID: $0) }
+        .searchable(text: $searchText, prompt: "Search items")
+        .scrollDismissesKeyboard(.interactively)
+        .refreshable { await load() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("Browse Options", systemImage: "line.3.horizontal.decrease") {
+                    Picker("Sort", selection: $sort) {
+                        Text("Reading Order").tag(ItemSortOrder.createdAscending)
+                        Text("Newest First").tag(ItemSortOrder.createdDescending)
+                        Text("Due Soonest").tag(ItemSortOrder.dueSoonest)
+                        Text("Title").tag(ItemSortOrder.titleAscending)
                     }
-                    pendingDeletion = []
-                }
-                Button("Cancel", role: .cancel) { pendingDeletion = [] }
-            } message: {
-                if affectedResponseCount > 0 {
-                    Text("This also permanently deletes \(affectedResponseCount) saved spoken \(affectedResponseCount == 1 ? "response" : "responses").")
-                } else {
-                    Text("This permanently deletes the selected items and their study cards.")
+                    Toggle("Repeatedly Forgotten", isOn: $attentionOnly)
+                    Toggle("Conceal Answers", isOn: $model.concealsAnswers)
+                    Button(selecting ? "Done Selecting" : "Select Items") { selecting.toggle(); selection = [] }
                 }
             }
-            .alert("Could Not Delete", isPresented: Binding(
-                get: { deletionError != nil },
-                set: { if !$0 { deletionError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(deletionError ?? "The items could not be deleted.")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Add Item", systemImage: "plus") { isAddingItem = true }
+            }
+
+        }
+        .safeAreaInset(edge: .bottom) {
+            if selecting {
+                VStack(spacing: 12) {
+                    Text("\(selection.count) selected").font(.subheadline)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(spacing: 8) { selectionActions }
+                    } else {
+                        HStack(spacing: 12) { selectionActions }
+                    }
+                }.padding(16).background(.bar)
             }
         }
     }
 
+    @ViewBuilder
+    private var selectionActions: some View {
+        Menu {
+            Button("Unassigned") { move(to: nil) }
+            ForEach(model.decks) { deck in Button(deck.name) { move(to: deck.id) } }
+        } label: { Label("Move", systemImage: "folder").frame(maxWidth: .infinity, minHeight: 44) }
+            .disabled(selection.isEmpty).buttonStyle(.bordered)
+        Button { Task { await markOK(selection) } } label: { Text("Mark OK").frame(maxWidth: .infinity, minHeight: 44) }
+            .disabled(selection.isEmpty).buttonStyle(.bordered)
+        Button(role: .destructive) { requestDeletion(selection) } label: { Label("Delete", systemImage: "trash").frame(maxWidth: .infinity, minHeight: 44) }
+            .disabled(selection.isEmpty).buttonStyle(.bordered)
+    }
+
+    private func itemRow(_ item: SavedItemSummary) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(item.title.isEmpty ? "Untitled Item" : item.title).font(.body.weight(.medium)).lineLimit(3)
+            if !model.concealsAnswers, !item.subtitle.isEmpty {
+                Text(item.subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Text(item.itemTypeName + (item.schedule?.needsAttention == true ? " · Needs attention" : ""))
+                .font(.caption).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.vertical, 4)
+    }
+    private func load() async {
+        do { items = try await model.library.items(scope: scope, sort: .createdAscending, search: "") }
+        catch { errorMessage = MobileAppModel.message(for: error) }
+    }
+    private func perform(_ action: () async throws -> Void) async {
+        do { try await action(); selection = []; await load() }
+        catch { errorMessage = MobileAppModel.message(for: error) }
+    }
+    private func move(to deck: UUID?) { Task { await perform { try await model.moveItems(selection, to: deck) } } }
+    private func markOK(_ ids: Set<UUID>) async {
+        await perform { _ = try await model.library.acknowledgeRepeatedLapses(itemIDs: ids, asOf: .now); await model.refresh() }
+    }
     private func requestDeletion(_ ids: Set<UUID>) {
         guard !ids.isEmpty else { return }
         pendingDeletion = ids
         Task {
-            do {
-                affectedResponseCount = try await model.studyResponseCount(itemIDs: ids)
-                showDeleteConfirmation = true
-            } catch {
-                pendingDeletion = []
-                deletionError = MobileAppModel.message(for: error)
-            }
-        }
-    }
-}
-
-private struct ConditionalLibrarySearch: ViewModifier {
-    @Binding var text: String
-    let isEnabled: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content.searchable(text: $text, prompt: "Search cards")
-        } else {
-            content
+            do { affectedResponseCount = try await model.studyResponseCount(itemIDs: ids); showDeleteConfirmation = true }
+            catch { errorMessage = MobileAppModel.message(for: error) }
         }
     }
 }
@@ -211,6 +213,7 @@ private struct ConditionalLibrarySearch: ViewModifier {
 struct AddItemView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
+    @State private var confirmsDiscard = false
     @State private var selectedTypeID: UUID?
     @State private var selectedDeckID: UUID?
     @State private var values: [UUID: String] = [:]
@@ -225,12 +228,17 @@ struct AddItemView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    private var hasChanges: Bool {
+        values.values.contains { !$0.isEmpty } || !richValues.isEmpty || !mediaValues.isEmpty || !clozeBlanks.isEmpty || mediaDescriptions.values.contains { !$0.isEmpty }
+    }
+
     private var selectedType: ItemType? {
         model.itemTypes.first(where: { $0.id == selectedTypeID }) ?? model.itemTypes.first
     }
 
-    init(model: MobileAppModel) {
+    init(model: MobileAppModel, deckID: UUID? = nil) {
         self.model = model
+        _selectedDeckID = State(initialValue: deckID)
         _selectedTypeID = State(initialValue: model.itemTypes.first?.id)
     }
 
@@ -241,10 +249,10 @@ struct AddItemView: View {
                     ContentUnavailableView(
                         "No Item Types",
                         systemImage: "square.stack.3d.up.slash",
-                        description: Text("Create an item type from the Create tab or import a deck before adding cards here.")
+                        description: Text("Create an item type from the Create tab or import a deck before adding items here.")
                     )
                 } else {
-                    Section("Card type") {
+                    Section("Item") {
                         Picker("Item type", selection: $selectedTypeID) {
                             ForEach(model.itemTypes) { type in
                                 Text(type.name).tag(Optional(type.id))
@@ -261,17 +269,11 @@ struct AddItemView: View {
                     if let selectedType {
                         Section("Content") {
                             ForEach(selectedType.fields) { field in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack(spacing: 4) {
-                                        Text(field.name)
-                                            .font(.subheadline.weight(.medium))
-                                        if field.isRequired {
-                                            Text("Required")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
+                                MobileItemFieldRow(field: field) {
                                     fieldEditor(field)
+                                    if let issue = validationIssue(field) {
+                                        Label(issue, systemImage: "exclamationmark.circle").font(.footnote).foregroundStyle(.red)
+                                    }
                                 }
                                 .padding(.vertical, 3)
                             }
@@ -279,16 +281,16 @@ struct AddItemView: View {
                     }
                 }
             }
-            .navigationTitle("Add Card")
+            .navigationTitle("New Item")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { if hasChanges { confirmsDiscard = true } else { dismiss() } }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
                         ProgressView()
-                            .accessibilityLabel("Saving card")
+                            .accessibilityLabel("Saving item")
                     } else {
                         Button("Save") { save() }
                             .accessibilityIdentifier("add-card-save")
@@ -296,7 +298,12 @@ struct AddItemView: View {
                     }
                 }
             }
-            .alert("Could Not Save Card", isPresented: errorBinding) {
+            .interactiveDismissDisabled(hasChanges)
+            .confirmationDialog("Discard this item?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
+                Button("Discard Changes", role: .destructive) { dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            }
+            .alert("Could Not Save Item", isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "Please check the card and try again.")
@@ -332,10 +339,10 @@ struct AddItemView: View {
                 get: { richValues[field.id] ?? [] },
                 set: { richValues[field.id] = $0 }
             ))
-            .frame(minHeight: 96)
+            .modifier(MobileTextEditorHeight())
         case .audio, .image, .gif, .video:
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Visual description (required)", text: Binding(
+                TextField(field.type == .audio ? "Audio description (required)" : "Visual description (required)", text: Binding(
                     get: { mediaDescriptions[field.id] ?? "" },
                     set: { mediaDescriptions[field.id] = $0 }
                 ), axis: .vertical)
@@ -346,22 +353,26 @@ struct AddItemView: View {
                     }
                     .simultaneousGesture(TapGesture().onEnded { selectedMediaField = field })
                 }
-                HStack {
-                    Button("Files", systemImage: "folder") {
+                MobileAdaptiveActionGroup {
+                    Button {
                         selectedMediaField = field
                         isImportingMediaFile = true
-                    }
-                    .frame(minHeight: 44)
+                    } label: { Label("Files", systemImage: "folder").frame(minHeight: 44) }
                     if field.type == .image || field.type == .video {
-                        Button("Camera", systemImage: "camera") {
+                        Button {
                             selectedMediaField = field
                             isCapturingMedia = true
-                        }
-                        .frame(minHeight: 44)
+                        } label: { Label("Camera", systemImage: "camera").frame(minHeight: 44) }
                         .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
                     }
                 }
-                if mediaValues[field.id] != nil { Label("Media ready", systemImage: "checkmark.circle").foregroundStyle(.secondary) }
+                if mediaValues[field.id] != nil {
+                    Label("Media ready", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(role: .destructive) { mediaValues[field.id] = nil } label: { Text("Remove Media").frame(minHeight: 44) }
+                }
             }
         case .cloze:
             ClozeSelectionEditor(text: valueBinding(for: field.id), blanks: Binding(
@@ -375,9 +386,19 @@ struct AddItemView: View {
         }
     }
 
+    private func validationIssue(_ field: FieldDef) -> String? {
+        let value = (values[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if field.type == .number, !value.isEmpty {
+            let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
+            if formatter.number(from: value) == nil { return "Enter a valid number." }
+        }
+        return nil
+    }
+
     private var canSave: Bool {
         guard let selectedType else { return false }
         return selectedType.fields.allSatisfy { field in
+            if validationIssue(field) != nil { return false }
             if !field.isRequired { return true }
             switch field.type {
             case .richText: return !(richValues[field.id] ?? []).map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -451,7 +472,7 @@ struct AddItemView: View {
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
             try await ingestData(Data(contentsOf: url, options: [.mappedIfSafe]), for: field)
-        } catch { errorMessage = MobileAppModel.message(for: error) }
+        } catch { if (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
     }
 
     private func ingestCapture(_ result: Result<MobileCameraCapture, Error>, for field: FieldDef) async {
@@ -459,7 +480,7 @@ struct AddItemView: View {
             let capture = try result.get()
             defer { if let temporaryURL = capture.temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) } }
             try await ingestData(capture.data, for: field)
-        } catch { errorMessage = MobileAppModel.message(for: error) }
+        } catch { if (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
     }
 
     private func ingestData(_ data: Data, for field: FieldDef) async throws {
@@ -508,6 +529,7 @@ private struct MobileCameraPicker: UIViewControllerRepresentable {
 }
 
 private struct ItemDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     let itemID: UUID
     @State private var loaded: (item: Item, itemType: ItemType)?
@@ -515,6 +537,8 @@ private struct ItemDetailView: View {
     @State private var errorMessage: String?
     @State private var isEditing = false
     @State private var confirmsDelete = false
+    @State private var affectedResponseCount = 0
+    @State private var deletionError: String?
 
     var body: some View {
         Group {
@@ -545,23 +569,28 @@ private struct ItemDetailView: View {
                 .navigationTitle(loaded.itemType.name)
                 .toolbar {
                     Button("Edit") { isEditing = true }
-                    Button("Delete", systemImage: "trash", role: .destructive) { confirmsDelete = true }
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        Task {
+                            do { affectedResponseCount = try await model.studyResponseCount(itemIDs: [itemID]); confirmsDelete = true }
+                            catch { deletionError = MobileAppModel.message(for: error) }
+                        }
+                    }
                 }
             } else if let errorMessage {
                 ContentUnavailableView(
-                    "Could Not Load Card",
+                    "Could Not Load Item",
                     systemImage: "exclamationmark.triangle",
                     description: Text(errorMessage)
                 )
             } else {
-                ProgressView("Loading card…")
+                ProgressView("Loading item…")
             }
         }
         .task {
             do {
                 loaded = try await model.item(id: itemID)
                 cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
-                if loaded == nil { errorMessage = "This card no longer exists." }
+                if loaded == nil { errorMessage = "This item no longer exists." }
             } catch {
                 errorMessage = MobileAppModel.message(for: error)
             }
@@ -577,11 +606,7 @@ private struct ItemDetailView: View {
                         deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Poem",
                         onSaved: {
                             isEditing = false
-                            Task {
-                                await model.refresh()
-                                self.loaded = try? await model.item(id: itemID)
-                                self.cardMaturityDetails = (try? await model.library.cardMaturityDetails(itemID: itemID)) ?? []
-                            }
+                            Task { await reloadAfterSourceEditing() }
                         },
                         onCancel: { isEditing = false }
                     )
@@ -594,12 +619,7 @@ private struct ItemDetailView: View {
                         deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Prose",
                         onSaved: {
                             isEditing = false
-                            Task {
-                                await model.refresh()
-                                self.loaded = try? await model.item(id: itemID)
-                                self.cardMaturityDetails =
-                                    (try? await model.library.cardMaturityDetails(itemID: itemID)) ?? []
-                            }
+                            Task { await reloadAfterSourceEditing() }
                         },
                         onCancel: { isEditing = false }
                     )
@@ -608,9 +628,33 @@ private struct ItemDetailView: View {
                 }
             }
         }
-        .confirmationDialog("Delete this item?", isPresented: $confirmsDelete) {
-            Button("Delete", role: .destructive) { Task { try? await model.deleteItems([itemID]) } }
+        .confirmationDialog("Delete this item?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    do { try await model.deleteItems([itemID]); dismiss() }
+                    catch { deletionError = MobileAppModel.message(for: error) }
+                }
+            }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(affectedResponseCount > 0 ? "This also permanently deletes \(affectedResponseCount) saved spoken responses." : "This permanently deletes the item and its study cards.")
+        }
+        .alert("Could Not Delete Item", isPresented: Binding(get: { deletionError != nil }, set: { if !$0 { deletionError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(deletionError ?? "Please try again.") }
+    }
+
+    private func reloadAfterSourceEditing() async {
+        await model.refresh()
+        do {
+            // Reconciliation can replace the selected unit. Return to its scoped
+            // browser rather than leaving a detail for a retired item mounted.
+            guard let updated = try await model.item(id: itemID) else { dismiss(); return }
+            loaded = updated
+            cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
+        } catch {
+            loaded = nil
+            errorMessage = MobileAppModel.message(for: error)
         }
     }
 
@@ -618,6 +662,33 @@ private struct ItemDetailView: View {
         let setup = itemType.templates.first(where: { $0.id == detail.templateID })?.name ?? "Card"
         if let group = detail.clozeGroup { return "\(setup) · blank \(group)" }
         return setup
+    }
+}
+
+struct MobileAdaptiveActionGroup<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        layout { content() }
+    }
+}
+
+private struct MobileItemFieldRow<Editor: View>: View {
+    let field: FieldDef
+    @ViewBuilder var editor: () -> Editor
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(field.name).font(.subheadline.weight(.medium))
+                if field.isRequired { Text("Required").font(.caption).foregroundStyle(.secondary) }
+            }
+            editor()
+        }.padding(.vertical, 4)
+            .buttonStyle(.borderless)
     }
 }
 
@@ -657,8 +728,15 @@ struct ItemEditMobileView: View {
                         ForEach(model.decks) { Text($0.name).tag(Optional($0.id)) }
                     }
                 }
-                ForEach(itemType.fields) { field in
-                    Section(field.name) { editor(field) }
+                Section("Content") {
+                    ForEach(itemType.fields) { field in
+                        MobileItemFieldRow(field: field) {
+                            editor(field)
+                            if let issue = fieldIssue(field) {
+                                Label(issue, systemImage: "exclamationmark.circle").font(.footnote).foregroundStyle(.red)
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("Edit Item").navigationBarTitleDisplayMode(.inline)
@@ -666,7 +744,7 @@ struct ItemEditMobileView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { if item == originalItem { dismiss() } else { confirmsDiscard = true } }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(itemType.fields.contains { fieldIssue($0) != nil }) }
             }
             .interactiveDismissDisabled(item != originalItem)
             .alert("Could Not Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
@@ -699,14 +777,15 @@ struct ItemEditMobileView: View {
         switch field.type {
         case .richText:
             let spans: [Span] = if case let .rich(value) = value { value } else { [] }
-            RichSpanTextEditor(spans: Binding(get: { spansFor(field.id) ?? spans }, set: { set(.rich($0), field.id) })).frame(minHeight: 96)
+            RichSpanTextEditor(spans: Binding(get: { spansFor(field.id) ?? spans }, set: { set(.rich($0), field.id) }))
+                .modifier(MobileTextEditorHeight())
         case .cloze:
             let text = textFor(field.id) ?? ""
             let blanks: [ClozeSpan] = clozeFor(field.id) ?? []
             ClozeSelectionEditor(text: Binding(get: { textFor(field.id) ?? text }, set: { set(.cloze($0, blanks: clozeFor(field.id) ?? blanks), field.id) }), blanks: Binding(get: { clozeFor(field.id) ?? blanks }, set: { set(.cloze(textFor(field.id) ?? text, blanks: $0), field.id) }))
         case .audio, .image, .gif, .video:
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Visual description (required)", text: Binding(
+                TextField(field.type == .audio ? "Audio description (required)" : "Visual description (required)", text: Binding(
                     get: { mediaDescriptions[field.id] ?? "" },
                     set: { description in
                         mediaDescriptions[field.id] = description
@@ -723,16 +802,20 @@ struct ItemEditMobileView: View {
                     }
                     .simultaneousGesture(TapGesture().onEnded { selectedMediaField = field })
                 }
-                HStack {
-                    Button("Files", systemImage: "folder") { selectedMediaField = field; isImportingMediaFile = true }
-                        .frame(minHeight: 44)
+                MobileAdaptiveActionGroup {
+                    Button { selectedMediaField = field; isImportingMediaFile = true } label: { Label("Files", systemImage: "folder").frame(minHeight: 44) }
                     if field.type == .image || field.type == .video {
-                        Button("Camera", systemImage: "camera") { selectedMediaField = field; isCapturingMedia = true }
-                            .frame(minHeight: 44)
+                        Button { selectedMediaField = field; isCapturingMedia = true } label: { Label("Camera", systemImage: "camera").frame(minHeight: 44) }
                             .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
                     }
                 }
-                if mediaReference(field.id) != nil { Label("Media ready", systemImage: "checkmark.circle").foregroundStyle(.secondary) }
+                if mediaReference(field.id) != nil {
+                    Label("Media ready", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(role: .destructive) { set(.empty, field.id) } label: { Text("Remove Media").frame(minHeight: 44) }
+                }
             }
         case .number:
             TextField("Number", value: Binding(get: { numberFor(field.id) }, set: { set($0.map(ContentValue.number) ?? .empty, field.id) }), format: .number)
@@ -741,6 +824,22 @@ struct ItemEditMobileView: View {
             TextField(field.name, text: Binding(get: { textFor(field.id) ?? "" }, set: { set(.text($0), field.id) }), axis: .vertical)
         }
     }
+    private func fieldIssue(_ field: FieldDef) -> String? {
+        let value = item.value(for: field.id) ?? .empty
+        if field.isRequired {
+            switch value {
+            case .empty: return "This field is required."
+            case let .text(text, _), let .cloze(text, _):
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "This field is required." }
+            case let .rich(spans):
+                if spans.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "This field is required." }
+            default: break
+            }
+        }
+        if case let .media(reference) = value, (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a media description." }
+        return nil
+    }
+
     private func set(_ value: ContentValue, _ fieldID: UUID) {
         if let index = item.fields.firstIndex(where: { $0.fieldID == fieldID }) { item.fields[index].value = value }
         else { item.fields.append(FieldValue(fieldID: fieldID, value: value)) }

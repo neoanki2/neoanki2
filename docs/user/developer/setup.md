@@ -59,6 +59,20 @@ Device, CloudKit, widget, and TestFlight work additionally requires the Apple
 identifiers and provisioning described in the
 [iOS release checklist]({{ '/IOS_RELEASE/' | relative_url }}).
 
+To deploy current local changes directly to a paired physical iPhone:
+
+```bash
+./Scripts/deploy-iphone.sh
+```
+
+The command uses saved signing material in
+`~/Library/Application Support/NeoAnki2 Signing/`, builds Release, signs the app
+and widget in a disposable Keychain, installs as an update, and launches once.
+It leaves existing Keychains and app data intact and does not publish a release.
+Use `--device NAME_OR_IDENTIFIER` when multiple iPhones are available, or
+`--prepare-only` to build and sign without installing. Logs and receipts are
+written to `.build/iphone-deploy/`.
+
 ## Local data
 
 Development and installed macOS builds normally share
