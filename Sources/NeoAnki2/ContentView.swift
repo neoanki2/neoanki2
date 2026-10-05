@@ -238,9 +238,6 @@ struct ContentView: View {
             if isShowingSavedResponses { isShowingSavedResponses = false }
             Task { await reloadScope() }
         }
-        .onChange(of: decksModel.allDecksDueCount, initial: true) { _, dueCount in
-            AppDelegate.updateDockBadge(dueCount: dueCount)
-        }
         .onAppear {
             AppStartupTrace.mark("content_appeared")
             if !decksModel.needsInitialLoad, !itemsModel.needsInitialLoad {

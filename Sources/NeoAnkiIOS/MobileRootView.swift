@@ -58,15 +58,15 @@ public struct MobileRootView: View {
                 catch { fixtureError = MobileAppModel.message(for: error) }
                 fixturesReady = true
             }
-            // The sync service also receives changes while this screen is
-            // idle. Refresh visible data and widget state after those pulls.
+            // Cards also become due with sync disabled. Refresh their count
+            // and the app icon while this screen is idle.
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(10)) }
                 catch { return }
                 if model.syncEnabled {
                     await model.refreshSyncStatus()
-                    await model.refresh()
                 }
+                await model.refresh()
             }
         }
     }

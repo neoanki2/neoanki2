@@ -30,7 +30,9 @@ struct StudyScope: Sendable, Equatable {
 final class DecksModel {
     private(set) var deckTree: [DeckNode] = []
     private(set) var summaries: [DeckSummary] = []
-    private(set) var allDecksDueCount = 0
+    private(set) var allDecksDueCount = 0 {
+        didSet { onDueCountChange?(allDecksDueCount) }
+    }
     private(set) var unassignedDueCount = 0
     private(set) var unassignedItemCount = 0
     /// True only until the sidebar first has something to show. Later reloads
@@ -45,9 +47,14 @@ final class DecksModel {
     var selectedScope: SidebarSelection = .allDecks
 
     let library: any LibraryBrowsing & LibraryDeckManaging
+    private let onDueCountChange: (@MainActor (Int) -> Void)?
 
-    init(library: any LibraryBrowsing & LibraryDeckManaging) {
+    init(
+        library: any LibraryBrowsing & LibraryDeckManaging,
+        onDueCountChange: (@MainActor (Int) -> Void)? = nil
+    ) {
         self.library = library
+        self.onDueCountChange = onDueCountChange
     }
 
     var studyScope: StudyScope {

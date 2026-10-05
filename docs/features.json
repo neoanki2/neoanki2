@@ -102,6 +102,13 @@
       "tests": ["Tests/NeoAnki2Tests/MacCloudSyncStatusModelTests.swift", "Tests/NeoAnkiApplicationTests/CKSyncEngineTransportTests.swift", "Tests/NeoAnkiApplicationTests/OfflineFirstSyncServiceTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiApplicationTests/SyncMergePolicyTests.swift", "Tests/NeoAnkiApplicationTests/SyncStateMachineTests.swift", "Tests/NeoAnkiApplicationTests/SyncMetadataStoreTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
     },
     {
+      "id": "app-icon-badge",
+      "name": "Show library-wide due counts on Mac and mobile app icons",
+      "article": "user/sync-reminders-widgets.md",
+      "sources": ["Sources/NeoAnkiApplication/AppIconBadge.swift", "Sources/NeoAnki2/AppDelegate.swift", "Sources/NeoAnki2/DecksModel.swift", "Platforms/iOS/IOSPlatformServices.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
+      "tests": ["Tests/NeoAnki2Tests/DockBadgeTests.swift", "Tests/NeoAnkiApplicationTests/AppIconBadgeTests.swift", "Tests/NeoAnkiFeaturesTests/AppIconBadgeFeatureTests.swift"]
+    },
+    {
       "id": "mobile-reminders-widgets",
       "name": "Configure daily reminders and due-count widgets",
       "article": "user/sync-reminders-widgets.md",
