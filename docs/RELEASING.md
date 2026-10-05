@@ -10,7 +10,7 @@ permalink: /RELEASING/
 
 NeoAnki2's default release path starts with the current local working tree and
 targets a verified installation from the official Homebrew tap within 300
-seconds. It does not require advance preparation.
+seconds once the saved Apple signing material is configured.
 
 ## Run a release
 
@@ -27,7 +27,9 @@ The command performs the complete transaction without prompts:
 2. Stages every tracked and untracked, non-ignored local change and commits the
    exact tree. Existing local commits ahead of `main` are included too.
 3. Derives the next `1.0.N` version from the latest published release.
-4. Runs `Scripts/test-fast.sh` and the universal DMG build concurrently.
+4. Runs `Scripts/test-fast.sh` and the universal DMG build concurrently. The
+   app is signed with Developer ID, provisioned for production CloudKit,
+   submitted to Apple for notarization, stapled, and assessed by Gatekeeper.
 5. Pushes with authenticated `gh`, creates or reuses a pull request, and checks
    that its head still matches the locally verified revision.
 6. Attempts an immediate administrative merge after the local gates pass. If
@@ -50,6 +52,48 @@ The app remains open during compilation, tests, upload, and tap publication.
 If it is running, the command requests a normal quit only immediately before
 Homebrew replaces it and relaunches the exact installed path once afterward.
 
+## Required Apple signing
+
+Mac releases and `Scripts/install-app.sh` require Developer ID signing,
+production CloudKit provisioning, hardened runtime, and accepted Apple
+notarization by default. Missing credentials, expired profiles, incorrect
+capabilities, rejected notarization, or failed Gatekeeper assessment stop the
+build before publication or replacement. There is no unsigned release fallback.
+
+The default material directory is
+`~/Library/Application Support/NeoAnki2 Signing/`. Override it with
+`NEOANKI_SIGNING_DIR`. It contains:
+
+- `Developer-ID-Application.cert.pem` and `Developer-ID-Application.key.pem`;
+- `DeveloperIDG2CA.cer`;
+- `Mac-DeveloperID.provisionprofile`, authorizing `com.neoanki2.app`,
+  `iCloud.com.neoanki2.app`, production CloudKit, and production push;
+- `app-store-connect.json`, with `key_id`, `issuer_id`, `private_key_path`, and
+  `team_id`, plus the referenced App Store Connect API private key.
+
+Run `python3 Scripts/sign-macos-app.py --check` to validate local inputs.
+Signing imports the saved material into a disposable Keychain and cleans it up;
+it never requires unlocking the existing signing Keychain. Notarization uses
+API authentication and does not prompt for Apple ID or Mac passwords.
+
+The Release and Release candidate workflows use the same signer. Configure
+repository secrets through authenticated `gh`: `APPLE_DEVELOPER_ID_P12_BASE64`,
+`APPLE_DEVELOPER_ID_P12_PASSWORD`, `APPLE_DEVELOPER_ID_PROFILE_BASE64`,
+`APPLE_DEVELOPER_ID_CHAIN_BASE64`, `APPLE_NOTARY_KEY_BASE64`,
+`APPLE_NOTARY_KEY_ID`, `APPLE_NOTARY_ISSUER_ID`, and `APPLE_DEVELOPMENT_TEAM`.
+The runner decodes them into a private temporary directory removed on exit.
+
+`NEOANKI_INSTALL_SIGNED=0` is an explicit development-only option for local
+unprovisioned bundles. The release packager always forces signing and rejects
+`NEOANKI_RELEASE_SIGNED=0`. Headless `swift build` and disposable UI-test bundles
+continue to work without distribution credentials.
+
+The packager saves `notarization.json` beside the DMG. Verify an existing bundle
+with `python3 Scripts/sign-macos-app.py --verify /path/to/NeoAnki2.app`.
+Homebrew casks preserve quarantine; they no longer remove it to bypass a missing
+notarization ticket. Previously published builds retain their original signing
+status, so inspect the selected release's notes.
+
 ## Five-minute budget
 
 `NEOANKI_RELEASE_SLO_SECONDS` defaults to `300`. The measured cold universal
@@ -65,7 +109,8 @@ publish, change the tap, or replace the app.
 
 Network and GitHub availability cannot be made deterministic by a local
 script. The 300-second value is an enforced operational SLO under available
-dependencies, not a claim that an internet outage can still produce a public
+dependencies. Apple notarization is an external gate and can exceed the budget;
+the release must stop instead of shipping an unnotarized app. The value is not a claim that an internet outage can still produce a public
 Homebrew release.
 
 ## Verification model
@@ -75,7 +120,8 @@ those jobs finish within five minutes. The release artifact is protected by:
 
 - an exact automatic commit of the local tree;
 - the complete headless fast suite before merge;
-- a universal release build, code-signature verification, architecture check,
+- a universal release build, Developer ID and production CloudKit verification,
+  accepted notarization, stapling, Gatekeeper assessment, architecture check,
   and SHA-256 manifest before publication;
 - exact PR-head and latest-version race checks;
 - automatic exhaustive Test and Documentation runs caused by the merge to

@@ -7,6 +7,14 @@ BUILD_NUMBER="${NEOANKI_RELEASE_BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count 
 VERSION="${NEOANKI_RELEASE_VERSION:-1.0.$BUILD_NUMBER}"
 ARTIFACT_NAME="NeoAnki2-$VERSION-mac-universal.dmg"
 
+# Published artifacts always carry real signing capabilities. Never silently
+# downgrade a release when signing material or Apple's service is unavailable.
+if [ "${NEOANKI_RELEASE_SIGNED:-1}" != "1" ]; then
+  echo "Mac releases require Developer ID, production CloudKit, and notarization." >&2
+  exit 1
+fi
+python3 "$ROOT/Scripts/sign-macos-app.py" --check
+
 if [[ ! "$VERSION" =~ ^[0-9]+([.][0-9]+)*$ ]]; then
   echo "Invalid release version: $VERSION" >&2
   exit 1
@@ -31,20 +39,15 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$PAYLOAD_DIR"
-if [ "${NEOANKI_RELEASE_SIGNED:-0}" = "1" ]; then
-  NEOANKI_INSTALL_VERSION="$VERSION" \
-  NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
-    "$ROOT/Scripts/archive-macos-release.sh" "$WORK_DIR/signed"
-  ditto "$WORK_DIR/signed/export/NeoAnki2.app" "$APP_PATH"
-else
-  NEOANKI_INSTALL_CONFIG=release \
-  NEOANKI_INSTALL_DIR="$PAYLOAD_DIR" \
-  NEOANKI_INSTALL_VERSION="$VERSION" \
-  NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
-  NEOANKI_INSTALL_UNIVERSAL=1 \
-  NEOANKI_INSTALL_ALLOW_RUNNING=1 \
-    "$ROOT/Scripts/install-app.sh"
-fi
+NEOANKI_INSTALL_CONFIG=release \
+NEOANKI_INSTALL_DIR="$PAYLOAD_DIR" \
+NEOANKI_INSTALL_VERSION="$VERSION" \
+NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
+NEOANKI_INSTALL_UNIVERSAL=1 \
+NEOANKI_INSTALL_ALLOW_RUNNING=1 \
+NEOANKI_INSTALL_SIGNED=1 \
+  "$ROOT/Scripts/install-app.sh"
+cp "$ROOT/.build/install/notarization.json" "$OUTPUT_DIR/notarization.json"
 
 installed_version=$(
   /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
@@ -57,10 +60,7 @@ fi
 
 codesign --verify --deep --strict "$APP_PATH"
 lipo "$APP_PATH/Contents/MacOS/NeoAnki2" -verify_arch arm64 x86_64
-if [ "${NEOANKI_RELEASE_SIGNED:-0}" = "1" ]; then
-  xcrun stapler validate "$APP_PATH"
-  spctl --assess --type execute --verbose=2 "$APP_PATH"
-fi
+python3 "$ROOT/Scripts/sign-macos-app.py" --verify "$APP_PATH"
 ln -s /Applications "$PAYLOAD_DIR/Applications"
 
 rm -f "$ARTIFACT_PATH" "$CHECKSUM_PATH"

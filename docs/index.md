@@ -20,7 +20,7 @@ nav_order: 1
       <a class="button button-secondary" href="{{ '/user/' | relative_url }}">Read the guides</a>
     </div>
     <p class="quiet-release-note">Universal Mac app · macOS 14+ · <a href="{{ '/download/' | relative_url }}">installation details</a></p>
-    <p class="quiet-caveat">Ad-hoc signed and not yet Apple-notarized. The download page explains the safe first launch.</p>
+    <p class="quiet-caveat">New releases require Developer ID signing and Apple notarization. Check older releases' notes for their signing status.</p>
   </div>
 
   <figure class="quiet-hero-figure">

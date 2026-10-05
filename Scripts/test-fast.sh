@@ -29,6 +29,9 @@ bash "$ROOT/Scripts/validate-architecture.sh"
 echo "==> Spotlight-safe Xcode build paths"
 bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 
+echo "==> Mac release signing policy"
+python3 "$ROOT/Scripts/test-macos-signing.py"
+
 echo "==> Release workflow reconciliation"
 bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
 

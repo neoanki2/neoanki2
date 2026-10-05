@@ -40,12 +40,38 @@ jobs:
     outputs:
       tag: ${{ steps.manifest.outputs.tag }}
     steps:
+      - name: Require the exact head of an internal pull request before exposing signing credentials
+        env:
+          EXPECTED_PR: ${{ inputs.pr }}
+          EXPECTED_HEAD: ${{ inputs.head }}
+          EXPECTED_BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          [[ "$EXPECTED_PR" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          gh pr view "$EXPECTED_PR" --repo "$GITHUB_REPOSITORY" \
+            --json state,headRefOid,baseRefName,isCrossRepository | \
+            jq -e --arg head "$EXPECTED_HEAD" --arg base "$EXPECTED_BASE" '
+              .state == "OPEN" and .headRefOid == $head and
+              .baseRefName == $base and .isCrossRepository == false
+            ' >/dev/null
       - name: Check out exact pull-request head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.head }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Configure Developer ID, CloudKit profile, and notarization
+        env:
+          APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_DEVELOPER_ID_PROFILE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_PROFILE_BASE64 }}
+          APPLE_DEVELOPER_ID_CHAIN_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CHAIN_BASE64 }}
+          APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
+        run: bash Scripts/configure-apple-signing.sh
+
       - name: Build release candidate
         env:
           PR_NUMBER: ${{ inputs.pr }}
@@ -72,6 +98,10 @@ jobs:
           path: .build/release-candidate/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Remove ephemeral signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/neoanki-signing-material"
 
   attest:
     name: Attest candidate provenance

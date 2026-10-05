@@ -51,6 +51,16 @@ Resume it with `./Scripts/release.sh --verified --pr NUMBER`. That path may wait
 for protected checks, screenshot promotion, hosted UI matrices, and the
 GitHub-attested candidate.
 
+## Required Apple signing
+
+The default Mac build uses saved Developer ID and production CloudKit material
+in `~/Library/Application Support/NeoAnki2 Signing/` (or `NEOANKI_SIGNING_DIR`),
+a disposable signing Keychain, and App Store Connect API notarization.
+Missing signing inputs or unaccepted notarization block publication. Never
+set `NEOANKI_RELEASE_SIGNED=0`, strip quarantine, unlock the existing signing
+Keychain, or bypass the notarization gate to meet the SLO. Apple processing can
+exceed the budget; preserve and report that failure.
+
 ## Guardrails
 
 - Use authenticated `gh` only; never use a GitHub connector.

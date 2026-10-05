@@ -21,7 +21,7 @@ permalink: /download/
     </div>
     <div>
       <pre class="download-command"><code>brew install --cask neoanki2/tap/neoanki2</code></pre>
-      <p class="download-security-note">Because this build is not yet notarized, the cask removes <code>com.apple.quarantine</code> from <code>NeoAnki2.app</code> after installation. It does not disable Gatekeeper or change any system-wide setting. <a href="https://github.com/neoanki2/homebrew-tap/blob/main/Casks/neoanki2.rb">Inspect the cask</a>.</p>
+      <p class="download-security-note">New releases require Developer ID signing, Apple notarization, and production CloudKit provisioning. Older downloads retain their original signing status; check the selected release notes. <a href="https://github.com/neoanki2/homebrew-tap/blob/main/Casks/neoanki2.rb">Inspect the cask</a>.</p>
     </div>
   </section>
 
@@ -39,7 +39,7 @@ permalink: /download/
 
   <aside class="notarization-note" aria-labelledby="first-launch-title">
     <h2 id="first-launch-title">Before the first launch</h2>
-    <p>NeoAnki2 is ad-hoc signed and provenance-attested, but it is not yet Apple-notarized. If macOS blocks it, Control-click NeoAnki2 in Applications, choose <strong>Open</strong>, then confirm <strong>Open</strong>. Do not disable Gatekeeper globally.</p>
+    <p>New releases use Developer ID signatures and stapled Apple notarization tickets. If you downloaded an older release, check its release notes for signing status and prefer a provisioned release. Keep Gatekeeper enabled.</p>
   </aside>
 
   <section class="download-option" aria-labelledby="mobile-download-title">

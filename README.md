@@ -15,13 +15,14 @@ brew install --cask neoanki2/tap/neoanki2
 brew upgrade --cask neoanki2
 ```
 
-Release artifacts are universal, checksummed, and ad-hoc signed. Candidates
-prepared in GitHub Actions are also provenance-attested. Releases are not yet
-Apple-notarized, so the first launch may require Control-clicking NeoAnki2 in
-Applications and choosing **Open**.
+New release artifacts require Developer ID signatures, production CloudKit
+provisioning, and accepted Apple notarization. They are universal and
+checksummed; candidates prepared in GitHub Actions are also provenance-attested.
+Older published downloads retain their original signing status.
 
-Maintainers use one resumable command that prepares an attested CI candidate,
-waits for protected checks, promotes it, and optionally upgrades Homebrew; see
+Maintainers run `Scripts/release.sh` to verify local changes, package and
+notarize the app, publish, and upgrade Homebrew. The slower attested CI path is
+available explicitly with `--verified`; see
 [the release procedure](docs/RELEASING.md).
 
 For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the

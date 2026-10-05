@@ -1,42 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-P12_BASE64="${APPLE_DEVELOPER_ID_P12_BASE64:?Missing Developer ID certificate data.}"
-P12_PASSWORD="${APPLE_DEVELOPER_ID_P12_PASSWORD:?Missing certificate password.}"
-PROFILE_BASE64="${APPLE_DEVELOPER_ID_PROFILE_BASE64:?Missing provisioning profile data.}"
-APPLE_ID="${APPLE_NOTARY_APPLE_ID:?Missing notarization Apple ID.}"
-APP_PASSWORD="${APPLE_NOTARY_PASSWORD:?Missing notarization app password.}"
-TEAM_ID="${APPLE_DEVELOPMENT_TEAM:?Missing Apple team ID.}"
-KEYCHAIN_PASSWORD="${APPLE_CI_KEYCHAIN_PASSWORD:?Missing temporary keychain password.}"
-CI_TEMP="${RUNNER_TEMP:?This helper is intended for an ephemeral CI runner.}"
+# Decode credentials only on the ephemeral runner; no persistent Keychain or
+# Apple ID password is needed. The signer owns its disposable Keychain.
+python3 - <<'PYTHON'
+import base64
+import json
+import os
+from pathlib import Path
+import subprocess
 
-KEYCHAIN_PATH="$CI_TEMP/neoanki-signing.keychain-db"
-CERTIFICATE_PATH="$CI_TEMP/developer-id.p12"
-PROFILE_PATH="$CI_TEMP/neoanki.provisionprofile"
-PROFILE_PLIST="$CI_TEMP/neoanki-profile.plist"
-
-printf '%s' "$P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
-printf '%s' "$PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
-
-security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -T /usr/bin/codesign
-security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-security list-keychains -d user -s "$KEYCHAIN_PATH"
-
-security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
-PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")
-PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")
-PROFILES_DIRECTORY="${HOME:?Missing runner home}/Library/MobileDevice/Provisioning Profiles"
-mkdir -p "$PROFILES_DIRECTORY"
-cp "$PROFILE_PATH" "$PROFILES_DIRECTORY/$PROFILE_UUID.provisionprofile"
-
-xcrun notarytool store-credentials neoanki-ci-notary \
-  --apple-id "$APPLE_ID" \
-  --team-id "$TEAM_ID" \
-  --password "$APP_PASSWORD" \
-  --keychain "$KEYCHAIN_PATH"
-
-echo "APPLE_DEVELOPER_ID_PROFILE_NAME=$PROFILE_NAME" >> "${GITHUB_ENV:?Missing GitHub environment file.}"
-echo "NEOANKI_CI_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+os.umask(0o077)
+folder = Path(os.environ["RUNNER_TEMP"]) / "neoanki-signing-material"
+folder.mkdir(mode=0o700, exist_ok=True)
+inputs = {
+    "APPLE_DEVELOPER_ID_P12_BASE64": "identity.p12",
+    "APPLE_DEVELOPER_ID_PROFILE_BASE64": "Mac-DeveloperID.provisionprofile",
+    "APPLE_DEVELOPER_ID_CHAIN_BASE64": "DeveloperIDG2CA.cer",
+    "APPLE_NOTARY_KEY_BASE64": "notary-key.p8",
+}
+for variable, filename in inputs.items():
+    if not os.environ.get(variable):
+        raise SystemExit("Missing signing secret: " + variable)
+    (folder / filename).write_bytes(base64.b64decode(os.environ[variable], validate=True))
+for variable in ("APPLE_NOTARY_KEY_ID", "APPLE_NOTARY_ISSUER_ID", "APPLE_DEVELOPMENT_TEAM"):
+    if not os.environ.get(variable):
+        raise SystemExit("Missing signing secret: " + variable)
+for flags, filename in ((["-nocerts", "-nodes"], "Developer-ID-Application.key.pem"),
+                        (["-clcerts", "-nokeys"], "Developer-ID-Application.cert.pem")):
+    result = subprocess.run(["openssl", "pkcs12", "-in", str(folder / "identity.p12"),
+                             "-passin", "env:APPLE_DEVELOPER_ID_P12_PASSWORD", *flags],
+                            capture_output=True, stdin=subprocess.DEVNULL)
+    if result.returncode:
+        raise SystemExit("Cannot decode Developer ID identity")
+    (folder / filename).write_bytes(result.stdout)
+(folder / "identity.p12").unlink()
+(folder / "app-store-connect.json").write_text(json.dumps({
+    "key_id": os.environ["APPLE_NOTARY_KEY_ID"],
+    "issuer_id": os.environ["APPLE_NOTARY_ISSUER_ID"],
+    "private_key_path": str(folder / "notary-key.p8"),
+    "team_id": os.environ["APPLE_DEVELOPMENT_TEAM"],
+}))
+with Path(os.environ["GITHUB_ENV"]).open("a") as stream:
+    stream.write("NEOANKI_SIGNING_DIR=" + str(folder) + "\n")
+PYTHON
