@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Developer ID + production CloudKit signing and mandatory notarization.
+"""Developer ID + production CloudKit signing; notarization for distribution.
 
 Uses saved PEM material in a disposable Keychain; never unlocks the user's
 signing Keychain or falls back to an ad-hoc signature.
@@ -91,7 +91,7 @@ def validate_entitlements(entitlements, team):
 
 
 class Material:
-    def __init__(self, directory):
+    def __init__(self, directory, require_notarization=True):
         self.directory = directory
         for name in ("Developer-ID-Application.cert.pem", "Developer-ID-Application.key.pem",
                      "DeveloperIDG2CA.cer", "Mac-DeveloperID.provisionprofile"):
@@ -113,6 +113,9 @@ class Material:
         self.profile = plistlib.loads(run(["security", "cms", "-D", "-i", str(directory / "Mac-DeveloperID.provisionprofile")]))
         self.team = validate_profile(self.profile, self.certificate)
         self.identity = hashlib.sha1(self.certificate).hexdigest().upper()
+        self.notary_args = []
+        if not require_notarization:
+            return
         config_path = Path(os.environ.get("NEOANKI_NOTARY_CONFIG", directory / "app-store-connect.json"))
         if not config_path.is_file():
             raise SigningError(f"Missing notarization API configuration: {config_path}")
@@ -163,7 +166,7 @@ def signing_keychain(material):
             print("MAC_SIGNING_CLEANUP=complete", flush=True)
 
 
-def verify(app):
+def verify(app, require_notarization=True):
     run(["codesign", "--verify", "--deep", "--strict", str(app)])
     details = subprocess.run(["codesign", "-d", "--verbose=4", str(app)], capture_output=True, check=True).stderr.decode()
     if "Authority=Developer ID Application:" not in details or "runtime" not in details:
@@ -177,12 +180,14 @@ def verify(app):
         raise SigningError("Signed app lacks the NeoAnki2 bundle identifier or source revision")
     signed = plistlib.loads(run(["codesign", "-d", "--entitlements", "-", "--xml", str(app)]))
     validate_entitlements(signed, team)
-    run(["xcrun", "stapler", "validate", str(app)])
-    run(["spctl", "--assess", "--type", "execute", str(app)])
-    print(f"MAC_SIGNING_VERIFIED=Developer ID; production CloudKit; notarized; team {team}", flush=True)
+    if require_notarization:
+        run(["xcrun", "stapler", "validate", str(app)])
+        run(["spctl", "--assess", "--type", "execute", str(app)])
+    notarization = "notarized" if require_notarization else "local source build"
+    print(f"MAC_SIGNING_VERIFIED=Developer ID; production CloudKit; {notarization}; team {team}", flush=True)
 
 
-def sign(app, material):
+def sign(app, material, require_notarization=True):
     receipt_path = app.parent / "notarization.json"
     receipt_path.unlink(missing_ok=True)
     shutil.copy2(material.directory / "Mac-DeveloperID.provisionprofile", app / "Contents/embedded.provisionprofile")
@@ -192,6 +197,9 @@ def sign(app, material):
         run(["codesign", "--force", "--sign", material.identity, "--keychain", str(keychain),
              "--options", "runtime", "--timestamp", "--entitlements", str(entitlements), str(app)], timeout=120)
     run(["codesign", "--verify", "--deep", "--strict", str(app)])
+    if not require_notarization:
+        verify(app, require_notarization=False)
+        return
     # Keep the notarization receipt beside the staged app, including on failure.
     archive = app.parent / "NeoAnki2-notarization.zip"
     run(["ditto", "-c", "-k", "--keepParent", str(app), str(archive)])
@@ -227,18 +235,20 @@ def main():
     parser.add_argument("app", nargs="?", type=Path)
     parser.add_argument("--check", action="store_true", help="Validate saved signing inputs without building")
     parser.add_argument("--verify", action="store_true", help="Verify an already notarized bundle")
+    parser.add_argument("--sign-only", action="store_true", help="Local source build: require real signing, without notarization")
     args = parser.parse_args()
     try:
         if args.verify:
             if not args.app:
                 parser.error("--verify requires an app path")
-            verify(args.app.resolve())
+            verify(args.app.resolve(), require_notarization=not args.sign_only)
         else:
-            material = Material(Path(os.environ.get("NEOANKI_SIGNING_DIR", DEFAULT_SIGNING)).expanduser())
+            material = Material(Path(os.environ.get("NEOANKI_SIGNING_DIR", DEFAULT_SIGNING)).expanduser(),
+                                require_notarization=not args.sign_only)
             if args.check:
                 print(f"MAC_SIGNING_INPUTS=ready; team {material.team}")
             elif args.app:
-                sign(args.app.resolve(), material)
+                sign(args.app.resolve(), material, require_notarization=not args.sign_only)
             else:
                 parser.error("an app path or --check is required")
         return 0

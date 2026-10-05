@@ -10,6 +10,9 @@ public struct SyncMetadata: Codable, Sendable {
     public var pendingOutbound: [SyncRecordEnvelope]?
     public var serverBaseline: [String: SyncRecordEnvelope]?
     public var issues: [SyncIssue]
+    /// Losing versions remain recoverable after automatic conflict resolution.
+    /// Optional for backward compatibility with metadata written by older apps.
+    public var resolvedConflictCopies: [SyncConflictCopy]?
     public var didCreateInitialBackup: Bool?
     public var didCompleteInitialMerge: Bool?
 
@@ -21,6 +24,7 @@ public struct SyncMetadata: Codable, Sendable {
         pendingOutbound: [SyncRecordEnvelope]? = nil,
         serverBaseline: [String: SyncRecordEnvelope]? = nil,
         issues: [SyncIssue] = [],
+        resolvedConflictCopies: [SyncConflictCopy]? = nil,
         didCreateInitialBackup: Bool? = nil,
         didCompleteInitialMerge: Bool? = nil
     ) {
@@ -31,6 +35,7 @@ public struct SyncMetadata: Codable, Sendable {
         self.pendingOutbound = pendingOutbound
         self.serverBaseline = serverBaseline
         self.issues = issues
+        self.resolvedConflictCopies = resolvedConflictCopies
         self.didCreateInitialBackup = didCreateInitialBackup
         self.didCompleteInitialMerge = didCompleteInitialMerge
     }
@@ -68,8 +73,22 @@ public actor SyncMetadataStore {
             // service snapshot cannot erase a concurrent transport callback.
             metadata.stagedInbound = current.stagedInbound
             metadata.serverBaseline = current.serverBaseline
+            metadata.resolvedConflictCopies = mergedArchive(current, metadata)
         }
         try persist(metadata)
+    }
+
+    /// Finish a single conflict against the latest metadata so a concurrent
+    /// transport callback cannot lose another newly preserved conflict.
+    func completeConflict(_ issue: SyncIssue) throws -> SyncMetadata {
+        var metadata = try load()
+        guard let copy = issue.conflictCopy else { return metadata }
+        var archive = metadata.resolvedConflictCopies ?? []
+        if !archive.contains(where: { $0.id == copy.id }) { archive.append(copy) }
+        metadata.resolvedConflictCopies = archive
+        metadata.issues.removeAll { $0.id == issue.id }
+        try persist(metadata)
+        return metadata
     }
 
     func saveEngineState(_ state: CKSyncEngine.State.Serialization) throws {
@@ -102,6 +121,7 @@ public actor SyncMetadataStore {
         committed.engineState = current.engineState
         committed.stagedInbound = current.stagedInbound.filter { !consumed.contains($0) }
         committed.serverBaseline = current.serverBaseline
+        committed.resolvedConflictCopies = mergedArchive(current, committed)
         for record in consumed { setBaseline(record, metadata: &committed) }
         try persist(committed)
         removeStagedAssets(in: consumed)
@@ -136,11 +156,12 @@ public actor SyncMetadataStore {
         guard !Self.sameContent(local, server) else { return }
         var metadata = try load()
         // Retries/restarts preserve one copy of each losing version.
-        guard !metadata.issues.contains(where: {
-            $0.conflictCopy?.originalResourceID == local.id
-                && $0.conflictCopy?.resourceKind == local.resourceKind
-                && $0.conflictCopy?.payload == local.payload
-                && $0.conflictCopy?.wasTombstone == local.isTombstone
+        let preserved = metadata.issues.compactMap(\.conflictCopy) + (metadata.resolvedConflictCopies ?? [])
+        guard !preserved.contains(where: {
+            $0.originalResourceID == local.id
+                && $0.resourceKind == local.resourceKind
+                && $0.payload == local.payload
+                && $0.wasTombstone == local.isTombstone
         }) else { return }
         let kind: SyncIssueKind = local.isTombstone || server.isTombstone ? .deleteVersusEdit
             : local.resourceKind == "deck" ? .deckConflict
@@ -158,6 +179,13 @@ public actor SyncMetadataStore {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try encoder.encode(metadata)
         try data.write(to: fileURL, options: .atomic)
+    }
+
+    private func mergedArchive(_ current: SyncMetadata, _ incoming: SyncMetadata) -> [SyncConflictCopy]? {
+        guard current.resolvedConflictCopies != nil || incoming.resolvedConflictCopies != nil else { return nil }
+        let existing = current.resolvedConflictCopies ?? []
+        let ids = Set(existing.map(\.id))
+        return existing + (incoming.resolvedConflictCopies ?? []).filter { !ids.contains($0.id) }
     }
 
     public func stageAssets(in records: [SyncRecordEnvelope]) throws -> [SyncRecordEnvelope] {

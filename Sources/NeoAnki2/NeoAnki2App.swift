@@ -41,7 +41,7 @@ struct NeoAnki2App: App {
     @State private var apiControlModel: APIControlModel?
     @State private var bootstrapError: String?
     @State private var syncService: OfflineFirstSyncService?
-    @State private var syncStatus: SyncStatus = .offline
+    @State private var syncStatusModel = MacCloudSyncStatusModel()
     @AppStorage(AppPreferences.cloudSyncEnabled) private var cloudSyncEnabled = false
 #if DEBUG
     @State private var testConfiguration: UITestRuntimeConfiguration?
@@ -130,7 +130,6 @@ struct NeoAnki2App: App {
                     .accessibilityIdentifier("bootstrapError")
                 } else {
                     ProgressView("Starting…")
-                        .task { await bootstrap() }
                 }
             }
             .frame(
@@ -144,6 +143,9 @@ struct NeoAnki2App: App {
                     : isFunctionalUITestRun ? functionalUITestContentHeight : nil
             )
             .task {
+                // The loading view disappears as models are assigned. Keep
+                // startup on the stable root so that it cannot cancel sync.
+                await bootstrap()
                 installUITestControlIfNeeded()
             }
             .preferredColorScheme(documentationScreenshotColorScheme)
@@ -203,10 +205,10 @@ struct NeoAnki2App: App {
                 if let library {
                     MacCloudSyncSettings(
                         isEnabled: $cloudSyncEnabled,
-                        status: syncStatus,
+                        status: syncStatusModel.status,
                         isAvailable: CKSyncEngineTransport.isAvailable,
                         onChange: { enabled in await updateCloudSync(enabled: enabled, library: library) },
-                        synchronize: { await syncService?.synchronize(); await refreshSyncStatus() }
+                        synchronize: { await syncService?.synchronize(); await syncStatusModel.refresh() }
                     )
                     .tabItem { Label("iCloud", systemImage: "icloud") }
                 }
@@ -288,15 +290,15 @@ struct NeoAnki2App: App {
     @MainActor
     private func updateCloudSync(enabled: Bool, library: SQLiteLibraryRepository) async {
         guard enabled else {
+            syncStatusModel.stop()
             await syncService?.stop()
             syncService = nil
-            syncStatus = .offline
             return
         }
         guard CKSyncEngineTransport.isAvailable else {
             cloudSyncEnabled = false
             syncService = nil
-            syncStatus = .accountUnavailable
+            syncStatusModel.stop(status: .accountUnavailable)
             return
         }
         do {
@@ -311,16 +313,12 @@ struct NeoAnki2App: App {
                 backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
             )
             syncService = service
+            syncStatusModel.observe(service)
             await service.start()
-            await refreshSyncStatus()
+            await syncStatusModel.refresh()
         } catch {
-            syncStatus = .accountUnavailable
+            syncStatusModel.stop(status: .accountUnavailable)
         }
-    }
-
-    @MainActor
-    private func refreshSyncStatus() async {
-        syncStatus = await syncService?.status() ?? .offline
     }
 
     private func prepareLibrary(

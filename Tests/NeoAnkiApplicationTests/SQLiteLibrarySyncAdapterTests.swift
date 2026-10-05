@@ -361,6 +361,11 @@ import Testing
     #expect(try await local.repository.deck(id: id).name == "Cloud wording")
     try await localAdapter.restoreConflictCopy(copy)
     #expect(try await local.repository.deckSummaries(asOf: .now).contains(where: { $0.name == "Local wording (Recovered)" }))
+    // Simulate death after domain commit but before the issue is acknowledged.
+    let restarted = SQLiteLibrarySyncAdapter(repository: local.repository)
+    try await restarted.restoreConflictCopy(copy)
+    #expect(try await local.repository.deckSummaries(asOf: .now).filter { $0.name == "Local wording (Recovered)" }.count == 1)
+    #expect(try await local.repository.deck(id: copy.id).name == "Local wording (Recovered)")
 }
 
 @Test func initialMergeDeterministicallyRemapsCrossLibraryIdentifierCollisions() async throws {
@@ -591,4 +596,21 @@ private func makeSyncRepository() async throws -> SyncRepositoryFixture {
     let repository = try SQLiteLibraryRepository(databaseURL: directory.appendingPathComponent("library.sqlite"))
     try await repository.bootstrap()
     return SyncRepositoryFixture(repository: repository, directory: directory)
+}
+
+@Test func conflictWithIdenticalItemContentDoesNotCreateADuplicate() async throws {
+    let fixture = try await makeSyncRepository()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let type = try #require(try await fixture.repository.loadItemTypes().itemTypes.first)
+    let item = Item(itemTypeID: type.id, fields: type.fields.map { .init(fieldID: $0.id, value: .text("Same content")) })
+    _ = try await fixture.repository.createItem(item)
+    let adapter = SQLiteLibrarySyncAdapter(repository: fixture.repository)
+    let records = try await adapter.encode(changes: fixture.repository.changes(after: 0, limit: 1_000), deviceID: "local")
+    let record = try #require(records.first { $0.resourceKind == "item" && $0.id == item.id.uuidString })
+    let copy = SyncConflictCopy(resourceKind: "item", originalResourceID: item.id.uuidString, sourceDeviceID: "local", payload: record.payload)
+    let before = try await fixture.repository.currentChangeCursor()
+    try await adapter.restoreConflictCopy(copy)
+    #expect(try await fixture.repository.currentChangeCursor() == before)
+    #expect(try await fixture.repository.item(id: copy.id) == nil)
+    #expect(try await fixture.repository.item(id: item.id)?.item == item)
 }

@@ -54,9 +54,10 @@ Homebrew replaces it and relaunches the exact installed path once afterward.
 
 ## Required Apple signing
 
-Mac releases and `Scripts/install-app.sh` require Developer ID signing,
-production CloudKit provisioning, hardened runtime, and accepted Apple
-notarization by default. Missing credentials, expired profiles, incorrect
+Mac releases require Developer ID signing, production CloudKit provisioning,
+hardened runtime, and accepted Apple notarization. Local source installations
+through `Scripts/install-app.sh` require the same signing and CloudKit
+capabilities, but do not wait for notarization by default. Missing credentials, expired profiles, incorrect
 capabilities, rejected notarization, or failed Gatekeeper assessment stop the
 build before publication or replacement. There is no unsigned release fallback.
 
@@ -71,7 +72,8 @@ The default material directory is
 - `app-store-connect.json`, with `key_id`, `issuer_id`, `private_key_path`, and
   `team_id`, plus the referenced App Store Connect API private key.
 
-Run `python3 Scripts/sign-macos-app.py --check` to validate local inputs.
+Run `python3 Scripts/sign-macos-app.py --check --sign-only` to validate local
+signing inputs, or omit `--sign-only` to also validate notarization credentials.
 Signing imports the saved material into a disposable Keychain and cleans it up;
 it never requires unlocking the existing signing Keychain. Notarization uses
 API authentication and does not prompt for Apple ID or Mac passwords.
@@ -84,12 +86,15 @@ repository secrets through authenticated `gh`: `APPLE_DEVELOPER_ID_P12_BASE64`,
 The runner decodes them into a private temporary directory removed on exit.
 
 `NEOANKI_INSTALL_SIGNED=0` is an explicit development-only option for local
-unprovisioned bundles. The release packager always forces signing and rejects
-`NEOANKI_RELEASE_SIGNED=0`. Headless `swift build` and disposable UI-test bundles
+unprovisioned bundles. The release packager always forces signing and notarization and rejects
+`NEOANKI_RELEASE_SIGNED=0`. Local installs default to
+`NEOANKI_INSTALL_NOTARIZE=0`; set it to `1` to require notarization for a local
+installation too. Headless `swift build` and disposable UI-test bundles
 continue to work without distribution credentials.
 
 The packager saves `notarization.json` beside the DMG. Verify an existing bundle
 with `python3 Scripts/sign-macos-app.py --verify /path/to/NeoAnki2.app`.
+Add `--sign-only` to verify a local source build without a notarization ticket.
 Homebrew casks preserve quarantine; they no longer remove it to bypass a missing
 notarization ticket. Previously published builds retain their original signing
 status, so inspect the selected release's notes.

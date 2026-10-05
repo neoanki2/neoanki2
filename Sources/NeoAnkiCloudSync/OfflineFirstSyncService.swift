@@ -97,6 +97,12 @@ public actor OfflineFirstSyncService: SyncService {
                 metadata.issues = currentIssues
                 metadata = try await metadataStore.completeIncoming(recovered, metadata: metadata)
             }
+            // Resolve both newly discovered conflicts and copies retained by
+            // older app versions. Commit each decision before advancing, and
+            // queue recovered resources through the ordinary outbound journal.
+            try await resolveConflictsAutomatically(generation: generation)
+            metadata = try await metadataStore.load()
+            currentIssues = metadata.issues
             try await flushOutbound(metadata: &metadata, generation: generation)
             try await stageLocalChanges(metadata: &metadata)
             try await flushOutbound(metadata: &metadata, generation: generation)
@@ -137,6 +143,28 @@ public actor OfflineFirstSyncService: SyncService {
 
     private func checkLifecycle(_ generation: Int) throws {
         guard generation == lifecycle, !Task.isCancelled else { throw CancellationError() }
+    }
+
+    private func resolveConflictsAutomatically(generation: Int) async throws {
+        let snapshot = try await metadataStore.load()
+        // Recover dependencies before items that may reference them.
+        let priority = ["itemType": 0, "deck": 1, "item": 2]
+        let issues = snapshot.issues.sorted {
+            (priority[$0.conflictCopy?.resourceKind ?? ""] ?? 3) < (priority[$1.conflictCopy?.resourceKind ?? ""] ?? 3)
+        }
+        for issue in issues {
+            guard let copy = issue.conflictCopy else { continue }
+            try checkLifecycle(generation)
+            guard LibraryResourceKind(rawValue: copy.resourceKind) != nil else { continue }
+            if copy.isRestorable {
+                // The adapter uses the copy's stable identity. A crash between
+                // the domain commit and metadata commit cannot duplicate it.
+                try await adapter.restoreConflictCopy(copy)
+            }
+            try checkLifecycle(generation)
+            let latest = try await metadataStore.completeConflict(issue)
+            currentIssues = latest.issues
+        }
     }
 
     private func flushOutbound(metadata: inout SyncMetadata, generation: Int) async throws {

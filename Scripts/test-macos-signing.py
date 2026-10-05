@@ -174,6 +174,47 @@ class SigningTests(unittest.TestCase):
             self.assertEqual(receipt['status'], 'In Progress')
         self.assertFalse(any(args[:3] == ['xcrun', 'stapler', 'staple'] for args in calls))
 
+    def test_local_signing_does_not_require_notarization_credentials(self):
+        def run(args, timeout=60):
+            if '-subject' in args:
+                return b'subject=Developer ID Application: Fixture (TEAM123)'
+            if '-pubkey' in args or '-pubout' in args:
+                return b'fixture-public-key'
+            if '-outform' in args:
+                return b'certificate'
+            if args[:2] == ['security', 'cms']:
+                return plistlib.dumps(profile())
+            return b''
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            for name in ('Developer-ID-Application.cert.pem', 'Developer-ID-Application.key.pem',
+                         'DeveloperIDG2CA.cer', 'Mac-DeveloperID.provisionprofile'):
+                (directory / name).touch()
+            with patch.object(signing, 'run', run):
+                material = signing.Material(directory, require_notarization=False)
+                self.assertEqual(material.team, 'TEAM123')
+                with self.assertRaisesRegex(signing.SigningError, 'Missing notarization'):
+                    signing.Material(directory)
+
+    def test_local_source_signing_never_submits_to_apple(self):
+        calls = []
+        def run(args, timeout=60):
+            calls.append(args)
+            if args[:2] == ['openssl', 'pkcs12']:
+                Path(args[args.index('-out') + 1]).touch()
+            return b''
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            app = base / 'NeoAnki2.app'
+            (app / 'Contents').mkdir(parents=True)
+            (base / 'Mac-DeveloperID.provisionprofile').write_bytes(b'fixture')
+            material = types.SimpleNamespace(directory=base, team='TEAM123', identity='fixture-identity')
+            with patch.object(signing, 'run', run), patch.object(signing, 'verify') as verify:
+                signing.sign(app, material, require_notarization=False)
+                verify.assert_called_once_with(app, require_notarization=False)
+        self.assertTrue(any(args[0] == 'codesign' and '--options' in args for args in calls))
+        self.assertFalse(any(args[0] == 'xcrun' for args in calls))
+
 
 if __name__ == '__main__':
     unittest.main()

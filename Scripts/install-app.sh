@@ -3,7 +3,8 @@ set -euo pipefail
 
 # Installs NeoAnki2 into /Applications so it launches like any other Mac app.
 #
-# Ordinary installs require Developer ID, production CloudKit, and notarization.
+# Ordinary local installs require Developer ID and production CloudKit.
+# Distribution packaging additionally requires accepted Apple notarization.
 # Explicit NEOANKI_INSTALL_SIGNED=0 is only for unprovisioned development bundles.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,6 +14,7 @@ VERSION="${NEOANKI_INSTALL_VERSION:-1.0}"
 UNIVERSAL="${NEOANKI_INSTALL_UNIVERSAL:-0}"
 ALLOW_RUNNING="${NEOANKI_INSTALL_ALLOW_RUNNING:-0}"
 SIGNED="${NEOANKI_INSTALL_SIGNED:-1}"
+NOTARIZE="${NEOANKI_INSTALL_NOTARIZE:-0}"
 BUILD_NUMBER="${NEOANKI_INSTALL_BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 0)}"
 APP_NAME="NeoAnki2.app"
 STAGE="$ROOT/.build/install/$APP_NAME"
@@ -34,6 +36,7 @@ Environment: NEOANKI_INSTALL_CONFIG (default release),
              NEOANKI_INSTALL_UNIVERSAL (0 or 1; default 0),
              NEOANKI_INSTALL_ALLOW_RUNNING (0 or 1; packaging only),
              NEOANKI_INSTALL_SIGNED (default 1; 0 for development only),
+             NEOANKI_INSTALL_NOTARIZE (default 0; releases require 1),
              NEOANKI_SIGNING_DIR (default saved NeoAnki2 Signing directory).
 EOF
 }
@@ -73,8 +76,18 @@ if [ "$SIGNED" != "0" ] && [ "$SIGNED" != "1" ]; then
   echo "NEOANKI_INSTALL_SIGNED must be 0 or 1." >&2
   exit 1
 fi
+if [ "$NOTARIZE" != "0" ] && [ "$NOTARIZE" != "1" ]; then
+  echo "NEOANKI_INSTALL_NOTARIZE must be 0 or 1." >&2
+  exit 1
+fi
+if [ "$NOTARIZE" -eq 1 ] && [ "$SIGNED" -ne 1 ]; then
+  echo "Notarization requires Developer ID signing." >&2
+  exit 1
+fi
+SIGNING_ARGUMENTS=()
+[ "$NOTARIZE" -eq 1 ] || SIGNING_ARGUMENTS+=(--sign-only)
 if [ "$SIGNED" -eq 1 ]; then
-  python3 "$ROOT/Scripts/sign-macos-app.py" --check
+  python3 "$ROOT/Scripts/sign-macos-app.py" --check "${SIGNING_ARGUMENTS[@]}"
 fi
 
 if [ ! -d "$DEST_DIR" ]; then
@@ -137,7 +150,7 @@ fi
 
 xattr -cr "$STAGE" 2>/dev/null || true
 if [ "$SIGNED" -eq 1 ]; then
-  python3 "$ROOT/Scripts/sign-macos-app.py" "$STAGE"
+  python3 "$ROOT/Scripts/sign-macos-app.py" "${SIGNING_ARGUMENTS[@]}" "$STAGE"
 else
   codesign --force --sign - --timestamp=none "$STAGE"
 fi

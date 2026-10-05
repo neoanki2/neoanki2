@@ -496,8 +496,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         catch { throw SQLiteLibrarySyncError.invalidPayload(copy.originalResourceID) }
         switch payload {
         case let .deck(deck):
+            if let original = try await existingDeck(id: deck.id), original == deck { break }
+            if try await existingDeck(id: copy.id) != nil { break }
             let restored = Deck(
-                id: UUID(),
+                id: copy.id,
                 name: "\(deck.name) (Recovered)",
                 parentID: deck.parentID,
                 newCardsPerDay: deck.newCardsPerDay
@@ -505,8 +507,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             _ = try await repository.createDeck(restored)
         case let .item(record):
             let item = record.item
+            if let original = try await existingItem(id: item.id), original == item { break }
+            if try await existingItem(id: copy.id) != nil { break }
             let restored = Item(
-                id: UUID(),
+                id: copy.id,
                 itemTypeID: item.itemTypeID,
                 fields: item.fields,
                 tags: item.tags,
@@ -514,8 +518,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             )
             _ = try await repository.createItem(restored, asOf: .now)
         case let .itemType(type):
+            if let original = try await existingItemType(id: type.id), original == type { break }
+            if try await existingItemType(id: copy.id) != nil { break }
             let restored = ItemType(
-                id: UUID(),
+                id: copy.id,
                 name: "\(type.name) (Recovered)",
                 fields: type.fields,
                 templates: type.templates
@@ -526,6 +532,21 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             throw SQLiteLibrarySyncError.invalidPayload(copy.originalResourceID)
         }
         conflictCopies.removeAll { $0.id == copy.id }
+    }
+
+    private func existingDeck(id: UUID) async throws -> Deck? {
+        do { return try await repository.deck(id: id) }
+        catch DatabaseError.deckNotFound { return nil }
+    }
+
+    private func existingItem(id: UUID) async throws -> Item? {
+        do { return try await repository.itemRecord(id: id).item }
+        catch DatabaseError.itemNotFound { return nil }
+    }
+
+    private func existingItemType(id: UUID) async throws -> ItemType? {
+        do { return try await repository.itemType(id: id) }
+        catch DatabaseError.itemTypeNotFound { return nil }
     }
 
     private func payload(kind: LibraryResourceKind, id: String) async throws -> (payload: SyncPayload, asset: SyncAssetDescriptor?, fileURL: URL?) {
