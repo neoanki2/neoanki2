@@ -15,6 +15,11 @@ requirement, or unavailable action.
 
 ## Find your symptom
 
+- **The app icon has no due-count badge:** confirm **All Decks** has cards due
+  now, then let the library refresh. On iPhone or iPad, allow **Badges** in
+  system notification settings. A caught-up library clears the badge, and a
+  library that cannot open cannot provide a current count. See
+  [App icon due count](../sync-reminders-widgets/#app-icon-due-count).
 - **A Terminal command, build, signing step, or launch failed:** use [Build,
   launch, and support](../support/).
 - **The app says Could Not Start:** see [Startup problems](#startup-problems).

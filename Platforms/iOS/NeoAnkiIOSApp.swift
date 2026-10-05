@@ -59,6 +59,7 @@ struct NeoAnkiIOSApp: App {
             syncService: syncService,
             notifier: IOSNotificationScheduler(),
             widgetPublisher: AppGroupWidgetPublisher(),
+            badgePublisher: IOSAppIconBadgePublisher(),
             settingsStore: IOSMobileSettingsStore()
         )
         _model = State(initialValue: model)

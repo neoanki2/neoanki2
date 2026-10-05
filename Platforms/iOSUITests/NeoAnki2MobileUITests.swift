@@ -7,6 +7,13 @@ class NeoAnki2MobileUITestCase: XCTestCase {
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
+        addUIInterruptionMonitor(withDescription: "App icon badge permission") { alert in
+            MainActor.assumeIsolated {
+                guard Self.isBadgePermissionAlert(alert) else { return false }
+                alert.buttons["Allow"].tap()
+                return true
+            }
+        }
         MainActor.assumeIsolated {
             XCUIDevice.shared.orientation = .portrait
         }
@@ -33,7 +40,25 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         ] + additionalArguments
         app.launchEnvironment.merge(environment) { _, requested in requested }
         app.launch()
+        // Populated fixtures can request badges during bootstrap, before the
+        // first app gesture can trigger an interruption monitor.
+        if environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
+            allowBadgePermissionIfPresented(timeout: 10)
+        }
         return app
+    }
+
+    private static func isBadgePermissionAlert(_ alert: XCUIElement) -> Bool {
+        alert.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@ AND label CONTAINS %@", "NeoAnki2", "Notifications"
+        )).firstMatch.exists && alert.buttons["Allow"].exists
+    }
+
+    func allowBadgePermissionIfPresented(timeout: TimeInterval = 5) {
+        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+        if alert.waitUntilExists(timeout: timeout), Self.isBadgePermissionAlert(alert) {
+            alert.buttons["Allow"].tap()
+        }
     }
 
     func openItemTypeStudioCatalog(in app: XCUIApplication) {
@@ -1103,6 +1128,7 @@ final class MobileProductionReviewJourneyUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(save.isEnabled)
         capture("03-first-item-authoring", in: app)
         save.tap()
+        allowBadgePermissionIfPresented()
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 10))
         let start = app.buttons["Start Studying"]
         XCTAssertTrue(start.waitUntilExists(timeout: 10))
@@ -1455,6 +1481,9 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts["3 lines · 1 stanza · 3 cards"].exists)
         capture("42-poem-preview", app)
         app.buttons["Import"].tap()
+        // Import creates the first due cards in this fresh library. Respond to
+        // badge consent before waiting for the import operation to finish.
+        allowBadgePermissionIfPresented()
         XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 10))
         open("Home", in: app)
         XCTAssertTrue(app.staticTexts["Poems"].waitUntilExists(timeout: 5))

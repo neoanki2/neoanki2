@@ -260,7 +260,10 @@ struct NeoAnki2App: App {
                 library: payload.library,
                 mediaStore: payload.mediaStore
             )
-            let newDecksModel = DecksModel(library: payload.library)
+            let newDecksModel = DecksModel(
+                library: payload.library,
+                onDueCountChange: AppDelegate.updateDockBadge
+            )
             if let snapshot = payload.snapshot {
                 newDecksModel.applyColdHomeSnapshot(snapshot)
                 newItemsModel.setCachedScope(.allDecks)

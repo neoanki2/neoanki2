@@ -1,4 +1,5 @@
 import AppKit
+import NeoAnkiApplication
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -9,7 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        Self.updateDockBadge(dueCount: 0)
+        // Bootstrap may already have published the count. Reapply it after
+        // activation instead of erasing it until the next count change.
+        Self.dockBadge.reapply()
 
         NotificationCenter.default.addObserver(
             self,
@@ -63,16 +66,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private static let dockBadge = DockBadgeController { label in
+        NSApp?.dockTile.badgeLabel = label
+    }
+
     static func updateDockBadge(dueCount: Int) {
-        NSApp.dockTile.badgeLabel = badgeLabel(forDueCount: dueCount)
+        dockBadge.update(dueCount: dueCount)
     }
 
     nonisolated static func badgeLabel(forDueCount dueCount: Int) -> String? {
-        dueCount > 0 ? String(dueCount) : nil
+        AppIconBadge(dueCount: dueCount).label
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+}
+
+/// Retains a count published before AppKit finishes launching.
+@MainActor
+final class DockBadgeController {
+    private var badge = AppIconBadge(dueCount: 0)
+    private let apply: (String?) -> Void
+
+    init(apply: @escaping (String?) -> Void) {
+        self.apply = apply
+    }
+
+    func update(dueCount: Int) {
+        badge = AppIconBadge(dueCount: dueCount)
+        reapply()
+    }
+
+    func reapply() {
+        apply(badge.label)
     }
 }
 

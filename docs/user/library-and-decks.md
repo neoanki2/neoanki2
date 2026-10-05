@@ -33,6 +33,11 @@ so the sidebar and the detail pane always agree.
 
 Selecting a scope opens its **scope home**, described below.
 
+The app icon's due-count badge always uses **All Decks**, including Unassigned.
+It counts cards available to study, excluding suspended cards and new cards
+deferred by daily limits. Changing a deck's limit updates that total; selecting
+a different scope does not. The badge clears when the library has no due cards.
+
 ## Create a top-level deck
 
 1. Choose the **+** button in the deck sidebar toolbar.

@@ -31,6 +31,7 @@ the local library. This is a build capability, not an iCloud account error.
 - [Sync status and issues](#sync-status-and-issues)
 - [Troubleshoot iCloud](#troubleshoot-icloud)
 - [Daily reminders](#daily-reminders)
+- [App icon due count](#app-icon-due-count)
 - [Due Cards widget](#due-cards-widget)
 </nav>
 
@@ -159,7 +160,8 @@ iCloud account changes.
 ## Daily reminders
 
 Open **Settings → Daily Reminder** and enable **Remind me**. NeoAnki2 requests
-notification permission only at this point. Choose a time and either **All
+alert and sound permission at this point, even if you already allowed app-icon
+badges. Choose a time and either **All
 Decks** or one deck as the scope.
 
 A reminder is scheduled only while that scope has due cards. When recalculation
@@ -169,6 +171,21 @@ deep-links into a study session for its scope.
 If permission was denied, enable notifications for NeoAnki2 in iOS Settings,
 then turn **Remind me** on again. Reminder preferences are local and do not sync
 to other devices.
+
+## App icon due count
+
+The Mac Dock icon and the iPhone/iPad Home Screen icon show the number of cards
+currently available to study across the whole library. Selecting one deck does
+not narrow this count. Suspended cards and new cards deferred by daily limits
+are excluded. The badge clears when no cards are due.
+
+On iPhone and iPad, NeoAnki2 requests badge permission when cards are first due.
+Badges work with daily reminders and iCloud sync turned off. If badges are
+disabled, allow **Badges** for NeoAnki2 in system notification settings.
+
+Counts refresh as you use the app and when you reopen it. iOS background refresh
+can update the badge when the system grants execution time; it does not provide
+an exact schedule while the app is closed.
 
 ## Due Cards widget
 

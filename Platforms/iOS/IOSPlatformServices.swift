@@ -39,7 +39,7 @@ actor IOSNotificationScheduler: NotificationSchedulingService {
         }
     }
     func requestAuthorization() async throws -> Bool {
-        try await center.requestAuthorization(options: [.alert, .sound])
+        try await center.requestAuthorization(options: [.alert, .sound, .badge])
     }
     func replaceDailyReminder(_ request: DailyReminderRequest?) async throws {
         let id = "neoanki2.daily-reminder"
@@ -61,6 +61,35 @@ actor IOSNotificationScheduler: NotificationSchedulingService {
         case .allDecks: URL(string: "neoanki2://study?kind=all")!
         case let .deck(id): URL(string: "neoanki2://study?kind=deck&id=\(id.uuidString)")!
         }
+    }
+}
+
+actor IOSAppIconBadgePublisher: AppIconBadgePublishing {
+    private let center = UNUserNotificationCenter.current()
+    private var hasRequestedAuthorization = false
+    private var publicationTask: Task<Void, Error>?
+
+    func publish(_ badge: AppIconBadge) async throws {
+        // Actor methods can interleave at awaits. Serialize system writes so
+        // a slower earlier refresh cannot overwrite a newer due count.
+        let previous = publicationTask
+        let task = Task {
+            _ = try? await previous?.value
+            try await apply(badge)
+        }
+        publicationTask = task
+        try await task.value
+    }
+
+    private func apply(_ badge: AppIconBadge) async throws {
+        if badge.count > 0, !hasRequestedAuthorization {
+            // Badge permission is independent of the optional daily reminder.
+            let settings = await center.notificationSettings()
+            guard settings.authorizationStatus != .denied else { return }
+            guard try await center.requestAuthorization(options: [.badge]) else { return }
+            hasRequestedAuthorization = true
+        }
+        try await center.setBadgeCount(badge.count)
     }
 }
 

@@ -56,6 +56,7 @@ public final class LibraryFeatureModel {
     private let syncService: any SyncService
     private let notifier: (any NotificationSchedulingService)?
     private let widgetPublisher: (any WidgetSnapshotPublishing)?
+    private let badgePublisher: (any AppIconBadgePublishing)?
     private let settingsStore: (any MobileSettingsStoring)?
     private let errorMapper: any UserFacingErrorMapping
     private var deferredSyncTask: Task<Void, Never>?
@@ -65,6 +66,7 @@ public final class LibraryFeatureModel {
         syncService: any SyncService = DisabledSyncService(),
         notifier: (any NotificationSchedulingService)? = nil,
         widgetPublisher: (any WidgetSnapshotPublishing)? = nil,
+        badgePublisher: (any AppIconBadgePublishing)? = nil,
         settingsStore: (any MobileSettingsStoring)? = nil,
         errorMapper: any UserFacingErrorMapping = DefaultUserFacingErrorMapper()
     ) {
@@ -72,6 +74,7 @@ public final class LibraryFeatureModel {
         self.syncService = syncService
         self.notifier = notifier
         self.widgetPublisher = widgetPublisher
+        self.badgePublisher = badgePublisher
         self.settingsStore = settingsStore
         self.errorMapper = errorMapper
     }
@@ -158,11 +161,11 @@ public final class LibraryFeatureModel {
             if let notifier {
                 let status = await notifier.authorizationStatus()
                 if status == .denied { throw UserFacingError(title: "Reminders Are Disabled", message: "Allow notifications for NeoAnki2 in Settings to enable a daily reminder.") }
-                if status == .notDetermined {
-                    let granted = try await notifier.requestAuthorization()
-                    if !granted {
-                        throw UserFacingError(title: "Reminders Weren’t Enabled", message: "NeoAnki2 will continue working without notifications.")
-                    }
+                // Overall authorization may cover only app-icon badges. Ask
+                // for the reminder's alert/sound capabilities when enabled.
+                let granted = try await notifier.requestAuthorization()
+                if !granted {
+                    throw UserFacingError(title: "Reminders Weren’t Enabled", message: "NeoAnki2 will continue working without notifications.")
                 }
             }
         }
@@ -475,6 +478,7 @@ public final class LibraryFeatureModel {
     }
 
     private func publishDeviceState(asOf now: Date) async {
+        try? await badgePublisher?.publish(AppIconBadge(dueCount: allDecksSummary.dueNow))
         try? await recalculateReminder(asOf: now)
         let deckSnapshots = await withTaskGroup(of: DueWidgetDeckSummary?.self) { group in
             for deck in decks.prefix(12) {
