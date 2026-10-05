@@ -51,6 +51,13 @@ a persistent sidebar with the selected destination in the detail area. Rotate
 the device freely: compact layouts use tabs and regular layouts use the split
 view. System Back controls return through nested screens.
 
+The Home Screen app icon shows the due-card count across All Decks, even when
+you are browsing a single deck. NeoAnki2 asks for badge permission when cards
+are first due. The badge updates after study, undo, authoring, and refreshes;
+it works with reminders and iCloud disabled. See
+[App icon due count](../sync-reminders-widgets/#app-icon-due-count) for permission
+and background-refresh details.
+
 ## Study
 
 Choose **Study** from All Decks, Unassigned, or a deck. The session opens full

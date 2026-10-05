@@ -21,6 +21,11 @@ Each generated card has its own maturity status. Editing a Card setup preserves
 that status when the card identity survives reconciliation; a newly generated
 card starts Not started.
 
+Due counts, including the app icon badge, count generated cards rather than
+items. An item with multiple Card setups can therefore contribute more than
+one due card. After saving a definition, library refreshes update those counts
+to reflect the cards that are currently eligible for study.
+
 [![The Item Types manager]({{ site.baseurl }}/assets/screenshots/item-types.png)]({{ site.baseurl }}/assets/screenshots/item-types.png)
 
 <nav class="local-toc" aria-label="On this page" markdown="1">

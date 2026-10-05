@@ -21,6 +21,11 @@ platform installation and distribution still follow the separate paths below.
 The Prose Deck builder is included in the same app targets; it adds no platform
 requirement.
 
+After the library opens, the Mac Dock icon shows the library-wide number of
+cards due for study. It clears when no cards are due; choosing a deck does not
+narrow the badge. See [App icon due count](../sync-reminders-widgets/#app-icon-due-count)
+for the matching iPhone and iPad behavior.
+
 ## Install the official Mac release
 
 On macOS 14 or newer with Homebrew installed, run:
