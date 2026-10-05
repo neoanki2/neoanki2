@@ -1435,7 +1435,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.buttons["new-deck-create"].tap()
         app.buttons["Deck Builders"].tap(); app.buttons["Poem Deck"].tap()
         app.buttons["Preview"].tap()
-        XCTAssertTrue(app.staticTexts["Enter at least two lines to preview cards."].waitUntilExists(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Enter at least two nonblank lines."].waitUntilExists(timeout: 3))
         capture("41-builder-validation", app)
         scrollToAndTap(app.buttons["poemBuilderRootDeck"], in: app); app.buttons["Poems"].tap()
         let author = app.textFields["poemBuilderAuthor"]
@@ -1445,7 +1445,10 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let text = app.textViews["poemBuilderText"]
         scrollToAndTap(text, in: app); text.typeText("First line\nSecond line\nThird line")
         scrollToAndTap(app.buttons["Preview"], in: app)
-        XCTAssertTrue(app.staticTexts["First line"].waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.staticTexts["First line"].firstMatch.waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Opening-line card included."].exists)
+        XCTAssertTrue(app.staticTexts["Recall the first line."].exists)
+        XCTAssertTrue(app.staticTexts["3 lines · 1 stanza · 3 cards"].exists)
         capture("42-poem-preview", app)
         app.buttons["Import"].tap()
         XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 10))
