@@ -274,3 +274,10 @@ files or injecting HTML into text fields.
 **Next:** [Build, launch, and issue-report support](../support/)
 
 **Related:** [Task index](../tasks/) · [Shortcuts and accessibility](../shortcuts-accessibility/)
+
+## A poem edit changed before it could be saved
+
+If another edit or sync changed a generated deck after you opened its preview,
+NeoAnki2 refuses the stale save. Reopen the whole-source editor and review a
+fresh preview, including any opening card that will be added or retired.
+The rejected save leaves the deck and its learned schedules unchanged.

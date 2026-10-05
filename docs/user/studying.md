@@ -121,6 +121,11 @@ The **Show Answer** control in Item Type Studio is an authoring preview. It
 does not reveal a live study card, write review history, or change scheduling;
 only a grade saved during a study session changes a card's memory state.
 
+A conditional poem opening card asks **Recall the first line.** with the title
+and author as its caption. The answer stays hidden until reveal. Opening cards
+follow the same learned-before-new queue policy; continuation cards retain
+their existing prompts and learned schedules after a whole-poem edit.
+
 ## Card interactions
 
 Every ordinary review interaction ends with self-grading. Automatic feedback is

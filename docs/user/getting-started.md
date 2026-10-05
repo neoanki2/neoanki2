@@ -190,6 +190,12 @@ silent, does not wait on navigation, and adds no scheduler choices or status to
 the interface. See
 [Scheduling](../scheduling/#optimization-happens-on-its-own).
 
+Generated poem decks may include a separate opening-line card when the title
+differs from that line. The builder shows the exact card count and previews
+before creation. The repair CLI can upgrade existing generated poems through
+the authorized local API; it starts with a dry run. This additional tool does
+not change the app's macOS 14 or iOS 17 minimum requirements.
+
 ## Current compatibility limits
 
 NeoAnki2 is a rewrite, not an Anki-compatible client. It does not support:

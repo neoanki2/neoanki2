@@ -181,6 +181,12 @@ and suspended cards are Inactive and excluded from deck progress. Becoming due
 or overdue does not by itself change maturity, and maturity never changes the
 review schedule. Item details show the status of each generated card.
 
+Editing a generated poem preserves the progress of its continuation cards.
+When the title differs from the opening line, the source preview can add a new
+opening card. An existing opening card can instead be updated or retired;
+review that change before saving. Existing card maturity remains attached to
+the surviving card identities.
+
 ## Browse and search items
 
 Open browse mode from the scope home link, from **Library ▸ Browse Items**, or

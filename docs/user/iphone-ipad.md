@@ -125,6 +125,16 @@ editor for that passage.
 and generated previews stay on the device until you explicitly import their
 result into the library.
 
+Builder previews show the actual cue and hidden answer for each card. A poem
+adds **Recall the first line.** only when its title differs from its opening
+line after ignoring punctuation, case, Unicode representation, and spacing.
+Prose always includes one **Opening unit** card. The whole-source editor previews
+opening-card additions and retirement before you save.
+
+Saved Audio Submission responses remain available after a session ends.
+Completion counts saved submissions separately from graded reviews; playback
+and deletion remain in Saved Responses on the device where you recorded them.
+
 ## Mobile data and feature boundaries
 
 The SQLite library, media, sync metadata, pre-sync backup, settings, saved
