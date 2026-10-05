@@ -164,7 +164,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "NeoAnkiPoemRepair",
-            dependencies: ["NeoAnkiAPI", "PoemDeckBuilder"],
+            dependencies: ["NeoAnkiAPI", "PoemDeckBuilder", .product(name: "NeoAnkiCore", package: "NeoAnkiCore")],
             path: "Tools/NeoAnkiPoemRepair"
         ),
         .target(

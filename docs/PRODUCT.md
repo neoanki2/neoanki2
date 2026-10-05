@@ -14,9 +14,9 @@ parent: Developer Guide
 adaptive
 
 macOS, iPhone, and iPad are first-class shipping targets (Swift 6 / SwiftUI). iOS and iPadOS
-are planned later, sharing `NeoAnkiCore`. UI work should follow Apple HIG per
-platform; Mac conventions (split navigation, menus, keyboard study flow) take
-priority until a mobile shell exists.
+share `NeoAnkiCore` and application features. Each platform uses native navigation:
+Mac split views and keyboard commands, iPhone destination stacks, and an iPad sidebar.
+Learner workflows have functional parity across these shells.
 
 ## Users
 
@@ -141,7 +141,7 @@ shared-deck catalogs, or Anki compatibility promises.
 2. **Native data, native UI** — content and presentation stay in Swift/SwiftUI; no document pipeline.
 3. **Domain stays out of the core** — new subjects are data, not code changes.
 4. **Scheduling is invisible until it isn't** — FSRS runs quietly; surface stats only when they help trust.
-5. **Mac-first craft** — menus, keyboard, and window structure should match platform expectations before mobile adaptation.
+5. **Platform craft** — Mac menus and windows, iPhone navigation and touch controls, and iPad layouts should each match their platform's expectations.
 
 ## Accessibility & Inclusion
 

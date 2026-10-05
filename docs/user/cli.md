@@ -68,20 +68,40 @@ deck. That app workflow does not change the CLI command or its diagnostics.
 ## Repair local poem decks
 
 With NeoAnki2's local API enabled, set `NEOANKI_API_TOKEN` to an approved token
-with `library.read` and `items.write` scopes. The repair command uses the API
-and never opens the database directly:
+with `library.read` and `items.write` scopes. All live repairs use the API:
 
 ```bash
 swift run neoanki-poem-repair --dry-run
-swift run neoanki-poem-repair --apply
+swift run neoanki-poem-repair --opening-cards --dry-run
+swift run neoanki-poem-repair --opening-cards --apply
 ```
 
-Set `NEOANKI_API_PORT` if the app uses a port other than `8766`. The command
-checks generated poem decks in the current Mac library, reports cards whose
-prompts or stanza spacing need repair, and skips decks whose source order is
-uncertain. Apply uses atomic API batches and verifies that card IDs remain the
-same. For poems exceeding one API batch, an interrupted run can be resumed by
-running the command again.
+`--opening-cards` also adds an opening-line card when the deck title differs
+from its first line, ignoring case, punctuation, whitespace, and Unicode
+representation differences. An existing opening card is retired if its title
+now gives the first line; the dry run reports additions, updates, and retirements.
+Without that option, the command repairs continuation prompts and stanza spacing
+while preserving the current opening-card policy.
+
+Back up the SQLite library before applying. The installed app must support
+ordered bulk requests; the command checks the advertised API contract and
+refuses to apply against older builds. `NEOANKI_API_PORT` overrides port `8766`.
+Each deck is repaired in one atomic transaction with a complete expected-content
+snapshot. Stale plans are rejected. Existing card identities and learned
+schedules are preserved, and the command verifies the result and a no-change
+second plan. Decks whose source order is uncertain need manual review. A repair
+requiring more than 500 operations is rejected instead of partially applied.
+
+For a headless audit without a token, use a **consistent SQLite backup**, not a
+copy of an active database file:
+
+```bash
+swift run neoanki-poem-repair --opening-cards --snapshot /path/to/backup.sqlite
+```
+
+Snapshot mode reads a disposable copy, leaves the supplied backup unchanged,
+and never applies changes. Create a current backup again before live repair,
+and keep its card-memory and review-history baseline for post-repair verification.
 
 ## Migrate a version-1 template library
 

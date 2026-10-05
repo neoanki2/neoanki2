@@ -10,6 +10,7 @@ final class ProseDeckEditorModel {
     private let itemTypeID: UUID
     private var records: [ProseDeckItemRecord] = []
 
+    var initialSourceText = ""
     var sourceText = ""
     var units: [ProseUnit] = []
     var preview: ProseDeckEditPreview?
@@ -50,6 +51,7 @@ final class ProseDeckEditorModel {
             let snapshot = try ProseDeckReconciler.snapshot(records: loaded)
             records = loaded
             sourceText = snapshot.sourceText
+            initialSourceText = snapshot.sourceText
             units = snapshot.units
             preview = nil
         } catch {
@@ -98,6 +100,7 @@ public struct ProseDeckEditorView: View {
     private let onCancel: () -> Void
     @State private var model: ProseDeckEditorModel
     @State private var isPreviewing = false
+    @State private var confirmsDiscard = false
 
     public init(
         library: any LibraryBrowsing & LibraryCoordinatedItemEditing,
@@ -130,6 +133,7 @@ public struct ProseDeckEditorView: View {
                         retiredCards: model.preview?.retiredCards ?? []
                     )
                         .onChange(of: model.units) { _, _ in model.refreshPreview() }
+                        .disabled(model.isSaving)
                 } else {
                     Form {
                         Section("Canonical source") {
@@ -162,6 +166,7 @@ public struct ProseDeckEditorView: View {
                         .padding()
                         .accessibilityIdentifier("proseEditorError")
                 }
+                #if os(macOS)
                 Divider()
                 HStack {
                     Button("Cancel", role: .cancel, action: onCancel)
@@ -195,13 +200,39 @@ public struct ProseDeckEditorView: View {
                     }
                 }
                 .padding()
+                #endif
             }
             .navigationTitle(isPreviewing ? "Review Prose Changes" : "Edit Prose")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { if hasChanges { confirmsDiscard = true } else { onCancel() } }.disabled(model.isSaving) }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isPreviewing {
+                        Button("Save") { Task { do { try await model.save(); onSaved() } catch { model.errorMessage = error.localizedDescription } } }
+                            .disabled(model.preview?.hasChanges != true || model.isSaving).accessibilityIdentifier("proseEditorSave")
+                    } else {
+                        Button("Preview") { isPreviewing = model.preparePreview() }.disabled(model.isLoading || model.isSaving).accessibilityIdentifier("proseEditorPreview")
+                    }
+                }
+                if isPreviewing { ToolbarItem(placement: .topBarLeading) { Button("Edit Text") { model.sourceText = ProseText.source(from: model.units); isPreviewing = false }.disabled(model.isSaving) } }
+            }
+            #endif
         }
         #if os(macOS)
         .frame(minWidth: 620, idealWidth: 720, minHeight: 620, idealHeight: 760)
         #endif
-        .interactiveDismissDisabled(model.isSaving)
+        .interactiveDismissDisabled(model.isSaving || isMobileDirty)
+        .confirmationDialog("Discard changes?", isPresented: $confirmsDiscard) { Button("Discard Changes", role: .destructive, action: onCancel); Button("Keep Editing", role: .cancel) {} }
         .task { await model.load() }
     }
+
+    private var isMobileDirty: Bool {
+        #if os(iOS)
+        hasChanges
+        #else
+        false
+        #endif
+    }
+    private var hasChanges: Bool { model.sourceText != model.initialSourceText || model.preview?.hasChanges == true }
 }

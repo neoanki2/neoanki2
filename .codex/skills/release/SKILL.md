@@ -8,6 +8,9 @@ description: Release current NeoAnki2 local changes to GitHub and the official H
 Use the repository command; do not reconstruct its GitHub, tap, or installation
 steps manually.
 
+For a physical iPhone installation, use [deploy-iphone](../deploy-iphone/SKILL.md)
+and `./Scripts/deploy-iphone.sh`; this macOS/Homebrew release flow does not apply.
+
 ## Default: local changes to Brew in five minutes
 
 When the user says `release`, immediately run:

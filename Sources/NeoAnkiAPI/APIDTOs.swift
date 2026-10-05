@@ -397,7 +397,7 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         self.number = number
     }
 
-    func domain(pointer: String) throws -> ContentValue {
+    package func domain(pointer: String) throws -> ContentValue {
         switch type {
         case "empty":
             return .empty
@@ -451,7 +451,7 @@ public struct APIFieldValue: Codable, Sendable, Equatable {
     public let fieldId: String
     public let value: APIContentValue
 
-    init(_ field: FieldValue) {
+    package init(_ field: FieldValue) {
         fieldId = field.fieldID.uuidString.lowercased()
         value = APIContentValue(field.value)
     }
@@ -467,6 +467,22 @@ public struct APIItem: Codable, Sendable, Equatable, Identifiable {
     public let createdAt: Date
     public let updatedAt: Date
     public let cardIds: [String]
+
+    package func domain() throws -> Item {
+        func uuid(_ value: String) throws -> UUID {
+            guard let id = UUID(uuidString: value) else {
+                throw APIServiceError.validation("Invalid item UUID.")
+            }
+            return id
+        }
+        return try Item(
+            id: uuid(id), itemTypeID: uuid(itemTypeId),
+            fields: fields.map {
+                try FieldValue(fieldID: uuid($0.fieldId), value: $0.value.domain(pointer: "/fields"))
+            },
+            tags: tags, deckID: deckId.map(uuid)
+        )
+    }
 
     init(_ record: LibraryItemRecord, revision: Int) {
         id = record.item.id.uuidString.lowercased()
@@ -514,10 +530,17 @@ struct BulkItemOperationInput: Decodable {
     let itemId: String?
 }
 
+struct OrderedItemsInput: Decodable {
+    let deckId: String
+    let expectedItems: [CreateItemInput]
+    let orderedItemIds: [String]
+}
+
 struct BulkItemsInput: Decodable {
     let atomic: Bool
     let dryRun: Bool
     let operations: [BulkItemOperationInput]
+    let order: OrderedItemsInput?
 }
 
 public struct APIBulkItemResult: Codable, Sendable, Equatable {
@@ -788,7 +811,7 @@ public struct APIFieldDefinition: Codable, Sendable, Equatable {
         isRequired = field.isRequired
     }
 
-    func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> FieldDef {
+    package func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> FieldDef {
         guard let type = FieldType(rawValue: type) else {
             throw APIServiceError.validation("Unknown field type.", pointer: pointer + "/type")
         }
@@ -984,7 +1007,7 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
         generateWhen = template.generateWhen.map(APICondition.init)
     }
 
-    func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> Template {
+    package func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> Template {
         guard let interaction = Interaction(rawValue: interaction) else {
             throw APIServiceError.validation("Unknown interaction.", pointer: pointer + "/interaction")
         }
@@ -1033,6 +1056,20 @@ public struct APIItemType: Codable, Sendable, Equatable, Identifiable {
     public let templates: [APITemplateDefinition]
     public let provenance: String
     public let itemCount: Int
+
+    package func domain() throws -> ItemType {
+        func uuid(_ value: String, _ pointer: String) throws -> UUID {
+            guard let id = UUID(uuidString: value) else {
+                throw APIServiceError.validation("Invalid item-type UUID.", pointer: pointer)
+            }
+            return id
+        }
+        return try ItemType(
+            id: uuid(id, "/id"), name: name,
+            fields: fields.map { try $0.domain(parseUUID: uuid, pointer: "/fields") },
+            templates: templates.map { try $0.domain(parseUUID: uuid, pointer: "/templates") }
+        )
+    }
 
     init(_ itemType: ItemType, revision: Int, itemCount: Int, provenance: String = "library") {
         id = itemType.id.uuidString.lowercased()

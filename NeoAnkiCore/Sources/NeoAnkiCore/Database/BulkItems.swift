@@ -81,34 +81,6 @@ public extension ItemStore {
         order: OrderedDeckItemReconciliation,
         now: Date = .now
     ) async throws -> [ItemBulkOperationResult] {
-        guard !order.expectedItemIDs.isEmpty,
-              !order.orderedItemIDs.isEmpty,
-              Set(order.expectedItemIDs).count == order.expectedItemIDs.count,
-              Set(order.orderedItemIDs).count == order.orderedItemIDs.count,
-              order.expectedItems.allSatisfy({ $0.deckID == order.deckID })
-        else {
-            throw DatabaseError.invalidItem("The ordered deck must have unique, nonempty item lists.")
-        }
-        let before = Set(order.expectedItemIDs)
-        let after = Set(order.orderedItemIDs)
-        for operation in operations {
-            switch operation.action {
-            case let .create(item):
-                guard item.deckID == order.deckID,
-                      !before.contains(item.id), after.contains(item.id) else {
-                    throw DatabaseError.invalidItem("A created item must belong to the edited deck.")
-                }
-            case let .replace(item):
-                guard item.deckID == order.deckID,
-                      before.contains(item.id), after.contains(item.id) else {
-                    throw DatabaseError.invalidItem("A replacement must stay in the edited deck.")
-                }
-            case let .delete(id):
-                guard before.contains(id), !after.contains(id) else {
-                    throw DatabaseError.invalidItem("A retired item must leave the edited deck.")
-                }
-            }
-        }
         return try await executeItemBulk(
             operations,
             dryRun: false,
@@ -256,6 +228,36 @@ public extension ItemStore {
         now: Date = .now,
         orderedDeck: OrderedDeckItemReconciliation? = nil
     ) async throws -> [ItemBulkOperationResult] {
+        if let order = orderedDeck {
+            guard !order.expectedItemIDs.isEmpty,
+                  !order.orderedItemIDs.isEmpty,
+                  Set(order.expectedItemIDs).count == order.expectedItemIDs.count,
+                  Set(order.orderedItemIDs).count == order.orderedItemIDs.count,
+                  order.expectedItems.allSatisfy({ $0.deckID == order.deckID })
+            else {
+                throw DatabaseError.invalidItem("The ordered deck must have unique, nonempty item lists.")
+            }
+            let before = Set(order.expectedItemIDs)
+            let after = Set(order.orderedItemIDs)
+            for operation in operations {
+                switch operation.action {
+                case let .create(item):
+                    guard item.deckID == order.deckID,
+                          !before.contains(item.id), after.contains(item.id) else {
+                        throw DatabaseError.invalidItem("A created item must belong to the edited deck.")
+                    }
+                case let .replace(item):
+                    guard item.deckID == order.deckID,
+                          before.contains(item.id), after.contains(item.id) else {
+                        throw DatabaseError.invalidItem("A replacement must stay in the edited deck.")
+                    }
+                case let .delete(id):
+                    guard before.contains(id), !after.contains(id) else {
+                        throw DatabaseError.invalidItem("A retired item must leave the edited deck.")
+                    }
+                }
+            }
+        }
         let maximumOperations = orderedDeck == nil ? 500 : 100_000
         guard !operations.isEmpty, operations.count <= maximumOperations else {
             throw DatabaseError.invalidItem(
@@ -362,8 +364,10 @@ public extension ItemStore {
             }
         }
 
-        if !dryRun {
-            try await database.applyItemBulk(mutations, orderedDeck: orderedDeck, now: now)
+        if !dryRun || orderedDeck != nil {
+            try await database.applyItemBulk(
+                mutations, orderedDeck: orderedDeck, dryRun: dryRun, now: now
+            )
         }
         return results
     }

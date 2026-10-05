@@ -31,6 +31,7 @@ public struct PoemDeckBuilderView: View {
     @State private var input = PoemDeckInput()
     @State private var errorMessage: String?
     @State private var isGenerating = false
+    @State private var isPreviewing = false
 
     private let rootDecks: [DeckBuilderDeckOption]
     private let workspaceProvider: any DeckBuildWorkspaceProviding
@@ -55,6 +56,22 @@ public struct PoemDeckBuilderView: View {
     public var body: some View {
         VStack(spacing: 0) {
             Form {
+                if isPreviewing {
+                    Section("Preview") {
+                        Text(lineSummary).font(.subheadline).foregroundStyle(.secondary)
+                        Text(openingSummary).font(.caption).foregroundStyle(.secondary)
+                        ForEach(Array(plannedCards.enumerated()), id: \.offset) { index, card in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(card.isOpening ? "Card \(index + 1) · Opening line" : "Card \(index + 1)")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Text("\(input.title.trimmingCharacters(in: .whitespacesAndNewlines)) · \(input.author.trimmingCharacters(in: .whitespacesAndNewlines))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Text(card.prompt).foregroundStyle(.secondary)
+                                Text(card.answer)
+                            }
+                        }
+                    }
+                } else {
                 Section {
                     Picker("Root Deck", selection: $input.destinationDeckID) {
                         Text("Choose a deck").tag(UUID?.none)
@@ -63,15 +80,24 @@ public struct PoemDeckBuilderView: View {
                         }
                     }
                     .accessibilityIdentifier("poemBuilderRootDeck")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Author").font(.subheadline).foregroundStyle(.secondary)
                     TextField("Author", text: $input.author)
                         .accessibilityIdentifier("poemBuilderAuthor")
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Title").font(.subheadline).foregroundStyle(.secondary)
                     TextField("Title", text: $input.title)
                         .accessibilityIdentifier("poemBuilderTitle")
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Poem text").font(.subheadline).foregroundStyle(.secondary)
                     TextEditor(text: $input.text)
                         .font(.body)
                         .frame(minHeight: 220)
                         .accessibilityLabel("Poem text")
                         .accessibilityIdentifier("poemBuilderText")
+                    }
                     Text(lineSummary)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -81,10 +107,11 @@ public struct PoemDeckBuilderView: View {
                     if rootDecks.isEmpty {
                         Text("Create a root deck before building a poem deck.")
                     } else {
-                        Text("The poem becomes a child of the selected deck. Each line becomes an answer.")
+                        Text("The poem becomes a child of the selected deck. An opening card is included when the title differs from the first line.")
                     }
                 }
 
+                }
                 if let errorMessage {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -95,6 +122,7 @@ public struct PoemDeckBuilderView: View {
             }
             .formStyle(.grouped)
 
+            #if os(macOS)
             Divider()
 
             HStack {
@@ -105,25 +133,63 @@ public struct PoemDeckBuilderView: View {
 
                 Spacer()
 
-                Button("Add to Library") {
-                    generate()
+                if isPreviewing {
+                    Button("Edit Text") { isPreviewing = false }
+                    Button("Add to Library", action: generate)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(isGenerating)
+                        .accessibilityIdentifier("poemBuilderAdd")
+                } else {
+                    Button("Review Cards", action: preview)
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("poemBuilderPreview")
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(isGenerating)
-                .accessibilityIdentifier("poemBuilderAdd")
             }
             .padding()
+            #endif
         }
         .navigationTitle(PoemDeckBuilderFeature.descriptor.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if isPreviewing {
+                    Button("Import", action: generate).disabled(isGenerating).accessibilityIdentifier("poemBuilderAdd")
+                } else {
+                    Button("Preview", action: preview).accessibilityIdentifier("poemBuilderPreview")
+                }
+            }
+            if isPreviewing { ToolbarItem(placement: .topBarLeading) { Button("Edit Text") { isPreviewing = false } } }
+        }
+        #endif
         .interactiveDismissDisabled(isGenerating)
     }
 
     private var lineSummary: String {
         let poem = PoemDeckGenerator.parse(input.text)
         let count = poem.lines.count
-        let cards = max(0, count - 1)
+        let cards = plannedCards.count
         let stanzaCount = poem.stanzas.count
         return "\(count) lines · \(stanzaCount) \(stanzaCount == 1 ? "stanza" : "stanzas") · \(cards) cards"
+    }
+
+    private var plannedCards: [PlannedPoemCard] {
+        PoemCardPlanner.cards(for: PoemDeckGenerator.parse(input.text), title: input.title)
+    }
+
+    private var openingSummary: String {
+        plannedCards.first?.isOpening == true
+            ? "Opening-line card included."
+            : "Opening-line card omitted: the title already gives the first line."
+    }
+
+    private func preview() {
+        guard PoemDeckGenerator.parse(input.text).lines.count >= 2 else {
+            errorMessage = PoemDeckBuilderError.tooFewLines.localizedDescription
+            return
+        }
+        errorMessage = nil
+        isPreviewing = true
     }
 
     private func generate() {

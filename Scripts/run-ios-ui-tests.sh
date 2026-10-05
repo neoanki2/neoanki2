@@ -125,6 +125,7 @@ while [[ $attempt -le 2 ]]; do
   result_bundle="$RESULT_ROOT/attempt-${attempt}.xcresult"
   raw_log="$RESULT_ROOT/attempt-${attempt}.log"
   compact_summary="$RESULT_ROOT/attempt-${attempt}-summary.json"
+  retry_classification="$RESULT_ROOT/attempt-${attempt}-retry.json"
   text_summary="$RESULT_ROOT/attempt-${attempt}-summary.txt"
   rm -rf "$result_bundle"
 
@@ -161,26 +162,30 @@ while [[ $attempt -le 2 ]]; do
   runner_exit_failure=false
   accessibility_audit_timeout=false
   app_launch_progress_timeout=false
+  app_background_assertion_timeout=false
+  retryable_infrastructure_failure=false
   if [[ -d "$result_bundle" ]] && xcrun xcresulttool get test-results summary \
       --path "$result_bundle" --compact > "$compact_summary"; then
     total_tests=$(jq -r '.totalTestCount' "$compact_summary")
-    if jq -e '
-      [.testFailures] | flatten
-      | any(.[]?; ((.failureText? // "") | contains("test runner exited with code")))
-    ' "$compact_summary" >/dev/null; then
+    # The shared classifier recognizes both "Audit failed to complete in time"
+    # and "Timed out while running accessibility audit with config:", plus
+    # "Failed to get launch progress". Every recorded failure must match an
+    # incomplete infrastructure operation before a fresh-Simulator retry.
+    jq -f "$ROOT/Scripts/classify-ios-ui-result.jq" "$compact_summary" > "$retry_classification"
+    if jq -e '.runner_exit_failure' "$retry_classification" >/dev/null; then
       runner_exit_failure=true
     fi
-    if jq -e '
-      [.testFailures] | flatten
-      | any(.[]?; ((.failureText? // "") | contains("Audit failed to complete in time")))
-    ' "$compact_summary" >/dev/null; then
+    if jq -e '.accessibility_audit_timeout' "$retry_classification" >/dev/null; then
       accessibility_audit_timeout=true
     fi
-    if jq -e '
-      [.testFailures] | flatten
-      | any(.[]?; ((.failureText? // "") | contains("Failed to get launch progress")))
-    ' "$compact_summary" >/dev/null; then
+    if jq -e '.app_launch_progress_timeout' "$retry_classification" >/dev/null; then
       app_launch_progress_timeout=true
+    fi
+    if jq -e '.app_background_assertion_timeout' "$retry_classification" >/dev/null; then
+      app_background_assertion_timeout=true
+    fi
+    if jq -e '.retryable' "$retry_classification" >/dev/null; then
+      retryable_infrastructure_failure=true
     fi
     jq -r '
       "result=\(.result) tests=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests)",
@@ -218,13 +223,15 @@ while [[ $attempt -le 2 ]]; do
     echo "iOS UI total timing: shard=$SHARD_ID device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
     exit 0
   fi
-  if [[ $attempt -eq 1 && ("$total_tests" == "0" || "$runner_exit_failure" == "true" || "$accessibility_audit_timeout" == "true" || "$app_launch_progress_timeout" == "true") ]]; then
+  if [[ $attempt -eq 1 && "$retryable_infrastructure_failure" == "true" ]]; then
     if [[ "$runner_exit_failure" == "true" ]]; then
       echo "The XCTest runner exited before finishing; retrying once with a newly provisioned simulator." >&2
     elif [[ "$accessibility_audit_timeout" == "true" ]]; then
       echo "The XCTest accessibility audit timed out; retrying once with a newly provisioned simulator." >&2
     elif [[ "$app_launch_progress_timeout" == "true" ]]; then
       echo "XCTest timed out while requesting app launch progress; retrying once with a newly provisioned simulator." >&2
+    elif [[ "$app_background_assertion_timeout" == "true" ]]; then
+      echo "XCTest timed out acquiring its app background assertion during launch; retrying once with a newly provisioned simulator." >&2
     else
       echo "No test started; retrying once with a newly provisioned simulator." >&2
     fi

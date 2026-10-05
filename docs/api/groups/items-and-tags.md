@@ -2,7 +2,7 @@
 title: Items and tags
 description: Generated NeoAnki local API operations for items and tags.
 audience: api
-contract_digest: sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc
+contract_digest: sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271
 parent: Local API reference
 permalink: /api/items-and-tags/
 ---
@@ -69,7 +69,7 @@ curl --request POST \
 ```
 ## `POST /v1/items/bulk`
 
-Bulk items through the loopback-only NeoAnki API.
+Bulk items through the loopback-only NeoAnki API. Optional order atomically reconciles one generated deck against complete expected item snapshots. Both dry runs and commits reject stale snapshots; only New-card introduction times are reordered.
 
 - **Operation ID:** `bulkItems`
 - **Authorization:** Bearer token with `items.write`
@@ -285,6 +285,6 @@ curl --request DELETE \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc`.
+Contract digest: `sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

@@ -68,7 +68,7 @@ private struct ProseUnitRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(isNewCard ? "Card \(index + 1) · New card" : "Card \(index + 1)")
+            Text("Card \(index + 1)" + (index == 0 ? " · Opening unit" : "") + (isNewCard ? " · New card" : ""))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if unit.separator == "\n\n" {

@@ -106,7 +106,11 @@ public final class LibraryFeatureModel {
             mediaStore = await library.mediaStore()
             try await reload()
             loadState = .ready
-            if startSync ?? syncEnabled { await syncService.start(); await refreshSyncStatus() }
+            if startSync ?? syncEnabled {
+                await syncService.start()
+                await refreshSyncStatus()
+                try await reload()
+            }
         } catch {
             loadState = .failed(errorMapper.map(error))
         }
@@ -146,6 +150,7 @@ public final class LibraryFeatureModel {
         await settingsStore?.saveSyncEnabled(enabled)
         if enabled { await syncService.start() } else { await syncService.stop() }
         await refreshSyncStatus()
+        if enabled { await refresh() }
     }
 
     public func setReminderSettings(_ settings: ReminderSettings) async throws {

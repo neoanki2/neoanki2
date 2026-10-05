@@ -1722,6 +1722,10 @@ public actor ItemStore {
     }
 
     func validate(_ item: Item, against itemType: ItemType) throws {
+        try Self.validateContent(item, against: itemType)
+    }
+
+    static func validateContent(_ item: Item, against itemType: ItemType) throws {
         let definitions = Dictionary(uniqueKeysWithValues: itemType.fields.map { ($0.id, $0) })
         var seen: Set<UUID> = []
         for fieldValue in item.fields {
@@ -1770,7 +1774,7 @@ public actor ItemStore {
         }
     }
 
-    private func value(_ value: ContentValue, matches type: FieldType) -> Bool {
+    private static func value(_ value: ContentValue, matches type: FieldType) -> Bool {
         if case .empty = value { return true }
         return switch (type, value) {
         case (.text, .text), (.text, .rich), (.richText, .text), (.richText, .rich),

@@ -41,7 +41,8 @@ public struct MobileCardSetupAccessibilityTestHost: View {
                             }
                         ),
                         cardSetupID: MobileItemTypeStudioUITestSeeder.legacyCardSetupID,
-                        auditSection: auditSection
+                        auditSection: auditSection,
+                        presentation: .mobile
                     )
                     .navigationTitle("Card Setup Accessibility")
                     .navigationBarTitleDisplayMode(.inline)

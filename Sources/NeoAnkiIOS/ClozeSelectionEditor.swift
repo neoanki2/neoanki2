@@ -4,6 +4,7 @@ import SwiftUI
 import UIKit
 
 struct ClozeSelectionEditor: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var text: String
     @Binding var blanks: [ClozeSpan]
     @State private var selection = NSRange(location: 0, length: 0)
@@ -11,15 +12,15 @@ struct ClozeSelectionEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SelectionTextView(text: $text, selection: $selection)
-                .frame(minHeight: 92)
-            HStack {
-                Button("Make Cloze") { makeCloze() }
+                .modifier(MobileTextEditorHeight())
+            MobileAdaptiveActionGroup {
+                Button { makeCloze() } label: { Text("Make Cloze").frame(minHeight: 44) }
                     .disabled(selection.length == 0)
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                 if !blanks.isEmpty {
-                    Button("Clear Blanks", role: .destructive) { blanks = [] }
+                    Button(role: .destructive) { blanks = [] } label: { Text("Clear Blanks").frame(minHeight: 44) }
                 }
-            }
+            }.buttonStyle(.borderless)
             Text(blanks.isEmpty ? "Select text, then make it a blank." : "\(blanks.count) \(blanks.count == 1 ? "blank" : "blanks")")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -51,6 +52,7 @@ private struct SelectionTextView: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
         view.delegate = context.coordinator
+        view.accessibilityLabel = "Cloze text"
         view.adjustsFontForContentSizeCategory = true
         view.font = .preferredFont(forTextStyle: .body)
         view.backgroundColor = .secondarySystemGroupedBackground
@@ -58,12 +60,34 @@ private struct SelectionTextView: UIViewRepresentable {
         view.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
         return view
     }
-    func updateUIView(_ view: UITextView, context: Context) { if view.text != text { view.text = text } }
+    func updateUIView(_ view: UITextView, context: Context) {
+        context.coordinator.updateBindings(text: $text, selection: $selection)
+        guard view.text != text else { return }
+        // Assigning text can invoke the selection delegate synchronously. Keep
+        // UIKit's programmatic updates from publishing state during rendering.
+        context.coordinator.isUpdatingText = true
+        defer { context.coordinator.isUpdatingText = false }
+        view.text = text
+    }
     final class Coordinator: NSObject, UITextViewDelegate {
         @Binding var text: String; @Binding var selection: NSRange
+        var isUpdatingText = false
         init(text: Binding<String>, selection: Binding<NSRange>) { _text = text; _selection = selection }
-        func textViewDidChange(_ textView: UITextView) { text = textView.text; selection = textView.selectedRange }
-        func textViewDidChangeSelection(_ textView: UITextView) { selection = textView.selectedRange }
+        func updateBindings(text: Binding<String>, selection: Binding<NSRange>) {
+            _text = text; _selection = selection
+        }
+        func textViewDidChange(_ textView: UITextView) {
+            guard !isUpdatingText else { return }
+            if text != textView.text { text = textView.text }
+            updateSelection(textView)
+        }
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            guard !isUpdatingText else { return }
+            updateSelection(textView)
+        }
+        private func updateSelection(_ textView: UITextView) {
+            if selection != textView.selectedRange { selection = textView.selectedRange }
+        }
     }
 }
 #endif

@@ -9,6 +9,14 @@ public struct StudyCompletion: Sendable, Equatable {
     public let reviews: Int
     public let uniqueCards: Int
     public let uniqueItems: Int
+    public let savedSubmissions: Int
+
+    public init(reviews: Int, uniqueCards: Int, uniqueItems: Int, savedSubmissions: Int = 0) {
+        self.reviews = reviews
+        self.uniqueCards = uniqueCards
+        self.uniqueItems = uniqueItems
+        self.savedSubmissions = savedSubmissions
+    }
 }
 
 @MainActor @Observable
@@ -153,7 +161,8 @@ public final class StudyFeatureModel: Identifiable {
             completion = .init(
                 reviews: completion.reviews,
                 uniqueCards: reviewedCards.count,
-                uniqueItems: reviewedItems.count
+                uniqueItems: reviewedItems.count,
+                savedSubmissions: completion.savedSubmissions + 1
             )
             index += 1
             advance()
@@ -179,7 +188,7 @@ public final class StudyFeatureModel: Identifiable {
             pendingUndo = (receipt.reviewLogID, index, rating, requeue ? card.id : nil)
             reviewedCards.insert(card.id)
             reviewedItems.insert(card.item.id)
-            completion = .init(reviews: completion.reviews + 1, uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count)
+            completion = .init(reviews: completion.reviews + 1, uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count, savedSubmissions: completion.savedSubmissions)
             index += 1
             advance()
             await onMutation?()
@@ -201,7 +210,7 @@ public final class StudyFeatureModel: Identifiable {
                 }
             }
             index = undo.index
-            completion = .init(reviews: max(0, completion.reviews - 1), uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count)
+            completion = .init(reviews: max(0, completion.reviews - 1), uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count, savedSubmissions: completion.savedSubmissions)
             pendingUndo = nil
             isAnswerRevealed = true
             reviewTiming.reset()

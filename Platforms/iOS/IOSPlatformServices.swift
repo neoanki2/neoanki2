@@ -2,6 +2,7 @@ import BackgroundTasks
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCloudSync
+import NeoAnkiCore
 import NeoAnkiFeatures
 import UserNotifications
 import WidgetKit
@@ -110,13 +111,64 @@ actor MobileSyncCoordinator: SyncService {
     }
 }
 
+/// Reset-only Simulator fixture. Uses the production codec and restore adapter
+/// while keeping visual recovery acceptance independent of a signed account.
+actor MobileSyncRecoveryUITestService: SyncService {
+    private let repository: SQLiteLibraryRepository
+    private let adapter: SQLiteLibrarySyncAdapter
+    private var seeded = false
+    private var pending: [SyncIssue] = []
+
+    init(repository: SQLiteLibraryRepository) {
+        self.repository = repository
+        adapter = SQLiteLibrarySyncAdapter(repository: repository)
+    }
+    func start() async {
+        guard !seeded else { return }
+        seeded = true
+        do {
+            let deck = Deck(name: "Preserved reading deck")
+            _ = try await repository.createDeck(deck)
+            let records = try await adapter.encode(
+                changes: repository.changes(after: 0, limit: 1_000), deviceID: "visual-fixture")
+            guard let record = records.first(where: { $0.id == deck.id.uuidString && $0.resourceKind == "deck" }) else { return }
+            let copy = SyncConflictCopy(resourceKind: "deck", originalResourceID: record.id,
+                                        sourceDeviceID: "another-device", payload: record.payload)
+            let invalid = SyncConflictCopy(resourceKind: "deck", originalResourceID: UUID().uuidString,
+                                           sourceDeviceID: "another-device", payload: Data("invalid".utf8))
+            pending = [
+                SyncIssue(kind: .deckConflict, resourceID: record.id,
+                          summary: "Another device changed this deck. Your earlier version is preserved.", conflictCopy: copy),
+                SyncIssue(kind: .invalidRemoteChange, resourceID: invalid.originalResourceID,
+                          summary: "This preserved copy could not be verified. Retry or dismiss this issue.", conflictCopy: invalid),
+            ]
+        } catch {
+            pending = [SyncIssue(kind: .invalidRemoteChange, resourceID: "visual-fixture",
+                                 summary: error.localizedDescription)]
+        }
+    }
+    func synchronize() async {}
+    func stop() async {}
+    func status() async -> SyncStatus { pending.isEmpty ? .current(lastSync: .now) : .needsAttention(issueCount: pending.count) }
+    func issues() async -> [SyncIssue] { pending }
+    func retryIssue(id: UUID) async {}
+    func dismissIssue(id: UUID) async { pending.removeAll { $0.id == id } }
+    func restoreConflictCopy(forIssueID id: UUID) async throws {
+        guard let copy = pending.first(where: { $0.id == id })?.conflictCopy else { return }
+        try await adapter.restoreConflictCopy(copy)
+        pending.removeAll { $0.id == id }
+    }
+}
+
 @MainActor final class IOSBackgroundRefresh {
     static let shared = IOSBackgroundRefresh()
     private let identifier = "com.neoanki2.ios.refresh"
     private weak var model: LibraryFeatureModel?
     func register(model: LibraryFeatureModel) {
         self.model = model
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: nil) { [weak self] task in
+        // Swift inherits this callback's MainActor isolation. A nil queue makes
+        // BGTaskScheduler invoke it off-main and traps before the handler runs.
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
             guard let refresh = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
             self?.handle(refresh)
         }
@@ -131,9 +183,12 @@ actor MobileSyncCoordinator: SyncService {
         let work = Task { [weak self] in
             guard let model = self?.model else { task.setTaskCompleted(success: false); return }
             await model.refresh()
+            guard !Task.isCancelled else { task.setTaskCompleted(success: false); return }
             if model.syncEnabled { await model.synchronize() }
-            task.setTaskCompleted(success: true)
+            task.setTaskCompleted(success: !Task.isCancelled)
         }
-        task.expirationHandler = { work.cancel() }
+        // The system can also expire a task off-main. Capturing only the
+        // Sendable work handle avoids inheriting MainActor on this callback.
+        task.expirationHandler = { @Sendable in work.cancel() }
     }
 }

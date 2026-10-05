@@ -4,6 +4,142 @@ import NeoAnkiCloudSync
 import NeoAnkiCore
 import Testing
 
+@Test func synchronizedItemMustRejectAValueWithTheWrongFieldType() async throws {
+    let fixture = try await makeSyncRepository()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let type = try #require(try await fixture.repository.loadItemTypes().itemTypes.first)
+    let invalid = Item(itemTypeID: type.id, fields: type.fields.map {
+        FieldValue(fieldID: $0.id, value: .number(123))
+    })
+    await #expect(throws: (any Error).self) {
+        try await fixture.repository.applySynchronizedBatch([.item(invalid, createdAt: .now, updatedAt: .now)])
+    }
+    #expect(try await fixture.repository.item(id: invalid.id) == nil)
+}
+
+@Test func initialMergeKeepsEquivalentSchemasWithIndependentTemplateIDs() async throws {
+    let local = try await makeSyncRepository(), remote = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: local.directory)
+        try? FileManager.default.removeItem(at: remote.directory)
+    }
+    let base = try #require(try await local.repository.loadItemTypes().itemTypes.first)
+    let templates = base.templates.map {
+        Template(id: UUID(), name: $0.name, layout: $0.layout, components: $0.components,
+            interaction: $0.interaction, skill: $0.skill, generateWhen: $0.generateWhen)
+    }
+    let type = ItemType(name: base.name, fields: base.fields, templates: templates)
+    #expect(try PortableItemTypeIdentity.schemaDigest(of: base) == PortableItemTypeIdentity.schemaDigest(of: type))
+    _ = try await remote.repository.createItemType(type)
+    let item = Item(itemTypeID: type.id, fields: type.fields.map {
+        FieldValue(fieldID: $0.id, value: .text("remote"))
+    })
+    _ = try await remote.repository.createItem(item, asOf: .now)
+    let records = try await SQLiteLibrarySyncAdapter(repository: remote.repository).initialMerge(remote: [], deviceID: "remote")
+    _ = try await SQLiteLibrarySyncAdapter(repository: local.repository).initialMerge(remote: records, deviceID: "local")
+    #expect(try await local.repository.item(id: item.id)?.item.itemTypeID == type.id)
+    #expect(try await local.repository.loadItemTypes().itemTypes.contains { $0.id == type.id })
+    let card = try #require(try await local.repository.cards().first { $0.itemID == item.id })
+    #expect(type.templates.contains { $0.id == card.templateID })
+}
+
+@Test func linkedLibrariesTreatChangedValuesAsUpdatesInsteadOfIdentityCollisions() async throws {
+    let local = try await makeSyncRepository()
+    let cloud = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: local.directory)
+        try? FileManager.default.removeItem(at: cloud.directory)
+    }
+    let id = UUID()
+    _ = try await local.repository.createDeck(Deck(id: id, name: "Before edit"))
+    _ = try await cloud.repository.createDeck(Deck(id: id, name: "After edit"))
+    try await local.repository.recordLibraryAlias(cloud.repository.libraryID(), canonicalID: local.repository.libraryID())
+    let records = try await SQLiteLibrarySyncAdapter(repository: cloud.repository).initialMerge(remote: [], deviceID: "cloud")
+    _ = try await SQLiteLibrarySyncAdapter(repository: local.repository).initialMerge(remote: records, deviceID: "local")
+    let decks = try await local.repository.deckSummaries(asOf: .now)
+    #expect(decks.count == 1)
+    #expect(decks.first?.id == id)
+    #expect(decks.first?.name == "After edit")
+}
+
+@Test func initialMergeIncludesResourcesMissingFromRetainedJournal() async throws {
+    let source = try await makeSyncRepository()
+    let destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let deck = try await source.repository.createDeck(Deck(name: "Before retained history"))
+    _ = try await source.repository.createDeck(Deck(name: "Retained change"))
+    let store = try ItemStore(databaseURL: source.directory.appendingPathComponent("library.sqlite"))
+    _ = try await store.pruneLibraryChanges(asOf: .distantFuture, retentionInterval: 0, minimumRetained: 1)
+    #expect(try await source.repository.changes(after: 0, limit: 1_000).allSatisfy { $0.resourceID != deck.id.uuidString })
+    let snapshot = try await SQLiteLibrarySyncAdapter(repository: source.repository).initialMerge(remote: [], deviceID: "source")
+    #expect(snapshot.contains { $0.resourceKind == "deck" && $0.id == deck.id.uuidString })
+    _ = try await SQLiteLibrarySyncAdapter(repository: destination.repository).initialMerge(remote: snapshot, deviceID: "destination")
+    #expect(try await destination.repository.deck(id: deck.id).name == "Before retained history")
+}
+
+@Test func sqliteSyncAdapterAppliesChildDeckBeforeParentAtomically() async throws {
+    let source = try await makeSyncRepository()
+    let destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let cursor = try await source.repository.currentChangeCursor()
+    let parent = Deck(name: "Parent")
+    let child = Deck(name: "Child", parentID: parent.id)
+    try await source.repository.applySynchronizedBatch([.deck(child), .deck(parent)])
+    let adapter = SQLiteLibrarySyncAdapter(repository: source.repository)
+    let records = try await adapter.encode(changes: source.repository.changes(after: cursor, limit: 100), deviceID: "source")
+    try await SQLiteLibrarySyncAdapter(repository: destination.repository).applyRemote(records, origin: .cloud)
+    #expect(try await destination.repository.deck(id: child.id).parentID == parent.id)
+    #expect(try await destination.repository.deck(id: parent.id).name == "Parent")
+    let orphan = Deck(name: "Missing parent", parentID: UUID())
+    let unrelated = Deck(name: "Must roll back")
+    await #expect(throws: (any Error).self) {
+        try await destination.repository.applySynchronizedBatch([.deck(unrelated), .deck(orphan)])
+    }
+    let summaries = try await destination.repository.deckSummaries(asOf: .now)
+    #expect(!summaries.contains { $0.id == orphan.id || $0.id == unrelated.id })
+}
+
+@Test func initialMergeKeepsExistingTypeIdentitiesWithEquivalentSchemas() async throws {
+    let fixture = try await makeSyncRepository()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let original = try #require(try await fixture.repository.loadItemTypes().itemTypes.first)
+    let duplicate = ItemType(name: "Equivalent schema", fields: original.fields, templates: original.templates)
+    _ = try await fixture.repository.createItemType(duplicate)
+    let deck = try await fixture.repository.createDeck(Deck(name: "Two equivalent types"))
+    let first = ItemTypeMembershipRecord.included(rootDeckID: deck.id, itemTypeID: original.id, ordinal: 0)
+    let second = ItemTypeMembershipRecord.included(rootDeckID: deck.id, itemTypeID: duplicate.id, ordinal: 1)
+    try await fixture.repository.applySynchronizedBatch([.itemTypeMembership(first), .itemTypeMembership(second)])
+    let item = Item(itemTypeID: original.id, fields: original.fields.map {
+        FieldValue(fieldID: $0.id, value: $0.type == .richText ? .rich([Span("Value")]) : .text("Value"))
+    }, deckID: deck.id)
+    let timestamp = Date(timeIntervalSince1970: 1_783_000_000.1234567)
+    _ = try await fixture.repository.createItem(item, asOf: timestamp)
+    let card = try #require(try await fixture.repository.cards().first { $0.itemID == item.id })
+    _ = try await fixture.repository.submitReview(cardID: card.id, rating: .good, asOf: timestamp, durationMilliseconds: 10)
+    let adapter = SQLiteLibrarySyncAdapter(repository: fixture.repository)
+    let records = try await adapter.encode(changes: fixture.repository.changes(after: 0, limit: 1_000), deviceID: "cloud")
+    let outbound = try await adapter.initialMerge(remote: records, deviceID: "local")
+    #expect(outbound.isEmpty)
+    #expect(try await fixture.repository.itemTypeMembershipRecord(id: first.id) == first)
+    #expect(try await fixture.repository.itemTypeMembershipRecord(id: second.id) == second)
+}
+
+@Test func initialMergeSkipsHistoricalCreateForDeletedDeck() async throws {
+    let fixture = try await makeSyncRepository()
+    defer { try? FileManager.default.removeItem(at: fixture.directory) }
+    let deck = try await fixture.repository.createDeck(Deck(name: "Deleted before sync"))
+    try await fixture.repository.commitDeckDeletion(id: deck.id, policy: .unassignItems, asOf: .now)
+    let adapter = SQLiteLibrarySyncAdapter(repository: fixture.repository)
+    let merged = try await adapter.initialMerge(remote: [], deviceID: "local")
+    #expect(merged.contains { $0.resourceKind == "deck" && $0.id == deck.id.uuidString && $0.isTombstone })
+}
+
 @Test func itemTypeSyncEnvelopeKeepsCloudKitPayloadContractStable() async throws {
     let fixture = try await makeSyncRepository()
     defer { try? FileManager.default.removeItem(at: fixture.directory) }
@@ -393,7 +529,7 @@ import Testing
     }
 }
 
-@Test func initialMergeAliasesLibrariesAndDeduplicatesEquivalentItemTypeSchemas() async throws {
+@Test func initialMergeHonorsLegacyTypeAliasesAcrossRestartAndIncrementalEdits() async throws {
     let local = try await makeSyncRepository()
     let cloud = try await makeSyncRepository()
     let localBase = try #require(try await local.repository.loadItemTypes().itemTypes.first)
@@ -418,10 +554,29 @@ import Testing
         deviceID: "cloud"
     )
 
+    // Reproduce the persisted alias left by an earlier merge implementation.
+    try await local.repository.recordSyncItemTypeAlias(remoteID: cloudType.id, localID: localType.id)
     _ = try await localAdapter.initialMerge(remote: remote, deviceID: "local")
     #expect(try await local.repository.libraryAliases(canonicalID: localID).contains(cloudID))
     #expect(try await local.repository.item(id: cloudItem.id)?.item.itemTypeID == localType.id)
     #expect(!(try await local.repository.loadItemTypes().itemTypes.contains(where: { $0.id == cloudType.id })))
+    #expect(try await local.repository.syncItemTypeAliases()[cloudType.id] == localType.id)
+    let cursor = try await cloud.repository.changes(after: 0, limit: 1_000).last!.cursor
+    let edited = Item(
+        id: cloudItem.id, itemTypeID: cloudType.id,
+        fields: cloudType.fields.map { field in
+            FieldValue(fieldID: field.id, value: field.type == .richText ? .rich([Span("Edited remotely")]) : .text("Edited remotely"))
+        }
+    )
+    _ = try await cloud.repository.updateItem(edited, asOf: .now)
+    let incremental = try await cloudAdapter.encode(
+        changes: cloud.repository.changes(after: cursor, limit: 1_000), deviceID: "cloud"
+    )
+    let restarted = SQLiteLibrarySyncAdapter(repository: local.repository)
+    try await restarted.applyRemote(incremental, origin: .cloud)
+    let received = try #require(try await local.repository.item(id: cloudItem.id))
+    #expect(received.item.itemTypeID == localType.id)
+    #expect(received.item.fields == edited.fields)
 }
 
 private struct SyncRepositoryFixture {

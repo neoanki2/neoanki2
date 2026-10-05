@@ -69,15 +69,24 @@ public struct ProseDeckBuilderView: View {
                             }
                         }
                         .accessibilityIdentifier("proseBuilderRootDeck")
+                        VStack(alignment: .leading, spacing: 8) {
+                        Text("Title").font(.subheadline).foregroundStyle(.secondary)
                         TextField("Title", text: $input.title)
                             .accessibilityIdentifier("proseBuilderTitle")
-                        TextField("Author (optional)", text: $input.author)
-                            .accessibilityIdentifier("proseBuilderAuthor")
+                    }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Author (optional)").font(.subheadline).foregroundStyle(.secondary)
+                            TextField("Author", text: $input.author)
+                                .accessibilityIdentifier("proseBuilderAuthor")
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                        Text("Passage").font(.subheadline).foregroundStyle(.secondary)
                         TextEditor(text: $input.text)
                             .font(.body)
                             .frame(minHeight: 260)
                             .accessibilityLabel("Prose text")
                             .accessibilityIdentifier("proseBuilderText")
+                    }
                     } header: {
                         Text("Passage")
                     } footer: {
@@ -97,6 +106,7 @@ public struct ProseDeckBuilderView: View {
                     .padding()
                     .accessibilityIdentifier("proseBuilderError")
             }
+            #if os(macOS)
             Divider()
             HStack {
                 Button("Cancel", role: .cancel, action: onCancel)
@@ -119,8 +129,24 @@ public struct ProseDeckBuilderView: View {
                 }
             }
             .padding()
+            #endif
         }
+        #if os(iOS)
+        .navigationTitle(isPreviewing ? "Preview" : "Prose Deck")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if isPreviewing {
+                    Button("Import", action: generate).disabled(isGenerating).accessibilityIdentifier("proseBuilderAdd")
+                } else {
+                    Button("Preview", action: preview).accessibilityIdentifier("proseBuilderReview")
+                }
+            }
+            if isPreviewing { ToolbarItem(placement: .topBarLeading) { Button("Edit Text") { input.text = ProseText.source(from: units); isPreviewing = false; errorMessage = nil } } }
+        }
+        #else
         .navigationTitle(isPreviewing ? "Review Prose Cards" : "Prose Deck")
+        #endif
         .interactiveDismissDisabled(isGenerating)
     }
 

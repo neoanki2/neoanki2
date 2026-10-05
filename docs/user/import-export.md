@@ -34,7 +34,7 @@ Anki template markup are not supported.
 
 Choose **File → Build Deck…** to open the deck-builder catalog, then select
 **Poem Deck**. Enter the author, title, and poem text, then choose **Add to
-Library**.
+Library** after reviewing the generated cards.
 
 Choose an existing root deck for the poem. NeoAnki2 creates the poem as its
 child and stores the entered author as an `author:<name>` tag on each generated
@@ -42,9 +42,23 @@ item. Each card shows `Title · Author` as a small, always-visible caption above
 the poem text. Every nonblank line after the first becomes one Basic card
 answer. Its prompt starts with the preceding one or two lines. When that context
 repeats, the prompt includes earlier lines until it identifies one place in the
-poem. Blank lines within that context preserve stanza spacing. For example, a
-12-line poem creates 11 cards. Generated cards
+poem. Blank lines within that context preserve stanza spacing.
+
+When the title differs from the opening line, the builder also creates an
+opening card: **Recall the first line.** → the opening line, with the same
+always-visible title and author caption. Case, punctuation, whitespace, and
+Unicode representation differences do not count; accents and actual words do.
+For example, a 12-line poem creates 12 cards with a distinct title, or 11 cards
+when its title already gives the opening line. Review shows the actual cues,
+answers, and whether an opening card is included. Generated cards
 retain the poem's line order in both Browse and their initial Study queue.
+
+Editing a generated poem previews opening cards to add, change, or retire.
+Adding an opening card preserves existing learned cards and their study history.
+If an edit makes the title match the first line, the preview explicitly shows
+that the opening card and its progress will be retired. The editor continues to
+require the same number of source lines. To upgrade existing decks in bulk, see
+[Repair local poem decks](../cli/#repair-local-poem-decks).
 
 The builder first writes a temporary `.neoanki` bundle, validates the complete
 bundle with the same rules as an imported authored deck, imports it atomically,
@@ -60,7 +74,9 @@ see the cues, answers, paragraph count, and card count before importing. Use
 unit in the same paragraph.
 
 The builder makes one card for every prose unit, including the opening words.
-The first cue asks you to begin the passage; later cues show preceding prose.
+Preview labels the first card **Opening unit**. Its cue asks you to begin the
+passage; later cues show preceding prose. The opening card is kept even when
+the title matches the first unit.
 Repeated context is extended or given a position cue so each prompt identifies
 one continuation. The generated deck is a child of the selected root deck and
 inherits its daily new-card limit. Very large passages must fit the authored

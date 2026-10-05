@@ -22,6 +22,8 @@ public struct PoemSequenceMismatch: Sendable, Equatable, Identifiable {
 }
 
 public struct PoemDeckSnapshot: Sendable, Equatable {
+    public let openingRecord: PoemDeckItemRecord?
+    /// Continuation records only; the opening answer is not a transition.
     public let orderedRecords: [PoemDeckItemRecord]
     public let sourceText: String
     public let mismatches: [PoemSequenceMismatch]
@@ -46,9 +48,15 @@ public struct PoemDeckReconciliationPreview: Sendable, Equatable {
     public let replacements: [Item]
     public let changes: [PoemDeckReconciliationChange]
     public let repairedMismatchCount: Int
+    public let operations: [ItemBulkOperation]
+    public let order: OrderedDeckItemReconciliation?
+    public let openingCard: Item?
+    public let retiredOpeningCard: Item?
+    public let addedCount: Int
+    public let retiredCount: Int
 
     public var changesItemType: Bool { originalItemType != updatedItemType }
-    public var hasChanges: Bool { changesItemType || !changes.isEmpty }
+    public var hasChanges: Bool { changesItemType || !operations.isEmpty }
 }
 
 public enum PoemDeckReconciliationError: LocalizedError, Sendable, Equatable {
@@ -58,6 +66,7 @@ public enum PoemDeckReconciliationError: LocalizedError, Sendable, Equatable {
     case missingField(String)
     case nonTextField(String)
     case missingTemplate
+    case invalidOpeningCard
     case ambiguousStart
     case brokenChain
     case ambiguousChain
@@ -77,6 +86,8 @@ public enum PoemDeckReconciliationError: LocalizedError, Sendable, Equatable {
             "The \(name) field must contain plain text."
         case .missingTemplate:
             "The Poem Line item type must have one card template."
+        case .invalidOpeningCard:
+            "The poem has duplicate or inconsistent opening-line cards."
         case .ambiguousStart:
             "NeoAnki could not identify one unambiguous first transition."
         case .brokenChain:
@@ -124,7 +135,11 @@ public enum PoemDeckReconciler {
             let startsStanza: Bool
         }
 
-        let candidates = try records.map { record -> Candidate in
+        let openings = records.filter { $0.item.tags.contains(PoemCardPlanner.openingTag) }
+        guard openings.count <= 1 else { throw PoemDeckReconciliationError.invalidOpeningCard }
+        let transitions = records.filter { !$0.item.tags.contains(PoemCardPlanner.openingTag) }
+        guard !transitions.isEmpty else { throw PoemDeckReconciliationError.emptyDeck }
+        let candidates = try transitions.map { record -> Candidate in
             let prompt = try text(record.item.value(for: front.id), fieldName: front.name)
                 .split(separator: "\n", omittingEmptySubsequences: true)
                 .map { normalize(String($0)) }
@@ -192,6 +207,18 @@ public enum PoemDeckReconciler {
             }
         }
         let sourceLines = [try requiredLast(ordered[0].prompt)] + ordered.map(\.answer)
+        if let opening = openings.first {
+            let answer = try text(opening.item.value(for: back.id), fieldName: back.name)
+            let prompt = try text(opening.item.value(for: front.id), fieldName: front.name)
+            let markerText = try marker.map {
+                try text(opening.item.value(for: $0.id), fieldName: $0.name, permitsMissing: true)
+            } ?? ""
+            guard normalize(answer) == sourceLines[0], !answer.contains("\n"),
+                  prompt == PoemCardPlanner.openingPrompt,
+                  markerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw PoemDeckReconciliationError.invalidOpeningCard
+            }
+        }
 
         var sourceParts: [String] = []
         for index in sourceLines.indices {
@@ -209,6 +236,7 @@ public enum PoemDeckReconciler {
             return .init(itemID: candidate.record.item.id, expectedPrompt: expected, actualPrompt: actual)
         }
         return PoemDeckSnapshot(
+            openingRecord: openings.first,
             orderedRecords: ordered.map(\.record),
             sourceText: sourceText,
             mismatches: mismatches
@@ -217,7 +245,9 @@ public enum PoemDeckReconciler {
 
     public static func preview(
         sourceText: String,
-        records: [PoemDeckItemRecord]
+        records: [PoemDeckItemRecord],
+        title: String? = nil,
+        deckID: UUID? = nil
     ) throws -> PoemDeckReconciliationPreview {
         let snapshot = try snapshot(records: records)
         let poem = PoemDeckGenerator.parse(sourceText)
@@ -279,23 +309,88 @@ public enum PoemDeckReconciler {
             }
         }
 
-        try validateGeneratedChain(items: replacements, itemType: updatedType)
+        let changedIDs = Set(changes.map(\.itemID))
+        var operations = replacements.filter { changedIDs.contains($0.id) }.map {
+            ItemBulkOperation(operationID: "replace-\($0.id)", action: .replace($0))
+        }
+        let needsOpening = title.map {
+            PoemCardPlanner.needsOpeningCard(title: $0, firstLine: proposedLines[0].text)
+        } ?? (snapshot.openingRecord != nil)
+        var openingCard: Item?
+        var retiredOpeningCard: Item?
+        var addedCount = 0
+        var retiredCount = 0
+        if needsOpening {
+            var opening = snapshot.openingRecord?.item ?? Item(
+                itemTypeID: originalType.id,
+                fields: snapshot.orderedRecords[0].item.fields,
+                tags: snapshot.orderedRecords[0].item.tags + [PoemCardPlanner.openingTag],
+                deckID: deckID ?? snapshot.orderedRecords[0].item.deckID
+            )
+            setText(PoemCardPlanner.openingPrompt, field: front, in: &opening)
+            setText(proposedLines[0].text, field: back, in: &opening)
+            if let marker { setText("", field: marker, in: &opening) }
+            openingCard = opening
+            if let old = snapshot.openingRecord?.item {
+                if old != opening {
+                    operations.append(.init(operationID: "opening-replace", action: .replace(opening)))
+                    changes.append(.init(
+                        itemID: old.id,
+                        oldPrompt: try text(old.value(for: front.id), fieldName: front.name),
+                        newPrompt: PoemCardPlanner.openingPrompt,
+                        oldAnswer: try text(old.value(for: back.id), fieldName: back.name),
+                        newAnswer: proposedLines[0].text,
+                        addsStanzaBreak: false, removesStanzaBreak: false
+                    ))
+                }
+            } else {
+                operations.append(.init(operationID: "opening-create", action: .create(opening)))
+                addedCount = 1
+            }
+        } else if let old = snapshot.openingRecord?.item {
+            retiredOpeningCard = old
+            operations.append(.init(operationID: "opening-delete", action: .delete(old.id)))
+            retiredCount = 1
+        }
+        let finalItems = openingCard.map { [$0] } ?? []
+        try validateGeneratedChain(items: finalItems + replacements, itemType: updatedType)
+        let order = deckID.map {
+            OrderedDeckItemReconciliation(
+                deckID: $0, expectedItems: records.map(\.item),
+                orderedItemIDs: (finalItems + replacements).map(\.id)
+            )
+        }
         return PoemDeckReconciliationPreview(
             poem: poem,
             originalItemType: originalType,
             updatedItemType: updatedType,
             replacements: replacements,
             changes: changes,
-            repairedMismatchCount: snapshot.mismatches.count
+            repairedMismatchCount: snapshot.mismatches.count,
+            operations: operations,
+            order: order,
+            openingCard: openingCard,
+            retiredOpeningCard: retiredOpeningCard,
+            addedCount: addedCount,
+            retiredCount: retiredCount
         )
     }
 
     public static func validateGeneratedChain(items: [Item], itemType: ItemType) throws {
+        let openings = items.filter { $0.tags.contains(PoemCardPlanner.openingTag) }
+        guard openings.count <= 1 else { throw PoemDeckReconciliationError.invalidOpeningCard }
+        let items = items.filter { !$0.tags.contains(PoemCardPlanner.openingTag) }
         let front = try requiredTextField(named: "Front", in: itemType)
         let back = try requiredTextField(named: "Back", in: itemType)
         guard !items.isEmpty else { throw PoemDeckReconciliationError.emptyDeck }
         var source = [normalize(try text(items[0].value(for: front.id), fieldName: front.name))]
         guard !source[0].contains("\n") else { throw PoemDeckReconciliationError.brokenChain }
+        if let opening = openings.first {
+            guard try text(opening.value(for: front.id), fieldName: front.name) == PoemCardPlanner.openingPrompt,
+                  try text(opening.value(for: back.id), fieldName: back.name) == source[0] else {
+                throw PoemDeckReconciliationError.invalidOpeningCard
+            }
+        }
         var stanzaStarts = [false]
         for item in items {
             let rawAnswer = try text(item.value(for: back.id), fieldName: back.name)

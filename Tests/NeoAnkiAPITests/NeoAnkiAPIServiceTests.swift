@@ -4461,3 +4461,73 @@ private extension Array where Element == String {
         return values
     }
 }
+
+@Test func orderedBulkRejectsStaleAndInvalidPlansAndPreservesHistory() async throws {
+    let (api, store) = try await makeAPIAndStore()
+    let token = try await pair(api, scopes: ["library.read", "items.write"])
+    let deck = try await store.createDeck(Deck(name: "Ordered poem"))
+    func value(id: UUID, front: String) -> [String: Any] {
+        ["id": id.uuidString.lowercased(), "itemTypeId": BuiltInItemTypes.basicID.uuidString.lowercased(),
+         "deckId": deck.id.uuidString.lowercased(), "tags": [], "fields": [
+            ["fieldId": BuiltInItemTypes.frontFieldID.uuidString.lowercased(), "value": ["type": "text", "text": front]],
+            ["fieldId": BuiltInItemTypes.backFieldID.uuidString.lowercased(), "value": ["type": "text", "text": "Answer"]],
+         ]]
+    }
+    let originalID = UUID()
+    let original = Item(id: originalID, itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Original")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+    ], deckID: deck.id)
+    _ = try await store.createItem(original)
+    let record = try await store.itemRecord(id: originalID)
+    let learnedID = try #require(record.cardIDs.first)
+    _ = try await store.submitReview(cardID: learnedID, rating: .good, now: .now)
+    let learned = try await store.card(id: learnedID)
+    let openingID = UUID()
+    let operation: [String: Any] = ["operationId": "opening", "action": "create", "item": value(id: openingID, front: "Recall the first line.")]
+    func send(dryRun: Bool, expected: [[String: Any]], ids: [UUID], operations: [[String: Any]] = [], key: String = "ordered-upgrade") async throws -> APIResponse {
+        await api.handle(APIRequest(method: .post, path: "/v1/items/bulk", headers: [
+            "Host": "127.0.0.1:8766", "Authorization": "Bearer \(token)", "Idempotency-Key": key,
+        ], body: try JSONSerialization.data(withJSONObject: [
+            "atomic": true, "dryRun": dryRun, "operations": operations.isEmpty ? [operation] : operations,
+            "order": ["deckId": deck.id.uuidString.lowercased(), "expectedItems": expected,
+                      "orderedItemIds": ids.map { $0.uuidString.lowercased() }],
+        ], options: [.sortedKeys])))
+    }
+    let expected = [value(id: originalID, front: "Original")]
+    let cursor = try await store.currentChangeCursor()
+    let orderedDryRun = try await send(dryRun: true, expected: expected, ids: [openingID, originalID])
+    #expect(orderedDryRun.status == 200, "\(String(decoding: orderedDryRun.body, as: UTF8.self))")
+    #expect(try await store.currentChangeCursor() == cursor)
+    #expect(try await store.itemRecords().count == 1)
+    #expect(try await send(dryRun: true, expected: expected, ids: [openingID, originalID, originalID]).status == 422)
+    #expect(try await send(dryRun: true, expected: expected, ids: [originalID]).status == 422)
+    for dry in [true, false] {
+        let stale = try await send(dryRun: dry, expected: [value(id: originalID, front: "Stale")], ids: [openingID, originalID], key: "stale-\(dry)")
+        #expect(stale.status == 409)
+        #expect(try jsonObject(stale)["code"] as? String == "ordered_deck_conflict")
+        #expect(try await store.itemRecords().count == 1)
+    }
+    // A late invalid member prevents all changes, including the opener.
+    var invalid = value(id: UUID(), front: "Invalid")
+    invalid["fields"] = []
+    let rejected = try await send(dryRun: false, expected: expected, ids: [openingID, originalID], operations: [operation,
+        ["operationId": "invalid", "action": "create", "item": invalid],
+    ], key: "invalid-ordered")
+    #expect(rejected.status == 422)
+    #expect(try await store.itemRecords().count == 1)
+    let committed = try await send(dryRun: false, expected: expected, ids: [openingID, originalID])
+    #expect(committed.status == 200)
+    let replay = try await send(dryRun: false, expected: expected, ids: [openingID, originalID])
+    #expect(replay.body == committed.body)
+    let final = try await store.itemRecordsPage(offset: 0, limit: 200)
+    #expect(final.map { $0.item.id } == [openingID, originalID])
+    #expect(final.last?.createdAt == record.createdAt)
+    #expect(try await store.card(id: learnedID) == learned)
+    #expect(try await store.reviewLogCount(for: learnedID) == 1)
+    let openapi = await api.handle(.init(method: .get, path: "/v1/openapi.json", headers: ["Host": "127.0.0.1:8766"]))
+    let document = try jsonObject(openapi)
+    let components = try #require(document["components"] as? [String: Any])
+    let schemas = try #require(components["schemas"] as? [String: Any])
+    #expect(schemas["OrderedItemsInput"] != nil)
+}

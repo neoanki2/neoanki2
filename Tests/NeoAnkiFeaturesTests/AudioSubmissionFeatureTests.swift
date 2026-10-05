@@ -61,6 +61,7 @@ private func featureAudioFixture() async throws -> (
 
     #expect(completed)
     #expect(model.isComplete)
+    #expect(model.completion.savedSubmissions == 1)
     #expect(model.completion.reviews == 0)
     #expect(model.completion.uniqueCards == 1)
     #expect(model.completion.uniqueItems == 1)
@@ -85,4 +86,36 @@ private func featureAudioFixture() async throws -> (
     await model.delete(response)
     #expect(model.responses.isEmpty)
     #expect(try await fixture.repository.dueCount(scope: .allDecks, asOf: .now) == 0)
+}
+
+@Test @MainActor func failedSubmissionDoesNotCountOrAdvance() async throws {
+    let fixture = try await featureAudioFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.root) }
+    let model = StudyFeatureModel(library: fixture.repository, scope: .allDecks, title: "Study")
+    await model.start()
+    let completed = await model.completeAudioSubmission(StudyResponseDraft(cardID: fixture.cardID,
+        fileURL: fixture.root.appendingPathComponent("missing.m4a"), durationMilliseconds: 1000, capturedAt: .now))
+    #expect(!completed)
+    #expect(model.completion.savedSubmissions == 0)
+    #expect(model.currentCard?.id == fixture.cardID)
+}
+
+@Test @MainActor func submissionCountSurvivesGradingAndUndo() async throws {
+    let fixture = try await featureAudioFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.root) }
+    let basic = try #require(try await fixture.repository.loadItemTypes().itemTypes.first { $0.name == "Basic" })
+    _ = try await fixture.repository.createItem(Item(itemTypeID: basic.id, fields: basic.fields.map {
+        FieldValue(fieldID: $0.id, value: .text($0.name == "Front" ? "Question" : "Answer"))
+    }))
+    let model = StudyFeatureModel(library: fixture.repository, scope: .allDecks, title: "Study")
+    await model.start()
+    #expect(model.currentCard?.id == fixture.cardID)
+    #expect(await model.completeAudioSubmission(StudyResponseDraft(cardID: fixture.cardID,
+        fileURL: fixture.draftURL, durationMilliseconds: 1000, capturedAt: .now)))
+    await model.grade(.easy)
+    #expect(model.completion.savedSubmissions == 1)
+    #expect(model.completion.reviews == 1)
+    await model.undoLastGrade()
+    #expect(model.completion.savedSubmissions == 1)
+    #expect(model.completion.reviews == 0)
 }

@@ -946,6 +946,15 @@ public actor SQLiteLibraryRepository:
     public func changes(after cursor: Int64, limit: Int) async throws -> [LibraryChange] {
         try await store.libraryChanges(after: cursor, limit: limit)
     }
+    public func resourceRevisionSnapshot() async throws -> [LibraryResourceRevision] {
+        try await store.resourceRevisionSnapshot()
+    }
+    public func recordSyncItemTypeAlias(remoteID: UUID, localID: UUID) async throws {
+        try await store.recordSyncItemTypeAlias(remoteID: remoteID, localID: localID)
+    }
+    public func syncItemTypeAliases() async throws -> [UUID: UUID] {
+        try await store.syncItemTypeAliases()
+    }
     public func createBackup(at destination: URL) async throws {
         try await store.createValidationDatabaseSnapshot(at: destination)
     }

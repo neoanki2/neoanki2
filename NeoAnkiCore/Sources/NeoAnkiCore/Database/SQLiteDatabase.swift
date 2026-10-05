@@ -21,6 +21,7 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
     case requiredFieldEmpty(String)
     case invalidItemType(String)
     case invalidItem(String)
+    case staleOrderedDeck
     case invalidDeck(String)
     case resourceInUse(String)
     case invalidMediaAsset(String)
@@ -62,6 +63,8 @@ public enum DatabaseError: Error, Sendable, Equatable, LocalizedError {
             return message
         case let .invalidItem(message):
             return message
+        case .staleOrderedDeck:
+            return "This deck changed while it was being edited. Reload and preview again."
         case let .invalidDeck(message):
             return message
         case let .resourceInUse(message):
@@ -141,6 +144,10 @@ actor SQLiteDatabase {
             throw DatabaseError.openFailed(String(cString: sqlite3_errstr(code)))
         }
         handle = db
+        // A reopened sync/backup connection can briefly overlap background
+        // scheduling maintenance. Serialize short writes rather than failing
+        // schema reads immediately with SQLITE_BUSY.
+        sqlite3_busy_timeout(db, 3_000)
 
         let fkCode = sqlite3_exec(db, "PRAGMA foreign_keys = ON;", nil, nil, nil)
         guard fkCode == SQLITE_OK else {
@@ -775,6 +782,21 @@ actor SQLiteDatabase {
         try getOrCreateLibraryID()
     }
 
+    func recordSyncItemTypeAlias(remoteID: UUID, localID: UUID) throws {
+        try setMetadataValue(localID.uuidString, forKey: "sync_item_type_alias_\(remoteID.uuidString)")
+    }
+
+    func syncItemTypeAliases() throws -> [UUID: UUID] {
+        var aliases: [UUID: UUID] = [:]
+        for row in try query("SELECT key, value FROM app_metadata WHERE key LIKE 'sync_item_type_alias_%';") {
+            guard let key = row["key"] as? String, let value = row["value"] as? String,
+                  let remote = UUID(uuidString: String(key.dropFirst("sync_item_type_alias_".count))),
+                  let local = UUID(uuidString: value) else { throw DatabaseError.decodingFailed }
+            aliases[remote] = local
+        }
+        return aliases
+    }
+
     func metadataValue(forKey key: String) throws -> String? {
         try query(
             "SELECT value FROM app_metadata WHERE key = ? LIMIT 1;",
@@ -872,6 +894,17 @@ actor SQLiteDatabase {
             updatedAt: Date(timeIntervalSince1970: updatedAt),
             isDeleted: isDeleted != 0
         )
+    }
+
+    func fetchResourceRevisionSnapshot() throws -> [LibraryResourceRevision] {
+        try query("SELECT resource_type, resource_id, revision, updated_at, is_deleted FROM resource_revisions ORDER BY updated_at, resource_type, resource_id;").map { row in
+            guard let kind = row["resource_type"] as? String,
+                  let id = row["resource_id"] as? String,
+                  let revision = row["revision"] as? Int64,
+                  let updatedAt = row["updated_at"] as? Double,
+                  let deleted = row["is_deleted"] as? Int64 else { throw DatabaseError.decodingFailed }
+            return LibraryResourceRevision(resourceType: kind, resourceID: id, revision: Int(revision), updatedAt: Date(timeIntervalSince1970: updatedAt), isDeleted: deleted != 0)
+        }
     }
 
     func pruneLibraryChanges(before cutoff: Date, minimumRetained: Int) throws -> Int {
@@ -2390,9 +2423,11 @@ actor SQLiteDatabase {
     func applyItemBulk(
         _ mutations: [ItemBulkDatabaseMutation],
         orderedDeck: OrderedDeckItemReconciliation? = nil,
+        dryRun: Bool = false,
         now: Date = .now
     ) throws {
-        try inTransaction {
+        func apply() throws {
+            var prependedCreationDates: [UUID: Date] = [:]
             if let orderedDeck {
                 let existing = try query(
                     "SELECT id FROM items WHERE deck_id = ?;",
@@ -2401,23 +2436,55 @@ actor SQLiteDatabase {
                 let currentIDs = Set(existing.compactMap { ($0["id"] as? String).flatMap(UUID.init(uuidString:)) })
                 guard currentIDs == Set(orderedDeck.expectedItemIDs),
                       currentIDs.count == existing.count else {
-                    throw DatabaseError.invalidItem("This deck changed while it was being edited. Reload and preview again.")
+                    throw DatabaseError.staleOrderedDeck
                 }
                 for expected in orderedDeck.expectedItems {
                     guard try fetchItem(id: expected.id)?.item == expected else {
-                        throw DatabaseError.invalidItem(
-                            "This passage changed while it was being edited. Reload and preview again."
-                        )
+                        throw DatabaseError.staleOrderedDeck
                     }
                 }
             }
+            if let orderedDeck {
+                // Validate the resulting membership and one-card invariant without
+                // writing, so ordered dry runs enforce the same contract as commits.
+                var finalCounts: [UUID: Int] = [:]
+                for id in orderedDeck.expectedItemIDs {
+                    finalCounts[id] = try fetchCards(for: id).count
+                }
+                for mutation in mutations {
+                    switch mutation {
+                    case let .create(item, cards, _, _), let .replace(item, cards, _, _):
+                        finalCounts[item.id] = cards.count
+                    case let .delete(id, _): finalCounts.removeValue(forKey: id)
+                    }
+                }
+                guard Set(finalCounts.keys) == Set(orderedDeck.orderedItemIDs),
+                      finalCounts.values.allSatisfy({ $0 == 1 }) else {
+                    throw DatabaseError.invalidItem("The ordered deck must contain exactly one card per planned item.")
+                }
+                // A prepended opening card must sort before the existing poem in
+                // Browse. Only new prefix items get synthetic ordering timestamps.
+                let prefix = orderedDeck.orderedItemIDs.prefix {
+                    !orderedDeck.expectedItemIDs.contains($0)
+                }
+                let earliest = try query(
+                    "SELECT MIN(created_at) AS earliest FROM items WHERE deck_id = ?;",
+                    bindings: [.text(orderedDeck.deckID.uuidString)]
+                ).first?["earliest"] as? Double ?? now.timeIntervalSince1970
+                for (index, id) in prefix.enumerated() {
+                    prependedCreationDates[id] = Date(
+                        timeIntervalSince1970: earliest - Double(prefix.count - index) / 1_000
+                    )
+                }
+            }
+            if dryRun { return }
             for mutation in mutations {
                 switch mutation {
                 case let .create(item, cards, descriptors, createdAt):
                     try insertItemWithCardsWithoutTransaction(
                         item,
                         cards: cards,
-                        createdAt: createdAt,
+                        createdAt: prependedCreationDates[item.id] ?? createdAt,
                         updatedAt: createdAt,
                         mediaDescriptors: descriptors
                     )
@@ -2450,7 +2517,7 @@ actor SQLiteDatabase {
                         bindings: [.text(itemID.uuidString)]
                     )
                     guard rows.count == 1 else {
-                        throw DatabaseError.invalidItem("Each prose unit must have exactly one card.")
+                        throw DatabaseError.invalidItem("Each ordered item must have exactly one card.")
                     }
                     guard rows[0]["phase"] as? String == "new",
                           let cardID = rows[0]["id"] as? String else { continue }
@@ -2468,6 +2535,11 @@ actor SQLiteDatabase {
                     )
                 }
             }
+        }
+        if dryRun {
+            try inReadTransaction(apply)
+        } else {
+            try inTransaction(apply)
         }
     }
 
@@ -7190,6 +7262,10 @@ actor SQLiteDatabase {
 
     func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) throws {
         try inTransaction {
+            // CloudKit records arrive in arbitrary order, and journal updates
+            // can put a parent after its child. Validate references against the
+            // complete atomic batch rather than each intermediate statement.
+            try execute("PRAGMA defer_foreign_keys = ON;")
             for mutation in mutations {
                 switch mutation {
                 case let .deck(deck):
@@ -7310,18 +7386,7 @@ actor SQLiteDatabase {
     }
 
     private func validateSynchronizedItem(_ item: Item, against itemType: ItemType) throws {
-        let definitions = Dictionary(uniqueKeysWithValues: itemType.fields.map { ($0.id, $0) })
-        var seen: Set<UUID> = []
-        for value in item.fields {
-            guard seen.insert(value.fieldID).inserted, definitions[value.fieldID] != nil else {
-                throw DatabaseError.invalidItem("The synchronized item has invalid fields.")
-            }
-        }
-        for field in itemType.fields where field.isRequired {
-            guard let value = item.value(for: field.id), !value.isEmpty else {
-                throw DatabaseError.requiredFieldEmpty(field.name)
-            }
-        }
+        try ItemStore.validateContent(item, against: itemType)
         if let deckID = item.deckID, try fetchDeck(id: deckID) == nil {
             throw DatabaseError.deckNotFound(deckID)
         }
