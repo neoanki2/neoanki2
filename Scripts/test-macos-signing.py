@@ -33,6 +33,25 @@ def profile():
 
 
 class SigningTests(unittest.TestCase):
+    def test_installer_signing_arguments_support_bash_three_empty_arrays(self):
+        source = (signing.ROOT / 'Scripts/install-app.sh').read_text()
+        start = source.index('SIGNING_ARGUMENTS=()')
+        end = source.index('if [ ! -d "$DEST_DIR" ]', start)
+        preflight = source[start:end]
+        invocation = next(line for line in source.splitlines()
+                          if 'python3' in line and '"$STAGE"' in line)
+        for notarize, expected in [('1', ['--check', '/fixture/app']),
+                                   ('0', ['--check', '--sign-only', '--sign-only', '/fixture/app'])]:
+            with self.subTest(notarize=notarize):
+                script = ('ROOT=/fixture\nSTAGE=/fixture/app\nSIGNED=1\n'
+                          f'NOTARIZE={notarize}\n'
+                          'python3() { shift; printf "%s\\n" "$@"; }\n'
+                          + preflight + invocation)
+                result = subprocess.run(['/bin/bash', '-euc', script],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(), expected)
+
     def test_accepts_real_profile_and_expands_signed_entitlements(self):
         p = profile()
         team = signing.validate_profile(p, b'certificate')

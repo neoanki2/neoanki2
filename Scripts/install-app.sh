@@ -87,7 +87,7 @@ fi
 SIGNING_ARGUMENTS=()
 [ "$NOTARIZE" -eq 1 ] || SIGNING_ARGUMENTS+=(--sign-only)
 if [ "$SIGNED" -eq 1 ]; then
-  python3 "$ROOT/Scripts/sign-macos-app.py" --check "${SIGNING_ARGUMENTS[@]}"
+  python3 "$ROOT/Scripts/sign-macos-app.py" --check ${SIGNING_ARGUMENTS[@]+"${SIGNING_ARGUMENTS[@]}"}
 fi
 
 if [ ! -d "$DEST_DIR" ]; then
@@ -150,7 +150,7 @@ fi
 
 xattr -cr "$STAGE" 2>/dev/null || true
 if [ "$SIGNED" -eq 1 ]; then
-  python3 "$ROOT/Scripts/sign-macos-app.py" "${SIGNING_ARGUMENTS[@]}" "$STAGE"
+  python3 "$ROOT/Scripts/sign-macos-app.py" ${SIGNING_ARGUMENTS[@]+"${SIGNING_ARGUMENTS[@]}"} "$STAGE"
 else
   codesign --force --sign - --timestamp=none "$STAGE"
 fi
