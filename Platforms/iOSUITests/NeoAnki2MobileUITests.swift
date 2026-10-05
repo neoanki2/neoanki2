@@ -56,7 +56,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
 
     func allowBadgePermissionIfPresented(timeout: TimeInterval = 5) {
         let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
-        if alert.waitForExistence(timeout: timeout), Self.isBadgePermissionAlert(alert) {
+        if alert.waitUntilExists(timeout: timeout), Self.isBadgePermissionAlert(alert) {
             alert.buttons["Allow"].tap()
         }
     }
