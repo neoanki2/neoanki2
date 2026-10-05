@@ -22,7 +22,8 @@ struct MobileStudyCompositionView: View {
         CardWireframeView(
             layout: effectiveLayout,
             components: components,
-            isAnswerRevealed: isAnswerRevealed
+            isAnswerRevealed: isAnswerRevealed,
+            mobileReading: true
         ) { component, _ in
             MobileContentValueView(
                 value: component.value,
@@ -33,9 +34,8 @@ struct MobileStudyCompositionView: View {
                 clozeGroup: clozeGroup
             )
         }
-        .frame(maxWidth: 680, maxHeight: .infinity)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(20)
+        .cardWireframeIntrinsicSizing(referenceHeight: 240)
+        .frame(maxWidth: 600)
     }
 }
 #endif

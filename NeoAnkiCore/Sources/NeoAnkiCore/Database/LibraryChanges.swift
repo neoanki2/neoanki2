@@ -124,6 +124,19 @@ public extension ItemStore {
         )
     }
 
+    /// Includes resources predating the change journal and retained tombstones.
+    func resourceRevisionSnapshot() async throws -> [LibraryResourceRevision] {
+        try await database.fetchResourceRevisionSnapshot()
+    }
+
+    func recordSyncItemTypeAlias(remoteID: UUID, localID: UUID) async throws {
+        try await database.recordSyncItemTypeAlias(remoteID: remoteID, localID: localID)
+    }
+
+    func syncItemTypeAliases() async throws -> [UUID: UUID] {
+        try await database.syncItemTypeAliases()
+    }
+
     /// Removes changes only after they are both older than `retentionInterval`
     /// and outside the newest `minimumRetained` events.
     @discardableResult

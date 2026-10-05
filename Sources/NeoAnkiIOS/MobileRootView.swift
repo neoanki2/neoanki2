@@ -5,8 +5,14 @@ import NeoAnkiSharedUI
 import SwiftUI
 
 #if os(iOS)
+import UIKit
 public struct MobileRootView: View {
     @Bindable var model: MobileAppModel
+    @State private var fixtureError: String?
+    @State private var fixturesReady = false
+    @State private var retriedFailureFixture = false
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("mobile-conceals-answers") private var concealsAnswers = true
     @State private var vocabularyLibrary: MobileVocabularyLibraryModel
 
     public init(model: LibraryFeatureModel, vocabularyRootURL: URL) {
@@ -16,26 +22,68 @@ public struct MobileRootView: View {
 
     public var body: some View {
         Group {
+            if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset"),
+               ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-load-error",
+               !retriedFailureFixture {
+                libraryRecovery(message: "Your library could not be opened. Try again to reconnect to your saved items.")
+            } else {
             switch model.loadState {
             case .loading:
                 ProgressView("Opening your library…")
             case .ready:
-                MobileTabView(model: model, vocabularyLibrary: vocabularyLibrary)
+                if ["mobile-redesign", "mobile-vocabulary"].contains(ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] ?? ""), !fixturesReady {
+                    ProgressView("Preparing visual fixtures…")
+                } else {
+                    MobileTabView(model: model, vocabularyLibrary: vocabularyLibrary)
+                }
             case let .failed(error):
-                ContentUnavailableView {
-                    Label("Could Not Open NeoAnki2", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(error.message)
-                } actions: {
-                    Button("Try Again") {
-                        Task { await model.bootstrap() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                libraryRecovery(message: error.message)
+            }
+            }
+        }
+        .tint(SharedDesignSystem.mobileTint(for: colorScheme))
+        .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
+            Button("OK") { fixtureError = nil }
+        } message: { Text(fixtureError ?? "") }
+        .onAppear { model.concealsAnswers = concealsAnswers }
+        .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
+        .task {
+            await model.bootstrap()
+            if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
+                do { try await MobileRedesignUITestSeeder.seedIfRequested(library: model.library); await model.refresh() }
+                catch { fixtureError = MobileAppModel.message(for: error); await model.refresh() }
+                fixturesReady = true
+            } else if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-vocabulary" {
+                do { try await vocabularyLibrary.seedVisualFixtureIfRequested() }
+                catch { fixtureError = MobileAppModel.message(for: error) }
+                fixturesReady = true
+            }
+            // The sync service also receives changes while this screen is
+            // idle. Refresh visible data and widget state after those pulls.
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(10)) }
+                catch { return }
+                if model.syncEnabled {
+                    await model.refreshSyncStatus()
+                    await model.refresh()
                 }
             }
         }
-        .task { await model.bootstrap() }
+    }
+
+    private func libraryRecovery(message: String) -> some View {
+        ContentUnavailableView {
+            Label("Could Not Open NeoAnki2", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(message)
+        } actions: {
+            Button {
+                retriedFailureFixture = true
+                Task { await model.bootstrap() }
+            } label: { Text("Try Again").frame(minHeight: 44) }
+            .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
+            .controlSize(.large)
+        }
     }
 }
 
@@ -43,50 +91,57 @@ private struct MobileTabView: View {
     @Bindable var model: MobileAppModel
     @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var detailIdentity = UUID()
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.neoAnkiAccessibilityReduceMotionOverride) private var reduceMotionOverride
+    @State private var homePath = NavigationPath()
+    @State private var libraryPath = NavigationPath()
+    @State private var createPath = NavigationPath()
+    @State private var settingsPath = NavigationPath()
+
+    private var usesSidebar: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
+    }
 
     var body: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                NavigationSplitView {
-                    List(AppSection.allCases) { section in
-                        Button {
-                            model.section = section
-                            detailIdentity = UUID()
-                        } label: {
-                            Label(section.title, systemImage: section.symbol)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("top-level-\(section.title.lowercased())")
-                        .listRowBackground(model.section == section ? Color.accentColor.opacity(0.14) : Color.clear)
-                        .accessibilityAddTraits(model.section == section ? .isSelected : [])
+        // Keep one TabView and its stacks mounted as the sidebar appears or
+        // disappears. A nested split view merges the stacks' navigation bars.
+        HStack(spacing: 0) {
+            if usesSidebar {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("NeoAnki2").font(.title2.weight(.semibold)).padding(20)
+                List(AppSection.allCases) { section in
+                    Button { model.section = section } label: {
+                        Label(section.title, systemImage: section.symbol)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                     }
-                    .navigationTitle("NeoAnki2")
-                } detail: {
-                    destination(model.section)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("top-level-\(section.title.lowercased())")
+                    .listRowBackground(model.section == section ? Color.accentColor.opacity(0.14) : Color.clear)
+                    .accessibilityAddTraits(model.section == section ? .isSelected : [])
                 }
-                .navigationSplitViewStyle(.balanced)
-                .id(detailIdentity)
-            } else {
-                TabView(selection: $model.section) {
-                    destination(.home)
-                        .tabItem { Label("Home", systemImage: "house") }
-                        .tag(AppSection.home)
-                    destination(.library)
-                        .tabItem { Label("Library", systemImage: "rectangle.stack") }
-                        .tag(AppSection.library)
-                    destination(.create)
-                        .tabItem { Label("Create", systemImage: "plus.square") }
-                        .tag(AppSection.create)
-                    destination(.settings)
-                        .tabItem { Label("Settings", systemImage: "gearshape") }
-                        .tag(AppSection.settings)
+                .listStyle(.sidebar)
+            }
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? 320 : 260)
+            }
+            TabView(selection: $model.section) {
+                ForEach(AppSection.allCases) { section in
+                    destination(section)
+                        .dynamicTypeSize(dynamicTypeSize)
+                        .frame(maxWidth: usesSidebar ? 900 : .infinity)
+                        .frame(maxWidth: .infinity)
+                        .tabItem { Label(section.title, systemImage: section.symbol) }
+                        .tag(section)
                 }
             }
+            .toolbar(usesSidebar ? .hidden : .visible, for: .tabBar)
         }
+        .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .fullScreenCover(item: $model.activeStudy) { session in
             StudySessionView(session: session, model: model)
+                .dynamicTypeSize(dynamicTypeSize)
+                .environment(\.neoAnkiAccessibilityReduceMotionOverride, reduceMotionOverride)
         }
         .onChange(of: model.activeStudy == nil) { _, isDismissed in
             if isDismissed {
@@ -98,11 +153,19 @@ private struct MobileTabView: View {
     @ViewBuilder
     private func destination(_ section: AppSection) -> some View {
         switch section {
-        case .home: HomeView(model: model)
-        case .library: LibraryView(model: model)
-        case .create: CreateHubView(model: model, vocabularyLibrary: vocabularyLibrary)
-        case .settings: SettingsView(model: model)
+        case .home: HomeView(model: model, path: $homePath)
+        case .library: LibraryView(model: model, navigationPath: $libraryPath)
+        case .create: CreateHubView(model: model, vocabularyLibrary: vocabularyLibrary, path: $createPath)
+        case .settings: SettingsView(model: model, path: $settingsPath)
         }
+    }
+}
+
+struct MobileTabBarVisibility: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    func body(content: Content) -> some View {
+        content.toolbar(UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular ? .hidden : .visible, for: .tabBar)
     }
 }
 
@@ -118,11 +181,12 @@ private extension AppSection {
 private struct CreateHubView: View {
     @Bindable var model: MobileAppModel
     @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
+    @Binding var path: NavigationPath
     @State private var isAddingItem = false
     @State private var isAddingDeck = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 Section("Add") {
                     Button { isAddingItem = true } label: { Label("New Item", systemImage: "rectangle.stack.badge.plus") }
@@ -138,6 +202,7 @@ private struct CreateHubView: View {
                 }
             }
             .navigationTitle("Create")
+            .modifier(MobileTabBarVisibility())
             .sheet(isPresented: $isAddingItem) { AddItemView(model: model) }
             .sheet(isPresented: $isAddingDeck) { NewDeckView(model: model) }
         }
@@ -146,12 +211,13 @@ private struct CreateHubView: View {
 
 private struct SettingsView: View {
     @Bindable var model: MobileAppModel
+    @Binding var path: NavigationPath
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @State private var showsSyncConsent = false
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Form {
                 Section("iCloud Sync") {
                     if model.syncEnabled {
@@ -194,9 +260,14 @@ private struct SettingsView: View {
                     LabeledContent("Data", value: "Stored on this device")
                     Text("NeoAnki2 keeps working offline. iCloud is optional and uses your private CloudKit database.")
                         .foregroundStyle(.secondary)
+                    Link("Privacy Policy", destination: URL(string: "https://neoanki2.github.io/user/privacy/")!)
+                        .accessibilityIdentifier("mobilePrivacyPolicy")
+                    Link("Help & Support", destination: URL(string: "https://neoanki2.github.io/user/support/")!)
+                        .accessibilityIdentifier("mobileSupport")
                 }
             }
             .navigationTitle("Settings")
+            .modifier(MobileTabBarVisibility())
             .alert("Enable iCloud Sync?", isPresented: $showsSyncConsent) {
                 Button("Create Backup & Enable") { Task { await model.setSyncEnabled(true) } }
                 Button("Not Now", role: .cancel) {}
@@ -245,9 +316,10 @@ private struct SettingsView: View {
 
 private struct HomeView: View {
     @Bindable var model: MobileAppModel
+    @Binding var path: NavigationPath
     @State private var isAddingDeck = false
+    @State private var isAddingItem = false
     @State private var errorMessage: String?
-    @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -261,6 +333,9 @@ private struct HomeView: View {
                     )
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                    if model.allDecksSummary.itemCount == 0 {
+                        Button("Add First Item", systemImage: "plus") { isAddingItem = true }
+                    }
                 }
 
                 Section {
@@ -273,7 +348,7 @@ private struct HomeView: View {
                         )
                     }
 
-                    ForEach(model.decks) { deck in
+                    ForEach(model.decks.filter { $0.parentID == nil }) { deck in
                         NavigationLink(value: MobileScope.deck(deck.id)) {
                             ScopeRow(
                                 title: deck.name,
@@ -281,7 +356,6 @@ private struct HomeView: View {
                                 itemCount: deck.itemCount,
                                 dueCount: deck.dueCount
                             )
-                            .padding(.leading, CGFloat(model.deckDepth(deck)) * 16)
                         }
                     }
 
@@ -300,7 +374,8 @@ private struct HomeView: View {
                         .textCase(nil)
                 }
             }
-            .navigationTitle("NeoAnki2")
+            .navigationTitle("Home")
+            .modifier(MobileTabBarVisibility())
             .navigationDestination(for: MobileScope.self) { scope in
                 ScopeDetailView(model: model, scope: scope)
             }
@@ -315,6 +390,7 @@ private struct HomeView: View {
             .sheet(isPresented: $isAddingDeck) {
                 NewDeckView(model: model)
             }
+            .sheet(isPresented: $isAddingItem) { AddItemView(model: model) }
             .alert("Could Not Start Study", isPresented: errorBinding) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -351,27 +427,22 @@ private struct DueNowCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Text(summary.dueNow, format: .number)
-                    .font(.largeTitle.bold())
-                    .contentTransition(.numericText())
-                Text(summary.dueNow == 1 ? "card due now" : "cards due now")
+            Text(summary.hasDueCards ? "\(summary.dueNow) \(summary.dueNow == 1 ? "card" : "cards") ready" : "You're all caught up")
+                .font(.title2.weight(.semibold))
+            if summary.hasDueCards {
+                Text("A little practice goes a long way.").foregroundStyle(.secondary)
+                Button(action: action) {
+                    Label("Start Studying", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
+                .disabled(isWorking)
+            } else {
+                Text(summary.itemCount == 0 ? "Add your first item to begin." : "Come back when your next cards are due.")
                     .foregroundStyle(.primary)
             }
-
-            Button(action: action) {
-                Label(summary.hasDueCards ? "Start Studying" : "Nothing Due", systemImage: "play.fill")
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!summary.hasDueCards || isWorking)
         }
         .padding(20)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 }
@@ -412,6 +483,7 @@ private struct ScopeDetailView: View {
     @State private var summary: ScopeSummary?
     @State private var errorMessage: String?
     @State private var showsDeckSettings = false
+    @State private var showsAddItem = false
 
     var body: some View {
         List {
@@ -427,7 +499,48 @@ private struct ScopeDetailView: View {
                     .listRowBackground(Color.clear)
                 }
 
-                Section("Overview") {
+                Section {
+                    NavigationLink("Browse Items") { LibraryView(model: model, scope: scope.filter, embedsNavigation: false) }
+                    Button("Add Item", systemImage: "plus") { showsAddItem = true }
+                }
+                if case let .deck(id) = scope, model.decks.contains(where: { $0.parentID == id }) {
+                    Section("Decks") {
+                        ForEach(model.decks.filter { $0.parentID == id }) { deck in
+                            NavigationLink(value: MobileScope.deck(deck.id)) {
+                                ScopeRow(title: deck.name, subtitle: "Deck", itemCount: deck.itemCount, dueCount: deck.dueCount)
+                            }
+                        }
+                    }
+                }
+                Section {
+                    NavigationLink("Progress") { progress(summary) }
+                }
+            } else if let errorMessage {
+                ContentUnavailableView("Could Not Load Deck", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+            } else {
+                ProgressView("Loading…").frame(maxWidth: .infinity)
+            }
+        }
+        .sheet(isPresented: $showsAddItem, onDismiss: { Task { await load() } }) {
+            AddItemView(model: model, deckID: { if case let .deck(id) = scope { return id }; return nil }())
+        }
+        .navigationTitle(model.scopeTitle(scope))
+        .toolbar {
+            if case let .deck(id) = scope {
+                Button("Deck Settings", systemImage: "ellipsis.circle") { showsDeckSettings = true }
+                    .sheet(isPresented: $showsDeckSettings) {
+                        DeckSettingsMobileView(model: model, deckID: id) { dismiss() }
+                    }
+            }
+        }
+        .task { await load() }
+        .onChange(of: model.allDecksSummary) { _, _ in Task { await load() } }
+        .onChange(of: model.activeStudy?.id) { _, id in if id == nil { Task { await load() } } }
+    }
+
+    private func progress(_ summary: ScopeSummary) -> some View {
+        List {
+                Section("Progress") {
                     LabeledContent("Items", value: summary.itemCount.formatted())
                     LabeledContent("Cards", value: summary.cardCount.formatted())
                     LabeledContent("New", value: summary.newCount.formatted())
@@ -438,25 +551,8 @@ private struct ScopeDetailView: View {
                         LabeledContent("Progress", value: summary.maturity.progressText)
                     }
                 }
-            } else if let errorMessage {
-                ContentUnavailableView("Could Not Load Deck", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
-            } else {
-                ProgressView("Loading…")
-                    .frame(maxWidth: .infinity)
-            }
         }
-        .navigationTitle(model.scopeTitle(scope))
-        .toolbar {
-            if case let .deck(id) = scope {
-                Button("Deck Settings", systemImage: "ellipsis.circle") { showsDeckSettings = true }
-                    .sheet(isPresented: $showsDeckSettings) {
-                        DeckSettingsMobileView(model: model, deckID: id) {
-                            dismiss()
-                        }
-                    }
-            }
-        }
-        .task { await load() }
+        .navigationTitle("Progress")
     }
 
     private func load() async {

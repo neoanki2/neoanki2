@@ -98,6 +98,12 @@ public protocol LocalAPILibrary: LibraryRepository {
         dryRun: Bool,
         asOf: Date
     ) async throws -> [ItemBulkOperationResult]
+    func executeOrderedItemBulk(
+        _ operations: [ItemBulkOperation],
+        order: OrderedDeckItemReconciliation,
+        dryRun: Bool,
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult]
     func renameTag(from source: String, to destination: String, asOf: Date) async throws -> Int
     func removeTag(_ value: String, asOf: Date) async throws -> Int
     func normalizedTagForLookup(_ raw: String) async throws -> String
@@ -234,6 +240,15 @@ public extension LocalAPILibrary {
         asOf: Date = .now
     ) async throws -> [ItemBulkOperationResult] {
         try await executeItemBulk(operations, dryRun: dryRun, asOf: asOf)
+    }
+
+    func executeOrderedItemBulk(
+        _ operations: [ItemBulkOperation],
+        order: OrderedDeckItemReconciliation,
+        dryRun: Bool,
+        asOf: Date = .now
+    ) async throws -> [ItemBulkOperationResult] {
+        throw DatabaseError.invalidItem("This library does not support ordered bulk operations.")
     }
 
     func renameTag(
@@ -454,6 +469,15 @@ extension SQLiteLibraryRepository: LocalAPILibrary {
     ) async throws -> [ItemBulkOperationResult] {
         try await store.executeItemBulk(operations, dryRun: dryRun, now: asOf)
     }
+    public func executeOrderedItemBulk(
+        _ operations: [ItemBulkOperation],
+        order: OrderedDeckItemReconciliation,
+        dryRun: Bool,
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        try await store.executeItemBulk(operations, dryRun: dryRun, now: asOf, orderedDeck: order)
+    }
+
     public func renameTag(
         from source: String,
         to destination: String,

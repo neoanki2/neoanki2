@@ -3,7 +3,7 @@ import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
 
-private enum SyncPayload: Codable {
+private enum SyncPayload: Codable, Equatable {
     case library(UUID)
     case deck(Deck)
     case itemType(ItemType)
@@ -40,7 +40,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
     private let repository: SQLiteLibraryRepository
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    private var echoedResources: [String: Int] = [:]
+    private var echoedResources: [String: SyncRecordEnvelope] = [:]
     private var conflictCopies: [SyncConflictCopy] = []
 
     public init(repository: SQLiteLibraryRepository) {
@@ -49,15 +49,16 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
     }
 
     public func encode(changes: [LibraryChange], deviceID: String) async throws -> [SyncRecordEnvelope] {
+        try await encode(changes: changes, deviceID: deviceID, consumeEchoes: true)
+    }
+
+    private func encode(
+        changes: [LibraryChange], deviceID: String, consumeEchoes: Bool
+    ) async throws -> [SyncRecordEnvelope] {
         var records: [SyncRecordEnvelope] = []
         records.reserveCapacity(changes.count)
         for change in changes {
             let echoKey = key(kind: change.resourceType, id: change.resourceID)
-            if let count = echoedResources[echoKey], count > 0 {
-                if count == 1 { echoedResources.removeValue(forKey: echoKey) }
-                else { echoedResources[echoKey] = count - 1 }
-                continue
-            }
             guard let kind = LibraryResourceKind(rawValue: change.resourceType) else {
                 throw SQLiteLibrarySyncError.unknownResourceKind(change.resourceType)
             }
@@ -70,6 +71,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 continue
             }
             if change.isTombstone {
+                if consumeEchoes, echoedResources.removeValue(forKey: echoKey)?.isTombstone == true { continue }
                 records.append(.init(
                     id: change.resourceID,
                     resourceKind: kind.rawValue,
@@ -82,6 +84,12 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 continue
             }
             let encoded = try await payload(kind: kind, id: change.resourceID)
+            let bytes = try encoder.encode(encoded.payload)
+            if consumeEchoes, let echo = echoedResources.removeValue(forKey: echoKey),
+               !echo.isTombstone, echo.asset == encoded.asset,
+               (echo.payload == bytes || (try? decoder.decode(SyncPayload.self, from: echo.payload)) == encoded.payload) {
+                continue
+            }
             records.append(.init(
                 id: change.resourceID,
                 resourceKind: kind.rawValue,
@@ -89,7 +97,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 deviceID: deviceID,
                 order: change.cursor,
                 isTombstone: false,
-                payload: try encoder.encode(encoded.payload),
+                payload: bytes,
                 asset: encoded.asset,
                 stagedFileURL: encoded.fileURL
             ))
@@ -99,6 +107,16 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
 
     public func applyRemote(_ records: [SyncRecordEnvelope], origin: LibraryChangeOrigin) async throws {
         _ = origin
+        let aliases = try await repository.syncItemTypeAliases()
+        let records = try normalizeRemote(
+            records, against: [], canonicalLibraryID: try await repository.libraryID(),
+            sourceLibraryID: nil, knownAliases: [], typeRemap: aliases, dropAliasedTypes: false
+        )
+        // Validate all assets before any domain row commits. A corrupt media
+        // envelope must not leave the accompanying item/deck partially applied.
+        for record in records where record.resourceKind == LibraryResourceKind.media.rawValue && !record.isTombstone {
+            try validateAsset(record)
+        }
         var mutations: [SynchronizedLibraryMutation] = []
         var media: [(SyncPayload, SyncRecordEnvelope)] = []
         for record in dependencyOrdered(records) {
@@ -133,14 +151,15 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         try await repository.applySynchronizedBatch(mutations)
         for (payload, envelope) in media { try await apply(payload, envelope: envelope) }
         for record in records {
-            echoedResources[key(kind: record.resourceKind, id: record.id), default: 0] += 1
+            echoedResources[key(kind: record.resourceKind, id: record.id)] = record
         }
     }
 
     public func initialMerge(remote: [SyncRecordEnvelope], deviceID: String) async throws -> [SyncRecordEnvelope] {
         let localChanges = try await allLocalChanges()
-        let local = try await encode(changes: localChanges, deviceID: deviceID)
+        let local = try await encode(changes: localChanges, deviceID: deviceID, consumeEchoes: false)
         let canonicalLibraryID = try await repository.libraryID()
+        let knownAliases = try await repository.libraryAliases(canonicalID: canonicalLibraryID)
         let remoteLibraryIDs = remote.compactMap { record -> UUID? in
             guard record.resourceKind == LibraryResourceKind.library.rawValue,
                   !record.isTombstone,
@@ -151,11 +170,17 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         for alias in remoteLibraryIDs where alias != canonicalLibraryID {
             try await repository.recordLibraryAlias(alias, canonicalID: canonicalLibraryID)
         }
+        // Equivalent schemas with distinct UUIDs are independent identities.
+        // Choosing a different canonical type on each replica prevents cloud
+        // convergence. Honor durable legacy aliases, but create no new aliases
+        // from structural similarity alone.
+        let typeRemap = try await repository.syncItemTypeAliases()
         let normalizedRemote = try normalizeRemote(
             remote,
             against: local,
             canonicalLibraryID: canonicalLibraryID,
-            sourceLibraryID: remoteLibraryIDs.first
+            sourceLibraryID: remoteLibraryIDs.first,
+            knownAliases: knownAliases, typeRemap: typeRemap
         )
         let canonicalLocalIdentity = local.filter {
             $0.resourceKind == LibraryResourceKind.library.rawValue && $0.id == canonicalLibraryID.uuidString
@@ -167,7 +192,17 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         )
         conflictCopies.append(contentsOf: merge.conflictCopies)
         try await applyRemote(merge.accepted, origin: .initialMerge)
-        return merge.accepted.map {
+        let serverByKey = Dictionary(
+            remote.map { (key(kind: $0.resourceKind, id: $0.id), $0) },
+            uniquingKeysWith: { $0.order >= $1.order ? $0 : $1 }
+        )
+        // Incoming records already exist on the server. Upload only additions
+        // and canonicalized payloads, avoiding a full-library echo on first sync.
+        return merge.accepted.filter { accepted in
+            guard let server = serverByKey[key(kind: accepted.resourceKind, id: accepted.id)] else { return true }
+            return server.payload != accepted.payload || server.isTombstone != accepted.isTombstone
+                || server.asset != accepted.asset
+        }.map {
             SyncRecordEnvelope(
                 id: $0.id,
                 resourceKind: $0.resourceKind,
@@ -183,14 +218,15 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
     }
 
     private func allLocalChanges() async throws -> [LibraryChange] {
-        var result: [LibraryChange] = []
-        var cursor: Int64 = 0
-        while true {
-            let page = try await repository.changes(after: cursor, limit: 1_000)
-            guard !page.isEmpty else { return result }
-            result.append(contentsOf: page)
-            cursor = page[page.count - 1].cursor
-            if page.count < 1_000 { return result }
+        // The journal is incremental: pre-migration resources and pruned
+        // history are absent. Initial merge needs the complete revision index.
+        try await repository.resourceRevisionSnapshot().enumerated().map { index, revision in
+            LibraryChange(
+                cursor: Int64(index + 1), transactionID: UUID(), sequence: index,
+                eventType: "snapshot", resourceType: revision.resourceType,
+                resourceID: revision.resourceID, revision: revision.revision,
+                isTombstone: revision.isDeleted, occurredAt: revision.updatedAt
+            )
         }
     }
 
@@ -198,23 +234,11 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         _ remote: [SyncRecordEnvelope],
         against local: [SyncRecordEnvelope],
         canonicalLibraryID: UUID,
-        sourceLibraryID: UUID?
+        sourceLibraryID: UUID?,
+        knownAliases: Set<UUID>,
+        typeRemap: [UUID: UUID],
+        dropAliasedTypes: Bool = true
     ) throws -> [SyncRecordEnvelope] {
-        var localByDigest: [String: UUID] = [:]
-        for record in local where record.resourceKind == LibraryResourceKind.itemType.rawValue && !record.isTombstone {
-            guard let payload = try? decoder.decode(SyncPayload.self, from: record.payload),
-                  case let .itemType(type) = payload else { continue }
-            localByDigest[try PortableItemTypeIdentity.schemaDigest(of: type)] = type.id
-        }
-        var typeRemap: [UUID: UUID] = [:]
-        for record in remote where record.resourceKind == LibraryResourceKind.itemType.rawValue && !record.isTombstone {
-            guard let payload = try? decoder.decode(SyncPayload.self, from: record.payload),
-                  case let .itemType(type) = payload,
-                  let canonical = localByDigest[try PortableItemTypeIdentity.schemaDigest(of: type)],
-                  canonical != type.id else { continue }
-            typeRemap[type.id] = canonical
-        }
-
         let collisionKinds = Set([
             LibraryResourceKind.deck.rawValue,
             LibraryResourceKind.itemType.rawValue,
@@ -235,11 +259,17 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                       let localRecord = localByKey["\(record.resourceKind):\(record.id)"],
                       localRecord.payload != record.payload || localRecord.isTombstone != record.isTombstone
                 else { continue }
-                collisionRemaps[record.resourceKind, default: [:]][id] = deterministicID(
+                let replacement = deterministicID(
                     sourceLibraryID: sourceLibraryID,
                     resourceKind: record.resourceKind,
                     originalID: id
                 )
+                // Once libraries are linked, differing values are ordinary
+                // sync conflicts. Reuse a prior collision remap, but never
+                // manufacture another identity during a retry or re-upload.
+                guard !knownAliases.contains(sourceLibraryID)
+                    || localByKey["\(record.resourceKind):\(replacement.uuidString)"] != nil else { continue }
+                collisionRemaps[record.resourceKind, default: [:]][id] = replacement
             }
         }
 
@@ -249,12 +279,24 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         }
 
         return try remote.compactMap { record in
+            try validateEnvelope(record)
             if record.isTombstone {
-                guard let id = UUID(uuidString: record.id),
-                      let replacement = collisionRemaps[record.resourceKind]?[id]
-                else { return record }
+                let components = record.id.split(separator: ":", omittingEmptySubsequences: false)
+                let replacement = components.enumerated().map { index, component -> String in
+                    guard let id = UUID(uuidString: String(component)) else { return String(component) }
+                    if record.resourceKind == LibraryResourceKind.itemTypeMembership.rawValue {
+                        let isDeck = components.first != "library" && index == 1
+                        return mapped(id, kind: isDeck ? .deck : .itemType).uuidString
+                    }
+                    if record.resourceKind == LibraryResourceKind.portableTypeMapping.rawValue,
+                       index == 0, id == sourceLibraryID { return canonicalLibraryID.uuidString }
+                    return (collisionRemaps[record.resourceKind]?[id]
+                        ?? (record.resourceKind == LibraryResourceKind.itemType.rawValue ? typeRemap[id] : nil)
+                        ?? id).uuidString
+                }.joined(separator: ":")
+                guard replacement != record.id else { return record }
                 return SyncRecordEnvelope(
-                    id: replacement.uuidString,
+                    id: replacement,
                     resourceKind: record.resourceKind,
                     revision: record.revision,
                     deviceID: record.deviceID,
@@ -269,7 +311,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             let transformed: SyncPayload
             var transformedID = record.id
             switch payload {
-            case let .itemType(type) where typeRemap[type.id] != nil:
+            case let .itemType(type) where dropAliasedTypes && typeRemap[type.id] != nil:
                 return nil
             case let .deck(deck):
                 let value = Deck(
@@ -308,6 +350,9 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                     templateID: card.templateID,
                     skill: card.skill,
                     memory: card.memory,
+                    memoryModelVersion: card.memoryModelVersion,
+                    memoryParameterSetID: card.memoryParameterSetID,
+                    schedulingHistoryOrigin: card.schedulingHistoryOrigin,
                     isSuspended: card.isSuspended,
                     deckID: card.deckID.map { mapped($0, kind: .deck) },
                     clozeGroup: card.clozeGroup
@@ -325,7 +370,8 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                         scheduledDays: log.scheduledDays,
                         phaseBefore: log.phaseBefore,
                         durationMs: log.durationMs,
-                        sequence: log.sequence
+                        sequence: log.sequence,
+                        schedulingAudit: log.schedulingAudit
                     ),
                     memoryBefore: review.memoryBefore
                 )
@@ -360,6 +406,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             default:
                 return record
             }
+            // Retain the original bytes when identity normalization is a no-op.
+            // Date round-trips can otherwise change a payload by a floating-point
+            // fraction and cause thousands of unnecessary uploads/conflicts.
+            if transformed == payload && transformedID == record.id { return record }
             return SyncRecordEnvelope(
                 id: transformedID,
                 resourceKind: record.resourceKind,
@@ -371,6 +421,57 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 asset: record.asset,
                 stagedFileURL: record.stagedFileURL
             )
+        }
+    }
+
+    private func validateEnvelope(_ record: SyncRecordEnvelope) throws {
+        guard let kind = LibraryResourceKind(rawValue: record.resourceKind) else {
+            throw SQLiteLibrarySyncError.unknownResourceKind(record.resourceKind)
+        }
+        if kind == .studyResponse { return }
+        if record.isTombstone {
+            if [.library, .deck, .itemType, .item, .card, .review, .reviewRevert].contains(kind),
+               UUID(uuidString: record.id) == nil { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
+            return
+        }
+        let payload: SyncPayload
+        do { payload = try decoder.decode(SyncPayload.self, from: record.payload) }
+        catch { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
+        let expected: (LibraryResourceKind, String)
+        switch payload {
+        case let .library(id): expected = (.library, id.uuidString)
+        case let .deck(value): expected = (.deck, value.id.uuidString)
+        case let .itemType(value): expected = (.itemType, value.id.uuidString)
+        case let .item(value): expected = (.item, value.item.id.uuidString)
+        case let .card(value): expected = (.card, value.id.uuidString)
+        case let .review(value): expected = (.review, value.log.id.uuidString)
+        case let .reviewRevert(value): expected = (.reviewRevert, value.id.uuidString)
+        case let .itemTypeMembership(value): expected = (.itemTypeMembership, value.id)
+        case let .schedulingSettings(value): expected = (.schedulingSettings, value.id)
+        case let .portableTypeMapping(value): expected = (.portableTypeMapping, value.id)
+        case let .metadata(name, id):
+            guard name == LibraryResourceKind.media.rawValue else { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
+            expected = (.media, id)
+        }
+        guard kind == expected.0, record.id == expected.1 else { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
+    }
+
+    private func validateAsset(_ envelope: SyncRecordEnvelope) throws {
+        guard let descriptor = envelope.asset, let url = envelope.stagedFileURL,
+              descriptor.hash == envelope.id, descriptor.byteSize >= 0 else {
+            throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
+        }
+        guard let kind = MediaKind(rawValue: descriptor.contentType) else {
+            throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
+        }
+        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        do {
+            try MediaValidation.validate(data: data, kind: kind, fileExtension: descriptor.fileExtension)
+            _ = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
+        } catch { throw SQLiteLibrarySyncError.invalidAsset(envelope.id) }
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard data.count == descriptor.byteSize, digest == descriptor.hash, digest == descriptor.signature else {
+            throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
         }
     }
 

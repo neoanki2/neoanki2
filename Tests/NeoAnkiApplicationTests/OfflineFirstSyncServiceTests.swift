@@ -20,6 +20,9 @@ private actor ChangeRepositoryStub: LibraryChangePersisting {
 private actor SyncAdapterStub: LibrarySyncAdapter {
     private var initialMergeCalls = 0
     private var applyCalls = 0
+    private var failsNextMerge: Bool
+    private var mergedIDs: Set<String> = []
+    init(failsNextMerge: Bool = false) { self.failsNextMerge = failsNextMerge }
     func encode(changes: [LibraryChange], deviceID: String) async throws -> [SyncRecordEnvelope] {
         changes.map {
             SyncRecordEnvelope(
@@ -38,20 +41,27 @@ private actor SyncAdapterStub: LibrarySyncAdapter {
     }
     func initialMerge(remote: [SyncRecordEnvelope], deviceID: String) async throws -> [SyncRecordEnvelope] {
         initialMergeCalls += 1
+        mergedIDs = Set(remote.map(\.id))
+        if failsNextMerge {
+            failsNextMerge = false
+            throw NSError(domain: "SyncRecoveryTest", code: 1)
+        }
         return remote
     }
     func counts() -> (initial: Int, apply: Int) { (initialMergeCalls, applyCalls) }
+    func lastMergedIDs() -> Set<String> { mergedIDs }
 }
 
 private actor TransportStub: CloudSyncTransport {
     var sent: [SyncRecordEnvelope] = []
-    let received: [SyncRecordEnvelope]
+    var received: [SyncRecordEnvelope]
     init(received: [SyncRecordEnvelope] = []) { self.received = received }
     func start() async throws {}
     func stop() async {}
     func enqueue(_ records: [SyncRecordEnvelope]) async throws { sent.append(contentsOf: records) }
     func fetchPendingChanges() async throws -> [SyncRecordEnvelope] { received }
     func sentCount() -> Int { sent.count }
+    func receive(_ records: [SyncRecordEnvelope]) { received = records }
 }
 
 private actor FailingTransportStub: CloudSyncTransport {
@@ -75,7 +85,116 @@ private actor FailingTransportStub: CloudSyncTransport {
     func sentCount() -> Int { sent.count }
 }
 
+private actor SuspendedUploadTransport: CloudSyncTransport {
+    private var entered = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var release: CheckedContinuation<Void, Never>?
+    var calls = 0
+    func start() async throws {}
+    func stop() async {}
+    func fetchPendingChanges() async throws -> [SyncRecordEnvelope] { [] }
+    func enqueue(_ records: [SyncRecordEnvelope]) async throws {
+        calls += 1
+        await withCheckedContinuation { continuation in
+            release = continuation
+            entered = true
+            for waiter in waiters { waiter.resume() }
+            waiters = []
+        }
+    }
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func finish() { release?.resume(); release = nil }
+}
+
 struct OfflineFirstSyncServiceTests {
+    @Test func stopWinsOverAnInFlightUploadAndOverlappingSyncIsCoalesced() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let change = LibraryChange(cursor: 1, transactionID: UUID(), sequence: 0, eventType: "updated",
+            resourceType: "deck", resourceID: "deck", revision: 1, isTombstone: false, occurredAt: .now)
+        let metadata = SyncMetadataStore(directory: directory)
+        try await metadata.save(SyncMetadata(didCreateInitialBackup: true, didCompleteInitialMerge: true))
+        let transport = SuspendedUploadTransport()
+        let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: [change]),
+            adapter: SyncAdapterStub(), transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") })
+        let running = Task { await service.start() }
+        await transport.waitUntilEntered()
+        await service.synchronize()
+        #expect(await transport.calls == 1)
+        await service.stop()
+        await transport.finish()
+        await running.value
+        #expect(await service.status() == .offline)
+        #expect(await service.issues().isEmpty)
+        #expect(try await metadata.load().pendingOutbound?.count == 1)
+    }
+
+    @Test func retriesPreservedMergeBeforeReportingCurrentWithoutRestart() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki-sync-retry-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let metadata = SyncMetadataStore(directory: directory)
+        let incoming = SyncRecordEnvelope(
+            id: "deck", resourceKind: "deck", revision: 1, deviceID: "cloud",
+            order: 1, isTombstone: false, payload: Data()
+        )
+        try await metadata.save(SyncMetadata(stagedInbound: [incoming], didCreateInitialBackup: true))
+        let adapter = SyncAdapterStub(failsNextMerge: true)
+        let transport = TransportStub()
+        let service = OfflineFirstSyncService(
+            repository: ChangeRepositoryStub(values: []), adapter: adapter,
+            transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") }
+        )
+        await service.synchronize()
+        #expect(try await metadata.load().stagedInbound.count == 1)
+        if case .needsAttention = await service.status() {} else {
+            Issue.record("A failed preserved merge must not report current")
+        }
+        await transport.receive([SyncRecordEnvelope(
+            id: "later-dependency", resourceKind: "deck", revision: 1, deviceID: "cloud",
+            order: 2, isTombstone: false, payload: Data()
+        )])
+        await service.synchronize()
+        #expect(await adapter.counts().initial == 2)
+        #expect(await adapter.lastMergedIDs() == ["deck", "later-dependency"])
+        #expect(try await metadata.load().stagedInbound.isEmpty)
+        #expect(try await metadata.load().didCompleteInitialMerge == true)
+        #expect(await service.issues().isEmpty)
+        if case .current = await service.status() {} else { Issue.record("Expected recovered sync") }
+    }
+
+    @Test func drainsAndCoalescesChangesAcrossJournalPages() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neoanki-sync-pages-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let changes = (1...1_002).map { cursor in
+            LibraryChange(
+                cursor: Int64(cursor), transactionID: UUID(), sequence: 0,
+                eventType: cursor == 1_002 ? "deleted" : "updated",
+                resourceType: "deck", resourceID: "later-deleted-deck",
+                revision: cursor, isTombstone: cursor == 1_002, occurredAt: .now
+            )
+        }
+        let transport = TransportStub()
+        let metadata = SyncMetadataStore(directory: directory)
+        try await metadata.save(SyncMetadata(didCompleteInitialMerge: true))
+        let service = OfflineFirstSyncService(
+            repository: ChangeRepositoryStub(values: changes), adapter: SyncAdapterStub(),
+            transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") }
+        )
+        await service.synchronize()
+        #expect(await transport.sentCount() == 1)
+        #expect(try await metadata.load().outboundCursor == 1_002)
+        #expect(await transport.sent.first?.isTombstone == true)
+    }
+
     @Test func advancesDurableCursorAfterSendingLocalChanges() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("neoanki-sync-test-\(UUID().uuidString)", isDirectory: true)
@@ -95,6 +214,7 @@ struct OfflineFirstSyncServiceTests {
         let repository = ChangeRepositoryStub(values: [change])
         let transport = TransportStub()
         let metadataStore = SyncMetadataStore(directory: directory)
+        try await metadataStore.save(SyncMetadata(didCompleteInitialMerge: true))
         let service = OfflineFirstSyncService(
             repository: repository,
             adapter: SyncAdapterStub(),
@@ -130,6 +250,7 @@ struct OfflineFirstSyncServiceTests {
         )
         let repository = ChangeRepositoryStub(values: [change])
         let metadataStore = SyncMetadataStore(directory: directory)
+        try await metadataStore.save(SyncMetadata(didCompleteInitialMerge: true))
         let failing = FailingTransportStub(.fetch)
         let first = OfflineFirstSyncService(
             repository: repository,

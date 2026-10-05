@@ -2,7 +2,7 @@
 name: NeoAnki2
 title: Design system
 parent: Developer Guide
-description: A calm, native Mac study surface where card content is the hero and the app chrome disappears.
+description: Calm native study surfaces for Mac, iPhone, and iPad, with readable content and focused controls.
 audience: developer
 colors:
   accent-study: "{system.controlAccentColor}"
@@ -78,7 +78,7 @@ components:
 
 **Creative North Star: "The Quiet Desk"**
 
-NeoAnki2 should feel like a well-lit desk: one open page (the card), a tidy stack of notes to the side (the item list), and almost nothing else competing for attention. The product is a **calm Mac study tool**, not a gamified learning app and not a legacy SRS dashboard.
+NeoAnki2 should feel like a well-lit desk: one open page (the card), a tidy stack of notes to the side (the item list), and almost nothing else competing for attention. The product is a **calm study tool for Mac, iPhone, and iPad**.
 
 Research across native SRS apps (immemor, sumi, SpaceRep, Cortex) and Apple platform guidance (HIG, WWDC25 design system) converges on one strategy: **platform-native restraint + content-forward layout**. Competitors that win on trust use minimal chrome, FSRS without spectacle, and typography that privileges the card. Anki’s spreadsheet density and Quizlet’s game visuals are explicit anti-references.
 
@@ -88,7 +88,7 @@ NeoAnki2 expresses brand through **precision and calm** — correct split-view s
 
 - Content-first: the selected Focus, Split, Media Aside, Media Hero, or Action
   Stage composition dominates the detail pane
-- The active Study Stage does not scroll; its action/grading footer is fixed.
+- The active Mac Study Stage does not scroll; its action/grading footer is fixed.
   Measured overflow opens a separate full-content sheet.
 - Presets own responsive geometry. Authored data selects named regions and
   semantic purposes but never supplies arbitrary layout or markup.
@@ -118,7 +118,7 @@ The palette is **semantic-first**. Prefer SwiftUI `Color` roles and `NSColor` sy
 ### Semantic
 
 - **Error Rose** (`systemRed` at ~12% opacity for banners; full red for icon): Inline errors only — always paired with icon + text.
-- **Success** (`systemGreen`): Reserved for future “correct answer” feedback in Type mode — not used decoratively today.
+- **Success** (`systemGreen`): Correct-answer feedback, paired with readable text and an icon.
 
 ### Named Rules
 
@@ -175,7 +175,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 3. Optional error banner — full width, subtle fill  
 4. Fixed footer — Show Answer or grade row  
 
-**Responsive behavior:** On future iPad/iPhone, collapse split to stack navigation; study column becomes full width with bottom-fixed grade bar (touch targets ≥44pt). Mac density preserved on desktop.
+**Responsive behavior:** On iPhone, use independent destination stacks; iPad uses a sidebar. See the mobile design contract below.
 
 ### Named Rules
 
@@ -275,7 +275,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 - **Adaptive inspector:** At compact Mac widths, keep the rail and card visible
   and open setup, selected-content, and Advanced controls from a labeled
   **Inspector** sheet. At wide widths the same inspector becomes a fixed trailing
-  pane. iPhone and iPad retain the shared stacked editor.
+  pane. iPhone and iPad use the shared preview-first mobile overview with focused editing routes.
 - **Traversal and motion:** Keyboard and VoiceOver order follows rail → canvas →
   inspector. Interactive targets are at least 44pt, validation mounts the
   necessary inspector context before focusing it, and answer concealment honors
@@ -294,7 +294,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 
 ### Sheets
 
-- **Add Item:** Grouped form, min 420×220; Cancel/Save in toolbar
+- **Add Item on Mac:** Grouped form, min 420×220; Cancel/Save in toolbar
 - **Use sparingly:** Prefer detail-pane inline editing when add-item becomes frequent
 
 ### Navigation
@@ -349,6 +349,24 @@ The centered prompt → divider → answer stack is the product’s visual signa
 **Recommended evolution path:**
 
 1. **Now (macOS 14+):** Semantic system theme + Study Indigo tint + split layout (current direction)
-2. **Next:** Type/Choose interaction UI using same reading column and footer pattern
+2. **Study interactions (current):** Reveal, Cloze, Type, Choose, Arrange, Record, and Audio Submission use the shared study workflow and platform-specific controls
 3. **macOS 26:** Liquid Glass sidebar/toolbar adoption without touching study stage opacity
-4. **iOS/iPad:** Stack navigation + bottom grade bar; preserve typography scale via Dynamic Type
+4. **iPhone/iPad (current):** Independent navigation stacks, an iPad sidebar, and a keyboard-safe study footer; preserve typography through Dynamic Type
+
+
+## iPhone and iPad design contract
+
+The mobile surface follows calm native iOS, with Things and Apple Books as craft references.
+Readable content, deliberate spacing, and focused tasks carry the identity. iPhone leads;
+iPad keeps the same workflows with a sidebar and a centered reading column.
+
+- Use scalable San Francisco text styles, semantic grouped/system backgrounds, and one accessible blue hue, brighter for text on dark surfaces and deeper behind white primary-action labels.
+- Space content at 8, 12, 16, 24, and 32 points. App-owned controls have at least 44-point targets; native toolbars retain native sizing.
+- Preserve Home, Library, Create, and Settings navigation independently. Home shows one due headline, root decks, and child deck navigation. Secondary statistics live under Progress.
+- Library rows lead with prompts. Answer subtitles appear only when concealment is explicitly disabled. Selection is a deliberate mode; ordinary taps open item details. Saved Responses scrolls with the list.
+- Study has one reading column, one horizontal inset, and a fixed keyboard-safe action footer. Mobile content scrolls at its natural type size, including response controls; Read Full Card also opens a dedicated reader. Prompt and revealed answer remain adjacent. Grade labels fill their controls and reflow at accessibility sizes. Full content remains concealed until reveal.
+- Authoring uses Item terminology, labeled fields, contextual deck selection, inline feedback, native media pickers, and unsaved-change protection.
+- Item Type Studio uses reorderable summaries and focused field editors. Card Setup starts with its preview and concise Layout/Answer Method controls; content, availability, and learning route open focused screens. Draft/reducer validation and atomic save remain shared with Mac.
+- Builders progress from source to preview to import. Transfer and missing-pack states provide a useful next action. Settings and local recordings use native grouped sections.
+
+Verification uses disposable headless Simulators only. Cover actual destinations, answer concealment, compact/large phones, iPad, light/dark, largest Dynamic Type, contrast, reduced motion, rotation, keyboards, and long content. Physical-device media and signed CloudKit acceptance remain separate. Persisted formats and HTTP interfaces remain unchanged.

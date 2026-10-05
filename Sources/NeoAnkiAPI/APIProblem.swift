@@ -110,6 +110,11 @@ enum APIServiceError: Error, Sendable {
         case .deckNotFound, .itemTypeNotFound, .itemNotFound, .cardNotFound, .reviewLogNotFound,
              .templateNotFound, .studySessionNotFound:
             return notFound("The requested resource does not exist.")
+        case .staleOrderedDeck:
+            return .problem(
+                status: 409, code: "ordered_deck_conflict", title: "Deck changed",
+                detail: error.localizedDescription
+            )
         case .idempotencyConflict:
             return .problem(
                 status: 409,

@@ -32,6 +32,12 @@ bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 echo "==> Release workflow reconciliation"
 bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
 
+echo "==> iOS UI infrastructure retry policy"
+python3 "$ROOT/Scripts/test-ios-ui-retry.py"
+
+echo "==> iOS background refresh executor isolation"
+python3 "$ROOT/Scripts/test-ios-background-refresh.py"
+
 echo "==> Documentation coverage and links"
 swift "$ROOT/Scripts/validate-docs.swift"
 

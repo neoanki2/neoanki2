@@ -42,42 +42,141 @@ struct ItemTypesMobileView: View {
     }
 }
 
+private struct MobileImportPreview: Identifiable {
+    let id = UUID()
+    let url: URL
+    let sourceName: String
+    let bytes: Int64
+    let payload: ImportPayload?
+}
+
 struct TransferToolsView: View {
     @Bindable var model: MobileAppModel
-    @State private var isImporting = false
+    @State private var isChoosingFile = false
+    @State private var isWorking = false
+    @State private var pendingImport: MobileImportPreview?
+    @State private var stagedDirectory: URL?
     @State private var progressMessage: String?
     @State private var errorMessage: String?
 
     var body: some View {
         List {
             Section("Import") {
-                Button { isImporting = true } label: { Label("Choose JSON, CSV, .neodeck, or .neoanki", systemImage: "square.and.arrow.down") }
-                if let progressMessage { Label(progressMessage, systemImage: "checkmark.circle").foregroundStyle(.secondary) }
+                Button { isChoosingFile = true } label: { Label("Choose File", systemImage: "square.and.arrow.down") }
+                Text("JSON, CSV, .neodeck, and .neoanki").font(.footnote).foregroundStyle(.secondary)
+                if isWorking { ProgressView("Preparing preview…") }
+                if let progressMessage { Label(progressMessage, systemImage: "checkmark.circle") }
             }
             Section("Export") {
+                if model.decks.isEmpty { Text("Create a deck to export its items.").foregroundStyle(.secondary) }
                 ForEach(model.decks) { deck in
                     NavigationLink { ExportDeckView(model: model, deck: deck) } label: { Label(deck.name, systemImage: "square.and.arrow.up") }
                 }
             }
         }
+        .disabled(isWorking)
         .navigationTitle("Transfer")
-        .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json, .commaSeparatedText, .neoDeck, .neoAnkiBundle]) { result in
-            Task { await importResult(result) }
+        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.json, .commaSeparatedText, .neoDeck, .neoAnkiBundle]) { result in
+            Task { await preparePreview(result) }
+        }
+        .sheet(item: $pendingImport, onDismiss: cleanupPreview) { preview in
+            NavigationStack {
+                List {
+                    Section("Source") {
+                        LabeledContent("File", value: preview.sourceName)
+                        LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: preview.bytes, countStyle: .file))
+                        LabeledContent("Format", value: preview.url.pathExtension.uppercased())
+                    }
+                    if let payload = preview.payload {
+                        Section("Preview") {
+                            LabeledContent("Item Type", value: payload.itemTypeName)
+                            LabeledContent("Items", value: payload.rows.count.formatted())
+                            ForEach(Array(payload.rows.prefix(5).enumerated()), id: \.offset) { index, row in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Item \(index + 1)").font(.caption).foregroundStyle(.secondary)
+                                    ForEach(row.fieldValues.keys.sorted(), id: \.self) { key in
+                                        Text(row.fieldValues[key] ?? "").lineLimit(3)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Section { Text("This package includes its decks, item types, and media. It will be checked before importing into your library.") }
+                    }
+                    if isWorking { ProgressView("Importing…") }
+                }
+                .navigationTitle("Review Import").navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { cleanupPreview(); pendingImport = nil }.disabled(isWorking) }
+                    ToolbarItem(placement: .confirmationAction) { Button("Import") { Task { await importPreview(preview) } }.disabled(isWorking) }
+                }
+                .interactiveDismissDisabled(isWorking)
+            }
         }
         .alert("Import Failed", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please verify the file and try again.") }
+        .task {
+            let process = ProcessInfo.processInfo
+            let scenario = process.environment["NEOANKI_TEST_SCENARIO"] ?? ""
+            if process.arguments.contains("-NeoAnkiUITestingReset"), ["mobile-transfer", "mobile-transfer-error"].contains(scenario) {
+                let file = FileManager.default.temporaryDirectory.appendingPathComponent("Sample.json")
+                do {
+                    let source = scenario == "mobile-transfer-error" ? "invalid JSON" : #"{"itemType":"Basic","rows":[{"Front":"Imported question","Back":"Imported answer"}]}"#
+                    try Data(source.utf8).write(to: file)
+                    await preparePreview(.success(file))
+                    try? FileManager.default.removeItem(at: file)
+                } catch { errorMessage = MobileAppModel.message(for: error) }
+            }
+        }
     }
 
-    private func importResult(_ result: Result<URL, Error>) async {
+    private func preparePreview(_ result: Result<URL, Error>) async {
+        isWorking = true
+        defer { isWorking = false }
         do {
-            let url = try result.get()
-            let accessed = url.startAccessingSecurityScopedResource(); defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-            switch url.pathExtension.lowercased() {
-            case "json": progressMessage = "Imported \(try await model.importJSON(Data(contentsOf: url), itemTypeID: nil, deckID: nil)) items"
-            case "csv": progressMessage = "Imported \(try await model.importCSV(Data(contentsOf: url), itemTypeID: nil, itemTypeName: "Imported", deckID: nil)) items"
-            case "neoanki": progressMessage = "Imported \(try await model.importAuthoredBundle(from: url).itemCount) items"
-            default: progressMessage = "Imported \(try await model.importPortableDeck(from: url, conflict: .useMatchingSchema).itemCount) items"
+            let source = try result.get()
+            let accessed = source.startAccessingSecurityScopedResource()
+            defer { if accessed { source.stopAccessingSecurityScopedResource() } }
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("import-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let staged = folder.appendingPathComponent(source.lastPathComponent)
+            do {
+                try FileManager.default.copyItem(at: source, to: staged)
+                let payload: ImportPayload?
+                switch staged.pathExtension.lowercased() {
+                case "json": payload = try JSONImportAdapter().parse(Data(contentsOf: staged))
+                case "csv": payload = try CSVImportAdapter(itemTypeName: "Imported").parse(Data(contentsOf: staged))
+                default: payload = nil
+                }
+                let size = Int64((try staged.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0)
+                stagedDirectory = folder
+                pendingImport = MobileImportPreview(url: staged, sourceName: source.lastPathComponent, bytes: size, payload: payload)
+            } catch {
+                try? FileManager.default.removeItem(at: folder)
+                throw error
             }
         } catch { errorMessage = MobileAppModel.message(for: error) }
+    }
+
+    private func importPreview(_ preview: MobileImportPreview) async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let url = preview.url
+            let count: Int
+            switch url.pathExtension.lowercased() {
+            case "json": count = try await model.importJSON(Data(contentsOf: url), itemTypeID: nil, deckID: nil)
+            case "csv": count = try await model.importCSV(Data(contentsOf: url), itemTypeID: nil, itemTypeName: "Imported", deckID: nil)
+            case "neoanki": count = try await model.importAuthoredBundle(from: url).itemCount
+            default: count = try await model.importPortableDeck(from: url, conflict: .useMatchingSchema).itemCount
+            }
+            progressMessage = "Imported \(count) \(count == 1 ? "item" : "items")"
+            cleanupPreview(); pendingImport = nil
+        } catch { cleanupPreview(); pendingImport = nil; errorMessage = MobileAppModel.message(for: error) }
+    }
+
+    private func cleanupPreview() {
+        if let stagedDirectory { try? FileManager.default.removeItem(at: stagedDirectory) }
+        stagedDirectory = nil
     }
 }
 
@@ -86,15 +185,16 @@ private struct ExportDeckView: View {
     let deck: DeckSummary
     @State private var document: PortableDeckDocument?
     @State private var isExporting = false
+    @State private var isPreparing = false
     @State private var errorMessage: String?
 
     var body: some View {
-        ContentUnavailableView {
-            Label("Export \(deck.name)", systemImage: "archivebox")
-        } description: {
-            Text("Creates a portable .neodeck bundle including schemas, scheduling history, and media.")
-        } actions: {
-            Button("Prepare Export") { Task { await prepare() } }.buttonStyle(.borderedProminent).controlSize(.large)
+        List {
+            Section("Deck") { LabeledContent("Name", value: deck.name); LabeledContent("Items", value: deck.itemCount.formatted()) }
+            Section {
+                Button("Prepare Export", systemImage: "square.and.arrow.up") { Task { await prepare() } }.disabled(isPreparing)
+                if isPreparing { ProgressView("Preparing export…") }
+            } footer: { Text("A portable .neodeck file includes item types, scheduling history, and media. Personal recordings stay on this device.") }
         }
         .navigationTitle("Export Deck")
         .fileExporter(isPresented: $isExporting, document: document, contentType: .neoDeck, defaultFilename: "\(deck.name).neodeck") { result in
@@ -105,6 +205,8 @@ private struct ExportDeckView: View {
     }
 
     private func prepare() async {
+        isPreparing = true
+        defer { isPreparing = false }
         do {
             let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("neodeck")
             try await model.exportDeck(id: deck.id, to: temporary)
@@ -130,12 +232,17 @@ struct SchedulingMobileView: View {
     var body: some View {
         Form {
             Section("Study Day") {
-                Stepper("Rollover: \(rollover / 60):\(String(format: "%02d", rollover % 60))", value: $rollover, in: 0...1439, step: 15)
+                DatePicker("New day begins", selection: Binding(
+                    get: { Calendar.current.date(from: DateComponents(hour: rollover / 60, minute: rollover % 60)) ?? .now },
+                    set: { let parts = Calendar.current.dateComponents([.hour, .minute], from: $0); rollover = (parts.hour ?? 4) * 60 + (parts.minute ?? 0) }
+                ), displayedComponents: .hourAndMinute)
                 Button("Save") {
                     Task {
-                        try? await model.library.setStudyDayRolloverMinutes(rollover)
-                        message = "Study day updated"
-                        await model.refresh()
+                        do {
+                            try await model.library.setStudyDayRolloverMinutes(rollover)
+                            message = "Study day updated"
+                            await model.refresh()
+                        } catch { message = MobileAppModel.message(for: error) }
                     }
                 }
                 if let message { Text(message).foregroundStyle(.secondary) }
@@ -152,26 +259,35 @@ struct SyncIssuesMobileView: View {
     @Bindable var model: MobileAppModel
     @State private var errorMessage: String?
     var body: some View {
-        List(model.syncIssues) { issue in
+        List {
+        ForEach(model.syncIssues) { issue in
+          Section {
             VStack(alignment: .leading, spacing: 6) {
                 Text(issue.summary).font(.headline)
                 Text(issue.resourceID).font(.caption.monospaced()).foregroundStyle(.secondary)
                 if issue.conflictCopy?.isRestorable == true {
                     Label("A restorable conflict copy is preserved", systemImage: "doc.on.doc").font(.subheadline)
-                    Button("Restore as New Copy") {
+                }
+            }.padding(.vertical, 5)
+                if issue.conflictCopy?.isRestorable == true {
+                    Button {
                         Task {
                             do { try await model.restoreSyncConflict(id: issue.id) }
                             catch { errorMessage = MobileAppModel.message(for: error) }
                         }
-                    }
-                    .buttonStyle(.borderedProminent)
+                    } label: { Text("Restore as New Copy").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading) }
+                    .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
                 }
-                HStack {
-                    Button("Retry") { Task { await model.retrySyncIssue(id: issue.id) } }
-                    Button("Dismiss", role: .destructive) { Task { await model.dismissSyncIssue(id: issue.id) } }
+                Button { Task { await model.retrySyncIssue(id: issue.id) } } label: {
+                    Label("Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }
-            }.padding(.vertical, 5)
+                Button(role: .destructive) { Task { await model.dismissSyncIssue(id: issue.id) } } label: {
+                    Label("Dismiss", systemImage: "xmark.circle").frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+          }
         }
+        }
+        .buttonStyle(.borderless)
         .overlay { if model.syncIssues.isEmpty { ContentUnavailableView("No Sync Issues", systemImage: "checkmark.icloud") } }
         .navigationTitle("Sync Issues")
         .alert("Could Not Restore Copy", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -202,10 +318,7 @@ struct BuilderToolsView: View {
             }
         }
         .navigationTitle("Deck Builders")
-        .safeAreaInset(edge: .bottom) {
-            Text("Builders validate a preview before importing the generated authored bundle.")
-                .font(.footnote).foregroundStyle(.secondary).padding()
-        }
+
     }
 }
 
@@ -214,6 +327,7 @@ private struct VocabularyBuilderMobileHost: View {
     @Bindable var model: MobileAppModel
     @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
     @State private var errorMessage: String?
+    @State private var isImporting = false
 
     var body: some View {
         Group {
@@ -224,8 +338,10 @@ private struct VocabularyBuilderMobileHost: View {
                         DeckBuilderDeckOption(id: $0.id, name: $0.name)
                     },
                     onGenerated: { generated in
+                        guard !isImporting else { generated.cleanup(); return }
+                        isImporting = true
                         Task {
-                            defer { generated.cleanup() }
+                            defer { generated.cleanup(); isImporting = false }
                             do {
                                 _ = try await model.importAuthoredBundle(from: generated.bundleURL)
                                 dismiss()
@@ -240,8 +356,10 @@ private struct VocabularyBuilderMobileHost: View {
                         DeckBuilderDeckOption(id: $0.id, name: $0.name)
                     },
                     onGenerated: { generated in
+                        guard !isImporting else { generated.cleanup(); return }
+                        isImporting = true
                         Task {
-                            defer { generated.cleanup() }
+                            defer { generated.cleanup(); isImporting = false }
                             do {
                                 _ = try await model.importAuthoredBundle(from: generated.bundleURL)
                                 dismiss()
@@ -252,6 +370,15 @@ private struct VocabularyBuilderMobileHost: View {
                     },
                     onCancel: { dismiss() }
                 )
+            }
+        }
+        .disabled(isImporting)
+        .navigationBarBackButtonHidden(isImporting)
+        .interactiveDismissDisabled(isImporting)
+        .overlay {
+            if isImporting {
+                ProgressView("Importing deck…").padding(24)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
         }
         .task { await vocabularyLibrary.load() }
@@ -265,6 +392,7 @@ private struct PoemBuilderMobileHost: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     @State private var errorMessage: String?
+    @State private var isImporting = false
 
     var body: some View {
         PoemDeckBuilderView(
@@ -272,8 +400,10 @@ private struct PoemBuilderMobileHost: View {
                 DeckBuilderDeckOption(id: $0.id, name: $0.name)
             },
             onGenerated: { generated in
+                guard !isImporting else { generated.cleanup(); return }
+                isImporting = true
                 Task {
-                    defer { generated.cleanup() }
+                    defer { generated.cleanup(); isImporting = false }
                     do {
                         let result = try await model.importAuthoredBundle(from: generated.bundleURL)
                         guard let parentID = generated.destinationDeckID,
@@ -296,6 +426,16 @@ private struct PoemBuilderMobileHost: View {
             },
             onCancel: { dismiss() }
         )
+        .disabled(isImporting)
+        .navigationBarBackButtonHidden(isImporting)
+        .interactiveDismissDisabled(isImporting)
+        .overlay {
+            if isImporting {
+                ProgressView("Importing deck…")
+                    .padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .accessibilityIdentifier("builderImportProgress")
+            }
+        }
         .alert("Could Not Add Deck", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(errorMessage ?? "Please try again.") }
@@ -306,6 +446,7 @@ private struct ProseBuilderMobileHost: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     @State private var errorMessage: String?
+    @State private var isImporting = false
 
     var body: some View {
         ProseDeckBuilderView(
@@ -313,8 +454,10 @@ private struct ProseBuilderMobileHost: View {
                 DeckBuilderDeckOption(id: $0.id, name: $0.name)
             },
             onGenerated: { generated in
+                guard !isImporting else { generated.cleanup(); return }
+                isImporting = true
                 Task {
-                    defer { generated.cleanup() }
+                    defer { generated.cleanup(); isImporting = false }
                     do {
                         let result = try await model.importAuthoredBundle(from: generated.bundleURL)
                         guard let parentID = generated.destinationDeckID,
@@ -337,6 +480,16 @@ private struct ProseBuilderMobileHost: View {
             },
             onCancel: { dismiss() }
         )
+        .disabled(isImporting)
+        .navigationBarBackButtonHidden(isImporting)
+        .interactiveDismissDisabled(isImporting)
+        .overlay {
+            if isImporting {
+                ProgressView("Importing deck…")
+                    .padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .accessibilityIdentifier("builderImportProgress")
+            }
+        }
         .alert("Could Not Add Deck", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -363,7 +516,7 @@ struct VocabularyToolsView: View {
                     Text("Install a .neovocab package once, then search it and generate cards entirely offline.")
                 } actions: {
                     Button("Install Pack…") { isImporting = true }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
                 }
             } else {
                 List {

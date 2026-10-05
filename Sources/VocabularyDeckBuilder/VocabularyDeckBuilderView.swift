@@ -51,6 +51,7 @@ public struct VocabularyDeckBuilderView: View {
     @State private var query = ""
     @State private var searchResults: [LexicalEntry] = []
     @State private var selectedEntryID: String?
+    @State private var showsMobilePreview = false
     @State private var previewCards: [VocabularyCardPreview] = []
     @State private var errorMessage: String?
     @State private var previewErrorMessage: String?
@@ -140,17 +141,11 @@ public struct VocabularyDeckBuilderView: View {
     public var body: some View {
         VStack(spacing: 0) {
             Form {
-                packSection
-
-                if let pack {
-                    searchSection(pack: pack)
-                }
-
-                if selectedEntryID != nil {
-                    reviewSection
-                    paradigmSection
-                    previewSection
-                }
+                #if os(iOS)
+                if showsMobilePreview { previewSection } else { sourceSections }
+                #else
+                sourceSections
+                #endif
 
                 if let attentionMessage = errorMessage ?? previewErrorMessage {
                     Section("Needs Attention") {
@@ -171,6 +166,7 @@ public struct VocabularyDeckBuilderView: View {
             }
             .formStyle(.grouped)
 
+            #if os(macOS)
             Divider()
 
             HStack {
@@ -191,8 +187,29 @@ public struct VocabularyDeckBuilderView: View {
                     .accessibilityIdentifier("vocabularyBuilderAdd")
             }
             .padding()
+            #endif
         }
+        #if os(iOS)
+        .navigationTitle(showsMobilePreview ? "Preview" : VocabularyDeckBuilderFeature.descriptor.title)
+        #else
         .navigationTitle(VocabularyDeckBuilderFeature.descriptor.title)
+        #endif
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .modifier(VocabularyMobileGenerationGuard(isGenerating: isGenerating))
+        .toolbar {
+            if showsMobilePreview { ToolbarItem(placement: .topBarLeading) { Button("Edit Content") { showsMobilePreview = false }.disabled(isGenerating) } }
+            ToolbarItem(placement: .topBarTrailing) {
+                if isGenerating {
+                    ProgressView().accessibilityLabel("Generating vocabulary deck")
+                } else if showsMobilePreview {
+                    Button("Import") { generate() }.disabled(!canGenerate || isGenerating).accessibilityIdentifier("vocabularyBuilderAdd")
+                } else {
+                    Button("Preview") { showsMobilePreview = true }.disabled(!canGenerate || isGenerating).accessibilityIdentifier("vocabularyBuilderPreview")
+                }
+            }
+        }
+        #endif
         .accessibilityIdentifier("vocabularyBuilderSheet")
         .interactiveDismissDisabled(isGenerating)
         .onDisappear { releasePackAccess() }
@@ -225,6 +242,19 @@ public struct VocabularyDeckBuilderView: View {
             } catch {
                 if (error as NSError).code != NSUserCancelledError { errorMessage = error.localizedDescription }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var sourceSections: some View {
+        packSection
+        if let pack { searchSection(pack: pack) }
+        if selectedEntryID != nil {
+            reviewSection
+            paradigmSection
+            #if os(macOS)
+            previewSection
+            #endif
         }
     }
 
@@ -749,3 +779,15 @@ public struct VocabularyDeckBuilderView: View {
         packURL = nil
     }
 }
+
+#if os(iOS)
+/// Leave the parent host's import guard in force when generation finishes.
+/// Applying a false back-button preference here would override that guard.
+private struct VocabularyMobileGenerationGuard: ViewModifier {
+    let isGenerating: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if isGenerating { content.navigationBarBackButtonHidden().disabled(true) }
+        else { content }
+    }
+}
+#endif

@@ -87,7 +87,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         )
         XCTAssertEqual(plan.schemaVersion, 1)
         XCTAssertEqual(plan.macos.count, 5)
-        XCTAssertEqual(plan.ios.count, 12)
+        XCTAssertEqual(plan.ios.count, 19)
 
         let macSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent(
@@ -153,10 +153,40 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
                     ["iPhone 17e", "iPad Pro 13-inch (M5)"],
                     "\(test) must cover both compact and regular-width layouts"
                 )
+            } else if test == "testCleanInstallCreateStudyAndPersistenceWithoutFixtures" {
+                XCTAssertEqual(
+                    Set(assignments.map(\.device)),
+                    ["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"],
+                    "The ordinary first-run journey must cover iPhone and iPad"
+                )
+                XCTAssertEqual(assignments.count, 2)
             } else {
                 XCTAssertEqual(assignments.map(\.device), ["iPhone 17 Pro Max"])
             }
         }
+    }
+
+    func testProductionFirstRunReviewOwnsFreshDedicatedCIShards() throws {
+        let plan = try JSONDecoder().decode(
+            CIUIPlan.self,
+            from: Data(contentsOf: repositoryRoot.appendingPathComponent("Config/ci-ui-shards.json"))
+        )
+        let productionTest = "NeoAnki2MobileUITests/MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures"
+        let reviewShards = plan.ios.filter { $0.tests.contains(productionTest) }
+        XCTAssertEqual(Set(reviewShards.map(\.id)), ["phone-production-review", "tablet-production-review"])
+        for shard in reviewShards {
+            XCTAssertEqual(shard.tests, [productionTest],
+                           "The fresh-install test must never share a Simulator with reset or seeded tests")
+            XCTAssertEqual(shard.workers, 1)
+        }
+        let runner = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Scripts/run-ios-ui-tests.sh"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(runner.contains("simulator_id=$(xcrun simctl create"),
+                      "Each CI shard must create its own new Simulator")
+        XCTAssertTrue(runner.contains("trap cleanup_simulators EXIT"))
+        XCTAssertTrue(runner.contains("xcrun simctl delete \"$simulator_id\""))
     }
 
     func testMobileUIHelpersAvoidKnownIntrinsicSlowPaths() throws {

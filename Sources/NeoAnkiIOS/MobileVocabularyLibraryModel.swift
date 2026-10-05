@@ -30,6 +30,24 @@ final class MobileVocabularyLibraryModel {
         }
     }
 
+    func seedVisualFixtureIfRequested() async throws {
+        let process = ProcessInfo.processInfo
+        guard process.arguments.contains("-NeoAnkiUITestingReset"),
+              process.environment["NEOANKI_TEST_SCENARIO"] == "mobile-vocabulary" else { return }
+        let workspace = FileManager.default.temporaryDirectory.appendingPathComponent("vocabulary-visual-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let entries = workspace.appendingPathComponent("entries.jsonl")
+        let entry = LexicalEntry(id: "en:swift", language: "en", canonicalForm: .init(text: .init("swift", language: "en")),
+            senses: [.init(id: "quick", definitions: [.init(text: .init("Moving quickly and smoothly.", language: "en"))])])
+        try (JSONEncoder().encode(entry) + Data([0x0A])).write(to: entries)
+        let package = workspace.appendingPathComponent("Acceptance.neovocab", isDirectory: true)
+        _ = try VocabularyPackCompiler.compile(jsonlURL: entries, to: package,
+            descriptor: .init(id: "visual.en", title: "Acceptance Lexicon", languages: ["en"], capabilities: [.lexicon]))
+        _ = try await store.install(from: package)
+        installedPacks = try await store.installedPacks()
+    }
+
     func load() async {
         guard !isLoading else { return }
         isLoading = true

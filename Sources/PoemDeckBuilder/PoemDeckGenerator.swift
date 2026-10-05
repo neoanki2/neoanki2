@@ -179,15 +179,12 @@ public enum PoemDeckGenerator {
 
         var itemData = Data()
         let attribution = "\(title) · \(author)"
-        let lines = poem.lines
-        let prompts = PoemPromptPlanner.prompts(for: poem)
-        for answerIndex in 1 ..< lines.count {
-            let answer = lines[answerIndex]
+        for card in PoemCardPlanner.cards(for: poem, title: title) {
             let fields = [
-                "front": TextValue(text: prompts[answerIndex - 1]),
+                "front": TextValue(text: card.prompt),
                 // A leading blank line carries stanza separation as whitespace
                 // within the answer rather than as visible instructional text.
-                "back": TextValue(text: answer.startsStanza ? "\n\(answer.text)" : answer.text),
+                "back": TextValue(text: card.answer),
                 "attribution": TextValue(text: attribution),
             ]
             let item = ItemRecord(
@@ -195,7 +192,7 @@ public enum PoemDeckGenerator {
                 deck: "poem",
                 type: "poem-line",
                 fields: fields,
-                tags: ["author:\(author)"]
+                tags: ["author:\(author)"] + (card.isOpening ? [PoemCardPlanner.openingTag] : [])
             )
             try append(item, to: &itemData)
         }

@@ -1959,6 +1959,21 @@ public actor NeoAnkiAPIService {
         guard let object = try JSONSerialization.jsonObject(with: body) as? [String: Any],
               let operations = object["operations"] as? [Any]
         else { return }
+        if let value = object["order"] {
+            guard let order = value as? [String: Any] else {
+                throw APIServiceError.validation("Expected an order object.", pointer: "/order")
+            }
+            try rejectUnknownMembers(order, allowed: ["deckId", "expectedItems", "orderedItemIds"], pointer: "/order")
+            if let snapshots = order["expectedItems"] as? [Any] {
+                for (index, value) in snapshots.enumerated() {
+                    let pointer = "/order/expectedItems/\(index)"
+                    guard let item = value as? [String: Any] else {
+                        throw APIServiceError.validation("Expected an item snapshot.", pointer: pointer)
+                    }
+                    try validateItemObjectShape(item, pointer: pointer, allowsID: true)
+                }
+            }
+        }
         for (index, value) in operations.enumerated() {
             let pointer = "/operations/\(index)"
             guard let operation = value as? [String: Any] else {
@@ -2295,7 +2310,7 @@ public actor NeoAnkiAPIService {
         let input = try APIJSON.decodeStrict(
             BulkItemsInput.self,
             from: request.body,
-            allowedKeys: ["atomic", "dryRun", "operations"]
+            allowedKeys: ["atomic", "dryRun", "operations", "order"]
         )
         guard input.atomic else {
             throw APIServiceError.validation(
@@ -2352,6 +2367,30 @@ public actor NeoAnkiAPIService {
             }
         }
 
+        let order = try input.order.map { source in
+            guard source.expectedItems.count <= 100_000, source.orderedItemIds.count <= 100_000 else {
+                throw APIServiceError.validation("The ordered deck is too large.", pointer: "/order")
+            }
+            let expected = try source.expectedItems.enumerated().map { index, value in
+                let pointer = "/order/expectedItems/\(index)"
+                guard let id = value.id else {
+                    throw APIServiceError.validation("An expected item requires id.", pointer: pointer + "/id")
+                }
+                return try item(
+                    id: parseUUID(id, pointer: pointer + "/id"),
+                    itemTypeID: value.itemTypeId, deckID: value.deckId,
+                    fields: value.fields, tags: value.tags
+                )
+            }
+            return OrderedDeckItemReconciliation(
+                deckID: try parseUUID(source.deckId, pointer: "/order/deckId"),
+                expectedItems: expected,
+                orderedItemIDs: try source.orderedItemIds.enumerated().map {
+                    try parseUUID($0.element, pointer: "/order/orderedItemIds/\($0.offset)")
+                }
+            )
+        }
+
         let key = input.dryRun ? nil : try requiredIdempotencyKey(request)
         let hash = try APIJSON.canonicalRequestHash(
             method: request.method, path: request.path, body: request.body
@@ -2374,7 +2413,13 @@ public actor NeoAnkiAPIService {
 
         let planned: [ItemBulkOperationResult]
         do {
-            planned = try await store.executeItemBulk(operations, dryRun: input.dryRun)
+            if let order {
+                planned = try await store.executeOrderedItemBulk(
+                    operations, order: order, dryRun: input.dryRun, asOf: .now
+                )
+            } else {
+                planned = try await store.executeItemBulk(operations, dryRun: input.dryRun)
+            }
         } catch let error as ItemBulkOperationError {
             throw APIServiceError.validation(
                 "Operation \(error.operationID): \(error.detail)",

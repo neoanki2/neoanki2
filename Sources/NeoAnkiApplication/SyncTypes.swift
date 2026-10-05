@@ -53,7 +53,9 @@ public struct SyncConflictCopy: Codable, Sendable, Equatable, Identifiable {
     public let wasTombstone: Bool
     public let acceptedWasTombstone: Bool
 
-    public var isRestorable: Bool { !wasTombstone && !payload.isEmpty }
+    public var isRestorable: Bool {
+        !wasTombstone && !payload.isEmpty && ["deck", "item", "itemType"].contains(resourceKind)
+    }
 
     public init(
         id: UUID = UUID(),

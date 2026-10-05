@@ -25,6 +25,13 @@ public enum SharedDesignSystem {
     public static let sectionSpacing: CGFloat = 24
 
     public static var accent: Color { .accentColor }
+
+    /// One blue hue with enough contrast for action text in both appearances.
+    public static func mobileTint(for colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark
+            ? Color(red: 0.40, green: 0.65, blue: 1)
+            : Color(red: 0.12, green: 0.38, blue: 0.72)
+    }
     public static var surface: Color { Color.primary.opacity(0.045) }
     public static var separator: Color { Color.primary.opacity(0.12) }
 }
@@ -46,6 +53,16 @@ public struct AdaptiveReadingColumn<Content: View>: View {
 }
 
 public extension View {
+    /// Filled mobile actions keep white labels legible in either appearance.
+    @ViewBuilder
+    func neoAnkiMobilePrimaryActionTint() -> some View {
+        #if os(iOS)
+        tint(Color(red: 0.12, green: 0.38, blue: 0.72))
+        #else
+        self
+        #endif
+    }
+
     func neoAnkiTouchTarget() -> some View {
         frame(
             minWidth: SharedDesignSystem.minimumTouchTarget,

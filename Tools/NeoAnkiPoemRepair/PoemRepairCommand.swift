@@ -1,15 +1,13 @@
 import Foundation
 import NeoAnkiAPI
+import NeoAnkiCore
 import PoemDeckBuilder
-
-private struct PlannedItem {
-    let original: APIItem
-    let fields: [[String: Any]]
-}
 
 private struct DeckPlan {
     let deck: APIDeck
-    let changes: [PlannedItem]
+    let originals: [APIItem]
+    let preview: PoemDeckReconciliationPreview
+    let openingCards: Bool
 }
 
 private struct LocalAPI {
@@ -30,8 +28,7 @@ private struct LocalAPI {
         if let key { request.setValue(key, forHTTPHeaderField: "Idempotency-Key") }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let response = response as? HTTPURLResponse,
-              (200 ..< 300).contains(response.statusCode)
-        else {
+              (200 ..< 300).contains(response.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw RepairError.message("Local API request failed (HTTP \(status), \(path)).")
         }
@@ -75,220 +72,222 @@ private enum RepairError: Error, LocalizedError {
 @main
 private enum PoemRepairCommand {
     static func main() async {
-        do {
-            try await run()
-        } catch {
+        do { try await run() }
+        catch {
             fputs("poem repair: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }
 
     private static func run() async throws {
-        let args = Array(CommandLine.arguments.dropFirst())
-        guard args.allSatisfy({ $0 == "--apply" || $0 == "--dry-run" }),
+        var args = Array(CommandLine.arguments.dropFirst())
+        var snapshotPath: String?
+        if let index = args.firstIndex(of: "--snapshot"), index + 1 < args.count {
+            snapshotPath = args[index + 1]
+            args.removeSubrange(index...index + 1)
+        }
+        guard args.allSatisfy({ ["--apply", "--dry-run", "--opening-cards"].contains($0) }),
               !(args.contains("--apply") && args.contains("--dry-run")) else {
-            throw RepairError.message("Usage: neoanki-poem-repair [--dry-run | --apply]")
+            throw RepairError.message("Usage: neoanki-poem-repair [--opening-cards] [--dry-run | --apply] [--snapshot /path/to/backup.sqlite]")
         }
         let shouldApply = args.contains("--apply")
+        let openingCards = args.contains("--opening-cards")
+        if let snapshotPath {
+            guard !shouldApply else { throw RepairError.message("Snapshot mode is dry-run only. Apply repairs through the local API.") }
+            try await auditSnapshot(at: URL(fileURLWithPath: snapshotPath), openingCards: openingCards)
+            return
+        }
         guard let token = ProcessInfo.processInfo.environment["NEOANKI_API_TOKEN"], !token.isEmpty else {
             throw RepairError.message("Set NEOANKI_API_TOKEN with library.read and items.write scopes.")
         }
-        let port = Int(ProcessInfo.processInfo.environment["NEOANKI_API_PORT"] ?? "8766") ?? 8_766
-        guard (1_024 ... 65_535).contains(port),
+        guard let port = Int(ProcessInfo.processInfo.environment["NEOANKI_API_PORT"] ?? "8766"),
+              (1_024 ... 65_535).contains(port),
               let url = URL(string: "http://127.0.0.1:\(port)/") else {
             throw RepairError.message("NEOANKI_API_PORT must be a local API port.")
         }
         let api = LocalAPI(baseURL: url, token: token)
+        // Refuse an ordered commit until the server explicitly advertises
+        // the ordering contract, rather than relying on unknown-key behavior.
+        if shouldApply {
+            let document = try JSONSerialization.jsonObject(with: await api.request("/v1/openapi.json")) as? [String: Any]
+            let components = document?["components"] as? [String: Any]
+            let schemas = components?["schemas"] as? [String: Any]
+            let bulk = schemas?["BulkItemsInput"] as? [String: Any]
+            let properties = bulk?["properties"] as? [String: Any]
+            guard properties?["order"] != nil else {
+                throw RepairError.message("Install a NeoAnki2 build supporting ordered bulk requests before applying repairs.")
+            }
+        }
         let decks: [APIDeck] = try await api.all("/v1/decks")
         let types: [APIItemType] = try await api.all("/v1/item-types")
         let items: [APIItem] = try await api.all("/v1/items")
         let typeByID = Dictionary(uniqueKeysWithValues: types.map { ($0.id, $0) })
-        let itemsByDeck = Dictionary(grouping: items.compactMap { item -> (String, APIItem)? in
-            item.deckId.map { ($0, item) }
-        }, by: \.0)
-
+        let itemsByDeck = Dictionary(grouping: items.filter { $0.deckId != nil }, by: { $0.deckId! })
         var plans: [DeckPlan] = []
         var skipped = 0
         for deck in decks {
-            let members = itemsByDeck[deck.id]?.map(\.1) ?? []
-            guard members.contains(where: { typeByID[$0.itemTypeId]?.name == "Poem Line" }) else {
-                continue
-            }
+            let members = itemsByDeck[deck.id] ?? []
+            guard members.contains(where: { typeByID[$0.itemTypeId]?.name == "Poem Line" }) else { continue }
             do {
-                let plan = try plan(deck: deck, items: members, types: typeByID)
+                let plan = try plan(deck: deck, items: members, types: typeByID, openingCards: openingCards)
                 plans.append(plan)
-                print("\(deck.name): \(plan.changes.count) card(s) to repair")
+                print("\(deck.name): \(plan.preview.addedCount) to add, \(plan.preview.changes.count) to update, \(plan.preview.retiredCount) to retire")
             } catch {
                 skipped += 1
                 print("\(deck.name): skipped — \(error.localizedDescription)")
             }
         }
-
+        guard skipped == 0 else { throw RepairError.message("Some poem decks need manual review; no repairs were applied.") }
         if shouldApply {
-            for plan in plans where !plan.changes.isEmpty {
-                do {
-                    try await apply(plan, api: api)
-                    print("\(plan.deck.name): verified")
-                } catch {
-                    skipped += 1
-                    print("\(plan.deck.name): incomplete — \(error.localizedDescription)")
-                }
+            for plan in plans where plan.preview.hasChanges {
+                try await apply(plan, api: api)
+                print("\(plan.deck.name): verified")
             }
         } else {
-            print("Dry run only. Pass --apply to repair the listed local decks.")
+            print("Dry run only. Back up the library, then pass --apply to repair the listed decks.")
         }
-        print("\(plans.count) poem deck(s) checked; \(skipped) skipped or incomplete")
+        print("\(plans.count) poem deck(s) checked; \(plans.reduce(0) { $0 + $1.preview.addedCount }) opening card(s) planned")
+    }
+
+    /// Audits a disposable copy of a consistent SQLite backup. The snapshot
+    /// and live library are never opened for writing by this mode.
+    private static func auditSnapshot(at snapshotURL: URL, openingCards: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("neoanki-poem-audit-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let copy = directory.appendingPathComponent("library.sqlite")
+        // Copy bytes from the resolved file, never a symlink that could make
+        // ItemStore open the original snapshot or live library for writing.
+        try FileManager.default.copyItem(at: snapshotURL.resolvingSymlinksInPath(), to: copy)
+        let store = try ItemStore(databaseURL: copy)
+        let types = try await store.listItemTypes()
+        let byID = Dictionary(uniqueKeysWithValues: types.map { ($0.id, $0) })
+        let items = try await store.itemRecords()
+        var checked = 0
+        var additions = 0
+        var skipped = 0
+        for deck in try await store.listDecks() {
+            let members = items.filter { $0.item.deckID == deck.id }
+            guard members.contains(where: { byID[$0.item.itemTypeID]?.name == "Poem Line" }) else { continue }
+            do {
+                let records = try members.map { record -> PoemDeckItemRecord in
+                    guard record.cardIDs.count == 1, let type = byID[record.item.itemTypeID] else {
+                        throw RepairError.message("Missing type or invalid card count.")
+                    }
+                    return .init(item: record.item, itemType: type, createdAt: record.createdAt)
+                }
+                let snapshot = try PoemDeckReconciler.snapshot(records: records)
+                let preview = try PoemDeckReconciler.preview(
+                    sourceText: snapshot.sourceText, records: records,
+                    title: openingCards ? deck.name : nil, deckID: deck.id
+                )
+                print("\(deck.name): \(preview.addedCount) to add, \(preview.changes.count) to update, \(preview.retiredCount) to retire")
+                checked += 1
+                additions += preview.addedCount
+            } catch {
+                skipped += 1
+                print("\(deck.name): skipped — \(error.localizedDescription)")
+            }
+        }
+        print("Snapshot dry run: \(checked) poem deck(s) checked; \(additions) opening card(s) planned; \(skipped) skipped")
         if skipped > 0 { throw RepairError.message("Some poem decks need manual review.") }
     }
 
     private static func plan(
-        deck: APIDeck,
-        items: [APIItem],
-        types: [String: APIItemType]
+        deck: APIDeck, items: [APIItem], types: [String: APIItemType], openingCards: Bool
     ) throws -> DeckPlan {
-        guard !items.isEmpty,
-              Set(items.map(\.itemTypeId)).count == 1,
-              let type = types[items[0].itemTypeId],
-              type.name == "Poem Line", type.templates.count == 1,
-              items.allSatisfy({ $0.cardIds.count == 1 }),
-              let front = type.fields.first(where: { $0.name == "Front" && $0.type == "text" }),
-              let back = type.fields.first(where: { $0.name == "Back" && $0.type == "text" }),
-              let attribution = type.fields.first(where: { $0.name == "Attribution" && $0.type == "text" })
-        else { throw RepairError.message("deck is mixed or does not have the generated poem schema") }
-        let marker = type.fields.first(where: { $0.name == "Stanza Break" && $0.type == "text" })
-        // The unfiltered items endpoint is ordered by the database's full
-        // creation timestamp. Its JSON timestamps have only millisecond
-        // precision, so sorting or rejecting ties here would lose that order.
-        let ordered = items
-        guard zip(ordered, ordered.dropFirst()).allSatisfy({ $0.0.createdAt <= $0.1.createdAt }) else {
-            throw RepairError.message("creation order is not reliable")
+        guard !items.isEmpty, items.allSatisfy({ $0.cardIds.count == 1 }),
+              zip(items, items.dropFirst()).allSatisfy({ $0.0.createdAt <= $0.1.createdAt }),
+              let deckID = UUID(uuidString: deck.id) else {
+            throw RepairError.message("The deck's card count or creation order is unreliable.")
         }
-        guard let first = text(front.id, in: ordered[0]),
-              !first.isEmpty, !first.contains("\n") else {
-            throw RepairError.message("first poem line cannot be recovered")
+        let records = try items.enumerated().map { index, item -> PoemDeckItemRecord in
+            guard let type = types[item.itemTypeId] else { throw RepairError.message("Missing item type.") }
+            // The endpoint preserves full database creation order; JSON dates
+            // round to milliseconds. Use that order instead of re-sorting ties.
+            return try .init(
+                item: item.domain(), itemType: type.domain(),
+                createdAt: Date(timeIntervalSince1970: Double(index))
+            )
         }
-        var parts = [first]
-        let caption = text(attribution.id, in: ordered[0])
-        guard caption != nil else { throw RepairError.message("attribution is missing") }
-        var previousLine = first
-        for item in ordered {
-            guard text(attribution.id, in: item) == caption,
-                  text(front.id, in: item)?
-                    .split(separator: "\n", omittingEmptySubsequences: true)
-                    .last.map(String.init) == previousLine,
-                  let raw = text(back.id, in: item) else {
-                throw RepairError.message("poem order, metadata, or answer is inconsistent")
-            }
-            let answer = raw.hasPrefix("\n") ? String(raw.dropFirst()) : raw
-            guard !answer.isEmpty, !answer.contains("\n") else {
-                throw RepairError.message("an answer contains multiple lines")
-            }
-            if raw.hasPrefix("\n") || (marker.flatMap { text($0.id, in: item) } ?? "") != "" {
-                parts.append("")
-            }
-            parts.append(answer)
-            previousLine = answer
+        let snapshot = try PoemDeckReconciler.snapshot(records: records)
+        let preview = try PoemDeckReconciler.preview(
+            sourceText: snapshot.sourceText, records: records,
+            title: openingCards ? deck.name : nil, deckID: deckID
+        )
+        guard preview.operations.count <= 500 else {
+            throw RepairError.message("The atomic repair exceeds the API's 500-operation limit.")
         }
-        let poem = PoemDeckGenerator.parse(parts.joined(separator: "\n"))
-        guard poem.lines.count == ordered.count + 1,
-              poem.lines.map(\.text) == [first] + ordered.map({ item in
-                  let raw = text(back.id, in: item)!
-                  return raw.hasPrefix("\n") ? String(raw.dropFirst()) : raw
-              }) else {
-            throw RepairError.message("source is not a canonical generated poem")
-        }
-        let prompts = PoemPromptPlanner.prompts(for: poem)
-        var changes: [PlannedItem] = []
-        for (index, item) in ordered.enumerated() {
-            let answer = poem.lines[index + 1]
-            let desiredBack = (answer.startsStanza ? "\n" : "") + answer.text
-            let oldBack = text(back.id, in: item)!
-            let oldFront = text(front.id, in: item)
-            let oldMarker = marker.flatMap { text($0.id, in: item) } ?? ""
-            guard oldFront != nil else {
-                throw RepairError.message("a prompt is missing")
-            }
-            if oldFront == prompts[index], oldBack == desiredBack, oldMarker.isEmpty { continue }
-            var fields = try fieldObjects(item)
-            replace(front.id, with: ["type": "text", "text": prompts[index]], in: &fields)
-            replace(back.id, with: ["type": "text", "text": desiredBack], in: &fields)
-            if let marker { replace(marker.id, with: ["type": "empty"], in: &fields) }
-            changes.append(.init(original: item, fields: fields))
-        }
-        return .init(deck: deck, changes: changes)
+        return .init(deck: deck, originals: items, preview: preview, openingCards: openingCards)
+    }
+
+    private static func itemObject(_ item: Item) throws -> [String: Any] {
+        let fields = try JSONSerialization.jsonObject(with: JSONEncoder().encode(item.fields.map(APIFieldValue.init)))
+        return ["id": item.id.uuidString.lowercased(), "itemTypeId": item.itemTypeID.uuidString.lowercased(),
+                "deckId": item.deckID?.uuidString.lowercased() as Any? ?? NSNull(), "fields": fields, "tags": item.tags]
     }
 
     private static func apply(_ plan: DeckPlan, api: LocalAPI) async throws {
-        for batch in plan.changes.chunked(into: 500) {
-            for change in batch {
-                let current = try LocalAPI.decoder.decode(
-                    APIItem.self,
-                    from: await api.request("/v1/items/\(change.original.id)")
-                )
-                guard current.revision == change.original.revision else {
-                    throw RepairError.message("item changed since preview; run the command again")
+        guard let order = plan.preview.order else { throw RepairError.message("Missing deck order.") }
+        var preservedCards: [String: Data] = [:]
+        for item in plan.originals {
+            let current = try LocalAPI.decoder.decode(APIItem.self, from: await api.request("/v1/items/\(item.id)"))
+            guard current == item else { throw RepairError.message("Item changed since preview; run the command again.") }
+            for id in item.cardIds {
+                preservedCards[id] = try await api.request("/v1/cards/\(id)")
+            }
+        }
+        let operations = try plan.preview.operations.map { operation -> [String: Any] in
+            switch operation.action {
+            case let .create(item):
+                return ["operationId": operation.operationID, "action": "create", "item": try itemObject(item)]
+            case let .replace(item):
+                return ["operationId": operation.operationID, "action": "replace", "item": try itemObject(item)]
+            case let .delete(id):
+                return ["operationId": operation.operationID, "action": "delete", "itemId": id.uuidString.lowercased()]
+            }
+        }
+        let orderObject: [String: Any] = [
+            "deckId": order.deckID.uuidString.lowercased(),
+            "expectedItems": try order.expectedItems.map(itemObject),
+            "orderedItemIds": order.orderedItemIDs.map { $0.uuidString.lowercased() },
+        ]
+        let dryRun = try JSONSerialization.data(withJSONObject: [
+            "atomic": true, "dryRun": true, "operations": operations, "order": orderObject,
+        ])
+        _ = try await api.request("/v1/items/bulk", method: "POST", body: dryRun)
+        let commit = try JSONSerialization.data(withJSONObject: [
+            "atomic": true, "dryRun": false, "operations": operations, "order": orderObject,
+        ])
+        _ = try await api.request("/v1/items/bulk", method: "POST", body: commit, key: UUID().uuidString)
+        let final: [APIItem] = try await api.all("/v1/items")
+        let members = final.filter { $0.deckId == plan.deck.id }
+        let types: [APIItemType] = try await api.all("/v1/item-types")
+        let verified = try Self.plan(deck: plan.deck, items: members,
+                                types: Dictionary(uniqueKeysWithValues: types.map { ($0.id, $0) }),
+                                openingCards: plan.openingCards)
+        guard !verified.preview.hasChanges,
+              members.map(\.id) == order.orderedItemIDs.map({ $0.uuidString.lowercased() }) else {
+            throw RepairError.message("Post-repair sequence verification failed.")
+        }
+        let retired = plan.preview.retiredOpeningCard?.id.uuidString.lowercased()
+        for item in plan.originals where item.id != retired {
+            guard members.first(where: { $0.id == item.id })?.cardIds == item.cardIds else {
+                throw RepairError.message("Existing card identities changed.")
+            }
+            for id in item.cardIds {
+                let before = try JSONSerialization.jsonObject(with: preservedCards[id]!) as? [String: Any]
+                let after = try JSONSerialization.jsonObject(with: await api.request("/v1/cards/\(id)")) as? [String: Any]
+                let oldMemory = before?["memory"] as? NSDictionary
+                let newMemory = after?["memory"] as? NSDictionary
+                // New-card introduction times intentionally change; learned
+                // memory and schedules must remain byte-for-byte equivalent.
+                if oldMemory?["phase"] as? String != "new", oldMemory != newMemory {
+                    throw RepairError.message("A learned card's memory or schedule changed.")
                 }
             }
-            let operations: [[String: Any]] = batch.map { change in
-                ["operationId": change.original.id, "action": "replace", "item": [
-                    "id": change.original.id,
-                    "itemTypeId": change.original.itemTypeId,
-                    "deckId": change.original.deckId as Any? ?? NSNull(),
-                    "fields": change.fields,
-                    "tags": change.original.tags,
-                ]]
-            }
-            let dryRun = try JSONSerialization.data(withJSONObject: [
-                "atomic": true, "dryRun": true, "operations": operations,
-            ])
-            _ = try await api.request("/v1/items/bulk", method: "POST", body: dryRun)
-            let commit = try JSONSerialization.data(withJSONObject: [
-                "atomic": true, "dryRun": false, "operations": operations,
-            ])
-            _ = try await api.request(
-                "/v1/items/bulk", method: "POST", body: commit, key: UUID().uuidString
-            )
-            for change in batch {
-                let current = try LocalAPI.decoder.decode(
-                    APIItem.self,
-                    from: await api.request("/v1/items/\(change.original.id)")
-                )
-                guard current.cardIds == change.original.cardIds,
-                      try fieldObjects(current).elementsEqual(change.fields, by: fieldsEqual)
-                else { throw RepairError.message("post-repair verification failed") }
-            }
         }
-    }
-
-    private static func text(_ id: String, in item: APIItem) -> String? {
-        guard let value = item.fields.first(where: { $0.fieldId == id })?.value,
-              value.type == "text" else { return nil }
-        return value.text
-    }
-
-    private static func fieldObjects(_ item: APIItem) throws -> [[String: Any]] {
-        let data = try JSONEncoder().encode(item.fields)
-        guard let fields = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw RepairError.message("item fields could not be encoded")
-        }
-        return fields
-    }
-
-    private static func replace(_ id: String, with value: [String: Any], in fields: inout [[String: Any]]) {
-        if let index = fields.firstIndex(where: { $0["fieldId"] as? String == id }) {
-            fields[index]["value"] = value
-        } else {
-            fields.append(["fieldId": id, "value": value])
-        }
-    }
-
-    private static func fieldsEqual(_ lhs: [String: Any], _ rhs: [String: Any]) -> Bool {
-        NSDictionary(dictionary: lhs).isEqual(to: rhs)
-    }
-}
-
-private extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        stride(from: 0, to: count, by: size).map { Array(self[$0 ..< Swift.min($0 + size, count)]) }
     }
 }

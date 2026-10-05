@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc
+contract_digest: sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -57,6 +57,7 @@ Type: **object**.
 - `atomic` — boolean; required
 - `dryRun` — boolean; required
 - `operations` — array of BulkItemOperation; required
+- `order` — OrderedItemsInput; optional
 
 ## BulkItemsResult {#schema-bulkitemsresult}
 
@@ -703,6 +704,28 @@ Type: **object**.
 
 Type: **object**.
 
+## OrderedItemSnapshot {#schema-ordereditemsnapshot}
+
+Type: **object**.
+
+### Properties
+
+- `deckId` — string or null; required
+- `fields` — array of FieldValue; required
+- `id` — string; required
+- `itemTypeId` — string; required
+- `tags` — array of string; required
+
+## OrderedItemsInput {#schema-ordereditemsinput}
+
+Type: **object**.
+
+### Properties
+
+- `deckId` — string; required
+- `expectedItems` — array of OrderedItemSnapshot; required
+- `orderedItemIds` — array of string; required
+
 ## PageInfo {#schema-pageinfo}
 
 Type: **object**.
@@ -1189,6 +1212,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:0716d15215b36d6eccf1a225b90db11eab17fa452833e32ae8e92e2d25f011fc`.
+Contract digest: `sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271`.
 
 _Generated from the runtime schema catalog; do not edit by hand._
