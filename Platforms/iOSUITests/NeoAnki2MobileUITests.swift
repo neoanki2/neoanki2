@@ -158,11 +158,15 @@ class NeoAnki2MobileUITestCase: XCTestCase {
     }
 
     func scrollingSurface(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+        // Navigation can remove a surface between query evaluation and filtering.
+        // Bind to its accessibility identity so a shifting index cannot resolve
+        // to a different surface, and ignore identities that already disappeared.
         let candidates = (
-            app.scrollViews.allElementsBoundByIndex
-                + app.collectionViews.allElementsBoundByIndex
+            app.scrollViews.allElementsBoundByAccessibilityElement
+                + app.collectionViews.allElementsBoundByAccessibilityElement
         ).filter { candidate in
-            candidate.label != "Sidebar"
+            candidate.exists
+                && candidate.label != "Sidebar"
                 && candidate.isHittable
                 && !candidate.frame.isEmpty
                 && candidate.frame.intersects(app.frame)
