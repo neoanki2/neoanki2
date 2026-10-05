@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-10-05T10:14:02Z",
+  "capturedAt" : "2026-10-05T13:09:19Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -30,9 +30,9 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 732,
+      "height" : 724,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "f7f3e58c6b8722b4f6a57bd0e79320901b32c08ff2e295c2654fde575eeef91e",
+      "sha256" : "f74701111584cb98fc7966d06a6ae336fb3ac1d8700f18a5f484ecbbff4bc03d",
       "width" : 1024
     },
     {
@@ -56,7 +56,7 @@
       "filename" : "item-detail.png",
       "height" : 732,
       "scenario" : "basic item detail",
-      "sha256" : "bc6929ef3a9ab6a5ef30f3597cdba7949b156efec2701c28935ecd52c7bb5b76",
+      "sha256" : "0afec50ef243f3d5663c2bf88c9a6c3972691c0376aaaeaf59f3278ead965c8f",
       "width" : 1024
     },
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 732,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "5e8459443bc149994604f3fa6d64e29a34106a0341272c012680a20cc3a04a8c",
+      "sha256" : "c6e8f854adaf130a0e3cce6214c9c120d34e06efa7e2bf91980a81fd2d3b433b",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "55f8e2d4ae7f1f0786a9bfb196f8ac4f86465068"
+  "sourceSHA" : "8360bcad50db60eeb0bb908d24107e6efa231e9a"
 }
