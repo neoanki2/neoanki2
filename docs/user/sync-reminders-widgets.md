@@ -111,21 +111,26 @@ attempt completed without a retained issue. **Account unavailable** means the
 iCloud account, entitlement, or container cannot be used. **Needs attention**
 means one or more recoverable batches or conflicts were preserved.
 
-On iPhone or iPad, open **Sync Issues** to inspect each issue:
+Mutable conflicts resolve automatically. The synced version stays in place. If
+the preserved item, deck, or item type has different content, NeoAnki2 restores
+it as a separate copy and syncs that copy. Identical content does not create a
+duplicate. Recovered decks and item types have **(Recovered)** in their names. Card
+scheduling conflicts keep the accepted state and archive the prior state;
+they do not create duplicate items or cards.
 
-- **Retry** removes that issue and attempts synchronization again.
-- **Restore as New Copy** recreates a preserved mutable resource with a new
-  identity, keeping both versions.
-- **Dismiss** removes the issue record without restoring its conflict copy.
+No conflict decision or review screen is required. Prior versions and deletion
+conflicts remain archived in local sync metadata. Recovery is idempotent, so
+restarting or retrying does not create additional copies of the same conflict.
+Transfer and validation failures retry automatically; a failure that cannot be
+safely recovered remains visible in the sync status.
+
+The iPhone and iPad **Sync Issues** view remains available for unresolved
+operational failures. **Retry** attempts synchronization again; **Dismiss**
+removes an issue record.
 
 Review the summary before dismissing. Invalid remote batches are staged outside
 domain tables and applied transactionally, so a rejected batch does not partly
 rewrite the library.
-
-The current Mac settings panel reports the issue count but does not expose the
-mobile restore and dismiss controls. Use a synced iPhone or iPad to inspect a
-restorable issue, or preserve both local libraries and report it before making
-destructive changes.
 
 ## Troubleshoot iCloud
 

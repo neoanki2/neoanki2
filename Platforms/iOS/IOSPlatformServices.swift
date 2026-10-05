@@ -134,6 +134,9 @@ actor MobileSyncRecoveryUITestService: SyncService {
             guard let record = records.first(where: { $0.id == deck.id.uuidString && $0.resourceKind == "deck" }) else { return }
             let copy = SyncConflictCopy(resourceKind: "deck", originalResourceID: record.id,
                                         sourceDeviceID: "another-device", payload: record.payload)
+            // The accepted version must differ from the preserved payload.
+            // Identical content is intentionally acknowledged without a copy.
+            _ = try await repository.updateDeck(Deck(id: deck.id, name: "Synced reading deck"))
             let invalid = SyncConflictCopy(resourceKind: "deck", originalResourceID: UUID().uuidString,
                                            sourceDeviceID: "another-device", payload: Data("invalid".utf8))
             pending = [

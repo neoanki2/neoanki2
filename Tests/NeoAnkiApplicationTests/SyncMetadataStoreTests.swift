@@ -73,6 +73,31 @@ struct SyncMetadataStoreTests {
         let issues = try await SyncMetadataStore(directory: root).load().issues
         #expect(issues.count == 1)
         #expect(issues.first?.conflictCopy?.payload == local.payload)
+        let store = SyncMetadataStore(directory: root)
+        let stale = try await store.load()
+        _ = try await store.completeConflict(#require(issues.first))
+        #expect(try await store.load().resolvedConflictCopies?.first?.payload == local.payload)
+        try await store.preserveConflict(local: local, server: server)
+        #expect(try await store.load().issues.isEmpty)
+        // Outbound bookkeeping from an earlier snapshot cannot erase history.
+        var oldBookkeeping = stale
+        oldBookkeeping.issues = []
+        try await store.save(oldBookkeeping)
+        #expect(try await store.load().resolvedConflictCopies?.count == 1)
+    }
+
+    @Test func completingOneConflictDoesNotLoseAnotherTransportConflict() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SyncMetadataStore(directory: root)
+        try await store.preserveConflict(local: envelope(id: "first"), server: envelope(id: "first", payload: "server"))
+        let first = try #require(try await store.load().issues.first)
+        try await store.preserveConflict(local: envelope(id: "second"), server: envelope(id: "second", payload: "server"))
+        let completed = try await store.completeConflict(first)
+        #expect(completed.issues.count == 1)
+        #expect(completed.issues.first?.resourceID == "second")
+        #expect(completed.resolvedConflictCopies?.count == 1)
+        #expect(completed.resolvedConflictCopies?.first?.originalResourceID == "first")
     }
 
     @Test func legacyMetadataWithoutNewFieldsStillDecodes() async throws {

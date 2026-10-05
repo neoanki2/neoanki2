@@ -329,3 +329,57 @@ struct OfflineFirstSyncServiceTests {
         #expect(await service.issues().isEmpty)
     }
 }
+
+private actor ConflictRecoveryAdapter: LibrarySyncAdapter {
+    let fails: Bool
+    private(set) var restored: [UUID] = []
+    init(fails: Bool = false) { self.fails = fails }
+    func encode(changes: [LibraryChange], deviceID: String) async throws -> [SyncRecordEnvelope] { [] }
+    func applyRemote(_ records: [SyncRecordEnvelope], origin: LibraryChangeOrigin) async throws {}
+    func initialMerge(remote: [SyncRecordEnvelope], deviceID: String) async throws -> [SyncRecordEnvelope] { [] }
+    func restoreConflictCopy(_ copy: SyncConflictCopy) async throws {
+        if fails { throw SQLiteLibrarySyncError.invalidPayload(copy.originalResourceID) }
+        restored.append(copy.id)
+    }
+}
+
+@Test func oldCardConflictAutomaticallyArchivesWithoutDuplicatingAnItem() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let copy = SyncConflictCopy(resourceKind: "card", originalResourceID: "card", sourceDeviceID: "local", payload: Data("preserved state".utf8))
+    let issue = SyncIssue(kind: .itemConflict, resourceID: "card", summary: "Old conflict", conflictCopy: copy)
+    let metadata = SyncMetadataStore(directory: directory)
+    try await metadata.save(SyncMetadata(issues: [issue], didCreateInitialBackup: true, didCompleteInitialMerge: true))
+    let adapter = ConflictRecoveryAdapter()
+    let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []), adapter: adapter,
+        transport: TransportStub(), metadataStore: metadata, backupURL: { directory.appendingPathComponent("backup") })
+    await service.synchronize()
+    #expect(await service.issues().isEmpty)
+    #expect(await adapter.restored.isEmpty)
+    #expect(try await metadata.load().resolvedConflictCopies == [copy])
+    if case .current = await service.status() {} else { Issue.record("Automatically resolved conflict should be Current") }
+    await service.synchronize()
+    #expect(try await metadata.load().resolvedConflictCopies == [copy])
+}
+
+@Test func failedAutomaticRecoveryRetainsOriginalConflictAndPayloadForRetry() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let copy = SyncConflictCopy(resourceKind: "item", originalResourceID: "item", sourceDeviceID: "local", payload: Data("preserved content".utf8))
+    let issue = SyncIssue(kind: .itemConflict, resourceID: "item", summary: "Old conflict", conflictCopy: copy)
+    let metadata = SyncMetadataStore(directory: directory)
+    try await metadata.save(SyncMetadata(issues: [issue], didCreateInitialBackup: true, didCompleteInitialMerge: true))
+    let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []), adapter: ConflictRecoveryAdapter(fails: true),
+        transport: TransportStub(), metadataStore: metadata, backupURL: { directory.appendingPathComponent("backup") })
+    await service.synchronize()
+    let retained = try await metadata.load()
+    #expect(retained.issues.contains(issue))
+    #expect(retained.resolvedConflictCopies?.isEmpty != false)
+    #expect(await service.issues().contains(issue))
+    // A subsequent automatic retry can finish the preserved work.
+    let recovered = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []), adapter: ConflictRecoveryAdapter(),
+        transport: TransportStub(), metadataStore: metadata, backupURL: { directory.appendingPathComponent("backup") })
+    await recovered.synchronize()
+    #expect(await recovered.issues().isEmpty)
+    #expect(try await metadata.load().resolvedConflictCopies == [copy])
+}

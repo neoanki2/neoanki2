@@ -4,6 +4,7 @@ set -euo pipefail
 PR_NUMBER=""
 INSTALL=0
 FORCE_LAUNCH=0
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TAP_REPOSITORY="neoanki2/homebrew-tap"
 APP_PATH="/Applications/NeoAnki2.app"
 APP_EXECUTABLE="$APP_PATH/Contents/MacOS/NeoAnki2"
@@ -225,15 +226,6 @@ cask "neoanki2" do
 
   app "NeoAnki2.app"
 
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/NeoAnki2.app"]
-  end
-
-  caveats <<~EOS
-    NeoAnki2 is currently ad-hoc signed and is not Apple-notarized. This cask
-    removes its quarantine attribute after installation so it can launch normally.
-  EOS
 end
 EOF
 ruby -c "$CASK_FILE" >/dev/null
@@ -355,7 +347,7 @@ if [ "$INSTALL" -eq 1 ]; then
     INSTALLED_REVISION="$(/usr/libexec/PlistBuddy \
       -c 'Print :NeoAnkiGitRevision' "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)"
     if [ "$INSTALLED_VERSION" = "$VERSION" ] && [[ "$HEAD_SHA" == "$INSTALLED_REVISION"* ]] && \
-       codesign --verify --deep --strict "$APP_PATH" >/dev/null 2>&1; then
+       python3 "$ROOT/Scripts/sign-macos-app.py" --verify "$APP_PATH" >/dev/null 2>&1; then
       INSTALLED_MATCHES=1
     fi
   fi
@@ -401,6 +393,7 @@ if [ "$INSTALL" -eq 1 ]; then
     exit 1
   fi
   codesign --verify --deep --strict "$APP_PATH"
+  python3 "$ROOT/Scripts/sign-macos-app.py" --verify "$APP_PATH"
 
   INSTALLED_PROCESS_RUNNING=0
   if pgrep -x NeoAnki2 >/dev/null 2>&1; then

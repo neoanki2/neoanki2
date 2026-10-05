@@ -87,13 +87,19 @@ if [[ ! "$SLO_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
-for command in base64 brew codesign gh git jq pgrep ps ruby shasum swift; do
+for command in base64 brew codesign gh git jq pgrep ps python3 ruby shasum swift; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "Missing required command: $command" >&2
     exit 1
   }
 done
 gh auth status >/dev/null
+PHASE="signing-preflight"
+if [ "${NEOANKI_RELEASE_SIGNED:-1}" != "1" ]; then
+  echo "Mac releases cannot disable Developer ID signing or notarization." >&2
+  exit 1
+fi
+python3 "$ROOT/Scripts/sign-macos-app.py" --check
 
 remaining_seconds() {
   echo "$((SLO_SECONDS - ($(date +%s) - STARTED_AT)))"
@@ -337,6 +343,7 @@ $TITLE
 - Source revision: \`$HEAD_SHA\`
 - Validation revision: \`$VALIDATION_SHA\` (\`$VALIDATION_KIND\`)
 - Local fast suite: passed
+- Developer ID signature, production CloudKit, and Apple notarization: verified
 - Full Test and Documentation workflows: running automatically for PR #$PR_NUMBER
 EOF
 
@@ -364,15 +371,6 @@ cask "neoanki2" do
 
   app "NeoAnki2.app"
 
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/NeoAnki2.app"]
-  end
-
-  caveats <<~EOS
-    NeoAnki2 is currently ad-hoc signed and is not Apple-notarized. This cask
-    removes its quarantine attribute after installation so it can launch normally.
-  EOS
 end
 EOF
 ruby -c "$CASK_FILE" >/dev/null
@@ -462,6 +460,7 @@ if [ "$INSTALL" -eq 1 ]; then
     exit 1
   fi
   codesign --verify --deep --strict "$APP_PATH"
+  python3 "$ROOT/Scripts/sign-macos-app.py" --verify "$APP_PATH"
 
   if [ "$SHOULD_LAUNCH" -eq 1 ]; then
     /usr/bin/open "$APP_PATH"

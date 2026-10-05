@@ -210,7 +210,7 @@ struct SyncStateMachineTests {
     }
 
     @Test(arguments: [false, true])
-    func offlineConflictSurvivesRestartAndPreservesLosingVersion(delete: Bool) async throws {
+    func offlineConflictAutomaticallyRecoversLosingVersionAcrossRestart(delete: Bool) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let cloud = TestCloud()
@@ -227,17 +227,20 @@ struct SyncStateMachineTests {
         await first.service.synchronize()
         try await second.restart(cloud: cloud, seed: 68)
         await second.service.synchronize()
-        let issues = await second.service.issues()
-        let issue = try #require(issues.first { $0.resourceID == deck.id.uuidString && $0.conflictCopy != nil })
-        #expect(issue.kind == (delete ? .deleteVersusEdit : .deckConflict))
-        #expect(issue.conflictCopy?.isRestorable == true)
+        let metadata = try await second.metadata.load()
+        let copy = try #require(metadata.resolvedConflictCopies?.first { $0.originalResourceID == deck.id.uuidString })
+        #expect(copy.acceptedWasTombstone == delete)
+        #expect(copy.isRestorable)
+        #expect(await second.service.issues().isEmpty)
         for _ in 0..<3 { await second.service.synchronize() }
-        #expect(await second.service.issues().count == 1)
+        #expect(await second.service.issues().isEmpty)
         try await second.restart(cloud: cloud, seed: 69)
         await second.service.synchronize()
-        try await second.service.restoreConflictCopy(forIssueID: issue.id)
         let recovered = try await second.repository.deckSummaries(asOf: .now)
-        #expect(recovered.contains { $0.name == "Offline edit to recover (Recovered)" })
+        #expect(recovered.filter { $0.name == "Offline edit to recover (Recovered)" }.count == 1)
+        #expect(recovered.contains { $0.id == copy.id })
+        if !delete { #expect(try await second.repository.deck(id: deck.id).name == "Server winner") }
+        #expect(try await second.metadata.load().resolvedConflictCopies?.filter { $0.id == copy.id }.count == 1)
         #expect(await second.service.issues().isEmpty)
     }
 

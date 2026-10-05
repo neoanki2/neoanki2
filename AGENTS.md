@@ -18,6 +18,9 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   treats current local changes as release input and owns committing, local
   verification, packaging, PR creation and non-blocking merge, publication,
   official-tap update, Homebrew installation, and exact-path launch.
+- Mac releases require Developer ID signing, production CloudKit provisioning,
+  and accepted Apple notarization. Never downgrade signing or remove quarantine
+  to meet the release budget. Saved signing inputs are validated before work.
 - The default release has a 300-second SLO. Do not run the full UI suite or wait
   for GitHub checks on its critical path; the merge starts exhaustive Test and
   Documentation workflows automatically.

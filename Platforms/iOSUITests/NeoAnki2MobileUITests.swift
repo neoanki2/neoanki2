@@ -1640,6 +1640,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(waitUntil(timeout: 5) { restore.count == 1 })
         open("Home", in: app)
         XCTAssertTrue(app.staticTexts["Preserved reading deck (Recovered)"].waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Synced reading deck"].exists)
         capture("68-sync-restored-deck", app)
         open("Settings", in: app)
         app.buttons["Dismiss"].firstMatch.tap()

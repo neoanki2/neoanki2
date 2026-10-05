@@ -44,7 +44,7 @@ struct MacCloudSyncSettings: View {
         case .syncing: "Syncing"
         case .current: "Current"
         case .accountUnavailable: "Account unavailable"
-        case let .needsAttention(count): "\(count) issues"
+        case let .needsAttention(count): count == 1 ? "1 issue" : "\(count) issues"
         }
     }
 

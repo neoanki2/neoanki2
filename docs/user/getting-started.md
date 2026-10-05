@@ -37,14 +37,15 @@ If you do not use Homebrew, open the [download page]({{ site.baseurl }}/download
 and choose **Download DMG**. Open the disk image, then move `NeoAnki2.app` to
 Applications. The Homebrew and direct-download options contain the same app.
 
-Release artifacts are ad-hoc signed and provenance-attested, but are not yet
-Apple-notarized. If macOS blocks the first launch, Control-click **NeoAnki2** in
-Applications, choose **Open**, then confirm **Open**. Do not disable Gatekeeper
-globally.
+New Mac releases require Developer ID signing, Apple notarization, and production
+CloudKit provisioning. Older published releases retain their original signing
+status; check the selected release notes. Homebrew and direct downloads use the
+same app, and newly generated casks preserve normal Gatekeeper checks.
 
-The public Mac release and ordinary source-built app bundles do not carry the
-private CloudKit entitlement, so the iCloud settings report **Unavailable in
-this build** and keep the library local. An iCloud container requires a separately provisioned and signed build.
+A provisioned Mac build can enable private iCloud sync in Settings. An older
+public release or an explicitly unprovisioned development bundle can still show
+**Unavailable in this build**. This means its signature lacks the container
+entitlement; installing a newly provisioned release resolves that capability.
 This does not affect manual backups, deck export, studying, or authoring.
 
 To update later, run:

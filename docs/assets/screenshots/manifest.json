@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-10-05T06:09:04Z",
+  "capturedAt" : "2026-10-05T10:14:02Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -30,9 +30,9 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 724,
+      "height" : 732,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "f74701111584cb98fc7966d06a6ae336fb3ac1d8700f18a5f484ecbbff4bc03d",
+      "sha256" : "f7f3e58c6b8722b4f6a57bd0e79320901b32c08ff2e295c2654fde575eeef91e",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "5ddedecef6dba21024ef830f7cf9d2cba7e0d2f1"
+  "sourceSHA" : "55f8e2d4ae7f1f0786a9bfb196f8ac4f86465068"
 }

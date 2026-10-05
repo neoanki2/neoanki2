@@ -127,7 +127,7 @@
       "contains": [
         "macOS 14 or newer",
         "~/Library/Application Support/neoanki2/",
-        "An iCloud container requires a separately provisioned and signed build",
+        "New Mac releases require Developer ID signing, Apple notarization, and production",
         "The Home summary is prepared while the app window opens",
         "neoanki-poem-repair",
         "The Prose Deck builder is included in the same app targets"
