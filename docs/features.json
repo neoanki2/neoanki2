@@ -105,7 +105,7 @@
       "id": "app-icon-badge",
       "name": "Show library-wide due counts on Mac and mobile app icons",
       "article": "user/sync-reminders-widgets.md",
-      "sources": ["Sources/NeoAnkiApplication/AppIconBadge.swift", "Sources/NeoAnki2/AppDelegate.swift", "Sources/NeoAnki2/DecksModel.swift", "Platforms/iOS/IOSPlatformServices.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
+      "sources": ["Sources/NeoAnkiApplication/AppIconBadge.swift", "Sources/NeoAnki2/AppDelegate.swift", "Sources/NeoAnki2/MacAppIconBadgeAuthorization.swift", "Sources/NeoAnki2/DecksModel.swift", "Platforms/iOS/IOSPlatformServices.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
       "tests": ["Tests/NeoAnki2Tests/DockBadgeTests.swift", "Tests/NeoAnkiApplicationTests/AppIconBadgeTests.swift", "Tests/NeoAnkiFeaturesTests/AppIconBadgeFeatureTests.swift"]
     },
     {

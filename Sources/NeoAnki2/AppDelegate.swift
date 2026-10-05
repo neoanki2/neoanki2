@@ -1,5 +1,6 @@
 import AppKit
 import NeoAnkiApplication
+import OSLog
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -40,6 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Returning from notification settings must restore an unchanged count.
+        Self.dockBadge.reapply()
+    }
+
     @objc private func windowGeometryDidChange(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         constrainToVisibleScreen(window)
@@ -66,9 +72,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private static let dockBadge = DockBadgeController { label in
-        NSApp?.dockTile.badgeLabel = label
-    }
+    private static let badgeLogger = Logger(subsystem: "com.neoanki2.app", category: "AppIconBadge")
+    private static let dockBadge = DockBadgeController(
+        apply: { label in
+            guard let app = NSApp else { return }
+            app.dockTile.badgeLabel = label
+            badgeLogger.info("Dock badge applied: \(app.dockTile.badgeLabel ?? "none", privacy: .public)")
+        },
+        authorize: MacAppIconBadgeAuthorization.request
+    )
 
     static func updateDockBadge(dueCount: Int) {
         dockBadge.update(dueCount: dueCount)
@@ -88,9 +100,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class DockBadgeController {
     private var badge = AppIconBadge(dueCount: 0)
     private let apply: (String?) -> Void
+    private let authorize: (@MainActor () async throws -> Bool)?
+    private var isAuthorized = false
+    private(set) var authorizationTask: Task<Void, Never>?
 
-    init(apply: @escaping (String?) -> Void) {
+    init(
+        apply: @escaping (String?) -> Void,
+        authorize: (@MainActor () async throws -> Bool)? = nil
+    ) {
         self.apply = apply
+        self.authorize = authorize
     }
 
     func update(dueCount: Int) {
@@ -100,6 +119,22 @@ final class DockBadgeController {
 
     func reapply() {
         apply(badge.label)
+        guard badge.count > 0, !isAuthorized, authorizationTask == nil,
+              let authorize else { return }
+        authorizationTask = Task {
+            defer { authorizationTask = nil }
+            do {
+                isAuthorized = try await authorize()
+                if isAuthorized {
+                    // Permission can finish after studying or another refresh.
+                    // Always use the latest count rather than the requested one.
+                    apply(badge.label)
+                }
+            } catch {
+                // Retry on the next activation or count update, preserving the
+                // library count while notification services are unavailable.
+            }
+        }
     }
 }
 

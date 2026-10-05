@@ -179,9 +179,11 @@ currently available to study across the whole library. Selecting one deck does
 not narrow this count. Suspended cards and new cards deferred by daily limits
 are excluded. The badge clears when no cards are due.
 
-On iPhone and iPad, NeoAnki2 requests badge permission when cards are first due.
+On Mac, iPhone, and iPad, NeoAnki2 requests badge permission when cards are first due.
 Badges work with daily reminders and iCloud sync turned off. If badges are
-disabled, allow **Badges** for NeoAnki2 in system notification settings.
+disabled, allow **Badge application icon** on Mac or **Badges** on iPhone/iPad
+for NeoAnki2 in system notification settings. Returning to the Mac app reapplies
+the count even if it has not changed.
 
 Counts refresh as you use the app and when you reopen it. iOS background refresh
 can update the badge when the system grants execution time; it does not provide

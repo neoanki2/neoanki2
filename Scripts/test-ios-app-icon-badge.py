@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the production iOS badge adapter headlessly with notification stand-ins."""
+"""Run production badge adapters headlessly with notification stand-ins."""
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,8 +9,12 @@ ROOT = Path(__file__).resolve().parent.parent
 STAND_INS = r"""
 import Foundation
 
-enum UNAuthorizationStatus: Sendable { case notDetermined, authorized, denied }
-struct UNNotificationSettings: Sendable { let authorizationStatus: UNAuthorizationStatus }
+enum UNAuthorizationStatus: Int, Sendable { case notDetermined, authorized, denied }
+enum UNNotificationSetting: Int, Sendable { case disabled, enabled }
+struct UNNotificationSettings: Sendable {
+    let authorizationStatus: UNAuthorizationStatus
+    var badgeSetting: UNNotificationSetting { .enabled }
+}
 struct UNAuthorizationOptions: OptionSet, Sendable {
     let rawValue: Int
     static let badge = Self(rawValue: 1)
@@ -60,6 +64,31 @@ HARNESS = r"""
         let center = UNUserNotificationCenter.current()
         let publisher = IOSAppIconBadgePublisher()
         switch CommandLine.arguments[1] {
+        case "mac-permission":
+            // Badge permission is missing even when alerts are authorized.
+            await center.configure(status: .authorized)
+            let allowed = try await MacAppIconBadgeAuthorization.request()
+            let requests = await center.requests
+            precondition(allowed && requests == [.badge])
+        case "mac-denied":
+            await center.configure(status: .denied)
+            let allowed = try await MacAppIconBadgeAuthorization.request()
+            let requests = await center.requests
+            precondition(!allowed && requests.isEmpty)
+            await center.configure(status: .notDetermined)
+            let recovered = try await MacAppIconBadgeAuthorization.request()
+            let retried = await center.requests
+            precondition(recovered && retried == [.badge])
+        case "mac-retry":
+            await center.configure(status: .notDetermined, failAuthorization: true)
+            do {
+                _ = try await MacAppIconBadgeAuthorization.request()
+                fatalError("Expected authorization failure")
+            } catch TestError.unavailable {}
+            await center.configure(status: .notDetermined)
+            let recovered = try await MacAppIconBadgeAuthorization.request()
+            let requests = await center.requests
+            precondition(recovered && requests == [.badge, .badge])
         case "counts":
             // Existing alert/sound authorization must still request badges.
             await center.configure(status: .authorized)
@@ -133,8 +162,10 @@ class AppIconBadgeRegressionTests(unittest.TestCase):
         start = source.index("actor IOSAppIconBadgePublisher:")
         end = source.index("actor AppGroupWidgetPublisher:", start)
         policy = (ROOT / "Sources/NeoAnkiApplication/AppIconBadge.swift").read_text()
+        mac = (ROOT / "Sources/NeoAnki2/MacAppIconBadgeAuthorization.swift").read_text()
+        mac = mac.replace("import UserNotifications", "")
         swift = folder / "Regression.swift"
-        swift.write_text(STAND_INS + policy + source[start:end] + HARNESS)
+        swift.write_text(STAND_INS + policy + mac + source[start:end] + HARNESS)
         cls.binary = folder / "Regression"
         sdk = subprocess.check_output(
             ["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True,
@@ -164,6 +195,15 @@ class AppIconBadgeRegressionTests(unittest.TestCase):
 
     def test_overlapping_refreshes_cannot_restore_stale_count(self):
         self.run_scenario("ordering")
+
+    def test_mac_requests_badges_even_when_alerts_are_authorized(self):
+        self.run_scenario("mac-permission")
+
+    def test_mac_denial_and_settings_recovery(self):
+        self.run_scenario("mac-denied")
+
+    def test_mac_authorization_errors_can_retry(self):
+        self.run_scenario("mac-retry")
 
 
 if __name__ == "__main__":

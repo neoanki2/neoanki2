@@ -31,6 +31,72 @@ import Testing
     #expect(Array(labels.suffix(3)) == [nil, "3", nil])
 }
 
+@Test @MainActor func dockBadgeRequestsPermissionOnlyForDueCardsAndReappliesAfterGrant() async {
+    var labels: [String?] = []
+    var requests = 0
+    let badge = DockBadgeController(apply: { labels.append($0) }, authorize: {
+        requests += 1
+        return true
+    })
+    badge.reapply()
+    badge.update(dueCount: 0)
+    #expect(badge.authorizationTask == nil)
+    #expect(requests == 0)
+
+    badge.update(dueCount: 7)
+    await badge.authorizationTask?.value
+    #expect(requests == 1)
+    #expect(Array(labels.suffix(2)) == ["7", "7"])
+    badge.reapply()
+    badge.update(dueCount: 3)
+    #expect(requests == 1)
+    #expect(labels.last == .some("3"))
+}
+
+@Test @MainActor func dockBadgePermissionCompletionUsesLatestCount() async {
+    var labels: [String?] = []
+    var grant: CheckedContinuation<Bool, Never>?
+    let badge = DockBadgeController(apply: { labels.append($0) }, authorize: {
+        await withCheckedContinuation { grant = $0 }
+    })
+    badge.update(dueCount: 7)
+    let pending = badge.authorizationTask
+    // Resume only after the production authorization task reaches its await.
+    while grant == nil { await Task.yield() }
+    badge.update(dueCount: 3)
+    badge.update(dueCount: 0)
+    grant?.resume(returning: true)
+    await pending?.value
+    #expect(labels == ["7", "3", nil, nil])
+}
+
+@Test @MainActor func dockBadgeRetriesDeniedOrFailedPermissionOnActivationWithoutCountChange() async {
+    enum Failure: Error { case unavailable }
+    var requests = 0
+    var labels: [String?] = []
+    let badge = DockBadgeController(apply: { labels.append($0) }, authorize: {
+        requests += 1
+        switch requests {
+        case 1: return false
+        case 2: throw Failure.unavailable
+        default: return true
+        }
+    })
+    badge.update(dueCount: 7)
+    await badge.authorizationTask?.value
+    #expect(requests == 1)
+    // The count remains seven while the user visits notification settings.
+    badge.reapply()
+    await badge.authorizationTask?.value
+    #expect(requests == 2)
+    badge.reapply()
+    await badge.authorizationTask?.value
+    #expect(requests == 3)
+    #expect(labels.last == .some("7"))
+    badge.reapply()
+    #expect(requests == 3)
+}
+
 @Test @MainActor func dockBadgePublishesColdSnapshotAndRefreshWithoutAView() async throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki-dock-badge-\(UUID().uuidString)")
