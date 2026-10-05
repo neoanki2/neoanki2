@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-10-02T10:47:37Z",
+  "capturedAt" : "2026-10-05T06:09:04Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 732,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "68a2c5daa21b0163b924818aa48aeefb14089cede35b77e59996dfb066a5434c",
+      "sha256" : "b73e2ae58adb1303d0374cc454fccb10ddb8a493b86a9fdc5d904beb0ca99c8f",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "3025f517649da0913b2b6a469f771b4d5a357481"
+  "sourceSHA" : "5ddedecef6dba21024ef830f7cf9d2cba7e0d2f1"
 }

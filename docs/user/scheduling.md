@@ -30,6 +30,11 @@ Upgrading legacy template definitions to study compositions changes presentation
 only. Card identities, memory state, due dates, and append-only review outcomes
 remain attached to the same cards.
 
+A newly added poem opening card starts New and uses the same daily allowance
+as the other cards in its deck. Putting it first changes introduction order
+among New cards; it does not reschedule cards you have already learned or
+rewrite their review history.
+
 ## Limit new cards per day
 
 To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,

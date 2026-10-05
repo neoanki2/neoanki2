@@ -67,6 +67,15 @@ Turning off **Sync this device** on iOS or **Sync this Mac** on macOS stops that
 device's sync and leaves its local library intact. It does not erase the private
 CloudKit library or change other devices.
 
+After enabling sync or receiving library changes, Home refreshes its deck and
+due-card counts. Edits made while a sync batch is uploading remain pending for
+a later batch, so you can keep authoring offline. Interrupted transfers retain
+their pending work and resume when the service becomes available.
+
+Background refresh updates reminder and widget information when iOS grants
+execution time. If iOS expires that work, it stops safely and can continue on a
+later refresh; opening the app remains the way to request a current summary.
+
 ## What syncs
 
 Private CloudKit sync includes decks, item types and their persisted templates

@@ -232,3 +232,14 @@ the result before studying.
 Delete is available only when no items use the selected editable type. The
 confirmation removes the type and all of its Card setups. Included read-only
 types must first be unlocked or duplicated according to the outcome you want.
+
+## Save a mobile Studio draft
+
+On iPhone and iPad, Studio keeps field reordering and Card setup changes in one
+draft. Open a field to move it, return to the setup, and choose **Save** only
+when the complete definition is ready. **Cancel** discards the draft.
+
+The shared editor offers Layout, Answer method, Availability, and Learning
+route screens. A Media Aside layout requires a Media component; select a
+compatible layout before saving if the setup contains only text. Scroll a
+control fully into view before activating it, especially with large text.
