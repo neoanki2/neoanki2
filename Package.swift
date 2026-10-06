@@ -92,6 +92,7 @@ let package = Package(
             name: "NeoAnkiSharedUI",
             dependencies: [
                 "NeoAnkiApplication",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
             path: "Sources/NeoAnkiSharedUI"

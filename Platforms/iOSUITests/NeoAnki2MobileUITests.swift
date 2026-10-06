@@ -61,6 +61,18 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         }
     }
 
+    func focusAuthoringField(_ field: XCUIElement, in app: XCUIApplication) {
+        // The dictionary section can place the next field beneath the keyboard
+        // accessory. Dismiss it before scrolling to the field's real hit target.
+        if app.keyboards.firstMatch.exists {
+            let done = app.buttons["add-card-keyboard-done"]
+            XCTAssertTrue(done.waitUntilExists(timeout: 5))
+            done.tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitUntilGone(timeout: 5))
+        }
+        scrollToAndTap(field, in: app)
+    }
+
     func openItemTypeStudioCatalog(in app: XCUIApplication) {
         open("Create", in: app)
         let destination = app.buttons["Item Types & Card Setups"]
@@ -518,7 +530,7 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap()
         front.typeText("Capital of France?")
-        back.tap()
+        focusAuthoringField(back, in: app)
         back.typeText("Paris")
         let save = app.buttons["add-card-save"]
         XCTAssertTrue(save.isEnabled)
@@ -1053,7 +1065,7 @@ final class MobileAppStoreScreenshotUITests: NeoAnki2MobileUITestCase {
             front.tap()
             front.typeText(frontText)
             let back = app.textFields["add-card-field-back"]
-            back.tap()
+            focusAuthoringField(back, in: app)
             back.typeText(backText)
             if frontText == "What is active recall?" { capture("04-authoring") }
             app.buttons["add-card-save"].tap()
@@ -1123,7 +1135,7 @@ final class MobileProductionReviewJourneyUITests: NeoAnki2MobileUITestCase {
         let back = app.textFields["add-card-field-back"]
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap(); front.typeText("Production review question")
-        back.tap(); back.typeText("Production review answer")
+        focusAuthoringField(back, in: app); back.typeText("Production review answer")
         let save = app.buttons["add-card-save"]
         XCTAssertTrue(save.isEnabled)
         capture("03-first-item-authoring", in: app)
@@ -1241,7 +1253,7 @@ final class MobileVisualRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap(); front.typeText("What makes a mobile study app feel well designed?")
         let backField = app.textFields["add-card-field-back"]
-        backField.tap(); backField.typeText("Readable content, clear hierarchy, generous touch targets, and predictable navigation.")
+        focusAuthoringField(backField, in: app); backField.typeText("Readable content, clear hierarchy, generous touch targets, and predictable navigation.")
         capture("17-authoring-keyboard", app)
         app.buttons["add-card-save"].tap()
         open("Library", in: app); capture("18-library-populated", app)
@@ -1370,7 +1382,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
             let front = app.textFields["add-card-field-front"]
             XCTAssertTrue(front.waitUntilExists(timeout: 5)); front.tap(); front.typeText(prompt)
             let answer = app.textFields["add-card-field-back"]
-            answer.tap(); answer.typeText("Private practice answer")
+            focusAuthoringField(answer, in: app); answer.typeText("Private practice answer")
             app.buttons["add-card-save"].tap()
         }
         open("Library", in: app)
@@ -1588,8 +1600,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         pickerCancel.tap()
         XCTAssertTrue(app.navigationBars["Edit Item"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.alerts["Could Not Save Item"].exists)
-        scrollTo(app.textFields["Audio description (required)"], in: app)
-        XCTAssertTrue(app.textFields["Audio description (required)"].isHittable)
+        scrollTo(app.textFields["Audio description (optional)"], in: app)
+        XCTAssertTrue(app.textFields["Audio description (optional)"].isHittable)
         capture("61-audio-video-authoring", app)
         app.buttons["Save"].tap()
         XCTAssertTrue(app.navigationBars["All Field Types"].waitUntilExists(timeout: 10))
@@ -1637,6 +1649,84 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.terminate(); app.launchArguments.removeAll { $0 == "-NeoAnkiUITestingReset" }; app.launch()
         open("Create", in: app); app.buttons["Vocabulary Packs"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Acceptance Lexicon")).firstMatch.waitUntilExists(timeout: 10))
+    }
+
+    func testGenericDictionaryLookupInNewItemSavesToChosenDeck() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+        open("Create", in: app)
+        app.buttons["New Item"].tap()
+        app.buttons["add-card-type"].tap(); app.buttons["Basic"].tap()
+        app.buttons["add-card-deck"].tap(); app.buttons["Words"].tap()
+        scrollToAndTap(app.buttons["Dictionary"].firstMatch, in: app)
+        app.buttons["itemDictionarySource"].tap(); app.buttons["Front"].tap()
+        app.buttons["itemDictionaryDestination"].tap(); app.buttons["Back"].tap()
+        let front = app.textFields["add-card-field-front"]
+        scrollToAndTap(front, in: app); front.typeText("swift")
+        app.buttons["add-card-keyboard-done"].tap()
+        let back = app.textFields["add-card-field-back"]
+        XCTAssertTrue(waitUntil(timeout: 10) { (back.value as? String)?.contains("ˈswɪft") == true })
+        XCTAssertTrue((back.value as? String)?.contains("Moving quickly and smoothly.") == true)
+        app.buttons["add-card-save"].tap()
+        XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
+        open("Home", in: app)
+        scrollToAndTap(app.staticTexts["Words"], in: app)
+        app.buttons["Browse Items"].tap()
+        let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "swift")).firstMatch
+        XCTAssertTrue(item.waitUntilExists(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        scrollToAndTap(app.buttons["Start Studying"], in: app)
+        XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 10))
+        app.buttons["Show Answer"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "ˈswɪft")).firstMatch.waitUntilExists(timeout: 5))
+        app.buttons["endStudySession"].tap()
+    }
+
+    func testPhotoCanBeSelectedBeforeNameAndDescription() throws {
+        // Initialize the disposable Simulator's system library before opening its extension.
+        let photos = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow")
+        photos.launch()
+        for label in ["Continue", "Get Started"] {
+            let button = photos.buttons[label]
+            if button.exists && button.isHittable { button.tap() }
+        }
+        photos.terminate()
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+        open("Create", in: app)
+        app.buttons["New Item"].tap()
+        app.buttons["add-card-type"].tap(); app.buttons["Photo Names"].tap()
+        app.buttons["add-card-deck"].tap(); app.buttons["Words"].tap()
+        scrollToAndTap(app.buttons["Photos"], in: app)
+        let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
+        XCTAssertTrue(photo.waitUntilExists(timeout: 30), "The disposable Simulator must have a photo added with simctl addmedia")
+        // Photos exposes a thumbnail frame but no XCTest hit point on this runtime.
+        photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["Media ready"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["add-card-preview-photo"].exists)
+        let name = app.textFields["add-card-field-name"]
+        scrollToAndTap(name, in: app); name.typeText("Oak")
+        app.buttons["add-card-keyboard-done"].tap()
+        XCTAssertFalse(app.buttons["add-card-save"].isEnabled, "An optional attached photo still needs a description")
+        let description = app.textFields["add-card-description-photo"]
+        scrollToAndTap(description, in: app); description.typeText("A tree with lobed leaves")
+        XCTAssertTrue(app.buttons["add-card-save"].isEnabled)
+        description.typeText(" updated")
+        app.buttons["add-card-keyboard-done"].tap()
+        app.buttons["add-card-save"].tap()
+        XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
+        open("Library", in: app)
+        let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A tree with lobed leaves updated")).firstMatch
+        XCTAssertTrue(item.waitUntilExists(timeout: 5)); item.tap()
+        app.buttons["Edit"].tap()
+        XCTAssertEqual(app.textFields["edit-card-description-photo"].value as? String, "A tree with lobed leaves updated")
+        app.buttons["Cancel"].tap()
+        open("Home", in: app)
+        app.buttons["Start Studying"].tap()
+        XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 10))
+        app.buttons["Show Answer"].tap()
+        XCTAssertTrue(app.staticTexts["Oak"].waitUntilExists(timeout: 5))
+        app.buttons["endStudySession"].tap()
     }
 
     func testTransferPreviewImportAndConcealment() throws {

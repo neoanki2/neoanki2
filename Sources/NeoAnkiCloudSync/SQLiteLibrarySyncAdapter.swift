@@ -373,7 +373,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                         sequence: log.sequence,
                         schedulingAudit: log.schedulingAudit
                     ),
-                    memoryBefore: review.memoryBefore
+                    memoryBefore: review.memoryBefore,
+                    introductionContext: review.introductionContext.map {
+                        .init(deckID: $0.deckID.map { mapped($0, kind: .deck) }, studyDay: $0.studyDay)
+                    }
                 )
                 transformed = .review(value); transformedID = value.log.id.uuidString
             case let .reviewRevert(revert):

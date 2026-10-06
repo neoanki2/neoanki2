@@ -75,11 +75,12 @@ python3 "$NORMALIZER" --input "$ARCHIVE" --output "$SUM_JSONL" --dictionary sum1
 swift run --package-path "$REPO_ROOT" neoanki-vocab compile \
   --input "$SUM_JSONL" \
   --output "$SUM_PACK_STAGING" \
-  --id stardict.sum11.uk.v3 \
-  --title "SUM-11 — Ukrainian definitions (v3)" \
+  --id stardict.sum11.uk.v4 \
+  --title "SUM-11 — Ukrainian definitions (v4)" \
   --summary "Locked local SUM-11 short definitions and stressed headwords" \
   --language uk \
   --capability lexicon \
+  --capability pronunciation \
   --source-id stardict-sum11 \
   --source-name "SUM-11 from locked StarDict Ukrainian bundle" \
   --license "Mixed upstream dictionary terms; personal local use only" \

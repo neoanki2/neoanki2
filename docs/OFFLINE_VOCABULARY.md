@@ -133,6 +133,19 @@ and configured limits before lookup.
 
 ## Application workflow
 
+The ordinary Add Item editor on Mac and iOS also supports generic field lookup:
+choose a pack and separate source/destination Text or Rich Text fields, then
+type in the source. A unique exact match fills editable dictionary text after
+a 300 ms debounce; other matches require selection. Forms, textual pronunciation
+representations, and definitions retain their source Unicode spelling. Manual
+destination edits are protected. The item is saved using its existing schema,
+templates, and selected deck.
+
+The SUM-11 normalizer emits stressed headwords as both lexical forms and textual
+pronunciation representations. Recompile and reimport older SUM-11 packs to
+expose these representations to pronunciation-card builders as well as field
+lookup. The offline-stack script identifies the updated pack as version 4.
+
 1. Choose **File → Import Vocabulary Pack…** and select the `.neovocab`
    directory. NeoAnki copies the validated package into its managed library
    directory; it does not keep a bookmark or live link to the source.

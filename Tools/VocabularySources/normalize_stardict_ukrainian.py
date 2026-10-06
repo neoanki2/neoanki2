@@ -225,7 +225,7 @@ def normalize_sum_entry(
         "language": "uk",
         "canonicalForm": canonical,
         "forms": forms,
-        "pronunciations": [],
+        "pronunciations": [text_pronunciation(form["text"]["value"], source) for form in forms],
         "senses": [
             {
                 "id": stable_id("sense", {"word": word, "record": record_id}),

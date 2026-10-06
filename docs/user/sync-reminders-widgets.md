@@ -82,6 +82,11 @@ later refresh; opening the app remains the way to request a current summary.
 Private CloudKit sync includes decks, item types and their persisted templates
 (shown as Card setups), items, card
 state, immutable review and revert history, and shared content-addressed media.
+First reviews also carry their original deck and study day, so introducing new
+cards on one device consumes the same daily allowance on your other devices.
+An upgrade restores missing allowance entries from older synced reviews using
+the current deck and study-day settings when the original context is unavailable;
+entries already recorded on the device are preserved.
 Immutable history is unioned deterministically. Concurrent edits to mutable
 resources accept one version while preserving the other as a conflict copy
 when it can be restored.
@@ -179,9 +184,11 @@ currently available to study across the whole library. Selecting one deck does
 not narrow this count. Suspended cards and new cards deferred by daily limits
 are excluded. The badge clears when no cards are due.
 
-On iPhone and iPad, NeoAnki2 requests badge permission when cards are first due.
+On Mac, iPhone, and iPad, NeoAnki2 requests badge permission when cards are first due.
 Badges work with daily reminders and iCloud sync turned off. If badges are
-disabled, allow **Badges** for NeoAnki2 in system notification settings.
+disabled, allow **Badge application icon** on Mac or **Badges** on iPhone/iPad
+for NeoAnki2 in system notification settings. Returning to the Mac app reapplies
+the count even if it has not changed.
 
 Counts refresh as you use the app and when you reopen it. iOS background refresh
 can update the badge when the system grants execution time; it does not provide

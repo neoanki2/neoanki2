@@ -1,5 +1,7 @@
 #if os(iOS)
 import Foundation
+import NeoAnkiApplication
+import NeoAnkiCore
 import NeoAnkiVocabularyKit
 import Observation
 import VocabularyDeckBuilder
@@ -30,16 +32,27 @@ final class MobileVocabularyLibraryModel {
         }
     }
 
-    func seedVisualFixtureIfRequested() async throws {
+    func seedVisualFixtureIfRequested(library: (any LibraryRepository)? = nil) async throws {
         let process = ProcessInfo.processInfo
         guard process.arguments.contains("-NeoAnkiUITestingReset"),
-              process.environment["NEOANKI_TEST_SCENARIO"] == "mobile-vocabulary" else { return }
+              ["mobile-vocabulary", "mobile-item-lookup"].contains(process.environment["NEOANKI_TEST_SCENARIO"] ?? "") else { return }
         let workspace = FileManager.default.temporaryDirectory.appendingPathComponent("vocabulary-visual-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
         let entries = workspace.appendingPathComponent("entries.jsonl")
-        let entry = LexicalEntry(id: "en:swift", language: "en", canonicalForm: .init(text: .init("swift", language: "en")),
+        var entry = LexicalEntry(id: "en:swift", language: "en", canonicalForm: .init(text: .init("swift", language: "en")),
             senses: [.init(id: "quick", definitions: [.init(text: .init("Moving quickly and smoothly.", language: "en"))])])
+        if process.environment["NEOANKI_TEST_SCENARIO"] == "mobile-item-lookup", let library {
+            entry.pronunciations = [.init(scheme: "ipa", representations: [.text(.init("ˈswɪft"))])]
+            let photo = FieldDef(name: "Photo", type: .image, isRequired: false)
+            let name = FieldDef(name: "Name", type: .text, isRequired: true)
+            _ = try await library.createItemType(ItemType(name: "Photo Names", fields: [photo, name], templates: [
+                Template(name: "Name it", prompt: Side(slots: [Slot(source: .field(photo.id))]),
+                         answer: Side(slots: [Slot(source: .field(name.id))]), interaction: .reveal,
+                         skill: Skill(input: .image, output: .text, operation: .recognize))
+            ]))
+            _ = try await library.createDeck(Deck(name: "Words"))
+        }
         try (JSONEncoder().encode(entry) + Data([0x0A])).write(to: entries)
         let package = workspace.appendingPathComponent("Acceptance.neovocab", isDirectory: true)
         _ = try VocabularyPackCompiler.compile(jsonlURL: entries, to: package,

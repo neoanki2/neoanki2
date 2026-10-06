@@ -126,6 +126,12 @@ and author as its caption. The answer stays hidden until reveal. Opening cards
 follow the same learned-before-new queue policy; continuation cards retain
 their existing prompts and learned schedules after a whole-poem edit.
 
+The daily new-card allowance also includes first reviews received through
+iCloud sync. After synchronization, **All Decks** uses the same remaining
+allowance on Mac, iPhone, and iPad; a deferred new card stays out of the ready
+queue even if its due date has arrived. Undoing that first review releases
+its allowance. See [Daily limits](../library-and-decks/#set-a-daily-new-card-limit).
+
 ## Card interactions
 
 Every ordinary review interaction ends with self-grading. Automatic feedback is

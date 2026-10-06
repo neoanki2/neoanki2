@@ -78,7 +78,7 @@
       "name": "Browse, author, organize, and transfer on iOS",
       "article": "user/iphone-ipad.md",
       "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/MediaAuthoringFeatureTests.swift"]
     },
     {
       "id": "mobile-study",
@@ -105,7 +105,7 @@
       "id": "app-icon-badge",
       "name": "Show library-wide due counts on Mac and mobile app icons",
       "article": "user/sync-reminders-widgets.md",
-      "sources": ["Sources/NeoAnkiApplication/AppIconBadge.swift", "Sources/NeoAnki2/AppDelegate.swift", "Sources/NeoAnki2/DecksModel.swift", "Platforms/iOS/IOSPlatformServices.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
+      "sources": ["Sources/NeoAnkiApplication/AppIconBadge.swift", "Sources/NeoAnki2/AppDelegate.swift", "Sources/NeoAnki2/MacAppIconBadgeAuthorization.swift", "Sources/NeoAnki2/DecksModel.swift", "Platforms/iOS/IOSPlatformServices.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
       "tests": ["Tests/NeoAnki2Tests/DockBadgeTests.swift", "Tests/NeoAnkiApplicationTests/AppIconBadgeTests.swift", "Tests/NeoAnkiFeaturesTests/AppIconBadgeFeatureTests.swift"]
     },
     {
@@ -168,6 +168,13 @@
       "sources": ["Sources/NeoAnki2/ItemReadingPreview.swift"],
       "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemsModelDetailTests.swift", "NeoAnkiCore/Tests/NeoAnkiFlowTests/RevertReviewFlowTests.swift"],
       "screenshot": "assets/screenshots/item-detail.png"
+    },
+    {
+      "id": "item-dictionary-lookup",
+      "name": "Fill arbitrary item fields from a local dictionary",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnkiSharedUI/DictionaryFieldLookupSection.swift", "Sources/NeoAnkiVocabularyKit/DictionaryLookupModel.swift"],
+      "tests": ["Tests/NeoAnkiVocabularyKitTests/DictionaryLookupTests.swift", "Tests/NeoAnki2Tests/DictionaryAuthoringFlowTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
     },
     {
       "id": "content-text-rich",

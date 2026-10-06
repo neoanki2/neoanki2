@@ -9,6 +9,11 @@ import UniformTypeIdentifiers
 
 #if os(iOS)
 import UIKit
+
+private func mediaDescriptionPrompt(_ type: FieldType) -> String {
+    if type == .audio { return "Audio description (optional)" }
+    return [.image, .gif].contains(type) ? "Visual description (required)" : "Visual description (optional)"
+}
 // Mobile direction: calm native lists, prompt-led browsing, deliberate selection,
 // focused authoring, and a single blue forward action. Native toolbar sizing is
 // retained; reading content stays within a comfortable iPad measure.
@@ -212,6 +217,7 @@ struct LibraryView: View {
 
 struct AddItemView: View {
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: UUID?
     @Bindable var model: MobileAppModel
     @State private var confirmsDiscard = false
     @State private var selectedTypeID: UUID?
@@ -258,15 +264,32 @@ struct AddItemView: View {
                                 Text(type.name).tag(Optional(type.id))
                             }
                         }
+                        .accessibilityIdentifier("add-card-type")
                         Picker("Deck", selection: $selectedDeckID) {
                             Text("Unassigned").tag(Optional<UUID>.none)
                             ForEach(model.decks) { deck in
                                 Text(deck.name).tag(Optional(deck.id))
                             }
                         }
+                        .accessibilityIdentifier("add-card-deck")
                     }
 
                     if let selectedType {
+                        DictionaryFieldLookupSection(fields: selectedType.fields) { id in
+                            Binding(
+                                get: {
+                                    if selectedType.fields.first(where: { $0.id == id })?.type == .richText {
+                                        return (richValues[id] ?? []).map(\.text).joined()
+                                    }
+                                    return values[id] ?? ""
+                                },
+                                set: { value in
+                                    if selectedType.fields.first(where: { $0.id == id })?.type == .richText {
+                                        richValues[id] = value.isEmpty ? [] : [Span(value)]
+                                    } else { values[id] = value }
+                                }
+                            )
+                        }.id(selectedType.id)
                         Section("Content") {
                             ForEach(selectedType.fields) { field in
                                 MobileItemFieldRow(field: field) {
@@ -283,7 +306,16 @@ struct AddItemView: View {
             }
             .navigationTitle("New Item")
             .navigationBarTitleDisplayMode(.inline)
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focusedField = nil
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                        .accessibilityIdentifier("add-card-keyboard-done")
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { if hasChanges { confirmsDiscard = true } else { dismiss() } }
                 }
@@ -334,6 +366,7 @@ struct AddItemView: View {
         case .number:
             TextField("Enter \(field.name.lowercased())", text: valueBinding(for: field.id))
                 .keyboardType(.decimalPad)
+                .focused($focusedField, equals: field.id)
         case .richText:
             RichSpanTextEditor(spans: Binding(
                 get: { richValues[field.id] ?? [] },
@@ -342,16 +375,26 @@ struct AddItemView: View {
             .modifier(MobileTextEditorHeight())
         case .audio, .image, .gif, .video:
             VStack(alignment: .leading, spacing: 8) {
-                TextField(field.type == .audio ? "Audio description (required)" : "Visual description (required)", text: Binding(
+                TextField(mediaDescriptionPrompt(field.type), text: Binding(
                     get: { mediaDescriptions[field.id] ?? "" },
-                    set: { mediaDescriptions[field.id] = $0 }
+                    set: { description in
+                        mediaDescriptions[field.id] = description
+                        if var reference = mediaValues[field.id] {
+                            reference.altText = description
+                            mediaValues[field.id] = reference
+                        }
+                    }
                 ), axis: .vertical)
+                .accessibilityIdentifier("add-card-description-\(field.name.lowercased())")
+                .focused($focusedField, equals: field.id)
                 if field.type != .audio {
-                    PhotosPicker(selection: $selectedPhoto, matching: field.type == .image || field.type == .gif ? .images : .videos) {
+                    PhotosPicker(selection: Binding(
+                        get: { selectedPhoto },
+                        set: { selectedMediaField = field; selectedPhoto = $0 }
+                    ), matching: field.type == .image || field.type == .gif ? .images : .videos) {
                         Label(mediaValues[field.id] == nil ? "Photos" : "Replace from Photos", systemImage: "photo.on.rectangle")
                             .frame(minHeight: 44)
                     }
-                    .simultaneousGesture(TapGesture().onEnded { selectedMediaField = field })
                 }
                 MobileAdaptiveActionGroup {
                     Button {
@@ -367,6 +410,11 @@ struct AddItemView: View {
                     }
                 }
                 if mediaValues[field.id] != nil {
+                    if [.image, .gif].contains(field.type), let reference = mediaValues[field.id] {
+                        MobileContentValueView(value: .media(reference), mediaStore: model.mediaStore, isAnswerRevealed: true)
+                            .frame(maxHeight: 160)
+                            .accessibilityIdentifier("add-card-preview-\(field.name.lowercased())")
+                    }
                     Label("Media ready", systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -382,6 +430,7 @@ struct AddItemView: View {
         case .text:
             TextField("Enter \(field.name.lowercased())", text: valueBinding(for: field.id), axis: .vertical)
                 .accessibilityIdentifier("add-card-field-\(field.name.lowercased())")
+                .focused($focusedField, equals: field.id)
                 .lineLimit(2...6)
         }
     }
@@ -392,20 +441,22 @@ struct AddItemView: View {
             let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
             if formatter.number(from: value) == nil { return "Enter a valid number." }
         }
+        if [.image, .gif].contains(field.type), mediaValues[field.id] != nil,
+           (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Add a visual description before saving."
+        }
         return nil
     }
 
     private var canSave: Bool {
         guard let selectedType else { return false }
-        return selectedType.fields.allSatisfy { field in
-            if validationIssue(field) != nil { return false }
-            if !field.isRequired { return true }
-            switch field.type {
-            case .richText: return !(richValues[field.id] ?? []).map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            case .audio, .image, .gif, .video: return mediaValues[field.id] != nil && !(mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            default: return !(values[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            }
-        }
+        var text = values
+        for (id, spans) in richValues { text[id] = spans.map(\.text).joined() }
+        return selectedType.fields.allSatisfy { validationIssue($0) == nil }
+            && ItemDraftValidation.canSave(
+                ItemDraftContent(text: text, media: mediaValues, mediaDescriptions: mediaDescriptions, clozeBlanks: clozeBlanks),
+                itemType: selectedType
+            )
     }
 
     private var errorBinding: Binding<Bool> {
@@ -429,7 +480,11 @@ struct AddItemView: View {
                 for field in selectedType.fields {
                     switch field.type {
                     case .richText: content[field.id] = .rich(richValues[field.id] ?? [])
-                    case .audio, .image, .gif, .video: content[field.id] = mediaValues[field.id].map(ContentValue.media) ?? .empty
+                    case .audio, .image, .gif, .video:
+                        if var reference = mediaValues[field.id] {
+                            reference.altText = mediaDescriptions[field.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+                            content[field.id] = .media(reference)
+                        } else { content[field.id] = .empty }
                     case .number:
                         let raw = values[field.id] ?? ""
                         let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
@@ -785,7 +840,7 @@ struct ItemEditMobileView: View {
             ClozeSelectionEditor(text: Binding(get: { textFor(field.id) ?? text }, set: { set(.cloze($0, blanks: clozeFor(field.id) ?? blanks), field.id) }), blanks: Binding(get: { clozeFor(field.id) ?? blanks }, set: { set(.cloze(textFor(field.id) ?? text, blanks: $0), field.id) }))
         case .audio, .image, .gif, .video:
             VStack(alignment: .leading, spacing: 8) {
-                TextField(field.type == .audio ? "Audio description (required)" : "Visual description (required)", text: Binding(
+                TextField(mediaDescriptionPrompt(field.type), text: Binding(
                     get: { mediaDescriptions[field.id] ?? "" },
                     set: { description in
                         mediaDescriptions[field.id] = description
@@ -795,12 +850,15 @@ struct ItemEditMobileView: View {
                         }
                     }
                 ), axis: .vertical)
+                .accessibilityIdentifier("edit-card-description-\(field.name.lowercased())")
                 if field.type != .audio {
-                    PhotosPicker(selection: $selectedPhoto, matching: field.type == .image || field.type == .gif ? .images : .videos) {
+                    PhotosPicker(selection: Binding(
+                        get: { selectedPhoto },
+                        set: { selectedMediaField = field; selectedPhoto = $0 }
+                    ), matching: field.type == .image || field.type == .gif ? .images : .videos) {
                         Label(mediaReference(field.id) == nil ? "Photos" : "Replace from Photos", systemImage: "photo.on.rectangle")
                             .frame(minHeight: 44)
                     }
-                    .simultaneousGesture(TapGesture().onEnded { selectedMediaField = field })
                 }
                 MobileAdaptiveActionGroup {
                     Button { selectedMediaField = field; isImportingMediaFile = true } label: { Label("Files", systemImage: "folder").frame(minHeight: 44) }
@@ -810,6 +868,10 @@ struct ItemEditMobileView: View {
                     }
                 }
                 if mediaReference(field.id) != nil {
+                    if [.image, .gif].contains(field.type), let reference = mediaReference(field.id) {
+                        MobileContentValueView(value: .media(reference), mediaStore: model.mediaStore, isAnswerRevealed: true)
+                            .frame(maxHeight: 160)
+                    }
                     Label("Media ready", systemImage: "checkmark.circle")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -836,7 +898,8 @@ struct ItemEditMobileView: View {
             default: break
             }
         }
-        if case let .media(reference) = value, (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a media description." }
+        if [.image, .gif].contains(field.type), case let .media(reference) = value,
+           (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a visual description." }
         return nil
     }
 
@@ -879,7 +942,7 @@ struct ItemEditMobileView: View {
     }
     private func save() async {
         do {
-            for field in itemType.fields where field.type.mediaKind != nil {
+            for field in itemType.fields where [.image, .gif].contains(field.type) {
                 if case let .media(reference) = item.value(for: field.id),
                    (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     throw ItemDraftError.missingMediaDescription(field.name)

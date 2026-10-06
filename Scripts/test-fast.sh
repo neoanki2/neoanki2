@@ -41,7 +41,7 @@ python3 "$ROOT/Scripts/test-ios-ui-retry.py"
 echo "==> iOS background refresh executor isolation"
 python3 "$ROOT/Scripts/test-ios-background-refresh.py"
 
-echo "==> iOS app icon badge permission and refresh ordering"
+echo "==> Mac and iOS app icon badge permission and refresh ordering"
 python3 "$ROOT/Scripts/test-ios-app-icon-badge.py"
 
 echo "==> Documentation coverage and links"

@@ -839,5 +839,42 @@ private func withMigrationDatabase<T>(
         throw DatabaseError.openFailed("Could not open migration test database.")
     }
     defer { sqlite3_close(database) }
+    sqlite3_busy_timeout(database, 3_000)
     return try body(database)
+}
+
+@Test func versionTwentyEightRepairsMissingSyncedDailyAllowanceWithoutReplacingOriginalEntries() async throws {
+    let url = migrationDatabaseURL()
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    let now = Date.now
+    let deck = Deck(name: "Limited", newCardsPerDay: 2)
+    _ = try await store.createDeck(deck)
+    for index in 0..<3 {
+        _ = try await store.createItem(Item(
+            itemTypeID: BuiltInItemTypes.basicID,
+            fields: [
+                .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Card \(index)")),
+                .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer"))
+            ], deckID: deck.id
+        ), now: now)
+    }
+    let cards = try await store.fetchDueCards(asOf: now)
+    var reviewIDs: [UUID] = []
+    for card in cards {
+        reviewIDs.append(try await store.submitReviewWithReceipt(cardID: card.card.id, rating: .easy, now: now).reviewLogID)
+    }
+    // Retain one original entry and emulate an older replica that received the
+    // other review but omitted its introduction bookkeeping.
+    try executeMigrationSQL(
+        "DELETE FROM new_card_introductions WHERE review_log_id = '\(reviewIDs[0].uuidString)'; UPDATE schema_version SET version = 28;",
+        at: url
+    )
+    let reopened = try ItemStore(databaseURL: url)
+    try await reopened.bootstrap()
+    #expect(try integer("SELECT COUNT(*) FROM new_card_introductions;", at: url) == 2)
+    #expect(try await reopened.scopeSummary(asOf: now).availableNewCount == 0)
+    let again = try ItemStore(databaseURL: url)
+    try await again.bootstrap()
+    #expect(try integer("SELECT COUNT(*) FROM new_card_introductions;", at: url) == 2)
 }

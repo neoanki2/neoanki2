@@ -244,6 +244,7 @@ struct ContentView: View {
                 AppStartupTrace.mark("home_ready")
             }
         }
+        .environment(\.vocabularyPackRootURL, vocabularyLibraryModel.rootURL)
         .task {
             await refreshLibrary()
 #if DEBUG

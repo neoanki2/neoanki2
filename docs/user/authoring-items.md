@@ -82,6 +82,27 @@ While editing an existing item:
 
 Saving closes the form and refreshes the current library scope.
 
+## Fill fields from a dictionary
+
+On Mac, iPhone, and iPad, the ordinary Add Item editor offers an optional
+**Dictionary** section when the selected item type has at least two Text or
+Rich Text fields. Import a local `.neovocab` pack first using the vocabulary
+pack tools (on iOS, **Create → Vocabulary Packs**).
+
+1. Expand **Dictionary** and choose an installed pack.
+2. Choose distinct **Look up field** and **Fill field** values for this item.
+3. Type a word in the lookup field. After a short typing pause, a single exact
+   match fills the destination automatically. Choose **Use Entry** for an
+   ambiguous or partial match.
+4. Review or edit the result, then save normally into the chosen deck.
+
+Dictionary text includes supplied spellings, forms, textual annotations such
+as stress marks or IPA, and definitions. You can keep the complete entry or
+trim it to just the content you need. The app preserves your edits: clear an
+edited destination before using another dictionary entry. If no entry matches,
+fill the fields yourself. Lookup uses local files and does not create a deck
+or choose a card setup for you.
+
 ## Open item detail
 
 Select an item row to open its detail view.
@@ -158,6 +179,12 @@ attention again, and resetting progress clears the acknowledgement.
 The one-shot template-definition migration likewise preserves item, card,
 review-log, saved-response, and media identities; it changes only the item type's
 validated composition definition and its derived revision records.
+Daily new-card introductions are reconstructed from retained first-review
+evidence when upgrading an older library. This restores the consumed
+allowance without creating new reviews or changing card maturity. New synced
+reviews carry the original introduction deck and study day; deleting or moving
+an item does not rewrite that historical quota context.
+
 Media no longer referenced by any item is eligible for cleanup. Choose
 **Cancel** to keep the item.
 
