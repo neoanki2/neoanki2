@@ -149,6 +149,11 @@ files by hand can break references.
 Removing the source checkout or rebuilding `.build/NeoAnki2.app` does not
 remove the library. Deleting the Application Support directory does.
 
+The Add Item editor can use a locally installed vocabulary pack to fill text
+fields from a dictionary. This works in the same Mac, iPhone, and iPad builds
+and keeps the macOS 14 and iOS 17 requirements above. See
+[Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+
 ## Navigate the library
 
 The main window is a split view:

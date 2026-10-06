@@ -179,6 +179,12 @@ attention again, and resetting progress clears the acknowledgement.
 The one-shot template-definition migration likewise preserves item, card,
 review-log, saved-response, and media identities; it changes only the item type's
 validated composition definition and its derived revision records.
+Daily new-card introductions are reconstructed from retained first-review
+evidence when upgrading an older library. This restores the consumed
+allowance without creating new reviews or changing card maturity. New synced
+reviews carry the original introduction deck and study day; deleting or moving
+an item does not rewrite that historical quota context.
+
 Media no longer referenced by any item is eligible for cleanup. Choose
 **Cancel** to keep the item.
 
