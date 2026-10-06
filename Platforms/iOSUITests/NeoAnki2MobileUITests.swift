@@ -61,6 +61,18 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         }
     }
 
+    func focusAuthoringField(_ field: XCUIElement, in app: XCUIApplication) {
+        // The dictionary section can place the next field beneath the keyboard
+        // accessory. Dismiss it before scrolling to the field's real hit target.
+        if app.keyboards.firstMatch.exists {
+            let done = app.buttons["add-card-keyboard-done"]
+            XCTAssertTrue(done.waitUntilExists(timeout: 5))
+            done.tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitUntilGone(timeout: 5))
+        }
+        scrollToAndTap(field, in: app)
+    }
+
     func openItemTypeStudioCatalog(in app: XCUIApplication) {
         open("Create", in: app)
         let destination = app.buttons["Item Types & Card Setups"]
@@ -518,7 +530,7 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap()
         front.typeText("Capital of France?")
-        back.tap()
+        focusAuthoringField(back, in: app)
         back.typeText("Paris")
         let save = app.buttons["add-card-save"]
         XCTAssertTrue(save.isEnabled)
@@ -1053,7 +1065,7 @@ final class MobileAppStoreScreenshotUITests: NeoAnki2MobileUITestCase {
             front.tap()
             front.typeText(frontText)
             let back = app.textFields["add-card-field-back"]
-            back.tap()
+            focusAuthoringField(back, in: app)
             back.typeText(backText)
             if frontText == "What is active recall?" { capture("04-authoring") }
             app.buttons["add-card-save"].tap()
@@ -1123,7 +1135,7 @@ final class MobileProductionReviewJourneyUITests: NeoAnki2MobileUITestCase {
         let back = app.textFields["add-card-field-back"]
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap(); front.typeText("Production review question")
-        back.tap(); back.typeText("Production review answer")
+        focusAuthoringField(back, in: app); back.typeText("Production review answer")
         let save = app.buttons["add-card-save"]
         XCTAssertTrue(save.isEnabled)
         capture("03-first-item-authoring", in: app)
@@ -1241,7 +1253,7 @@ final class MobileVisualRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap(); front.typeText("What makes a mobile study app feel well designed?")
         let backField = app.textFields["add-card-field-back"]
-        backField.tap(); backField.typeText("Readable content, clear hierarchy, generous touch targets, and predictable navigation.")
+        focusAuthoringField(backField, in: app); backField.typeText("Readable content, clear hierarchy, generous touch targets, and predictable navigation.")
         capture("17-authoring-keyboard", app)
         app.buttons["add-card-save"].tap()
         open("Library", in: app); capture("18-library-populated", app)
@@ -1370,7 +1382,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
             let front = app.textFields["add-card-field-front"]
             XCTAssertTrue(front.waitUntilExists(timeout: 5)); front.tap(); front.typeText(prompt)
             let answer = app.textFields["add-card-field-back"]
-            answer.tap(); answer.typeText("Private practice answer")
+            focusAuthoringField(answer, in: app); answer.typeText("Private practice answer")
             app.buttons["add-card-save"].tap()
         }
         open("Library", in: app)
