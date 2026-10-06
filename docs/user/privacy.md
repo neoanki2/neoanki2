@@ -49,7 +49,10 @@ answers. Media attached to study items remains in your library and is included
 in private iCloud sync when you enable it. Temporary comparison recordings are
 removed when the card changes or the study session closes. Saved spoken
 responses remain on the device and are excluded from private iCloud sync.
-The app requests notification access only when you enable study reminders.
+On iPhone and iPad, the app may request permission to show a due-card badge when
+your library first has due cards. It requests alert and sound permission when you
+enable study reminders. Both permissions are optional; you can continue studying
+without them.
 Due Cards widgets use shared on-device storage to show aggregate due
 information. You can revoke permissions in device Settings.
 
