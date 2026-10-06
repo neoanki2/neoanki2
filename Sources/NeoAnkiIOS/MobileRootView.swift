@@ -14,9 +14,11 @@ public struct MobileRootView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("mobile-conceals-answers") private var concealsAnswers = true
     @State private var vocabularyLibrary: MobileVocabularyLibraryModel
+    private let vocabularyRootURL: URL
 
     public init(model: LibraryFeatureModel, vocabularyRootURL: URL) {
         self.model = model
+        self.vocabularyRootURL = vocabularyRootURL
         _vocabularyLibrary = State(initialValue: MobileVocabularyLibraryModel(rootURL: vocabularyRootURL))
     }
 
@@ -31,7 +33,7 @@ public struct MobileRootView: View {
             case .loading:
                 ProgressView("Opening your library…")
             case .ready:
-                if ["mobile-redesign", "mobile-vocabulary"].contains(ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] ?? ""), !fixturesReady {
+                if ["mobile-redesign", "mobile-vocabulary", "mobile-item-lookup"].contains(ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] ?? ""), !fixturesReady {
                     ProgressView("Preparing visual fixtures…")
                 } else {
                     MobileTabView(model: model, vocabularyLibrary: vocabularyLibrary)
@@ -42,6 +44,7 @@ public struct MobileRootView: View {
             }
         }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
+        .environment(\.vocabularyPackRootURL, vocabularyRootURL)
         .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
             Button("OK") { fixtureError = nil }
         } message: { Text(fixtureError ?? "") }
@@ -53,8 +56,8 @@ public struct MobileRootView: View {
                 do { try await MobileRedesignUITestSeeder.seedIfRequested(library: model.library); await model.refresh() }
                 catch { fixtureError = MobileAppModel.message(for: error); await model.refresh() }
                 fixturesReady = true
-            } else if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-vocabulary" {
-                do { try await vocabularyLibrary.seedVisualFixtureIfRequested() }
+            } else if ["mobile-vocabulary", "mobile-item-lookup"].contains(ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] ?? "") {
+                do { try await vocabularyLibrary.seedVisualFixtureIfRequested(library: model.library); await model.refresh() }
                 catch { fixtureError = MobileAppModel.message(for: error) }
                 fixturesReady = true
             }

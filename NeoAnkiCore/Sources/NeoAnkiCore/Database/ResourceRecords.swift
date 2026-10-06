@@ -64,10 +64,28 @@ public struct DeckResetImpact: Codable, Sendable, Equatable {
 public struct SynchronizedReviewRecord: Codable, Sendable, Equatable {
     public let log: ReviewLog
     public let memoryBefore: MemoryState
+    /// Captures the original deck and local study day, even if the card moves
+    /// later. A missing context identifies a payload from an older client.
+    public let introductionContext: IntroductionContext?
 
-    public init(log: ReviewLog, memoryBefore: MemoryState) {
+    public struct IntroductionContext: Codable, Sendable, Equatable {
+        public let deckID: UUID?
+        public let studyDay: String?
+
+        public init(deckID: UUID?, studyDay: String?) {
+            self.deckID = deckID
+            self.studyDay = studyDay
+        }
+    }
+
+    public init(
+        log: ReviewLog,
+        memoryBefore: MemoryState,
+        introductionContext: IntroductionContext? = nil
+    ) {
         self.log = log
         self.memoryBefore = memoryBefore
+        self.introductionContext = introductionContext
     }
 }
 

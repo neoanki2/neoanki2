@@ -614,3 +614,114 @@ private func makeSyncRepository() async throws -> SyncRepositoryFixture {
     #expect(try await fixture.repository.item(id: copy.id) == nil)
     #expect(try await fixture.repository.item(id: item.id)?.item == item)
 }
+
+@Test(arguments: [false, true])
+func synchronizedFirstReviewsConsumeDailyAllowance(legacyPayload: Bool) async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let now = Date.now
+    let deck = try await source.repository.createDeck(Deck(name: "Two per day", newCardsPerDay: 2))
+    for index in 0..<3 {
+        _ = try await source.repository.createItem(Item(
+            itemTypeID: BuiltInItemTypes.basicID,
+            fields: [
+                .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Card \(index)")),
+                .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer"))
+            ], deckID: deck.id
+        ), asOf: now)
+    }
+    let cards = try await source.repository.dueCards(scope: .allDecks, asOf: now)
+    for card in cards {
+        _ = try await source.repository.submitReview(cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 1000)
+    }
+    let adapter = SQLiteLibrarySyncAdapter(repository: source.repository)
+    let encoded = try await adapter.initialMerge(remote: [], deviceID: "source")
+    let records = try encoded.map { record in
+        guard legacyPayload, record.resourceKind == "review" else { return record }
+        var object = try #require(try JSONSerialization.jsonObject(with: record.payload) as? [String: Any])
+        var review = try #require(object["review"] as? [String: Any])
+        var value = try #require(review["_0"] as? [String: Any])
+        value.removeValue(forKey: "introductionContext")
+        review["_0"] = value
+        object["review"] = review
+        return SyncRecordEnvelope(
+            id: record.id, resourceKind: record.resourceKind, revision: record.revision,
+            deviceID: record.deviceID, order: record.order, isTombstone: false,
+            payload: try JSONSerialization.data(withJSONObject: object)
+        )
+    }
+    let receiver = SQLiteLibrarySyncAdapter(repository: destination.repository)
+    try await receiver.applyRemote(records, origin: .cloud)
+    // Re-delivery must not consume the allowance twice or restore it.
+    try await receiver.applyRemote(records, origin: .cloud)
+    let summary = try await destination.repository.scopeSummary(scope: .allDecks, asOf: now)
+    #expect(summary.dueNow == 0)
+    #expect(summary.newCount == 1)
+    #expect(summary.hiddenNewCount == 1)
+    #expect(summary == (try await source.repository.scopeSummary(scope: .allDecks, asOf: now)))
+    // Undo on the source restores the same capacity on the other device.
+    let review = try #require(records.first { $0.resourceKind == "review" })
+    try await source.repository.revertReview(id: UUID(uuidString: review.id)!, asOf: now)
+    let revertRecords = try await adapter.encode(
+        changes: source.repository.changes(after: 0, limit: 1000), deviceID: "source"
+    )
+    try await receiver.applyRemote(revertRecords, origin: .cloud)
+    #expect(try await destination.repository.scopeSummary(scope: .allDecks, asOf: now).availableNewCount == 1)
+}
+
+@Test func synchronizedQuotaKeepsOriginalDeckAfterCardMoves() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let now = Date.now
+    let original = try await source.repository.createDeck(Deck(name: "Original", newCardsPerDay: 1))
+    let moved = try await source.repository.createDeck(Deck(name: "Moved"))
+    for index in 0..<2 {
+        _ = try await source.repository.createItem(Item(
+            itemTypeID: BuiltInItemTypes.basicID,
+            fields: [
+                .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Card \(index)")),
+                .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer"))
+            ], deckID: original.id
+        ), asOf: now)
+    }
+    let card = try #require(try await source.repository.dueCards(scope: .allDecks, asOf: now).first)
+    _ = try await source.repository.submitReview(cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 1000)
+    var item = try #require(try await source.repository.item(id: card.item.id)?.item)
+    item.deckID = moved.id
+    _ = try await source.repository.updateItem(item, asOf: now)
+    let records = try await SQLiteLibrarySyncAdapter(repository: source.repository).initialMerge(remote: [], deviceID: "source")
+    try await SQLiteLibrarySyncAdapter(repository: destination.repository).applyRemote(records, origin: .cloud)
+    #expect(try await destination.repository.scopeSummary(scope: .deck(original.id), asOf: now).availableNewCount == 0)
+}
+
+@Test func synchronizedUnassignedFirstReviewDoesNotConsumeALaterDeckAllowance() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let now = Date.now
+    let deck = try await source.repository.createDeck(Deck(name: "Limited", newCardsPerDay: 1))
+    var item = Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Unassigned review")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer"))
+    ])
+    _ = try await source.repository.createItem(item, asOf: now)
+    let card = try #require(try await source.repository.dueCards(scope: .allDecks, asOf: now).first)
+    _ = try await source.repository.submitReview(cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 1000)
+    item.deckID = deck.id
+    _ = try await source.repository.updateItem(item, asOf: now)
+    _ = try await source.repository.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Still available")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer"))
+    ], deckID: deck.id), asOf: now)
+    let records = try await SQLiteLibrarySyncAdapter(repository: source.repository).initialMerge(remote: [], deviceID: "source")
+    try await SQLiteLibrarySyncAdapter(repository: destination.repository).applyRemote(records, origin: .cloud)
+    #expect(try await destination.repository.scopeSummary(scope: .allDecks, asOf: now).availableNewCount == 1)
+}

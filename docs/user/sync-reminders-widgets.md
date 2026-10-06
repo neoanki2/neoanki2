@@ -82,6 +82,11 @@ later refresh; opening the app remains the way to request a current summary.
 Private CloudKit sync includes decks, item types and their persisted templates
 (shown as Card setups), items, card
 state, immutable review and revert history, and shared content-addressed media.
+First reviews also carry their original deck and study day, so introducing new
+cards on one device consumes the same daily allowance on your other devices.
+An upgrade restores missing allowance entries from older synced reviews using
+the current deck and study-day settings when the original context is unavailable;
+entries already recorded on the device are preserved.
 Immutable history is unioned deterministically. Concurrent edits to mutable
 resources accept one version while preserving the other as a conflict copy
 when it can be restored.

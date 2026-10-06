@@ -8,6 +8,14 @@ parent: User Guide
 
 # Content and media
 
+For photo-to-name cards, create an item type with an Image field and a Text
+field, then configure the image as the question and the name as the answer.
+On iPhone or iPad, use **Camera**, **Photos**, or **Files** in the Image field;
+on Mac, choose or drop an image file. You can attach the photo before typing
+its name and visual description. The editor shows a preview, and Save requires
+a visual description for any attached image or GIF, including optional fields.
+Description changes are saved with the image.
+
 An item type can define Text, Rich Text, Number, Cloze, Image, GIF, Audio, and
 Video fields. The field type controls authoring, validation, storage, and
 native rendering.

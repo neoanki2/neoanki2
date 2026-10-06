@@ -112,6 +112,8 @@ while [[ $attempt -le 2 ]]; do
   printf '%s\n' "$simulator_id" >> "$SIMULATOR_IDS_FILE"
   xcrun simctl boot "$simulator_id"
   xcrun simctl bootstatus "$simulator_id" -b
+  # Supply the image used by the real Photos picker authoring journey.
+  xcrun simctl addmedia "$simulator_id" "$ROOT/UITests/Fixtures/media/cover.png"
   # Use the supported Simulator UI setting so SwiftUI's read-only
   # colorSchemeContrast environment reflects increased contrast. The simulator
   # is deleted after this attempt, so no user or later-test state is retained.

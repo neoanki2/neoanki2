@@ -78,7 +78,7 @@
       "name": "Browse, author, organize, and transfer on iOS",
       "article": "user/iphone-ipad.md",
       "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/MediaAuthoringFeatureTests.swift"]
     },
     {
       "id": "mobile-study",
@@ -168,6 +168,13 @@
       "sources": ["Sources/NeoAnki2/ItemReadingPreview.swift"],
       "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/ItemsModelDetailTests.swift", "NeoAnkiCore/Tests/NeoAnkiFlowTests/RevertReviewFlowTests.swift"],
       "screenshot": "assets/screenshots/item-detail.png"
+    },
+    {
+      "id": "item-dictionary-lookup",
+      "name": "Fill arbitrary item fields from a local dictionary",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnkiSharedUI/DictionaryFieldLookupSection.swift", "Sources/NeoAnkiVocabularyKit/DictionaryLookupModel.swift"],
+      "tests": ["Tests/NeoAnkiVocabularyKitTests/DictionaryLookupTests.swift", "Tests/NeoAnki2Tests/DictionaryAuthoringFlowTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
     },
     {
       "id": "content-text-rich",

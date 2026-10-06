@@ -282,11 +282,15 @@ public final class LibraryFeatureModel {
             fields: itemType.fields.map { FieldValue(fieldID: $0.id, value: values[$0.id] ?? .empty) },
             deckID: deckID
         )
+        try validateMediaDescriptions(item, itemType: itemType)
         _ = try await library.createItem(item, asOf: .now)
         try await didMutate()
     }
 
     public func updateItem(_ item: Item) async throws {
+        if let loaded = try await library.item(id: item.id) {
+            try validateMediaDescriptions(item, itemType: loaded.itemType)
+        }
         _ = try await library.updateItem(item, asOf: .now)
         try await didMutate()
     }
@@ -319,8 +323,16 @@ public final class LibraryFeatureModel {
 
     public func reserveMedia(data: Data, kind: MediaKind, altText: String) async throws -> MediaRef {
         let description = altText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !description.isEmpty else { throw ItemDraftError.missingMediaDescription("Media") }
         return try await library.reserveMedia(data: data, kind: kind, altText: description, asOf: .now).reference
+    }
+
+    private func validateMediaDescriptions(_ item: Item, itemType: ItemType) throws {
+        for field in itemType.fields where [.image, .gif].contains(field.type) {
+            if case let .media(reference) = item.value(for: field.id),
+               (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw ItemDraftError.missingMediaDescription(field.name)
+            }
+        }
     }
 
     public func importJSON(_ data: Data, itemTypeID: UUID?, deckID: UUID?) async throws -> Int {

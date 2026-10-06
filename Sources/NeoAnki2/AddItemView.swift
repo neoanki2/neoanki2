@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 
 struct AddItemView: View {
@@ -103,6 +104,14 @@ struct AddItemView: View {
             }
 
             if let itemType {
+                if !isEditing {
+                    DictionaryFieldLookupSection(fields: itemType.fields) { id in
+                        Binding(
+                            get: { SpanFormatting.plainText(from: fieldSpans[id] ?? []) },
+                            set: { fieldSpans[id] = $0.isEmpty ? [] : [Span($0)] }
+                        )
+                    }.id(itemType.id)
+                }
                 Section(itemType.name) {
                     ForEach(itemType.fields) { field in
                         fieldEditor(for: field)

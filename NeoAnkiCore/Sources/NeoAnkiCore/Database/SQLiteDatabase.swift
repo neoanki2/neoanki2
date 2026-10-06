@@ -472,6 +472,10 @@ actor SQLiteDatabase {
                 try migrateSchedulerCohortsV28(now: .now)
             }
 
+            if current < 29 {
+                try restoreMissingLegacyReviewIntroductions()
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -7153,7 +7157,13 @@ actor SQLiteDatabase {
 
     func fetchSynchronizedReviewRecord(id: UUID) throws -> SynchronizedReviewRecord? {
         let rows = try query(
-            "SELECT log, memory_before, sequence FROM review_logs WHERE id = ? LIMIT 1;",
+            """
+            SELECT log, memory_before, sequence, introductions.deck_id, introductions.study_day
+            FROM review_logs
+            LEFT JOIN new_card_introductions AS introductions
+                ON introductions.review_log_id = review_logs.id
+            WHERE review_logs.id = ? LIMIT 1;
+            """,
             bindings: [.text(id.uuidString)]
         )
         guard let row = rows.first,
@@ -7162,7 +7172,11 @@ actor SQLiteDatabase {
               let sequence = row["sequence"] as? Int64 else { return nil }
         return SynchronizedReviewRecord(
             log: try decode(ReviewLog.self, from: logData).withSequence(sequence),
-            memoryBefore: try decode(MemoryState.self, from: memoryData)
+            memoryBefore: try decode(MemoryState.self, from: memoryData),
+            introductionContext: .init(
+                deckID: (row["deck_id"] as? String).flatMap(UUID.init(uuidString:)),
+                studyDay: row["study_day"] as? String
+            )
         )
     }
 
@@ -7350,6 +7364,70 @@ actor SQLiteDatabase {
                     try applySynchronizedTombstone(kind: kind, id: id)
                 }
             }
+            for mutation in mutations {
+                if case let .review(record) = mutation {
+                    try persistSynchronizedReviewIntroduction(record)
+                }
+            }
+        }
+    }
+
+    private func persistSynchronizedReviewIntroduction(_ record: SynchronizedReviewRecord) throws {
+        let deckID: UUID
+        let studyDay: String
+        if let context = record.introductionContext {
+            // An explicit empty context means no deck quota was consumed.
+            guard let originalDeckID = context.deckID, let originalDay = context.studyDay else { return }
+            deckID = originalDeckID
+            studyDay = originalDay
+        } else {
+            // Old clients did not send quota context. Recover from the review's
+            // pre-grade phase, current deck and shared rollover setting. Keep any
+            // original entry already recorded locally instead of replacing it.
+            guard record.memoryBefore.phase == .new,
+                  let cardDeckID = try fetchCard(id: record.log.cardID)?.deckID else { return }
+            deckID = cardDeckID
+            let rollover = try metadataValue(forKey: ItemStore.studyDayRolloverMetadataKeyForSync)
+                .flatMap(Int.init) ?? StudyDay.defaultRolloverMinutes
+            studyDay = StudyDay.key(for: record.log.reviewedAt, rolloverMinutes: rollover)
+        }
+        // A deck can have been deleted after this historical review.
+        guard try fetchDeck(id: deckID) != nil else { return }
+        let conflict = record.introductionContext == nil
+            ? "DO NOTHING"
+            : "DO UPDATE SET deck_id = excluded.deck_id, study_day = excluded.study_day"
+        try execute(
+            """
+            INSERT INTO new_card_introductions (review_log_id, deck_id, study_day)
+            VALUES (?, ?, ?)
+            ON CONFLICT(review_log_id) \(conflict);
+            """,
+            bindings: [.text(record.log.id.uuidString), .text(deckID.uuidString), .text(studyDay)]
+        )
+    }
+
+    private func restoreMissingLegacyReviewIntroductions() throws {
+        guard try tableExists("new_card_introductions"),
+              try tableExists("review_logs"), try tableExists("cards"),
+              try columnExists("log", in: "review_logs"),
+              try columnExists("memory_before", in: "review_logs"),
+              try columnExists("deck_id", in: "cards") else { return }
+        let rows = try query(
+            """
+            SELECT review_logs.log, review_logs.memory_before
+            FROM review_logs
+            JOIN cards ON cards.id = review_logs.card_id
+            LEFT JOIN new_card_introductions AS introductions
+                ON introductions.review_log_id = review_logs.id
+            WHERE introductions.review_log_id IS NULL AND cards.deck_id IS NOT NULL;
+            """
+        )
+        for row in rows {
+            guard let logData = payload(row, "log"), let memoryData = payload(row, "memory_before") else { continue }
+            try persistSynchronizedReviewIntroduction(SynchronizedReviewRecord(
+                log: decode(ReviewLog.self, from: logData),
+                memoryBefore: decode(MemoryState.self, from: memoryData)
+            ))
         }
     }
 

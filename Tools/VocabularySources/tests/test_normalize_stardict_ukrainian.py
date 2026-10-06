@@ -43,6 +43,8 @@ class NormalizeStarDictTests(unittest.TestCase):
             [{"name": "dictionaryHeader", "value": "АБАЖУ́Р, а, ч."}],
         )
         self.assertEqual(entry["forms"][0]["text"]["value"], "АБАЖУ́Р")
+        self.assertEqual(entry["pronunciations"][0]["representations"][0]["text"]["_0"]["value"], "АБАЖУ́Р")
+        self.assertEqual(entry["pronunciations"][0]["formIDs"], ["canonical"])
         self.assertEqual(
             entry["senses"][0]["definitions"][0]["text"]["value"],
             "Дашок для захисту очей від світла.",
