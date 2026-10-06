@@ -20,8 +20,8 @@ send your study data to servers operated by the developer.
 
 ## Optional iCloud sync
 
-iCloud sync is off until you enable it. Before its first upload, the app creates
-a local backup. When enabled, library content and associated media synchronize
+iCloud sync is off until you enable it. Before library content first uploads,
+the app creates a local library backup. When enabled, library content and associated media synchronize
 through your private CloudKit database in your Apple iCloud account. Saved
 spoken responses and their private recording files stay on the device and are
 not uploaded through this sync feature. The developer does not have access to
