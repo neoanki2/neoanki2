@@ -9,7 +9,7 @@ permalink: /user/privacy/
 
 # Privacy policy
 
-Effective October 3, 2026. NeoAnki2 is provided by Oleksii Grachov.
+Effective October 6, 2026. NeoAnki2 is provided by Oleksii Grachov.
 
 ## Your study data
 
@@ -27,6 +27,15 @@ spoken responses and their private recording files stay on the device and are
 not uploaded through this sync feature. The developer does not have access to
 your private database. Apple provides this
 service under its [privacy policy](https://www.apple.com/legal/privacy/).
+
+The same optional iCloud setting also enables vocabulary-pack synchronization.
+Installed dictionary packages upload automatically to your private iCloud
+database. Other devices fetch the catalog of available packs; a dictionary's
+files download only when you choose Download. Downloaded packs remain available
+offline. No dictionaries are shared publicly or sent to a developer-operated
+server.
+Removing a pack from one device keeps its iCloud copy and cards already created
+from that pack.
 
 Disabling sync stops future synchronization on that device. It does not delete
 copies already stored in iCloud or on your other devices. Manage those copies
