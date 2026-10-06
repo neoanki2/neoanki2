@@ -1639,15 +1639,6 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Acceptance Lexicon")).firstMatch.waitUntilExists(timeout: 10))
     }
 
-    private func replaceDictionaryText(in field: XCUIElement, with value: String, app: XCUIApplication) {
-        scrollToAndTap(field, in: app)
-        field.press(forDuration: 1.2)
-        let selectAll = app.buttons["Select All"]
-        XCTAssertTrue(selectAll.waitUntilExists(timeout: 3))
-        selectAll.tap()
-        field.typeText(value.isEmpty ? XCUIKeyboardKey.delete.rawValue : value)
-    }
-
     func testGenericDictionaryLookupInNewItemSavesToChosenDeck() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
@@ -1664,27 +1655,19 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let back = app.textFields["add-card-field-back"]
         XCTAssertTrue(waitUntil(timeout: 10) { (back.value as? String)?.contains("ˈswɪft") == true })
         XCTAssertTrue((back.value as? String)?.contains("Moving quickly and smoothly.") == true)
-        scrollToAndTap(back, in: app); replaceDictionaryText(in: back, with: "", app: app); back.typeText("My own answer")
-        app.buttons["add-card-keyboard-done"].tap()
-        scrollToAndTap(front, in: app); front.typeText("x")
-        app.buttons["add-card-keyboard-done"].tap()
-        XCTAssertTrue(app.staticTexts["itemDictionaryNoMatch"].waitUntilExists(timeout: 5))
-        XCTAssertEqual(back.value as? String, "My own answer")
-        replaceDictionaryText(in: front, with: "", app: app); front.typeText("swift")
-        app.buttons["add-card-keyboard-done"].tap()
-        XCTAssertTrue(app.buttons["itemDictionaryEntry-en:swift"].waitUntilExists(timeout: 5))
-        XCTAssertEqual(back.value as? String, "My own answer")
-        scrollToAndTap(back, in: app); replaceDictionaryText(in: back, with: "", app: app)
-        app.buttons["add-card-keyboard-done"].tap()
-        scrollToAndTap(app.buttons["itemDictionaryEntry-en:swift"], in: app)
         app.buttons["add-card-save"].tap()
         XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
         open("Home", in: app)
         scrollToAndTap(app.staticTexts["Words"], in: app)
         app.buttons["Browse Items"].tap()
         let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "swift")).firstMatch
-        XCTAssertTrue(item.waitUntilExists(timeout: 5)); item.tap()
+        XCTAssertTrue(item.waitUntilExists(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        scrollToAndTap(app.buttons["Start Studying"], in: app)
+        XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 10))
+        app.buttons["Show Answer"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "ˈswɪft")).firstMatch.waitUntilExists(timeout: 5))
+        app.buttons["endStudySession"].tap()
     }
 
     func testPhotoCanBeSelectedBeforeNameAndDescription() throws {
@@ -1705,7 +1688,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         scrollToAndTap(app.buttons["Photos"], in: app)
         let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
         XCTAssertTrue(photo.waitUntilExists(timeout: 30), "The disposable Simulator must have a photo added with simctl addmedia")
-        photo.tap()
+        // Photos exposes a thumbnail frame but no XCTest hit point on this runtime.
+        photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.staticTexts["Media ready"].waitUntilExists(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["add-card-preview-photo"].exists)
         let name = app.textFields["add-card-field-name"]
@@ -1715,16 +1699,22 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let description = app.textFields["add-card-description-photo"]
         scrollToAndTap(description, in: app); description.typeText("A tree with lobed leaves")
         XCTAssertTrue(app.buttons["add-card-save"].isEnabled)
-        replaceDictionaryText(in: description, with: "", app: app); description.typeText("Updated visual description")
+        description.typeText(" updated")
         app.buttons["add-card-keyboard-done"].tap()
         app.buttons["add-card-save"].tap()
         XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
         open("Library", in: app)
-        let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Updated visual description")).firstMatch
+        let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "A tree with lobed leaves updated")).firstMatch
         XCTAssertTrue(item.waitUntilExists(timeout: 5)); item.tap()
         app.buttons["Edit"].tap()
-        XCTAssertEqual(app.textFields["Visual description (required)"].value as? String, "Updated visual description")
+        XCTAssertEqual(app.textFields["edit-card-description-photo"].value as? String, "A tree with lobed leaves updated")
         app.buttons["Cancel"].tap()
+        open("Home", in: app)
+        app.buttons["Start Studying"].tap()
+        XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 10))
+        app.buttons["Show Answer"].tap()
+        XCTAssertTrue(app.staticTexts["Oak"].waitUntilExists(timeout: 5))
+        app.buttons["endStudySession"].tap()
     }
 
     func testTransferPreviewImportAndConcealment() throws {

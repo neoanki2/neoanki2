@@ -850,6 +850,7 @@ struct ItemEditMobileView: View {
                         }
                     }
                 ), axis: .vertical)
+                .accessibilityIdentifier("edit-card-description-\(field.name.lowercased())")
                 if field.type != .audio {
                     PhotosPicker(selection: Binding(
                         get: { selectedPhoto },
