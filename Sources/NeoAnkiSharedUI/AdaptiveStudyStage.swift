@@ -18,7 +18,7 @@ public enum StudyStageGeometry {
         switch template.interaction {
         case .record, .audioSubmission, .choose, .arrange:
             return .actionStage
-        case .reveal, .type, .cloze:
+        case .reveal, .type, .cloze, .imageOcclusion:
             return .focus
         }
     }

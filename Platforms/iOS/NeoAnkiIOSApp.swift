@@ -1,5 +1,7 @@
 import NeoAnkiApplication
 import NeoAnkiFeatures
+import NeoAnkiCloudSync
+import NeoAnkiVocabularyKit
 import NeoAnkiMobile
 import SwiftUI
 import UIKit
@@ -8,6 +10,12 @@ import UIKit
 struct NeoAnkiIOSApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: LibraryFeatureModel
+    private var packCloudTransport: (any VocabularyPackCloudTransport)? {
+        if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") {
+            return MobileVocabularyCloudUITestTransport.makeIfRequested()
+        }
+        return CKVocabularyPackCloudTransport()
+    }
 
     private var usesAccessibilityUITestEnvironment: Bool {
         ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingAccessibility")
@@ -50,10 +58,13 @@ struct NeoAnkiIOSApp: App {
         let repository = try! SQLiteLibraryRepository(databaseURL: paths.databaseURL)
         let usesSyncFixture = ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset")
             && ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-sync-recovery"
-        if usesSyncFixture { UserDefaults.standard.set(true, forKey: "cloud-sync-enabled-v1") }
-        let syncService: any SyncService = usesSyncFixture
-            ? MobileSyncRecoveryUITestService(repository: repository)
-            : MobileSyncCoordinator(repository: repository, paths: paths)
+        let usesPackFixture = ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset")
+            && ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-vocabulary-cloud"
+        if usesSyncFixture || usesPackFixture { UserDefaults.standard.set(true, forKey: "cloud-sync-enabled-v1") }
+        let syncService: any SyncService
+        if usesPackFixture { syncService = DisabledSyncService() }
+        else if usesSyncFixture { syncService = MobileSyncRecoveryUITestService(repository: repository) }
+        else { syncService = MobileSyncCoordinator(repository: repository, paths: paths) }
         let model = LibraryFeatureModel(
             library: repository,
             syncService: syncService,
@@ -68,23 +79,25 @@ struct NeoAnkiIOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if usesAccessibilityUITestEnvironment && usesCardSetupAccessibilityTestHost {
+            if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") && ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "image-occlusion" {
+                MobileImageOcclusionTestHost(model: model)
+            } else if usesAccessibilityUITestEnvironment && usesCardSetupAccessibilityTestHost {
                 MobileCardSetupAccessibilityTestHost(model: model)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
                     .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
             } else if usesAccessibilityUITestEnvironment {
-                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
                     .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
             } else if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset")
                         && ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingLargeText") {
-                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.xxxLarge)
             } else {
-                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL)
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport)
             }
         }
         .onChange(of: scenePhase) { _, phase in

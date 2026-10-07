@@ -29,7 +29,7 @@
   "portableDeck": {
     "article": "user/import-export.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
-    "formatVersion": 5,
+    "formatVersion": 6,
     "maximumFileBytes": 512000000,
     "maximumDecks": 1000,
     "maximumItemTypes": 256,

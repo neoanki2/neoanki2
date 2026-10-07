@@ -309,6 +309,7 @@ public enum Interaction: String, Codable, CaseIterable, Sendable {
     case record
     case audioSubmission
     case cloze
+    case imageOcclusion
     case arrange
 }
 

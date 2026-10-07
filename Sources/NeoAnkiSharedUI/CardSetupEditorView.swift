@@ -198,7 +198,7 @@ public enum CardSetupEditorPreviewPolicy {
 
         // Production preserves the sentence around cloze blanks rather than
         // concealing the whole value.
-        if fieldType == .cloze { return .content }
+        if fieldType == .cloze || fieldType == .imageOcclusion { return .content }
 
         switch revealMode {
         case .always:
@@ -264,6 +264,7 @@ public enum SharedStudyContentVisibilityPolicy {
         switch value {
         case .text, .rich: "Text"
         case .number: "Number"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         case let .media(reference):
             switch reference.kind {
@@ -2573,7 +2574,7 @@ public struct CardSetupEditorView: View {
 
     private func sourceFields(for request: CardSetupSourceRequest) -> [ItemTypeFieldDraft] {
         guard request.hole == .media else { return draft.fields }
-        return draft.fields.filter { [.image, .gif, .video].contains($0.type) }
+        return draft.fields.filter { [.image, .imageOcclusion, .gif, .video].contains($0.type) }
     }
 
     private func mediaKind(for source: CardSetupComponentSourceDraft) -> MediaKind? {
@@ -3101,6 +3102,7 @@ private extension ContentValue {
         case let .text(text, _): text
         case let .rich(spans): spans.map(\.text).joined()
         case .media: "Media"
+        case let .imageOcclusion(content): content.image.altText ?? "Image Occlusion"
         case let .cloze(text, _): text
         case let .number(value): value.formatted()
         case .empty: "Choose content"
@@ -3118,6 +3120,7 @@ private extension FieldType {
         case .gif: "GIF"
         case .video: "Video"
         case .number: "Number"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         }
     }
@@ -3130,6 +3133,7 @@ private extension CardSetupStarter {
         case .reverse: "Reverse"
         case .typeAnswer: "Type Answer"
         case .visual: "Visual"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         case .audioSubmission: "Audio Submission"
         }
@@ -3144,6 +3148,7 @@ private extension Interaction {
         case .choose: "Choose"
         case .record: "Record"
         case .audioSubmission: "Audio Submission"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         case .arrange: "Arrange"
         }

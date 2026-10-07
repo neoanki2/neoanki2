@@ -13,6 +13,8 @@ struct AddItemView: View {
     @State private var fieldText: [UUID: String] = [:]
     @State private var fieldMedia: [UUID: MediaRef] = [:]
     @State private var fieldMediaAltText: [UUID: String] = [:]
+    @State private var occlusionDraftReferences: [MediaRef] = []
+    @State private var fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
     @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var selectedDeckID: UUID?
     @State private var isSaving = false
@@ -173,7 +175,7 @@ struct AddItemView: View {
             isPresented: $showDiscardConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Discard Changes", role: .destructive) { onDismiss() }
+            Button("Discard Changes", role: .destructive) { closeEditor() }
                 .accessibilityIdentifier("confirmDiscardItem")
             Button("Keep Editing", role: .cancel) {}
                 .accessibilityIdentifier("cancelDiscardItem")
@@ -224,6 +226,13 @@ struct AddItemView: View {
                     accessibilityIdentifier: "field-\(field.name)"
                 )
             }
+        case .imageOcclusion:
+            ImageOcclusionFieldEditor(label: fieldLabel(field), content: Binding(
+                get: { fieldOcclusions[field.id] }, set: { value in
+                    if let value { occlusionDraftReferences.append(value.image) }
+                    fieldOcclusions[field.id] = value
+                }
+            ), mediaStore: model.mediaStore)
         case .cloze:
             ClozeFieldEditor(
                 label: fieldLabel(field),
@@ -259,6 +268,7 @@ struct AddItemView: View {
             || fieldText.values.contains {
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
+            || !fieldOcclusions.isEmpty
             || !fieldMedia.isEmpty
             || fieldMediaAltText.values.contains {
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -349,6 +359,7 @@ struct AddItemView: View {
         fieldText = snapshot.fieldText
         fieldMedia = snapshot.fieldMedia
         fieldMediaAltText = snapshot.fieldMediaAltText
+        fieldOcclusions = snapshot.fieldOcclusions
         fieldClozeBlanks = snapshot.fieldClozeBlanks
     }
 
@@ -358,15 +369,22 @@ struct AddItemView: View {
             fieldText: fieldText,
             fieldMedia: fieldMedia,
             fieldMediaAltText: fieldMediaAltText,
-            fieldClozeBlanks: fieldClozeBlanks
+            fieldClozeBlanks: fieldClozeBlanks,
+            fieldOcclusions: fieldOcclusions
         )
+    }
+
+    private func closeEditor() {
+        let refs = occlusionDraftReferences + fieldOcclusions.values.map(\.image)
+        Task { for ref in refs { try? await model.mediaStore?.discardDraftReference(ref) } }
+        onDismiss()
     }
 
     private func requestDismissal() {
         if isEditing, initialSnapshot != currentSnapshot {
             showDiscardConfirmation = true
         } else {
-            onDismiss()
+            closeEditor()
         }
     }
 
@@ -393,7 +411,8 @@ struct AddItemView: View {
                 fieldText: fieldText,
                 fieldMedia: fieldMedia,
                 fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks
+                fieldClozeBlanks: fieldClozeBlanks,
+                fieldOcclusions: fieldOcclusions
             )
         } else {
             didSave = await model.addItem(
@@ -402,11 +421,12 @@ struct AddItemView: View {
                 fieldMedia: fieldMedia,
                 fieldMediaAltText: fieldMediaAltText,
                 fieldClozeBlanks: fieldClozeBlanks,
+                fieldOcclusions: fieldOcclusions,
                 deckID: selectedDeckID
             )
         }
         if didSave {
-            onDismiss()
+            closeEditor()
         }
     }
 }

@@ -123,7 +123,7 @@ public final class StudyFeatureModel: Identifiable {
     public func performPrimaryAction() {
         guard let card = currentCard else { return }
         switch card.template.interaction {
-        case .reveal, .cloze: revealAnswer()
+        case .reveal, .cloze, .imageOcclusion: revealAnswer()
         case .type:
             guard !typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { interactionMessage = "Enter an answer, or reveal it to self-grade."; return }
             answerEvaluation = StudyResponseEvaluator.evaluate(typedAnswer, for: card); isAnswerRevealed = true

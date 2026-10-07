@@ -2,7 +2,7 @@
 title: Decks
 description: Generated NeoAnki local API operations for decks.
 audience: api
-contract_digest: sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271
+contract_digest: sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485
 parent: Local API reference
 permalink: /api/decks/
 ---
@@ -229,6 +229,6 @@ curl --request GET \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271`.
+Contract digest: `sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

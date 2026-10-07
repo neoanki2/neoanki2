@@ -205,7 +205,7 @@ public extension ItemStore {
         }
         let mediaCount = items.reduce(0) { total, record in
             total + record.item.fields.count { field in
-                if case .media = field.value { true } else { false }
+                field.value.mediaReference != nil
             }
         }
         return DeckDeletionImpact(

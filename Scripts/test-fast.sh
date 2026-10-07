@@ -17,6 +17,9 @@ swift test --filter NeoAnkiApplicationTests --parallel
 echo "==> Shared feature workflow tests"
 swift test --filter NeoAnkiFeaturesTests --parallel
 
+echo "==> Offline dictionaries and pack sync tests"
+swift test --filter NeoAnkiVocabularyKitTests --parallel
+
 echo "==> Local API registry and OpenAPI contract tests"
 swift test --filter NeoAnkiAPITests --parallel
 

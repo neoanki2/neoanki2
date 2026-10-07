@@ -34,7 +34,7 @@ struct MacCloudSyncSettings: View {
             Button("Create Backup & Enable") { isEnabled = true; Task { await onChange(true) } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your existing library is never uploaded without this confirmation. Local and iCloud libraries are merged, not replaced.")
+            Text("Your existing library is never uploaded without this confirmation. Local and iCloud libraries are merged, not replaced. Imported dictionaries upload automatically; other devices download them when you choose.")
         }
     }
 
@@ -52,6 +52,6 @@ struct MacCloudSyncSettings: View {
         if !isAvailable {
             return "This app build isn't signed for iCloud. Install a CloudKit-capable release to enable private sync. Your local library remains available."
         }
-        return "Each device opts in separately. Before the first upload, NeoAnki2 creates a verified SQLite backup and merges local and private CloudKit content."
+        return "Each device opts in separately. Library sync creates a verified SQLite backup and merges local and private CloudKit content. Dictionaries upload automatically and download on demand in Vocabulary Packs."
     }
 }

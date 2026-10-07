@@ -359,6 +359,9 @@ private struct AuthoredDeckLoader {
             ))
             return .init(package: nil, diagnostics: diagnostics)
         }
+        if manifest.version < 6, types.contains(where: { $0.fields.contains(where: { $0.kind == .imageOcclusion }) }) {
+            diagnostics.append(.init(file: manifest.location.file, line: manifest.location.line, code: "AD113", message: "Image occlusion requires authored deck version 6."))
+        }
         if manifest.version < 5,
            types.contains(where: { type in
                type.templates.contains { $0.layout != nil || $0.components != nil }
@@ -651,8 +654,8 @@ private struct AuthoredDeckLoader {
             throw DecodeFailure("AD110", "Manifest kind must be \"neoanki\".")
         }
         let version = try requiredInteger(object, "version")
-        guard (1...5).contains(version) else {
-            throw DecodeFailure("AD111", "Only authored deck versions 1 through 5 are supported.")
+        guard (1...6).contains(version) else {
+            throw DecodeFailure("AD111", "Only authored deck versions 1 through 6 are supported.")
         }
         return .init(
             version: version,
@@ -1262,6 +1265,19 @@ private struct AuthoredDeckCompiler {
                 throw DecodeFailure("AD244", "Number field must contain a finite JSON number.")
             }
             return .number(number.doubleValue)
+        case .imageOcclusion:
+            try exactKeys(object, required: ["imageOcclusion"])
+            guard let input = object["imageOcclusion"] as? [String: Any] else { throw DecodeFailure("AD248", "Occlusion needs an imageOcclusion object.") }
+            try exactKeys(input, required: ["image", "mode", "masks", "nextGroup"])
+            var imageField = definition
+            imageField.type = .image
+            let image = try compileValue(["media": input["image"] as Any], definition: imageField, mediaByHash: &mediaByHash, totalMediaBytes: &totalMediaBytes)
+            guard let ref = image.mediaReference else { throw DecodeFailure("AD248", "Occlusion image is missing.") }
+            var data = input
+            data["image"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ref))
+            let content = try JSONDecoder().decode(ImageOcclusionContent.self, from: JSONSerialization.data(withJSONObject: data))
+            try ImageOcclusionValidation.validate(content)
+            return .imageOcclusion(content)
         case .cloze:
             try exactKeys(object, required: ["cloze"])
             let parsed = try parseCloze(try requiredString(object, "cloze"))

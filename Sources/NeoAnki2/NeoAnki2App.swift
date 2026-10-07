@@ -208,7 +208,7 @@ struct NeoAnki2App: App {
                         status: syncStatusModel.status,
                         isAvailable: CKSyncEngineTransport.isAvailable,
                         onChange: { enabled in await updateCloudSync(enabled: enabled, library: library) },
-                        synchronize: { await syncService?.synchronize(); await syncStatusModel.refresh() }
+                        synchronize: { await syncService?.synchronize(); await vocabularyLibraryModel?.sync.refresh(); await syncStatusModel.refresh() }
                     )
                     .tabItem { Label("iCloud", systemImage: "icloud") }
                 }
@@ -274,7 +274,8 @@ struct NeoAnki2App: App {
             decksModel = newDecksModel
             library = payload.library
             schedulingModel = SchedulingModel(library: payload.library)
-            vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL)
+            vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL,
+                cloudTransport: !AppDatabase.isTesting && CKSyncEngineTransport.isAvailable ? CKVocabularyPackCloudTransport() : nil)
             let apiModel = APIControlModel(
                 library: payload.library,
                 vocabularyRootURL: payload.vocabularyRootURL
@@ -293,6 +294,7 @@ struct NeoAnki2App: App {
     @MainActor
     private func updateCloudSync(enabled: Bool, library: SQLiteLibraryRepository) async {
         guard enabled else {
+            vocabularyLibraryModel?.sync.setEnabled(false)
             syncStatusModel.stop()
             await syncService?.stop()
             syncService = nil
@@ -319,6 +321,7 @@ struct NeoAnki2App: App {
             syncStatusModel.observe(service)
             await service.start()
             await syncStatusModel.refresh()
+            vocabularyLibraryModel?.sync.setEnabled(true)
         } catch {
             syncStatusModel.stop(status: .accountUnavailable)
         }

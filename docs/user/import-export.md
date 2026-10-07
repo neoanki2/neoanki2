@@ -95,6 +95,11 @@ directory. NeoAnki validates it and copies it into the library's managed
 Vocabulary Packs directory. The source can then be moved or deleted. Use
 **Library → Vocabulary Packs…** to see the packs installed in this library.
 
+With iCloud sync enabled, imported packs upload automatically. Other devices
+receive the catalog and can choose **Download** to install a pack for offline
+use. **Remove from Device** keeps uploaded copies and saved cards. See
+[Dictionary packs]({{ '/user/sync-reminders-widgets.html' | relative_url }}#dictionary-packs).
+
 Select the deck that should receive the cards, then choose **File → Add from
 Vocabulary…** or use **Add from Vocabulary** in the deck toolbar. Choose an
 installed pack, search its local index, review the forms, pronunciations,
@@ -105,7 +110,7 @@ needs a different vocabulary card type, so meaning, pronunciation, and example
 cards can be added to the same deck across separate sessions. The window stays
 open so another word can be added immediately.
 
-Both operations are offline-only. Import reads and copies the selected local
+Import and lookup work offline. Import reads and copies the selected local
 package; lookup reads only the installed SQLite index and local media.
 
 ## Import JSON or CSV
@@ -244,7 +249,7 @@ The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
 of the exported tree. Unrelated library items are not loaded into the export snapshot.
 
-`.neodeck` version 5 is deliberately **content-only**. It does not contain:
+`.neodeck` version 6 is deliberately **content-only**. It does not contain:
 
 - review history, due dates, or scheduler parameters;
 - card or memory state, suspension state, or study statistics; or
@@ -332,3 +337,33 @@ accepted by this format. Validate a bundle before import with the
 - Use **`.neoanki`** for editable, reviewable source that defines a whole deck.
 - Use **`.neodeck`** to exchange a complete native deck with its schemas and
   media, understanding that learner progress is excluded.
+
+## Image occlusion transfers
+
+Portable decks written by this version use format 6 and include occlusion
+images, rectangular masks, groups, masking mode, and the next-group allocator.
+Readers still accept versions 1–5; image occlusion requires version 6. Authored
+bundles also accept manifest version 6 for image occlusion fields.
+
+Structured JSON import represents an occlusion cell as:
+
+```json
+{
+  "imageOcclusion": {
+    "path": "diagram.png",
+    "altText": "Diagram with labels to recall",
+    "mode": "hideAllRevealOne",
+    "masks": [{
+      "id": "00000000-0000-4000-8000-000000000001",
+      "group": 1,
+      "rect": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.1},
+      "answerText": "Optional revealed answer"
+    }],
+    "nextGroup": 2
+  }
+}
+```
+
+The path follows the existing JSON media path rules. Coordinates are fractions
+of the oriented image. `nextGroup` must exceed every mask group. CSV cannot
+represent image occlusion.

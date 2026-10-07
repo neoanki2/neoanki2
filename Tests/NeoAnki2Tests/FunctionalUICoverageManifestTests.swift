@@ -87,7 +87,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         )
         XCTAssertEqual(plan.schemaVersion, 1)
         XCTAssertEqual(plan.macos.count, 5)
-        XCTAssertEqual(plan.ios.count, 19)
+        XCTAssertEqual(plan.ios.count, 21)
 
         let macSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent(
@@ -153,7 +153,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
                     ["iPhone 17e", "iPad Pro 13-inch (M5)"],
                     "\(test) must cover both compact and regular-width layouts"
                 )
-            } else if test == "testCleanInstallCreateStudyAndPersistenceWithoutFixtures" {
+            } else if test == "testCleanInstallCreateStudyAndPersistenceWithoutFixtures" || test == "testCreateEditCancelGroupAndStudyOcclusion" || test == "testCanceledCreationDoesNotGenerateCards" {
                 XCTAssertEqual(
                     Set(assignments.map(\.device)),
                     ["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"],

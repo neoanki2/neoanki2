@@ -47,18 +47,27 @@ public final class DictionaryLookupModel {
     public private(set) var isSearching = false
     public private(set) var hasSearched = false
     private var generation = 0
-    private var cachedPack: (url: URL, pack: VocabularyPack)?
+    private var packTask: (url: URL, id: UUID, task: Task<VocabularyPack, Error>)?
     private let delay: Duration
     private let searchOverride: (@Sendable (String, URL, VocabularySearchMode) async throws -> [LexicalEntry])?
+    private let openPack: @Sendable (URL) async throws -> VocabularyPack
 
     public init(delay: Duration = .milliseconds(300)) {
         self.delay = delay
         searchOverride = nil
+        openPack = { try await VocabularyPack.open(at: $0) }
     }
 
     init(delay: Duration, search: @escaping @Sendable (String, URL, VocabularySearchMode) async throws -> [LexicalEntry]) {
         self.delay = delay
         searchOverride = search
+        openPack = { try await VocabularyPack.open(at: $0) }
+    }
+
+    init(delay: Duration, openPack: @escaping @Sendable (URL) async throws -> VocabularyPack) {
+        self.delay = delay
+        searchOverride = nil
+        self.openPack = openPack
     }
 
     public func invalidate() {
@@ -80,6 +89,8 @@ public final class DictionaryLookupModel {
             try await Task.sleep(for: delay)
             try Task.checkCancellation()
             let exact = try await search(query, url: packURL, mode: .exact)
+            try Task.checkCancellation()
+            guard request == generation else { return }
             let entries = exact.isEmpty ? try await search(query, url: packURL, mode: .prefix) : exact
             guard request == generation, !Task.isCancelled else { return }
             results = entries
@@ -96,13 +107,23 @@ public final class DictionaryLookupModel {
     }
 
     private func search(_ query: String, url: URL, mode: VocabularySearchMode) async throws -> [LexicalEntry] {
+        try Task.checkCancellation()
         if let searchOverride { return try await searchOverride(query, url, mode) }
-        let pack: VocabularyPack
-        if let cachedPack, cachedPack.url == url { pack = cachedPack.pack }
-        else {
-            pack = try await VocabularyPack.open(at: url)
-            cachedPack = (url, pack)
+        if packTask?.url != url {
+            packTask?.task.cancel()
+            let openPack = openPack
+            // Share validation even before it finishes. Canceling one typing
+            // request must not start another full checksum of the same pack.
+            packTask = (url, UUID(), Task.detached { try await openPack(url) })
         }
+        guard let pending = packTask else { throw CancellationError() }
+        let pack: VocabularyPack
+        do { pack = try await pending.task.value }
+        catch {
+            if packTask?.id == pending.id { packTask = nil }
+            throw error
+        }
+        try Task.checkCancellation()
         return try await pack.search(query: query, mode: mode, limit: 50)
     }
 }

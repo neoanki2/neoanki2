@@ -51,6 +51,13 @@
   },
   "features": [
     {
+      "id": "content-image-occlusion",
+      "name": "Create, group, and study image occlusion masks",
+      "article": "user/content-and-media.md",
+      "sources": ["Sources/NeoAnkiSharedUI/ImageOcclusionView.swift", "Sources/NeoAnkiIOS/MobileImageOcclusionTestHost.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Content/ImageOcclusion.swift"],
+      "tests": ["Tests/NeoAnki2Tests/ImageOcclusionCanvasTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ImageOcclusionTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
+    },
+    {
       "id": "app-first-launch",
       "name": "First launch and local library",
       "article": "user/getting-started.md",
@@ -399,6 +406,13 @@
       "article": "user/import-export.md",
       "sources": ["Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnki2/VocabularyLibraryModel.swift", "Sources/NeoAnkiIOS/MobileVocabularyLibraryModel.swift", "Sources/VocabularyDeckBuilder/VocabularyDeckBuilderView.swift"],
       "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "UITests/NeoAnki2UITests/VocabularyUITests.swift", "Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift", "Tests/VocabularyDeckBuilderTests/VocabularyDeckBuilderTests.swift"]
+    },
+    {
+      "id": "vocabulary-pack-sync",
+      "name": "Sync dictionary catalogs and download offline packs on demand",
+      "article": "user/sync-reminders-widgets.md",
+      "sources": ["Sources/NeoAnkiVocabularyKit/VocabularyPackCloudTransfer.swift", "Sources/NeoAnkiVocabularyKit/VocabularyPackSyncModel.swift", "Sources/NeoAnkiVocabularyKit/InstalledVocabularyPackStore.swift", "Sources/NeoAnkiCloudSync/CKVocabularyPackCloudTransport.swift", "Sources/NeoAnkiSharedUI/VocabularyPackCloudList.swift", "Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/MobileVocabularyCloudUITestTransport.swift"],
+      "tests": ["Tests/NeoAnkiVocabularyKitTests/VocabularyPackSyncTests.swift", "Tests/NeoAnkiApplicationTests/VocabularyPackCloudTransportTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
     },
     {
       "id": "deck-cli",

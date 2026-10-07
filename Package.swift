@@ -101,6 +101,7 @@ let package = Package(
             name: "NeoAnkiCloudSync",
             dependencies: [
                 "NeoAnkiApplication",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
             path: "Sources/NeoAnkiCloudSync",
@@ -210,6 +211,7 @@ let package = Package(
             dependencies: [
                 "NeoAnkiApplication",
                 "NeoAnkiCloudSync",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
             ],

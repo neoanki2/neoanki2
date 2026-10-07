@@ -112,7 +112,7 @@ struct StudySessionView: View {
                     if let card = session.currentCard {
                         MobileStudyCompositionView(template: card.template, item: card.item,
                             mediaStore: session.mediaStore, isAnswerRevealed: session.isAnswerRevealed,
-                            clozeGroup: card.card.clozeGroup)
+                            occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(24)
                     }
@@ -186,7 +186,7 @@ struct StudySessionView: View {
                 VStack(spacing: 24) {
                     MobileStudyCompositionView(
                         template: card.template, item: card.item, mediaStore: session.mediaStore,
-                        isAnswerRevealed: session.isAnswerRevealed, clozeGroup: card.card.clozeGroup
+                        isAnswerRevealed: session.isAnswerRevealed, occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     if !session.isAnswerRevealed {
@@ -268,7 +268,7 @@ struct StudySessionView: View {
     @ViewBuilder
     private func interaction(for card: DueCard) -> some View {
         switch card.template.interaction {
-        case .reveal, .cloze:
+        case .reveal, .cloze, .imageOcclusion:
             EmptyView()
         case .type:
             TextField("Type your answer", text: Binding(get: { session.typedAnswer }, set: { session.updateTypedAnswer($0) }), axis: .vertical)
@@ -559,6 +559,8 @@ struct MobileContentValueView: View {
     var mediaBehavior: MediaBehavior = .default
     var revealMode: RevealMode = .always
     var isAnswerRevealed = true
+    var isStudyContent = false
+    var occlusionGroup: Int? = nil
     var clozeGroup: Int? = nil
 
     private var visibility: SharedStudyContentVisibility {
@@ -601,6 +603,8 @@ struct MobileContentValueView: View {
             Text(Self.attributed(spans))
         case let .number(number):
             Text(number, format: .number)
+        case let .imageOcclusion(content):
+            ImageOcclusionStudyView(content: content, mediaStore: mediaStore, group: content.displayGroup(cardGroup: occlusionGroup, allowsPreview: !isStudyContent && isAnswerRevealed), revealed: isAnswerRevealed)
         case let .cloze(text, blanks):
             Text(SharedStudyClozePresentation.displayText(
                 from: text,

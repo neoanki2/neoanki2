@@ -9,7 +9,7 @@ permalink: /user/privacy/
 
 # Privacy policy
 
-Effective October 3, 2026. NeoAnki2 is provided by Oleksii Grachov.
+Effective October 6, 2026. NeoAnki2 is provided by Oleksii Grachov.
 
 ## Your study data
 
@@ -20,13 +20,22 @@ send your study data to servers operated by the developer.
 
 ## Optional iCloud sync
 
-iCloud sync is off until you enable it. Before its first upload, the app creates
-a local backup. When enabled, library content and associated media synchronize
+iCloud sync is off until you enable it. Before library content first uploads,
+the app creates a local library backup. When enabled, library content and associated media synchronize
 through your private CloudKit database in your Apple iCloud account. Saved
 spoken responses and their private recording files stay on the device and are
 not uploaded through this sync feature. The developer does not have access to
 your private database. Apple provides this
 service under its [privacy policy](https://www.apple.com/legal/privacy/).
+
+The same optional iCloud setting also enables vocabulary-pack synchronization.
+Installed dictionary packages upload automatically to your private iCloud
+database. Other devices fetch the catalog of available packs; a dictionary's
+files download only when you choose Download. Downloaded packs remain available
+offline. No dictionaries are shared publicly or sent to a developer-operated
+server.
+Removing a pack from one device keeps its iCloud copy and cards already created
+from that pack.
 
 Disabling sync stops future synchronization on that device. It does not delete
 copies already stored in iCloud or on your other devices. Manage those copies
@@ -40,7 +49,10 @@ answers. Media attached to study items remains in your library and is included
 in private iCloud sync when you enable it. Temporary comparison recordings are
 removed when the card changes or the study session closes. Saved spoken
 responses remain on the device and are excluded from private iCloud sync.
-The app requests notification access only when you enable study reminders.
+On iPhone and iPad, the app may request permission to show a due-card badge when
+your library first has due cards. It requests alert and sound permission when you
+enable study reminders. Both permissions are optional; you can continue studying
+without them.
 Due Cards widgets use shared on-device storage to show aggregate due
 information. You can revoke permissions in device Settings.
 

@@ -1922,6 +1922,8 @@ public actor NeoAnkiAPIService {
             case "empty": allowedContent = common
             case "text": allowedContent = common.union(["text", "lang"])
             case "rich": allowedContent = common.union(["spans"])
+            case "imageOcclusion":
+                allowedContent = common.union(["mediaId", "kind", "sha256", "fileExtension", "altText", "reservationId", "occlusionMode", "masks", "nextGroup"])
             case "media":
                 allowedContent = common.union([
                     "mediaId", "kind", "sha256", "fileExtension", "durationMs",
@@ -1940,6 +1942,17 @@ public actor NeoAnkiAPIService {
                         allowed: ["text", "styles", "textColor", "textSize", "link"],
                         pointer: contentPointer + "/spans/\(spanIndex)"
                     )
+                }
+            }
+            if let masks = content["masks"] as? [Any] {
+                for (index, raw) in masks.enumerated() {
+                    guard let mask = raw as? [String: Any] else { continue }
+                    let pointer = contentPointer + "/masks/\(index)"
+                    try rejectUnknownMembers(mask, allowed: ["id", "group", "rect", "answerText"], pointer: pointer)
+                    if let id = mask["id"] as? String { _ = try parseUUID(id, pointer: pointer + "/id") }
+                    if let rect = mask["rect"] as? [String: Any] {
+                        try rejectUnknownMembers(rect, allowed: ["x", "y", "width", "height"], pointer: pointer + "/rect")
+                    }
                 }
             }
             if let blanks = content["blanks"] as? [Any] {

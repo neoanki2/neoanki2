@@ -26,6 +26,9 @@ public enum ContentVisibilityPolicy {
         }
         // Cloze content masks individual blanks in its renderer; concealing the
         // whole value would remove the sentence context needed to answer it.
+        if case .imageOcclusion = value {
+            return .init(rendering: .content, shouldResolveMedia: true)
+        }
         if case .cloze = value {
             return .init(rendering: .content, shouldResolveMedia: false)
         }

@@ -30,4 +30,5 @@ public enum FieldType: String, Codable, Sendable, CaseIterable {
     case video
     case number
     case cloze
+    case imageOcclusion
 }
