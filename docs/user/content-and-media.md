@@ -16,7 +16,7 @@ its name and visual description. The editor shows a preview, and Save requires
 a visual description for any attached image or GIF, including optional fields.
 Description changes are saved with the image.
 
-An item type can define Text, Rich Text, Number, Cloze, Image, GIF, Audio, and
+An item type can define Text, Rich Text, Number, Cloze, Image Occlusion, Image, GIF, Audio, and
 Video fields. The field type controls authoring, validation, storage, and
 native rendering.
 
@@ -88,6 +88,40 @@ NeoAnki2 adjusts blank positions as text is edited. If an edit crosses a
 blank's boundary, that blank is removed and the editor asks you to mark it
 again. Overlapping or otherwise invalid ranges are rejected. A required Cloze
 field must have both non-empty text and at least one blank.
+
+## Image occlusion
+
+Use **Image Occlusion** when you want to recall labels or details in a diagram.
+In Item Types, choose the **Image Occlusion** starter, or add an Image Occlusion
+field and matching Card setup to a custom type. The starter is created only
+when you choose it.
+
+1. Add an item, choose an image from Files (or Photos on iPhone/iPad), and open
+   the mask editor.
+2. Enter an image description that explains the diagram without giving away
+   the masked answers.
+3. Draw rectangles over the details to hide, or choose **Add Region** and edit
+   its position and size as percentages of the image.
+4. Use **Select / Move** to drag a region. Drag its corner handle to resize it.
+   Select regions in the list and use **Group Into** to test them together.
+   **Ungroup** gives selected regions their own new cards.
+5. Choose **Hide all, reveal one** (the default) to keep other groups covered,
+   or **Hide one, reveal one** to leave the other groups visible.
+6. Use **Preview Cards** to inspect a group before and after revealing it.
+   Optional region answer text appears only after reveal.
+7. Choose **Done**, then save the item. Each distinct group generates one card.
+
+Undo and redo apply to mask edits. Zoom controls enlarge the canvas; turn on **Pan Image** to scroll
+without editing masks. **Remove Image** clears an optional field after confirmation. Cancel discards the mask editor's draft. Replacing an image asks for
+confirmation, clears its masks, and allocates new groups. Moving or resizing
+existing masks, changing descriptions, or switching masking modes preserves
+matching cards' review history. Grouping keeps the destination group's history;
+ungrouping creates new cards.
+
+During study, the numbered outline identifies the group to recall. **Show
+Answer** reveals it, then grade your recall normally. Overlapping masks reveal
+the tested group's full area. An unavailable image shows a repair message.
+Image occlusion supports still images and rectangular masks.
 
 ## Attach media
 

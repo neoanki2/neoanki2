@@ -28,6 +28,7 @@ the local library. This is a build capability, not an iCloud account error.
 
 - [Set up iCloud sync](#set-up-icloud-sync)
 - [What syncs](#what-syncs)
+- [Dictionary packs](#dictionary-packs)
 - [Sync status and issues](#sync-status-and-issues)
 - [Troubleshoot iCloud](#troubleshoot-icloud)
 - [Daily reminders](#daily-reminders)
@@ -103,11 +104,34 @@ These remain local to each device:
 - the iCloud opt-in itself;
 - the Fail / Pass grading-control preference;
 - reminder time and scope;
-- installed offline vocabulary packs;
 - persistent Audio Submission recordings and their private-only media; and
 - widget snapshots, which contain aggregate due information only.
 
 Use portable deck export when you need an explicit file transfer or archive.
+
+## Dictionary packs
+
+When iCloud sync is enabled, imported vocabulary packs upload automatically to
+your private iCloud library. Other devices receive the dictionary catalog
+automatically; the dictionary files download only when you choose **Download**.
+
+Open **Library → Vocabulary Packs…** on Mac or **Create → Vocabulary Packs** on
+iOS. **On This Device** lists packs available offline. **In iCloud** shows the
+available dictionaries and their download sizes. Choose **Download** to install
+one, or cancel a download and resume it later. The catalog refreshes while the
+app is running; **Refresh** and **Sync Now** also check for changes.
+
+**Remove from Device** frees local storage and keeps the uploaded copy and saved
+cards. Disabling sync stops transfers; installed dictionaries remain available
+offline. If another version of the same pack is available, **Replace Download**
+asks before replacing it. The existing version stays usable until the new copy
+has downloaded and passed validation.
+
+Large packs consume iCloud storage, network bandwidth, and temporary local
+storage during installation. Uploads retry automatically. A pack appears on
+other devices only after its complete upload, and interrupted transfers reuse
+completed chunks when retried. Dictionary transfer progress and errors appear
+in Vocabulary Packs, separately from the card library's sync status.
 
 ## Sync status and issues
 

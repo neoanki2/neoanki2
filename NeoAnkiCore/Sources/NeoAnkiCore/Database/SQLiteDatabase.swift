@@ -238,6 +238,10 @@ actor SQLiteDatabase {
                 try migrateNotesToItemsSchemaIfNeeded()
             }
 
+            if current < 30, try tableExists("cards"), !(try columnExists("occlusion_group", in: "cards")) {
+                try execute("ALTER TABLE cards ADD COLUMN occlusion_group INTEGER;")
+            }
+
             if current < 4 {
                 for sql in Schema.migrationV4Statements {
                     try execute(sql)
@@ -2252,10 +2256,10 @@ actor SQLiteDatabase {
                 """
                 INSERT INTO cards (
                     id, item_id, template_id, skill, memory, due_at, phase, lapses,
-                    is_suspended, deck_id, cloze_group, memory_model_version,
+                    is_suspended, deck_id, cloze_group, occlusion_group, memory_model_version,
                     memory_parameter_set_id, scheduling_history_origin
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """
             )
             let browseStatement = try prepareStatement(
@@ -2327,6 +2331,7 @@ actor SQLiteDatabase {
                             .int(card.isSuspended ? 1 : 0),
                             card.deckID.map { .text($0.uuidString) } ?? .null,
                             card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                    card.occlusionGroup.map { .int(Int64($0)) } ?? .null,
                             card.memoryModelVersion.map(Binding.text) ?? .null,
                             card.memoryParameterSetID.map { .text($0.uuidString) } ?? .null,
                             card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
@@ -2706,10 +2711,10 @@ actor SQLiteDatabase {
                 """
                 INSERT INTO cards (
                     id, item_id, template_id, skill, memory, due_at, phase, lapses,
-                    is_suspended, deck_id, cloze_group, memory_model_version,
+                    is_suspended, deck_id, cloze_group, occlusion_group, memory_model_version,
                     memory_parameter_set_id, scheduling_history_origin
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 bindings: [
                     .text(card.id.uuidString),
@@ -2723,6 +2728,7 @@ actor SQLiteDatabase {
                     .int(card.isSuspended ? 1 : 0),
                     card.deckID.map { .text($0.uuidString) } ?? .null,
                     card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                    card.occlusionGroup.map { .int(Int64($0)) } ?? .null,
                     card.memoryModelVersion.map(Binding.text) ?? .null,
                     card.memoryParameterSetID.map { .text($0.uuidString) } ?? .null,
                     card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
@@ -2741,9 +2747,9 @@ actor SQLiteDatabase {
             """
             INSERT INTO cards (
                 id, item_id, template_id, skill, memory, due_at, phase, lapses,
-                is_suspended, deck_id, cloze_group, memory_model_version,
+                is_suspended, deck_id, cloze_group, occlusion_group, memory_model_version,
                 memory_parameter_set_id, scheduling_history_origin
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 item_id = excluded.item_id,
                 template_id = excluded.template_id,
@@ -2755,6 +2761,7 @@ actor SQLiteDatabase {
                 is_suspended = excluded.is_suspended,
                 deck_id = excluded.deck_id,
                 cloze_group = excluded.cloze_group,
+                occlusion_group = excluded.occlusion_group,
                 memory_model_version = excluded.memory_model_version,
                 memory_parameter_set_id = excluded.memory_parameter_set_id,
                 scheduling_history_origin = excluded.scheduling_history_origin;
@@ -2766,6 +2773,7 @@ actor SQLiteDatabase {
                 .int(card.isSuspended ? 1 : 0),
                 card.deckID.map { .text($0.uuidString) } ?? .null,
                 card.clozeGroup.map { .int(Int64($0)) } ?? .null,
+                    card.occlusionGroup.map { .int(Int64($0)) } ?? .null,
                 card.memoryModelVersion.map(Binding.text) ?? .null,
                 card.memoryParameterSetID.map { .text($0.uuidString) } ?? .null,
                 card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
@@ -2776,7 +2784,7 @@ actor SQLiteDatabase {
     func fetchCard(id: UUID) throws -> Card? {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group,
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group, occlusion_group,
                    memory_model_version, memory_parameter_set_id, scheduling_history_origin
             FROM cards
             WHERE id = ?
@@ -2791,7 +2799,7 @@ actor SQLiteDatabase {
     func fetchAllCards() throws -> [Card] {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group,
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group, occlusion_group,
                    memory_model_version, memory_parameter_set_id, scheduling_history_origin
             FROM cards
             ORDER BY id ASC;
@@ -2811,7 +2819,7 @@ actor SQLiteDatabase {
         guard try tableExists("cards") else { return false }
         for column in [
             "id", "item_id", "template_id", "skill", "memory", "is_suspended",
-            "deck_id", "cloze_group", "memory_model_version",
+            "deck_id", "cloze_group", "occlusion_group", "memory_model_version",
             "memory_parameter_set_id", "scheduling_history_origin",
         ] where !(try columnExists(column, in: "cards")) {
             return false
@@ -3465,7 +3473,7 @@ actor SQLiteDatabase {
     ) -> (sql: String, bindings: [Binding]) {
         let cardColumns = [
             "id", "item_id", "template_id", "skill", "memory", "is_suspended",
-            "deck_id", "due_at", "cloze_group", "phase", "lapses",
+            "deck_id", "due_at", "cloze_group", "occlusion_group", "phase", "lapses",
             "memory_model_version", "memory_parameter_set_id", "scheduling_history_origin",
         ].joined(separator: ", ")
         var commonTableExpressions = [
@@ -4638,7 +4646,7 @@ actor SQLiteDatabase {
             let existing = try query(
                 """
                 SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group, cards.occlusion_group,
                        cards.memory_model_version, cards.memory_parameter_set_id,
                        cards.scheduling_history_origin
                 FROM api_card_reservations AS reservations
@@ -4658,7 +4666,7 @@ actor SQLiteDatabase {
             var rows = try query(
                 """
                 SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                       cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group, cards.occlusion_group,
                        cards.memory_model_version, cards.memory_parameter_set_id,
                        cards.scheduling_history_origin
                 FROM cards
@@ -4690,7 +4698,7 @@ actor SQLiteDatabase {
 
                     SELECT eligible_due.id, eligible_due.item_id, eligible_due.template_id,
                            eligible_due.skill, eligible_due.memory, eligible_due.is_suspended,
-                           eligible_due.deck_id, eligible_due.cloze_group,
+                           eligible_due.deck_id, eligible_due.cloze_group, eligible_due.occlusion_group,
                            eligible_due.memory_model_version,
                            eligible_due.memory_parameter_set_id,
                            eligible_due.scheduling_history_origin
@@ -4762,7 +4770,7 @@ actor SQLiteDatabase {
                 let scopeFilter = scopeClause(scope, column: "cards.deck_id")
                 var sql = """
                     SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                           cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                           cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group, cards.occlusion_group,
                            cards.memory_model_version, cards.memory_parameter_set_id,
                            cards.scheduling_history_origin
                     FROM cards
@@ -4789,7 +4797,7 @@ actor SQLiteDatabase {
             var sql = eligible.sql + """
 
                 SELECT id, item_id, template_id, skill, memory, is_suspended,
-                       deck_id, cloze_group, memory_model_version,
+                       deck_id, cloze_group, occlusion_group, memory_model_version,
                        memory_parameter_set_id, scheduling_history_origin
                 FROM eligible_due
                 WHERE phase = 'new'
@@ -4802,7 +4810,7 @@ actor SQLiteDatabase {
         let scopeFilter = scopeClause(scope, column: "cards.deck_id")
         var sql = """
             SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
-                   cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group,
+                   cards.memory, cards.is_suspended, cards.deck_id, cards.cloze_group, cards.occlusion_group,
                    cards.memory_model_version, cards.memory_parameter_set_id,
                    cards.scheduling_history_origin
             FROM cards
@@ -5328,7 +5336,7 @@ actor SQLiteDatabase {
     func fetchCards(for itemID: UUID) throws -> [Card] {
         let rows = try query(
             """
-            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group,
+            SELECT id, item_id, template_id, skill, memory, is_suspended, deck_id, cloze_group, occlusion_group,
                    memory_model_version, memory_parameter_set_id, scheduling_history_origin
             FROM cards
             WHERE item_id = ?;
@@ -5831,6 +5839,7 @@ actor SQLiteDatabase {
     private struct CardIdentity: Hashable {
         let templateID: UUID
         let clozeGroup: Int?
+        let occlusionGroup: Int?
     }
 
     /// One retirement calculation shared by preparation, transactional
@@ -5851,16 +5860,13 @@ actor SQLiteDatabase {
         let previousTemplateIDs = Set(previous.templates.map(\.id))
         var retired: Set<UUID> = []
         for item in items {
-            var desiredGroupsByTemplate: [UUID: Set<Int?>] = [:]
-            desiredGroupsByTemplate.reserveCapacity(updatedTemplates.count)
+            var desired: Set<CardIdentity> = []
             for template in updated.templates {
-                guard CardGenerator.shouldGenerate(template, for: item) else {
-                    desiredGroupsByTemplate[template.id] = []
-                    continue
-                }
-                desiredGroupsByTemplate[template.id] = template.interaction == .cloze
-                    ? Set(CardGenerator.clozeGroups(for: template, item: item).map(Optional.some))
-                    : [nil]
+                var type = updated
+                type.templates = [template]
+                desired.formUnion(CardGenerator.cards(for: item, type: type).map {
+                    CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup, occlusionGroup: $0.occlusionGroup)
+                })
             }
             for card in try fetchCards(for: item.id) {
                 guard updatedTemplates[card.templateID] != nil else {
@@ -5869,7 +5875,7 @@ actor SQLiteDatabase {
                     }
                     continue
                 }
-                if desiredGroupsByTemplate[card.templateID]?.contains(card.clozeGroup) != true {
+                if !desired.contains(CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup, occlusionGroup: card.occlusionGroup)) {
                     retired.insert(card.id)
                 }
             }
@@ -5919,7 +5925,7 @@ actor SQLiteDatabase {
     private func reconcileCards(for itemID: UUID, desired: [Card]) throws {
         var existingByIdentity: [CardIdentity: Card] = [:]
         for card in try fetchCards(for: itemID) {
-            let identity = CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+            let identity = CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup, occlusionGroup: card.occlusionGroup)
             if existingByIdentity[identity] == nil {
                 existingByIdentity[identity] = card
             } else {
@@ -5928,14 +5934,14 @@ actor SQLiteDatabase {
         }
 
         let desiredIdentities = Set(desired.map {
-            CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup)
+            CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup, occlusionGroup: $0.occlusionGroup)
         })
         for (identity, card) in existingByIdentity where !desiredIdentities.contains(identity) {
             try deleteCard(id: card.id)
         }
 
         for card in desired {
-            let identity = CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+            let identity = CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup, occlusionGroup: card.occlusionGroup)
             if let existing = existingByIdentity[identity] {
                 let skillData = try encode(card.skill)
                 try execute(
@@ -5988,17 +5994,17 @@ actor SQLiteDatabase {
                 var singleTemplateType = updated
                 singleTemplateType.templates = [template]
                 let desiredCards = CardGenerator.cards(for: item, type: singleTemplateType, now: now)
-                let desiredGroups = Set(desiredCards.map(\.clozeGroup))
+                let desiredGroups = Set(desiredCards.map { CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup, occlusionGroup: $0.occlusionGroup) })
                 let currentCards = existingCards.filter { $0.templateID == template.id }
 
-                let currentGroups = Set(currentCards.map(\.clozeGroup))
-                let missingCards = desiredCards.filter { !currentGroups.contains($0.clozeGroup) }
+                let currentGroups = Set(currentCards.map { CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup, occlusionGroup: $0.occlusionGroup) })
+                let missingCards = desiredCards.filter { !currentGroups.contains(CardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup, occlusionGroup: $0.occlusionGroup)) }
                 if !missingCards.isEmpty {
                     try insertCards(missingCards)
                 }
 
                 for card in currentCards
-                    where desiredGroups.contains(card.clozeGroup) && card.skill != template.skill {
+                    where desiredGroups.contains(CardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup, occlusionGroup: card.occlusionGroup)) && card.skill != template.skill {
                     try updateCardSkill(card.id, skill: template.skill)
                 }
             }
@@ -6008,7 +6014,7 @@ actor SQLiteDatabase {
     private func mediaReferenceCounts(in item: Item) -> [String: Int] {
         var counts: [String: Int] = [:]
         for field in item.fields {
-            guard case let .media(ref) = field.value,
+            guard let ref = field.value.mediaReference,
                   isValidMediaHash(ref.assetHash),
                   MediaValidation.allowedExtensions(for: ref.kind)
                       .contains(ref.fileExtension.lowercased())
@@ -6022,7 +6028,7 @@ actor SQLiteDatabase {
 
     private func mediaReservationIDs(in item: Item) -> Set<UUID> {
         Set(item.fields.compactMap { field in
-            guard case let .media(ref) = field.value else { return nil }
+            guard let ref = field.value.mediaReference else { return nil }
             return ref.reservationID
         })
     }
@@ -6106,7 +6112,7 @@ actor SQLiteDatabase {
     ) throws {
         var existingCounts = previous.map(mediaReferenceCounts(in:)) ?? [:]
         for field in item.fields {
-            guard case let .media(ref) = field.value else { continue }
+            guard let ref = field.value.mediaReference else { continue }
             if existingCounts[ref.assetHash, default: 0] > 0 {
                 existingCounts[ref.assetHash, default: 0] -= 1
                 continue
@@ -6179,7 +6185,7 @@ actor SQLiteDatabase {
         for persisted in try fetchItems() {
             var descriptors: [String: MediaAssetDescriptor] = [:]
             for field in persisted.item.fields {
-                guard case let .media(ref) = field.value,
+                guard let ref = field.value.mediaReference,
                       isValidMediaHash(ref.assetHash),
                       MediaValidation.allowedExtensions(for: ref.kind)
                           .contains(ref.fileExtension.lowercased())
@@ -6570,6 +6576,7 @@ actor SQLiteDatabase {
             schedulingHistoryOrigin: schedulingHistoryOrigin,
             isSuspended: suspendedValue != 0,
             deckID: deckID,
+            occlusionGroup: (row["occlusion_group"] as? Int64).map(Int.init),
             clozeGroup: clozeGroup
         )
     }

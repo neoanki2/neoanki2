@@ -76,6 +76,7 @@ extension LibraryFeatureModel {
                     throw ItemDraftError.invalidNumber(field.name)
                 }
                 content[field.id] = .number(number)
+            case .imageOcclusion: content[field.id] = .empty
             case .cloze: content[field.id] = .cloze(input, blanks: [])
             case .audio, .image, .gif, .video: throw ItemDraftError.unsupportedValue(field.name)
             }

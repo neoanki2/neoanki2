@@ -531,9 +531,19 @@ enum SHA256File {
         defer { try? handle.close() }
         var hasher = SHA256()
         do {
-            while let chunk = try handle.read(upToCount: 1_048_576), !chunk.isEmpty {
-                hasher.update(data: chunk)
+            while true {
+                try Task.checkCancellation()
+                // FileHandle's bridged read buffers are autoreleased. Drain each
+                // chunk instead of retaining a dictionary-sized copy until the
+                // surrounding task's autorelease pool is drained on iOS.
+                let count = try autoreleasepool {
+                    let chunk = try handle.read(upToCount: 1_048_576) ?? Data()
+                    hasher.update(data: chunk)
+                    return chunk.count
+                }
+                if count == 0 { break }
             }
+        } catch is CancellationError { throw CancellationError()
         } catch { throw VocabularyPackError.ioFailure(error.localizedDescription) }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }

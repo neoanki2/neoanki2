@@ -226,6 +226,8 @@ struct AddItemView: View {
     @State private var richValues: [UUID: [Span]] = [:]
     @State private var mediaValues: [UUID: MediaRef] = [:]
     @State private var mediaDescriptions: [UUID: String] = [:]
+    @State private var occlusionDraftReferences: [MediaRef] = []
+    @State private var occlusions: [UUID: ImageOcclusionContent] = [:]
     @State private var clozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var selectedMediaField: FieldDef?
     @State private var selectedPhoto: PhotosPickerItem?
@@ -234,8 +236,14 @@ struct AddItemView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    private func closeEditor() {
+        let refs = occlusionDraftReferences + occlusions.values.map(\.image)
+        Task { for ref in refs { try? await model.mediaStore?.discardDraftReference(ref) } }
+        dismiss()
+    }
+
     private var hasChanges: Bool {
-        values.values.contains { !$0.isEmpty } || !richValues.isEmpty || !mediaValues.isEmpty || !clozeBlanks.isEmpty || mediaDescriptions.values.contains { !$0.isEmpty }
+        !occlusions.isEmpty || values.values.contains { !$0.isEmpty } || !richValues.isEmpty || !mediaValues.isEmpty || !clozeBlanks.isEmpty || mediaDescriptions.values.contains { !$0.isEmpty }
     }
 
     private var selectedType: ItemType? {
@@ -317,7 +325,7 @@ struct AddItemView: View {
                         .accessibilityIdentifier("add-card-keyboard-done")
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { if hasChanges { confirmsDiscard = true } else { dismiss() } }
+                    Button("Cancel") { if hasChanges { confirmsDiscard = true } else { closeEditor() } }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
@@ -332,7 +340,7 @@ struct AddItemView: View {
             }
             .interactiveDismissDisabled(hasChanges)
             .confirmationDialog("Discard this item?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
-                Button("Discard Changes", role: .destructive) { dismiss() }
+                Button("Discard Changes", role: .destructive) { closeEditor() }
                 Button("Keep Editing", role: .cancel) {}
             }
             .alert("Could Not Save Item", isPresented: errorBinding) {
@@ -422,6 +430,11 @@ struct AddItemView: View {
                     Button(role: .destructive) { mediaValues[field.id] = nil } label: { Text("Remove Media").frame(minHeight: 44) }
                 }
             }
+        case .imageOcclusion:
+            ImageOcclusionFieldEditor(label: field.name, content: Binding(get: { occlusions[field.id] }, set: { value in
+                if let value { occlusionDraftReferences.append(value.image) }
+                occlusions[field.id] = value
+            }), mediaStore: model.mediaStore)
         case .cloze:
             ClozeSelectionEditor(text: valueBinding(for: field.id), blanks: Binding(
                 get: { clozeBlanks[field.id] ?? [] },
@@ -437,6 +450,9 @@ struct AddItemView: View {
 
     private func validationIssue(_ field: FieldDef) -> String? {
         let value = (values[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if field.type == .imageOcclusion, let content = occlusions[field.id] {
+            do { try ImageOcclusionValidation.validate(content) } catch { return error.localizedDescription }
+        }
         if field.type == .number, !value.isEmpty {
             let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
             if formatter.number(from: value) == nil { return "Enter a valid number." }
@@ -454,7 +470,7 @@ struct AddItemView: View {
         for (id, spans) in richValues { text[id] = spans.map(\.text).joined() }
         return selectedType.fields.allSatisfy { validationIssue($0) == nil }
             && ItemDraftValidation.canSave(
-                ItemDraftContent(text: text, media: mediaValues, mediaDescriptions: mediaDescriptions, clozeBlanks: clozeBlanks),
+                ItemDraftContent(text: text, media: mediaValues, mediaDescriptions: mediaDescriptions, clozeBlanks: clozeBlanks, occlusions: occlusions),
                 itemType: selectedType
             )
     }
@@ -490,12 +506,13 @@ struct AddItemView: View {
                         let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
                         guard raw.isEmpty || formatter.number(from: raw) != nil else { throw ItemDraftError.invalidNumber(field.name) }
                         content[field.id] = raw.isEmpty ? .empty : .number(formatter.number(from: raw)!.doubleValue)
+                    case .imageOcclusion: content[field.id] = occlusions[field.id].map(ContentValue.imageOcclusion) ?? .empty
                     case .cloze: content[field.id] = .cloze(values[field.id] ?? "", blanks: clozeBlanks[field.id] ?? [])
                     case .text: content[field.id] = .text(values[field.id] ?? "")
                     }
                 }
                 try await model.createItem(itemType: selectedType, deckID: selectedDeckID, values: content)
-                dismiss()
+                closeEditor()
             } catch {
                 errorMessage = MobileAppModel.message(for: error)
             }
@@ -715,6 +732,7 @@ private struct ItemDetailView: View {
 
     private func cardMaturityName(_ detail: CardMaturityDetail, itemType: ItemType) -> String {
         let setup = itemType.templates.first(where: { $0.id == detail.templateID })?.name ?? "Card"
+        if let group = detail.occlusionGroup { return "\(setup) · region group \(group)" }
         if let group = detail.clozeGroup { return "\(setup) · blank \(group)" }
         return setup
     }
@@ -761,6 +779,7 @@ struct ItemEditMobileView: View {
     @State private var isImportingMediaFile = false
     @State private var isCapturingMedia = false
     @State private var confirmsDiscard = false
+    @State private var occlusionDraftReferences: [MediaRef] = []
 
     init(model: MobileAppModel, loaded: (item: Item, itemType: ItemType), onSaved: @escaping ((item: Item, itemType: ItemType)) -> Void) {
         self.model = model
@@ -769,7 +788,7 @@ struct ItemEditMobileView: View {
         itemType = loaded.itemType
         self.onSaved = onSaved
         _mediaDescriptions = State(initialValue: Dictionary(uniqueKeysWithValues: loaded.item.fields.compactMap { value in
-            guard case let .media(reference) = value.value else { return nil }
+            guard let reference = value.value.mediaReference else { return nil }
             return (value.fieldID, reference.altText ?? "")
         }))
     }
@@ -797,14 +816,14 @@ struct ItemEditMobileView: View {
             .navigationTitle("Edit Item").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { if item == originalItem { dismiss() } else { confirmsDiscard = true } }
+                    Button("Cancel") { if item == originalItem { closeEditor() } else { confirmsDiscard = true } }
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(itemType.fields.contains { fieldIssue($0) != nil }) }
             }
             .interactiveDismissDisabled(item != originalItem)
             .alert("Could Not Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
             .confirmationDialog("Discard changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
-                Button("Discard Changes", role: .destructive) { dismiss() }
+                Button("Discard Changes", role: .destructive) { closeEditor() }
                 Button("Keep Editing", role: .cancel) {}
             }
             .onChange(of: selectedPhoto) { _, selection in
@@ -834,6 +853,11 @@ struct ItemEditMobileView: View {
             let spans: [Span] = if case let .rich(value) = value { value } else { [] }
             RichSpanTextEditor(spans: Binding(get: { spansFor(field.id) ?? spans }, set: { set(.rich($0), field.id) }))
                 .modifier(MobileTextEditorHeight())
+        case .imageOcclusion:
+            ImageOcclusionFieldEditor(label: field.name, content: Binding(get: {
+                if case let .imageOcclusion(content) = item.value(for: field.id) { return content }
+                return nil
+            }, set: { set($0.map(ContentValue.imageOcclusion) ?? .empty, field.id) }), mediaStore: model.mediaStore)
         case .cloze:
             let text = textFor(field.id) ?? ""
             let blanks: [ClozeSpan] = clozeFor(field.id) ?? []
@@ -898,12 +922,22 @@ struct ItemEditMobileView: View {
             default: break
             }
         }
+        if case let .imageOcclusion(content) = value {
+            do { try ImageOcclusionValidation.validate(content) } catch { return error.localizedDescription }
+        }
         if [.image, .gif].contains(field.type), case let .media(reference) = value,
            (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a visual description." }
         return nil
     }
 
+    private func closeEditor() {
+        let refs = occlusionDraftReferences
+        Task { for ref in refs { try? await model.mediaStore?.discardDraftReference(ref) } }
+        dismiss()
+    }
+
     private func set(_ value: ContentValue, _ fieldID: UUID) {
+        if case let .imageOcclusion(content) = value { occlusionDraftReferences.append(content.image) }
         if let index = item.fields.firstIndex(where: { $0.fieldID == fieldID }) { item.fields[index].value = value }
         else { item.fields.append(FieldValue(fieldID: fieldID, value: value)) }
     }
@@ -943,12 +977,12 @@ struct ItemEditMobileView: View {
     private func save() async {
         do {
             for field in itemType.fields where [.image, .gif].contains(field.type) {
-                if case let .media(reference) = item.value(for: field.id),
+                if let reference = item.value(for: field.id)?.mediaReference,
                    (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     throw ItemDraftError.missingMediaDescription(field.name)
                 }
             }
-            try await model.updateItem(item); onSaved((item, itemType)); dismiss()
+            try await model.updateItem(item); onSaved((item, itemType)); closeEditor()
         } catch { errorMessage = MobileAppModel.message(for: error) }
     }
 }

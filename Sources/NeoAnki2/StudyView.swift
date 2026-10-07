@@ -339,7 +339,7 @@ struct StudyView: View {
                 item: card.item,
                 isAnswerRevealed: model.isAnswerRevealed,
                 mediaStore: mediaStore,
-                clozeGroup: card.card.clozeGroup
+                occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup
             )
             .accessibilityIdentifier(model.isAnswerRevealed ? "studyAnswer" : "studyPrompt")
             .frame(maxWidth: .infinity)
@@ -384,7 +384,7 @@ struct StudyView: View {
     @ViewBuilder
     private func interactionResponse(for card: DueCard) -> some View {
         switch card.template.interaction {
-        case .reveal, .cloze:
+        case .reveal, .cloze, .imageOcclusion:
             EmptyView()
         case .type:
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
@@ -838,7 +838,7 @@ struct StudyView: View {
 
     private func primaryActionTitle(for interaction: Interaction) -> String {
         switch interaction {
-        case .reveal, .cloze: "Show Answer"
+        case .reveal, .cloze, .imageOcclusion: "Show Answer"
         case .type: "Check Answer"
         case .choose: "Check Choice"
         case .record: "Reveal & Compare"

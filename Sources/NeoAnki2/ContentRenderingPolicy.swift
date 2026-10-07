@@ -50,6 +50,8 @@ enum ContentRenderingPolicy {
             "Text"
         case .number:
             "Number"
+        case .imageOcclusion:
+            "Image occlusion"
         case .cloze:
             "Cloze"
         case let .media(ref):

@@ -7,6 +7,7 @@ struct StudyCompositionView: View {
     let item: Item
     let isAnswerRevealed: Bool
     let mediaStore: MediaStore?
+    var occlusionGroup: Int? = nil
     let clozeGroup: Int?
 
     private var components: [ResolvedTemplateComponent] {
@@ -29,6 +30,8 @@ struct StudyCompositionView: View {
                 isAnswerRevealed: isAnswerRevealed,
                 richTextPointSize: richTextPointSize(for: hole),
                 mediaStore: mediaStore,
+                isStudyContent: true,
+                occlusionGroup: occlusionGroup,
                 clozeGroup: clozeGroup
             )
         }

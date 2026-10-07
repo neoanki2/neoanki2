@@ -191,7 +191,10 @@ struct TemplatesView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("templatesItemTypesHeader")
                 Spacer()
-                Button("Add", systemImage: "plus") { model.beginCreatingItemType() }
+                Menu("Add", systemImage: "plus") {
+                    Button("Basic") { model.beginCreatingItemType() }
+                    Button("Image Occlusion") { model.beginCreatingItemType(imageOcclusion: true) }
+                }
                     .disabled(model.studioDraft != nil)
                     .accessibilityIdentifier("addItemTypeToolbar")
             }
@@ -513,6 +516,7 @@ extension FieldType {
         case .gif: "GIF"
         case .video: "Video"
         case .number: "Number"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         }
     }
@@ -526,6 +530,7 @@ extension Interaction {
         case .choose: "Choose"
         case .record: "Record"
         case .audioSubmission: "Audio submission"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         case .arrange: "Arrange"
         }

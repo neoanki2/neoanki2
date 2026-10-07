@@ -9,14 +9,14 @@ import VocabularyDeckBuilder
 @MainActor
 @Observable
 final class MobileVocabularyLibraryModel {
-    private let store: InstalledVocabularyPackStore
+    let sync: VocabularyPackSyncModel
     private(set) var installedPacks: [InstalledVocabularyPack] = []
     private(set) var isLoading = false
     private(set) var isImporting = false
     var errorMessage: String?
 
-    init(rootURL: URL) {
-        store = InstalledVocabularyPackStore(rootURL: rootURL)
+    init(rootURL: URL, cloudTransport: (any VocabularyPackCloudTransport)? = nil) {
+        sync = VocabularyPackSyncModel(rootURL: rootURL, transport: cloudTransport)
     }
 
     var builderOptions: [VocabularyPackOption] {
@@ -42,6 +42,7 @@ final class MobileVocabularyLibraryModel {
         let entries = workspace.appendingPathComponent("entries.jsonl")
         var entry = LexicalEntry(id: "en:swift", language: "en", canonicalForm: .init(text: .init("swift", language: "en")),
             senses: [.init(id: "quick", definitions: [.init(text: .init("Moving quickly and smoothly.", language: "en"))])])
+        var fixtureEntries: [LexicalEntry] = []
         if process.environment["NEOANKI_TEST_SCENARIO"] == "mobile-item-lookup", let library {
             entry.pronunciations = [.init(scheme: "ipa", representations: [.text(.init("ˈswɪft"))])]
             let photo = FieldDef(name: "Photo", type: .image, isRequired: false)
@@ -52,21 +53,43 @@ final class MobileVocabularyLibraryModel {
                          skill: Skill(input: .image, output: .text, operation: .recognize))
             ]))
             _ = try await library.createDeck(Deck(name: "Words"))
+            let word = FieldDef(name: "Слово без наголосу", type: .text, isRequired: true)
+            let stress = FieldDef(name: "Форма з наголосом", type: .text, isRequired: true)
+            let phrase = FieldDef(name: "Фраза", type: .text, isRequired: true)
+            _ = try await library.createItemType(ItemType(name: "Наголос", fields: [word, stress, phrase], templates: [
+                Template(name: "Поставити наголос", prompt: Side(slots: [Slot(source: .field(word.id))]),
+                         answer: Side(slots: [Slot(source: .field(stress.id))]), interaction: .reveal,
+                         skill: Skill(input: .text, output: .text, operation: .recall))
+            ]))
+            _ = try await library.createDeck(Deck(name: "Наголоси"))
+            fixtureEntries.append(LexicalEntry(id: "uk:nachynka", language: "uk", canonicalForm: .init(text: .init("начинка")),
+                pronunciations: [.init(scheme: "orthographic-respelling", representations: [.text(.init("НА\u{301}ЧИНКА"))])],
+                senses: [.init(id: "filling", definitions: [.init(text: .init("Те, чим начиняють що-небудь, готуючи їстівне."))])]))
         }
-        try (JSONEncoder().encode(entry) + Data([0x0A])).write(to: entries)
+        fixtureEntries.insert(entry, at: 0)
+        try fixtureEntries.reduce(into: Data()) { data, entry in
+            data += try JSONEncoder().encode(entry) + Data([0x0A])
+        }.write(to: entries)
         let package = workspace.appendingPathComponent("Acceptance.neovocab", isDirectory: true)
         _ = try VocabularyPackCompiler.compile(jsonlURL: entries, to: package,
             descriptor: .init(id: "visual.en", title: "Acceptance Lexicon", languages: ["en"], capabilities: [.lexicon]))
-        _ = try await store.install(from: package)
-        installedPacks = try await store.installedPacks()
+        _ = try await sync.installLocal(from: package)
+#if DEBUG && targetEnvironment(simulator)
+        // Optional real-pack regression coverage stays inside the disposable
+        // Simulator fixture path and never applies to a physical installation.
+        if let path = process.environment["NEOANKI_TEST_LARGE_DICTIONARY"] {
+            _ = try await sync.installLocal(from: URL(fileURLWithPath: path))
+        }
+#endif
+        installedPacks = sync.localPacks
     }
 
     func load() async {
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
-        do { installedPacks = try await store.installedPacks() }
-        catch { errorMessage = error.localizedDescription }
+        await sync.reloadLocal()
+        installedPacks = sync.localPacks
     }
 
     func install(from url: URL) async {
@@ -79,20 +102,12 @@ final class MobileVocabularyLibraryModel {
             isImporting = false
         }
         do {
-            _ = try await store.install(from: url)
-            installedPacks = try await store.installedPacks()
+            _ = try await sync.installLocal(from: url)
+            installedPacks = sync.localPacks
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func remove(id: String) async {
-        do {
-            try await store.remove(id: id)
-            installedPacks = try await store.installedPacks()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 #endif

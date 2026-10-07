@@ -578,6 +578,14 @@ package enum APIOpenAPI {
                     "durationMs": nonnegative, "altText": ["type": "string"],
                     "reservationId": uuid,
                 ]),
+                object(["type", "mediaId", "kind", "sha256", "fileExtension", "altText", "occlusionMode", "masks", "nextGroup"], [
+                    "type": ["type": "string", "const": "imageOcclusion"],
+                    "mediaId": uuid, "kind": ["type": "string", "const": "image"],
+                    "sha256": sha256, "fileExtension": ["type": "string"],
+                    "altText": ["type": "string", "minLength": 1], "reservationId": uuid,
+                    "occlusionMode": ["type": "string", "enum": ["hideAllRevealOne", "hideOneRevealOne"]],
+                    "masks": array(reference("ImageOcclusionMask"), min: 1), "nextGroup": ["type": "integer", "minimum": 2],
+                ]),
                 object(["type", "text", "blanks"], [
                     "type": ["type": "string", "const": "cloze"],
                     "text": ["type": "string"], "blanks": array(reference("ClozeSpan"), min: 1),
@@ -775,7 +783,7 @@ package enum APIOpenAPI {
             "FieldDefinition": object(["id", "name", "type", "isRequired"], [
                 "id": uuid, "name": ["type": "string"],
                 "type": ["type": "string", "enum": ["text", "richText", "audio", "image",
-                                                          "gif", "video", "number", "cloze"]],
+                                                          "gif", "video", "number", "cloze", "imageOcclusion"]],
                 "isRequired": ["type": "boolean"],
             ]),
             "Skill": object(["input", "output", "operation"], [
@@ -809,7 +817,7 @@ package enum APIOpenAPI {
                  "answer": array(reference("Slot")),
                  "layout": ["type": ["string", "null"], "enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage", NSNull()]],
                  "components": ["oneOf": [array(reference("TemplateComponent")), ["type": "null"]]],
-                 "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "arrange"]],
+                 "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "imageOcclusion", "arrange"]],
                  "skill": reference("Skill"), "generateWhen": reference("Condition")]
             ),
             "ItemTypeInput": object(["name", "fields", "templates"], itemTypeInputProperties),
@@ -836,6 +844,15 @@ package enum APIOpenAPI {
             "ClozeSpan": object(["group", "start", "length"], [
                 "group": ["type": "integer"], "start": nonnegative, "length": nonnegative,
                 "hint": ["type": "string"],
+            ]),
+            "ImageOcclusionMask": object(["id", "group", "rect"], [
+                "id": uuid, "group": ["type": "integer", "minimum": 1], "answerText": ["type": "string"],
+                "rect": object(["x", "y", "width", "height"], [
+                    "x": ["type": "number", "minimum": 0, "maximum": 1],
+                    "y": ["type": "number", "minimum": 0, "maximum": 1],
+                    "width": ["type": "number", "exclusiveMinimum": 0, "maximum": 1],
+                    "height": ["type": "number", "exclusiveMinimum": 0, "maximum": 1],
+                ]),
             ]),
             "ContentValue": contentValue,
             "FieldValue": object(["fieldId", "value"], [
@@ -902,7 +919,7 @@ package enum APIOpenAPI {
             "Card": object(
                 ["id", "revision", "itemId", "templateId", "skill", "isSuspended", "maturityStatus", "memory"],
                 ["id": uuid, "revision": revision, "itemId": uuid, "templateId": uuid,
-                 "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]],
+                 "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]], "occlusionGroup": ["type": ["integer", "null"]],
                  "skill": reference("Skill"), "isSuspended": ["type": "boolean"],
                  "maturityStatus": ["type": "string", "enum": ["notStarted", "learning", "maintaining", "inactive"]],
                  "memory": reference("Memory")]
@@ -919,7 +936,7 @@ package enum APIOpenAPI {
             "StudyCard": object(
                 ["id", "revision", "itemId", "templateId", "interaction", "layout", "components", "prompt", "answer", "memory"],
                 ["id": uuid, "revision": revision, "itemId": uuid, "templateId": uuid,
-                 "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]],
+                 "deckId": nullableUUID, "clozeGroup": ["type": ["integer", "null"]], "occlusionGroup": ["type": ["integer", "null"]],
                  "interaction": ["type": "string"], "layout": ["type": "string"],
                  "components": array(reference("ResolvedComponent")), "prompt": array(reference("ResolvedSlot")),
                  "answer": array(reference("ResolvedSlot")), "memory": reference("Memory")]

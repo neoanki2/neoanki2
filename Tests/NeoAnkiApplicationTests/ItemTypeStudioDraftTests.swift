@@ -149,6 +149,7 @@ struct ItemTypeStudioDraftTests {
             ItemTypeFieldDraft(name: "Back", type: .text),
             ItemTypeFieldDraft(name: "Picture", type: .image),
             ItemTypeFieldDraft(name: "Sentence", type: .cloze),
+            ItemTypeFieldDraft(name: "Diagram", type: .imageOcclusion),
         ]
         #expect(starter.isApplicable(to: fields))
         let setup = try starter.makeCardSetup(id: UUID(), fields: fields)

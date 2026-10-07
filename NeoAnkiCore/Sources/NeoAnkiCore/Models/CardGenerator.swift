@@ -16,6 +16,8 @@ public enum CardGenerator {
             let groups: [Int?]
             if template.interaction == .cloze {
                 groups = clozeGroups(for: template, item: item).map(Optional.some)
+            } else if template.interaction == .imageOcclusion {
+                groups = occlusionGroups(for: template, item: item).map(Optional.some)
             } else {
                 groups = [nil]
             }
@@ -25,7 +27,8 @@ public enum CardGenerator {
                         ? deterministicCardID(
                             itemID: item.id,
                             templateID: template.id,
-                            clozeGroup: group
+                            clozeGroup: group,
+                            isOcclusion: template.interaction == .imageOcclusion
                         )
                         : UUID(),
                     itemID: item.id,
@@ -33,7 +36,8 @@ public enum CardGenerator {
                     skill: template.skill,
                     memory: .new(due: now),
                     deckID: item.deckID,
-                    clozeGroup: group
+                    occlusionGroup: template.interaction == .imageOcclusion ? group : nil,
+                    clozeGroup: template.interaction == .cloze ? group : nil
                 )
             }
         }
@@ -45,10 +49,12 @@ public enum CardGenerator {
     private static func deterministicCardID(
         itemID: UUID,
         templateID: UUID,
-        clozeGroup: Int?
+        clozeGroup: Int?,
+        isOcclusion: Bool = false
     ) -> UUID {
         let groupText = clozeGroup.map(String.init) ?? "none"
-        let input = "neoanki-card-v1|\(itemID.uuidString.lowercased())|\(templateID.uuidString.lowercased())|\(groupText)"
+        let namespace = isOcclusion ? "neoanki-occlusion-card-v1" : "neoanki-card-v1"
+        let input = "\(namespace)|\(itemID.uuidString.lowercased())|\(templateID.uuidString.lowercased())|\(groupText)"
         var bytes = Array(SHA256.hash(data: Data(input.utf8)).prefix(16))
         // RFC 9562-compatible name-derived UUID shape (version 5, variant 1).
         bytes[6] = (bytes[6] & 0x0f) | 0x50
@@ -77,6 +83,17 @@ public enum CardGenerator {
         case let .any(conditions):
             return conditions.contains { evaluate($0, for: item) }
         }
+    }
+
+    public static func occlusionGroups(for template: Template, item: Item) -> [Int] {
+        guard template.interaction == .imageOcclusion else { return [] }
+        for component in template.components where component.purpose == .question {
+            if case let .field(id) = component.source,
+               case let .imageOcclusion(content)? = item.value(for: id) {
+                return content.groups
+            }
+        }
+        return []
     }
 
     public static func clozeGroups(for template: Template, item: Item) -> [Int] {

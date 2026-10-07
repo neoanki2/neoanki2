@@ -58,12 +58,14 @@ struct CardMaturityEvidence: Sendable {
 public struct CardMaturityDetail: Sendable, Equatable, Identifiable {
     public let id: UUID
     public let templateID: UUID
+    public let occlusionGroup: Int?
     public let clozeGroup: Int?
     public let status: CardMaturityStatus
 
-    public init(id: UUID, templateID: UUID, clozeGroup: Int?, status: CardMaturityStatus) {
+    public init(id: UUID, templateID: UUID, clozeGroup: Int?, occlusionGroup: Int? = nil, status: CardMaturityStatus) {
         self.id = id
         self.templateID = templateID
+        self.occlusionGroup = occlusionGroup
         self.clozeGroup = clozeGroup
         self.status = status
     }

@@ -355,7 +355,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                     schedulingHistoryOrigin: card.schedulingHistoryOrigin,
                     isSuspended: card.isSuspended,
                     deckID: card.deckID.map { mapped($0, kind: .deck) },
-                    clozeGroup: card.clozeGroup
+                    occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup
                 )
                 transformed = .card(value); transformedID = value.id.uuidString
             case let .review(review):

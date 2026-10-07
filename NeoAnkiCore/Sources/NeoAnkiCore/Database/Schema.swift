@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 29
+    static let version = 30
 
     static let createStatements: [String] = [
         """
@@ -64,6 +64,7 @@ enum Schema {
             is_suspended INTEGER NOT NULL DEFAULT 0,
             deck_id TEXT,
             cloze_group INTEGER,
+            occlusion_group INTEGER,
             memory_model_version TEXT,
             memory_parameter_set_id TEXT,
             scheduling_history_origin REAL

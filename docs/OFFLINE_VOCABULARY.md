@@ -158,6 +158,26 @@ lookup. The offline-stack script identifies the updated pack as version 4.
 The add window remains open after a successful import so multiple words can be
 captured in one session.
 
+## Device sync
+
+Enabling the existing iCloud opt-in automatically uploads installed dictionaries
+and synchronizes their catalog on Mac and iOS. Pack bytes download on demand
+from Vocabulary Packs. Local removal keeps the cloud copy and authored cards;
+different versions of the same pack require an explicit replacement download.
+
+The shared sync model caches an account-scoped catalog and coordinates bounded,
+resumable transfers. Canonical manifest hashes identify immutable versions.
+Transfers use 8 MiB chunks, verify file hashes, and publish catalog metadata only
+after a complete upload. Downloads install through the ordinary validated pack
+store; the previous version is preserved until replacement validation succeeds.
+
+CloudKit uses a separate NeoAnkiVocabulary private zone and the existing
+LibraryResource record type and fields. Catalog fetches request metadata fields
+without assets; chunk assets are fetched only for an explicit download. This
+requires no database, vocabulary pack format, HTTP API, or CloudKit field
+migration. Real account availability, quota, and network failures are reported
+in the pack list without preventing offline lookup or study.
+
 ## Verification
 
 ```sh
