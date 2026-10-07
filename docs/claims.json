@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewedAt": "2026-10-05",
+  "lastReviewedAt": "2026-10-06",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
@@ -148,7 +148,8 @@
         "Database migrations and performance indexes do not change this retention rule",
         "explicit **Reset All Progress** action",
         "Local API token verifiers are stored outside the library database and its snapshots",
-        "resetting progress clears the acknowledgement"
+        "resetting progress clears the acknowledgement",
+        "original introduction deck and study day"
       ]
     },
     {

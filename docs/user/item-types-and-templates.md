@@ -41,6 +41,12 @@ to reflect the cards that are currently eligible for study.
 - [Repair or delete an item type](#repair-or-delete-an-item-type)
 </nav>
 
+For dictionary-assisted authoring, include at least two Text or Rich Text
+fields. The Add Item editor lets you choose which field supplies the lookup
+word and which receives the dictionary text. This does not add or change a
+Card setup; the selected item type continues to determine the generated cards.
+See [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+
 ## Start with a complete item type
 
 Choose **New Item Type**. A new type already contains required Text fields

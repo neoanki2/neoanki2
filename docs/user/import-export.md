@@ -113,6 +113,14 @@ open so another word can be added immediately.
 Import and lookup work offline. Import reads and copies the selected local
 package; lookup reads only the installed SQLite index and local media.
 
+An installed pack can also fill fields in the ordinary Add Item editor.
+Expand **Dictionary**, choose two distinct Text or Rich Text fields, and type
+a lookup word. Review the filled definition before saving. This creates an
+ordinary item in your selected deck, using its chosen item type and Card
+setups. On iPhone and iPad, install the pack through
+**Create → Vocabulary Packs**. See
+[Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+
 ## Import JSON or CSV
 
 Choose **File → Import…**, select one `.json` or `.csv` file, review the import

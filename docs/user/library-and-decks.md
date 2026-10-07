@@ -101,6 +101,11 @@ Poem and Prose Deck builders create child decks with no separate limit, so
 their new cards use the selected parent's allowance unless you later set a
 stricter limit on the child.
 
+With iCloud sync enabled, a new card first reviewed on another device also
+uses today’s shared deck allowance. Its original deck and study day travel
+with the review, so moving the item later does not charge a different deck.
+This affects availability, not the card’s maturity status.
+
 ## Rename a deck
 
 1. Control-click or right-click the deck.

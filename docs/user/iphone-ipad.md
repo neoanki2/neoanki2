@@ -116,6 +116,13 @@ behavior with no controls or status surface. Maintenance runs locally after
 eligible sessions, sync, startup, or idle time; it never runs inline while a
 grade is saved.
 
+When adding an item with at least two Text or Rich Text fields, expand
+**Dictionary** to choose an installed vocabulary pack, a **Look up field**,
+and a distinct **Fill field**. A single exact match can fill the destination;
+**Use Entry** selects another result. Your edited destination is preserved.
+Install packs through **Create → Vocabulary Packs**; lookup stays offline.
+See [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+
 ## Import, export, and build decks
 
 Use **Create → Import or Export** to choose JSON, CSV, portable `.neodeck`, or
