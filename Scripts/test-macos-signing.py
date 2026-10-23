@@ -4,6 +4,8 @@ import datetime as dt
 import importlib.util
 from pathlib import Path
 import plistlib
+import shutil
+import struct
 import subprocess
 import tempfile
 import types
@@ -233,6 +235,28 @@ class SigningTests(unittest.TestCase):
                 verify.assert_called_once_with(app, require_notarization=False)
         self.assertTrue(any(args[0] == 'codesign' and '--options' in args for args in calls))
         self.assertFalse(any(args[0] == 'xcrun' for args in calls))
+
+
+@unittest.skipUnless(shutil.which('lipo'), 'Apple lipo is required')
+class UniversalArchitectureTests(unittest.TestCase):
+    def test_universal_gate_requires_both_real_macho_slices(self):
+        verifier = Path(__file__).with_name('verify-universal-macos.sh')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            arm = root / 'arm64'
+            intel = root / 'x86_64'
+            universal = root / 'universal'
+            # Minimal valid Mach-O object headers exercise lipo without compiling
+            # or launching an application, and without depending on build output.
+            arm.write_bytes(struct.pack('<8I', 0xfeedfacf, 0x0100000c, 0, 1, 0, 0, 0, 0))
+            intel.write_bytes(struct.pack('<8I', 0xfeedfacf, 0x01000007, 3, 1, 0, 0, 0, 0))
+            subprocess.run(['lipo', '-create', str(arm), str(intel), '-o', str(universal)],
+                           check=True, capture_output=True)
+            for binary, expected_success in [(universal, True), (arm, False), (intel, False)]:
+                with self.subTest(binary=binary.name):
+                    result = subprocess.run(['bash', str(verifier), str(binary)], capture_output=True)
+                    self.assertEqual(result.returncode == 0, expected_success,
+                                     result.stderr.decode(errors='replace'))
 
 
 if __name__ == '__main__':
