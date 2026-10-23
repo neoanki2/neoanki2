@@ -1,5 +1,6 @@
 import ImageIO
 import NeoAnkiCore
+import NeoAnkiTextEditing
 import SwiftUI
 import UniformTypeIdentifiers
 #if os(iOS)
@@ -258,6 +259,8 @@ public struct ImageOcclusionFieldEditor: View {
 }
 
 public struct ImageOcclusionEditor: View {
+    private let initial: ImageOcclusionContent
+    @State private var dismissal = DraftDismissal()
     @State private var draft: ImageOcclusionContent
     @State private var selected: Set<UUID> = []
     @State private var undo: [ImageOcclusionContent] = []
@@ -277,6 +280,7 @@ public struct ImageOcclusionEditor: View {
 
     public init(initial: ImageOcclusionContent, mediaStore: MediaStore?,
                 onDone: @escaping (ImageOcclusionContent) -> Void, onCancel: @escaping () -> Void) {
+        self.initial = initial
         _draft = State(initialValue: initial); self.mediaStore = mediaStore
         self.onDone = onDone; self.onCancel = onCancel
         _previewGroup = State(initialValue: initial.groups.first ?? initial.nextGroup)
@@ -303,16 +307,23 @@ public struct ImageOcclusionEditor: View {
                     }.padding()
                 }
             }
+            .editingUndoContext(EditingUndoContext(canUndo: !undo.isEmpty, canRedo: !redo.isEmpty, undo: undoEdit, redo: redoEdit))
+            .editingShortcut(.delete, modifiers: [], isEnabled: !preview && !selected.isEmpty) {
+                change { $0.masks.removeAll { selected.contains($0.id) } }
+                selected = []
+            }
             .navigationTitle("Image Occlusion")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction) }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") {
+                    dismissal.request(isDirty: draft != initial, action: onCancel)
+                }.keyboardShortcut(.cancelAction) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { onDone(draft) }
                         .disabled((try? ImageOcclusionValidation.validate(draft)) == nil)
                         .keyboardShortcut(.defaultAction).accessibilityIdentifier("occlusion-done")
                 }
             }
-            .interactiveDismissDisabled()
+            .protectDraft(isDirty: draft != initial, dismissal: dismissal)
         }
     }
 
@@ -322,9 +333,9 @@ public struct ImageOcclusionEditor: View {
                 Picker("Tool", selection: $drawing) { Text("Draw").tag(true); Text("Select / Move").tag(false) }.pickerStyle(.segmented)
                     .disabled(preview)
                 Button { undoEdit() } label: { Image(systemName: "arrow.uturn.backward") }.disabled(undo.isEmpty)
-                    .accessibilityLabel("Undo mask edit").keyboardShortcut("z", modifiers: .command)
+                    .accessibilityLabel("Undo mask edit")
                 Button { redoEdit() } label: { Image(systemName: "arrow.uturn.forward") }.disabled(redo.isEmpty)
-                    .accessibilityLabel("Redo mask edit").keyboardShortcut("z", modifiers: [.command, .shift])
+                    .accessibilityLabel("Redo mask edit")
             }
             HStack {
                 Toggle("Preview Cards", isOn: $preview).accessibilityIdentifier("occlusion-preview")
@@ -455,7 +466,6 @@ public struct ImageOcclusionEditor: View {
                     }
                     Button("Ungroup") { change { $0.ungroup(maskIDs: selected) } }
                     Button("Delete Selected", role: .destructive) { change { $0.masks.removeAll { selected.contains($0.id) } }; selected = [] }
-                        .keyboardShortcut(.delete, modifiers: [])
                 }
                 if selected.count == 1, let id = selected.first, let index = draft.masks.firstIndex(where: { $0.id == id }) {
                     Text("Position and size (%)").font(.headline)

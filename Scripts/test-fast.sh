@@ -7,6 +7,10 @@ echo "==> NeoAnkiCore unit + flow tests"
 cd "$ROOT/NeoAnkiCore"
 swift test --parallel
 
+echo "==> Native editing and draft interaction tests"
+cd "$ROOT"
+swift test --filter NeoAnkiTextEditingTests --parallel
+
 echo "==> NeoAnki2 ViewModel tests"
 cd "$ROOT"
 swift test --filter NeoAnki2Tests --skip AppLaunchSmokeTests --parallel

@@ -2,6 +2,7 @@ import NeoAnkiCore
 import NeoAnkiSharedUI
 import PoemDeckBuilder
 import ProseDeckBuilder
+import NeoAnkiTextEditing
 import SwiftUI
 
 struct StudyView: View {
@@ -18,6 +19,7 @@ struct StudyView: View {
     @Binding var isEditingCard: Bool
     let onEndSession: () -> Void
 
+    @FocusState private var typedAnswerFocused: Bool
     @State private var showGradeGuide = false
     @State private var showDeleteDraftConfirm = false
     @State private var recording = StudyRecordingController()
@@ -59,6 +61,7 @@ struct StudyView: View {
             Text("This recording has not been saved and cannot be recovered.")
         }
         .onChange(of: model.isAnswerRevealed) { _, revealed in
+            if revealed { typedAnswerFocused = false }
             guard revealed, let cardID = model.currentCard?.id else { return }
             if AccessibilityNotifier.shared.post(.answerRevealed(cardID: cardID)) != nil {
                 answerAccessibilityFocused = true
@@ -68,6 +71,25 @@ struct StudyView: View {
             cardEditor
         }
         .focusedSceneValue(\.studyPrimaryActionHandler, primaryActionHandler)
+        .editingShortcut(.space, modifiers: [], isEnabled: !isEditingCard && (canGrade || primaryActionHandler.isEnabled)) {
+            if canGrade { Task { await model.grade(.good) } }
+            else { primaryActionHandler.invoke() }
+        }
+        .editingShortcut("e", modifiers: .command, isEnabled: model.currentCard != nil && !isEditingCard && !model.isGrading && !model.isPreparingQueue) {
+            isEditingCard = true
+        }
+        .editingShortcut("p", modifiers: .command, isEnabled: recording.hasRecording && !isEditingCard) {
+            recording.togglePlayback()
+        }
+        .editingShortcut("r", modifiers: .command, isEnabled: canUseRecordingShortcut) {
+            if recording.state == .recording { recording.stop() }
+            else {
+                Task { await recording.start(persistentSubmission: model.currentCard?.template.interaction == .audioSubmission) }
+            }
+        }
+        .editingUndoContext(EditingUndoContext(canUndo: model.canUndoLastGrade && !model.isGrading && !isEditingCard) {
+            Task { await model.undoLastGrade() }
+        })
     }
 
     /// The library's item editor, opened on the card in front of you. Saving
@@ -134,6 +156,16 @@ struct StudyView: View {
                 && interaction != .audioSubmission
                 && !isEditingCard
         )
+    }
+
+    // Menu contents mount lazily; recording shortcuts belong to the study
+    // surface so they remain available while the actions menu is closed.
+    private var canUseRecordingShortcut: Bool {
+        let interaction = model.currentCard?.template.interaction
+        return (interaction == .record || interaction == .audioSubmission)
+            && !model.isAnswerRevealed && !isEditingCard
+            && !model.isCompletingSubmission && !model.isPreparingQueue
+            && recording.state != .requestingPermission
     }
 
     private var canShowAnswer: Bool {
@@ -399,7 +431,8 @@ struct StudyView: View {
                     )
                 )
                 .textFieldStyle(.roundedBorder)
-                .onSubmit { model.submitTypedAnswer() }
+                .focused($typedAnswerFocused)
+                .onSubmit { model.submitTypedAnswer(); typedAnswerFocused = false }
                 .accessibilityIdentifier("typedAnswer")
                 Text("Press Return to check. You’ll still choose your own grade.")
                     .font(DesignSystem.Typography.uiHint)
@@ -425,7 +458,9 @@ struct StudyView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
-                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [])
+                    .editingShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [], isEnabled: !model.isAnswerRevealed && !isEditingCard) {
+                        model.selectChoice(option)
+                    }
                     .help("Choose option \(index + 1) (\(index + 1))")
                     .accessibilityLabel("Option \(index + 1), \(option)")
                     .accessibilityValue(model.selectedChoice == option ? "Selected" : "")
@@ -514,7 +549,6 @@ struct StudyView: View {
                 recording.togglePlayback()
             }
             .controlSize(.large)
-            .keyboardShortcut("p", modifiers: [.command])
             .accessibilityIdentifier("playRecording")
         }
     }
@@ -542,7 +576,9 @@ struct StudyView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.bordered)
-                .modifier(ArrangementSelectionShortcut(index: index))
+                .modifier(ArrangementSelectionShortcut(index: index, isEnabled: !isEditingCard) {
+                    model.selectArrangementItem(at: index)
+                })
                 .accessibilityLabel("Position \(index + 1), \(item)")
                 .accessibilityValue(model.selectedArrangementIndex == index ? "Selected" : "")
                 .accessibilityIdentifier("arrangementItem\(index)")
@@ -552,14 +588,18 @@ struct StudyView: View {
                 Button("Move Up", systemImage: "arrow.up") {
                     model.moveSelectedArrangementItem(by: -1)
                 }
-                .keyboardShortcut(.upArrow, modifiers: [.command])
+                .editingShortcut(.upArrow, modifiers: .command, isEnabled: !isEditingCard && model.selectedArrangementIndex != nil && model.selectedArrangementIndex != 0) {
+                    model.moveSelectedArrangementItem(by: -1)
+                }
                 .disabled(model.selectedArrangementIndex == nil || model.selectedArrangementIndex == 0)
                 .accessibilityIdentifier("moveArrangementUp")
 
                 Button("Move Down", systemImage: "arrow.down") {
                     model.moveSelectedArrangementItem(by: 1)
                 }
-                .keyboardShortcut(.downArrow, modifiers: [.command])
+                .editingShortcut(.downArrow, modifiers: .command, isEnabled: !isEditingCard && model.selectedArrangementIndex != nil && model.selectedArrangementIndex != model.arrangedItems.indices.last) {
+                    model.moveSelectedArrangementItem(by: 1)
+                }
                 .disabled(
                     model.selectedArrangementIndex == nil
                         || model.selectedArrangementIndex == model.arrangedItems.indices.last
@@ -616,7 +656,6 @@ struct StudyView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .keyboardShortcut("r", modifiers: [.command])
             .accessibilityHint("Stops the current private-response recording")
             .accessibilityIdentifier("stopAudioSubmission")
         } else if recording.submissionDraft(cardID: card.id) != nil {
@@ -639,7 +678,6 @@ struct StudyView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .keyboardShortcut("r", modifiers: [.command])
             .accessibilityHint("Starts a private audio response stored only in the local library")
             .accessibilityIdentifier("startAudioSubmission")
         }
@@ -653,13 +691,11 @@ struct StudyView: View {
             ) {
                 recording.togglePlayback()
             }
-            .keyboardShortcut("p", modifiers: [.command])
             .accessibilityIdentifier("playAudioSubmission")
 
             Button("Record Again", systemImage: "arrow.counterclockwise") {
                 Task { await recording.start(persistentSubmission: true) }
             }
-            .keyboardShortcut("r", modifiers: [.command])
             .accessibilityIdentifier("rerecordAudioSubmission")
 
             Divider()
@@ -690,7 +726,6 @@ struct StudyView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
                     .accessibilityIdentifier("stopRecording")
                 } else if recording.isReadyForComparison {
                     Button("Reveal & Compare", systemImage: "arrow.right.circle.fill") {
@@ -710,7 +745,6 @@ struct StudyView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .keyboardShortcut("r", modifiers: [.command])
                     .accessibilityIdentifier("startRecording")
                 }
 
@@ -727,13 +761,11 @@ struct StudyView: View {
             ) {
                 recording.togglePlayback()
             }
-            .keyboardShortcut("p", modifiers: [.command])
             .accessibilityIdentifier("playRecording")
 
             Button("Record Again", systemImage: "arrow.counterclockwise") {
                 Task { await recording.start() }
             }
-            .keyboardShortcut("r", modifiers: [.command])
             .accessibilityIdentifier("startRecording")
         } label: {
             Label("Recording", systemImage: "waveform")
@@ -751,7 +783,9 @@ struct StudyView: View {
             }
         }
         .controlSize(.large)
-        .keyboardShortcut(.rightArrow, modifiers: [])
+        .editingShortcut(.rightArrow, modifiers: [], isEnabled: !isEditingCard && recording.state != .recording && recording.state != .requestingPermission) {
+            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) { model.revealAnswer() }
+        }
         .help("Reveal without checking (Right Arrow)")
         .disabled(
             recording.state == .recording
@@ -778,10 +812,9 @@ struct StudyView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
-                .keyboardShortcut(
-                    KeyEquivalent(Character(choice.shortcutLabel)),
-                    modifiers: []
-                )
+                .editingShortcut(KeyEquivalent(Character(choice.shortcutLabel)), modifiers: [], isEnabled: canGrade && !isEditingCard) {
+                    Task { await model.grade(choice.rating) }
+                }
                 .help(choice.guidance)
                 .disabled(model.isGrading || model.isPreparingQueue)
                 .accessibilityLabel(choice.accessibilityLabel)
@@ -906,13 +939,15 @@ struct StudyView: View {
 /// active once the answer is revealed.
 private struct ArrangementSelectionShortcut: ViewModifier {
     let index: Int
+    let isEnabled: Bool
+    let action: () -> Void
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if index < 9 {
-            content.keyboardShortcut(
+            content.editingShortcut(
                 KeyEquivalent(Character("\(index + 1)")),
-                modifiers: [.command]
+                modifiers: [.command], isEnabled: isEnabled, action: action
             )
         } else {
             content

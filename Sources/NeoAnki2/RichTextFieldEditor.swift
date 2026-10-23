@@ -300,6 +300,7 @@ private struct FormatButton: View {
 }
 
 private struct RichTextEditorRepresentable: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     let label: String
     @Binding var spans: [Span]
     var accessibilityIdentifier: String?
@@ -323,7 +324,7 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
         }
 
         textView.isRichText = true
-        textView.isEditable = true
+        textView.isEditable = isEnabled
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.drawsBackground = true
@@ -352,6 +353,7 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
     @MainActor
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        textView.isEditable = isEnabled
         context.coordinator.textView = textView
         context.coordinator.isFocused = isFocused
         textViewHolder.textView = textView

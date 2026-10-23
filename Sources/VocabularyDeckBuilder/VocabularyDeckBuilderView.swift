@@ -1,6 +1,7 @@
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
 import NeoAnkiVocabularyKit
+import NeoAnkiTextEditing
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -45,6 +46,8 @@ public enum VocabularyDeckBuilderFeature {
 
 public struct VocabularyDeckBuilderView: View {
     @State private var input = VocabularyDeckInput()
+    @State private var definitionSessions = PlainTextEditorSessions()
+    @State private var dismissal = DraftDismissal()
     @State private var pack: VocabularyPack?
     @State private var packURL: URL?
     @State private var hasSecurityScopedAccess = false
@@ -170,7 +173,9 @@ public struct VocabularyDeckBuilderView: View {
             Divider()
 
             HStack {
-                Button("Cancel", role: .cancel) { onCancel() }
+                Button("Cancel", role: .cancel) {
+                    dismissal.request(isDirty: hasDraft, isBusy: isGenerating, action: onCancel)
+                }
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("vocabularyBuilderCancel")
 
@@ -211,9 +216,12 @@ public struct VocabularyDeckBuilderView: View {
         }
         #endif
         .accessibilityIdentifier("vocabularyBuilderSheet")
-        .interactiveDismissDisabled(isGenerating)
+        .protectDraft(isDirty: hasDraft, isBusy: isGenerating, dismissal: dismissal)
         .onDisappear { releasePackAccess() }
-        .onChange(of: input, initial: true) { _, _ in refreshPreview() }
+        .onChange(of: input, initial: true) { _, _ in
+            definitionSessions.retain(identifiers: Set(input.senses.map { AnyHashable($0.id) }))
+            refreshPreview()
+        }
         .task {
             guard pack == nil,
                   let selectedPackID,
@@ -454,7 +462,10 @@ public struct VocabularyDeckBuilderView: View {
                 Text("Definition")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $input.senses[index].definition)
+                PlainTextEditor(text: $input.senses[index].definition,
+                                session: definitionSessions.session(for: input.senses[index].id),
+                                label: "Definition for meaning \(index + 1)",
+                                identifier: "vocabularyDefinition-\(input.senses[index].id)")
                     .frame(minHeight: 58)
                     .accessibilityLabel("Definition for meaning \(index + 1)")
 
@@ -723,6 +734,11 @@ public struct VocabularyDeckBuilderView: View {
             previewCards = []
             previewErrorMessage = error.localizedDescription
         }
+    }
+
+    private var hasDraft: Bool {
+        !input.form.isEmpty || !input.senses.isEmpty
+            || (fixedDestination == nil && !input.deckName.isEmpty)
     }
 
     private func generate() {

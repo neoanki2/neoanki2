@@ -133,6 +133,7 @@ struct AddItemView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { requestDismissal() }
+                    .disabled(isSaving)
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier(isEditing ? "cancelEditItem" : "cancelAddItem")
             }
@@ -147,6 +148,7 @@ struct AddItemView: View {
             }
         }
         .frame(minWidth: 420, minHeight: 360)
+        .interactiveDismissDisabled(isSaving || initialSnapshot != currentSnapshot)
         .onAppear {
             initializeIfNeeded()
         }
@@ -381,7 +383,8 @@ struct AddItemView: View {
     }
 
     private func requestDismissal() {
-        if isEditing, initialSnapshot != currentSnapshot {
+        guard !isSaving else { return }
+        if initialSnapshot != currentSnapshot {
             showDiscardConfirmation = true
         } else {
             closeEditor()
@@ -400,6 +403,7 @@ struct AddItemView: View {
     }
 
     private func save() async {
+        guard !isSaving else { return }
         isSaving = true
         defer { isSaving = false }
 

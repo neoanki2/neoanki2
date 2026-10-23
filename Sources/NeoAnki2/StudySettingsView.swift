@@ -17,6 +17,6 @@ struct StudySettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 480, height: 300)
+        .frame(minWidth: 420, idealWidth: 480, minHeight: 260, idealHeight: 300)
     }
 }

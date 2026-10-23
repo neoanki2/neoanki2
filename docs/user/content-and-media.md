@@ -30,6 +30,15 @@ The Text editor exposes the same semantic formatting controls as Rich Text.
 Unformatted input remains plain text; applying a style preserves it as rich
 spans.
 
+On Mac, text fields support normal typing, selection, clipboard commands, and
+**Command-Z** / **Shift-Command-Z** for undo and redo. These commands edit the
+focused text even while a study session or image-mask editor is open.
+
+Poem, prose, and vocabulary-definition editors use plain text, with native
+**Edit > Find**, spelling controls, wrapping, and scrolling. Return adds a new
+line; Tab and Shift-Tab move between form controls. Source editors retain their
+selection and undo history when you review cards and return to the text.
+
 ## Rich text
 
 Select text and use the formatting toolbar:

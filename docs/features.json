@@ -37,10 +37,11 @@
       "Sources/NeoAnkiDeckBuilderKit",
       "Sources/NeoAnkiFeatures",
       "Sources/NeoAnkiIOS",
+      "Sources/NeoAnkiTextEditing",
       "Sources/PoemDeckBuilder"
     ],
     "sourceMarkers": ["CommandMenu(", "CommandGroup(", ": Commands {", ": View {", ".keyboardShortcut(", ".accessibilityIdentifier("],
-    "testRoots": ["UITests/NeoAnki2UITests", "Platforms/iOSUITests", "Tests/NeoAnki2Tests", "Tests/NeoAnkiApplicationTests", "Tests/NeoAnkiFeaturesTests", "Tests/PoemDeckBuilderTests"],
+    "testRoots": ["UITests/NeoAnki2UITests", "Platforms/iOSUITests", "Tests/NeoAnki2Tests", "Tests/NeoAnkiApplicationTests", "Tests/NeoAnkiFeaturesTests", "Tests/PoemDeckBuilderTests", "Tests/NeoAnkiTextEditingTests"],
     "testMarkers": ["func test", "@Test"],
     "excludedFiles": [
       "UITests/NeoAnki2UITests/DocumentationScreenshotTests.swift",
@@ -164,8 +165,8 @@
       "id": "item-create-edit",
       "name": "Create and edit items",
       "article": "user/authoring-items.md",
-      "sources": ["Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemsModel.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"],
+      "sources": ["Sources/NeoAnkiTextEditing/DraftProtection.swift", "Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemsModel.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
+      "tests": ["Tests/NeoAnkiTextEditingTests/TextEditingTests.swift", "UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"],
       "screenshot": "assets/screenshots/item-add.png"
     },
     {
@@ -187,8 +188,8 @@
       "id": "content-text-rich",
       "name": "Text and rich-text fields",
       "article": "user/content-and-media.md",
-      "sources": ["Sources/NeoAnki2/RichTextFieldEditor.swift", "Sources/NeoAnki2/SpanFormatting.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/RichTextEditingTests.swift", "Tests/NeoAnki2Tests/SpanFormattingTests.swift"],
+      "sources": ["Sources/NeoAnkiTextEditing/PlainTextEditor.swift", "Sources/NeoAnkiTextEditing/EditingCommands.swift", "Sources/NeoAnki2/RichTextFieldEditor.swift", "Sources/NeoAnki2/SpanFormatting.swift"],
+      "tests": ["Tests/NeoAnkiTextEditingTests/TextEditingTests.swift", "UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/RichTextEditingTests.swift", "Tests/NeoAnki2Tests/SpanFormattingTests.swift"],
       "screenshot": "assets/screenshots/item-rich-text.png"
     },
     {

@@ -5,6 +5,7 @@ import NeoAnkiCloudSync
 import PoemDeckBuilder
 import ProseDeckBuilder
 import VocabularyDeckBuilder
+import NeoAnkiTextEditing
 import SwiftUI
 
 private struct InitialLibraryPayload: Sendable {
@@ -142,6 +143,7 @@ struct NeoAnki2App: App {
                     ? 680
                     : isFunctionalUITestRun ? functionalUITestContentHeight : nil
             )
+            .textFieldStyle(.roundedBorder)
             .task {
                 // The loading view disappears as models are assigned. Keep
                 // startup on the stable root so that it cannot cancel sync.
@@ -187,6 +189,8 @@ struct NeoAnki2App: App {
                 : .automatic
         )
         .commands {
+            TextEditingCommands()
+            NativeEditingCommands()
             LibraryCommands()
             StudyCommands()
             SchedulingCommands(model: schedulingModel)
@@ -213,6 +217,7 @@ struct NeoAnki2App: App {
                     .tabItem { Label("iCloud", systemImage: "icloud") }
                 }
             }
+            .textFieldStyle(.roundedBorder)
         }
     }
 

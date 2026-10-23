@@ -82,7 +82,6 @@ struct StudyCommands: Commands {
             Button("Edit Card…") {
                 handlers?.editCurrentCard?()
             }
-            .keyboardShortcut("e", modifiers: [.command])
             .disabled(!(handlers?.canEditCurrentCard ?? false))
 
             Divider()
@@ -90,7 +89,6 @@ struct StudyCommands: Commands {
             Button(handlers?.canGrade == true ? "Grade: Good with Space" : "Continue") {
                 handlers?.useSpace(primaryAction: primaryAction)
             }
-            .keyboardShortcut(.space, modifiers: [])
             .disabled(!(handlers?.canUseSpace(primaryAction: primaryAction) ?? false))
 
             Divider()
@@ -99,10 +97,6 @@ struct StudyCommands: Commands {
                 Button("Grade: \(choice.title)") {
                     handlers?.grade?(choice.rating)
                 }
-                .keyboardShortcut(
-                    KeyEquivalent(Character(choice.shortcutLabel)),
-                    modifiers: []
-                )
                 .disabled(!(handlers?.canGrade ?? false))
             }
 
@@ -111,7 +105,6 @@ struct StudyCommands: Commands {
             Button("Undo Last Grade") {
                 handlers?.undoLastGrade?()
             }
-            .keyboardShortcut("z", modifiers: [.command])
             .disabled(!(handlers?.canUndoLastGrade ?? false))
         }
     }

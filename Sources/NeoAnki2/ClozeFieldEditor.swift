@@ -217,6 +217,7 @@ enum ClozeBlankBuilder {
 }
 
 private struct ClozeTextEditor: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var text: String
     @Binding var selectionStart: Int?
     @Binding var selectionLength: Int
@@ -230,7 +231,11 @@ private struct ClozeTextEditor: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView(frame: .zero)
         textView.delegate = context.coordinator
+        textView.isEditable = isEnabled
         textView.isRichText = false
+        textView.allowsUndo = true
+        textView.textColor = .textColor
+        textView.backgroundColor = .textBackgroundColor
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
@@ -252,7 +257,9 @@ private struct ClozeTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
-        guard let textView = scrollView.documentView as? NSTextView, textView.string != text else { return }
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+        textView.isEditable = isEnabled
+        guard textView.string != text, !textView.hasMarkedText() else { return }
         let selectedRange = textView.selectedRange()
         textView.string = text
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
