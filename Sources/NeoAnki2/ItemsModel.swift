@@ -330,6 +330,7 @@ final class ItemsModel {
         fieldMedia: [UUID: MediaRef] = [:],
         fieldMediaAltText: [UUID: String] = [:],
         fieldClozeBlanks: [UUID: [ClozeSpan]] = [:],
+        fieldOcclusions: [UUID: ImageOcclusionContent] = [:],
         deckID: UUID? = nil
     ) async -> Bool {
         errorMessage = nil
@@ -347,7 +348,8 @@ final class ItemsModel {
                 fieldText: fieldText,
                 fieldMedia: fieldMedia,
                 fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks
+                fieldClozeBlanks: fieldClozeBlanks,
+                fieldOcclusions: fieldOcclusions
             )
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
@@ -374,7 +376,8 @@ final class ItemsModel {
         fieldText: [UUID: String] = [:],
         fieldMedia: [UUID: MediaRef] = [:],
         fieldMediaAltText: [UUID: String] = [:],
-        fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
+        fieldClozeBlanks: [UUID: [ClozeSpan]] = [:],
+        fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
     ) async -> Bool {
         errorMessage = nil
 
@@ -389,7 +392,8 @@ final class ItemsModel {
                 fieldText: fieldText,
                 fieldMedia: fieldMedia,
                 fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks
+                fieldClozeBlanks: fieldClozeBlanks,
+                fieldOcclusions: fieldOcclusions
             )
             preserveTextLanguages(in: &fields, from: stored.item)
 
@@ -427,7 +431,8 @@ final class ItemsModel {
         fieldText: [UUID: String],
         fieldMedia: [UUID: MediaRef],
         fieldMediaAltText: [UUID: String],
-        fieldClozeBlanks: [UUID: [ClozeSpan]]
+        fieldClozeBlanks: [UUID: [ClozeSpan]],
+        fieldOcclusions: [UUID: ImageOcclusionContent]
     ) throws -> [FieldValue] {
         var fields: [FieldValue] = []
         for field in itemType.fields {
@@ -437,7 +442,8 @@ final class ItemsModel {
                 fieldText: fieldText,
                 fieldMedia: fieldMedia,
                 fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks
+                fieldClozeBlanks: fieldClozeBlanks,
+                fieldOcclusions: fieldOcclusions
             )
             if value.isEmpty, field.isRequired {
                 throw DatabaseError.requiredFieldEmpty(field.name)
@@ -455,7 +461,8 @@ final class ItemsModel {
         fieldText: [UUID: String],
         fieldMedia: [UUID: MediaRef],
         fieldMediaAltText: [UUID: String],
-        fieldClozeBlanks: [UUID: [ClozeSpan]]
+        fieldClozeBlanks: [UUID: [ClozeSpan]],
+        fieldOcclusions: [UUID: ImageOcclusionContent]
     ) throws -> ContentValue {
         switch field.type {
         case .text, .richText:
@@ -473,6 +480,10 @@ final class ItemsModel {
                 return field.contentValue(from: ref)
             }
             return .empty
+        case .imageOcclusion:
+            guard let content = fieldOcclusions[field.id] else { return .empty }
+            try ImageOcclusionValidation.validate(content)
+            return .imageOcclusion(content)
         case .cloze:
             let text = fieldText[field.id, default: ""]
             let blanks = fieldClozeBlanks[field.id, default: []]

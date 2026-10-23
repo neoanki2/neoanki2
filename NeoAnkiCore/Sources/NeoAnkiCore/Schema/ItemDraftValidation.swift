@@ -5,17 +5,20 @@ public struct ItemDraftContent: Sendable, Equatable {
     public var text: [UUID: String]
     public var media: [UUID: MediaRef]
     public var mediaDescriptions: [UUID: String]
+    public var occlusions: [UUID: ImageOcclusionContent]
     public var clozeBlanks: [UUID: [ClozeSpan]]
 
     public init(
         text: [UUID: String] = [:],
         media: [UUID: MediaRef] = [:],
         mediaDescriptions: [UUID: String] = [:],
-        clozeBlanks: [UUID: [ClozeSpan]] = [:]
+        clozeBlanks: [UUID: [ClozeSpan]] = [:],
+        occlusions: [UUID: ImageOcclusionContent] = [:]
     ) {
         self.text = text
         self.media = media
         self.mediaDescriptions = mediaDescriptions
+        self.occlusions = occlusions
         self.clozeBlanks = clozeBlanks
     }
 }
@@ -24,6 +27,7 @@ public enum ItemDraftValidationIssue: Sendable, Equatable {
     case missingRequiredField(UUID)
     case missingMediaDescription(UUID)
     case invalidCloze(UUID)
+    case invalidOcclusion(UUID)
 }
 
 public enum ItemDraftValidation {
@@ -36,6 +40,10 @@ public enum ItemDraftValidation {
                 let description = draft.mediaDescriptions[field.id, default: ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 if description.isEmpty { return .missingMediaDescription(field.id) }
+            }
+            if field.type == .imageOcclusion, let content = draft.occlusions[field.id] {
+                do { try ImageOcclusionValidation.validate(content) }
+                catch { return .invalidOcclusion(field.id) }
             }
             if field.type == .cloze {
                 let characterCount = draft.text[field.id, default: ""].count
@@ -50,6 +58,8 @@ public enum ItemDraftValidation {
             case .text, .richText, .number, .cloze:
                 hasValue = !draft.text[field.id, default: ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            case .imageOcclusion:
+                hasValue = draft.occlusions[field.id] != nil
             case .audio, .image, .gif, .video:
                 hasValue = draft.media[field.id] != nil
             }

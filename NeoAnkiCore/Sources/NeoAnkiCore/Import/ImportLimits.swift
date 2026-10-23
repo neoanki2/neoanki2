@@ -39,6 +39,10 @@ public enum ImportLimits {
                 switch value {
                 case let .text(text), let .cloze(text, _), let .mediaPath(text):
                     try validateFieldString(text, fieldName: name)
+                case let .imageOcclusion(path, alt, _, masks, _):
+                    try validateFieldString(path, fieldName: name)
+                    try validateFieldString(alt, fieldName: name)
+                    for mask in masks { if let text = mask.answerText { try validateFieldString(text, fieldName: name) } }
                 case let .mediaBase64(_, fileExtension, altText):
                     if let fileExtension {
                         try validateFieldString(fileExtension, fieldName: "\(name) file extension")
@@ -73,11 +77,12 @@ public enum ImportLimits {
 public enum StructuredFieldValue: Decodable, Sendable, Equatable {
     case text(String)
     case cloze(text: String, blanks: [ClozeSpan])
+    case imageOcclusion(path: String, altText: String, mode: ImageOcclusionMode, masks: [ImageOcclusionMask], nextGroup: Int)
     case mediaPath(String)
     case mediaBase64(String, fileExtension: String?, altText: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case text, blanks, path, base64, fileExtension, altText
+        case text, blanks, path, base64, fileExtension, altText, imageOcclusion
     }
 
     public init(from decoder: Decoder) throws {
@@ -88,6 +93,18 @@ public enum StructuredFieldValue: Decodable, Sendable, Equatable {
         }
 
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        if container.contains(.imageOcclusion) {
+            struct Input: Decodable {
+                let path: String
+                let altText: String
+                let mode: ImageOcclusionMode
+                let masks: [ImageOcclusionMask]
+                let nextGroup: Int
+            }
+            let input = try container.decode(Input.self, forKey: .imageOcclusion)
+            self = .imageOcclusion(path: input.path, altText: input.altText, mode: input.mode, masks: input.masks, nextGroup: input.nextGroup)
+            return
+        }
         if let path = try container.decodeIfPresent(String.self, forKey: .path) {
             self = .mediaPath(path)
             return

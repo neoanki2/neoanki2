@@ -5,6 +5,7 @@ import NeoAnkiCloudSync
 import PoemDeckBuilder
 import ProseDeckBuilder
 import VocabularyDeckBuilder
+import NeoAnkiTextEditing
 import SwiftUI
 
 private struct InitialLibraryPayload: Sendable {
@@ -142,6 +143,7 @@ struct NeoAnki2App: App {
                     ? 680
                     : isFunctionalUITestRun ? functionalUITestContentHeight : nil
             )
+            .textFieldStyle(.roundedBorder)
             .task {
                 // The loading view disappears as models are assigned. Keep
                 // startup on the stable root so that it cannot cancel sync.
@@ -187,6 +189,8 @@ struct NeoAnki2App: App {
                 : .automatic
         )
         .commands {
+            TextEditingCommands()
+            NativeEditingCommands()
             LibraryCommands()
             StudyCommands()
             SchedulingCommands(model: schedulingModel)
@@ -208,11 +212,12 @@ struct NeoAnki2App: App {
                         status: syncStatusModel.status,
                         isAvailable: CKSyncEngineTransport.isAvailable,
                         onChange: { enabled in await updateCloudSync(enabled: enabled, library: library) },
-                        synchronize: { await syncService?.synchronize(); await syncStatusModel.refresh() }
+                        synchronize: { await syncService?.synchronize(); await vocabularyLibraryModel?.sync.refresh(); await syncStatusModel.refresh() }
                     )
                     .tabItem { Label("iCloud", systemImage: "icloud") }
                 }
             }
+            .textFieldStyle(.roundedBorder)
         }
     }
 
@@ -274,7 +279,8 @@ struct NeoAnki2App: App {
             decksModel = newDecksModel
             library = payload.library
             schedulingModel = SchedulingModel(library: payload.library)
-            vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL)
+            vocabularyLibraryModel = VocabularyLibraryModel(rootURL: payload.vocabularyRootURL,
+                cloudTransport: !AppDatabase.isTesting && CKSyncEngineTransport.isAvailable ? CKVocabularyPackCloudTransport() : nil)
             let apiModel = APIControlModel(
                 library: payload.library,
                 vocabularyRootURL: payload.vocabularyRootURL
@@ -293,6 +299,7 @@ struct NeoAnki2App: App {
     @MainActor
     private func updateCloudSync(enabled: Bool, library: SQLiteLibraryRepository) async {
         guard enabled else {
+            vocabularyLibraryModel?.sync.setEnabled(false)
             syncStatusModel.stop()
             await syncService?.stop()
             syncService = nil
@@ -319,6 +326,7 @@ struct NeoAnki2App: App {
             syncStatusModel.observe(service)
             await service.start()
             await syncStatusModel.refresh()
+            vocabularyLibraryModel?.sync.setEnabled(true)
         } catch {
             syncStatusModel.stop(status: .accountUnavailable)
         }

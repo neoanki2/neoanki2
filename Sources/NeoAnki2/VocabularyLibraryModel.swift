@@ -14,14 +14,11 @@ struct VocabularyLibraryNotice: Identifiable, Equatable {
 
 private enum VocabularyLibraryError: LocalizedError {
     case invalidSelection
-    case alreadyInstalled(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidSelection:
             "Choose a local directory whose name ends in .neovocab."
-        case let .alreadyInstalled(title):
-            "\(title) is already installed."
         }
     }
 }
@@ -35,15 +32,18 @@ final class VocabularyLibraryModel {
     var notice: VocabularyLibraryNotice?
 
     let rootURL: URL
+    let sync: VocabularyPackSyncModel
 
-    init(rootURL: URL) {
+    init(rootURL: URL, cloudTransport: (any VocabularyPackCloudTransport)? = nil) {
         self.rootURL = rootURL
+        sync = VocabularyPackSyncModel(rootURL: rootURL, transport: cloudTransport)
     }
 
     func load() async {
         guard !isLoading, !isImporting else { return }
         isLoading = true
         defer { isLoading = false }
+        await sync.reloadLocal()
         let rootURL = rootURL
         do {
             installedPacks = try await Task.detached(priority: .utility) {
@@ -82,15 +82,13 @@ final class VocabularyLibraryModel {
 
         let rootURL = rootURL
         do {
-            let option = try await Task.detached(priority: .userInitiated) {
-                try await Self.install(sourceURL: sourceURL, rootURL: rootURL)
-            }.value
+            let imported = try await sync.installLocal(from: sourceURL)
             installedPacks = try await Task.detached(priority: .utility) {
                 try Self.scan(rootURL: rootURL)
             }.value
             notice = .init(
                 title: "Vocabulary Pack Imported",
-                message: "\(option.title) is available for offline vocabulary lookup."
+                message: "\(imported.title) is available for offline vocabulary lookup."
             )
             return true
         } catch {
@@ -100,40 +98,6 @@ final class VocabularyLibraryModel {
             )
             return false
         }
-    }
-
-    private nonisolated static func install(sourceURL: URL, rootURL: URL) async throws
-        -> VocabularyPackOption
-    {
-        try FileManager.default.createDirectory(
-            at: rootURL,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-
-        let sourceManifest = try readManifest(at: sourceURL)
-        let current = try scan(rootURL: rootURL)
-        if current.contains(where: { $0.id == sourceManifest.id }) {
-            throw VocabularyLibraryError.alreadyInstalled(sourceManifest.title)
-        }
-
-        let stagingURL = rootURL.appendingPathComponent(
-            ".import-\(UUID().uuidString).neovocab",
-            isDirectory: true
-        )
-        let destinationURL = rootURL.appendingPathComponent(
-            "\(UUID().uuidString).neovocab",
-            isDirectory: true
-        )
-        defer { try? FileManager.default.removeItem(at: stagingURL) }
-
-        try FileManager.default.copyItem(at: sourceURL, to: stagingURL)
-        let opened = try await VocabularyPack.open(at: stagingURL)
-        if current.contains(where: { $0.id == opened.manifest.id }) {
-            throw VocabularyLibraryError.alreadyInstalled(opened.manifest.title)
-        }
-        try FileManager.default.moveItem(at: stagingURL, to: destinationURL)
-        return option(manifest: opened.manifest, packageURL: destinationURL)
     }
 
     private nonisolated static func scan(rootURL: URL) throws -> [VocabularyPackOption] {

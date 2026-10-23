@@ -291,6 +291,7 @@ struct ItemDetailView: View {
 
     private func cardMaturityName(_ detail: CardMaturityDetail, itemType: ItemType) -> String {
         let setup = itemType.templates.first(where: { $0.id == detail.templateID })?.name ?? "Card"
+        if let group = detail.occlusionGroup { return "\(setup) · region group \(group)" }
         if let group = detail.clozeGroup { return "\(setup) · blank \(group)" }
         return setup
     }

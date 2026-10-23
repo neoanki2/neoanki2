@@ -111,3 +111,61 @@ private actor DictionarySearchGate {
     await model.lookup(query: "аба", packURL: pack)
     #expect(model.results.count == 1 && model.automaticText == nil)
 }
+
+private actor DictionaryPackOpenGate {
+    var count = 0
+    var continuation: CheckedContinuation<Void, Never>?
+    func open() async {
+        count += 1
+        if count == 1 { await withCheckedContinuation { continuation = $0 } }
+    }
+    func resume() { continuation?.resume(); continuation = nil }
+}
+
+@Test @MainActor func dictionaryLookupSharesPendingPackValidationWhileTyping() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("dictionary-pending-\(UUID())")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    var entry = dictionaryEntry("начинка")
+    entry.pronunciations = [.init(scheme: "orthographic-respelling", representations: [.text(.init("НА\u{301}ЧИНКА"))])]
+    let jsonl = root.appendingPathComponent("entries.jsonl")
+    try (JSONEncoder().encode(entry) + Data([10])).write(to: jsonl)
+    let pack = root.appendingPathComponent("Fixture.neovocab")
+    try VocabularyPackCompiler.compile(jsonlURL: jsonl, to: pack,
+        descriptor: .init(id: "fixture", title: "Fixture", languages: ["uk"], capabilities: [.lexicon]))
+    let gate = DictionaryPackOpenGate()
+    let model = DictionaryLookupModel(delay: .zero, openPack: { url in
+        await gate.open()
+        return try await VocabularyPack.open(at: url)
+    })
+    let old = Task { await model.lookup(query: "на", packURL: pack) }
+    while await gate.count == 0 { await Task.yield() }
+    old.cancel()
+    let release = Task {
+        try? await Task.sleep(for: .milliseconds(30))
+        await gate.resume()
+    }
+    await model.lookup(query: "начинка", packURL: pack)
+    await old.value
+    await release.value
+    #expect(await gate.count == 1)
+    #expect(model.automaticText?.contains("НА\u{301}ЧИНКА") == true)
+    await model.lookup(query: "нач", packURL: pack)
+    #expect(await gate.count == 1)
+    #expect(model.results.count == 1 && model.automaticText == nil)
+}
+
+@Test @MainActor func dictionaryLookupDoesNotRunPrefixSearchAfterCancellation() async {
+    let gate = DictionarySearchGate()
+    let model = DictionaryLookupModel(delay: .zero) { _, _, mode in
+        if mode == .exact { await gate.pause() }
+        else { Issue.record("Canceled exact lookup must not start a prefix query.") }
+        return []
+    }
+    let old = Task { await model.lookup(query: "на", packURL: URL(fileURLWithPath: "/unused.neovocab")) }
+    while !(await gate.started) { await Task.yield() }
+    old.cancel()
+    await gate.resume()
+    await old.value
+    #expect(model.results.isEmpty && model.errorMessage == nil && !model.isSearching)
+}

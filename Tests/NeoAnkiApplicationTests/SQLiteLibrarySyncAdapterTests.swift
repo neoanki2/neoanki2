@@ -725,3 +725,39 @@ func synchronizedFirstReviewsConsumeDailyAllowance(legacyPayload: Bool) async th
     try await SQLiteLibrarySyncAdapter(repository: destination.repository).applyRemote(records, origin: .cloud)
     #expect(try await destination.repository.scopeSummary(scope: .allDecks, asOf: now).availableNewCount == 1)
 }
+
+
+@Test func imageOcclusionSyncRoundTripKeepsCardGroupsAndMediaReferences() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let type = try ItemTypeStudioDraft.newImageOcclusion().candidateItemType()
+    _ = try await source.repository.createItemType(type)
+    let image = try await source.repository.reserveMedia(data: Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kind: .image, altText: "Diagram", asOf: .now).reference
+    var content = ImageOcclusionContent(image: image)
+    content.addMask(rect: .init(x: 0.1, y: 0.1, width: 0.3, height: 0.2))
+    content.addMask(rect: .init(x: 0.6, y: 0.5, width: 0.2, height: 0.3))
+    let item = Item(itemTypeID: type.id, fields: [.init(fieldID: type.fields[0].id, value: .imageOcclusion(content))])
+    _ = try await source.repository.createItem(item, asOf: .now)
+    let records = try await SQLiteLibrarySyncAdapter(repository: source.repository).initialMerge(remote: [], deviceID: "source")
+    #expect(records.contains { $0.resourceKind == "media" })
+    _ = try await SQLiteLibrarySyncAdapter(repository: destination.repository).initialMerge(remote: records, deviceID: "destination")
+    let restored = try #require(try await destination.repository.item(id: item.id))
+    #expect(restored.item.fields == item.fields)
+    let cards = try await destination.repository.cards().filter { $0.itemID == item.id }
+    #expect(Set(cards.compactMap(\.occlusionGroup)) == [1, 2])
+    #expect(cards.allSatisfy { $0.clozeGroup == nil })
+}
+
+@Test func imageOcclusionStarterAndDraftValidationAreConsistent() throws {
+    let draft = ItemTypeStudioDraft.newImageOcclusion()
+    #expect(draft.isValid)
+    let type = try draft.candidateItemType()
+    #expect(type.templates[0].interaction == .imageOcclusion)
+    let visual = try CardSetupStarter.visual.makeCardSetup(fields: draft.fields)
+    #expect(visual.interaction == .imageOcclusion)
+    #expect(type.fields[0].isRequired)
+    #expect(!ItemEditorState.canSave(ItemEditorState.empty(for: type), itemType: type))
+}

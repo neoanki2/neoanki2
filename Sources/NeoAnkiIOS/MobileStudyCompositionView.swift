@@ -8,6 +8,7 @@ struct MobileStudyCompositionView: View {
     let item: Item
     let mediaStore: MediaStore?
     let isAnswerRevealed: Bool
+    var occlusionGroup: Int? = nil
     let clozeGroup: Int?
 
     private var components: [ResolvedTemplateComponent] {
@@ -31,6 +32,8 @@ struct MobileStudyCompositionView: View {
                 mediaBehavior: component.presentation.media,
                 revealMode: component.presentation.reveal,
                 isAnswerRevealed: isAnswerRevealed,
+                isStudyContent: true,
+                occlusionGroup: occlusionGroup,
                 clozeGroup: clozeGroup
             )
         }

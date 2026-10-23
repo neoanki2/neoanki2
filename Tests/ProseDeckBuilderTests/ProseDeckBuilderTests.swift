@@ -241,3 +241,11 @@ private extension Array {
     let fields = try #require(record["fields"] as? [String: [String: String]])
     #expect(fields["back"]?["text"] == "One sentence.")
 }
+
+@Test func sourcePreviewRoundTripPreservesExactTextUnlessUnitsChange() {
+    let source = "  First sentence.  Second sentence.\n\n\nAnother paragraph.\n"
+    let units = ProseText.parse(source)
+    #expect(ProseText.sourceAfterReview(originalSource: source, originalUnits: units, reviewedUnits: units) == source)
+    let edited = [ProseUnit(text: "First sentence. Second sentence.", separator: "")]
+    #expect(ProseText.sourceAfterReview(originalSource: source, originalUnits: units, reviewedUnits: edited) == ProseText.source(from: edited))
+}

@@ -45,13 +45,20 @@ struct ItemTypeStudioCatalogMobileView: View {
         .navigationTitle("Item Types")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("New Item Type", systemImage: "plus") {
+                Menu("New Item Type", systemImage: "plus") {
+                    Button("Image Occlusion") {
+                        model.selectItemType(id: nil)
+                        model.beginCreatingItemType(imageOcclusion: true)
+                        presentsStudio = true
+                    }
+                    Button("Basic") {
                     // A deck-provided selection belongs to the catalog, not to
                     // the new draft. Clear it before authoring so read-only
                     // actions can never target or replace the new identity.
                     model.selectItemType(id: nil)
                     model.beginCreatingItemType()
                     presentsStudio = true
+                    }
                 }
                 .neoAnkiTouchTarget()
                 .accessibilityIdentifier("item-types.new")
@@ -945,6 +952,7 @@ struct ItemTypeStudioMobileView: View {
         case .image: "Image"
         case .gif: "GIF"
         case .video: "Video"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         }
     }

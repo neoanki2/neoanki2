@@ -1,5 +1,6 @@
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiTextEditing
 import SwiftUI
 
 @MainActor
@@ -120,8 +121,9 @@ public struct PoemDeckEditorView: View {
     public let onSaved: () -> Void
     public let onCancel: () -> Void
 
+    @State private var textSession = PlainTextEditorSession()
+    @State private var dismissal = DraftDismissal()
     @State private var isPreviewing = false
-    @State private var confirmsDiscard = false
     @State private var model: PoemDeckEditorModel
     @AccessibilityFocusState private var errorFocused: Bool
 
@@ -151,18 +153,14 @@ public struct PoemDeckEditorView: View {
                     ProgressView("Loading poem…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    editor
+                    editor.disabled(model.isSaving)
                 }
             }
             .navigationTitle("Edit Poem")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", role: .cancel) {
-                        #if os(iOS)
-                        if model.sourceText != model.initialSourceText { confirmsDiscard = true } else { onCancel() }
-                        #else
-                        onCancel()
-                        #endif
+                        requestCancel()
                     }
                         .disabled(model.isSaving)
                         .keyboardShortcut(.cancelAction)
@@ -183,8 +181,7 @@ public struct PoemDeckEditorView: View {
         #if os(macOS)
         .frame(minWidth: 620, idealWidth: 720, minHeight: 620, idealHeight: 760)
         #endif
-        .interactiveDismissDisabled(model.isSaving || isMobileDirty)
-        .confirmationDialog("Discard changes?", isPresented: $confirmsDiscard) { Button("Discard Changes", role: .destructive, action: onCancel); Button("Keep Editing", role: .cancel) {} }
+        .protectDraft(isDirty: hasChanges, isBusy: model.isSaving, dismissal: dismissal)
         .task { await model.load() }
     }
 
@@ -195,7 +192,7 @@ public struct PoemDeckEditorView: View {
                 Section("Canonical source") {
                     Text(deckName)
                         .font(.headline)
-                    TextEditor(text: $model.sourceText)
+                    PlainTextEditor(text: $model.sourceText, session: textSession, label: "Canonical poem source", identifier: "poemEditorSource")
                         .font(.body)
                         .frame(minHeight: 300)
                         .accessibilityLabel("Canonical poem source")
@@ -292,6 +289,7 @@ public struct PoemDeckEditorView: View {
 
                 Button("Save Changes") {
                     Task {
+                        guard model.canSave else { return }
                         do {
                             try await model.save()
                             onSaved()
@@ -311,13 +309,12 @@ public struct PoemDeckEditorView: View {
         }
     }
 
-    private var isMobileDirty: Bool {
-        #if os(iOS)
-        model.sourceText != model.initialSourceText
-        #else
-        false
-        #endif
+    private var hasChanges: Bool { model.sourceText != model.initialSourceText }
+
+    private func requestCancel() {
+        dismissal.request(isDirty: hasChanges, isBusy: model.isSaving, action: onCancel)
     }
+
     private var isMobilePreview: Bool {
         #if os(iOS)
         isPreviewing
@@ -327,6 +324,7 @@ public struct PoemDeckEditorView: View {
     }
     private func save() {
         Task {
+            guard model.canSave else { return }
             do { try await model.save(); onSaved() }
             catch { model.errorMessage = error.localizedDescription; errorFocused = true }
         }

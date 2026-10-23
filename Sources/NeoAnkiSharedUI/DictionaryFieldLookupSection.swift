@@ -88,7 +88,9 @@ public struct DictionaryFieldLookupSection: View {
                 guard let rootURL else { return }
                 do {
                     packs = try await InstalledVocabularyPackStore(rootURL: rootURL).installedPacks()
-                    packID = packs.first?.id
+                    // Form rows can remount while scrolling. Preserve the
+                    // user's selection and the autofill it owns on that path.
+                    if packID == nil { packID = packs.first?.id }
                 } catch { loadingError = error.localizedDescription }
             }
             .task(id: request) {

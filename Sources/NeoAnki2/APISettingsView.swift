@@ -24,11 +24,15 @@ struct APISettingsView: View {
                     TextField("Port", text: $portText)
                         .frame(width: 100)
                         .accessibilityLabel("Local API port")
+                        .onSubmit {
+                            guard !model.isChangingState, let port = Int(portText), (1_024 ... 65_535).contains(port) else { return }
+                            Task { await model.applyPort(port) }
+                        }
                     Button("Apply") {
                         guard let port = Int(portText) else { return }
                         Task { await model.applyPort(port) }
                     }
-                    .disabled(Int(portText).map { !(1_024 ... 65_535).contains($0) } ?? true)
+                    .disabled(model.isChangingState || (Int(portText).map { !(1_024 ... 65_535).contains($0) } ?? true))
                 }
 
                 Text("The API listens only on this Mac. It is for local automation, not synchronization or remote access.")
@@ -75,7 +79,7 @@ struct APISettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 460)
+        .frame(minWidth: 480, idealWidth: 560, minHeight: 360, idealHeight: 460)
         .padding()
         .navigationTitle("Local API")
         .task {

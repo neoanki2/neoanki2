@@ -20,6 +20,7 @@ public struct ItemEditorSnapshot: Sendable, Equatable {
     public var fieldText: [UUID: String]
     public var fieldMedia: [UUID: MediaRef]
     public var fieldMediaAltText: [UUID: String]
+    public var fieldOcclusions: [UUID: ImageOcclusionContent]
     public var fieldClozeBlanks: [UUID: [ClozeSpan]]
 
     public init(
@@ -27,12 +28,14 @@ public struct ItemEditorSnapshot: Sendable, Equatable {
         fieldText: [UUID: String],
         fieldMedia: [UUID: MediaRef],
         fieldMediaAltText: [UUID: String],
-        fieldClozeBlanks: [UUID: [ClozeSpan]]
+        fieldClozeBlanks: [UUID: [ClozeSpan]],
+        fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
     ) {
         self.fieldSpans = fieldSpans
         self.fieldText = fieldText
         self.fieldMedia = fieldMedia
         self.fieldMediaAltText = fieldMediaAltText
+        self.fieldOcclusions = fieldOcclusions
         self.fieldClozeBlanks = fieldClozeBlanks
     }
 }
@@ -71,6 +74,7 @@ public enum ItemEditorState {
             case let .cloze(text, blanks):
                 snapshot.fieldText[field.id] = text
                 snapshot.fieldClozeBlanks[field.id] = blanks
+            case let .imageOcclusion(content): snapshot.fieldOcclusions[field.id] = content
             case .empty: break
             }
         }
@@ -88,7 +92,8 @@ public enum ItemEditorState {
                 text: text,
                 media: snapshot.fieldMedia,
                 mediaDescriptions: snapshot.fieldMediaAltText,
-                clozeBlanks: snapshot.fieldClozeBlanks
+                clozeBlanks: snapshot.fieldClozeBlanks,
+                occlusions: snapshot.fieldOcclusions
             ),
             itemType: itemType
         )

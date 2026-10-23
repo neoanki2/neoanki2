@@ -509,34 +509,31 @@ struct VocabularyToolsView: View {
         Group {
             if model.isLoading {
                 ProgressView("Loading installed packs…")
-            } else if model.installedPacks.isEmpty {
+            } else if model.installedPacks.isEmpty && model.sync.catalog.isEmpty {
+                if model.sync.isRefreshing { ProgressView("Refreshing dictionary catalog…") }
                 ContentUnavailableView {
                     Label("No Vocabulary Packs", systemImage: "books.vertical")
                 } description: {
-                    Text("Install a .neovocab package once, then search it and generate cards entirely offline.")
+                    Text(model.sync.isEnabled ? "Install a .neovocab package. Packs from your other devices appear here after their upload finishes." : "Install a .neovocab package, or enable iCloud sync in Settings to download packs from your other devices.")
+                    if let error = model.sync.catalogError { Text(error).foregroundStyle(.red) }
                 } actions: {
+                    if model.sync.isEnabled {
+                        Button(model.sync.catalogError == nil ? "Refresh from iCloud" : "Retry iCloud Sync") { Task { await model.sync.refresh() } }.disabled(model.sync.isRefreshing)
+                    }
                     Button("Install Pack…") { isImporting = true }
                         .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
                 }
             } else {
-                List {
-                    ForEach(model.installedPacks) { pack in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(pack.title).font(.headline)
-                            Text("\(pack.languages.joined(separator: ", ")) · \(pack.entryCount.formatted()) entries")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                        .accessibilityElement(children: .combine)
-                    }
-                    .onDelete { offsets in
-                        for index in offsets { Task { await model.remove(id: model.installedPacks[index].id) } }
-                    }
-                }
+                VocabularyPackCloudList(model: model.sync) { await model.load() }
             }
         }
         .navigationTitle("Vocabulary Packs")
         .toolbar {
+            if model.sync.isEnabled {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Refresh", systemImage: "arrow.clockwise") { Task { await model.sync.refresh() } }.disabled(model.sync.isRefreshing)
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("Install Pack", systemImage: "plus") { isImporting = true }
                     .disabled(model.isImporting)

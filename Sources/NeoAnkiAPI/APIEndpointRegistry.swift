@@ -80,6 +80,10 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
 
     package var additionalDescription: String? {
         switch self {
+        case .createItem, .replaceItem, .validateItem:
+            "Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Each stable mask group generates a separate recall card."
+        case .cardContent, .nextStudyCard:
+            "Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal."
         case .bulkItems:
             "Optional order atomically reconciles one generated deck against complete expected item snapshots. Both dry runs and commits reject stale snapshots; only New-card introduction times are reordered."
         default:

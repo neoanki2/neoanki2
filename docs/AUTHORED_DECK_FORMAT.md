@@ -10,7 +10,7 @@ parent: Reference
 ## 1. Status and purpose
 
 This document is the normative specification for NeoAnki Authored Deck Format
-version 5. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
+version 6. The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**,
 **SHOULD NOT**, and **MAY** are interpreted as in RFC 2119 and RFC 8174.
 
 The format is an import-only, text-based source representation for coding
@@ -65,13 +65,13 @@ templates, slots, rich spans, and tags.
 `deck.jsonl` MUST contain exactly one manifest record:
 
 ```json
-{"kind":"neoanki","version":5,"root":"biology","parts":["items/cells-001.jsonl"]}
+{"kind":"neoanki","version":6,"root":"biology","parts":["items/cells-001.jsonl"]}
 ```
 
 Members are exact:
 
 - `kind`: `"neoanki"`;
-- `version`: integer `5`;
+- `version`: integer `6`;
 - `root`: identifier of the root deck; and
 - `parts`: ordered, unique relative paths to `.jsonl` item files.
 
@@ -130,7 +130,7 @@ editing or explicitly duplicates one as an independent definition.
 ```
 
 Field `required` defaults to `false`. Field types are `text`, `richText`,
-`audio`, `image`, `gif`, `video`, `number`, and `cloze`. Field identifiers are
+`audio`, `image`, `gif`, `video`, `number`, `cloze`, and `imageOcclusion`. Field identifiers are
 unique within their type. Every type needs at least one field and template.
 
 ### 6.1 Template compositions
@@ -160,7 +160,7 @@ to `always`. Optional `media` is `default`, `autoplay`, `playOnTap`, or `loop`;
 it defaults to `default`. Non-default media behavior is valid only on audio,
 GIF, or video fields.
 
-`interaction` is `reveal`, `type`, `choose`, `record`, `audioSubmission`, `cloze`, or `arrange`.
+`interaction` is `reveal`, `type`, `choose`, `record`, `audioSubmission`, `cloze`, `arrange`, or `imageOcclusion`.
 An `audioSubmission` template MUST contain at least one prompt slot, MUST have an
 empty answer side, and MUST declare `audio` as its skill output. Learner
 recordings are local library data and are never part of an authored bundle.
@@ -320,8 +320,17 @@ Version 5 adds preset layouts and semantic components. Version 4 adds
 `audioSubmission` templates. Version 3 adds deck item-type policies and
 included item types. Version 2 adds
 portable inline text color, relative size, links, superscript, and subscript.
-Versions 1–4 remain readable and are converted during import. Version 1 cannot
+Versions 1–5 remain readable and are converted during import. Version 1 cannot
 use the version-2 text members or styles. Writers
 MUST NOT add members or record kinds not defined here.
 Incompatible changes increment the manifest `version`; importers MUST reject
 unsupported versions rather than guessing.
+
+## Version 6 image occlusion
+
+Manifest version 6 adds field type and interaction `imageOcclusion`. A field
+value has one `imageOcclusion` object containing `image` (the existing authored
+media object with `path` and `alt`), `mode`, `masks`, and `nextGroup`. Mask shape
+and validation follow [portable image occlusion](PORTABLE_DECK_FORMAT.md#version-6-image-occlusion).
+The media path remains confined beneath the bundle's `media/` directory.
+Versions 1–5 continue to be accepted for their existing capabilities.

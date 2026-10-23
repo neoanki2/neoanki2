@@ -29,6 +29,13 @@ public enum ItemTypeValidation {
                 try validateAudioSubmissionTemplate(template)
             }
 
+            if template.interaction == .imageOcclusion {
+                let fields = Set(template.components.filter { $0.purpose == .question }.compactMap { component -> UUID? in
+                    guard case let .field(id) = component.source, itemType.field(id)?.type == .imageOcclusion else { return nil }
+                    return id
+                })
+                guard fields.count == 1 else { throw DatabaseError.invalidItemType("Image Occlusion needs exactly one occlusion question field.") }
+            }
             if template.interaction == .cloze {
                 try validateClozeTemplate(template, in: itemType)
             }
@@ -80,7 +87,7 @@ public enum ItemTypeValidation {
         guard template.components.contains(where: { $0.purpose == .question }) else {
             throw DatabaseError.invalidItemType("Every template needs a question component.")
         }
-        if template.interaction != .audioSubmission,
+        if template.interaction != .audioSubmission, template.interaction != .imageOcclusion,
            !template.components.contains(where: { $0.purpose == .expectedAnswer }) {
             throw DatabaseError.invalidItemType("Every graded template needs an expected answer component.")
         }
@@ -241,7 +248,7 @@ public enum TemplateBuilder {
             return .text
         case .audio:
             return .audio
-        case .image, .gif:
+        case .image, .imageOcclusion, .gif:
             return .image
         case .video:
             return .video

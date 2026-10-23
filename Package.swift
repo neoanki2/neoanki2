@@ -41,6 +41,8 @@ let package = Package(
         .package(path: "NeoAnkiCore"),
     ],
     targets: [
+        .target(name: "NeoAnkiTextEditing"),
+        .testTarget(name: "NeoAnkiTextEditingTests", dependencies: ["NeoAnkiTextEditing"]),
         .target(
             name: "NeoAnkiFeatures",
             dependencies: [
@@ -67,6 +69,7 @@ let package = Package(
         .executableTarget(
             name: "NeoAnki2",
             dependencies: [
+                "NeoAnkiTextEditing",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 "NeoAnkiApplication",
                 "NeoAnkiFeatures",
@@ -91,6 +94,7 @@ let package = Package(
         .target(
             name: "NeoAnkiSharedUI",
             dependencies: [
+                "NeoAnkiTextEditing",
                 "NeoAnkiApplication",
                 "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
@@ -101,6 +105,7 @@ let package = Package(
             name: "NeoAnkiCloudSync",
             dependencies: [
                 "NeoAnkiApplication",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
             path: "Sources/NeoAnkiCloudSync",
@@ -171,6 +176,7 @@ let package = Package(
         .target(
             name: "PoemDeckBuilder",
             dependencies: [
+                "NeoAnkiTextEditing",
                 "NeoAnkiApplication",
                 "NeoAnkiDeckBuilderKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
@@ -180,6 +186,7 @@ let package = Package(
         .target(
             name: "ProseDeckBuilder",
             dependencies: [
+                "NeoAnkiTextEditing",
                 "NeoAnkiApplication",
                 "NeoAnkiDeckBuilderKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
@@ -189,6 +196,7 @@ let package = Package(
         .target(
             name: "VocabularyDeckBuilder",
             dependencies: [
+                "NeoAnkiTextEditing",
                 "NeoAnkiVocabularyKit",
                 "NeoAnkiDeckBuilderKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
@@ -210,6 +218,7 @@ let package = Package(
             dependencies: [
                 "NeoAnkiApplication",
                 "NeoAnkiCloudSync",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
             ],

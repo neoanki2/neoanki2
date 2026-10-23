@@ -140,7 +140,7 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
         }
     }
 
-    private static func validateCurrentProcessEntitlements() throws {
+    static func validateCurrentProcessEntitlements() throws {
 #if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil),
               let value = SecTaskCopyValueForEntitlement(

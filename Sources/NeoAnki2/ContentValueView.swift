@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 
 struct ContentValueView: View {
@@ -10,6 +11,8 @@ struct ContentValueView: View {
     var isAnswerRevealed: Bool = true
     var richTextPointSize: CGFloat = DesignSystem.Typography.richTextPointSize
     var mediaStore: MediaStore?
+    var isStudyContent = false
+    var occlusionGroup: Int? = nil
     var clozeGroup: Int?
 
     var body: some View {
@@ -52,6 +55,8 @@ struct ContentValueView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
+            case let .imageOcclusion(content):
+                ImageOcclusionStudyView(content: content, mediaStore: mediaStore, group: content.displayGroup(cardGroup: occlusionGroup, allowsPreview: !isStudyContent && isAnswerRevealed), revealed: isAnswerRevealed)
             case let .cloze(text, blanks):
                 ClozeContentView(
                     text: text,
@@ -122,6 +127,7 @@ struct SideContentView: View {
     var isAnswerRevealed: Bool = true
     var richTextPointSize: CGFloat = DesignSystem.Typography.richTextPointSize
     var mediaStore: MediaStore?
+    var occlusionGroup: Int? = nil
     var clozeGroup: Int?
 
     var body: some View {
@@ -134,6 +140,7 @@ struct SideContentView: View {
                     isAnswerRevealed: isAnswerRevealed,
                     richTextPointSize: richTextPointSize,
                     mediaStore: mediaStore,
+                    occlusionGroup: occlusionGroup,
                     clozeGroup: clozeGroup
                 )
             }

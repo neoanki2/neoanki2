@@ -7,6 +7,10 @@ echo "==> NeoAnkiCore unit + flow tests"
 cd "$ROOT/NeoAnkiCore"
 swift test --parallel
 
+echo "==> Native editing and draft interaction tests"
+cd "$ROOT"
+swift test --filter NeoAnkiTextEditingTests --parallel
+
 echo "==> NeoAnki2 ViewModel tests"
 cd "$ROOT"
 swift test --filter NeoAnki2Tests --skip AppLaunchSmokeTests --parallel
@@ -16,6 +20,9 @@ swift test --filter NeoAnkiApplicationTests --parallel
 
 echo "==> Shared feature workflow tests"
 swift test --filter NeoAnkiFeaturesTests --parallel
+
+echo "==> Offline dictionaries and pack sync tests"
+swift test --filter NeoAnkiVocabularyKitTests --parallel
 
 echo "==> Local API registry and OpenAPI contract tests"
 swift test --filter NeoAnkiAPITests --parallel

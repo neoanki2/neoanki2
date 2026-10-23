@@ -363,7 +363,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
         case .arrange:
             model.selectArrangementItem(at: 0)
             model.moveSelectedArrangementItem(by: 1)
-        case .reveal, .record, .cloze:
+        case .reveal, .record, .cloze, .imageOcclusion:
             break
         case .audioSubmission:
             break

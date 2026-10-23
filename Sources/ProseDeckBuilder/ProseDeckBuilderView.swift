@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
+import NeoAnkiTextEditing
 import SwiftUI
 
 public enum ProseDeckBuilderFeature {
@@ -28,8 +29,14 @@ public enum ProseDeckBuilderFeature {
 }
 
 public struct ProseDeckBuilderView: View {
+    private enum Field: Hashable { case destination, author, title }
+    @FocusState private var focusedField: Field?
+    @AccessibilityFocusState private var errorFocused: Bool
     @State private var input = ProseDeckInput()
     @State private var units: [ProseUnit] = []
+    @State private var previewedUnits: [ProseUnit] = []
+    @State private var textSession = PlainTextEditorSession()
+    @State private var dismissal = DraftDismissal()
     @State private var isPreviewing = false
     @State private var isGenerating = false
     @State private var errorMessage: String?
@@ -68,20 +75,23 @@ public struct ProseDeckBuilderView: View {
                                 Text(deck.name).tag(Optional(deck.id))
                             }
                         }
-                        .accessibilityIdentifier("proseBuilderRootDeck")
+                        .focused($focusedField, equals: .destination)
+                    .accessibilityIdentifier("proseBuilderRootDeck")
                         VStack(alignment: .leading, spacing: 8) {
                         Text("Title").font(.subheadline).foregroundStyle(.secondary)
                         TextField("Title", text: $input.title)
+                        .focused($focusedField, equals: .title)
                             .accessibilityIdentifier("proseBuilderTitle")
                     }
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Author (optional)").font(.subheadline).foregroundStyle(.secondary)
                             TextField("Author", text: $input.author)
+                        .focused($focusedField, equals: .author)
                                 .accessibilityIdentifier("proseBuilderAuthor")
                         }
                         VStack(alignment: .leading, spacing: 8) {
                         Text("Passage").font(.subheadline).foregroundStyle(.secondary)
-                        TextEditor(text: $input.text)
+                        PlainTextEditor(text: $input.text, session: textSession, label: "Prose text", identifier: "proseBuilderText")
                             .font(.body)
                             .frame(minHeight: 260)
                             .accessibilityLabel("Prose text")
@@ -104,17 +114,18 @@ public struct ProseDeckBuilderView: View {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
                     .padding()
-                    .accessibilityIdentifier("proseBuilderError")
+                    .accessibilityFocused($errorFocused)
+                            .accessibilityIdentifier("proseBuilderError")
             }
             #if os(macOS)
             Divider()
             HStack {
-                Button("Cancel", role: .cancel, action: onCancel)
+                Button("Cancel", role: .cancel, action: requestCancel)
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 if isPreviewing {
                     Button("Edit Text") {
-                        input.text = ProseText.source(from: units)
+                        input.text = ProseText.sourceAfterReview(originalSource: input.text, originalUnits: previewedUnits, reviewedUnits: units)
                         isPreviewing = false
                         errorMessage = nil
                     }
@@ -142,21 +153,45 @@ public struct ProseDeckBuilderView: View {
                     Button("Preview", action: preview).accessibilityIdentifier("proseBuilderReview")
                 }
             }
-            if isPreviewing { ToolbarItem(placement: .topBarLeading) { Button("Edit Text") { input.text = ProseText.source(from: units); isPreviewing = false; errorMessage = nil } } }
+            if isPreviewing { ToolbarItem(placement: .topBarLeading) { Button("Edit Text") { input.text = ProseText.sourceAfterReview(originalSource: input.text, originalUnits: previewedUnits, reviewedUnits: units); isPreviewing = false; errorMessage = nil } } }
         }
         #else
         .navigationTitle(isPreviewing ? "Review Prose Cards" : "Prose Deck")
         #endif
-        .interactiveDismissDisabled(isGenerating)
+        .protectDraft(isDirty: hasDraft, isBusy: isGenerating, dismissal: dismissal)
+        .onChange(of: input) { _, _ in errorMessage = nil }
+    }
+
+    private var hasDraft: Bool {
+        !input.title.isEmpty || !input.author.isEmpty || !input.text.isEmpty
+    }
+
+    private func requestCancel() {
+        dismissal.request(isDirty: hasDraft, isBusy: isGenerating, action: onCancel)
     }
 
     private func preview() {
+        guard input.destinationDeckID != nil else {
+            errorMessage = ProseDeckBuilderError.missingDestinationDeck.localizedDescription
+            focusedField = .destination
+            errorFocused = true
+            return
+        }
+        guard !input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = ProseDeckBuilderError.missingTitle.localizedDescription
+            focusedField = .title
+            errorFocused = true
+            return
+        }
         errorMessage = nil
         units = ProseText.parse(input.text, preserving: units)
         guard !units.isEmpty else {
             errorMessage = ProseDeckBuilderError.emptyText.localizedDescription
+            textSession.focus()
+            errorFocused = true
             return
         }
+        previewedUnits = units
         isPreviewing = true
     }
 

@@ -2,6 +2,7 @@ import NeoAnkiCore
 import NeoAnkiApplication
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
+import NeoAnkiVocabularyKit
 import SwiftUI
 
 #if os(iOS)
@@ -12,14 +13,15 @@ public struct MobileRootView: View {
     @State private var fixturesReady = false
     @State private var retriedFailureFixture = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("mobile-conceals-answers") private var concealsAnswers = true
     @State private var vocabularyLibrary: MobileVocabularyLibraryModel
     private let vocabularyRootURL: URL
 
-    public init(model: LibraryFeatureModel, vocabularyRootURL: URL) {
+    public init(model: LibraryFeatureModel, vocabularyRootURL: URL, packCloudTransport: (any VocabularyPackCloudTransport)? = nil) {
         self.model = model
         self.vocabularyRootURL = vocabularyRootURL
-        _vocabularyLibrary = State(initialValue: MobileVocabularyLibraryModel(rootURL: vocabularyRootURL))
+        _vocabularyLibrary = State(initialValue: MobileVocabularyLibraryModel(rootURL: vocabularyRootURL, cloudTransport: packCloudTransport))
     }
 
     public var body: some View {
@@ -50,6 +52,10 @@ public struct MobileRootView: View {
         } message: { Text(fixtureError ?? "") }
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
+        .task(id: model.syncEnabled) { vocabularyLibrary.sync.setEnabled(model.syncEnabled) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await vocabularyLibrary.sync.refresh() } }
+        }
         .task {
             await model.bootstrap()
             if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
@@ -159,7 +165,7 @@ private struct MobileTabView: View {
         case .home: HomeView(model: model, path: $homePath)
         case .library: LibraryView(model: model, navigationPath: $libraryPath)
         case .create: CreateHubView(model: model, vocabularyLibrary: vocabularyLibrary, path: $createPath)
-        case .settings: SettingsView(model: model, path: $settingsPath)
+        case .settings: SettingsView(model: model, vocabularyLibrary: vocabularyLibrary, path: $settingsPath)
         }
     }
 }
@@ -214,6 +220,7 @@ private struct CreateHubView: View {
 
 private struct SettingsView: View {
     @Bindable var model: MobileAppModel
+    let vocabularyLibrary: MobileVocabularyLibraryModel
     @Binding var path: NavigationPath
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @State private var showsSyncConsent = false
@@ -237,7 +244,7 @@ private struct SettingsView: View {
                     if !model.syncIssues.isEmpty {
                         NavigationLink("Sync Issues (\(model.syncIssues.count))") { SyncIssuesMobileView(model: model) }
                     }
-                    Button("Sync Now") { Task { await model.synchronize() } }
+                    Button("Sync Now") { Task { await model.synchronize(); await vocabularyLibrary.sync.refresh() } }
                         .disabled(!model.syncEnabled)
                 }
                 Section("Daily Reminder") {
@@ -275,7 +282,7 @@ private struct SettingsView: View {
                 Button("Create Backup & Enable") { Task { await model.setSyncEnabled(true) } }
                 Button("Not Now", role: .cancel) {}
             } message: {
-                Text("NeoAnki2 will create a verified local backup, then merge this library with your private iCloud library. Existing content is never replaced wholesale.")
+                Text("NeoAnki2 will create a verified local backup, then merge this library with your private iCloud library. Imported dictionaries upload automatically; other devices download them when you choose. Existing content is never replaced wholesale.")
             }
             .alert("Could Not Update Settings", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}

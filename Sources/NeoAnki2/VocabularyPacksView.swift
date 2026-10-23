@@ -1,4 +1,5 @@
 import SwiftUI
+import NeoAnkiSharedUI
 
 struct VocabularyPacksView: View {
     @Bindable var model: VocabularyLibraryModel
@@ -11,41 +12,40 @@ struct VocabularyPacksView: View {
                 if model.isLoading {
                     ProgressView("Loading installed packs…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if model.installedPacks.isEmpty {
+                } else if model.installedPacks.isEmpty && model.sync.catalog.isEmpty {
+                    if model.sync.isRefreshing { ProgressView("Refreshing dictionary catalog…") }
                     ContentUnavailableView {
                         Label("No Vocabulary Packs", systemImage: "character.book.closed")
                     } description: {
-                        Text("Import a .neovocab package once, then use it entirely offline.")
+                        Text(model.sync.isEnabled ? "Import a .neovocab package. Packs from your other devices appear here after their upload finishes." : "Import a .neovocab package, or enable iCloud sync in Settings to download packs from your other devices.")
+                        if let error = model.sync.catalogError { Text(error).foregroundStyle(.red) }
                     } actions: {
+                        if model.sync.isEnabled {
+                            Button(model.sync.catalogError == nil ? "Refresh from iCloud" : "Retry iCloud Sync") { Task { await model.sync.refresh() } }
+                                .disabled(model.sync.isRefreshing)
+                        }
                         Button("Import Pack…", action: onImport)
                             .buttonStyle(.borderedProminent)
                             .disabled(model.isImporting)
                             .accessibilityIdentifier("importVocabularyPackEmptyState")
                     }
                 } else {
-                    List(model.installedPacks) { pack in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(pack.title)
-                                .font(.headline)
-                            Text(pack.summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(pack.title), \(pack.summary)")
-                        .accessibilityIdentifier("vocabularyPack-\(pack.id)")
-                    }
+                    VocabularyPackCloudList(model: model.sync) { await model.load() }
                 }
             }
             .navigationTitle("Vocabulary Packs")
             .toolbar {
+                if model.sync.isEnabled {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Refresh", systemImage: "arrow.clockwise") { Task { await model.sync.refresh() } }.disabled(model.sync.isRefreshing)
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done", action: onDone)
                         .keyboardShortcut(.cancelAction)
                         .accessibilityIdentifier("vocabularyPacksDone")
                 }
-                if !model.installedPacks.isEmpty {
+                if !model.installedPacks.isEmpty || !model.sync.catalog.isEmpty {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Import Pack…", systemImage: "plus", action: onImport)
                             .disabled(model.isImporting)
@@ -53,6 +53,7 @@ struct VocabularyPacksView: View {
                     }
                 }
             }
+            .task { await model.load() }
             .overlay {
                 if model.isImporting {
                     ZStack {

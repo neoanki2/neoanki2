@@ -66,7 +66,7 @@ public actor InstalledVocabularyPackStore {
     }
 
     @discardableResult
-    public func install(from sourceURL: URL) async throws -> InstalledVocabularyPack {
+    public func install(from sourceURL: URL, replacingExisting: Bool = false) async throws -> InstalledVocabularyPack {
         guard sourceURL.isFileURL,
               sourceURL.pathExtension.lowercased() == "neovocab" else {
             throw InstalledVocabularyPackStoreError.invalidSelection
@@ -78,8 +78,8 @@ public actor InstalledVocabularyPackStore {
             attributes: [.posixPermissions: 0o700]
         )
         let openedSource = try await VocabularyPack.open(at: sourceURL)
-        let current = try installedPacks()
-        if current.contains(where: { $0.id == openedSource.manifest.id }) {
+        var current = try installedPacks()
+        if !replacingExisting, current.contains(where: { $0.id == openedSource.manifest.id }) {
             throw InstalledVocabularyPackStoreError.alreadyInstalled(openedSource.manifest.title)
         }
 
@@ -95,10 +95,22 @@ public actor InstalledVocabularyPackStore {
 
         try fileManager.copyItem(at: sourceURL, to: stagingURL)
         let stagedPack = try await VocabularyPack.open(at: stagingURL)
-        if current.contains(where: { $0.id == stagedPack.manifest.id }) {
+        current = try installedPacks()
+        if !replacingExisting, current.contains(where: { $0.id == stagedPack.manifest.id }) {
             throw InstalledVocabularyPackStoreError.alreadyInstalled(stagedPack.manifest.title)
         }
         try fileManager.moveItem(at: stagingURL, to: destinationURL)
+        if replacingExisting, let previous = current.first(where: { $0.id == stagedPack.manifest.id }) {
+            let superseded = rootURL.appendingPathComponent(".superseded-\(UUID()).neovocab")
+            // Rename before cleanup: a failed recursive delete must never damage
+            // the old version and then cause the newly validated copy to be discarded.
+            do { try fileManager.moveItem(at: previous.packageURL, to: superseded) }
+            catch {
+                try? fileManager.removeItem(at: destinationURL)
+                throw error
+            }
+            try? fileManager.removeItem(at: superseded)
+        }
         return installedPack(manifest: stagedPack.manifest, packageURL: destinationURL)
     }
 

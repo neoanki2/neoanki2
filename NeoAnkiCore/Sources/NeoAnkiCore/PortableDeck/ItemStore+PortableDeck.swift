@@ -125,7 +125,7 @@ extension ItemStore {
         let references = records
             .flatMap(\.item.fields)
             .compactMap { field -> MediaRef? in
-                guard case let .media(ref) = field.value else { return nil }
+                guard let ref = field.value.mediaReference else { return nil }
                 return ref
             }
         let uniqueReferences = Dictionary(grouping: references, by: \.assetHash)
@@ -452,7 +452,7 @@ private func validatePortableFields(_ fields: [FieldValue], against itemType: It
 private func portableValue(_ value: ContentValue, matches type: FieldType) -> Bool {
     if case .empty = value { return true }
     switch (type, value) {
-    case (.text, .text), (.richText, .rich), (.number, .number), (.cloze, .cloze):
+    case (.imageOcclusion, .imageOcclusion), (.text, .text), (.richText, .rich), (.number, .number), (.cloze, .cloze):
         return true
     case let (.audio, .media(ref)): return ref.kind == .audio
     case let (.image, .media(ref)): return ref.kind == .image
@@ -522,12 +522,12 @@ private func itemByApplyingReservations(
 ) -> Item {
     var result = item
     result.fields = item.fields.map { field in
-        guard case let .media(original) = field.value,
+        guard let original = field.value.mediaReference,
               let reservationID = reservationIDs[original.assetHash]
         else { return field }
         var ref = original
         ref.reservationID = reservationID
-        return FieldValue(fieldID: field.fieldID, value: .media(ref))
+        return FieldValue(fieldID: field.fieldID, value: field.value.replacingMediaReference(ref))
     }
     return result
 }
