@@ -98,7 +98,7 @@ Vocabulary Packs directory. The source can then be moved or deleted. Use
 With iCloud sync enabled, imported packs upload automatically. Other devices
 receive the catalog and can choose **Download** to install a pack for offline
 use. **Remove from Device** keeps uploaded copies and saved cards. See
-[Dictionary packs]({{ '/user/sync-reminders-widgets.html' | relative_url }}#dictionary-packs).
+[Dictionary packs]({{ '/user/sync-reminders-widgets/' | relative_url }}#dictionary-packs).
 
 Select the deck that should receive the cards, then choose **File → Add from
 Vocabulary…** or use **Add from Vocabulary** in the deck toolbar. Choose an
