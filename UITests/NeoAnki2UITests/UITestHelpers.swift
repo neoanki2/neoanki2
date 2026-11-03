@@ -555,6 +555,9 @@ class NeoAnkiUITestCase: XCTestCase {
             return
         }
         control.click()
+        let basicItemType = app.menuItems["Basic"]
+        XCTAssertTrue(basicItemType.waitForExistence(timeout: 5), "Basic item type menu action not found")
+        basicItemType.click()
     }
 
     func openItemTypeStudio(named name: String, in app: XCUIApplication) {

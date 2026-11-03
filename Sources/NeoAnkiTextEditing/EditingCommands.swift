@@ -93,7 +93,7 @@ final class EditingAnchorView: NSView {
 final class EditingRouter {
     static let shared = EditingRouter()
     private struct Entry { weak var view: EditingAnchorView? }
-    private var entries: [Entry] = []
+    @ObservationIgnored private var entries: [Entry] = []
     private var monitor: Any?
     private var observers: [NSObjectProtocol] = []
     var canUndo = false
