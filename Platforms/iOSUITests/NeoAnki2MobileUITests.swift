@@ -80,6 +80,13 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         XCTAssertTrue(app.navigationBars["Item Types"].waitUntilExists(timeout: 10))
     }
 
+    func createNewBasicItemType(in app: XCUIApplication) {
+        app.buttons["item-types.new"].tap()
+        let basic = app.buttons["Basic"]
+        XCTAssertTrue(basic.waitUntilExists(timeout: 3))
+        basic.tap()
+    }
+
     func scrollToAndTap(
         _ element: XCUIElement,
         in app: XCUIApplication,
@@ -599,7 +606,7 @@ final class MobileStudioAuthoringUITests: NeoAnki2MobileUITestCase {
         let app = launchApp()
         openItemTypeStudioCatalog(in: app)
 
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         let typeName = app.textFields["item-type-studio.name"]
         XCTAssertTrue(typeName.waitUntilExists(timeout: 5))
         typeName.tap()
@@ -695,7 +702,7 @@ final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
 
         // Cloze is recipe-filtered: a text-only type cannot add it, then the
         // starter appears immediately after an explicit Cloze field is added.
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         XCTAssertTrue(app.buttons["item-type-studio.save"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.staticTexts["Deck-provided · Read-only"].exists)
         scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
@@ -806,7 +813,7 @@ final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
         // leave an Unlock action capable of replacing it.
         app.buttons["item-type-studio.cancel"].tap()
         XCTAssertTrue(app.navigationBars["Item Types"].waitUntilExists(timeout: 5))
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         XCTAssertTrue(app.buttons["item-type-studio.save"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.staticTexts["Deck-provided · Read-only"].exists)
         XCTAssertFalse(app.buttons["Unlock for Editing…"].exists)
@@ -825,7 +832,7 @@ final class MobileStudioValidationUITests: NeoAnki2MobileUITestCase {
     func testItemTypeStudioValidationRoutesToInvalidCardSetupAndFocusesIt() throws {
         let app = launchApp()
         openItemTypeStudioCatalog(in: app)
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         let typeName = app.textFields["item-type-studio.name"]
         XCTAssertTrue(typeName.waitUntilExists(timeout: 5))
         typeName.tap()
