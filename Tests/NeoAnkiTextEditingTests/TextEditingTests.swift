@@ -1,4 +1,5 @@
 import SwiftUI
+import Observation
 import Testing
 @testable import NeoAnkiTextEditing
 
@@ -28,6 +29,74 @@ import Testing
 
 #if os(macOS)
 import AppKit
+
+private final class ObservationChangeProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var changed = false
+
+    func recordChange() {
+        lock.lock()
+        defer { lock.unlock() }
+        changed = true
+    }
+
+    var wasChanged: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return changed
+    }
+}
+
+@Test @MainActor func anchorRegistrationDoesNotInvalidateItsRenderingObserver() {
+    let router = EditingRouter()
+    let anchor = EditingAnchorView(frame: .zero)
+    let update = ObservationChangeProbe()
+
+    // updateNSView runs inside SwiftUI's observation transaction. Registering
+    // there must not subscribe the rendering view to the router's registry.
+    withObservationTracking {
+        router.register(anchor)
+    } onChange: {
+        update.recordChange()
+    }
+
+    router.register(anchor)
+    #expect(!update.wasChanged)
+    router.unregister(anchor)
+    #expect(!update.wasChanged)
+}
+
+@Test @MainActor func anchorLifecycleDoesNotInvalidateAnotherAnchorObserver() {
+    let router = EditingRouter()
+    let first = EditingAnchorView(frame: .zero)
+    let second = EditingAnchorView(frame: .zero)
+    let update = ObservationChangeProbe()
+
+    withObservationTracking {
+        router.register(first)
+    } onChange: {
+        update.recordChange()
+    }
+
+    router.register(second)
+    router.unregister(first)
+    router.unregister(second)
+    #expect(!update.wasChanged)
+}
+
+@Test @MainActor func undoAvailabilityStillNotifiesPresentationObservers() {
+    let router = EditingRouter()
+    let update = ObservationChangeProbe()
+
+    withObservationTracking {
+        _ = router.canUndo
+    } onChange: {
+        update.recordChange()
+    }
+
+    router.canUndo = true
+    #expect(update.wasChanged)
+}
 
 @Test func textAlwaysOwnsUndoEvenWhenItsHistoryIsEmpty() {
     #expect(EditingCommandPolicy.undoOwner(textOwnsFocus: true, hasContext: true) == .text)

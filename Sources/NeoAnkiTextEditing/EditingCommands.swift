@@ -93,9 +93,13 @@ final class EditingAnchorView: NSView {
 final class EditingRouter {
     static let shared = EditingRouter()
     private struct Entry { weak var view: EditingAnchorView? }
-    private var entries: [Entry] = []
-    private var monitor: Any?
-    private var observers: [NSObjectProtocol] = []
+    // updateNSView registers anchors during SwiftUI observation tracking. If
+    // this registry were observable, registration would subscribe the rendering
+    // view to its own lifecycle changes and continuously invalidate that view.
+    // Only the actual undo/redo presentation state below should be observed.
+    @ObservationIgnored private var entries: [Entry] = []
+    @ObservationIgnored private var monitor: Any?
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
     var canUndo = false
     var canRedo = false
 

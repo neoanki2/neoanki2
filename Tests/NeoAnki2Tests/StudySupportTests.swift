@@ -58,6 +58,45 @@ private func supportCard(
     #expect(StudySupport.evaluate("tea", for: card) == .incorrect)
 }
 
+@Test func explicitZeroArticleIsAUsableTypedAnswer() {
+    let card = supportCard(interaction: .type, answer: .text("0"))
+
+    #expect(StudySupport.evaluate("0", for: card) == .correct)
+    #expect(StudySupport.evaluate("", for: card) == .incorrect)
+    #expect(StudySupport.evaluate("the", for: card) == .incorrect)
+}
+
+@Test func typedPossessivesDoNotIgnoreInternalApostrophes() {
+    let card = supportCard(interaction: .type, answer: .text("its"))
+
+    #expect(StudySupport.evaluate("ITS", for: card) == .correct)
+    #expect(StudySupport.evaluate("it's", for: card) == .incorrect)
+}
+
+@Test func typedVariantsAreAcceptedWithoutTreatingExplanationsAsAnswers() {
+    let explanation = "Both forms are standard in this construction."
+    var card = supportCard(
+        interaction: .type,
+        answer: .text("0"),
+        extraValues: [.text("the"), .text(explanation)]
+    )
+    let alternative = card.item.fields[2].fieldID
+    let supporting = card.item.fields[3].fieldID
+    card.template.components = [
+        TemplateComponent(region: .primary, purpose: .question, source: .field(promptFieldID)),
+        TemplateComponent(region: .secondary, purpose: .expectedAnswer, source: .field(answerFieldID),
+                          presentation: Presentation(reveal: .hiddenUntilAnswer)),
+        TemplateComponent(region: .secondary, purpose: .expectedAnswer, source: .field(alternative),
+                          presentation: Presentation(reveal: .hiddenUntilAnswer)),
+        TemplateComponent(region: .supporting, purpose: .supporting, source: .field(supporting),
+                          presentation: Presentation(reveal: .hiddenUntilAnswer)),
+    ]
+
+    #expect(StudySupport.evaluate("0", for: card) == .correct)
+    #expect(StudySupport.evaluate("the", for: card) == .correct)
+    #expect(StudySupport.evaluate(explanation, for: card) == .incorrect)
+}
+
 @Test func choicesAreDeterministicAndIncludeCorrectAnswer() {
     let card = supportCard(interaction: .choose)
 
