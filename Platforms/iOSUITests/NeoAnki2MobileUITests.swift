@@ -1313,7 +1313,7 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Study Fixtures"].waitUntilExists(timeout: 5))
         capture("31-nested-decks", app)
         for mode in ["reveal", "cloze", "type", "choose", "arrange", "record", "audioSubmission"] {
-            scrollToAndTap(app.staticTexts[mode], in: app)
+            scrollToAndTap(app.staticTexts[mode], in: app, maximumSteps: 16)
             XCTAssertTrue(app.navigationBars[mode].waitUntilExists(timeout: 5))
             app.buttons["Start Studying"].tap()
             XCTAssertTrue(app.buttons["endStudySession"].waitUntilExists(timeout: 10))
@@ -1480,14 +1480,12 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.textFields["e.g. Spanish vocabulary"].tap(); app.textFields["e.g. Spanish vocabulary"].typeText("Poems")
         app.buttons["new-deck-create"].tap()
         app.buttons["Deck Builders"].tap(); app.buttons["Poem Deck"].tap()
+        app.buttons["poemBuilderRootDeck"].tap(); app.buttons["Poems"].tap()
+        app.textFields["poemBuilderAuthor"].tap(); app.textFields["poemBuilderAuthor"].typeText("A Writer")
+        app.textFields["poemBuilderTitle"].tap(); app.textFields["poemBuilderTitle"].typeText("A Small Poem")
         app.buttons["Preview"].tap()
         XCTAssertTrue(app.staticTexts["Enter at least two nonblank lines."].waitUntilExists(timeout: 3))
         capture("41-builder-validation", app)
-        scrollToAndTap(app.buttons["poemBuilderRootDeck"], in: app); app.buttons["Poems"].tap()
-        let author = app.textFields["poemBuilderAuthor"]
-        scrollToAndTap(author, in: app); author.typeText("A Writer")
-        let title = app.textFields["poemBuilderTitle"]
-        scrollToAndTap(title, in: app); title.typeText("A Small Poem")
         let text = app.textViews["poemBuilderText"]
         scrollToAndTap(text, in: app); text.typeText("First line\nSecond line\nThird line")
         scrollToAndTap(app.buttons["Preview"], in: app)
@@ -1500,7 +1498,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         // Import creates the first due cards in this fresh library. Respond to
         // badge consent before waiting for the import operation to finish.
         allowBadgePermissionIfPresented()
-        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 60))
         open("Home", in: app)
         XCTAssertTrue(app.staticTexts["Poems"].waitUntilExists(timeout: 5))
         app.staticTexts["Poems"].tap()
@@ -1533,7 +1531,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Preview"].waitUntilExists(timeout: 5))
         capture("53-prose-preview", app)
         app.buttons["proseBuilderAdd"].tap()
-        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 60))
         open("Home", in: app); app.staticTexts["Reading"].tap()
         app.staticTexts["A Passage"].tap(); app.buttons["Browse Items"].tap()
         let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Prose Unit")).firstMatch

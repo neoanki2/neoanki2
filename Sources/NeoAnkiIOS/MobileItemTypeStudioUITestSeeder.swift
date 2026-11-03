@@ -197,9 +197,9 @@ enum MobileRedesignUITestSeeder {
             }, deckID: attentionDeck.id)
             _ = try await library.createItem(item)
             if let due = try await library.dueCards(scope: .deck(attentionDeck.id), asOf: .now).first {
-                // Exercise the public grading capability to produce eight lapses.
-                let start = Date.now.addingTimeInterval(-17 * 86_400)
-                for day in 0..<8 {
+                // Exercise public grading enough times to cross the warning threshold.
+                let start = Date.now.addingTimeInterval(-33 * 86_400)
+                for day in 0..<16 {
                     let instant = start.addingTimeInterval(Double(day) * 86_400)
                     _ = try await library.submitReview(cardID: due.id, rating: .easy, asOf: instant, durationMilliseconds: 1000)
                     _ = try await library.submitReview(cardID: due.id, rating: .again, asOf: instant.addingTimeInterval(1), durationMilliseconds: 1000)
