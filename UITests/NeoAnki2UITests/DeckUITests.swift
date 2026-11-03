@@ -194,7 +194,7 @@ extension FastFunctionalJourneyTests {
             XCTAssertTrue(markBlank.waitUntilExists(timeout: 3))
             markBlank.click()
             authoringApp.buttons.identified("cancelAddItem").click()
-            let discardChanges = authoringApp.buttons["Discard Changes"]
+            let discardChanges = authoringApp.sheets.buttons.identified("confirmDiscardItem")
             XCTAssertTrue(discardChanges.waitUntilExists(timeout: 3))
             discardChanges.click()
             waitForLibraryReady(in: authoringApp)
