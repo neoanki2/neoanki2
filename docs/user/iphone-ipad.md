@@ -77,9 +77,12 @@ opens the whole poem so line order and its generated cards stay in sync.
 **End** leaves immediately;
 completion reports reviews and saved submissions separately.
 
-The mobile study view supports native images, audio, video, rich text, cloze
-selection, microphone permission and recording, Dynamic Type, dark appearance,
-increased contrast, Reduce Motion, and portrait or landscape layouts.
+The mobile study view supports native images, image occlusion, audio, video,
+rich text, cloze selection, microphone permission and recording, Dynamic Type,
+dark appearance, increased contrast, Reduce Motion, and portrait or landscape
+layouts.
+Image Occlusion cards reveal the current mask group while keeping the other
+groups concealed.
 On Focus cards, the question remains first after reveal and the expected answer
 appears immediately below it, followed by supplemental answer details. This
 preserves the reading order of continuations such as poetry. VoiceOver focus
@@ -157,9 +160,11 @@ Use portable export rather than trying to edit those files directly.
 
 Optional iCloud sync transfers library structure, items, scheduling state,
 review history, and shared media through the user's private CloudKit database.
-Device consent, reminder settings, installed vocabulary packs, and saved Audio
-Submission recordings remain local. The macOS loopback automation API and Mac
-keyboard command menus are not mobile features.
+When enabled, imported vocabulary packs upload automatically; on another device,
+choose when to download them from **Vocabulary Packs**. Downloaded packs work
+offline. Device consent, reminder settings, and saved Audio Submission
+recordings remain local. The macOS loopback automation API and Mac keyboard
+command menus are not mobile features.
 
 Continue with [iCloud, reminders, and widgets](../sync-reminders-widgets/) or
 the [first study session](../first-study-session/).

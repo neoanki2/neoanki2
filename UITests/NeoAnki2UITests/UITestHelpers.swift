@@ -541,6 +541,11 @@ class NeoAnkiUITestCase: XCTestCase {
     func clickAddItemType(in app: XCUIApplication) {
         guard let control = firstExisting(
             of: [
+                // SwiftUI may expose Menu as a menu button rather than a
+                // button on macOS. Match the stable identifier across element
+                // types so the test follows the visible control either way.
+                app.descendants(matching: .any)
+                    .matching(identifier: "addItemTypeToolbar").firstMatch,
                 app.buttons.identified("addItemTypeToolbar"),
                 app.buttons.identified("addItemTypeEmptyState"),
             ],
