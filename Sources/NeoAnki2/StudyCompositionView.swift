@@ -32,7 +32,7 @@ struct StudyCompositionView: View {
                     .accessibilityIdentifier("readFullStudyCard")
             }
         }
-        .frame(maxWidth: DesignSystem.readingColumnMaxWidth)
+        .frame(maxWidth: 820)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.lg)
@@ -71,9 +71,8 @@ struct StudyCompositionView: View {
                 occlusionGroup: occlusionGroup,
                 clozeGroup: clozeGroup
             )
-            .font(component.purpose == .supporting
-                  ? (hole == .instruction ? DesignSystem.Typography.uiCaption : DesignSystem.Typography.uiBody)
-                  : nil)
+            // Inherit the wireframe's study font. A local font(nil) resets it
+            // to the small UI default, including on unrelated poetry cards.
         }
     }
 

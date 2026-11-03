@@ -115,3 +115,154 @@ private func descendant(_ name: String, in view: NSView) -> NSView? {
         }
     }
 }
+
+@MainActor
+private func paintedTextBounds<V: View>(_ view: V) throws -> CGRect {
+    let renderer = ImageRenderer(content: view.foregroundStyle(.white))
+    renderer.scale = 2
+    let image = try #require(renderer.cgImage)
+    let width = image.width
+    let height = image.height
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    let bounds = try pixels.withUnsafeMutableBytes { buffer -> CGRect in
+        let context = try #require(CGContext(
+            data: buffer.baseAddress, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        for y in 0 ..< height {
+            for x in 0 ..< width where buffer[(y * width + x) * 4 + 3] > 16 {
+                minX = min(minX, x); minY = min(minY, y)
+                maxX = max(maxX, x); maxY = max(maxY, y)
+            }
+        }
+        #expect(maxX >= minX && maxY >= minY, "The study text must actually render")
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    }
+    return bounds
+}
+
+@Test("Poetry prompts and revealed answers retain the native study type sizes")
+@MainActor func studyTextRetainsReadableQuestionAndAnswerFonts() throws {
+    // Exercise the real composition, not a duplicated font-selection helper.
+    // Comparing painted glyph bounds catches font(nil) resetting inheritance.
+    let line = "І день і ніч плачу"
+    for (region, purpose, font) in [
+        (ComponentRegion.primary, ComponentPurpose.question, DesignSystem.Typography.cardPrompt),
+        (.secondary, .expectedAnswer, DesignSystem.Typography.cardAnswer),
+    ] {
+        let field = UUID()
+        let template = Template(name: "Poetry", layout: .focus, components: [
+            TemplateComponent(region: region, purpose: purpose, source: .field(field))
+        ], interaction: .reveal, skill: Skill(input: .text, output: .text, operation: .recall))
+        let item = Item(itemTypeID: UUID(), fields: [FieldValue(fieldID: field, value: .text(line))])
+        let actual = try paintedTextBounds(
+            StudyCompositionView(template: template, item: item, isAnswerRevealed: true,
+                                 mediaStore: nil, clozeGroup: nil)
+                .frame(width: 960, height: 640)
+        )
+        let expected = try paintedTextBounds(Text(line).font(font).frame(width: 960, height: 640))
+        #expect(abs(actual.width - expected.width) <= 2)
+        #expect(abs(actual.height - expected.height) <= 2)
+    }
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["NEOANKI_LAYOUT_FIXTURES"] != nil))
+@MainActor func poetryCardRendersOffscreenBeforeAndAfterReveal() throws {
+    let directory = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["NEOANKI_LAYOUT_FIXTURES"]))
+        .appendingPathComponent("offscreen-poetry-layouts")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let attribution = UUID(), front = UUID(), back = UUID()
+    let template = Template(name: "Poem Line", layout: .focus, components: [
+        TemplateComponent(region: .label, purpose: .supporting, source: .field(attribution)),
+        TemplateComponent(region: .primary, purpose: .question, source: .field(front)),
+        TemplateComponent(region: .secondary, purpose: .expectedAnswer, source: .field(back),
+                          presentation: Presentation(reveal: .hiddenUntilAnswer)),
+    ], interaction: .reveal, skill: Skill(input: .text, output: .text, operation: .recall))
+    // The user's supplied example; never touches the poetry deck or its grades.
+    let item = Item(itemTypeID: UUID(), fields: [
+        FieldValue(fieldID: attribution, value: .text("І мертвим, і живим, і ненарожденним землякам моїм в Україні і не в Україні моє дружнєє посланіє · Тарас Шевченко")),
+        FieldValue(fieldID: front, value: .text("І все спочиває.\nТільки я, мов окаянний,")),
+        FieldValue(fieldID: back, value: .text("І день і ніч плачу")),
+    ])
+    for size in [CGSize(width: 960, height: 640), CGSize(width: 800, height: 500)] {
+        for revealed in [false, true] {
+            let renderer = ImageRenderer(content:
+                AdaptiveStudyStage(layout: .focus) {
+                    StudyStageContent(spacing: 16) {
+                        StudyCompositionView(template: template, item: item, isAnswerRevealed: revealed,
+                                             mediaStore: nil, clozeGroup: nil)
+                    } response: { EmptyView() }
+                } footer: {
+                    HStack {
+                        ForEach(["Again (1)", "Hard (2)", "Good (3)", "Easy (4)"], id: \.self) { title in
+                            Button(title) {}
+                        }
+                    }.padding(16)
+                }
+                .frame(width: size.width, height: size.height)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .environment(\.colorScheme, .dark)
+            )
+            renderer.scale = 2
+            let image = try #require(renderer.cgImage)
+            let png = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+            try png.write(to: directory.appendingPathComponent("poetry-\(revealed ? "answer" : "question")-\(Int(size.width))x\(Int(size.height)).png"))
+        }
+    }
+}
+
+@Test("The original grammar prompt fits with full-sized text and visible typed controls")
+@MainActor func originalGrammarCardKeepsTextAndControlsInsideViewport() throws {
+    let prompt = UUID()
+    let template = Template(name: "Original grammar card", layout: .focus, components: [
+        TemplateComponent(region: .primary, purpose: .question, source: .field(prompt)),
+    ], interaction: .type, skill: Skill(input: .text, output: .freeResponse, operation: .recall))
+    let text = "Read the sentence. Type the head noun of its subject noun phrase.\n\nThe box of cables is heavy."
+    let item = Item(itemTypeID: UUID(), fields: [FieldValue(fieldID: prompt, value: .text(text))])
+    for size in [CGSize(width: 960, height: 640), CGSize(width: 800, height: 500)] {
+        let composition = StudyCompositionView(template: template, item: item,
+                                              isAnswerRevealed: false, mediaStore: nil, clozeGroup: nil)
+        let stage = AdaptiveStudyStage(layout: .focus) {
+            StudyStageContent(spacing: 16) {
+                composition
+            } response: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your answer")
+                    TextField("Type your answer", text: .constant(""))
+                        .textFieldStyle(.roundedBorder)
+                    Text("Press Return to check. You’ll still choose your own grade.")
+                }.frame(maxWidth: 640).padding(.horizontal, 20)
+            }
+        } footer: {
+            StudyControlProbe(name: "footer", height: 60)
+        }
+        let host = NSHostingView(rootView: stage)
+        host.frame = CGRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        func findTextField(_ view: NSView) -> NSTextField? {
+            if let field = view as? NSTextField { return field }
+            return view.subviews.lazy.compactMap(findTextField).first
+        }
+        let field = try #require(findTextField(host))
+        for view in [field, try #require(descendant("footer", in: host))] {
+            let bounds = host.convert(view.bounds, from: view)
+            #expect(bounds.minY >= -1 && bounds.maxY <= size.height + 1)
+            #expect(bounds.height > 16)
+        }
+        // Check the original long prompt at its normal semantic study size,
+        // with only the space actually left above the response and footer.
+        let available = CGSize(width: size.width, height: size.height - 170)
+        let actual = try paintedTextBounds(composition.frame(width: available.width, height: available.height))
+        let reference = try paintedTextBounds(
+            Text(text).font(DesignSystem.Typography.cardPrompt).multilineTextAlignment(.center)
+                .frame(maxWidth: min(820, size.width - 40))
+                .frame(width: available.width, height: available.height)
+        )
+        #expect(abs(actual.width - reference.width) <= 2)
+        #expect(abs(actual.height - reference.height) <= 2)
+    }
+}
