@@ -33,6 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.didMoveNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowGeometryDidChange(_:)),
+            name: NSWindow.didResizeNotification,
+            object: nil
+        )
     }
 
     func applicationDidChangeScreenParameters(_ notification: Notification) {

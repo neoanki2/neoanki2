@@ -234,7 +234,7 @@
       "name": "Reveal and self-grade interaction",
       "article": "user/studying.md",
       "sources": ["Sources/NeoAnki2/StudyCompositionView.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnkiSharedUI/AdaptiveStudyStage.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyCompositionTests.swift", "Tests/NeoAnki2Tests/StudySupportTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyCompositionTests.swift", "Tests/NeoAnki2Tests/StudySupportTests.swift", "Tests/NeoAnki2Tests/StudyViewportTests.swift"],
       "screenshot": "assets/screenshots/study-answer.png"
     },
     {

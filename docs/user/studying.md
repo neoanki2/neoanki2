@@ -121,6 +121,12 @@ The **Show Answer** control in Item Type Studio is an authoring preview. It
 does not reveal a live study card, write review history, or change scheduling;
 only a grade saved during a study session changes a card's memory state.
 
+If a card needs more room than the study area provides, choose **Read Full
+Card** to open a scrollable reader. It follows the same reveal state, so opening
+it before answering does not expose the answer. The response and grading
+controls stay within the main study window. Hidden explanations appear only
+after reveal, without placeholder rows taking up space beforehand.
+
 A conditional poem opening card asks **Recall the first line.** with the title
 and author as its caption. The answer stays hidden until reveal. Opening cards
 follow the same learned-before-new queue policy; continuation cards retain
