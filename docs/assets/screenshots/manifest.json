@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-10-06T07:02:35Z",
+  "capturedAt" : "2026-11-03T14:52:37Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -56,7 +56,7 @@
       "filename" : "item-detail.png",
       "height" : 732,
       "scenario" : "basic item detail",
-      "sha256" : "bc6929ef3a9ab6a5ef30f3597cdba7949b156efec2701c28935ecd52c7bb5b76",
+      "sha256" : "0afec50ef243f3d5663c2bf88c9a6c3972691c0376aaaeaf59f3278ead965c8f",
       "width" : 1024
     },
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 732,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "b73e2ae58adb1303d0374cc454fccb10ddb8a493b86a9fdc5d904beb0ca99c8f",
+      "sha256" : "ec94dd751bd0bb0ffe0d93a5785106a0fc3798a1c7eadd9b6cd31a15680959a0",
       "width" : 1024
     },
     {
@@ -92,7 +92,7 @@
       "filename" : "item-types.png",
       "height" : 732,
       "scenario" : "deck-provided item type with its owner and unlock action",
-      "sha256" : "d67bdb3bef04e2a1ff77121e90a4b66feb85b55d660cf07d57d3ba6972b9fbf3",
+      "sha256" : "1e6ff9392c9dc17e5048e764a0e2665aa39f8a5c3a5b7017364d81c3727f7504",
       "width" : 1024
     },
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 732,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "c6e8f854adaf130a0e3cce6214c9c120d34e06efa7e2bf91980a81fd2d3b433b",
+      "sha256" : "8b72c97e117d8759e062fabce737014797e7a0d74e38328ecafb5a2086397071",
       "width" : 1024
     },
     {
@@ -136,7 +136,7 @@
       "filename" : "scheduling-result.png",
       "height" : 732,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "4341f43b59126dd0dae16082dbc5c9576f44dcf76716e64489e3e2ecce93224c",
+      "sha256" : "1c68105840b0b7c416f64a0d5611446b3ec30d01acaec3efc3617f8c0f97174a",
       "width" : 1024
     },
     {
@@ -203,7 +203,7 @@
       "filename" : "template-advanced.png",
       "height" : 712,
       "scenario" : "Item Type Studio inspector with Advanced Availability controls",
-      "sha256" : "3d023259dd47f9d03c6eae3092158cc0b1f09e60240c259fe084b8def73725e8",
+      "sha256" : "402d36e47f0c6c28e02aadd39a66264c48827e465961f19670c4e08e6a5ceb3f",
       "width" : 1024
     },
     {
@@ -217,9 +217,9 @@
       "filename" : "template-editor.png",
       "height" : 712,
       "scenario" : "preview-first Item Type Studio with one rail and an always-visible card canvas",
-      "sha256" : "473f4f758f70c16a83220413993cc133b93c6b5f14d2fcff610eea7d1e3c9047",
+      "sha256" : "aac175298151a2c84a64f3a1f4340007367971a2ff6ff56c2549cf5249c9d1d9",
       "width" : 1024
     }
   ],
-  "sourceSHA" : "b5cbe441b6d01f7f95f09795afca4e06071b88bc"
+  "sourceSHA" : "fb3b419ec873f4de54806b35397881a182dff4fc"
 }
