@@ -149,7 +149,8 @@ def signing_keychain(material):
         try:
             run(["openssl", "pkcs12", "-export", "-inkey", str(material.directory / "Developer-ID-Application.key.pem"),
                  "-in", str(material.directory / "Developer-ID-Application.cert.pem"), "-out", str(p12),
-                 "-passout", "file:" + str(passfile), "-passin", "pass:"])
+                 "-passout", "file:" + str(passfile), "-passin", "pass:",
+                 "-keypbe", "PBE-SHA1-3DES", "-certpbe", "PBE-SHA1-3DES", "-macalg", "sha1"])
             p12.chmod(0o600)
             run(["security", "create-keychain", "-p", password, str(keychain)])
             created = True
