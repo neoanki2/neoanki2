@@ -36,6 +36,11 @@ def run(args, timeout=60):
     except subprocess.TimeoutExpired:
         raise SigningError(f"{args[0]} timed out") from None
     if result.returncode:
+        if args[0] == "security":
+            detail = result.stderr.decode(errors="replace").strip()
+            operation = args[1] if len(args) > 1 else "command"
+            suffix = f": {detail[-500:]}" if detail else ""
+            raise SigningError(f"security {operation} failed (exit {result.returncode}){suffix}")
         raise SigningError(f"{args[0]} failed (exit {result.returncode})")
     return result.stdout
 
