@@ -73,12 +73,29 @@ private func descendant(_ name: String, in view: NSView) -> NSView? {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     for schema in schemas {
         let schemaID = try #require(schema["id"] as? String)
-        let authored = try #require(items.first { $0["itemTypeId"] as? String == schemaID })
+        let candidates = items.filter { $0["itemTypeId"] as? String == schemaID }
+        let authored = try #require(candidates.first { item in
+            (item["fields"] as? [[String: Any]])?.contains { field in
+                (field["value"] as? [String: Any])?["type"] as? String == "cloze"
+            } == true
+        } ?? candidates.first)
         let fields = try #require(authored["fields"] as? [[String: Any]]).map { field in
             let value = try #require(field["value"] as? [String: Any])
             let fieldID = try #require(field["fieldId"] as? String)
-            return FieldValue(fieldID: try #require(UUID(uuidString: fieldID)),
-                              value: .text(try #require(value["text"] as? String)))
+            let content: ContentValue
+            switch value["type"] as? String {
+            case "text": content = .text(try #require(value["text"] as? String))
+            case "empty": content = .empty
+            case "cloze":
+                let blanks = try #require(value["blanks"] as? [[String: Any]]).map { blank in
+                    ClozeSpan(group: try #require(blank["group"] as? Int),
+                              start: try #require(blank["start"] as? Int),
+                              length: try #require(blank["length"] as? Int))
+                }
+                content = .cloze(try #require(value["text"] as? String), blanks: blanks)
+            default: throw CocoaError(.coderInvalidValue)
+            }
+            return FieldValue(fieldID: try #require(UUID(uuidString: fieldID)), value: content)
         }
         let definition = try #require((schema["templates"] as? [[String: Any]])?.first)
         let components = try #require(definition["components"] as? [[String: Any]]).map { part in
