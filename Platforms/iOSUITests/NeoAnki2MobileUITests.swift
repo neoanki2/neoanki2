@@ -82,7 +82,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
 
     func createNewBasicItemType(in app: XCUIApplication) {
         app.buttons["item-types.new"].tap()
-        let basic = app.buttons["Basic"]
+        let basic = app.buttons["item-types.new-basic"]
         XCTAssertTrue(basic.waitUntilExists(timeout: 3))
         basic.tap()
     }
@@ -1319,7 +1319,10 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(fixtures.waitUntilExists(timeout: 15)); fixtures.tap()
         XCTAssertTrue(app.navigationBars["Study Fixtures"].waitUntilExists(timeout: 5))
         capture("31-nested-decks", app)
-        for mode in ["reveal", "cloze", "type", "choose", "arrange", "record", "audioSubmission"] {
+        // Follow the visible deck list from top to bottom. Besides making the
+        // journey match the user's navigation, this avoids relying on a lazy
+        // List to materialize a far offscreen row in an arbitrary order.
+        for mode in ["arrange", "audioSubmission", "choose", "cloze", "record", "reveal", "type"] {
             scrollToAndTap(app.staticTexts[mode], in: app, maximumSteps: 16)
             XCTAssertTrue(app.navigationBars[mode].waitUntilExists(timeout: 5))
             app.buttons["Start Studying"].tap()

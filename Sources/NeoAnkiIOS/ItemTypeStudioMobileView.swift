@@ -59,6 +59,7 @@ struct ItemTypeStudioCatalogMobileView: View {
                     model.beginCreatingItemType()
                     presentsStudio = true
                     }
+                    .accessibilityIdentifier("item-types.new-basic")
                 }
                 .neoAnkiTouchTarget()
                 .accessibilityIdentifier("item-types.new")
