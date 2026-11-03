@@ -80,3 +80,13 @@ jobs:
           path: docs/assets/screenshots/
           if-no-files-found: error
           retention-days: 14
+      - name: Upload screenshot test diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: neoanki2-documentation-screenshot-failure-${{ github.event.pull_request.head.sha }}
+          path: |
+            .build/ui-results/DocumentationScreenshots.xcresult
+            .build/ui-results/diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
