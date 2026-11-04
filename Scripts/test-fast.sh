@@ -42,6 +42,9 @@ python3 "$ROOT/Scripts/test-macos-signing.py"
 echo "==> Release workflow reconciliation"
 bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
 
+echo "==> GitHub read retry response isolation"
+bash "$ROOT/Scripts/test-github-read-retry.sh"
+
 echo "==> iOS UI infrastructure retry policy"
 python3 "$ROOT/Scripts/test-ios-ui-retry.py"
 
