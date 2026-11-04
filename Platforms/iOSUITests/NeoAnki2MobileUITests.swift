@@ -1328,7 +1328,10 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         // journey match the user's navigation, this avoids relying on a lazy
         // List to materialize a far offscreen row in an arbitrary order.
         for mode in ["arrange", "audioSubmission", "choose", "cloze", "record", "reveal", "type"] {
-            scrollToAndTap(app.staticTexts[mode], in: app, maximumSteps: 16)
+            let deck = app.buttons.matching(
+                NSPredicate(format: "label BEGINSWITH %@", mode + ",")
+            ).firstMatch
+            scrollToAndTap(deck, in: app, maximumSteps: 16)
             XCTAssertTrue(app.navigationBars[mode].waitUntilExists(timeout: 5))
             app.buttons["Start Studying"].tap()
             XCTAssertTrue(app.buttons["endStudySession"].waitUntilExists(timeout: 10))
@@ -1445,7 +1448,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
     func testScopedBrowseSelectionAttentionAndSavedRecordingPersistence() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
         XCTAssertTrue(app.staticTexts["Study Fixtures"].waitUntilExists(timeout: 20))
-        open("Library", in: app)
+        app.staticTexts["Study Fixtures"].tap()
+        app.buttons["Browse Items"].tap()
         app.buttons["Browse Options"].tap(); app.buttons["Repeatedly Forgotten"].tap()
         let prompt = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Repeatedly forgotten prompt")).firstMatch
         XCTAssertTrue(prompt.waitUntilExists(timeout: 5))
@@ -1459,6 +1463,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts["Nothing Needs Attention"].waitUntilExists(timeout: 5))
         app.buttons["Browse Options"].tap(); app.buttons["Done Selecting"].tap()
         app.buttons["Browse Options"].tap(); app.buttons["Repeatedly Forgotten"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        open("Library", in: app)
         app.buttons["Browse Options"].tap(); app.buttons["Title"].tap()
         app.buttons["Browse Options"].tap(); app.buttons["Select Items"].tap()
         let reveal = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Practice reveal:")).firstMatch
@@ -1584,8 +1590,12 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
         open("Library", in: app)
+        let search = app.searchFields["Search items"]
+        XCTAssertTrue(search.waitUntilExists(timeout: 5))
+        search.tap(); search.typeText("Authoring media fixture")
         let item = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Authoring media fixture")).firstMatch
-        scrollToAndTap(item, in: app)
+        XCTAssertTrue(item.waitUntilExists(timeout: 10), "Search should find the seeded authoring item")
+        item.tap()
         XCTAssertTrue(app.navigationBars["All Field Types"].waitUntilExists(timeout: 5))
         capture("58-all-field-detail", app)
         app.buttons["Edit"].tap()
