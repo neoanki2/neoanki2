@@ -228,6 +228,7 @@ let package = Package(
             name: "NeoAnki2Tests",
             dependencies: [
                 "NeoAnki2",
+                "NeoAnkiMobile",
                 "NeoAnkiApplication",
                 "NeoAnkiFeatures",
                 "NeoAnkiSharedUI",

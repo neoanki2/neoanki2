@@ -44,6 +44,9 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         // first app gesture can trigger an interruption monitor.
         if environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
             allowBadgePermissionIfPresented(timeout: 10)
+            XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+            let fixtureFailure = app.alerts["Visual Fixture Failed"]
+            XCTAssertFalse(fixtureFailure.exists, fixtureFailure.debugDescription)
         }
         return app
     }
