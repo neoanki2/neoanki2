@@ -41,6 +41,12 @@ def run(args, timeout=60):
             operation = args[1] if len(args) > 1 else "command"
             suffix = f": {detail[-500:]}" if detail else ""
             raise SigningError(f"security {operation} failed (exit {result.returncode}){suffix}")
+        if args[0] == "codesign":
+            # Codesign diagnostics identify signing configuration failures and
+            # contain no credentials; keep them visible in CI logs.
+            detail = result.stderr.decode(errors="replace").strip()
+            suffix = f": {detail[-1000:]}" if detail else ""
+            raise SigningError(f"codesign failed (exit {result.returncode}){suffix}")
         raise SigningError(f"{args[0]} failed (exit {result.returncode})")
     return result.stdout
 
