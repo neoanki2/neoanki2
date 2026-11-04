@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-11-04T09:13:11Z",
+  "capturedAt" : "2026-11-04T10:40:10Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -67,7 +67,7 @@
       "filename" : "item-media.png",
       "height" : 732,
       "scenario" : "editing an image item missing its description",
-      "sha256" : "d93ac45ad6e0e5e44269a31250b7cd41b87df24b4dfa8efb344bf26c269b4591",
+      "sha256" : "ec94dd751bd0bb0ffe0d93a5785106a0fc3798a1c7eadd9b6cd31a15680959a0",
       "width" : 1024
     },
     {
@@ -147,7 +147,7 @@
       "filename" : "study-answer.png",
       "height" : 712,
       "scenario" : "revealed study answer with grading controls",
-      "sha256" : "0939a0f53220dc3ab7fa32e7337eefb26f9215d1b37a127c19158f771d2396b7",
+      "sha256" : "c3cd19ff29a387d560a19b4632229c52ac04cf8be96853cd4d58107a40bc2258",
       "width" : 1024
     },
     {
@@ -168,7 +168,7 @@
       "filename" : "study-grade-help.png",
       "height" : 712,
       "scenario" : "study prompt with grading guide open",
-      "sha256" : "4d67cb9dc6d36ac6b939f5a199cadac5796a15cd24d36262b30b5c583c6a492b",
+      "sha256" : "26d33e9a3fb4c5ff0941480dea5a396591b67478117557cc5547cd9306dab7c2",
       "width" : 1024
     },
     {
@@ -180,7 +180,7 @@
       "filename" : "study-prompt.png",
       "height" : 712,
       "scenario" : "study prompt before revealing the answer",
-      "sha256" : "67b2beca058a2abeb73212e5bb80d6e95ee037c4c2b4b3f284debeeaeb01be7a",
+      "sha256" : "2039e0d52d4569227b80ee784d16043ab2df5fb21f35ac919f6599e2feaf03fd",
       "width" : 1024
     },
     {
@@ -190,7 +190,7 @@
       "filename" : "study-type.png",
       "height" : 712,
       "scenario" : "typed-answer study result",
-      "sha256" : "c6124eb0824dcdc23036c253e40373cd55511b5c2f465362cc069937eb53ecdc",
+      "sha256" : "a89f44caf8da594797c4740635145665ee5df655446d94ffe412335e31cc7d54",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "906105368dfb8a12acda909fbdb0cade381136c0"
+  "sourceSHA" : "577ed626f7ac3f2939664975262b99df1daa2ead"
 }
