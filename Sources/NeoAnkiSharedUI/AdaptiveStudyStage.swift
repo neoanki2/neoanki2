@@ -18,7 +18,7 @@ public enum StudyStageGeometry {
         switch template.interaction {
         case .record, .audioSubmission, .choose, .arrange:
             return .actionStage
-        case .reveal, .type, .cloze:
+        case .reveal, .type, .cloze, .imageOcclusion:
             return .focus
         }
     }
@@ -71,10 +71,13 @@ public struct StudyStageContent<Composition: View, Response: View>: View {
     }
 
     public var body: some View {
-        VStack(spacing: spacing) {
-            composition
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(0)
+        // A flexible composition must accept the viewport's height instead of
+        // contributing its ideal height to the window's minimum content size.
+        StudyRegionLayout(spacing: spacing) {
+            GeometryReader { viewport in
+                composition.frame(width: viewport.size.width, height: viewport.size.height)
+                .clipped()
+            }
 
             response
                 .fixedSize(horizontal: false, vertical: true)
@@ -102,21 +105,48 @@ public struct AdaptiveStudyStage<Stage: View, Footer: View>: View {
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            stage
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        StudyRegionLayout(spacing: 0) {
+            GeometryReader { viewport in
+                stage.frame(width: viewport.size.width, height: viewport.size.height)
+                    .clipped()
+            }
 
-            Divider()
-
-            footer
+            VStack(spacing: 0) {
+                Divider()
+                footer
                 .fixedSize(horizontal: false, vertical: true)
-                .layoutPriority(1)
                 .background(.regularMaterial)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("studyFooter")
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(layout.displayName) study layout")
+    }
+}
+
+/// The first child may consume only the space left by the second child. Using
+/// an explicit allocation prevents oversized content from moving controls off
+/// the bottom edge or increasing the enclosing window's minimum height.
+private struct StudyRegionLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let fixed = subviews[1].sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? fixed.width,
+                      height: proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? fixed.height + spacing + 10)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let fixed = subviews[1].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+        let fixedHeight = min(bounds.height, fixed.height)
+        let flexibleHeight = max(0, bounds.height - fixedHeight - spacing)
+        subviews[0].place(at: bounds.origin, anchor: .topLeading,
+                         proposal: ProposedViewSize(width: bounds.width, height: flexibleHeight))
+        subviews[1].place(at: CGPoint(x: bounds.minX, y: bounds.maxY - fixedHeight), anchor: .topLeading,
+                         proposal: ProposedViewSize(width: bounds.width, height: fixedHeight))
     }
 }
 

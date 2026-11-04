@@ -21,6 +21,8 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
     public var schedulingHistoryOrigin: Date?
     public var isSuspended: Bool
     public var deckID: UUID?
+    /// The image region group tested by this card; nil for other interactions.
+    public var occlusionGroup: Int?
     /// For cloze interactions, identifies the one blank group this card tests.
     /// Nil for non-cloze cards.
     public var clozeGroup: Int?
@@ -36,6 +38,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         schedulingHistoryOrigin: Date? = nil,
         isSuspended: Bool = false,
         deckID: UUID? = nil,
+        occlusionGroup: Int? = nil,
         clozeGroup: Int? = nil
     ) {
         self.id = id
@@ -48,6 +51,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
         self.schedulingHistoryOrigin = schedulingHistoryOrigin
         self.isSuspended = isSuspended
         self.deckID = deckID
+        self.occlusionGroup = occlusionGroup
         self.clozeGroup = clozeGroup
     }
 
@@ -58,7 +62,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, itemID, templateID, skill, memory
         case memoryModelVersion, memoryParameterSetID, schedulingHistoryOrigin
-        case isSuspended, deckID, clozeGroup
+        case isSuspended, deckID, clozeGroup, occlusionGroup
     }
 
     public init(from decoder: Decoder) throws {
@@ -74,6 +78,7 @@ public struct Card: Codable, Equatable, Sendable, Identifiable {
             schedulingHistoryOrigin: try values.decodeIfPresent(Date.self, forKey: .schedulingHistoryOrigin),
             isSuspended: try values.decode(Bool.self, forKey: .isSuspended),
             deckID: try values.decodeIfPresent(UUID.self, forKey: .deckID),
+            occlusionGroup: try values.decodeIfPresent(Int.self, forKey: .occlusionGroup),
             clozeGroup: try values.decodeIfPresent(Int.self, forKey: .clozeGroup)
         )
     }

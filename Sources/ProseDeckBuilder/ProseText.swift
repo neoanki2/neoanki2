@@ -13,6 +13,12 @@ public struct ProseUnit: Sendable, Equatable {
 }
 
 public enum ProseText {
+    /// Viewing a preview is not an edit. Reconstruct only when the user changed
+    /// unit boundaries, preserving the exact source on an ordinary round trip.
+    public static func sourceAfterReview(originalSource: String, originalUnits: [ProseUnit], reviewedUnits: [ProseUnit]) -> String {
+        reviewedUnits == originalUnits ? originalSource : source(from: reviewedUnits)
+    }
+
     public static func parse(_ source: String) -> [ProseUnit] {
         let normalized = source
             .replacingOccurrences(of: "\r\n", with: "\n")

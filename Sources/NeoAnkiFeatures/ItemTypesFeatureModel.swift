@@ -230,9 +230,9 @@ public final class ItemTypesFeatureModel {
         selectedItemTypeID = id
     }
 
-    public func beginCreatingItemType(id: UUID = UUID()) {
+    public func beginCreatingItemType(id: UUID = UUID(), imageOcclusion: Bool = false) {
         selectedItemTypeID = nil
-        studioDraft = .new(id: id)
+        studioDraft = imageOcclusion ? .newImageOcclusion(id: id) : .new(id: id)
     }
 
     @discardableResult

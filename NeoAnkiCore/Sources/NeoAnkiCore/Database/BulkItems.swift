@@ -70,6 +70,7 @@ enum ItemBulkDatabaseMutation: Sendable {
 
 private struct BulkCardIdentity: Hashable {
     let templateID: UUID
+    let occlusionGroup: Int?
     let clozeGroup: Int?
 }
 
@@ -183,13 +184,13 @@ public extension ItemStore {
             let existing = try await database.fetchCards(for: source.id)
             let existingByIdentity = Dictionary(
                 existing.map {
-                    (BulkCardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup), $0)
+                    (BulkCardIdentity(templateID: $0.templateID, occlusionGroup: $0.occlusionGroup, clozeGroup: $0.clozeGroup), $0)
                 },
                 uniquingKeysWith: { first, _ in first }
             )
             let finalCardIDs = planned.cards.map { card in
                 existingByIdentity[
-                    BulkCardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+                    BulkCardIdentity(templateID: card.templateID, occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup)
                 ]?.id ?? card.id
             }
             mutations.append(.replace(
@@ -321,13 +322,13 @@ public extension ItemStore {
                     let existing = try await database.fetchCards(for: source.id)
                     let existingByIdentity = Dictionary(
                         existing.map {
-                            (BulkCardIdentity(templateID: $0.templateID, clozeGroup: $0.clozeGroup), $0)
+                            (BulkCardIdentity(templateID: $0.templateID, occlusionGroup: $0.occlusionGroup, clozeGroup: $0.clozeGroup), $0)
                         },
                         uniquingKeysWith: { first, _ in first }
                     )
                     let finalCardIDs = planned.cards.map { card in
                         existingByIdentity[
-                            BulkCardIdentity(templateID: card.templateID, clozeGroup: card.clozeGroup)
+                            BulkCardIdentity(templateID: card.templateID, occlusionGroup: card.occlusionGroup, clozeGroup: card.clozeGroup)
                         ]?.id ?? card.id
                     }
                     mutations.append(.replace(

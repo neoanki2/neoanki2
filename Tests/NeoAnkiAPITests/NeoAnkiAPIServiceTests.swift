@@ -2122,7 +2122,7 @@ private func pairWithAuthority(
     for (index, interaction) in Interaction.allCases.enumerated() {
         let promptField = FieldDef(
             name: "Prompt",
-            type: interaction == .cloze ? .cloze : .text,
+            type: interaction == .cloze ? .cloze : interaction == .imageOcclusion ? .imageOcclusion : .text,
             isRequired: true
         )
         let answerField = FieldDef(name: "Answer", type: .text, isRequired: true)
@@ -2155,9 +2155,15 @@ private func pairWithAuthority(
             templates: [template]
         )
         _ = try await store.createItemType(type)
-        let promptValue: ContentValue = interaction == .cloze
-            ? .cloze("One two", blanks: [ClozeSpan(group: 1, start: 4, length: 3)])
-            : .text("Prompt \(index)")
+        let promptValue: ContentValue
+        if interaction == .imageOcclusion {
+            let reservation = try await store.reserveMedia(data: Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kind: .image, altText: "Diagram")
+            var content = ImageOcclusionContent(image: reservation.reference)
+            content.addMask(rect: .init(x: 0.1, y: 0.2, width: 0.3, height: 0.2))
+            promptValue = .imageOcclusion(content)
+        } else if interaction == .cloze {
+            promptValue = .cloze("One two", blanks: [ClozeSpan(group: 1, start: 4, length: 3)])
+        } else { promptValue = .text("Prompt \(index)") }
         let item = Item(
             itemTypeID: type.id,
             fields: [
@@ -4530,4 +4536,62 @@ private extension Array where Element == String {
     let components = try #require(document["components"] as? [String: Any])
     let schemas = try #require(components["schemas"] as? [String: Any])
     #expect(schemas["OrderedItemsInput"] != nil)
+}
+
+
+@Test func imageOcclusionAPIAuthorsReadsAndValidatesStructuredMasks() async throws {
+    let directory = apiTestDatabaseURL().deletingLastPathComponent()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let media = try MediaStore(rootDirectory: directory)
+    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"), mediaStore: media)
+    try await store.bootstrap()
+    let field = FieldDef(name: "Image", type: .imageOcclusion, isRequired: true)
+    let type = ItemType(name: "Occlusion", fields: [field], templates: [
+        Template(name: "Regions", prompt: .init(slots: [.init(source: .field(field.id))]),
+                 answer: .init(slots: [.init(source: .field(field.id))]), interaction: .imageOcclusion,
+                 skill: .init(input: .image, output: .freeResponse, operation: .recall)),
+    ])
+    _ = try await store.createItemType(type)
+    let reservation = try await store.reserveMedia(data: Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kind: .image, altText: "Diagram")
+    let ref = reservation.reference
+    var content = ImageOcclusionContent(image: ref)
+    content.addMask(rect: .init(x: 0.1, y: 0.2, width: 0.3, height: 0.2))
+    content.addMask(rect: .init(x: 0.5, y: 0.6, width: 0.2, height: 0.1))
+    let dto = APIContentValue(.imageOcclusion(content))
+    #expect(try dto.domain(pointer: "/value") == .imageOcclusion(content))
+    let api = NeoAnkiAPIService(store: store, authorization: APIAuthorizationStore(persistence: InMemoryAPICredentialPersistence()), pairingApprover: ApproveAllPairings(), applicationVersion: "test")
+    let token = try await pair(api, scopes: ["library.read", "items.write", "study.review"])
+    let itemID = UUID().uuidString.lowercased()
+    var value = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(dto)) as? [String: Any])
+    value["reservationId"] = reservation.reservationID.uuidString.lowercased()
+    let input: [String: Any] = ["id": itemID, "itemTypeId": type.id.uuidString.lowercased(), "fields": [["fieldId": field.id.uuidString.lowercased(), "value": value]], "tags": []]
+    let body = String(decoding: try JSONSerialization.data(withJSONObject: input), as: UTF8.self)
+    let auth = ["Authorization": "Bearer \(token)"]
+    let created = await api.handle(request(.post, "/v1/items", headers: auth.merging(["Idempotency-Key": UUID().uuidString]) { _, new in new }, body: body))
+    #expect(created.status == 201, Comment(rawValue: String(decoding: created.body, as: UTF8.self)))
+    let read = await api.handle(request(.get, "/v1/items/\(itemID)", headers: auth))
+    #expect(read.status == 200)
+    #expect(String(decoding: read.body, as: UTF8.self).contains("imageOcclusion"))
+    let cards = await api.handle(request(.get, "/v1/cards", headers: auth))
+    #expect(cards.status == 200)
+    #expect(String(decoding: cards.body, as: UTF8.self).contains("occlusionGroup"))
+    let due = try await store.fetchDueCards()
+    #expect(Set(due.compactMap { $0.card.occlusionGroup }) == [1, 2])
+    let originalCardIDs = Set(due.map { $0.card.id })
+    content.mode = .hideOneRevealOne
+    content.masks[0].rect.x = 0.2
+    var replacement = input
+    replacement.removeValue(forKey: "id")
+    replacement["fields"] = [["fieldId": field.id.uuidString.lowercased(), "value": try JSONSerialization.jsonObject(with: JSONEncoder().encode(APIContentValue(.imageOcclusion(content))))]]
+    let updated = await api.handle(request(.put, "/v1/items/\(itemID)", headers: auth.merging(["If-Match": try #require(read.headers["ETag"])]) { _, new in new }, body: String(decoding: try JSONSerialization.data(withJSONObject: replacement), as: UTF8.self)))
+    #expect(updated.status == 200, Comment(rawValue: String(decoding: updated.body, as: UTF8.self)))
+    #expect(Set(try await store.cards().map(\.id)) == originalCardIDs)
+    content.masks[0].rect.width = 2
+    let badValue = try JSONSerialization.jsonObject(with: JSONEncoder().encode(APIContentValue(.imageOcclusion(content))))
+    var invalid = input
+    invalid["id"] = UUID().uuidString.lowercased()
+    invalid["fields"] = [["fieldId": field.id.uuidString.lowercased(), "value": badValue]]
+    let rejected = await api.handle(request(.post, "/v1/items", headers: auth.merging(["Idempotency-Key": UUID().uuidString]) { _, new in new }, body: String(decoding: try JSONSerialization.data(withJSONObject: invalid), as: UTF8.self)))
+    #expect(rejected.status == 422)
+    #expect(try await store.listItems().count == 1)
 }

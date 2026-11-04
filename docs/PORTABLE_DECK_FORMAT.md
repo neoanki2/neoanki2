@@ -10,12 +10,12 @@ parent: Reference
 ## 1. Status and scope
 
 This document is the normative specification for **NeoAnki Portable Deck
-Format version 5**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
+Format version 6**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
 **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described by
 RFC 2119 and RFC 8174.
 
 A `.neodeck` file is one SQLite database containing deck structure, item-type
-definitions, deck item-type policies, item content, tags, and media bytes. Version 5 is a
+definitions, deck item-type policies, item content, tags, and media bytes. Version 6 is a
 **content-only** interchange format. It never contains cards, scheduling
 state, review history, statistics, scheduler parameters, suspension state, or
 other learner progress.
@@ -30,7 +30,7 @@ Writers MUST produce a SQLite 3 database with:
 - filename extension `.neodeck`;
 - page-header `application_id` equal to `0x4E44454B` (ASCII `NDEK`,
   decimal `1313097035`);
-- `user_version` equal to `5`;
+- `user_version` equal to `6`;
 - UTF-8 text encoding;
 - foreign-key enforcement enabled while writing; and
 - no attached databases, virtual tables, triggers, views, or executable SQL.
@@ -39,16 +39,16 @@ The required initialization pragmas are:
 
 ```sql
 PRAGMA application_id = 1313097035;
-PRAGMA user_version = 5;
+PRAGMA user_version = 6;
 PRAGMA encoding = 'UTF-8';
 PRAGMA foreign_keys = ON;
 ```
 
 Readers MUST inspect `application_id` and `user_version` before reading
 application data. A reader MUST reject a file with a different
-`application_id`. A version-5 reader MUST reject `user_version > 5`; it MUST
+`application_id`. A version-6 reader MUST reject `user_version > 6`; it MUST
 NOT guess at a newer schema. A reader MAY support older versions through an
-explicit compatibility path. NeoAnki supports versions 1 through 5.
+explicit compatibility path. NeoAnki supports versions 1 through 6.
 
 The schema uses only portable SQLite storage classes and features available in
 SQLite 3.24 or later. UUIDs and timestamps are text, JSON is UTF-8 text, and
@@ -100,7 +100,7 @@ document explicitly makes that object extensible.
 
 ## 4. Required schema
 
-The following DDL is exact. A version-5 file MUST contain these tables,
+The following DDL is exact. A version-6 file MUST contain these tables,
 columns, constraints, foreign keys, and indexes. It MUST NOT contain
 application rows outside these tables. Additional indexes are allowed;
 additional tables, columns, views, triggers, and virtual tables are not.
@@ -109,7 +109,7 @@ additional tables, columns, views, triggers, and virtual tables are not.
 CREATE TABLE manifest (
     singleton          INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
     format_name        TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-    format_version     INTEGER NOT NULL CHECK (format_version = 5),
+    format_version     INTEGER NOT NULL CHECK (format_version = 6),
     created_at         TEXT NOT NULL,
     exporter           TEXT NOT NULL,
     source_library_id  TEXT NOT NULL,
@@ -151,7 +151,7 @@ CREATE TABLE fields (
     name          TEXT NOT NULL,
     kind          TEXT NOT NULL CHECK (
         kind IN ('text', 'richText', 'audio', 'image', 'gif', 'video',
-                 'number', 'cloze')
+                 'number', 'cloze', 'imageOcclusion')
     ),
     is_required   INTEGER NOT NULL CHECK (is_required IN (0, 1)),
     UNIQUE (item_type_id, ordinal),
@@ -170,7 +170,7 @@ CREATE TABLE templates (
     ),
     components_json     TEXT NOT NULL,
     interaction         TEXT NOT NULL CHECK (
-        interaction IN ('reveal', 'type', 'choose', 'record', 'audioSubmission', 'cloze', 'arrange')
+        interaction IN ('reveal', 'type', 'choose', 'record', 'audioSubmission', 'cloze', 'arrange', 'imageOcclusion')
     ),
     skill_json          TEXT NOT NULL,
     generate_when_json  TEXT,
@@ -275,7 +275,7 @@ The schemas below are exhaustive. Literal strings are shown in quotes;
 
 `region` is `primary`, `secondary`, `media`, `supporting`, or `label`.
 `purpose` is `question`, `expectedAnswer`, or `supporting`. Component UUIDs are
-preserved by version-5 round trips. Expected answers MUST be concealed before
+preserved by version-6 round trips. Expected answers MUST be concealed before
 reveal, and visual media regions accept only image, GIF, or video fields.
 
 `prompt_json` and `answer_json` are arrays of slots in display order:
@@ -381,7 +381,8 @@ The value type MUST agree with its field kind:
 - `text` accepts `text` or `empty`;
 - `richText` accepts `rich` or `empty`;
 - `number` accepts `number` or `empty`;
-- `cloze` accepts `cloze` or `empty`; and
+- `cloze` accepts `cloze` or `empty`;
+- `imageOcclusion` accepts `imageOcclusion` or `empty`; and
 - `audio`, `image`, `gif`, and `video` accept matching `media` or `empty`.
 
 Every item MUST have exactly one `item_fields` row for every field ordinal of
@@ -502,7 +503,7 @@ the file.
 
 No table or JSON value may contain card IDs, review logs, due dates, memory
 state, scheduler parameters, suspension flags, study statistics, or deletion
-tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 5 has no progress-export
+tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 6 has no progress-export
 option.
 
 ### 8.2 Import validation and type resolution
@@ -569,7 +570,7 @@ single import transaction. Media MUST be copied in bounded chunks.
 ## 9. Validation and security limits
 
 An implementation MAY impose lower limits before the user selects a file, but
-a conforming version-5 importer MUST reject a file exceeding any of these hard
+a conforming version-6 importer MUST reject a file exceeding any of these hard
 limits before committing:
 
 - file size: 2 GiB;
@@ -663,7 +664,7 @@ skip-invalid-row, or partial-import mode.
 
 ## 11. Compatibility rules
 
-A version-5 reader MUST validate exact table and column names and MUST tolerate
+A version-6 reader MUST validate exact table and column names and MUST tolerate
 additional indexes only. It MUST reject missing or additional application
 schema objects because those can change semantics or expand the attack surface.
 
@@ -676,3 +677,18 @@ the `.neodeck` filename alone.
 Cross-platform implementations MUST derive behavior from this specification,
 not Swift `Codable` case encoding, Foundation dictionary order, host endianness,
 filesystem paths, locale-sensitive sorting, or SQLite's incidental row order.
+
+## Version 6 image occlusion
+
+Version 6 adds field kind and interaction `imageOcclusion`. Its content JSON
+uses `type: "imageOcclusion"`, `image` (a standard portable `media` content
+object), `mode` (`hideAllRevealOne` or `hideOneRevealOne`), `masks`, and
+`nextGroup`. Each mask contains a UUID `id`, positive integer `group`, a `rect`
+with normalized `x`, `y`, `width`, `height`, and optional `answerText`.
+
+Image descriptions are required. Rectangles must have finite coordinates,
+positive area, and lie within the image. Mask IDs are unique and `nextGroup`
+exceeds every used group. The image bytes participate in ordinary media
+validation, deduplication, and transfer. Versions 1–5 remain readable but must
+not declare occlusion fields, interactions, or values. Format 6 remains
+content-only and does not export learner scheduling history.

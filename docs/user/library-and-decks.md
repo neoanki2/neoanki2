@@ -170,6 +170,8 @@ to study right now?
 - **Maturity** shows whether the scope is Not started, Learning, or Maintaining,
   plus how many active cards are maintaining. A deck includes its subdecks and
   reaches Maintaining only when every active card qualifies.
+- The progress chart shows the percentage of active cards that are Maintaining;
+  the adjacent state counts keep New and Learning cards visible too.
 - When a daily limit defers new cards, a note separates today's available new
   cards from the deferred backlog and reports when more become available.
 - If cards in the scope have lapsed at least eight times, a note says how many

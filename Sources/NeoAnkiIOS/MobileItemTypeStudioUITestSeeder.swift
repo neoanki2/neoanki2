@@ -1,8 +1,8 @@
-#if os(iOS)
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
 
+#if os(iOS)
 /// Deterministic repository fixtures for isolated iOS UI journeys. The reset
 /// launch argument is required so normal app launches can never seed content.
 enum MobileItemTypeStudioUITestSeeder {
@@ -150,20 +150,34 @@ enum MobileItemTypeStudioUITestSeeder {
 }
 #endif
 
-#if os(iOS)
+private enum MobileRedesignFixtureError: LocalizedError {
+    case attentionCardDidNotReachLapseThreshold
+
+    var errorDescription: String? {
+        "The repeated-forgetting fixture did not reach the attention threshold."
+    }
+}
+
 /// Real repository content for visual acceptance; gated by reset + scenario.
 enum MobileRedesignUITestSeeder {
     static func seedIfRequested(library: any LibraryRepository) async throws {
         let process = ProcessInfo.processInfo
         guard process.arguments.contains("-NeoAnkiUITestingReset"),
               process.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" else { return }
+        try await seed(library: library)
+    }
+
+    // Repository-only setup is also exercised headlessly on macOS, so a new
+    // interaction cannot silently truncate the remaining mobile fixtures.
+    static func seed(library: any LibraryRepository) async throws {
         guard try await library.items(scope: .allDecks, sort: .createdAscending, search: "").isEmpty else { return }
         let root = try await library.createDeck(Deck(name: "Study Fixtures"))
         let media = await library.mediaStore()
         let imageData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE1sAAAAASUVORK5CYII=")!
         for (index, interaction) in Interaction.allCases.enumerated() {
             let deck = try await library.createDeck(Deck(name: interaction.rawValue, parentID: root.id))
-            let front = FieldDef(name: "Question", type: interaction == .cloze ? .cloze : .text, isRequired: true)
+            let frontType: FieldType = interaction == .cloze ? .cloze : interaction == .imageOcclusion ? .imageOcclusion : .text
+            let front = FieldDef(name: "Question", type: frontType, isRequired: true)
             let back = FieldDef(name: "Answer", type: .text, isRequired: false)
             let visual = FieldDef(name: "Image", type: .image)
             let layout = CardLayoutID.allCases[index % CardLayoutID.allCases.count]
@@ -177,12 +191,24 @@ enum MobileRedesignUITestSeeder {
             }
             let type = ItemType(name: "Fixture \(interaction.rawValue)", fields: [front, back, visual], templates: [
                 Template(name: interaction.rawValue, layout: layout, components: components, interaction: interaction,
-                    skill: Skill(input: .text, output: interaction == .audioSubmission || interaction == .record ? .audio : .text, operation: interaction == .audioSubmission ? .explain : .recall))
+                    skill: Skill(input: interaction == .imageOcclusion ? .image : .text, output: interaction == .audioSubmission || interaction == .record ? .audio : .text,
+                        operation: interaction == .audioSubmission ? .explain : interaction == .arrange ? .order : .recall))
             ])
             _ = try await library.createItemType(type)
-            var fields = [FieldValue(fieldID: front.id, value: interaction == .cloze
-                ? .cloze("The answer is Paris.", blanks: [ClozeSpan(group: 1, start: 14, length: 5)])
-                : .text("Practice \(interaction.rawValue): what do you remember?"))]
+            let question: ContentValue
+            switch interaction {
+            case .cloze:
+                question = .cloze("The answer is Paris.", blanks: [ClozeSpan(group: 1, start: 14, length: 5)])
+            case .imageOcclusion:
+                let image = try await library.reserveMedia(data: imageData, kind: .image,
+                    altText: "Occlusion fixture image", asOf: .now).reference
+                question = .imageOcclusion(ImageOcclusionContent(image: image, masks: [
+                    ImageOcclusionMask(group: 1, rect: OcclusionRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5), answerText: "Paris")
+                ], nextGroup: 2))
+            default:
+                question = .text("Practice \(interaction.rawValue): what do you remember?")
+            }
+            var fields = [FieldValue(fieldID: front.id, value: question)]
             fields.append(FieldValue(fieldID: back.id, value: interaction == .audioSubmission ? .empty : .text(interaction == .arrange ? "one two three" : "Paris")))
             if layout == .mediaAside || layout == .mediaHero,
                let image = try await media?.ingest(data: imageData, kind: .image, fileExtension: "png", altText: "A small white sample image") {
@@ -197,12 +223,20 @@ enum MobileRedesignUITestSeeder {
             }, deckID: attentionDeck.id)
             _ = try await library.createItem(item)
             if let due = try await library.dueCards(scope: .deck(attentionDeck.id), asOf: .now).first {
-                // Exercise the public grading capability to produce eight lapses.
-                let start = Date.now.addingTimeInterval(-17 * 86_400)
-                for day in 0..<8 {
-                    let instant = start.addingTimeInterval(Double(day) * 86_400)
+                // Exercise public grading enough times to cross the warning threshold.
+                let start = Date.now
+                // Cross the leech threshold with room for scheduler phase
+                // transitions. Reviews use the public path just like a learner.
+                for day in 0..<20 {
+                    let instant = start.addingTimeInterval(Double(day) * 2)
                     _ = try await library.submitReview(cardID: due.id, rating: .easy, asOf: instant, durationMilliseconds: 1000)
                     _ = try await library.submitReview(cardID: due.id, rating: .again, asOf: instant.addingTimeInterval(1), durationMilliseconds: 1000)
+                }
+                let attentionItem = try await library.items(
+                    scope: .deck(attentionDeck.id), sort: .createdAscending, search: ""
+                ).first
+                guard attentionItem?.schedule?.needsAttention == true else {
+                    throw MobileRedesignFixtureError.attentionCardDidNotReachLapseThreshold
                 }
             }
         }
@@ -242,7 +276,8 @@ enum MobileRedesignUITestSeeder {
             .rich([Span("Formatted text", styles: [.bold])]), .cloze("A blank to edit", blanks: [ClozeSpan(group: 1, start: 2, length: 5)]),
             .media(authoringImage), .empty, .empty, .empty]
         _ = try await library.createItem(Item(itemTypeID: authoringType.id,
-            fields: zip(authoringFields, authoringValues).map { FieldValue(fieldID: $0.id, value: $1) }))
+            fields: zip(authoringFields, authoringValues).map { FieldValue(fieldID: $0.id, value: $1) },
+            deckID: root.id))
         let longDeck = try await library.createDeck(Deck(name: "Long Content", parentID: root.id))
         let basic = try await library.loadItemTypes().itemTypes.first { $0.name == "Basic" }
         if let basic {
@@ -252,4 +287,3 @@ enum MobileRedesignUITestSeeder {
         }
     }
 }
-#endif

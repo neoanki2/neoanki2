@@ -1,4 +1,5 @@
 import NeoAnkiDeckBuilderKit
+import NeoAnkiTextEditing
 import SwiftUI
 
 struct DeckBuilderSheet: View {
@@ -9,6 +10,7 @@ struct DeckBuilderSheet: View {
     let onCancel: @MainActor () -> Void
 
     @State private var selectedBuilderID: String?
+    @State private var draftGuard: DraftNavigationGuard?
 
     init(
         registry: DeckBuilderRegistry,
@@ -34,13 +36,15 @@ struct DeckBuilderSheet: View {
                     onGenerated: onGenerated,
                     onCancel: onCancel
                 )
+                    .onDraftNavigationGuardChange { draftGuard = $0 }
                     .disabled(isImporting)
                     .toolbar {
                         ToolbarItem(placement: .navigation) {
                             Button("Builders", systemImage: "chevron.left") {
-                                self.selectedBuilderID = nil
+                                let leave = { self.selectedBuilderID = nil; draftGuard = nil }
+                                if let draftGuard { draftGuard.request(leave) } else { leave() }
                             }
-                            .disabled(isImporting)
+                            .disabled(isImporting || draftGuard?.isBusy == true)
                         }
                     }
             } else {
@@ -72,8 +76,8 @@ struct DeckBuilderSheet: View {
                 }
             }
         }
-        .frame(minWidth: 500, idealWidth: 560, minHeight: 460, idealHeight: 560)
-        .interactiveDismissDisabled(isImporting)
+        .frame(minWidth: 560, idealWidth: 720, minHeight: 560, idealHeight: 760)
+        .interactiveDismissDisabled(isImporting || draftGuard?.isDirty == true || draftGuard?.isBusy == true)
         .accessibilityIdentifier("deckBuilderSheet")
     }
 }

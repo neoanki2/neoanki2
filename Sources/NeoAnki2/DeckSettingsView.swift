@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiTextEditing
 import SwiftUI
 
 struct DeckSettingsView: View {
@@ -8,6 +9,7 @@ struct DeckSettingsView: View {
     let onSaved: () async -> Void
     let onProgressReset: () async -> Void
 
+    @State private var dismissal = DraftDismissal()
     @State private var isLimited: Bool
     @State private var newCardsPerDay: Int
     @State private var isSaving = false
@@ -85,10 +87,14 @@ struct DeckSettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            .disabled(isSaving || isResetting)
             .navigationTitle(deck.name)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        dismissal.request(isDirty: pendingLimit != deck.newCardsPerDay, isBusy: isSaving || isResetting) { dismiss() }
+                    }
+                        .disabled(isSaving || isResetting)
                         .keyboardShortcut(.cancelAction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -101,6 +107,7 @@ struct DeckSettingsView: View {
                 }
             }
         }
+        .protectDraft(isDirty: pendingLimit != deck.newCardsPerDay, isBusy: isSaving || isResetting, dismissal: dismissal)
         .confirmationDialog(
             "Reset all progress for \"\(deck.name)\"?",
             isPresented: $showResetConfirmation,
@@ -118,8 +125,10 @@ struct DeckSettingsView: View {
         .frame(minWidth: 420, idealWidth: 420, minHeight: 340)
     }
 
+    private var pendingLimit: Int? { isLimited ? newCardsPerDay : nil }
+
     private func save() {
-        guard !isSaving else { return }
+        guard !isSaving, !isResetting else { return }
         isSaving = true
         Task {
             let saved = await decksModel.updateNewCardsPerDay(
@@ -135,7 +144,7 @@ struct DeckSettingsView: View {
     }
 
     private func resetProgress() {
-        guard !isResetting else { return }
+        guard !isResetting, !isSaving else { return }
         isResetting = true
         resetCardCount = nil
         Task {

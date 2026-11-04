@@ -74,7 +74,7 @@ final class APIControlModel {
     }
 
     func applyPort(_ value: Int) async {
-        guard (1_024 ... 65_535).contains(value), value != port else { return }
+        guard !isChangingState, (1_024 ... 65_535).contains(value), value != port else { return }
         let wasEnabled = isEnabled
         if isRunning { await stop(persistDisabled: false) }
         port = value

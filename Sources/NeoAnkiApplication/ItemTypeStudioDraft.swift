@@ -246,7 +246,7 @@ public struct CardSetupRecommendation: Equatable, Sendable {
             guard let field = component.source.fieldID.flatMap({ fieldsByID[$0] }) else {
                 return false
             }
-            return [.image, .gif, .video].contains(field.type)
+            return [.image, .imageOcclusion, .gif, .video].contains(field.type)
         }
         let layout: CardLayoutID
         if hasVisual {
@@ -288,7 +288,7 @@ public struct CardSetupRecommendation: Equatable, Sendable {
                 answer.map { modality(for: $0.type) } ?? .text,
                 operation(question: question, answer: answer, fields: fields)
             )
-        case .type, .cloze:
+        case .type, .cloze, .imageOcclusion:
             return (.freeResponse, .recall)
         case .choose:
             return (.selection, .classify)
@@ -303,7 +303,7 @@ public struct CardSetupRecommendation: Equatable, Sendable {
         switch type {
         case .text, .richText, .number, .cloze: .text
         case .audio: .audio
-        case .image, .gif: .image
+        case .image, .imageOcclusion, .gif: .image
         case .video: .video
         }
     }
@@ -581,6 +581,7 @@ public enum CardSetupStarter: String, CaseIterable, Sendable {
     case typeAnswer
     case visual
     case cloze
+    case imageOcclusion
     case audioSubmission
 
     public func isApplicable(to fields: [ItemTypeFieldDraft]) -> Bool {
@@ -590,8 +591,10 @@ public enum CardSetupStarter: String, CaseIterable, Sendable {
         case .audioSubmission:
             !fields.isEmpty
         case .visual:
-            fields.contains { [.image, .gif, .video].contains($0.type) }
-                && fields.contains { ![.image, .gif, .video].contains($0.type) }
+            fields.contains { [.image, .imageOcclusion, .gif, .video].contains($0.type) }
+                && fields.contains { ![.image, .imageOcclusion, .gif, .video].contains($0.type) }
+        case .imageOcclusion:
+            fields.contains { $0.type == .imageOcclusion }
         case .cloze:
             fields.contains { $0.type == .cloze }
         }
@@ -621,10 +624,13 @@ public enum CardSetupStarter: String, CaseIterable, Sendable {
         case .typeAnswer:
             (question, answer, name, interaction) = (first, second, "Type Answer", .type)
         case .visual:
-            let visual = fields.first { [.image, .gif, .video].contains($0.type) }!
-            let text = fields.first { ![.image, .gif, .video].contains($0.type) }!
-            (question, answer, name, interaction) = (visual, text, "Visual", .reveal)
+            let visual = fields.first { [.image, .imageOcclusion, .gif, .video].contains($0.type) }!
+            let text = fields.first { ![.image, .imageOcclusion, .gif, .video].contains($0.type) }!
+            (question, answer, name, interaction) = (visual, text, "Visual", visual.type == .imageOcclusion ? .imageOcclusion : .reveal)
             availability = .fieldPresent(visual.id)
+        case .imageOcclusion:
+            let image = fields.first { $0.type == .imageOcclusion }!
+            (question, answer, name, interaction) = (image, nil, "Image Occlusion", .imageOcclusion)
         case .cloze:
             let cloze = fields.first { $0.type == .cloze }!
             (question, answer, name, interaction) = (cloze, cloze, "Cloze", .cloze)
@@ -634,7 +640,7 @@ public enum CardSetupStarter: String, CaseIterable, Sendable {
 
         var components = [CardSetupComponentDraft(
             source: .field(question.id),
-            region: [.image, .gif, .video].contains(question.type) ? .media : .primary,
+            region: [.image, .imageOcclusion, .gif, .video].contains(question.type) ? .media : .primary,
             purpose: .question,
             reveal: interaction == .cloze ? .hiddenUntilAnswer : .always
         )]
@@ -859,6 +865,15 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
             isLayoutManuallySelected: false
         )
         return ItemTypeStudioDraft(id: id, name: "", fields: fields, setups: [setup])
+    }
+
+    public static func newImageOcclusion(id: UUID = UUID()) -> ItemTypeStudioDraft {
+        let fields = [ItemTypeFieldDraft(name: "Image", type: .imageOcclusion, isRequired: true),
+                      ItemTypeFieldDraft(name: "Explanation", type: .richText, isRequired: false)]
+        // The starter has known applicable fields, so construction cannot fail.
+        var setup = try! CardSetupStarter.imageOcclusion.makeCardSetup(fields: fields)
+        setup.components.append(.init(source: .field(fields[1].id), region: .supporting, purpose: .supporting, reveal: .hiddenUntilAnswer))
+        return .init(id: id, name: "Image Occlusion", fields: fields, setups: [setup])
     }
 
     public var isDirty: Bool {
@@ -1155,7 +1170,7 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
                 message: "Choose question content."
             ))
         }
-        if setup.interaction != .audioSubmission,
+        if setup.interaction != .audioSubmission, setup.interaction != .imageOcclusion,
            !setup.components.contains(where: { $0.purpose == .expectedAnswer }) {
             issues.append(.init(
                 target: .recipe(cardSetupID: setup.id, purpose: .expectedAnswer),
@@ -1213,7 +1228,7 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
                 issues.append(.init(target: target, message: "This playback behavior is not supported by the selected content."))
             }
             if component.region == .media,
-               field.map({ [.image, .gif, .video].contains($0.type) }) != true {
+               field.map({ [.image, .imageOcclusion, .gif, .video].contains($0.type) }) != true {
                 issues.append(.init(target: target, message: "The Media area accepts image, GIF, or video fields."))
             }
         }
@@ -1226,6 +1241,13 @@ public struct ItemTypeStudioDraft: Identifiable, Equatable, Sendable {
                     message: "Repair the Availability rule."
                 ))
             }
+        }
+        if setup.interaction == .imageOcclusion {
+            let ids = Set(setup.components.filter { $0.purpose == .question }.compactMap { component -> UUID? in
+                guard let id = component.source.fieldID, fieldByID[id]?.type == .imageOcclusion else { return nil }
+                return id
+            })
+            if ids.count != 1 { issues.append(.init(target: .recipe(cardSetupID: setup.id, purpose: .question), message: "Image Occlusion needs exactly one occlusion question field.")) }
         }
         if setup.interaction == .cloze {
             let clozeQuestionComponents = setup.components.filter { component in

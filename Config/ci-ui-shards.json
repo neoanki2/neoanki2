@@ -154,7 +154,9 @@
         "NeoAnki2MobileUITests/MobileAppStoreScreenshotUITests/testCaptureAppStoreScreenshots",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testAllFieldAuthoringMediaRemovalAndPickerCancellation",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testGenericDictionaryLookupInNewItemSavesToChosenDeck",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testPhotoCanBeSelectedBeforeNameAndDescription"
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTypingUkrainianStressLookupRepeatedlySavesWithoutCrashing",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testPhotoCanBeSelectedBeforeNameAndDescription",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy"
       ]
     },
     {
@@ -211,6 +213,24 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures"
+      ]
+    },
+    {
+      "id": "phone-occlusion",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileImageOcclusionUITests/testCreateEditCancelGroupAndStudyOcclusion",
+        "NeoAnki2MobileUITests/MobileImageOcclusionUITests/testCanceledCreationDoesNotGenerateCards"
+      ]
+    },
+    {
+      "id": "tablet-occlusion",
+      "device": "iPad Pro 13-inch (M5)",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileImageOcclusionUITests/testCreateEditCancelGroupAndStudyOcclusion",
+        "NeoAnki2MobileUITests/MobileImageOcclusionUITests/testCanceledCreationDoesNotGenerateCards"
       ]
     }
   ]

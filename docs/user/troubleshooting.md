@@ -130,6 +130,11 @@ update as the status changes; reopening Settings or toggling sync is not
 required. See [iCloud recovery](../sync-reminders-widgets/#troubleshoot-icloud)
 if an account or transfer problem remains visible.
 
+If **Vocabulary Packs** reports a catalog refresh problem, retry its iCloud
+refresh after sync becomes available. Packs already installed on the device
+remain available offline; another device's catalog entry does not download the
+pack until you choose it.
+
 ## Empty and loading states
 
 These states are informational:

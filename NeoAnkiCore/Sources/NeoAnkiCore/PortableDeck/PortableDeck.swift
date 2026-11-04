@@ -167,7 +167,7 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 5
+    public static let version = 6
     fileprivate static let supportedVersions = 1...version
 
     public static func export(
@@ -814,6 +814,7 @@ private final class PortableDeckDatabase {
                       let kindText = fieldRow.text(4), let kind = FieldType(rawValue: kindText),
                       let required = fieldRow.integer(5), required == 0 || required == 1
                 else { throw PortableDeckError.invalidPackage("Field row is invalid.") }
+                guard formatVersion >= 6 || kind != .imageOcclusion else { throw PortableDeckError.invalidPackage("Image occlusion requires version 6.") }
                 return FieldDef(id: fieldID, name: fieldName, type: kind, isRequired: required == 1)
             }
             let decodedTemplates = try templates.enumerated().map { index, templateRow -> Template in
@@ -825,6 +826,7 @@ private final class PortableDeckDatabase {
                       let interaction = Interaction(rawValue: interactionText),
                       let skill = templateRow.text(formatVersion >= 5 ? 9 : 7)
                 else { throw PortableDeckError.invalidPackage("Template row is invalid.") }
+                guard formatVersion >= 6 || interaction != .imageOcclusion else { throw PortableDeckError.invalidPackage("Image occlusion requires version 6.") }
                 let condition: SlotCondition? = try templateRow.text(formatVersion >= 5 ? 10 : 8).map {
                     try PortableJSON.decodeCondition($0, fields: decodedFields)
                 }
@@ -1082,7 +1084,7 @@ private final class PortableDeckDatabase {
         let byHash = Dictionary(uniqueKeysWithValues: media.map { ($0.descriptor.hash, $0.descriptor) })
         for record in items {
             for field in record.item.fields {
-                guard case let .media(ref) = field.value else { continue }
+                guard let ref = field.value.mediaReference else { continue }
                 guard let descriptor = byHash[ref.assetHash],
                       descriptor.kind == ref.kind,
                       descriptor.fileExtension == ref.fileExtension
@@ -1467,6 +1469,11 @@ enum PortableJSON {
                     return object
                 },
             ]
+        case let .imageOcclusion(content):
+            try ImageOcclusionValidation.validate(content)
+            value = try dictionary(JSONSerialization.jsonObject(with: JSONEncoder().encode(content)))
+            value["image"] = try object(encodeContent(.media(content.image)))
+            value["type"] = "imageOcclusion"
         case let .number(number):
             guard number.isFinite else { throw invalid() }
             value = ["type": "number", "value": number]
@@ -1513,6 +1520,16 @@ enum PortableJSON {
         let value = try dictionary(object(json))
         guard let type = value["type"] as? String else { throw invalid() }
         switch type {
+        case "imageOcclusion":
+            guard formatVersion >= 6 else { throw invalid() }
+            guard Set(value.keys) == ["type", "image", "mode", "masks", "nextGroup"] else { throw invalid() }
+            var object = value
+            object.removeValue(forKey: "type")
+            guard let ref = try decodeContent(encode(value["image"] as Any), formatVersion: formatVersion).mediaReference else { throw invalid() }
+            object["image"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ref))
+            let content = try JSONDecoder().decode(ImageOcclusionContent.self, from: JSONSerialization.data(withJSONObject: object))
+            try ImageOcclusionValidation.validate(content)
+            return .imageOcclusion(content)
         case "empty":
             guard Set(value.keys) == ["type"] else { throw invalid() }
             return .empty
@@ -1746,7 +1763,7 @@ private let schema = [
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 5),
+        format_version INTEGER NOT NULL CHECK (format_version = 6),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),
@@ -1785,7 +1802,7 @@ private let schema = [
         id TEXT PRIMARY KEY NOT NULL CHECK(length(id) = 36),
         item_type_id TEXT NOT NULL REFERENCES item_types(id) ON DELETE CASCADE,
         ordinal INTEGER NOT NULL CHECK(ordinal >= 0), name TEXT NOT NULL,
-        kind TEXT NOT NULL CHECK(kind IN ('text','richText','audio','image','gif','video','number','cloze')),
+        kind TEXT NOT NULL CHECK(kind IN ('text','richText','audio','image','gif','video','number','cloze','imageOcclusion')),
         is_required INTEGER NOT NULL CHECK(is_required IN (0,1)),
         UNIQUE(item_type_id, ordinal), UNIQUE(item_type_id, id)
     );
@@ -1798,7 +1815,7 @@ private let schema = [
         prompt_json TEXT NOT NULL, answer_json TEXT NOT NULL,
         layout TEXT NOT NULL CHECK(layout IN ('focus','split','mediaAside','mediaHero','actionStage')),
         components_json TEXT NOT NULL,
-        interaction TEXT NOT NULL CHECK(interaction IN ('reveal','type','choose','record','audioSubmission','cloze','arrange')),
+        interaction TEXT NOT NULL CHECK(interaction IN ('reveal','type','choose','record','audioSubmission','cloze','imageOcclusion','arrange')),
         skill_json TEXT NOT NULL, generate_when_json TEXT,
         UNIQUE(item_type_id, ordinal), UNIQUE(item_type_id, id)
     );

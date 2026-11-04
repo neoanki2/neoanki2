@@ -183,15 +183,13 @@ struct ScopeHomeView: View {
                 .foregroundStyle(.secondary)
 
             if activeCardCount > 0 {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: DesignSystem.Spacing.lg) {
-                        cardProgressChart
-                        cardStateLegend
-                    }
-                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                        cardProgressChart
-                        cardStateLegend
-                    }
+                // This section lives in a vertical ScrollView, where the width
+                // offered to ViewThatFits can be effectively unbounded. It may
+                // then choose the horizontal arrangement even when the actual
+                // window is narrow, letting a scaled chart overlap the heading.
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                    cardProgressChart
+                    cardStateLegend
                 }
             } else {
                 Text("No active cards")

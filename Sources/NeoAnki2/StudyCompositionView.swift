@@ -3,10 +3,12 @@ import NeoAnkiSharedUI
 import SwiftUI
 
 struct StudyCompositionView: View {
+    @State private var showsFullCard = false
     let template: Template
     let item: Item
     let isAnswerRevealed: Bool
     let mediaStore: MediaStore?
+    var occlusionGroup: Int? = nil
     let clozeGroup: Int?
 
     private var components: [ResolvedTemplateComponent] {
@@ -18,6 +20,42 @@ struct StudyCompositionView: View {
     }
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            wireframe
+                .cardWireframeIntrinsicSizing()
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                Text("This card needs more room.")
+                    .font(DesignSystem.Typography.uiBody)
+                Button("Read Full Card") { showsFullCard = true }
+                    .accessibilityIdentifier("readFullStudyCard")
+            }
+        }
+        .frame(maxWidth: 820)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
+        .padding(.vertical, DesignSystem.Spacing.lg)
+        .sheet(isPresented: $showsFullCard) {
+            VStack(spacing: 0) {
+                ScrollView {
+                    wireframe
+                        .cardWireframeIntrinsicSizing()
+                        .padding(DesignSystem.Spacing.lg)
+                }
+                Divider()
+                HStack {
+                    Spacer()
+                    Button("Done") { showsFullCard = false }
+                        .keyboardShortcut(.cancelAction)
+                }
+                .padding(DesignSystem.Spacing.md)
+            }
+            .frame(minWidth: 480, idealWidth: 640, minHeight: 360, idealHeight: 560)
+        }
+    }
+
+    private var wireframe: some View {
         CardWireframeView(
             layout: effectiveLayout,
             components: components,
@@ -29,13 +67,13 @@ struct StudyCompositionView: View {
                 isAnswerRevealed: isAnswerRevealed,
                 richTextPointSize: richTextPointSize(for: hole),
                 mediaStore: mediaStore,
+                isStudyContent: true,
+                occlusionGroup: occlusionGroup,
                 clozeGroup: clozeGroup
             )
+            // Inherit the wireframe's study font. A local font(nil) resets it
+            // to the small UI default, including on unrelated poetry cards.
         }
-        .frame(maxWidth: 820, maxHeight: .infinity)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
-        .padding(.vertical, DesignSystem.Spacing.lg)
     }
 
     private func richTextPointSize(for hole: CardWireframeHole) -> CGFloat {

@@ -25,7 +25,7 @@ concurrency:
 jobs:
   validate-content:
     name: Documentation content validation
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     timeout-minutes: 10
     steps:
       - name: Check out repository

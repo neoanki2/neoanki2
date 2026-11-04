@@ -328,7 +328,7 @@ public final class LibraryFeatureModel {
 
     private func validateMediaDescriptions(_ item: Item, itemType: ItemType) throws {
         for field in itemType.fields where [.image, .gif].contains(field.type) {
-            if case let .media(reference) = item.value(for: field.id),
+            if let reference = item.value(for: field.id)?.mediaReference,
                (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 throw ItemDraftError.missingMediaDescription(field.name)
             }

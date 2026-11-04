@@ -23,6 +23,8 @@ public enum ItemDisplay {
             return ContentNumberRendering.string(from: number, locale: locale)
         case let .media(ref):
             return ref.altText ?? mediaKindLabel(ref.kind)
+        case let .imageOcclusion(content):
+            return content.image.altText ?? "Image Occlusion"
         case let .cloze(text, blanks):
             return ClozeValidation.displayText(from: text, blanks: blanks, revealed: false)
         case .empty:
@@ -52,7 +54,7 @@ public extension FieldDef {
         switch type {
         case .text, .richText, .number, .cloze:
             return true
-        case .audio, .image, .gif, .video:
+        case .audio, .image, .gif, .video, .imageOcclusion:
             return false
         }
     }
@@ -92,7 +94,7 @@ public extension FieldDef {
             return .number(number)
         case .cloze:
             return plain.isEmpty ? .empty : .cloze(plain, blanks: [])
-        case .audio, .image, .gif, .video:
+        case .audio, .image, .gif, .video, .imageOcclusion:
             return .empty
         }
     }

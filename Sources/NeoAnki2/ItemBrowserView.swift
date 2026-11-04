@@ -84,7 +84,10 @@ struct ItemBrowserView: View {
         .navigationTitle(scope.label)
         .navigationSubtitle(subtitle)
         .searchable(text: $itemsModel.searchText, placement: .toolbar, prompt: "Search items")
-        .onExitCommand(perform: onDone)
+        .onExitCommand {
+            if !itemsModel.searchText.isEmpty { itemsModel.searchText = "" }
+            else { onDone() }
+        }
         .onChange(of: showsAnswerColumn, initial: true) { _, shows in
             columnCustomization[visibility: "answer"] = shows ? .visible : .hidden
         }

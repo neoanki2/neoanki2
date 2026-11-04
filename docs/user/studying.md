@@ -121,6 +121,12 @@ The **Show Answer** control in Item Type Studio is an authoring preview. It
 does not reveal a live study card, write review history, or change scheduling;
 only a grade saved during a study session changes a card's memory state.
 
+If a card needs more room than the study area provides, choose **Read Full
+Card** to open a scrollable reader. It follows the same reveal state, so opening
+it before answering does not expose the answer. The response and grading
+controls stay within the main study window. Hidden explanations appear only
+after reveal, without placeholder rows taking up space beforehand.
+
 A conditional poem opening card asks **Recall the first line.** with the title
 and author as its caption. The answer stays hidden until reveal. Opening cards
 follow the same learned-before-new queue policy; continuation cards retain
@@ -299,3 +305,11 @@ or Audio Submission draft has not been saved, ending discards that draft.
 NeoAnki2 respects macOS **Reduce Motion**. With it enabled, answer reveals and study-layout changes occur without the normal transition animation.
 
 Controls have spoken labels and state values for VoiceOver, including progress, selected choices and arrangement items, concealed or blurred content, grade meanings, and recording failures. When an answer is revealed, NeoAnki2 announces it and moves accessibility focus to the answer. Recording and other errors are announced and focused. Hidden media is not loaded before reveal, and concealed content is described without exposing its answer.
+
+## Study image occlusion
+
+Each mask group is a separate scheduled card. The numbered outline marks the
+region or regions to recall. In **Hide all, reveal one**, other groups remain
+covered after **Show Answer**. In **Hide one, reveal one**, the other groups
+are visible from the start. Answer text attached to the tested regions appears
+only after reveal. Grade recall with the normal Again/Hard/Good/Easy controls.

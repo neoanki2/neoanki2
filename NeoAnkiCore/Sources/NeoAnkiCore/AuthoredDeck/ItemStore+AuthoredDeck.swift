@@ -226,13 +226,13 @@ private func authoredItemByApplyingReservations(
 ) -> Item {
     var result = item
     result.fields = item.fields.map { field in
-        guard case let .media(original) = field.value,
+        guard let original = field.value.mediaReference,
               let reservationID = reservationIDs[original.assetHash] else {
             return field
         }
         var ref = original
         ref.reservationID = reservationID
-        return FieldValue(fieldID: field.fieldID, value: .media(ref))
+        return FieldValue(fieldID: field.fieldID, value: field.value.replacingMediaReference(ref))
     }
     return result
 }

@@ -268,6 +268,7 @@ public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
     public let itemId: String
     public let templateId: String
     public let deckId: String?
+    public let occlusionGroup: Int?
     public let clozeGroup: Int?
     public let interaction: String
     public let layout: String
@@ -282,6 +283,7 @@ public struct APIStudyCard: Codable, Sendable, Equatable, Identifiable {
         itemId = due.item.id.uuidString.lowercased()
         templateId = due.template.id.uuidString.lowercased()
         deckId = due.card.deckID?.uuidString.lowercased()
+        occlusionGroup = due.card.occlusionGroup
         clozeGroup = due.card.clozeGroup
         interaction = due.template.interaction.rawValue
         layout = due.template.layout.rawValue
@@ -344,6 +346,9 @@ public struct APIContentValue: Codable, Sendable, Equatable {
     public let durationMs: Int?
     public let altText: String?
     public let reservationId: String?
+    public let occlusionMode: ImageOcclusionMode?
+    public let masks: [ImageOcclusionMask]?
+    public let nextGroup: Int?
     public let blanks: [ClozeSpan]?
     public let number: Double?
 
@@ -360,6 +365,9 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         var altText: String?
         var reservationId: String?
         var blanks: [ClozeSpan]?
+        var occlusionMode: ImageOcclusionMode?
+        var masks: [ImageOcclusionMask]?
+        var nextGroup: Int?
         var number: Double?
         switch value {
         case .empty:
@@ -377,6 +385,12 @@ public struct APIContentValue: Codable, Sendable, Equatable {
             durationMs = ref.durationMs
             altText = ref.altText
             reservationId = nil
+        case let .imageOcclusion(content):
+            type = "imageOcclusion"
+            let ref = content.image
+            mediaId = ref.id.uuidString.lowercased(); kind = ref.kind.rawValue
+            sha256 = ref.assetHash; fileExtension = ref.fileExtension; altText = ref.altText
+            occlusionMode = content.mode; masks = content.masks; nextGroup = content.nextGroup
         case let .cloze(value, valueBlanks):
             type = "cloze"; text = value; blanks = valueBlanks
         case let .number(value):
@@ -393,6 +407,9 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         self.durationMs = durationMs
         self.altText = altText
         self.reservationId = reservationId
+        self.occlusionMode = occlusionMode
+        self.masks = masks
+        self.nextGroup = nextGroup
         self.blanks = blanks
         self.number = number
     }
@@ -407,7 +424,7 @@ public struct APIContentValue: Codable, Sendable, Equatable {
         case "rich":
             guard let spans else { throw APIServiceError.validation("Spans are required.", pointer: pointer + "/spans") }
             return .rich(spans)
-        case "media":
+        case "media", "imageOcclusion":
             guard let mediaId, let id = UUID(uuidString: mediaId),
                   id.uuidString.lowercased() == mediaId,
                   let kind, let mediaKind = MediaKind(rawValue: kind),
@@ -433,6 +450,13 @@ public struct APIContentValue: Codable, Sendable, Equatable {
                     )
                 }
                 reference = reference.attachingReservation(reservationID)
+            }
+            if type == "imageOcclusion" {
+                guard let occlusionMode, let masks, let nextGroup else { throw APIServiceError.validation("Occlusion mode, masks, and nextGroup are required.", pointer: pointer) }
+                let content = ImageOcclusionContent(image: reference, mode: occlusionMode, masks: masks, nextGroup: nextGroup)
+                do { try ImageOcclusionValidation.validate(content) }
+                catch { throw APIServiceError.validation(error.localizedDescription, pointer: pointer) }
+                return .imageOcclusion(content)
             }
             return .media(reference)
         case "cloze":
@@ -576,6 +600,7 @@ public struct APICard: Codable, Sendable, Equatable, Identifiable {
     public let itemId: String
     public let templateId: String
     public let deckId: String?
+    public let occlusionGroup: Int?
     public let clozeGroup: Int?
     public let skill: Skill
     public let isSuspended: Bool
@@ -588,6 +613,7 @@ public struct APICard: Codable, Sendable, Equatable, Identifiable {
         itemId = card.itemID.uuidString.lowercased()
         templateId = card.templateID.uuidString.lowercased()
         deckId = card.deckID?.uuidString.lowercased()
+        occlusionGroup = card.occlusionGroup
         clozeGroup = card.clozeGroup
         skill = card.skill
         isSuspended = card.isSuspended

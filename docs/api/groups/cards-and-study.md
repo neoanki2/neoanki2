@@ -2,7 +2,7 @@
 title: Cards and study
 description: Generated NeoAnki local API operations for cards and study.
 audience: api
-contract_digest: sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271
+contract_digest: sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485
 parent: Local API reference
 permalink: /api/cards-and-study/
 ---
@@ -91,7 +91,7 @@ curl --request PATCH \
 ```
 ## `GET /v1/cards/{id}/content`
 
-Card content through the loopback-only NeoAnki API.
+Card content through the loopback-only NeoAnki API. Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal.
 
 - **Operation ID:** `cardContent`
 - **Authorization:** Bearer token with `library.read`
@@ -301,7 +301,7 @@ curl --request GET \
 ```
 ## `POST /v1/study-sessions/{id}/next`
 
-Next study card through the loopback-only NeoAnki API.
+Next study card through the loopback-only NeoAnki API. Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal.
 
 - **Operation ID:** `nextStudyCard`
 - **Authorization:** Bearer token with `study.review`
@@ -348,6 +348,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271`.
+Contract digest: `sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

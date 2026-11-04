@@ -373,6 +373,13 @@ public actor MediaStore {
         try removeAssetFile(asset)
     }
 
+    public func discardDraftReference(_ ref: MediaRef) async throws {
+        guard let id = ref.reservationID, let metadataDatabase else { return }
+        if let asset = try await metadataDatabase.cancelMediaReservation(id: id, deleteNewAsset: true) {
+            try removeAssetFile(asset)
+        }
+    }
+
     func rollbackReservations(scopeID: UUID) async throws {
         guard let metadataDatabase else { return }
         let assets = try await metadataDatabase.rollbackMediaReservations(scopeID: scopeID)

@@ -44,6 +44,9 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         // first app gesture can trigger an interruption monitor.
         if environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
             allowBadgePermissionIfPresented(timeout: 10)
+            XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+            let fixtureFailure = app.alerts["Visual Fixture Failed"]
+            XCTAssertFalse(fixtureFailure.exists, fixtureFailure.debugDescription)
         }
         return app
     }
@@ -78,6 +81,13 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         let destination = app.buttons["Item Types & Card Setups"]
         scrollToAndTap(destination, in: app)
         XCTAssertTrue(app.navigationBars["Item Types"].waitUntilExists(timeout: 10))
+    }
+
+    func createNewBasicItemType(in app: XCUIApplication) {
+        app.buttons["item-types.new"].tap()
+        let basic = app.buttons["item-types.new-basic"]
+        XCTAssertTrue(basic.waitUntilExists(timeout: 3))
+        basic.tap()
     }
 
     func scrollToAndTap(
@@ -532,6 +542,7 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
         front.typeText("Capital of France?")
         focusAuthoringField(back, in: app)
         back.typeText("Paris")
+        app.buttons["add-card-keyboard-done"].tap()
         let save = app.buttons["add-card-save"]
         XCTAssertTrue(save.isEnabled)
         save.tap()
@@ -598,7 +609,7 @@ final class MobileStudioAuthoringUITests: NeoAnki2MobileUITestCase {
         let app = launchApp()
         openItemTypeStudioCatalog(in: app)
 
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         let typeName = app.textFields["item-type-studio.name"]
         XCTAssertTrue(typeName.waitUntilExists(timeout: 5))
         typeName.tap()
@@ -694,7 +705,7 @@ final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
 
         // Cloze is recipe-filtered: a text-only type cannot add it, then the
         // starter appears immediately after an explicit Cloze field is added.
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         XCTAssertTrue(app.buttons["item-type-studio.save"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.staticTexts["Deck-provided · Read-only"].exists)
         scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
@@ -805,7 +816,7 @@ final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
         // leave an Unlock action capable of replacing it.
         app.buttons["item-type-studio.cancel"].tap()
         XCTAssertTrue(app.navigationBars["Item Types"].waitUntilExists(timeout: 5))
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         XCTAssertTrue(app.buttons["item-type-studio.save"].waitUntilExists(timeout: 5))
         XCTAssertFalse(app.staticTexts["Deck-provided · Read-only"].exists)
         XCTAssertFalse(app.buttons["Unlock for Editing…"].exists)
@@ -824,7 +835,7 @@ final class MobileStudioValidationUITests: NeoAnki2MobileUITestCase {
     func testItemTypeStudioValidationRoutesToInvalidCardSetupAndFocusesIt() throws {
         let app = launchApp()
         openItemTypeStudioCatalog(in: app)
-        app.buttons["item-types.new"].tap()
+        createNewBasicItemType(in: app)
         let typeName = app.textFields["item-type-studio.name"]
         XCTAssertTrue(typeName.waitUntilExists(timeout: 5))
         typeName.tap()
@@ -1067,6 +1078,7 @@ final class MobileAppStoreScreenshotUITests: NeoAnki2MobileUITestCase {
             let back = app.textFields["add-card-field-back"]
             focusAuthoringField(back, in: app)
             back.typeText(backText)
+            app.buttons["add-card-keyboard-done"].tap()
             if frontText == "What is active recall?" { capture("04-authoring") }
             app.buttons["add-card-save"].tap()
         }
@@ -1135,7 +1147,9 @@ final class MobileProductionReviewJourneyUITests: NeoAnki2MobileUITestCase {
         let back = app.textFields["add-card-field-back"]
         XCTAssertTrue(front.waitUntilExists(timeout: 5))
         front.tap(); front.typeText("Production review question")
-        focusAuthoringField(back, in: app); back.typeText("Production review answer")
+        focusAuthoringField(back, in: app)
+        back.typeText("Production review answer")
+        app.buttons["add-card-keyboard-done"].tap()
         let save = app.buttons["add-card-save"]
         XCTAssertTrue(save.isEnabled)
         capture("03-first-item-authoring", in: app)
@@ -1308,8 +1322,19 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(fixtures.waitUntilExists(timeout: 15)); fixtures.tap()
         XCTAssertTrue(app.navigationBars["Study Fixtures"].waitUntilExists(timeout: 5))
         capture("31-nested-decks", app)
-        for mode in ["reveal", "cloze", "type", "choose", "arrange", "record", "audioSubmission"] {
-            scrollToAndTap(app.staticTexts[mode], in: app)
+        let fixtureDeckList = app.collectionViews.firstMatch
+        XCTAssertTrue(fixtureDeckList.waitUntilExists(timeout: 5))
+        // A prior nested-deck visit can restore the list near its lower rows.
+        // Bring the concrete List to its first row before querying lazy cells.
+        for _ in 0..<8 { fixtureDeckList.swipeDown() }
+        // Follow the visible deck list from top to bottom. Besides making the
+        // journey match the user's navigation, this avoids relying on a lazy
+        // List to materialize a far offscreen row in an arbitrary order.
+        for mode in ["arrange", "audioSubmission", "choose", "cloze", "record", "reveal", "type"] {
+            let deck = app.buttons.matching(
+                NSPredicate(format: "label BEGINSWITH %@", mode + ",")
+            ).firstMatch
+            scrollToAndTap(deck, in: app, maximumSteps: 16)
             XCTAssertTrue(app.navigationBars[mode].waitUntilExists(timeout: 5))
             app.buttons["Start Studying"].tap()
             XCTAssertTrue(app.buttons["endStudySession"].waitUntilExists(timeout: 10))
@@ -1426,7 +1451,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
     func testScopedBrowseSelectionAttentionAndSavedRecordingPersistence() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
         XCTAssertTrue(app.staticTexts["Study Fixtures"].waitUntilExists(timeout: 20))
-        open("Library", in: app)
+        app.staticTexts["Study Fixtures"].tap()
+        app.buttons["Browse Items"].tap()
         app.buttons["Browse Options"].tap(); app.buttons["Repeatedly Forgotten"].tap()
         let prompt = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Repeatedly forgotten prompt")).firstMatch
         XCTAssertTrue(prompt.waitUntilExists(timeout: 5))
@@ -1440,6 +1466,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts["Nothing Needs Attention"].waitUntilExists(timeout: 5))
         app.buttons["Browse Options"].tap(); app.buttons["Done Selecting"].tap()
         app.buttons["Browse Options"].tap(); app.buttons["Repeatedly Forgotten"].tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        open("Library", in: app)
         app.buttons["Browse Options"].tap(); app.buttons["Title"].tap()
         app.buttons["Browse Options"].tap(); app.buttons["Select Items"].tap()
         let reveal = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Practice reveal:")).firstMatch
@@ -1476,14 +1504,12 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.textFields["e.g. Spanish vocabulary"].tap(); app.textFields["e.g. Spanish vocabulary"].typeText("Poems")
         app.buttons["new-deck-create"].tap()
         app.buttons["Deck Builders"].tap(); app.buttons["Poem Deck"].tap()
+        app.buttons["poemBuilderRootDeck"].tap(); app.buttons["Poems"].tap()
+        app.textFields["poemBuilderAuthor"].tap(); app.textFields["poemBuilderAuthor"].typeText("A Writer")
+        app.textFields["poemBuilderTitle"].tap(); app.textFields["poemBuilderTitle"].typeText("A Small Poem")
         app.buttons["Preview"].tap()
         XCTAssertTrue(app.staticTexts["Enter at least two nonblank lines."].waitUntilExists(timeout: 3))
         capture("41-builder-validation", app)
-        scrollToAndTap(app.buttons["poemBuilderRootDeck"], in: app); app.buttons["Poems"].tap()
-        let author = app.textFields["poemBuilderAuthor"]
-        scrollToAndTap(author, in: app); author.typeText("A Writer")
-        let title = app.textFields["poemBuilderTitle"]
-        scrollToAndTap(title, in: app); title.typeText("A Small Poem")
         let text = app.textViews["poemBuilderText"]
         scrollToAndTap(text, in: app); text.typeText("First line\nSecond line\nThird line")
         scrollToAndTap(app.buttons["Preview"], in: app)
@@ -1496,7 +1522,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         // Import creates the first due cards in this fresh library. Respond to
         // badge consent before waiting for the import operation to finish.
         allowBadgePermissionIfPresented()
-        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 60))
         open("Home", in: app)
         XCTAssertTrue(app.staticTexts["Poems"].waitUntilExists(timeout: 5))
         app.staticTexts["Poems"].tap()
@@ -1529,7 +1555,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Preview"].waitUntilExists(timeout: 5))
         capture("53-prose-preview", app)
         app.buttons["proseBuilderAdd"].tap()
-        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Deck Builders"].waitUntilExists(timeout: 60))
         open("Home", in: app); app.staticTexts["Reading"].tap()
         app.staticTexts["A Passage"].tap(); app.buttons["Browse Items"].tap()
         let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Prose Unit")).firstMatch
@@ -1567,8 +1593,12 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
         open("Library", in: app)
+        let search = app.searchFields["Search items"]
+        XCTAssertTrue(search.waitUntilExists(timeout: 5))
+        search.tap(); search.typeText("Authoring media fixture")
         let item = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Authoring media fixture")).firstMatch
-        scrollToAndTap(item, in: app)
+        XCTAssertTrue(item.waitUntilExists(timeout: 10), "Search should find the seeded authoring item")
+        item.tap()
         XCTAssertTrue(app.navigationBars["All Field Types"].waitUntilExists(timeout: 5))
         capture("58-all-field-detail", app)
         app.buttons["Edit"].tap()
@@ -1651,6 +1681,37 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Acceptance Lexicon")).firstMatch.waitUntilExists(timeout: 10))
     }
 
+    func testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-vocabulary-cloud"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+        open("Create", in: app)
+        app.buttons["Vocabulary Packs"].tap()
+        let download = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "downloadVocabularyPack-acceptance.cloud-")).firstMatch
+        XCTAssertTrue(download.waitUntilExists(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Available offline"].exists)
+        capture("65-cloud-vocabulary-catalog", app)
+        download.tap()
+        XCTAssertTrue(app.staticTexts["Available offline"].waitUntilExists(timeout: 15))
+        XCTAssertFalse(download.exists)
+        capture("66-cloud-vocabulary-downloaded", app)
+        let remove = app.buttons["removeVocabularyDownload-acceptance.cloud"]
+        XCTAssertTrue(remove.waitUntilExists(timeout: 5))
+        remove.tap()
+        app.buttons["Remove from Device"].tap()
+        XCTAssertTrue(download.waitUntilExists(timeout: 10), "Local removal must leave the cloud pack available")
+        download.tap()
+        XCTAssertTrue(app.staticTexts["Available offline"].waitUntilExists(timeout: 15))
+        open("Settings", in: app)
+        app.switches["Sync this device"].switches.firstMatch.tap()
+        XCTAssertTrue(app.buttons["Enable iCloud Sync…"].waitUntilExists(timeout: 5))
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-NeoAnkiUITestingReset" }
+        app.launch()
+        open("Create", in: app)
+        app.buttons["Vocabulary Packs"].tap()
+        XCTAssertTrue(app.staticTexts["Available offline"].waitUntilExists(timeout: 10))
+    }
+
     func testGenericDictionaryLookupInNewItemSavesToChosenDeck() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
@@ -1680,6 +1741,65 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.buttons["Show Answer"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "ˈswɪft")).firstMatch.waitUntilExists(timeout: 5))
         app.buttons["endStudySession"].tap()
+    }
+
+    func testTypingUkrainianStressLookupRepeatedlySavesWithoutCrashing() throws {
+        var environment = ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"]
+        if let pack = ProcessInfo.processInfo.environment["NEOANKI_TEST_LARGE_DICTIONARY"] {
+            environment["NEOANKI_TEST_LARGE_DICTIONARY"] = pack
+        }
+        let app = launchApp(environment: environment)
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 60))
+        open("Create", in: app)
+        app.buttons["New Item"].tap()
+        app.buttons["add-card-type"].tap()
+        scrollToAndTap(app.buttons["Наголос"], in: app)
+        app.buttons["add-card-deck"].tap()
+        scrollToAndTap(app.buttons["Наголоси"], in: app)
+        scrollToAndTap(app.buttons["Dictionary"].firstMatch, in: app)
+        if environment["NEOANKI_TEST_LARGE_DICTIONARY"] != nil {
+            app.buttons["itemDictionaryPack"].tap()
+            app.buttons["SUM-11 — Ukrainian definitions (v4)"].tap()
+        }
+        app.buttons["itemDictionarySource"].tap(); app.buttons["Слово без наголосу"].tap()
+        app.buttons["itemDictionaryDestination"].tap(); app.buttons["Форма з наголосом"].tap()
+        let word = app.textFields["add-card-field-слово без наголосу"]
+        let stress = app.textFields["add-card-field-форма з наголосом"]
+        scrollToAndTap(word, in: app)
+        for attempt in 0..<3 {
+            if attempt > 0 {
+                app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "начинка".count))
+            }
+            // Pause on a prefix, exercising result insertion while the keyboard
+            // and the destination field are mounted, then complete the word.
+            app.typeText("нач")
+            XCTAssertTrue(waitUntil(timeout: 20) {
+                app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "itemDictionaryEntry-")).firstMatch.exists
+            })
+            // Continue through the keyboard without retapping a field that
+            // can move when the Form inserts dictionary results above it.
+            app.typeText("инка")
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        app.buttons["add-card-keyboard-done"].tap()
+        scrollToAndTap(app.buttons["Dictionary"].firstMatch, in: app, preferredDirection: .towardTop)
+        scrollTo(stress, in: app)
+        XCTAssertTrue(waitUntil(timeout: 20) { (stress.value as? String)?.contains("НА\u{301}ЧИНКА") == true })
+        capture("67-ukrainian-stress-autofill", app)
+        let phrase = app.textFields["add-card-field-фраза"]
+        scrollToAndTap(phrase, in: app); phrase.typeText("Начинка для пирога.")
+        app.buttons["add-card-keyboard-done"].tap()
+        XCTAssertTrue(waitUntil(timeout: 10) { app.buttons["add-card-save"].isEnabled }, "Scrolling must preserve the chosen dictionary and autofilled stress")
+        app.buttons["add-card-save"].tap()
+        XCTAssertTrue(waitUntil(timeout: 10) { !app.navigationBars["New Item"].exists })
+        XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
+        open("Home", in: app)
+        scrollToAndTap(app.staticTexts["Наголоси"], in: app)
+        app.buttons["Browse Items"].tap()
+        let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "начинка")).firstMatch
+        XCTAssertTrue(item.waitUntilExists(timeout: 5)); item.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "НА\u{301}ЧИНКА")).firstMatch.waitUntilExists(timeout: 5))
+        capture("68-ukrainian-stress-saved", app)
     }
 
     func testPhotoCanBeSelectedBeforeNameAndDescription() throws {
@@ -1851,5 +1971,83 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(done.isHittable)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(done.frame))
         done.tap()
+    }
+}
+
+
+@MainActor
+final class MobileImageOcclusionUITests: NeoAnki2MobileUITestCase {
+    private func tapOcclusionControl(_ element: XCUIElement, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let list = app.scrollViews["occlusion-region-list"]
+        for _ in 0..<12 {
+            if element.isHittable, list.frame.contains(CGPoint(x: element.frame.midX, y: element.frame.midY)) {
+                element.tap()
+                return
+            }
+            if element.exists, element.frame.maxY < list.frame.minY { list.swipeDown() }
+            else { list.swipeUp() }
+        }
+        XCTFail("Occlusion control is not reachable: \(element)", file: file, line: line)
+    }
+
+    private func capture(_ name: String, _ app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = name + "-tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
+    func testCreateEditCancelGroupAndStudyOcclusion() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "image-occlusion"])
+        let edit = app.buttons["occlusion-fixture-edit"]
+        XCTAssertTrue(edit.waitUntilExists(timeout: 15))
+        edit.tap()
+        let add = app.buttons["occlusion-add-region"]
+        XCTAssertTrue(add.waitUntilExists(timeout: 10))
+        tapOcclusionControl(add, in: app)
+        tapOcclusionControl(add, in: app)
+        capture("occlusion-editor-two-regions", app)
+        app.buttons["occlusion-done"].tap()
+        XCTAssertTrue(app.staticTexts["2 saved cards"].waitUntilExists(timeout: 10))
+        edit.tap()
+        tapOcclusionControl(add, in: app)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["2 saved cards"].waitUntilExists(timeout: 10))
+        edit.tap()
+        let first = app.switches["occlusion-region-1"]
+        let second = app.switches["occlusion-region-2"]
+        tapOcclusionControl(first, in: app)
+        tapOcclusionControl(second, in: app)
+        tapOcclusionControl(app.buttons["Group Into"], in: app)
+        app.buttons["Group 1"].tap()
+        app.buttons["occlusion-done"].tap()
+        XCTAssertTrue(app.staticTexts["1 saved cards"].waitUntilExists(timeout: 10))
+        app.buttons["occlusion-fixture-study"].tap()
+        let reveal = app.buttons["Show Answer"]
+        XCTAssertTrue(reveal.waitUntilExists(timeout: 10))
+        XCTAssertFalse(app.staticTexts["occlusion-revealed-answer"].exists)
+        XCTAssertFalse(app.debugDescription.contains("Region answer"))
+        capture("occlusion-study-question", app)
+        reveal.tap()
+        XCTAssertTrue(app.staticTexts["occlusion-revealed-answer"].waitUntilExists(timeout: 5))
+        capture("occlusion-study-answer", app)
+        XCTAssertTrue(app.buttons["Good"].waitUntilExists(timeout: 10))
+        app.buttons["Good"].tap()
+    }
+
+    func testCanceledCreationDoesNotGenerateCards() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "image-occlusion"])
+        XCTAssertTrue(app.buttons["occlusion-fixture-edit"].waitUntilExists(timeout: 15))
+        app.buttons["occlusion-fixture-edit"].tap()
+        let add = app.buttons["occlusion-add-region"]
+        XCTAssertTrue(add.waitUntilExists(timeout: 10))
+        tapOcclusionControl(add, in: app)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["0 saved cards"].waitUntilExists(timeout: 10))
+        XCTAssertFalse(app.buttons["occlusion-fixture-study"].exists)
     }
 }

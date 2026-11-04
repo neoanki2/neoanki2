@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Release regressions: production capability validation and cleanup on failure."""
 import datetime as dt
+import contextlib
 import importlib.util
 from pathlib import Path
 import plistlib
+import shutil
+import struct
 import subprocess
 import tempfile
 import types
@@ -104,6 +107,7 @@ class SigningTests(unittest.TestCase):
     def test_keychain_cleanup_preserves_concurrent_search_list_on_failure(self):
         calls = []
         keychain = None
+        search_list = ['login']
 
         def run(args, timeout=60):
             nonlocal keychain
@@ -112,17 +116,38 @@ class SigningTests(unittest.TestCase):
                 Path(args[args.index('-out') + 1]).touch()
             if args[:2] == ['security', 'create-keychain']:
                 keychain = args[-1]
-            if args[:2] == ['security', 'list-keychains'] and '-s' not in args:
-                return f'"login"\n"{keychain}"\n"concurrent"'.encode()
+            if args[:2] == ['security', 'list-keychains']:
+                if '-s' in args:
+                    search_list[:] = args[args.index('-s') + 1:]
+                else:
+                    return '\n'.join(f'"{path}"' for path in search_list).encode()
             return b''
 
         with patch.object(signing, 'run', run):
             with self.assertRaisesRegex(RuntimeError, 'fixture'):
                 with signing.signing_keychain(types.SimpleNamespace(directory=Path('/fixture'))):
+                    self.assertEqual(search_list, ['login', keychain])
+                    search_list.append('concurrent')
                     raise RuntimeError('fixture')
         self.assertIn(['security', 'delete-keychain', keychain], calls)
         self.assertIn(['security', 'list-keychains', '-d', 'user', '-s', 'login', 'concurrent'], calls)
+        self.assertEqual(search_list, ['login', 'concurrent'])
         self.assertFalse(any('NeoAnki2-signing.keychain-db' in arg for args in calls for arg in args))
+
+    def test_identity_preflight_requires_the_expected_valid_identity(self):
+        material = types.SimpleNamespace(identity='A' * 40)
+        for available in [True, False]:
+            with self.subTest(available=available):
+                identities = (f'1) {material.identity} "Developer ID Application: Fixture"' if available
+                              else '0 valid identities found').encode()
+                keychain = contextlib.nullcontext((Path('/fixture/signing.keychain-db'), None))
+                with patch.object(signing, 'signing_keychain', return_value=keychain), \
+                     patch.object(signing, 'run', return_value=identities):
+                    if available:
+                        signing.check_identity(material)
+                    else:
+                        with self.assertRaisesRegex(signing.SigningError, 'not available'):
+                            signing.check_identity(material)
 
     def test_rejected_notarization_cannot_staple_or_verify(self):
         calls = []
@@ -233,6 +258,28 @@ class SigningTests(unittest.TestCase):
                 verify.assert_called_once_with(app, require_notarization=False)
         self.assertTrue(any(args[0] == 'codesign' and '--options' in args for args in calls))
         self.assertFalse(any(args[0] == 'xcrun' for args in calls))
+
+
+@unittest.skipUnless(shutil.which('lipo'), 'Apple lipo is required')
+class UniversalArchitectureTests(unittest.TestCase):
+    def test_universal_gate_requires_both_real_macho_slices(self):
+        verifier = Path(__file__).with_name('verify-universal-macos.sh')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            arm = root / 'arm64'
+            intel = root / 'x86_64'
+            universal = root / 'universal'
+            # Minimal valid Mach-O object headers exercise lipo without compiling
+            # or launching an application, and without depending on build output.
+            arm.write_bytes(struct.pack('<8I', 0xfeedfacf, 0x0100000c, 0, 1, 0, 0, 0, 0))
+            intel.write_bytes(struct.pack('<8I', 0xfeedfacf, 0x01000007, 3, 1, 0, 0, 0, 0))
+            subprocess.run(['lipo', '-create', str(arm), str(intel), '-o', str(universal)],
+                           check=True, capture_output=True)
+            for binary, expected_success in [(universal, True), (arm, False), (intel, False)]:
+                with self.subTest(binary=binary.name):
+                    result = subprocess.run(['bash', str(verifier), str(binary)], capture_output=True)
+                    self.assertEqual(result.returncode == 0, expected_success,
+                                     result.stderr.decode(errors='replace'))
 
 
 if __name__ == '__main__':

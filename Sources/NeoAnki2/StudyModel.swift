@@ -347,7 +347,7 @@ final class StudyModel {
     func performPrimaryAction() {
         guard let interaction = currentCard?.template.interaction else { return }
         switch interaction {
-        case .reveal, .cloze:
+        case .reveal, .cloze, .imageOcclusion:
             revealAnswer()
         case .type:
             submitTypedAnswer()

@@ -15,6 +15,8 @@ public enum ContentValue: Codable, Equatable, Sendable {
     case media(MediaRef)
     /// Text containing one or more fill-in blanks.
     case cloze(String, blanks: [ClozeSpan])
+    /// An oriented image with grouped rectangular recall masks.
+    case imageOcclusion(ImageOcclusionContent)
     /// A numeric value (measurements, dates-as-numbers, quantities).
     case number(Double)
     /// No content.
@@ -34,7 +36,7 @@ public enum ContentValue: Codable, Equatable, Sendable {
             }
         case let .cloze(string, _):
             return string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .number, .media:
+        case .imageOcclusion, .number, .media:
             return false
         }
     }

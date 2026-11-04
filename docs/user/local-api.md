@@ -86,6 +86,12 @@ operations. Use the smallest set of scopes that completes the integration's
 job. A read-only tool normally needs only `library.read`. Existing approvals do
 not gain either study-response scope automatically.
 
+Image Occlusion items use a typed content value containing their media
+reference, occlusion mode, and mask groups. Each mask carries its own ID, group,
+rectangle, and optional answer text. The API validates these fields and rejects
+unknown members; correct malformed content using the field-specific validation
+errors returned by the item endpoints.
+
 ## Retrieve saved spoken responses
 
 An explicitly approved client can list `/v1/study-responses`, filter by card,

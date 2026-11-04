@@ -117,7 +117,7 @@ public extension FieldType {
     var mediaKind: MediaKind? {
         switch self {
         case .audio: .audio
-        case .image: .image
+        case .image, .imageOcclusion: .image
         case .gif: .gif
         case .video: .video
         default: nil

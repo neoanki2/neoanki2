@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271
+contract_digest: sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -82,6 +82,7 @@ Type: **object**.
 - `itemId` — string; required
 - `maturityStatus` — string; required
 - `memory` — Memory; required
+- `occlusionGroup` — integer or null; optional
 - `revision` — integer; required
 - `skill` — Skill; required
 - `templateId` — string; required
@@ -172,7 +173,7 @@ Type: **object**.
 
 ## ContentValue {#schema-contentvalue}
 
-Type: **object or object or object or object or object or object**.
+Type: **object or object or object or object or object or object or object**.
 
 ## CreateDeckDeletionPlanInput {#schema-createdeckdeletionplaninput}
 
@@ -479,6 +480,17 @@ Type: **object**.
 ### Properties
 
 - `status` — string; required
+
+## ImageOcclusionMask {#schema-imageocclusionmask}
+
+Type: **object**.
+
+### Properties
+
+- `answerText` — string; optional
+- `group` — integer; required
+- `id` — string; required
+- `rect` — object; required
 
 ## ImpactSummary {#schema-impactsummary}
 
@@ -991,6 +1003,7 @@ Type: **object**.
 - `itemId` — string; required
 - `layout` — string; required
 - `memory` — Memory; required
+- `occlusionGroup` — integer or null; optional
 - `prompt` — array of ResolvedSlot; required
 - `revision` — integer; required
 - `templateId` — string; required
@@ -1212,6 +1225,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:82bf901af2d5d21f52386b741256bfc8143ae647b7e631391a6986e195cd6271`.
+Contract digest: `sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

@@ -108,7 +108,7 @@ public struct ReviewSubmission: Sendable, Equatable {
 private extension FieldType {
     var requiresStructuredImportValue: Bool {
         switch self {
-        case .audio, .image, .gif, .video, .cloze:
+        case .audio, .image, .gif, .video, .cloze, .imageOcclusion:
             true
         case .text, .richText, .number:
             false
@@ -341,6 +341,7 @@ public actor ItemStore {
                     id: card.id,
                     templateID: card.templateID,
                     clozeGroup: card.clozeGroup,
+                    occlusionGroup: card.occlusionGroup,
                     status: status
                 )
             )
@@ -1440,6 +1441,14 @@ public actor ItemStore {
         in item: Item,
         comparedTo previous: Item?
     ) async throws -> [String: MediaAssetDescriptor] {
+        if let previous {
+            for field in item.fields {
+                if case let .imageOcclusion(updated) = field.value,
+                   case let .imageOcclusion(original)? = previous.value(for: field.fieldID) {
+                    try ImageOcclusionValidation.validateTransition(from: original, to: updated)
+                }
+            }
+        }
         var previousCounts: [String: Int] = [:]
         if let previous {
             for ref in mediaReferences(in: previous) {
@@ -1468,7 +1477,7 @@ public actor ItemStore {
 
     private func mediaReferences(in item: Item) -> [MediaRef] {
         item.fields.compactMap { field in
-            guard case let .media(ref) = field.value else { return nil }
+            guard let ref = field.value.mediaReference else { return nil }
             return ref
         }
     }
@@ -1536,6 +1545,14 @@ public actor ItemStore {
         mediaReservationScope: UUID
     ) async throws -> ContentValue {
         switch structured {
+        case let .imageOcclusion(path, alt, mode, masks, nextGroup):
+            guard field.type == .imageOcclusion else { throw ImportError.invalidFormat("An image occlusion field is required.") }
+            let media = try await contentValue(from: .mediaPath(path), field: field, context: context, mediaReservationScope: mediaReservationScope)
+            guard var ref = media.mediaReference else { throw MediaError.readFailed }
+            ref.altText = alt
+            let content = ImageOcclusionContent(image: ref, mode: mode, masks: masks, nextGroup: nextGroup)
+            try ImageOcclusionValidation.validate(content)
+            return .imageOcclusion(content)
         case let .text(string):
             try ImportLimits.validateFieldString(string, fieldName: field.name)
             return field.contentValue(from: string)
@@ -1741,6 +1758,8 @@ public actor ItemStore {
                 )
             }
             switch fieldValue.value {
+            case let .imageOcclusion(content):
+                try ImageOcclusionValidation.validate(content)
             case let .cloze(text, blanks):
                 try ClozeValidation.validate(text: text, blanks: blanks)
             case let .media(ref):
@@ -1780,7 +1799,7 @@ public actor ItemStore {
         case (.text, .text), (.text, .rich), (.richText, .text), (.richText, .rich),
              (.audio, .media),
              (.image, .media), (.gif, .media), (.video, .media),
-             (.number, .number), (.cloze, .cloze):
+             (.number, .number), (.cloze, .cloze), (.imageOcclusion, .imageOcclusion):
             true
         default:
             false

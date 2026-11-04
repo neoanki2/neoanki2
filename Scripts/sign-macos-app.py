@@ -36,6 +36,17 @@ def run(args, timeout=60):
     except subprocess.TimeoutExpired:
         raise SigningError(f"{args[0]} timed out") from None
     if result.returncode:
+        if args[0] == "security":
+            detail = result.stderr.decode(errors="replace").strip()
+            operation = args[1] if len(args) > 1 else "command"
+            suffix = f": {detail[-500:]}" if detail else ""
+            raise SigningError(f"security {operation} failed (exit {result.returncode}){suffix}")
+        if args[0] == "codesign":
+            # Codesign diagnostics identify signing configuration failures and
+            # contain no credentials; keep them visible in CI logs.
+            detail = result.stderr.decode(errors="replace").strip()
+            suffix = f": {detail[-1000:]}" if detail else ""
+            raise SigningError(f"codesign failed (exit {result.returncode}){suffix}")
         raise SigningError(f"{args[0]} failed (exit {result.returncode})")
     return result.stdout
 
@@ -144,7 +155,8 @@ def signing_keychain(material):
         try:
             run(["openssl", "pkcs12", "-export", "-inkey", str(material.directory / "Developer-ID-Application.key.pem"),
                  "-in", str(material.directory / "Developer-ID-Application.cert.pem"), "-out", str(p12),
-                 "-passout", "file:" + str(passfile), "-passin", "pass:"])
+                 "-passout", "file:" + str(passfile), "-passin", "pass:",
+                 "-keypbe", "PBE-SHA1-3DES", "-certpbe", "PBE-SHA1-3DES", "-macalg", "sha1"])
             p12.chmod(0o600)
             run(["security", "create-keychain", "-p", password, str(keychain)])
             created = True
@@ -152,6 +164,11 @@ def signing_keychain(material):
             run(["security", "import", str(p12), "-k", str(keychain), "-P", password, "-T", "/usr/bin/codesign"])
             run(["security", "import", str(material.directory / "DeveloperIDG2CA.cer"), "-k", str(keychain)])
             run(["security", "set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, str(keychain)])
+            # --keychain narrows identity lookup, but codesign still uses the
+            # user's search list to discover the signing certificate chain.
+            current = re.findall(r'"([^"]+)"', run(["security", "list-keychains", "-d", "user"]).decode())
+            if str(keychain) not in current:
+                run(["security", "list-keychains", "-d", "user", "-s", *current, str(keychain)])
             yield keychain, folder
         finally:
             # Preserve concurrent search-list changes, removing only our entry.
@@ -164,6 +181,15 @@ def signing_keychain(material):
                     if remaining != current:
                         run(["security", "list-keychains", "-d", "user", "-s", *remaining])
             print("MAC_SIGNING_CLEANUP=complete", flush=True)
+
+
+def check_identity(material):
+    with signing_keychain(material) as (keychain, _):
+        identities = run(["security", "find-identity", "-v", "-p", "codesigning", str(keychain)]).decode()
+        if material.identity not in identities:
+            details = run(["security", "find-identity", "-p", "codesigning", str(keychain)]).decode().strip()
+            raise SigningError("Developer ID identity is not available in the temporary signing Keychain: "
+                               + details[-1000:])
 
 
 def verify(app, require_notarization=True):
@@ -246,6 +272,7 @@ def main():
             material = Material(Path(os.environ.get("NEOANKI_SIGNING_DIR", DEFAULT_SIGNING)).expanduser(),
                                 require_notarization=not args.sign_only)
             if args.check:
+                check_identity(material)
                 print(f"MAC_SIGNING_INPUTS=ready; team {material.team}")
             elif args.app:
                 sign(args.app.resolve(), material, require_notarization=not args.sign_only)

@@ -1,5 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiDeckBuilderKit
+import NeoAnkiTextEditing
 import SwiftUI
 
 public enum PoemDeckBuilderFeature {
@@ -28,9 +29,16 @@ public enum PoemDeckBuilderFeature {
 }
 
 public struct PoemDeckBuilderView: View {
+    private enum Field: Hashable { case destination, author, title }
+    @FocusState private var focusedField: Field?
+    @AccessibilityFocusState private var errorFocused: Bool
     @State private var input = PoemDeckInput()
     @State private var errorMessage: String?
+    @State private var parsedPoem = ParsedPoem(stanzas: [])
+    @State private var plannedCards: [PlannedPoemCard] = []
     @State private var isGenerating = false
+    @State private var textSession = PlainTextEditorSession()
+    @State private var dismissal = DraftDismissal()
     @State private var isPreviewing = false
 
     private let rootDecks: [DeckBuilderDeckOption]
@@ -60,6 +68,7 @@ public struct PoemDeckBuilderView: View {
                     Section("Preview") {
                         Text(lineSummary).font(.subheadline).foregroundStyle(.secondary)
                         Text(openingSummary).font(.caption).foregroundStyle(.secondary)
+                        LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(Array(plannedCards.enumerated()), id: \.offset) { index, card in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(card.isOpening ? "Card \(index + 1) · Opening line" : "Card \(index + 1)")
@@ -70,6 +79,7 @@ public struct PoemDeckBuilderView: View {
                                 Text(card.answer)
                             }
                         }
+                        }
                     }
                 } else {
                 Section {
@@ -79,20 +89,23 @@ public struct PoemDeckBuilderView: View {
                             Text(deck.name).tag(Optional(deck.id))
                         }
                     }
+                    .focused($focusedField, equals: .destination)
                     .accessibilityIdentifier("poemBuilderRootDeck")
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Author").font(.subheadline).foregroundStyle(.secondary)
                     TextField("Author", text: $input.author)
+                        .focused($focusedField, equals: .author)
                         .accessibilityIdentifier("poemBuilderAuthor")
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Title").font(.subheadline).foregroundStyle(.secondary)
                     TextField("Title", text: $input.title)
+                        .focused($focusedField, equals: .title)
                         .accessibilityIdentifier("poemBuilderTitle")
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Poem text").font(.subheadline).foregroundStyle(.secondary)
-                    TextEditor(text: $input.text)
+                    PlainTextEditor(text: $input.text, session: textSession, label: "Poem text", identifier: "poemBuilderText")
                         .font(.body)
                         .frame(minHeight: 220)
                         .accessibilityLabel("Poem text")
@@ -116,6 +129,7 @@ public struct PoemDeckBuilderView: View {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.red)
+                            .accessibilityFocused($errorFocused)
                             .accessibilityIdentifier("poemBuilderError")
                     }
                 }
@@ -127,7 +141,7 @@ public struct PoemDeckBuilderView: View {
 
             HStack {
                 Button("Cancel", role: .cancel) {
-                    onCancel()
+                    requestCancel()
                 }
                 .keyboardShortcut(.cancelAction)
 
@@ -162,19 +176,24 @@ public struct PoemDeckBuilderView: View {
             if isPreviewing { ToolbarItem(placement: .topBarLeading) { Button("Edit Text") { isPreviewing = false } } }
         }
         #endif
-        .interactiveDismissDisabled(isGenerating)
+        .protectDraft(isDirty: hasDraft, isBusy: isGenerating, dismissal: dismissal)
+        .onChange(of: input) { _, _ in errorMessage = nil }
+        .onChange(of: input.text, initial: true) { _, text in
+            parsedPoem = PoemDeckGenerator.parse(text)
+            refreshPlan()
+        }
+        .onChange(of: input.title) { _, _ in refreshPlan() }
     }
 
     private var lineSummary: String {
-        let poem = PoemDeckGenerator.parse(input.text)
-        let count = poem.lines.count
+        let count = parsedPoem.lines.count
         let cards = plannedCards.count
-        let stanzaCount = poem.stanzas.count
+        let stanzaCount = parsedPoem.stanzas.count
         return "\(count) lines · \(stanzaCount) \(stanzaCount == 1 ? "stanza" : "stanzas") · \(cards) cards"
     }
 
-    private var plannedCards: [PlannedPoemCard] {
-        PoemCardPlanner.cards(for: PoemDeckGenerator.parse(input.text), title: input.title)
+    private func refreshPlan() {
+        plannedCards = PoemCardPlanner.cards(for: parsedPoem, title: input.title)
     }
 
     private var openingSummary: String {
@@ -183,9 +202,37 @@ public struct PoemDeckBuilderView: View {
             : "Opening-line card omitted: the title already gives the first line."
     }
 
+    private var hasDraft: Bool {
+        !input.title.isEmpty || !input.author.isEmpty || !input.text.isEmpty
+    }
+
+    private func requestCancel() {
+        dismissal.request(isDirty: hasDraft, isBusy: isGenerating, action: onCancel)
+    }
+
     private func preview() {
-        guard PoemDeckGenerator.parse(input.text).lines.count >= 2 else {
+        guard input.destinationDeckID != nil else {
+            errorMessage = PoemDeckBuilderError.missingDestinationDeck.localizedDescription
+            focusedField = .destination
+            errorFocused = true
+            return
+        }
+        guard !input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = PoemDeckBuilderError.missingTitle.localizedDescription
+            focusedField = .title
+            errorFocused = true
+            return
+        }
+        guard !input.author.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = PoemDeckBuilderError.missingAuthor.localizedDescription
+            focusedField = .author
+            errorFocused = true
+            return
+        }
+        guard parsedPoem.lines.count >= 2 else {
             errorMessage = PoemDeckBuilderError.tooFewLines.localizedDescription
+            textSession.focus()
+            errorFocused = true
             return
         }
         errorMessage = nil

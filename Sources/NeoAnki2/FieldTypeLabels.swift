@@ -22,6 +22,7 @@ enum FieldTypeLabels {
         case .gif: "GIF"
         case .video: "Video"
         case .number: "Number"
+        case .imageOcclusion: "Image Occlusion"
         case .cloze: "Cloze"
         }
     }

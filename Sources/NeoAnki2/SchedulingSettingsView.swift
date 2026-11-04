@@ -1,5 +1,6 @@
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiTextEditing
 import SwiftUI
 
 struct SchedulingSettingsView: View {
@@ -7,6 +8,7 @@ struct SchedulingSettingsView: View {
     @Bindable var model: SchedulingModel
     let onSaved: () async -> Void
 
+    @State private var dismissal = DraftDismissal()
     @State private var rolloverTime: Date
 
     init(model: SchedulingModel, onSaved: @escaping () async -> Void) {
@@ -35,6 +37,7 @@ struct SchedulingSettingsView: View {
                         rolloverTime = Self.date(for: StudyDay.defaultRolloverMinutes)
                     }
                     .buttonStyle(.link)
+                    .disabled(model.isLoadingSettings || model.isSavingSettings)
                 } header: {
                     Text("Daily Rollover")
                 } footer: {
@@ -49,7 +52,10 @@ struct SchedulingSettingsView: View {
             .navigationTitle("Study Day Settings")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        dismissal.request(isDirty: pendingMinutes != model.rolloverMinutes, isBusy: model.isSavingSettings) { dismiss() }
+                    }
+                        .disabled(model.isSavingSettings)
                         .keyboardShortcut(.cancelAction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -62,18 +68,24 @@ struct SchedulingSettingsView: View {
                 }
             }
         }
+        .protectDraft(isDirty: pendingMinutes != model.rolloverMinutes, isBusy: model.isSavingSettings, dismissal: dismissal)
         .frame(minWidth: 500, idealWidth: 520, minHeight: 260)
         .onChange(of: model.rolloverMinutes) { _, minutes in
             rolloverTime = Self.date(for: minutes)
         }
     }
 
-    private func save() {
+    private var pendingMinutes: Int {
         let components = Calendar.autoupdatingCurrent.dateComponents(
             [.hour, .minute],
             from: rolloverTime
         )
-        let minutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        return (components.hour ?? 0) * 60 + (components.minute ?? 0)
+    }
+
+    private func save() {
+        guard !model.isSavingSettings else { return }
+        let minutes = pendingMinutes
         Task {
             if await model.saveRolloverMinutes(minutes) {
                 await onSaved()

@@ -34,6 +34,13 @@ The selected item type is fixed when the item is created. The current UI
 cannot change an existing item's type later. To use a different type, create a
 new item and delete the old one after checking the result.
 
+## Create image occlusion items
+
+Choose the **Image Occlusion** starter in Item Types, then create an item of
+that type. Its focused image editor supports drawing and grouping rectangular
+masks, both masking modes, and card previews. See [Image occlusion](content-and-media.md#image-occlusion)
+for the complete authoring workflow.
+
 ## Meet validation requirements
 
 Fields marked **(optional)** may be left empty. All other fields are required,

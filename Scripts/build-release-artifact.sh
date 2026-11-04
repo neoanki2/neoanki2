@@ -60,7 +60,7 @@ if [ "$installed_version" != "$VERSION" ]; then
 fi
 
 codesign --verify --deep --strict "$APP_PATH"
-lipo "$APP_PATH/Contents/MacOS/NeoAnki2" -verify_arch arm64 x86_64
+"$ROOT/Scripts/verify-universal-macos.sh" "$APP_PATH/Contents/MacOS/NeoAnki2"
 python3 "$ROOT/Scripts/sign-macos-app.py" --verify "$APP_PATH"
 ln -s /Applications "$PAYLOAD_DIR/Applications"
 

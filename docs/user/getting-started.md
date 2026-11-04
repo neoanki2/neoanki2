@@ -18,6 +18,7 @@ App Store or TestFlight download; see the [iPhone and iPad guide](../iphone-ipad
 The current package supports macOS 14 or newer and iOS 17 or newer, using Swift
 tools 6.0. These deployment targets are shared by release and source builds;
 platform installation and distribution still follow the separate paths below.
+Shared native text-editing and vocabulary modules do not raise those minimums.
 The Prose Deck builder is included in the same app targets; it adds no platform
 requirement.
 
@@ -153,6 +154,11 @@ The Add Item editor can use a locally installed vocabulary pack to fill text
 fields from a dictionary. This works in the same Mac, iPhone, and iPad builds
 and keeps the macOS 14 and iOS 17 requirements above. See
 [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+
+With private iCloud sync enabled, imported dictionary packs upload
+automatically. On another device, open **Vocabulary Packs** and choose when to
+download a pack; installed packs remain usable offline. Library sync and pack
+transfer are separate actions, and a device can use local study without either.
 
 ## Navigate the library
 

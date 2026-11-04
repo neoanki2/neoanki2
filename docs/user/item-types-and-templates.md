@@ -83,7 +83,8 @@ top-level **Save** or **Cancel** action when the whole definition is ready.
 For each field, set:
 
 - **Name:** nonblank and unique within the type, ignoring case.
-- **Type:** Text, Rich Text, Number, Audio, Image, GIF, Video, or Cloze.
+- **Type:** Text, Rich Text, Number, Audio, Image, Image Occlusion, GIF, Video,
+  or Cloze.
 - **Required:** whether every item must contain that value.
 
 Add, rename, change, or remove fields in the draft. Card setup removals are
@@ -157,6 +158,9 @@ menu offers recipes that apply to the current fields:
 - **Reverse** asks in the opposite direction.
 - **Type Answer** compares typed text before self-grading.
 - **Visual** uses compatible image, GIF, or video content and can be conditional.
+- **Image Occlusion** starts with an Image Occlusion field and creates one
+  setup for its mask groups; each generated card conceals the other groups
+  while testing one group.
 - **Cloze** conceals the current blank in a Cloze field.
 - **Audio Submission** saves one private spoken response on this device and
   completes without grading.
