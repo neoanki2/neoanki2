@@ -100,6 +100,20 @@ for command in gh git jq python3 swift; do
 done
 gh auth status >/dev/null
 
+gh_with_retry() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if "$@"; then
+      return 0
+    fi
+    if [ "$attempt" -eq 5 ]; then
+      return 1
+    fi
+    echo "GitHub CLI request failed; retrying in $((attempt * 2)) seconds..." >&2
+    sleep "$((attempt * 2))"
+  done
+}
+
 REPOSITORY="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 TRUSTED_WORKFLOW_REF="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 
@@ -272,16 +286,16 @@ wait_for_candidate_checks() {
 
   echo "Waiting for documentation and fast UI checks before candidate packaging..."
   while true; do
-    current_head="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
+    current_head="$(gh_with_retry gh pr view "$PR_NUMBER" --repo "$REPOSITORY" \
       --json headRefOid --jq .headRefOid)"
     if [ "$current_head" != "$HEAD_SHA" ]; then
       echo "PR #$PR_NUMBER moved from $HEAD_SHA to $current_head while waiting for candidate checks." >&2
       return 1
     fi
 
-    check_runs_json="$(gh api --paginate \
-      "repos/$REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" \
-      | jq -s '[.[].check_runs[]]')"
+    check_runs_pages="$(gh_with_retry gh api --paginate \
+      "repos/$REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100")"
+    check_runs_json="$(jq -s '[.[].check_runs[]]' <<<"$check_runs_pages")"
     missing=0
     pending=0
     for context in "${contexts[@]}"; do
