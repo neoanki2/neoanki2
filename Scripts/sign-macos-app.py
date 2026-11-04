@@ -164,6 +164,11 @@ def signing_keychain(material):
             run(["security", "import", str(p12), "-k", str(keychain), "-P", password, "-T", "/usr/bin/codesign"])
             run(["security", "import", str(material.directory / "DeveloperIDG2CA.cer"), "-k", str(keychain)])
             run(["security", "set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, str(keychain)])
+            # --keychain narrows identity lookup, but codesign still uses the
+            # user's search list to discover the signing certificate chain.
+            current = re.findall(r'"([^"]+)"', run(["security", "list-keychains", "-d", "user"]).decode())
+            if str(keychain) not in current:
+                run(["security", "list-keychains", "-d", "user", "-s", *current, str(keychain)])
             yield keychain, folder
         finally:
             # Preserve concurrent search-list changes, removing only our entry.
@@ -176,6 +181,15 @@ def signing_keychain(material):
                     if remaining != current:
                         run(["security", "list-keychains", "-d", "user", "-s", *remaining])
             print("MAC_SIGNING_CLEANUP=complete", flush=True)
+
+
+def check_identity(material):
+    with signing_keychain(material) as (keychain, _):
+        identities = run(["security", "find-identity", "-v", "-p", "codesigning", str(keychain)]).decode()
+        if material.identity not in identities:
+            details = run(["security", "find-identity", "-p", "codesigning", str(keychain)]).decode().strip()
+            raise SigningError("Developer ID identity is not available in the temporary signing Keychain: "
+                               + details[-1000:])
 
 
 def verify(app, require_notarization=True):
@@ -258,6 +272,7 @@ def main():
             material = Material(Path(os.environ.get("NEOANKI_SIGNING_DIR", DEFAULT_SIGNING)).expanduser(),
                                 require_notarization=not args.sign_only)
             if args.check:
+                check_identity(material)
                 print(f"MAC_SIGNING_INPUTS=ready; team {material.team}")
             elif args.app:
                 sign(args.app.resolve(), material, require_notarization=not args.sign_only)
