@@ -151,6 +151,14 @@ enum MobileItemTypeStudioUITestSeeder {
 #endif
 
 #if os(iOS)
+private enum MobileRedesignFixtureError: LocalizedError {
+    case attentionCardDidNotReachLapseThreshold
+
+    var errorDescription: String? {
+        "The repeated-forgetting fixture did not reach the attention threshold."
+    }
+}
+
 /// Real repository content for visual acceptance; gated by reset + scenario.
 enum MobileRedesignUITestSeeder {
     static func seedIfRequested(library: any LibraryRepository) async throws {
@@ -198,13 +206,19 @@ enum MobileRedesignUITestSeeder {
             _ = try await library.createItem(item)
             if let due = try await library.dueCards(scope: .deck(attentionDeck.id), asOf: .now).first {
                 // Exercise public grading enough times to cross the warning threshold.
-                let start = Date.now.addingTimeInterval(-33 * 86_400)
+                let start = Date.now
                 // Cross the leech threshold with room for scheduler phase
                 // transitions. Reviews use the public path just like a learner.
                 for day in 0..<20 {
-                    let instant = start.addingTimeInterval(Double(day) * 86_400)
+                    let instant = start.addingTimeInterval(Double(day) * 2)
                     _ = try await library.submitReview(cardID: due.id, rating: .easy, asOf: instant, durationMilliseconds: 1000)
                     _ = try await library.submitReview(cardID: due.id, rating: .again, asOf: instant.addingTimeInterval(1), durationMilliseconds: 1000)
+                }
+                let attentionItem = try await library.items(
+                    scope: .deck(attentionDeck.id), sort: .createdAscending, search: ""
+                ).first
+                guard attentionItem?.schedule?.needsAttention == true else {
+                    throw MobileRedesignFixtureError.attentionCardDidNotReachLapseThreshold
                 }
             }
         }
@@ -244,7 +258,8 @@ enum MobileRedesignUITestSeeder {
             .rich([Span("Formatted text", styles: [.bold])]), .cloze("A blank to edit", blanks: [ClozeSpan(group: 1, start: 2, length: 5)]),
             .media(authoringImage), .empty, .empty, .empty]
         _ = try await library.createItem(Item(itemTypeID: authoringType.id,
-            fields: zip(authoringFields, authoringValues).map { FieldValue(fieldID: $0.id, value: $1) }))
+            fields: zip(authoringFields, authoringValues).map { FieldValue(fieldID: $0.id, value: $1) },
+            deckID: root.id))
         let longDeck = try await library.createDeck(Deck(name: "Long Content", parentID: root.id))
         let basic = try await library.loadItemTypes().itemTypes.first { $0.name == "Basic" }
         if let basic {

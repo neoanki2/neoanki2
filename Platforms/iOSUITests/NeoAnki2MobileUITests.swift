@@ -1319,6 +1319,11 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(fixtures.waitUntilExists(timeout: 15)); fixtures.tap()
         XCTAssertTrue(app.navigationBars["Study Fixtures"].waitUntilExists(timeout: 5))
         capture("31-nested-decks", app)
+        let fixtureDeckList = app.collectionViews.firstMatch
+        XCTAssertTrue(fixtureDeckList.waitUntilExists(timeout: 5))
+        // A prior nested-deck visit can restore the list near its lower rows.
+        // Bring the concrete List to its first row before querying lazy cells.
+        for _ in 0..<8 { fixtureDeckList.swipeDown() }
         // Follow the visible deck list from top to bottom. Besides making the
         // journey match the user's navigation, this avoids relying on a lazy
         // List to materialize a far offscreen row in an arbitrary order.
