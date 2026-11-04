@@ -185,7 +185,8 @@ enum MobileRedesignUITestSeeder {
             }
             let type = ItemType(name: "Fixture \(interaction.rawValue)", fields: [front, back, visual], templates: [
                 Template(name: interaction.rawValue, layout: layout, components: components, interaction: interaction,
-                    skill: Skill(input: .text, output: interaction == .audioSubmission || interaction == .record ? .audio : .text, operation: interaction == .audioSubmission ? .explain : .recall))
+                    skill: Skill(input: .text, output: interaction == .audioSubmission || interaction == .record ? .audio : .text,
+                        operation: interaction == .audioSubmission ? .explain : interaction == .arrange ? .order : .recall))
             ])
             _ = try await library.createItemType(type)
             var fields = [FieldValue(fieldID: front.id, value: interaction == .cloze
