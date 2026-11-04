@@ -135,7 +135,7 @@ jobs:
       - name: Build once for all simulator destinations
         run: bash Scripts/build-ios-ui-tests.sh
       - name: Upload exact-revision UI build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ios-ui-build-${{ github.sha }}
           path: .build/ios-ui-artifact/
@@ -169,7 +169,7 @@ jobs:
         run: bash Scripts/run-ios-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ios-ui-${{ matrix.id }}
           path: .build/ios-ui-results/
@@ -188,7 +188,7 @@ jobs:
       - name: Build once for all functional shards
         run: bash Scripts/build-macos-ui-tests.sh
       - name: Upload exact-revision UI build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: macos-ui-build-${{ github.sha }}
           path: .build/macos-ui-artifact/
@@ -221,7 +221,7 @@ jobs:
         run: bash Scripts/run-ui-tests.sh
       - name: Upload UI diagnostics
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: macos-ui-${{ matrix.id }}
           path: .build/ui-results
