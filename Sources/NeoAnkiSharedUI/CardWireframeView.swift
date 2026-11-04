@@ -297,6 +297,10 @@ public struct CardWireframeDescriptor: Equatable, Identifiable, Sendable {
         components.enumerated().compactMap { index, component in
             let phase = revealPhase(for: component.purpose)
             guard answerRevealed || phase == .question else { return nil }
+            // Hidden explanations have no pre-answer content or useful
+            // placeholder. Reserving one row per field can obscure the task.
+            if !answerRevealed, component.purpose == .supporting,
+               component.presentation.reveal == .hiddenUntilAnswer { return nil }
             return CardWireframeRenderedComponent(
                 component: component,
                 hole: hole(for: component.region),
@@ -405,7 +409,19 @@ public struct CardWireframeView<ComponentView: View>: View {
     private var composition: some View {
         switch descriptor.geometry {
         case .focus:
-            centeredContent(spacing: 24)
+            if emptyHoleView == nil {
+                VStack(alignment: mobileReading ? .leading : .center, spacing: 16) {
+                    if sizingMode.fillsAvailableHeight { Spacer(minLength: 0) }
+                    ForEach(descriptor.renderedComponents(from: components, answerRevealed: isAnswerRevealed)) { rendered in
+                        componentView(rendered.component, rendered.hole)
+                            .font(font(for: rendered.hole))
+                            .frame(maxWidth: .infinity, alignment: mobileReading ? .leading : .center)
+                    }
+                    if sizingMode.fillsAvailableHeight { Spacer(minLength: 0) }
+                }
+            } else {
+                centeredContent(spacing: 24)
+            }
         case let .split(compactWidth):
             if mobileReading {
                 VStack(alignment: .leading, spacing: 24) { questionPanel; answerPanel }
