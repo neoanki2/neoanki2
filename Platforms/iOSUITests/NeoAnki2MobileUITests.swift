@@ -174,12 +174,16 @@ class NeoAnki2MobileUITestCase: XCTestCase {
                    content.descendants(matching: .any).matching(identifier: element.identifier).count > 0 {
                     usableContent = usableContent.intersection(content.frame)
                 }
-                if !acceptsPartialVisibility && frame.height <= usableContent.height {
-                    return usableContent.contains(frame)
-                }
             }
             if acceptsPartialVisibility {
                 return frame.intersects(usableContent)
+            }
+            // Native hit testing can accept a partly covered control. A control
+            // that fits must clear both navigation and the floating tab bar in
+            // full before a tap or audit. Taller scrolling rows keep a visible
+            // activation point because their full bounds cannot fit at once.
+            if frame.height <= usableContent.height {
+                return usableContent.contains(frame)
             }
             return usableContent.contains(CGPoint(x: frame.midX, y: frame.midY))
         }
@@ -1043,15 +1047,20 @@ final class MobileFirstScreenAccessibilityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.navigationBars["Library"].waitUntilExists(timeout: 5))
         let addFirstCard = app.buttons["Add First Item"]
         scrollTo(addFirstCard, in: app)
-        let emptyStateScroll = app.collectionViews.firstMatch
-        XCTAssertTrue(emptyStateScroll.waitUntilExists(timeout: 3))
-        for _ in 0..<3 where !addFirstCard.isHittable {
-            emptyStateScroll.swipeUp()
-        }
         XCTAssertTrue(addFirstCard.isHittable)
+        XCTAssertGreaterThanOrEqual(addFirstCard.frame.minY, app.navigationBars["Library"].frame.maxY)
+        let tabBar = app.tabBars.firstMatch
+        let window = app.windows.firstMatch.frame
+        let contentBottom = tabBar.exists && tabBar.isHittable && tabBar.frame.minY > window.midY
+            ? tabBar.frame.minY : window.maxY
+        XCTAssertLessThanOrEqual(addFirstCard.frame.maxY, contentBottom)
         try app.performAccessibilityAudit(
             for: [.contrast, .hitRegion, .sufficientElementDescription]
         ) { issue in
+            let diagnostic = XCTAttachment(string: "\(issue.auditType): \(issue.element?.debugDescription ?? "No element")")
+            diagnostic.name = "Audit failure element"
+            diagnostic.lifetime = .keepAlways
+            self.add(diagnostic)
             // SwiftUI owns the TabView/sidebar labels and reports them as contrast
             // failures in this simulated configuration. Keep all app-rendered content
             // audited.
