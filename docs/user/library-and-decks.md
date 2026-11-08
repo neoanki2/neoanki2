@@ -33,6 +33,11 @@ so the sidebar and the detail pane always agree.
 
 Selecting a scope opens its **scope home**, described below.
 
+Choose **Add Word** from a deck to capture vocabulary directly into that deck.
+From **All Decks**, capture restores the last destination and dictionary pair,
+or asks you to choose a destination on first use. Renaming a deck preserves its
+saved dictionary setup because the pairing uses the deck's stable identity.
+
 The app icon's due-count badge always uses **All Decks**, including Unassigned.
 It counts cards available to study, excluding suspended cards and new cards
 deferred by daily limits. Changing a deck's limit updates that total; selecting

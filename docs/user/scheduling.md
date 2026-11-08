@@ -22,6 +22,9 @@ and describe your recall:
 Each grade updates that card's memory state and appends a review outcome. A new
 or newly imported card starts never-reviewed and is due immediately. Portable
 and authored deck imports do not carry scheduling history.
+Words saved through **Add Word** follow these same rules: the selected item
+type generates the cards, and the destination deck's daily limits determine
+when new cards are available. Dictionary setup does not change scheduling.
 The separate [maturity status](../library-and-decks/#read-the-scope-home) uses
 spaced successful recalls and estimated stability to show when a card is in
 maintenance. It never changes FSRS intervals or the due queue.
