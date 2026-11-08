@@ -364,7 +364,9 @@ private struct HomeView: View {
                     DueNowCard(
                         title: "Ready to study",
                         summary: model.allDecksSummary,
-                        isWorking: model.isRefreshing || model.isStartingStudy,
+                        // Background count refreshes do not prevent study.
+                        // Only starting a session must disable this action.
+                        isWorking: model.isStartingStudy,
                         action: { startStudy(.allDecks) }
                     )
                     .listRowInsets(EdgeInsets())

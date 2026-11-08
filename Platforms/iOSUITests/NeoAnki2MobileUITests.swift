@@ -90,6 +90,28 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         basic.tap()
     }
 
+    func chooseNativeMenuOption(
+        _ label: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        // UIKit can expose an invalid activation point for a visible menu
+        // action. Resolve the actual popup row, validate its rendered bounds,
+        // and tap its measured center instead of XCTest's activation point.
+        let menu = app.collectionViews.containing(.button, identifier: label).firstMatch
+        let option = menu.buttons[label]
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            guard menu.exists, option.exists, option.isEnabled else { return false }
+            let frame = option.frame
+            return !frame.isEmpty && frame.minX.isFinite && frame.minY.isFinite
+                && frame.maxX.isFinite && frame.maxY.isFinite
+                && app.windows.firstMatch.frame.contains(frame)
+                && menu.frame.contains(frame)
+        }, "Menu option must have visible, finite bounds: \(label)", file: file, line: line)
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
     func scrollToAndTap(
         _ element: XCUIElement,
         in app: XCUIApplication,
@@ -741,7 +763,9 @@ final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
         scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
         XCTAssertFalse(app.buttons["Cloze"].exists)
         XCTAssertTrue(app.buttons["Reverse"].waitUntilExists(timeout: 3))
-        app.buttons["Reverse"].tap()
+        chooseNativeMenuOption("Reverse", in: app)
+        XCTAssertTrue(app.textFields["cardSetupEditor.name"].waitUntilExists(timeout: 5))
+        XCTAssertEqual(app.textFields["cardSetupEditor.name"].value as? String, "Reverse")
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
         scrollToAndTap(app.buttons["item-type-studio.add-field"], in: app)
@@ -760,12 +784,15 @@ final class MobileStudioLegacyUITests: NeoAnki2MobileUITestCase {
         let fieldType = fieldTypes.element(boundBy: fieldTypes.count - 1)
         scrollToAndTap(fieldType, in: app)
         XCTAssertTrue(app.buttons["Cloze"].waitUntilExists(timeout: 3))
-        app.buttons["Cloze"].tap()
+        chooseNativeMenuOption("Cloze", in: app)
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            fieldType.label.contains("Cloze") || (fieldType.value as? String)?.contains("Cloze") == true
+        })
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
         scrollToAndTap(app.buttons["itemTypeStudio.addCardSetupMenu"], in: app)
         XCTAssertTrue(app.buttons["Cloze"].waitUntilExists(timeout: 3))
-        app.buttons["Cloze"].tap()
+        chooseNativeMenuOption("Cloze", in: app)
         XCTAssertTrue(app.textFields["cardSetupEditor.name"].waitUntilExists(timeout: 5))
         XCTAssertEqual(app.textFields["cardSetupEditor.name"].value as? String, "Cloze")
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -1439,6 +1466,9 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
             let answer = app.textFields["add-card-field-back"]
             focusAuthoringField(answer, in: app); answer.typeText("Private practice answer")
             app.buttons["add-card-save"].tap()
+            allowBadgePermissionIfPresented()
+            XCTAssertTrue(app.navigationBars["New Item"].waitUntilGone(timeout: 5))
+            XCTAssertTrue(waitUntil(timeout: 5) { app.navigationBars["Create"].isHittable })
         }
         open("Library", in: app)
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First practice question")).firstMatch.tap()
@@ -1446,15 +1476,26 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         open("Settings", in: app); open("Library", in: app)
         XCTAssertTrue(app.navigationBars["Basic"].waitUntilExists(timeout: 5))
         XCUIDevice.shared.orientation = .landscapeRight
-        XCTAssertTrue(app.navigationBars["Basic"].waitUntilExists(timeout: 5))
-        XCTAssertTrue(waitUntil(timeout: 5) { app.windows.firstMatch.frame.width > app.windows.firstMatch.frame.height })
-        RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            let window = app.windows.firstMatch.frame
+            let detail = app.navigationBars["Basic"]
+            return window.width > window.height && detail.exists && detail.isHittable
+                && window.contains(detail.frame)
+        })
         capture("50-retained-item-detail-landscape", app)
         XCUIDevice.shared.orientation = .portrait
-        XCTAssertTrue(waitUntil(timeout: 5) { app.windows.firstMatch.frame.height > app.windows.firstMatch.frame.width })
-        RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            let window = app.windows.firstMatch.frame
+            let detail = app.navigationBars["Basic"]
+            return window.height > window.width && detail.exists && detail.isHittable
+                && window.contains(detail.frame)
+        })
         defer { XCUIDevice.shared.orientation = .portrait }
-        open("Home", in: app); app.buttons["Start Studying"].tap()
+        open("Home", in: app)
+        let startStudy = app.buttons["Start Studying"]
+        scrollTo(startStudy, in: app)
+        XCTAssertTrue(waitUntil(timeout: 5) { startStudy.isEnabled && startStudy.isHittable })
+        startStudy.tap()
         XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 10))
         let currentPrompt = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["First practice question", "Second practice question"])).firstMatch.label
         app.buttons["Show Answer"].tap(); app.buttons["Good"].tap()
@@ -1470,7 +1511,10 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         scrollTo(passFail, in: app)
         passFail.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         XCTAssertTrue(waitUntil(timeout: 3) { passFail.value as? String == "1" })
-        open("Home", in: app); app.buttons["Start Studying"].tap()
+        open("Home", in: app)
+        scrollTo(startStudy, in: app)
+        XCTAssertTrue(waitUntil(timeout: 5) { startStudy.isEnabled && startStudy.isHittable })
+        startStudy.tap()
         XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 10)); app.buttons["Show Answer"].tap()
         XCTAssertTrue(app.buttons["Fail"].isHittable); XCTAssertTrue(app.buttons["Pass"].isHittable)
         XCTAssertFalse(app.buttons["Good"].exists)

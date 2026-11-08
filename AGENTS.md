@@ -12,6 +12,15 @@
 Preserve unrelated working-tree changes. API changes must update the typed
 endpoint registry, tests, and generated `docs/api/` artifacts together.
 
+## GitHub check failures
+
+- Do not rerun an unchanged failed check to obtain a green result.
+- Diagnose the failure and fix the application, test, or workflow before a new
+  validation run. Replace timing assumptions with observable readiness and
+  deterministic fixtures; do not mask assertion failures with retries.
+- Harden a flaky check or remove it. Preserve meaningful coverage when possible
+  and report any coverage removed.
+
 ## Release workflow
 
 - A user request to `release` runs `./Scripts/release.sh` directly. The command
