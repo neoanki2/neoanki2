@@ -126,7 +126,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         func isReachable() -> Bool {
             guard element.exists, element.isHittable else { return false }
             let frame = element.frame
-            let navigationBars = app.navigationBars.allElementsBoundByIndex
+            let navigationBars = activeNavigationBars(in: app)
             if navigationBars.contains(where: { $0.frame.contains(frame) }) {
                 return true
             }
@@ -162,7 +162,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             return usableContent.contains(CGPoint(x: frame.midX, y: frame.midY))
         }
         let scrollingSurface = scrollingSurface(for: element, in: app)
-        let navigationBottom = app.navigationBars.allElementsBoundByIndex
+        let navigationBottom = activeNavigationBars(in: app)
             .map(\.frame.maxY)
             .max() ?? app.frame.minY
         let inferredDirection: MobileScrollDirection = if element.exists
@@ -206,7 +206,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             // the editor and the fully visible header separately below.
             var visible = app.windows.firstMatch.frame.intersection(scroll.frame)
             let bottom = isCapture ? min(visible.maxY, captureAdd.frame.minY - 8) : visible.maxY
-            let top = app.navigationBars.allElementsBoundByIndex.filter(\.isHittable)
+            let top = self.activeNavigationBars(in: app)
                 .map(\.frame.maxY).max() ?? visible.minY
             visible.origin.y = max(visible.minY, top)
             visible.size.height = max(0, bottom - visible.minY)
@@ -221,6 +221,17 @@ class NeoAnki2MobileUITestCase: XCTestCase {
     enum MobileScrollDirection: Equatable {
         case towardTop
         case towardBottom
+    }
+
+    private func activeNavigationBars(in app: XCUIApplication) -> [XCUIElement] {
+        // A sheet leaves Home's large-title bar in the accessibility tree.
+        // Its bottom can extend below the sheet's inline bar, falsely marking
+        // the visible capture header as occluded and provoking needless drags.
+        for title in ["Set Up This Pair", "Add Word"] {
+            let bar = app.navigationBars[title]
+            if bar.exists { return [bar] }
+        }
+        return app.navigationBars.allElementsBoundByIndex.filter(\.isHittable)
     }
 
     func scrollingSurface(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
@@ -1750,8 +1761,11 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.buttons["add-card-save"].tap()
         XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
         open("Home", in: app)
-        scrollToAndTap(app.staticTexts["Words"], in: app)
-        app.buttons["Browse Items"].tap()
+        let deck = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Words,")).firstMatch
+        scrollToAndTap(deck, in: app)
+        let browse = app.buttons["Browse Items"]
+        XCTAssertTrue(browse.waitUntilExists(timeout: 5))
+        browse.tap()
         let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "swift")).firstMatch
         XCTAssertTrue(item.waitUntilExists(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
