@@ -141,6 +141,12 @@ public final class LibraryFeatureModel {
         catch { loadState = .failed(errorMapper.map(error)) }
     }
 
+    /// A shared authoring workflow committed through the repository. Publish counts and schedule sync.
+    public func authoringDidCommit() async {
+        await refresh()
+        scheduleDebouncedSync()
+    }
+
     public func synchronize() async {
         guard syncEnabled else { return }
         await syncService.synchronize()

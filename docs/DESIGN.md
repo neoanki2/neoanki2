@@ -370,3 +370,18 @@ iPad keeps the same workflows with a sidebar and a centered reading column.
 - Builders progress from source to preview to import. Transfer and missing-pack states provide a useful next action. Settings and local recordings use native grouped sections.
 
 Verification uses disposable headless Simulators only. Cover actual destinations, answer concealment, compact/large phones, iPad, light/dark, largest Dynamic Type, contrast, reduced motion, rotation, keyboards, and long content. Physical-device media and signed CloudKit acceptance remain separate. Persisted formats and HTTP interfaces remain unchanged.
+
+## Quick vocabulary capture
+
+The capture sheet is an Operate surface: one stable word input, content choices
+only when needed, and one fixed Add action. On mobile the footer follows the
+keyboard safe area; on Mac it stays at the sheet bottom. Deck, dictionary, and
+card-setup controls remain compact above the input. Results and content scroll
+independently of those controls. At accessibility text sizes and in short
+landscape layouts, the header scrolls too so every control remains reachable. Required fields are visible; optional fields
+live under More details. Saving clears the draft and returns focus to the input.
+
+Field mapping belongs to the dictionary–deck pair and is configured separately
+from per-word edits. The ordinary capture path never asks for source/destination
+field wiring. System typography, semantic colors, native pickers, and 44-point
+touch targets preserve the app’s quiet native identity.

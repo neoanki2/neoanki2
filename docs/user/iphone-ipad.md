@@ -119,6 +119,12 @@ behavior with no controls or status surface. Maintenance runs locally after
 eligible sessions, sync, startup, or idle time; it never runs inline while a
 grade is saved.
 
+Use **Add Word** on Home, inside a deck, or in Create for quick vocabulary
+capture. Look up a word, set up the dictionary–deck pair once, and add the
+prepared item. Each pair remembers its item type, field mappings, and preferred
+content variants on this device. Add stays above the keyboard, and the flow
+stays open for the next word. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
+
 When adding an item with at least two Text or Rich Text fields, expand
 **Dictionary** to choose an installed vocabulary pack, a **Look up field**,
 and a distinct **Fill field**. A single exact match can fill the destination;

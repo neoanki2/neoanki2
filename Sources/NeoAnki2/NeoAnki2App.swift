@@ -483,6 +483,7 @@ private extension DeckBuilderRegistry {
         DeckBuilderRegistry([
             PoemDeckBuilderFeature.makeFeature(),
             ProseDeckBuilderFeature.makeFeature(),
+            VocabularyDeckBuilderFeature.makeFeature(),
         ])
     }
 }

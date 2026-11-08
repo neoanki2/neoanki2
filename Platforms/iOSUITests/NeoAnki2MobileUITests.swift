@@ -132,14 +132,30 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             }
             let contentTop = navigationBars.map(\.frame.maxY).max() ?? app.frame.minY
             let tabBar = app.tabBars.firstMatch
-            let contentBottom = tabBar.exists && tabBar.isHittable && tabBar.frame.minY > app.frame.midY
+            var contentBottom = tabBar.exists && tabBar.isHittable && tabBar.frame.minY > app.frame.midY
                 ? tabBar.frame.minY : app.frame.maxY
-            let usableContent = CGRect(
+            let captureAdd = app.buttons["word-capture-add"]
+            if captureAdd.exists && captureAdd.isHittable {
+                // Capture keeps Add above the keyboard. Scroll targets must be
+                // fully above that footer, including its 12-point top padding.
+                contentBottom = min(contentBottom, captureAdd.frame.minY - 12)
+            }
+            var usableContent = CGRect(
                 x: app.frame.minX,
                 y: contentTop,
                 width: app.frame.width,
                 height: max(0, contentBottom - bottomClearance - contentTop)
             )
+            if captureAdd.exists && captureAdd.isHittable {
+                let content = app.scrollViews["word-capture-content"]
+                if content.exists, !element.identifier.isEmpty,
+                   content.descendants(matching: .any).matching(identifier: element.identifier).count > 0 {
+                    usableContent = usableContent.intersection(content.frame)
+                }
+                if !acceptsPartialVisibility && frame.height <= usableContent.height {
+                    return usableContent.contains(frame)
+                }
+            }
             if acceptsPartialVisibility {
                 return frame.intersects(usableContent)
             }
@@ -173,9 +189,11 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             diagnostic.name = "Audit failure element"
             diagnostic.lifetime = .keepAlways
             self.add(diagnostic)
+            let captureAdd = app.buttons["word-capture-add"]
+            let isCapture = captureAdd.exists && captureAdd.isHittable
             guard issue.auditType == .contrast, let element = issue.element,
                   element.elementType == .staticText,
-                  ["Front", "Back", "Legacy Notes", "Preview", "Practice type: what do you remember?", "Paris", "Correct"].contains(element.label),
+                  (isCapture || ["Front", "Back", "Legacy Notes", "Preview", "Practice type: what do you remember?", "Paris", "Correct"].contains(element.label)),
                   let scroll = app.scrollViews.allElementsBoundByIndex.first(where: { scroll in
                       scroll.staticTexts.matching(NSPredicate(format: "label == %@", element.label))
                           .allElementsBoundByIndex.contains { $0.frame == element.frame }
@@ -184,9 +202,10 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             // XCTest samples identified fixture text outside its scrolling
             // viewport. Pixel contrast there is undefined. Re-audit the real
             // question after scrolling it into view; never exclude controls,
-            // horizontal overflow, or fully visible text.
+            // horizontal overflow, or fully visible text. Capture audits both
+            // the editor and the fully visible header separately below.
             var visible = app.windows.firstMatch.frame.intersection(scroll.frame)
-            let bottom = visible.maxY
+            let bottom = isCapture ? min(visible.maxY, captureAdd.frame.minY - 8) : visible.maxY
             let top = app.navigationBars.allElementsBoundByIndex.filter(\.isHittable)
                 .map(\.frame.maxY).max() ?? visible.minY
             visible.origin.y = max(visible.minY, top)
@@ -1800,6 +1819,125 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(item.waitUntilExists(timeout: 5)); item.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "НА\u{301}ЧИНКА")).firstMatch.waitUntilExists(timeout: 5))
         capture("68-ukrainian-stress-saved", app)
+    }
+
+    func testQuickWordCaptureRemembersPairAndSavesStressWithoutDefinition() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 30))
+        app.buttons["home-add-word"].tap()
+        let query = app.textFields["word-capture-query"]
+        XCTAssertTrue(query.waitUntilExists(timeout: 10))
+        app.buttons["word-capture-deck"].tap()
+        app.buttons["Наголоси"].tap()
+        query.tap(); query.typeText("начинка")
+        XCTAssertTrue(waitUntil(timeout: 10) { app.buttons["word-capture-setup"].isEnabled })
+        app.buttons["word-capture-setup"].tap()
+        app.buttons["word-capture-setup-type"].tap()
+        app.buttons["Наголос"].tap()
+        let source = app.buttons["word-capture-source-Форма з наголосом"]
+        scrollToAndTap(source, in: app)
+        app.buttons["Pronunciation text"].tap()
+        scrollToAndTap(app.buttons["word-capture-save-setup"], in: app)
+        let pronunciation = app.textFields["word-capture-field-Форма з наголосом"]
+        XCTAssertTrue(waitUntil(timeout: 10) { (pronunciation.value as? String) == "НА\u{301}ЧИНКА" })
+        let add = app.buttons["word-capture-add"]
+        XCTAssertFalse(add.isEnabled, "The existing phrase field remains required")
+        let phrase = app.textFields["word-capture-field-Фраза"]
+        scrollToAndTap(phrase, in: app)
+        phrase.typeText("Начинка для пирога.")
+        XCTAssertTrue(add.isHittable && add.isEnabled, "Add stays available above the keyboard")
+        capture("69-quick-word-ready", app)
+        add.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
+        XCTAssertTrue(query.exists)
+        XCTAssertTrue((query.value as? String) == "Type or paste a word" || (query.value as? String) == "")
+        capture("70-quick-word-added", app)
+        XCTAssertTrue(waitUntil(timeout: 5) { app.keyboards.firstMatch.exists && query.isEnabled })
+        app.typeText("начинка")
+        XCTAssertTrue(waitUntil(timeout: 10) { (pronunciation.value as? String) == "НА\u{301}ЧИНКА" })
+        app.buttons["word-capture-done"].tap()
+        app.buttons["Discard Changes"].tap()
+        XCTAssertTrue(app.buttons["home-add-word"].waitUntilExists(timeout: 5))
+        app.buttons["home-add-word"].tap()
+        XCTAssertTrue(query.waitUntilExists(timeout: 5))
+        let destination = app.buttons["word-capture-deck"]
+        XCTAssertTrue((destination.label + " " + (destination.value as? String ?? "")).contains("Наголоси"))
+        XCTAssertTrue((app.buttons["word-capture-setup"].value as? String) == "Наголос")
+        query.tap(); query.typeText("начинка")
+        XCTAssertTrue(waitUntil(timeout: 10) { (pronunciation.value as? String) == "НА\u{301}ЧИНКА" })
+        app.buttons["word-capture-done"].tap()
+        app.buttons["Discard Changes"].tap()
+    }
+
+    func testQuickWordCaptureGenericMeaningAndManualFallback() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 30))
+        open("Create", in: app)
+        app.buttons["create-add-word"].tap()
+        app.buttons["word-capture-deck"].tap(); app.buttons["Words"].tap()
+        let query = app.textFields["word-capture-query"]
+        query.tap(); query.typeText("swift")
+        app.buttons["word-capture-setup"].tap()
+        app.buttons["word-capture-setup-type"].tap(); app.buttons["Basic"].tap()
+        app.buttons["word-capture-save-setup"].tap()
+        let answer = app.textFields["word-capture-field-Back"]
+        XCTAssertTrue(waitUntil(timeout: 10) { (answer.value as? String) == "Moving quickly and smoothly." })
+        app.buttons["word-capture-add"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
+        query.tap(); query.typeText("notaword")
+        scrollToAndTap(app.buttons["word-capture-manual"], in: app)
+        if app.buttons["Hide Keyboard"].exists { app.buttons["Hide Keyboard"].tap() }
+        scrollToAndTap(answer, in: app); answer.typeText("My own definition")
+        XCTAssertTrue(app.buttons["word-capture-add"].isEnabled)
+        app.buttons["word-capture-add"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
+        app.buttons["word-capture-done"].tap()
+        open("Home", in: app)
+        scrollToAndTap(app.staticTexts["Words"], in: app)
+        app.buttons["deck-add-word"].tap()
+        XCTAssertTrue(waitUntil(timeout: 5) { (app.buttons["word-capture-setup"].value as? String) == "Basic" })
+        app.buttons["word-capture-done"].tap()
+    }
+
+    func testQuickWordCaptureLargestTypeKeepsContentAndAddReachable() throws {
+        let app = launchApp(additionalArguments: ["-NeoAnkiUITestingAccessibility"],
+                            environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 30))
+        scrollToAndTap(app.buttons["home-add-word"], in: app)
+        let hideKeyboard = app.buttons["Hide Keyboard"]
+        if hideKeyboard.waitUntilExists(timeout: 5) { hideKeyboard.tap() }
+        scrollToAndTap(app.buttons["word-capture-deck"], in: app)
+        app.buttons["Words"].tap()
+        let query = app.textFields["word-capture-query"]
+        scrollToAndTap(query, in: app); query.typeText("swift")
+        app.buttons["word-capture-setup"].tap()
+        scrollToAndTap(app.buttons["word-capture-setup-type"], in: app)
+        app.buttons["Basic"].tap()
+        app.buttons["word-capture-save-setup"].tap()
+        let answer = app.textFields["word-capture-field-Back"]
+        scrollTo(answer, in: app)
+        XCTAssertTrue(waitUntil(timeout: 10) { (answer.value as? String) == "Moving quickly and smoothly." })
+        let add = app.buttons["word-capture-add"]
+        XCTAssertTrue(add.isHittable && add.isEnabled)
+        XCTAssertGreaterThan(answer.frame.height, 40, "Capture must inherit the accessibility text size")
+        XCTAssertGreaterThanOrEqual(answer.frame.minY, app.navigationBars["Add Word"].frame.maxY)
+        XCTAssertLessThanOrEqual(answer.frame.maxY, add.frame.minY - 8)
+        capture("71-quick-word-largest-type", app)
+        try auditVisibleContent(in: app)
+        add.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
+        allowBadgePermissionIfPresented()
+        XCTAssertTrue(waitUntil(timeout: 5) { query.isEnabled })
+        XCTAssertTrue(hideKeyboard.waitUntilExists(timeout: 5), "Saving should refocus the word input")
+        hideKeyboard.tap()
+        scrollTo(app.buttons["word-capture-deck"], in: app, preferredDirection: .towardTop)
+        for control in [app.buttons["word-capture-deck"], app.buttons["word-capture-dictionary"], query] {
+            XCTAssertGreaterThanOrEqual(control.frame.minY, app.navigationBars["Add Word"].frame.maxY)
+            XCTAssertLessThanOrEqual(control.frame.maxY, add.frame.minY - 8)
+        }
+        capture("72-quick-word-largest-type-header", app)
+        try auditVisibleContent(in: app)
+        app.buttons["word-capture-done"].tap()
     }
 
     func testPhotoCanBeSelectedBeforeNameAndDescription() throws {

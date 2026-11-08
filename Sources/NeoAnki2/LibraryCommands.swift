@@ -54,9 +54,10 @@ struct LibraryCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
             .disabled(!(handlers?.canAddItem ?? false))
 
-            Button("Add from Vocabulary…") {
+            Button("Add Word…") {
                 handlers?.openAddFromVocabulary?()
             }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(!(handlers?.canAddFromVocabulary ?? false))
         }
 
