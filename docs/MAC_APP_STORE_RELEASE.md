@@ -73,3 +73,25 @@ Mac checks cannot be waived. No report may turn an unperformed check into a pass
 Report uploaded, submitted, Apple-approved, and publicly available states
 separately. Automatic release does not establish approval or storefront
 availability.
+
+## Hosted native review
+
+When local macOS XCTest cannot enable automation mode, the existing Release
+candidate workflow has an isolated `mac_store_review_tag` mode. It downloads a
+checksummed signed app from an unpublished draft release, checks out the exact
+internal candidate source, and runs the ordinary sandboxed journey on a fresh
+hosted Mac. No Apple signing key is provided to that job. The existing privileged
+packaging/attestation path is skipped in review mode.
+
+Use the stable `/tmp/neoanki2-mac-store-review/candidate` and
+`/tmp/neoanki2-mac-store-review/review` paths both locally and on the runner so
+retained receipts and xctestrun paths remain unchanged when results are downloaded.
+The runner configures an actual supported display mode and enters Full Screen
+through the standard keyboard command; screenshots retain the actual app pixels.
+
+The ordinary native journey also selects an external authored deck through the
+Open panel, verifies its image in study, exports through the Save panel and checks
+the package contents, cancels both panels, records and plays a real microphone
+response, verifies its persisted audio after restart, and enables the local API
+through Settings to check actual loopback health, authentication, and shutdown.
+These checks run after the five listing captures and never seed app storage.

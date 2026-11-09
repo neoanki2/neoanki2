@@ -49,7 +49,8 @@ def main():
     mac.run(["xcodebuild", "build-for-testing", "-quiet", "-project", str(mac.ROOT / "UITests/NeoAnki2UITests.xcodeproj"),
              "-scheme", "NeoAnki2UITests", "-testPlan", "FastFunctional", "-destination", "platform=macOS,arch=arm64",
              "-derivedDataPath", str(derived), "CODE_SIGN_IDENTITY=-", "CODE_SIGNING_ALLOWED=YES",
-             "CODE_SIGNING_REQUIRED=YES", "NEOANKI_UI_APP_PATH=" + str(app)], timeout=1200, log=output / "build.log")
+             "CODE_SIGNING_REQUIRED=YES", "SYMROOT=" + str(derived / "Build/Products"),
+             "NEOANKI_UI_APP_PATH=" + str(app)], timeout=1200, log=output / "build.log")
     runs = list((derived / "Build/Products").glob("*.xctestrun"))
     if len(runs) != 1: raise mac.ReleaseError("Expected one macOS review xctestrun")
     data = plistlib.loads(runs[0].read_bytes())

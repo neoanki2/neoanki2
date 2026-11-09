@@ -13,6 +13,15 @@ on:
         required: true
         type: string
 
+      mac_store_review_tag:
+        description: Optional private draft release containing the signed native Store review bundle
+        required: false
+        type: string
+      mac_store_review_sha256:
+        description: SHA-256 of native-mac-store-review.zip
+        required: false
+        type: string
+
 permissions:
   contents: read
 
@@ -31,7 +40,7 @@ concurrency:
 jobs:
   package:
     name: Build candidate
-    if: github.ref_name == github.event.repository.default_branch
+    if: github.ref_name == github.event.repository.default_branch && inputs.mac_store_review_tag == ''
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -247,3 +256,83 @@ jobs:
         run: |
           chmod +x Scripts/publish-release-candidate.sh
           ./Scripts/publish-release-candidate.sh .build/release-candidate
+
+
+  mac-store-review:
+    name: Review exact signed native Mac Store candidate
+    if: inputs.mac_store_review_tag != ''
+    runs-on: macos-26
+    timeout-minutes: 35
+    permissions:
+      # Draft release assets are visible only with repository push access.
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Validate the internal source and private review bundle request
+        env:
+          EXPECTED_PR: ${{ inputs.pr }}
+          EXPECTED_HEAD: ${{ inputs.head }}
+          REVIEW_TAG: ${{ inputs.mac_store_review_tag }}
+          REVIEW_SHA256: ${{ inputs.mac_store_review_sha256 }}
+        run: |
+          [[ "$EXPECTED_PR" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REVIEW_TAG" =~ ^mac-store-review-[0-9a-f]{12}-b[1-9][0-9]*$ ]]
+          [[ "$REVIEW_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          current_head=$(gh pr view "$EXPECTED_PR" --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid,isCrossRepository,baseRefName | \
+            jq -er --arg base "${{ github.event.repository.default_branch }}" \
+              'select(.isCrossRepository == false and .baseRefName == $base) | .headRefOid')
+          gh api "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_HEAD...$current_head" \
+            | jq -e '.status == "ahead" or .status == "identical"'
+          gh release view "$REVIEW_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,targetCommitish | \
+            jq -e --arg head "$EXPECTED_HEAD" '.isDraft == true and .targetCommitish == $head'
+      - name: Check out the exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download and verify the signed candidate without signing keys
+        env:
+          REVIEW_TAG: ${{ inputs.mac_store_review_tag }}
+          REVIEW_SHA256: ${{ inputs.mac_store_review_sha256 }}
+        run: |
+          mkdir -p /tmp/neoanki2-mac-store-review
+          gh release download "$REVIEW_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern native-mac-store-review.zip --dir /tmp/neoanki2-mac-store-review
+          printf '%s  %s\n' "$REVIEW_SHA256" /tmp/neoanki2-mac-store-review/native-mac-store-review.zip | shasum -a 256 -c -
+          ditto -x -k /tmp/neoanki2-mac-store-review/native-mac-store-review.zip /tmp/neoanki2-mac-store-review
+      - name: Configure an actual App Store screenshot display mode
+        run: |
+          swift - <<'SWIFT'
+          import CoreGraphics
+          import Foundation
+          let display = CGMainDisplayID()
+          let accepted = Set(["1280x800", "1440x900", "2560x1600", "2880x1800"])
+          let options = [kCGDisplayShowDuplicateLowResolutionModes as String: true] as CFDictionary
+          let modes = (CGDisplayCopyAllDisplayModes(display, options) as? [CGDisplayMode] ?? []).filter {
+              $0.width >= 1280 && $0.height >= 800 && accepted.contains("\($0.pixelWidth)x\($0.pixelHeight)")
+          }.sorted {
+              if $0.width * $0.height != $1.width * $1.height { return $0.width * $0.height < $1.width * $1.height }
+              return $0.pixelWidth > $1.pixelWidth
+          }
+          guard let mode = modes.first else { fatalError("No App Store screenshot display mode is available") }
+          guard CGDisplaySetDisplayMode(display, mode, nil) == .success else { fatalError("Could not set the review display mode") }
+          print("MACOS_STORE_REVIEW_DISPLAY=\(mode.width)x\(mode.height) pixels=\(mode.pixelWidth)x\(mode.pixelHeight)")
+          SWIFT
+      - name: Run the ordinary sandboxed first-launch journey
+        run: |
+          env -u GH_TOKEN -u GITHUB_TOKEN -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            python3 Scripts/review-macos-app.py \
+            --candidate /tmp/neoanki2-mac-store-review/candidate \
+            --output /tmp/neoanki2-mac-store-review/review
+      - name: Retain original UI results, executable checksums, configuration, and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-mac-store-review-${{ inputs.head }}
+          path: /tmp/neoanki2-mac-store-review/review/
+          if-no-files-found: error
+          retention-days: 14
