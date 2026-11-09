@@ -114,6 +114,13 @@ section accessibility audits, shared model tests, and Mac Studio checks. Do not
 rerun an unchanged failed check to obtain green: correct its cause or remove it,
 and record any coverage loss.
 
+The largest-type study journey retains keyboard, grading, rotation, hit-region,
+and description checks on both devices, plus contrast on iPad. Its phone pixel
+contrast audit was removed after a Springboard Apple Intelligence banner covered
+the native navigation title during sampling. Other phone first-screen and
+authoring contrast audits remain required; this study journey no longer samples
+phone contrast.
+
 Each shared build and UI shard writes its elapsed time to the Actions step
 summary. When adding coverage, rebalance existing shards before adding another
 macOS job: standard GitHub-hosted plans allow only five concurrent macOS jobs,
