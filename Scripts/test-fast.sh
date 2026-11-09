@@ -55,6 +55,7 @@ python3 "$ROOT/Scripts/test-ios-runtime-selection.py"
 
 echo "==> iOS UI infrastructure retry policy"
 python3 "$ROOT/Scripts/test-ios-ui-retry.py"
+python3 "$ROOT/Scripts/test-ios-ui-runner.py"
 
 echo "==> iOS background refresh executor isolation"
 python3 "$ROOT/Scripts/test-ios-background-refresh.py"

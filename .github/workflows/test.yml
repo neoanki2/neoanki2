@@ -39,6 +39,7 @@ jobs:
         run: |
           bash -n Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh
+          python3 Scripts/test-ios-ui-runner.py
           python3 Scripts/test-ios-ui-retry.py
           python3 Scripts/test-ios-runtime-selection.py
           python3 Scripts/test-ios-test-services.py
