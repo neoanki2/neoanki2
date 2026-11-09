@@ -21,6 +21,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_ID = "com.neoanki2.ios"
@@ -69,6 +70,46 @@ def digest(path):
 
 def json_digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def validate_privacy_data(data, scope, required):
+    try:
+        manifest = plistlib.loads(data)
+    except (ValueError, plistlib.InvalidFileException) as error:
+        raise ReleaseError("Invalid " + scope + " privacy manifest") from error
+    reasons = {item.get("NSPrivacyAccessedAPIType"): set(item.get("NSPrivacyAccessedAPITypeReasons", []))
+               for item in manifest.get("NSPrivacyAccessedAPITypes", [])}
+    for category, values in required.items():
+        if not values <= reasons.get(category, set()):
+            raise ReleaseError(scope + " privacy manifest lacks required reasons for " + category)
+    if manifest.get("NSPrivacyTracking") is not False or manifest.get("NSPrivacyCollectedDataTypes") != []:
+        raise ReleaseError(scope + " privacy manifest differs from the no-tracking/no-collection declaration")
+
+
+def validate_ios_privacy_data(data, scope):
+    required = {"NSPrivacyAccessedAPICategoryUserDefaults": {"1C8F.1"} | ({"CA92.1"} if scope == "app" else set())}
+    if scope == "app":
+        required["NSPrivacyAccessedAPICategoryFileTimestamp"] = {"C617.1", "3B52.1"}
+    validate_privacy_data(data, scope, required)
+
+
+def validate_ios_archive_privacy(app):
+    for scope, path in [("app", app / "PrivacyInfo.xcprivacy"),
+                        ("widget", app / "PlugIns/NeoAnki2Widget.appex/PrivacyInfo.xcprivacy")]:
+        if not path.is_file():
+            raise ReleaseError("Missing " + scope + " privacy manifest in the actual archive")
+        validate_ios_privacy_data(path.read_bytes(), scope)
+
+
+def validate_ios_package_privacy(ipa):
+    with zipfile.ZipFile(ipa) as package:
+        for scope, path in [("app", "Payload/NeoAnki2.app/PrivacyInfo.xcprivacy"),
+                            ("widget", "Payload/NeoAnki2.app/PlugIns/NeoAnki2Widget.appex/PrivacyInfo.xcprivacy")]:
+            try:
+                data = package.read(path)
+            except KeyError as error:
+                raise ReleaseError("Missing " + scope + " privacy manifest in the actual exported IPA") from error
+            validate_ios_privacy_data(data, scope)
 
 
 def production_input(path):
@@ -666,6 +707,7 @@ class Workflow:
         app = archive / "Products/Applications/NeoAnki2.app"
         saved = self.state["phases"].get("archive")
         if saved and app.exists() and digest(app / "NeoAnki2") == saved["executable_sha256"]:
+            validate_ios_archive_privacy(app)
             return
         self.mark("archive")
         if archive.exists():
@@ -681,6 +723,7 @@ class Workflow:
             if (info["CFBundleIdentifier"], info["CFBundleShortVersionString"], info["CFBundleVersion"]) != (
                     bundle, self.state["version"], self.state["build"]):
                 raise ReleaseError("Archived app/widget identity does not match the release")
+        validate_ios_archive_privacy(app)
         self.verify_source()
         self.state["phases"]["archive"] = {"executable_sha256": digest(app / "NeoAnki2"),
                                               "xcode": run(["xcodebuild", "-version"]).decode().strip()}
@@ -746,6 +789,7 @@ class Workflow:
         ipa = self.output / "export/NeoAnki2.ipa"
         saved = self.state["phases"].get("export")
         if saved and ipa.exists() and digest(ipa) == saved["ipa_sha256"]:
+            validate_ios_package_privacy(ipa)
             return ipa
         profiles, cert = self.profiles()
         identity = hashlib.sha1(cert).hexdigest().upper()
@@ -784,6 +828,7 @@ class Workflow:
         if not ipa.exists():
             raise ReleaseError("Xcode did not export NeoAnki2.ipa")
         self.verify_source()
+        validate_ios_package_privacy(ipa)
         self.state["phases"]["export"] = {"ipa_sha256": digest(ipa), "temporary_signing_cleaned": True}
         self.save()
         return ipa

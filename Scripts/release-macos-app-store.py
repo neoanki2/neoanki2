@@ -22,6 +22,9 @@ import urllib.error
 SPEC = importlib.util.spec_from_file_location("ios_store_release", Path(__file__).with_name("release-ios.py"))
 release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release)
+TF_SPEC = importlib.util.spec_from_file_location("mac_testflight", Path(__file__).with_name("validate-macos-testflight.py"))
+testflight = importlib.util.module_from_spec(TF_SPEC)
+TF_SPEC.loader.exec_module(testflight)
 ROOT, SIGNING, TEAM, APP_ID = release.ROOT, release.SIGNING, release.TEAM, release.APP_ID
 ReleaseError, run, digest = release.ReleaseError, release.run, release.digest
 SCOPES = {
@@ -66,6 +69,16 @@ def validate_profile(profile, certificate, now=None):
     if kvstore not in (TEAM + ".*", result["com.apple.developer.ubiquity-kvstore-identifier"]):
         raise ReleaseError("Mac App Store profile does not authorize the shared iCloud key-value store")
     return result
+
+
+def validate_mac_privacy(app):
+    path = app / "Contents/Resources/PrivacyInfo.xcprivacy"
+    if not path.is_file():
+        raise ReleaseError("Mac archive lacks its privacy manifest")
+    release.validate_privacy_data(path.read_bytes(), "Mac app", {
+        "NSPrivacyAccessedAPICategoryUserDefaults": {"CA92.1"},
+        "NSPrivacyAccessedAPICategoryFileTimestamp": {"C617.1", "3B52.1"},
+    })
 
 
 def validate_internal_review(review, context, output):
@@ -113,9 +126,17 @@ def validate_internal_review(review, context, output):
                     or PRODUCTION_TEST not in identifiers):
                 raise ReleaseError("Mac production review requires an ordinary sandboxed optimized first launch")
             executable = release.checked_evidence(proof.get("executable"), proof_path.parent)
-            if digest(executable) != context.get("mac_executable_sha256"):
-                raise ReleaseError("Mac review executable differs from the exported candidate")
+            if not proof.get("testflight_identity"):
+                raise ReleaseError("Mac review executable differs from an authenticated Apple TestFlight candidate")
             app = executable.parent.parent.parent
+            exported = release.checked_evidence(context.get("mac_exported_executable"), output)
+            if digest(exported) != context.get("mac_executable_sha256"):
+                raise ReleaseError("Retained Mac distribution executable changed")
+            expected = {key: context[key] for key in
+                        ("version", "build", "source_revision", "source_sha256", "build_id")}
+            identity = testflight.validate_testflight_app(app, exported.parent.parent.parent, expected)
+            if proof["testflight_identity"] != identity:
+                raise ReleaseError("Mac TestFlight identity differs from the app actually reviewed")
             info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
             if (info.get("CFBundleIdentifier"), info.get("CFBundleShortVersionString"), info.get("CFBundleVersion")) != (
                     APP_ID, context["version"], context["build"]):
@@ -197,6 +218,7 @@ class Workflow(release.Workflow):
         binary = app / "Contents/MacOS/NeoAnki2"
         saved = self.state["phases"].get("archive", {})
         if binary.is_file() and saved.get("executable_sha256") == digest(binary):
+            validate_mac_privacy(app)
             return
         if archive.exists():
             raise ReleaseError("Incomplete Mac archive exists; preserve it and use a new output directory")
@@ -216,6 +238,7 @@ class Workflow(release.Workflow):
         if (not info.get("LSApplicationCategoryType") or not info.get("NSHumanReadableCopyright")
                 or not (app / "Contents/Resources/PrivacyInfo.xcprivacy").is_file()):
             raise ReleaseError("Mac archive lacks its category, copyright or privacy manifest")
+        validate_mac_privacy(app)
         arches = run(["lipo", "-archs", str(binary)]).decode().split()
         if set(arches) != {"arm64", "x86_64"}:
             raise ReleaseError("Mac archive must contain both arm64 and x86_64")
@@ -346,7 +369,9 @@ class Workflow(release.Workflow):
         if not executable.is_file() or digest(executable) != expected:
             raise ReleaseError("Retained Mac executable differs from the exported candidate")
         context.update(platform=self.platform, app_source_sha256=application_source(),
-                       binary_source_sha256=application_source(), mac_executable_sha256=expected)
+                       binary_source_sha256=application_source(), mac_executable_sha256=expected,
+                       source_revision=self.state["source_revision"],
+                       mac_exported_executable={"path": str(executable), "sha256": expected})
         return context
 
     def validate_review(self, review, context):
@@ -394,7 +419,7 @@ def main():
                                "VERSION": flow.state["version"], "BUILD": flow.state["build"],
                                "ELAPSED_SECONDS": f"{time.monotonic() - started:.1f}"}.items():
                 print(f"MACOS_APP_STORE_{key}={value}")
-        except (ReleaseError, release.SIGNER.DeploymentError, OSError, ValueError, KeyError, urllib.error.URLError, KeyboardInterrupt) as error:
+        except (ReleaseError, RuntimeError, release.SIGNER.DeploymentError, OSError, ValueError, KeyError, urllib.error.URLError, KeyboardInterrupt) as error:
             print("MACOS_APP_STORE_BLOCKED_PHASE=" + (flow.phase if flow else "preflight"))
             print("MACOS_APP_STORE_ERROR=" + ("Interrupted" if isinstance(error, KeyboardInterrupt) else str(error)))
             if flow: print("MACOS_APP_STORE_RECEIPT=" + str(flow.receipt))

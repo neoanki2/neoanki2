@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 HERE = Path(__file__).resolve().parent
 
@@ -87,9 +87,13 @@ class ReadinessTests(unittest.TestCase):
     def test_timeout_retains_partial_output_and_unpassed_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
             recorder = readiness.CommandRecorder(temporary)
-            with patch.object(readiness.subprocess, "run", side_effect=subprocess.TimeoutExpired(["simctl"], 20, b"partial stdout", b"partial stderr")):
+            process = Mock(pid=98765)
+            process.communicate.side_effect = [subprocess.TimeoutExpired(["simctl"], 20), ("partial stdout", "partial stderr")]
+            with patch.object(readiness.subprocess, "Popen", return_value=process) as popen, patch.object(readiness.os, "killpg") as kill_group:
                 with self.assertRaises(RuntimeError):
                     recorder.run(["simctl"], check=True)
+                self.assertTrue(popen.call_args.kwargs["start_new_session"])
+                kill_group.assert_called_once_with(98765, readiness.signal.SIGTERM)
             receipt = json.loads((Path(temporary) / "receipt.json").read_text())
             entry = receipt["commands"][0]
             self.assertTrue(entry["timed_out"])

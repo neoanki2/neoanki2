@@ -19,6 +19,7 @@
 		A1000000000000000000000C /* NeoAnki2Widget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = C10000000000000000000021; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A1000000000000000000000D /* NeoAnki2MobileUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000014; };
 		A1000000000000000000000E /* NeoAnkiMobile in UI Test Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000001; };
+		A1000000000000000000000F /* Widget PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000015; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,6 +46,7 @@
 		C10000000000000000000020 /* NeoAnki2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeoAnki2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C10000000000000000000021 /* NeoAnki2Widget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NeoAnki2Widget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C10000000000000000000022 /* NeoAnki2MobileUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NeoAnki2MobileUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C10000000000000000000015 /* Widget PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = ../Platforms/iOSWidget/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,14 +58,14 @@
 /* Begin PBXGroup section */
 		C10000000000000000000030 = {isa = PBXGroup; children = (C10000000000000000000031, C10000000000000000000032, C10000000000000000000034, C10000000000000000000033, ); sourceTree = "<group>"; };
 		C10000000000000000000031 /* iOS App */ = {isa = PBXGroup; children = (C10000000000000000000001, C10000000000000000000002, C10000000000000000000003, C10000000000000000000004, C10000000000000000000005, C10000000000000000000006, C10000000000000000000007, ); name = "iOS App"; sourceTree = "<group>"; };
-		C10000000000000000000032 /* Widget */ = {isa = PBXGroup; children = (C10000000000000000000011, C10000000000000000000012, C10000000000000000000013, ); name = Widget; sourceTree = "<group>"; };
+		C10000000000000000000032 /* Widget */ = {isa = PBXGroup; children = (C10000000000000000000011, C10000000000000000000012, C10000000000000000000013, C10000000000000000000015, ); name = Widget; sourceTree = "<group>"; };
 		C10000000000000000000033 /* Products */ = {isa = PBXGroup; children = (C10000000000000000000020, C10000000000000000000021, C10000000000000000000022, ); name = Products; sourceTree = "<group>"; };
 		C10000000000000000000034 /* iOS UI Tests */ = {isa = PBXGroup; children = (C10000000000000000000014, ); name = "iOS UI Tests"; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 		E10000000000000000000002 /* NeoAnkiiOS */ = {isa = PBXNativeTarget; buildConfigurationList = E10000000000000000000012; buildPhases = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000005, ); buildRules = (); dependencies = (D10000000000000000000002, ); name = NeoAnkiiOS; packageProductDependencies = (F10000000000000000000001, F10000000000000000000002, F10000000000000000000003, F10000000000000000000004, ); productName = NeoAnki2; productReference = C10000000000000000000020; productType = "com.apple.product-type.application"; };
-		E10000000000000000000003 /* NeoAnki2Widget */ = {isa = PBXNativeTarget; buildConfigurationList = E10000000000000000000013; buildPhases = (B10000000000000000000011, B10000000000000000000012, ); buildRules = (); dependencies = (); name = NeoAnki2Widget; packageProductDependencies = (); productName = NeoAnki2Widget; productReference = C10000000000000000000021; productType = "com.apple.product-type.app-extension"; };
+		E10000000000000000000003 /* NeoAnki2Widget */ = {isa = PBXNativeTarget; buildConfigurationList = E10000000000000000000013; buildPhases = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, ); buildRules = (); dependencies = (); name = NeoAnki2Widget; packageProductDependencies = (); productName = NeoAnki2Widget; productReference = C10000000000000000000021; productType = "com.apple.product-type.app-extension"; };
 		E10000000000000000000004 /* NeoAnki2MobileUITests */ = {isa = PBXNativeTarget; buildConfigurationList = E10000000000000000000014; buildPhases = (B10000000000000000000021, B10000000000000000000022, ); buildRules = (); dependencies = (D10000000000000000000004, ); name = NeoAnki2MobileUITests; packageProductDependencies = (F10000000000000000000001, ); productName = NeoAnki2MobileUITests; productReference = C10000000000000000000022; productType = "com.apple.product-type.bundle.ui-testing"; };
 /* End PBXNativeTarget section */
 
@@ -73,6 +75,7 @@
 
 /* Begin PBXResourcesBuildPhase section */
 		B10000000000000000000003 /* App Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000004, A10000000000000000000005, ); runOnlyForDeploymentPostprocessing = 0; };
+		B10000000000000000000013 /* Widget Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A1000000000000000000000F, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */

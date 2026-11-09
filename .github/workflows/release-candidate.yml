@@ -264,7 +264,7 @@ jobs:
 
 
   mac-store-review:
-    name: Review exact signed native Mac Store candidate
+    name: Review Apple TestFlight native Mac Store candidate
     if: inputs.mac_store_review_tag != '' && inputs.ios_service_probe != true
     runs-on: macos-26
     timeout-minutes: 35
@@ -325,6 +325,7 @@ jobs:
             /tmp/neoanki2-mac-store-review/environment/review-display \
             python3 Scripts/review-macos-app.py \
             --candidate /tmp/neoanki2-mac-store-review/candidate \
+            --installed-app /tmp/neoanki2-mac-store-review/candidate/testflight/NeoAnki2.app \
             --output /tmp/neoanki2-mac-store-review/review 2>&1 | \
             tee /tmp/neoanki2-mac-store-review/environment/display.log
       - name: Retain original UI results, executable checksums, configuration, and screenshots
@@ -333,7 +334,12 @@ jobs:
         with:
           name: native-mac-store-review-${{ inputs.head }}
           path: |
-            /tmp/neoanki2-mac-store-review/review/
+            /tmp/neoanki2-mac-store-review/review/review.json
+            /tmp/neoanki2-mac-store-review/review/build.log
+            /tmp/neoanki2-mac-store-review/review/test.log
+            /tmp/neoanki2-mac-store-review/review/review.xcresult/
+            /tmp/neoanki2-mac-store-review/review/attachments/
+            /tmp/neoanki2-mac-store-review/review/derived-data/Build/Products/
             /tmp/neoanki2-mac-store-review/environment/
           if-no-files-found: error
           retention-days: 14

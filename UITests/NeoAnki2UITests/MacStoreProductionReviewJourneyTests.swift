@@ -16,16 +16,37 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         runningApp = app
         defer { app.terminate() }
         app.launch()
+        guard app.wait(for: .runningForeground, timeout: 10) else {
+            XCTFail("The Apple-installed Store app failed its ordinary launch")
+            return
+        }
         waitForLibraryReady(in: app)
         assertEmptyLibrary(in: app)
-        // Use the ordinary Full Screen command on a Store-sized display. This
-        // changes window presentation without injecting app configuration.
-        app.typeKey("f", modifierFlags: [.control, .command])
-        let display = try XCTUnwrap(NSScreen.main).frame
-        XCTAssertTrue(waitUntil(timeout: 10) {
-            let frame = app.windows.firstMatch.frame
-            return frame.width >= display.width - 2 && frame.height >= display.height - 2
-        }, "The native app must enter Full Screen before Store screenshots")
+        // Resize through the ordinary window chrome on a large screen. This
+        // yields a native 1440x900 (or Retina 2880x1800) Store capture without
+        // resampling pixels or changing the user's display preferences.
+        let display = try XCTUnwrap(NSScreen.main).visibleFrame
+        let window = app.windows.firstMatch
+        if display.width >= 1500 && display.height >= 950 {
+            let origin = window.frame.origin
+            let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+                .withOffset(CGVector(dx: -3, dy: -3))
+            let destination = window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: 1437, dy: 897))
+            corner.press(forDuration: 0.1, thenDragTo: destination)
+            XCTAssertTrue(waitUntil(timeout: 10) {
+                let frame = window.frame
+                return abs(frame.width - 1440) < 1 && abs(frame.height - 900) < 1
+                    && frame.origin == origin
+            }, "The review window must have native Store screenshot dimensions")
+        } else {
+            app.typeKey("f", modifierFlags: [.control, .command])
+            let screen = try XCTUnwrap(NSScreen.main).frame
+            XCTAssertTrue(waitUntil(timeout: 10) {
+                let frame = window.frame
+                return frame.width >= screen.width - 2 && frame.height >= screen.height - 2
+            }, "The native app must enter Full Screen on a Store-sized display")
+        }
         XCTAssertTrue(app.descendants(matching: .any)["emptyLibraryState"].waitUntilExists(timeout: 5),
                       "A fresh Store container must contain no study items")
         storeCapture("01-native-mac-first-launch", app)

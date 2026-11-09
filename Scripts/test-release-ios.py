@@ -9,6 +9,7 @@ import plistlib
 import subprocess
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location("ios_release", Path(__file__).with_name("release-ios.py"))
@@ -17,6 +18,32 @@ SPEC.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_actual_ipa_requires_app_group_and_widget_privacy_manifests(self):
+        app = plistlib.loads((release.ROOT / "Platforms/iOS/PrivacyInfo.xcprivacy").read_bytes())
+        widget = plistlib.loads((release.ROOT / "Platforms/iOSWidget/PrivacyInfo.xcprivacy").read_bytes())
+        with tempfile.TemporaryDirectory() as folder:
+            ipa = Path(folder) / "candidate.ipa"
+            def package(app_data, widget_data=None):
+                with zipfile.ZipFile(ipa, "w") as archive:
+                    archive.writestr("Payload/NeoAnki2.app/PrivacyInfo.xcprivacy", plistlib.dumps(app_data))
+                    if widget_data is not None:
+                        archive.writestr("Payload/NeoAnki2.app/PlugIns/NeoAnki2Widget.appex/PrivacyInfo.xcprivacy", plistlib.dumps(widget_data))
+            package(app)
+            with self.assertRaisesRegex(release.ReleaseError, "Missing widget"):
+                release.validate_ios_package_privacy(ipa)
+            old_app = plistlib.loads(plistlib.dumps(app))
+            old_app["NSPrivacyAccessedAPITypes"][0]["NSPrivacyAccessedAPITypeReasons"] = ["CA92.1"]
+            package(old_app, widget)
+            with self.assertRaisesRegex(release.ReleaseError, "UserDefaults"):
+                release.validate_ios_package_privacy(ipa)
+            old_widget = plistlib.loads(plistlib.dumps(widget))
+            old_widget["NSPrivacyAccessedAPITypes"][0]["NSPrivacyAccessedAPITypeReasons"] = ["CA92.1"]
+            package(app, old_widget)
+            with self.assertRaisesRegex(release.ReleaseError, "UserDefaults"):
+                release.validate_ios_package_privacy(ipa)
+            package(app, widget)
+            release.validate_ios_package_privacy(ipa)
+
     def test_resolved_apple_state_preserves_review_but_age_rating_change_invalidates_it(self):
         with tempfile.TemporaryDirectory() as folder:
             output, context, review, _, xcrun = self.review_fixture(folder)

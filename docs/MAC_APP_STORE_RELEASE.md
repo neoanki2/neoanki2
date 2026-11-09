@@ -23,7 +23,8 @@ through portable deck export/import or explicitly enabled iCloud sync.
 ./Scripts/release-macos-app-store.sh prepare --version 1.0.1
 ./Scripts/release-macos-app-store.sh upload --version 1.0.1
 ./Scripts/release-macos-app-store.sh status --version 1.0.1
-python3 Scripts/review-macos-app.py --candidate /absolute/path/to/candidate
+python3 Scripts/review-macos-app.py --candidate /absolute/path/to/candidate \
+  --installed-app /absolute/path/to/TestFlight-installed/NeoAnki2.app
 ./Scripts/release-macos-app-store.sh review-context --version 1.0.1
 ./Scripts/release-macos-app-store.sh submit --version 1.0.1
 ```
@@ -41,6 +42,24 @@ shared bundle identity, production CloudKit, and push notifications. Signing use
 a disposable Keychain; no existing signing Keychain is unlocked.
 
 ## Candidate review
+
+Upload and process the exact build, then make it available to the existing
+internal TestFlight acceptance group. Install it through Apple's TestFlight app
+and retain the installation observation with the authenticated Apple build ID.
+The raw Apple Distribution export must not be launched for review: Apple re-signs
+Store and TestFlight apps, and restricted entitlements such as CloudKit prevent
+reliable execution of the original distribution signature. See
+[Apple TN3161](https://developer.apple.com/documentation/technotes/tn3161-inside-code-signing-certificates).
+
+`--installed-app` must name that Apple-re-signed build. The review runner and
+submission gate independently verify Apple's Store signature, beta entitlement,
+Production CloudKit and sandbox entitlements, version/build/source revision,
+architecture UUIDs and code/data payload, and resources against the retained
+export. They permit Apple's signature replacement and architecture thinning,
+while retaining hashes of both executables and the actual receipt. An opaque
+receipt is not represented as containing an App Store Connect build UUID.
+Unexpected transformations fail for investigation. No ad hoc or Developer ID
+re-signing is accepted as App Store candidate review.
 
 Finish the native Mac listing, screenshots, reviewer contact/instructions,
 privacy declaration, category, age rating, and automatic release setting before
@@ -78,7 +97,8 @@ availability.
 
 When local macOS XCTest cannot enable automation mode, the existing Release
 candidate workflow has an isolated `mac_store_review_tag` mode. It downloads a
-checksummed signed app from an unpublished draft release, checks out the exact
+checksummed candidate, including its Apple TestFlight-installed app under
+`candidate/testflight/NeoAnki2.app`, from an unpublished draft release, checks out the exact
 internal candidate source, and runs the ordinary sandboxed journey on a fresh
 hosted Mac. No Apple signing key is provided to that job. The existing privileged
 packaging/attestation path is skipped in review mode.
@@ -87,7 +107,9 @@ Use the stable `/tmp/neoanki2-mac-store-review/candidate` and
 `/tmp/neoanki2-mac-store-review/review` paths both locally and on the runner so
 retained receipts and xctestrun paths remain unchanged when results are downloaded.
 The runner configures an actual supported display mode and enters Full Screen
-through the standard keyboard command; screenshots retain the actual app pixels.
+through the standard keyboard command. On a larger local display, the test resizes
+the ordinary window to 1440 × 900 points through its window chrome. Screenshots
+retain native app pixels without resampling or display-preference changes.
 
 The ordinary native journey also selects an external authored deck through the
 Open panel, verifies its image in study, exports through the Save panel and checks

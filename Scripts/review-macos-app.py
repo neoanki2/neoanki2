@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Review the signed sandboxed native Store app in its new, caller-owned container."""
+"""Review the Apple TestFlight build in its new, caller-owned sandbox container."""
 import argparse
 import importlib.util
 import json
@@ -12,23 +12,31 @@ spec = importlib.util.spec_from_file_location("mac_store", Path(__file__).with_n
 mac = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mac)
 
+testflight_spec = importlib.util.spec_from_file_location("mac_testflight", Path(__file__).with_name("validate-macos-testflight.py"))
+testflight = importlib.util.module_from_spec(testflight_spec)
+testflight_spec.loader.exec_module(testflight)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--installed-app", type=Path, required=True,
+                        help="Apple-re-signed app installed by TestFlight; never the raw distribution export")
     args = parser.parse_args()
     candidate = args.candidate.expanduser().resolve()
     output = (args.output or mac.ROOT / ".build/macos-store-review" / uuid.uuid4().hex[:12]).resolve()
     if output.exists(): parser.error("Use a fresh review output directory")
     output.mkdir(parents=True)
-    app = candidate / "export/NeoAnki2.app"
+    exported_app = candidate / "export/NeoAnki2.app"
+    app = args.installed_app.expanduser().resolve()
     binary = app / "Contents/MacOS/NeoAnki2"
     state = json.loads((candidate / "release.json").read_text())
     if state.get("source_sha256") != mac.release.source_snapshot()[0]:
         raise mac.ReleaseError("Store source changed since export")
-    if mac.digest(binary) != state["phases"]["export"]["executable_sha256"]:
-        raise mac.ReleaseError("Store review executable differs from the exported candidate")
+    if mac.digest(exported_app / "Contents/MacOS/NeoAnki2") != state["phases"]["export"]["executable_sha256"]:
+        raise mac.ReleaseError("Retained distribution export changed")
+    identity = testflight.validate_testflight_app(app, exported_app, state)
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     if info.get("CFBundleIdentifier") != mac.APP_ID:
         raise mac.ReleaseError("Store review bundle identity is incorrect")
@@ -44,7 +52,8 @@ def main():
     receipt = {"app_source_sha256": mac.application_source(), "source_sha256": state["source_sha256"],
         "configuration": "AppStore", "optimization": "-O", "launch_arguments": [], "launch_environment": {},
         "fresh_install": True, "test_fixture_seeded": False, "result": str(result),
-        "executable": {"path": str(binary), "sha256": mac.digest(binary)}, "container": str(container), "passed": False}
+        "executable": {"path": str(binary), "sha256": mac.digest(binary)},
+        "testflight_identity": identity, "container": str(container), "passed": False}
     mac.release.save_json(output / "review.json", receipt)
     mac.run(["xcodebuild", "build-for-testing", "-quiet", "-project", str(mac.ROOT / "UITests/NeoAnki2UITests.xcodeproj"),
              "-scheme", "NeoAnki2UITests", "-testPlan", "FastFunctional", "-destination", "platform=macOS,arch=arm64",
@@ -77,6 +86,8 @@ def main():
             raise mac.ReleaseError("The ordinary Mac Store review journey did not pass exactly once")
         if mac.application_source() != receipt["app_source_sha256"]:
             raise mac.ReleaseError("Mac source changed during review")
+        if testflight.validate_testflight_app(app, exported_app, state) != identity:
+            raise mac.ReleaseError("TestFlight app changed during review")
         receipt["passed"] = True
         mac.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
                  "--output-path", str(output / "attachments")], timeout=120)

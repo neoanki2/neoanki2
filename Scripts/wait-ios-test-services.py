@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import time
 
@@ -41,13 +42,32 @@ class CommandRecorder:
         self.save()
         started = time.monotonic()
         try:
-            result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
-            entry.update(returncode=result.returncode, timed_out=False)
-        except subprocess.TimeoutExpired as error:
-            def text(value):
-                return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
-            result = subprocess.CompletedProcess(command, 124, text(error.stdout), text(error.stderr))
-            entry.update(returncode=124, timed_out=True)
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       text=True, start_new_session=True)
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+                result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+                entry.update(returncode=result.returncode, timed_out=False)
+            except subprocess.TimeoutExpired:
+                # sample and developer tools can fork children which retain the
+                # output pipes. Terminate only this command's newly created group.
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    stdout, stderr = process.communicate(timeout=5)
+                except subprocess.TimeoutExpired as error:
+                    def text(value):
+                        return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
+                    stdout, stderr = text(error.stdout), text(error.stderr)
+                    entry["termination_incomplete"] = True
+                    # Do not escalate signals or wait indefinitely on a child
+                    # ignoring termination. Preserve that failure explicitly.
+                    process.stdout.close()
+                    process.stderr.close()
+                result = subprocess.CompletedProcess(command, 124, stdout, stderr)
+                entry.update(returncode=124, timed_out=True)
         except OSError as error:
             result = subprocess.CompletedProcess(command, 127, "", str(error))
             entry.update(returncode=127, timed_out=False)

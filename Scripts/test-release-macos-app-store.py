@@ -27,6 +27,22 @@ class MacStoreTests(unittest.TestCase):
                     "com.apple.developer.aps-environment": "production",
                     "com.apple.developer.ubiquity-kvstore-identifier": mac.TEAM + ".*"}}
 
+    def test_actual_mac_bundle_requires_selected_file_metadata_reason(self):
+        data = plistlib.loads((mac.ROOT / "Packaging/AppStore/PrivacyInfo.xcprivacy").read_bytes())
+        with tempfile.TemporaryDirectory() as folder:
+            app = Path(folder) / "NeoAnki2.app"
+            path = app / "Contents/Resources/PrivacyInfo.xcprivacy"
+            path.parent.mkdir(parents=True)
+            old = plistlib.loads(plistlib.dumps(data))
+            for category in old["NSPrivacyAccessedAPITypes"]:
+                if category["NSPrivacyAccessedAPIType"] == "NSPrivacyAccessedAPICategoryFileTimestamp":
+                    category["NSPrivacyAccessedAPITypeReasons"] = ["C617.1"]
+            path.write_bytes(plistlib.dumps(old))
+            with self.assertRaisesRegex(mac.ReleaseError, "FileTimestamp"):
+                mac.validate_mac_privacy(app)
+            path.write_bytes(plistlib.dumps(data))
+            mac.validate_mac_privacy(app)
+
     def test_store_profile_produces_sandboxed_shared_identity(self):
         ent = mac.validate_profile(self.profile(), b"certificate")
         self.assertTrue(ent["com.apple.security.app-sandbox"])

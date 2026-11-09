@@ -244,3 +244,15 @@ deletes those devices even on failure. It never uses personal study libraries.
 
 The signed two-device CloudKit test and TestFlight upload are the only expected
 external blockers until a paid Apple Developer team is available.
+
+## Bundled privacy manifests
+
+The app declares both app-only UserDefaults (`CA92.1`) and shared App Group
+UserDefaults (`1C8F.1`). The widget bundles its own manifest declaring the shared
+App Group access used to read the due-card snapshot. Archive and exported-IPA
+checks inspect both actual bundled manifests before upload; source-file presence
+alone does not establish that a manifest was packaged.
+
+Both app distributions also declare `3B52.1` for reading metadata of files the
+user selected, alongside `C617.1` for app/group/CloudKit container files. The
+widget's manifest is narrower because it reads only shared preferences.

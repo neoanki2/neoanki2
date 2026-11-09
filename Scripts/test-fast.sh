@@ -39,11 +39,17 @@ bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 echo "==> Mac release signing policy"
 python3 "$ROOT/Scripts/test-macos-signing.py"
 
+echo "==> Apple TestFlight candidate integrity"
+python3 "$ROOT/Scripts/test-macos-testflight.py"
+
 echo "==> Release workflow reconciliation"
 bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
 
 echo "==> GitHub read retry response isolation"
 bash "$ROOT/Scripts/test-github-read-retry.sh"
+
+echo "==> iOS XCTest service readiness policy"
+python3 "$ROOT/Scripts/test-ios-test-services.py"
 
 echo "==> iOS UI infrastructure retry policy"
 python3 "$ROOT/Scripts/test-ios-ui-retry.py"

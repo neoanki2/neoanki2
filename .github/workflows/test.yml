@@ -40,6 +40,10 @@ jobs:
           bash -n Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh
           python3 Scripts/test-ios-ui-retry.py
+          python3 Scripts/test-ios-test-services.py
+          python3 Scripts/test-release-ios.py
+          python3 Scripts/test-release-macos-app-store.py
+          python3 Scripts/test-macos-testflight.py
           echo "macos=$(bash Scripts/ci-ui-test-plan.sh macos)" >> "$GITHUB_OUTPUT"
           echo "ios=$(bash Scripts/ci-ui-test-plan.sh ios)" >> "$GITHUB_OUTPUT"
 
@@ -155,6 +159,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Initialize and record the selected Xcode/CoreSimulator toolchain
+        run: python3 Scripts/wait-ios-test-services.py --initialize-host
       - name: Download exact-revision UI build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -172,7 +178,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ios-ui-${{ matrix.id }}
-          path: .build/ios-ui-results/
+          path: |
+            .build/ios-ui-results/
+            .build/ios-host-initialization/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
