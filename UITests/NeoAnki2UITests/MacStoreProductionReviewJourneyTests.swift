@@ -22,57 +22,20 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         }
         waitForLibraryReady(in: app)
         assertEmptyLibrary(in: app)
-        // Resize through the ordinary window chrome on a large screen. This
-        // yields a native 1440x900 (or Retina 2880x1800) Store capture without
-        // resampling pixels or changing the user's display preferences.
-        let display = try XCTUnwrap(NSScreen.main).visibleFrame
-        let window = app.windows.firstMatch
-        if display.width >= 1500 && display.height >= 950 {
-            let initial = window.frame
-            let screen = try XCTUnwrap(NSScreen.main).frame
-            let destinationOrigin = CGPoint(x: display.minX + 24, y: screen.maxY - display.maxY + 24)
-            let title = window.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: initial.width / 2, dy: 10))
-            let movedTitle = title.withOffset(CGVector(dx: destinationOrigin.x - initial.minX,
-                                                       dy: destinationOrigin.y - initial.minY))
-            title.press(forDuration: 0.1, thenDragTo: movedTitle)
-            XCTAssertTrue(waitUntil(timeout: 5) {
-                abs(window.frame.minX - destinationOrigin.x) < 2
-                    && abs(window.frame.minY - destinationOrigin.y) < 2
-            }, "Position the ordinary window before enlarging it within the visible screen")
-            let origin = window.frame.origin
-            let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-                .withOffset(CGVector(dx: -3, dy: -3))
-            let destination = window.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: 1437, dy: 897))
-            corner.press(forDuration: 0.1, thenDragTo: destination)
-            XCTAssertTrue(waitUntil(timeout: 10) {
-                let frame = window.frame
-                return abs(frame.width - 1440) < 1 && abs(frame.height - 900) < 1
-                    && frame.origin == origin
-            }, "The review window must have native Store screenshot dimensions")
-        } else {
-            app.typeKey("f", modifierFlags: [.control, .command])
-            let screen = try XCTUnwrap(NSScreen.main).frame
-            XCTAssertTrue(waitUntil(timeout: 10) {
-                let frame = window.frame
-                return frame.width >= screen.width - 2 && frame.height >= screen.height - 2
-            }, "The native app must enter Full Screen on a Store-sized display")
-        }
         XCTAssertTrue(app.descendants(matching: .any)["emptyLibraryState"].waitUntilExists(timeout: 5),
                       "A fresh Store container must contain no study items")
-        storeCapture("01-native-mac-first-launch", app)
+        try storeCapture("01-native-mac-first-launch", app)
         addBasicItem(front: "What does spaced repetition improve?", back: "Long-term recall.", in: app)
         waitForItem(named: "What does spaced repetition improve?", in: app)
-        storeCapture("02-native-mac-library", app)
+        try storeCapture("02-native-mac-library", app)
         leaveBrowseMode(in: app)
         startStudyViaMenu(in: app)
-        storeCapture("03-native-mac-study", app)
+        try storeCapture("03-native-mac-study", app)
         let action = app.buttons.identified("primaryStudyAction")
         XCTAssertTrue(action.waitUntilExists(timeout: 5), "The new card must be available to study")
         action.click()
         XCTAssertTrue(app.staticTexts["Long-term recall."].waitUntilExists(timeout: 5))
-        storeCapture("04-native-mac-answer", app)
+        try storeCapture("04-native-mac-answer", app)
         let grade = app.buttons.identified("gradeEasy")
         XCTAssertTrue(grade.waitUntilExists(timeout: 5))
         grade.click()
@@ -81,7 +44,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         app.launch()
         waitForLibraryReady(in: app)
         waitForItem(named: "What does spaced repetition improve?", in: app)
-        storeCapture("05-native-mac-persistence", app)
+        try storeCapture("05-native-mac-persistence", app)
         try verifySandboxFilesAndRecording(in: app)
         try await verifySandboxLocalAPI(in: app)
     }
@@ -124,7 +87,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         startStudyViaMenu(in: app)
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.images["Store review cover"].waitUntilExists(timeout: 10))
-        evidenceCapture("sandbox-imported-image", app)
+        try evidenceCapture("sandbox-imported-image", app)
         clickOrType("gradeEasy", shortcut: "4", in: app)
         finishStudySession(in: app)
         selectScope("deckRow-Store Import", in: app)
@@ -148,7 +111,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertTrue(exportedContent.hasPrefix("2\n"), exportedContent)
         let expectedHash = SHA256.hash(data: image).map { String(format: "%02x", $0) }.joined()
         XCTAssertTrue(exportedContent.contains(expectedHash), "Export must retain the selected external image bytes")
-        evidenceCapture("sandbox-export-complete", app)
+        try evidenceCapture("sandbox-export-complete", app)
         selectScope("deckRow-Voice", in: app)
         leaveBrowseMode(in: app)
         startStudy(in: app)
@@ -167,7 +130,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertTrue(waitUntil(timeout: 10) {
             duration.exists && !["00:00", "00:01", "00:02"].contains(where: duration.label.hasSuffix)
         })
-        evidenceCapture("sandbox-microphone-recording", app)
+        try evidenceCapture("sandbox-microphone-recording", app)
         stop.click()
         app.buttons.identified("audioSubmissionActions").click()
         app.menuItems.identified("playAudioSubmission").click()
@@ -187,7 +150,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         persistedPlay.click()
         let persistedStop = app.buttons["Stop recording"]
         XCTAssertTrue(persistedStop.waitUntilExists(timeout: 5), "The saved response must play from library storage after restart")
-        evidenceCapture("sandbox-recording-persisted", app)
+        try evidenceCapture("sandbox-recording-persisted", app)
         if persistedStop.exists { persistedStop.click() }
     }
 
@@ -216,7 +179,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertEqual((health as? HTTPURLResponse)?.statusCode, 200)
         let (_, unauthorized) = try await session.data(from: XCTUnwrap(URL(string: address + "/v1/decks")))
         XCTAssertEqual((unauthorized as? HTTPURLResponse)?.statusCode, 401)
-        evidenceCapture("sandbox-local-api-listening", app)
+        try evidenceCapture("sandbox-local-api-listening", app)
         toggle.click()
         XCTAssertTrue(app.staticTexts["Not listening"].waitUntilExists(timeout: 10))
         do {
@@ -226,8 +189,8 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         app.typeKey("w", modifierFlags: [.command])
     }
 
-    private func evidenceCapture(_ name: String, _ app: XCUIApplication) {
-        storeCapture("review-" + name, app)
+    private func evidenceCapture(_ name: String, _ app: XCUIApplication) throws {
+        try storeCapture("review-" + name, app)
     }
 
     private func unusedLoopbackPort() throws -> UInt16 {
@@ -252,8 +215,88 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         return UInt16(bigEndian: address.sin_port)
     }
 
-    private func storeCapture(_ name: String, _ app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+    private func prepareStoreCaptureWindow(in app: XCUIApplication) throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let primaryTop = try XCTUnwrap(NSScreen.screens.first).frame.maxY
+        let visible = CGRect(x: screen.visibleFrame.minX, y: primaryTop - screen.visibleFrame.maxY,
+                             width: screen.visibleFrame.width, height: screen.visibleFrame.height)
+        let window = app.windows.firstMatch
+        if visible.width >= 1440 && visible.height >= 900 {
+            let initial = window.frame
+            let proposed = CGRect(origin: initial.origin, size: CGSize(width: 1440, height: 900))
+            if !visible.contains(proposed) {
+                // The retained failed gesture grabbed ten points below the
+                // outer frame and never moved the window. Use the observed
+                // native chrome control's vertical center as the drag band.
+                let close = window.buttons[XCUIIdentifierCloseWindow]
+                XCTAssertTrue(close.waitUntilExists(timeout: 5), app.debugDescription)
+                let title = window.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: initial.width / 2, dy: close.frame.midY - initial.minY))
+                let destinationOrigin = CGPoint(x: visible.minX + (visible.width - 1440) / 2,
+                                                y: visible.minY + (visible.height - 900) / 2)
+                let destination = title.withOffset(CGVector(dx: destinationOrigin.x - initial.minX,
+                                                            dy: destinationOrigin.y - initial.minY))
+                title.press(forDuration: 0.1, thenDragTo: destination)
+                XCTAssertTrue(waitUntil(timeout: 5) {
+                    let proposed = CGRect(origin: window.frame.origin, size: CGSize(width: 1440, height: 900))
+                    return visible.insetBy(dx: -1, dy: -1).contains(proposed)
+                }, "The actual window origin must leave room for the full Store capture: \(window.frame), visible: \(visible)")
+            }
+            if abs(window.frame.width - 1440) >= 1 || abs(window.frame.height - 900) >= 1 {
+                let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+                    .withOffset(CGVector(dx: -3, dy: -3))
+                let destination = window.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: 1437, dy: 897))
+                corner.press(forDuration: 0.1, thenDragTo: destination)
+            }
+            XCTAssertTrue(waitUntil(timeout: 10) {
+                let frame = window.frame
+                return abs(frame.width - 1440) < 1 && abs(frame.height - 900) < 1
+                    && visible.insetBy(dx: -1, dy: -1).contains(frame)
+            }, "The review window must have native Store dimensions and remain fully visible: \(window.frame)")
+        } else {
+            app.typeKey("f", modifierFlags: [.control, .command])
+            XCTAssertTrue(waitUntil(timeout: 10) {
+                let frame = window.frame
+                return abs(frame.width - 1440) < 1 && abs(frame.height - 900) < 1
+            }, "Full Screen must supply a native 1440x900 Store capture on this display")
+        }
+    }
+
+    private func storeCapture(_ name: String, _ app: XCUIApplication) throws {
+        let listingCapture = name.contains("-native-mac-")
+        if listingCapture { try prepareStoreCaptureWindow(in: app) }
+        let window = app.windows.firstMatch
+        let frame = window.frame
+        guard let primary = NSScreen.screens.first else {
+            XCTFail("A Store capture requires a connected screen")
+            return
+        }
+        let fullyOnscreen = NSScreen.screens.contains { screen in
+            let bounds = CGRect(x: screen.frame.minX, y: primary.frame.maxY - screen.frame.maxY,
+                                width: screen.frame.width, height: screen.frame.height)
+            return bounds.insetBy(dx: -1, dy: -1).contains(frame)
+        }
+        guard fullyOnscreen else {
+            XCTFail("Capture \(name) requires a fully onscreen app window; actual: \(frame)")
+            return
+        }
+        if listingCapture && (abs(frame.width - 1440) >= 1 || abs(frame.height - 900) >= 1) {
+            XCTFail("Listing capture \(name) requires a 1440x900 window; actual: \(frame)")
+            return
+        }
+        // Application screenshots include the surrounding desktop on macOS.
+        // Capture only this real window and verify the unmodified PNG pixels.
+        let screenshot = window.screenshot()
+        if listingCapture {
+            let pixels = try XCTUnwrap(NSBitmapImageRep(data: screenshot.pngRepresentation))
+            guard (pixels.pixelsWide == 1440 && pixels.pixelsHigh == 900)
+                    || (pixels.pixelsWide == 2880 && pixels.pixelsHigh == 1800) else {
+                XCTFail("Capture \(name) must have native 1440x900 or 2880x1800 pixels; actual: \(pixels.pixelsWide)x\(pixels.pixelsHigh)")
+                return
+            }
+        }
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)

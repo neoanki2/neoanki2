@@ -31,6 +31,7 @@ echo "==> Generated API reference"
 swift run neoanki-api-reference check
 
 echo "==> Architecture boundaries"
+python3 "$ROOT/Scripts/test-validate-architecture.py"
 bash "$ROOT/Scripts/validate-architecture.sh"
 
 echo "==> Spotlight-safe Xcode build paths"

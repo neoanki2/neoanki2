@@ -232,15 +232,23 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         XCTAssertTrue(runner.contains("if [[ \"$PARALLEL_WORKERS\" -eq 1 ]]"))
         XCTAssertTrue(runner.contains("test_command+=( -parallel-testing-enabled NO )"))
         XCTAssertTrue(
-            runner.contains("accessibility_audit_timeout=true"),
-            "An XCTest accessibility-audit timeout is infrastructure failure and gets one fresh-simulator retry"
+            runner.contains("status=${PIPESTATUS[0]}"),
+            "Preserve XCTest's failure status instead of rerunning a failed validation"
         )
-        XCTAssertTrue(runner.contains("Audit failed to complete in time"))
         XCTAssertTrue(
-            runner.contains("app_launch_progress_timeout=true"),
-            "An XCTest app-launch progress timeout is infrastructure failure and gets one fresh-simulator retry"
+            runner.contains("jq -f \"$ROOT/Scripts/classify-ios-ui-result.jq\""),
+            "Retain infrastructure classification for diagnosis even though failed XCTest runs are not retried"
         )
-        XCTAssertTrue(runner.contains("Failed to get launch progress"))
+        XCTAssertTrue(
+            runner.contains("exit \"$status\""),
+            "Report the failed attempt so its cause must be corrected before another validation run"
+        )
+        XCTAssertTrue(
+            runner.contains(".totalTestCount > 0")
+                && runner.contains(".passedTests == .totalTestCount")
+                && runner.contains(".failedTests == 0 and .skippedTests == 0"),
+            "A successful process cannot conceal missing, failed, or skipped UI tests"
+        )
     }
 
     func testReleaseDefaultsToFiveMinuteLocalFirstPathAndRetainsVerifiedRecovery() throws {

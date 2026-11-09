@@ -54,6 +54,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Ensure the architecture scanner is available
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
+          fi
+          rg --version
       - name: Run every SwiftPM test gate with shared build products
         run: |
           failures=0
@@ -69,6 +75,7 @@ jobs:
           python3 Scripts/test-macos-testflight.py || failures=1
           python3 Scripts/test-review-macos-app.py || failures=1
           bash Scripts/test-release-workflow-reconciliation.sh || failures=1
+          python3 Scripts/test-validate-architecture.py || failures=1
           bash Scripts/validate-architecture.sh || failures=1
           (cd NeoAnkiCore && swift test --parallel) || failures=1
           swift test --filter NeoAnki2Tests --parallel || failures=1
