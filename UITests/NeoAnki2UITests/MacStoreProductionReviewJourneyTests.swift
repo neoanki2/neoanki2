@@ -3,6 +3,25 @@ import CryptoKit
 import Darwin
 import XCTest
 
+/// App Store Mac sizes at 1x and 2x; kept pure for the geometry regression test.
+enum MacStoreCaptureGeometry {
+    static let pointSizes = [CGSize(width: 1440, height: 900), CGSize(width: 1280, height: 800)]
+
+    static func preferredSize(at origin: CGPoint, within bounds: CGRect) -> CGSize? {
+        pointSizes.first { bounds.contains(CGRect(origin: origin, size: $0)) }
+    }
+
+    static func acceptsPointSize(_ size: CGSize) -> Bool {
+        pointSizes.contains { abs($0.width - size.width) < 1 && abs($0.height - size.height) < 1 }
+    }
+
+    static func acceptsPixels(width: Int, height: Int) -> Bool {
+        [1, 2].contains { scale in
+            pointSizes.contains { Int($0.width) * scale == width && Int($0.height) * scale == height }
+        }
+    }
+}
+
 /// The Store review runner launches the optimized sandboxed application without
 /// fixture arguments. Its caller owns a fresh container and preserves the result.
 final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
@@ -221,9 +240,13 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         let visible = CGRect(x: screen.visibleFrame.minX, y: primaryTop - screen.visibleFrame.maxY,
                              width: screen.visibleFrame.width, height: screen.visibleFrame.height)
         let window = app.windows.firstMatch
-        if visible.width >= 1440 && visible.height >= 900 {
-            let initial = window.frame
-            let proposed = CGRect(origin: initial.origin, size: CGSize(width: 1440, height: 900))
+        let initial = window.frame
+        // Prefer a supported size at the existing origin before moving chrome.
+        // In the retained regression frame (384,212), 1280x800 fits completely.
+        let target = MacStoreCaptureGeometry.preferredSize(at: initial.origin, within: visible)
+            ?? MacStoreCaptureGeometry.preferredSize(at: visible.origin, within: visible)
+        if let target {
+            let proposed = CGRect(origin: initial.origin, size: target)
             if !visible.contains(proposed) {
                 // The retained failed gesture grabbed ten points below the
                 // outer frame and never moved the window. Use the observed
@@ -232,34 +255,34 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
                 XCTAssertTrue(close.waitUntilExists(timeout: 5), app.debugDescription)
                 let title = window.coordinate(withNormalizedOffset: .zero)
                     .withOffset(CGVector(dx: initial.width / 2, dy: close.frame.midY - initial.minY))
-                let destinationOrigin = CGPoint(x: visible.minX + (visible.width - 1440) / 2,
-                                                y: visible.minY + (visible.height - 900) / 2)
+                let destinationOrigin = CGPoint(x: visible.minX + (visible.width - target.width) / 2,
+                                                y: visible.minY + (visible.height - target.height) / 2)
                 let destination = title.withOffset(CGVector(dx: destinationOrigin.x - initial.minX,
                                                             dy: destinationOrigin.y - initial.minY))
                 title.press(forDuration: 0.1, thenDragTo: destination)
                 XCTAssertTrue(waitUntil(timeout: 5) {
-                    let proposed = CGRect(origin: window.frame.origin, size: CGSize(width: 1440, height: 900))
+                    let proposed = CGRect(origin: window.frame.origin, size: target)
                     return visible.insetBy(dx: -1, dy: -1).contains(proposed)
                 }, "The actual window origin must leave room for the full Store capture: \(window.frame), visible: \(visible)")
             }
-            if abs(window.frame.width - 1440) >= 1 || abs(window.frame.height - 900) >= 1 {
+            if abs(window.frame.width - target.width) >= 1 || abs(window.frame.height - target.height) >= 1 {
                 let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
                     .withOffset(CGVector(dx: -3, dy: -3))
                 let destination = window.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: 1437, dy: 897))
+                    .withOffset(CGVector(dx: target.width - 3, dy: target.height - 3))
                 corner.press(forDuration: 0.1, thenDragTo: destination)
             }
             XCTAssertTrue(waitUntil(timeout: 10) {
                 let frame = window.frame
-                return abs(frame.width - 1440) < 1 && abs(frame.height - 900) < 1
+                return abs(frame.width - target.width) < 1 && abs(frame.height - target.height) < 1
                     && visible.insetBy(dx: -1, dy: -1).contains(frame)
             }, "The review window must have native Store dimensions and remain fully visible: \(window.frame)")
         } else {
             app.typeKey("f", modifierFlags: [.control, .command])
             XCTAssertTrue(waitUntil(timeout: 10) {
                 let frame = window.frame
-                return abs(frame.width - 1440) < 1 && abs(frame.height - 900) < 1
-            }, "Full Screen must supply a native 1440x900 Store capture on this display")
+                return MacStoreCaptureGeometry.acceptsPointSize(frame.size)
+            }, "Full Screen must supply an accepted native Mac Store capture size on this display")
         }
     }
 
@@ -281,8 +304,8 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
             XCTFail("Capture \(name) requires a fully onscreen app window; actual: \(frame)")
             return
         }
-        if listingCapture && (abs(frame.width - 1440) >= 1 || abs(frame.height - 900) >= 1) {
-            XCTFail("Listing capture \(name) requires a 1440x900 window; actual: \(frame)")
+        if listingCapture && !MacStoreCaptureGeometry.acceptsPointSize(frame.size) {
+            XCTFail("Listing capture \(name) requires a 1440x900 or 1280x800 window; actual: \(frame)")
             return
         }
         // Application screenshots include the surrounding desktop on macOS.
@@ -290,9 +313,8 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         let screenshot = window.screenshot()
         if listingCapture {
             let pixels = try XCTUnwrap(NSBitmapImageRep(data: screenshot.pngRepresentation))
-            guard (pixels.pixelsWide == 1440 && pixels.pixelsHigh == 900)
-                    || (pixels.pixelsWide == 2880 && pixels.pixelsHigh == 1800) else {
-                XCTFail("Capture \(name) must have native 1440x900 or 2880x1800 pixels; actual: \(pixels.pixelsWide)x\(pixels.pixelsHigh)")
+            guard MacStoreCaptureGeometry.acceptsPixels(width: pixels.pixelsWide, height: pixels.pixelsHigh) else {
+                XCTFail("Capture \(name) must have an accepted native Mac Store pixel size; actual: \(pixels.pixelsWide)x\(pixels.pixelsHigh)")
                 return
             }
         }
