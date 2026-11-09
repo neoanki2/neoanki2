@@ -148,13 +148,16 @@ class ReadinessTests(unittest.TestCase):
 
 
 class ProbeTests(unittest.TestCase):
-    def run_probe(self, temporary, failure=None, wait_failure=False):
+    def run_probe(self, temporary, failure=None, wait_failure=False, prepare_dyld_cache=False):
         recorders = []
         class Recorder(FakeRecorder):
             def __init__(self, output):
                 super().__init__(output); recorders.append(self); self.name = None
             def run(self, command, timeout=20, check=False):
                 super().run(command, timeout, check)
+                if command[1:] == ["simctl", "runtime", "dyld_shared_cache", "update", "--all"]:
+                    if failure == "cache": raise RuntimeError("cache update failed")
+                    return subprocess.CompletedProcess(command, 0, "Caches ready", "")
                 if command[1:4] == ["simctl", "list", "runtimes"]:
                     if failure == "runtimes": raise RuntimeError("runtimes timed out")
                     result = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-26-5", "version": "26.5"}]}
@@ -175,7 +178,7 @@ class ProbeTests(unittest.TestCase):
         def wait(*args):
             if wait_failure: raise RuntimeError("writer not ready")
         with patch.object(probe, "capture_host_diagnostics"):
-            result = probe.run_probe(Path(temporary), HERE / "wait-ios-test-services.py", Recorder, wait, readiness.SERVICES, readiness.service_ready, lambda recorder: None)
+            result = probe.run_probe(Path(temporary), HERE / "wait-ios-test-services.py", Recorder, wait, readiness.SERVICES, readiness.service_ready, lambda recorder: None, prepare_dyld_cache)
         proof = json.loads((Path(temporary) / "probe.json").read_text())
         commands = [c["argv"] for c in recorders[0].proof["commands"]]
         return result, proof, commands
@@ -214,6 +217,53 @@ class ProbeTests(unittest.TestCase):
             self.assertTrue(proof["simulator_deleted"])
             self.assertIn(["xcrun", "simctl", "delete", OWNED_ID], commands)
             self.assertFalse(any("DO-NOT-DELETE" in c for c in commands))
+
+    def test_opt_in_cache_update_completes_before_any_simulator_is_created(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result, proof, commands = self.run_probe(temporary, prepare_dyld_cache=True)
+            self.assertEqual(result, 0)
+            update = ["xcrun", "simctl", "runtime", "dyld_shared_cache", "update", "--all"]
+            self.assertLess(commands.index(update), next(i for i, c in enumerate(commands) if c[1:3] == ["simctl", "create"]))
+            self.assertTrue(proof["prepare_dyld_cache_requested"])
+            self.assertTrue(proof["dyld_cache_update_completed"])
+        with tempfile.TemporaryDirectory() as temporary:
+            _, proof, commands = self.run_probe(temporary)
+            self.assertFalse(proof["prepare_dyld_cache_requested"])
+            self.assertFalse(any("update" in c for c in commands))
+
+    def test_cache_failure_remains_failure_without_boot_or_ui_retry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result, proof, commands = self.run_probe(temporary, failure="cache", prepare_dyld_cache=True)
+            self.assertEqual(result, 1)
+            self.assertEqual(proof["phase"], "prepare-dyld-cache")
+            self.assertNotIn("dyld_cache_update_completed", proof)
+            self.assertFalse(any("create" in c or "boot" in c for c in commands))
+
+    def test_targeted_diagnostics_use_only_owned_launchctl_pid_and_verify_program(self):
+        for matches in (True, False):
+            with tempfile.TemporaryDirectory() as temporary:
+                recorder = FakeRecorder(temporary)
+                program = "/Runtime/System/Library/PrivateFrameworks/AutomationMode.framework/automationmode-writer"
+                (recorder.output / "owned.txt").write_text("pid = 3093\nprogram = " + program + "\n")
+                (recorder.output / "other.txt").write_text("pid = 9999\nprogram = " + program + "\n")
+                recorder.proof["commands"] = [
+                    {"argv": ["xcrun", "simctl", "spawn", OWNED_ID, "launchctl", "print", "user/501/com.apple.dt.automationmode-writer"], "stdout_file": "owned.txt"},
+                    {"argv": ["xcrun", "simctl", "spawn", "OTHER-SIMULATOR", "launchctl", "print", "user/501/com.apple.dt.automationmode-writer"], "stdout_file": "other.txt"}]
+                original = recorder.run
+                def run(command, timeout=20, check=False):
+                    result = original(command, timeout, check)
+                    if command[0] == "/bin/ps": result.stdout = program if matches else "/unrelated/reused-pid"
+                    return result
+                recorder.run = run
+                found = probe.capture_owned_service_diagnostics(OWNED_ID, recorder)
+                self.assertEqual(found["com.apple.dt.automationmode-writer"]["live_program_matches"], matches)
+                commands = [c["argv"] for c in recorder.proof["commands"]]
+                samples = [c for c in commands if c[0] == "/usr/bin/sample"]
+                self.assertEqual(len(samples), 1 if matches else 0)
+                self.assertFalse(any("9999" in c for c in commands if c[0] != "xcrun"))
+                logs = [c for c in commands if c[0] == "/usr/bin/log"]
+                self.assertEqual(len(logs), 1 if matches else 0)
+                if matches: self.assertEqual(logs[0][-1], "processIdentifier == 3093")
 
     def test_guard_rejects_local_run_before_creating_output_or_running_commands(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {}, clear=True):

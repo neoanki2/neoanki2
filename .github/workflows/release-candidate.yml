@@ -26,6 +26,11 @@ on:
         required: false
         default: false
         type: boolean
+      ios_prepare_dyld_cache:
+        description: Opt-in diagnostic experiment using Apple runtime cache preparation before boot
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -364,10 +369,14 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/wait-ios-test-services.py?ref=$GITHUB_SHA" \
             --jq .content | base64 --decode > "$RUNNER_TEMP/wait-ios-test-services.py"
       - name: Record both services before and after activation
+        env:
+          PREPARE_DYLD_CACHE: ${{ inputs.ios_prepare_dyld_cache }}
         run: |
+          probe_options=()
+          if [ "$PREPARE_DYLD_CACHE" = "true" ]; then probe_options+=(--prepare-dyld-cache); fi
           env -u GH_TOKEN -u GITHUB_TOKEN -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
             python3 "$RUNNER_TEMP/probe-ios-test-services.py" \
-            --helper "$RUNNER_TEMP/wait-ios-test-services.py" --output "$RUNNER_TEMP/ios-service-probe"
+            --helper "$RUNNER_TEMP/wait-ios-test-services.py" --output "$RUNNER_TEMP/ios-service-probe" "${probe_options[@]}"
       - name: Retain observations without declaring UI validation passed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

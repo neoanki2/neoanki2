@@ -41,9 +41,6 @@ jobs:
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh
           python3 Scripts/test-ios-ui-retry.py
           python3 Scripts/test-ios-test-services.py
-          python3 Scripts/test-release-ios.py
-          python3 Scripts/test-release-macos-app-store.py
-          python3 Scripts/test-macos-testflight.py
           echo "macos=$(bash Scripts/ci-ui-test-plan.sh macos)" >> "$GITHUB_OUTPUT"
           echo "ios=$(bash Scripts/ci-ui-test-plan.sh ios)" >> "$GITHUB_OUTPUT"
 
@@ -65,6 +62,9 @@ jobs:
             Scripts/watch-release-workflow.sh \
             Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh || failures=1
+          python3 Scripts/test-release-ios.py || failures=1
+          python3 Scripts/test-release-macos-app-store.py || failures=1
+          python3 Scripts/test-macos-testflight.py || failures=1
           bash Scripts/test-release-workflow-reconciliation.sh || failures=1
           bash Scripts/validate-architecture.sh || failures=1
           (cd NeoAnkiCore && swift test --parallel) || failures=1
