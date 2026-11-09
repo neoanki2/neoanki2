@@ -61,7 +61,7 @@ def main():
     target["CommandLineArguments"] = []
     target["UITargetAppCommandLineArguments"] = []
     target["UITargetAppEnvironmentVariables"] = {}
-    data["TestConfigurations"][0]["UserAttachmentLifetime"] = "keepAlways"
+    target["UserAttachmentLifetime"] = "keepAlways"
     runs[0].write_bytes(plistlib.dumps(data))
     receipt["xctestrun"] = {"path": str(runs[0]), "sha256": mac.digest(runs[0])}
     mac.release.save_json(output / "review.json", receipt)
