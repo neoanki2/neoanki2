@@ -186,3 +186,5 @@ That workflow also builds and crawls the Jekyll output, then runs
 `Scripts/check-docs-responsive.mjs` in headless Chromium at 375, 768, and 1024
 pixels. It checks keyboard navigation, contained code blocks, and the absence
 of page-level horizontal overflow.
+
+The image attachment paste/save/replace regression owns the `phone-image-attachments` shard so no iOS batch exceeds five cases. Native Mac Store first-launch acceptance runs separately through `Scripts/review-macos-app.py` against the signed sandboxed candidate.

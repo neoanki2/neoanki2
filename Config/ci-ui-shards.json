@@ -161,7 +161,6 @@
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testGenericDictionaryLookupInNewItemSavesToChosenDeck",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTypingUkrainianStressLookupRepeatedlySavesWithoutCrashing",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testPhotoCanBeSelectedBeforeNameAndDescription",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testOversizedImageCanBePastedSavedAndReplaced",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy"
       ]
     },
@@ -247,6 +246,14 @@
       "tests": [
         "NeoAnki2MobileUITests/MobileImageOcclusionUITests/testCreateEditCancelGroupAndStudyOcclusion",
         "NeoAnki2MobileUITests/MobileImageOcclusionUITests/testCanceledCreationDoesNotGenerateCards"
+      ]
+    },
+    {
+      "id": "phone-image-attachments",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testOversizedImageCanBePastedSavedAndReplaced"
       ]
     }
   ]

@@ -87,7 +87,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         )
         XCTAssertEqual(plan.schemaVersion, 1)
         XCTAssertEqual(plan.macos.count, 5)
-        XCTAssertEqual(plan.ios.count, 23)
+        XCTAssertEqual(plan.ios.count, 24)
 
         let macSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent(
