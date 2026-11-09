@@ -131,6 +131,13 @@ checksums, and the exact
 `MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures`
 case. Fixture-based parity cases cannot substitute for that production journey.
 
+The production review and screenshot capture use Simulator `bootstatus -b`
+followed by Xcode's `test-without-building` lifecycle. They do not require manual
+activation of private AutomationMode/XCTest services. Those service probes remain
+optional diagnostics. Every actual review case must pass with its required count,
+retained evidence, and owned-device cleanup; removing prewarming does not waive a
+runner-startup failure or permit an unchanged automatic rerun.
+
 ### Rejected submissions and metadata-only fixes
 
 Preserve Apple's original written rejection and account evidence in

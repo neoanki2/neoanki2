@@ -34,6 +34,31 @@ explicit candidate directory; `--build` selects an unused numeric build number.
 Changing source or release identity requires a fresh candidate. An uncertain
 upload must be inspected in Apple processing before another upload attempt.
 
+For metadata or test-tooling corrections after upload, keep the original candidate
+immutable and create a separate review view:
+
+```bash
+./Scripts/release-macos-app-store.sh review-context --version 1.0.1 --build 2 \
+  --reuse-build-from /absolute/path/to/original-candidate \
+  --output /absolute/path/to/current-review-view
+python3 Scripts/review-macos-app.py --candidate /absolute/path/to/current-review-view \
+  --installed-app /absolute/path/to/TestFlight-installed/NeoAnki2.app
+```
+
+Supply fresh privacy evidence in the review view before generating its context.
+Reuse is limited to `status`, `review-context`, and `submit`. Every existing
+production input and every `Packaging/` file except the listing
+`Packaging/AppStore/en-US.json` must match the uploaded snapshot. Code, project,
+entitlement, privacy-manifest, icon, or other shipping changes require a new build.
+The original archive, exported app, package, and delivered-upload checksums are
+verified; no rebuild, re-signing, or repeated upload occurs.
+
+The view binds the current QA and metadata source separately from
+`binary_source_revision` and `binary_snapshot_sha256`. TestFlight comparison uses
+the original binary identity and export path. Existing approval, acceptance, and
+submission receipts are not copied; complete fresh candidate-bound independent
+reviews and the ordinary Release product journey before submission.
+
 Saved signing inputs live outside the repository in the same signing directory
 used for iOS. In addition to Apple Distribution material, export requires
 `Mac-Installer-Distribution.cert.pem` and `Mac-Installer-Distribution.key.pem`.

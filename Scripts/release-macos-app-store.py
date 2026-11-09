@@ -18,6 +18,7 @@ import signal
 import tempfile
 import time
 import urllib.error
+import uuid
 
 SPEC = importlib.util.spec_from_file_location("ios_store_release", Path(__file__).with_name("release-ios.py"))
 release = importlib.util.module_from_spec(SPEC)
@@ -32,6 +33,87 @@ SCOPES = {
     "compliance": {"metadata", "screenshots", "privacy", "age_rating", "rejection_remediation"},
 }
 PRODUCTION_TEST = "MacStoreProductionReviewJourneyTests/testFreshInstallCreateStudyAndPersistence"
+REUSE_STAGES = {"status", "review-context", "submit"}
+
+
+def binary_source(files):
+    # The existing iOS predicate excludes AppStore metadata. Mac packaging also
+    # supplies the actual executable's Info.plist, privacy manifest and sandbox.
+    # Exclude only the known listing, never all JSON or all AppStore resources.
+    return release.json_digest([f for f in files if release.production_input(f["path"])
+                               or (f["path"].startswith("Packaging/")
+                                   and f["path"] != "Packaging/AppStore/en-US.json")])
+
+
+def testflight_expected_identity(record):
+    """Separate the uploaded app's identity from the current QA/metadata view."""
+    result = {key: record[key] for key in ("version", "build", "build_id")}
+    original = (record.get("binary_source_revision"), record.get("binary_snapshot_sha256"))
+    if any(value is not None for value in original):
+        if not all(original):
+            raise ReleaseError("Incomplete original Mac binary identity")
+        result.update(source_revision=original[0], source_sha256=original[1])
+    else:
+        result.update(source_revision=record["source_revision"], source_sha256=record["source_sha256"])
+    checksum = record.get("phases", {}).get("export", {}).get("executable_sha256")
+    if checksum is not None:
+        result["phases"] = {"export": {"executable_sha256": checksum}}
+    return result
+
+
+def reuse_binary_candidate(candidate, files, version, build):
+    """Retain an uploaded Mac build only across metadata/test-tooling changes."""
+    candidate = Path(candidate).resolve()
+    state = json.loads((candidate / "release.json").read_text())
+    old_files = json.loads((candidate / "source.json").read_text())
+    if state.get("binary_candidate"):
+        raise ReleaseError("Reuse the original Mac binary candidate, not another review view")
+    if release.json_digest(old_files) != state["source_sha256"] or binary_source(old_files) != binary_source(files):
+        raise ReleaseError("Uploaded Mac binary production inputs changed; prepare and upload a new build")
+    if (state.get("bundle_id") != APP_ID or state.get("team_id") != TEAM
+            or not re.fullmatch(r"[0-9a-f]{40}", state.get("source_revision", ""))):
+        raise ReleaseError("Retained Mac binary source/bundle/team identity is invalid")
+    try:
+        uuid.UUID(state["build_id"])
+    except (ValueError, KeyError, TypeError, AttributeError) as error:
+        raise ReleaseError("Retained Mac binary has no valid Apple build UUID") from error
+    if state["version"] != version or (build and state["build"] != build):
+        raise ReleaseError("Retained Mac binary version/build differs from the requested candidate")
+    phases = state.get("phases", {})
+    archive_app = candidate / "NeoAnki2.xcarchive/Products/Applications/NeoAnki2.app"
+    exported_app = candidate / "export/NeoAnki2.app"
+    archive = archive_app / "Contents/MacOS/NeoAnki2"
+    exported = exported_app / "Contents/MacOS/NeoAnki2"
+    package = candidate / "export/NeoAnki2.pkg"
+    if (phases.get("upload", {}).get("status") != "delivered"
+            or not archive.is_file() or digest(archive) != phases.get("archive", {}).get("executable_sha256")
+            or not exported.is_file() or digest(exported) != phases.get("export", {}).get("executable_sha256")
+            or not package.is_file() or digest(package) != phases.get("export", {}).get("pkg_sha256")
+            or digest(package) != phases["upload"].get("pkg_sha256") or not state.get("build_id")):
+        raise ReleaseError("Retained Mac binary lacks matching verified archive/export/upload evidence")
+    sources = {entry["path"]: entry for entry in old_files}
+    for app in (archive_app, exported_app):
+        info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+        if any(info.get(key) != value for key, value in {
+                "CFBundleIdentifier": APP_ID, "CFBundleShortVersionString": state["version"],
+                "CFBundleVersion": state["build"], "NeoAnkiGitRevision": state["source_revision"]}.items()):
+            raise ReleaseError("Retained Mac app Info.plist differs from the original binary identity")
+        validate_mac_privacy(app)
+        for source, resource in (("Packaging/AppStore/PrivacyInfo.xcprivacy", "PrivacyInfo.xcprivacy"),
+                                 ("Packaging/NeoAnki2.icns", "NeoAnki2.icns")):
+            expected = sources.get(source, {})
+            path = app / "Contents/Resources" / resource
+            if expected.get("kind") != "file" or not path.is_file() or digest(path) != expected.get("sha256"):
+                raise ReleaseError("Retained Mac resource differs from the uploaded source: " + source)
+    run(["codesign", "--verify", "--deep", "--strict", "--all-architectures", str(exported_app)])
+    ent = plistlib.loads(run(["codesign", "-d", "--entitlements", ":-", str(exported_app)]))
+    if (any(ent.get(k) != v or type(ent.get(k)) is not type(v)
+            for k, v in testflight.REQUIRED_ENTITLEMENTS.items())
+            or ent.get("get-task-allow", False) is not False
+            or ent.get("com.apple.security.get-task-allow", False) is not False):
+        raise ReleaseError("Retained Mac binary lacks the original Production sandbox entitlements")
+    run(["pkgutil", "--check-signature", str(package)])
+    return state
 
 
 def application_source():
@@ -132,8 +214,7 @@ def validate_internal_review(review, context, output):
             exported = release.checked_evidence(context.get("mac_exported_executable"), output)
             if digest(exported) != context.get("mac_executable_sha256"):
                 raise ReleaseError("Retained Mac distribution executable changed")
-            expected = {key: context[key] for key in
-                        ("version", "build", "source_revision", "source_sha256", "build_id")}
+            expected = testflight_expected_identity(context)
             identity = testflight.validate_testflight_app(app, exported.parent.parent.parent, expected)
             if proof["testflight_identity"] != identity:
                 raise ReleaseError("Mac TestFlight identity differs from the app actually reviewed")
@@ -191,11 +272,46 @@ class Workflow(release.Workflow):
     package_checksum = "pkg_sha256"
     listing_path = "Packaging/AppStore/en-US.json"
 
+    def reuse_binary_candidate(self, candidate, files, version, build):
+        return reuse_binary_candidate(candidate, files, version, build)
+
+    def binary_source(self, files):
+        return binary_source(files)
+
+    def __init__(self, args):
+        if args.reuse_build_from and args.stage not in REUSE_STAGES:
+            raise ReleaseError("Mac binary reuse is limited to status, review-context, and submit")
+        if args.reuse_build_from and args.output and args.output.resolve() == args.reuse_build_from.resolve():
+            raise ReleaseError("Use a separate Mac review view; preserve the original binary candidate")
+        super().__init__(args)
+        if self.state.get("binary_candidate"):
+            if args.stage not in REUSE_STAGES:
+                raise ReleaseError("A Mac review view cannot prepare, export, or upload the retained binary")
+            candidate = Path(self.state["binary_candidate"]).resolve()
+            if args.reuse_build_from and args.reuse_build_from.resolve() != candidate:
+                raise ReleaseError("The Mac review view already binds a different binary candidate")
+            previous = self.reuse_binary_candidate(candidate, release.source_snapshot()[1], args.version, args.build)
+            if any(self.state.get(key) != previous[key]
+                   for key in ("app_id", "bundle_id", "team_id", "build_id", "version", "build")):
+                raise ReleaseError("Mac review view differs from the original Apple build identity")
+            if (any(self.state["phases"].get(key) != previous["phases"][key]
+                    for key in ("archive", "export", "upload"))
+                    or self.state.get("binary_source_sha256") != binary_source(release.source_snapshot()[1])):
+                raise ReleaseError("Mac review view changed the original binary fingerprints or artifact receipts")
+            identity = {"binary_source_revision": previous["source_revision"],
+                        "binary_snapshot_sha256": previous["source_sha256"]}
+            if any(key in self.state and self.state[key] != value for key, value in identity.items()):
+                raise ReleaseError("Mac review view changed the original binary source identity")
+            self.state.update(identity)
+            self.save()
+
     def mark(self, phase):
         self.phase = phase
         print("MACOS_APP_STORE_PHASE=" + phase, flush=True)
 
     def prepare(self):
+        if self.state.get("binary_candidate"):
+            raise ReleaseError("A Mac review view cannot rebuild the retained binary")
         self.mark("verify")
         environment = os.environ.copy()
         environment["SDKROOT"] = run(["xcrun", "--sdk", "macosx", "--show-sdk-path"]).decode().strip()
@@ -279,6 +395,8 @@ class Workflow(release.Workflow):
         return validate_profile(profile, cert), path, cert
 
     def export(self):
+        if self.state.get("binary_candidate"):
+            raise ReleaseError("A Mac review view cannot export the retained binary")
         self.require_api()
         self.prepare()
         package = self.output / "export" / self.package_name
@@ -336,6 +454,8 @@ class Workflow(release.Workflow):
         return package
 
     def upload(self):
+        if self.state.get("binary_candidate"):
+            raise ReleaseError("A Mac review view cannot upload the retained binary")
         self.require_api()
         existing = self.exact_build() if self.state["build"] else None
         saved = self.state["phases"].get("upload")
@@ -363,14 +483,21 @@ class Workflow(release.Workflow):
         self.state["phases"]["upload"]["status"] = "delivered"; self.save()
 
     def internal_review_context(self, build, version):
+        candidate = Path(self.state.get("binary_candidate", self.output))
+        if candidate != self.output:
+            previous = self.reuse_binary_candidate(candidate, release.source_snapshot()[1], self.state["version"], self.state["build"])
+            if not build or build["id"] != previous["build_id"]:
+                raise ReleaseError("Apple build differs from the retained Mac binary")
         context = super().internal_review_context(build, version)
-        executable = self.output / "export/NeoAnki2.app/Contents/MacOS/NeoAnki2"
+        executable = candidate / "export/NeoAnki2.app/Contents/MacOS/NeoAnki2"
         expected = self.state["phases"]["export"].get("executable_sha256")
         if not executable.is_file() or digest(executable) != expected:
             raise ReleaseError("Retained Mac executable differs from the exported candidate")
         context.update(platform=self.platform, app_source_sha256=application_source(),
-                       binary_source_sha256=application_source(), mac_executable_sha256=expected,
+                       binary_source_sha256=binary_source(release.source_snapshot()[1]), mac_executable_sha256=expected,
                        source_revision=self.state["source_revision"],
+                       binary_source_revision=self.state.get("binary_source_revision", self.state["source_revision"]),
+                       binary_snapshot_sha256=self.state.get("binary_snapshot_sha256", self.state["source_sha256"]),
                        mac_exported_executable={"path": str(executable), "sha256": expected})
         return context
 
@@ -396,6 +523,8 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--version", default="1.0.1")
     parser.add_argument("--build")
+    parser.add_argument("--reuse-build-from", type=Path,
+                        help="retain the exact uploaded binary for metadata/test-only remediation; all shipping inputs must match")
     parser.add_argument("--rejection-evidence", type=Path, default=ROOT / ".build/macos-review-rejection/rejection.json")
     args = parser.parse_args()
     if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", args.version) or (args.build and not re.fullmatch(r"[1-9]\d{0,3}", args.build)):
@@ -403,7 +532,11 @@ def main():
     args.config, args.signing_dir = args.config.expanduser().resolve(), args.signing_dir.expanduser().resolve()
     args.rejection_evidence = args.rejection_evidence.expanduser().resolve()
     args.output = args.output.expanduser().resolve() if args.output else None
-    args.reuse_build_from, args.allow_physical_test_waivers = None, False
+    if args.reuse_build_from:
+        args.reuse_build_from = args.reuse_build_from.expanduser().resolve()
+        if args.stage not in REUSE_STAGES:
+            parser.error("--reuse-build-from is limited to status, review-context, and submit; it never rebuilds or uploads")
+    args.allow_physical_test_waivers = False
     base = ROOT / Workflow.output_root
     base.mkdir(parents=True, exist_ok=True)
     started, flow = time.monotonic(), None

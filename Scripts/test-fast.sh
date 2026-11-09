@@ -41,6 +41,7 @@ python3 "$ROOT/Scripts/test-macos-signing.py"
 
 echo "==> Apple TestFlight candidate integrity"
 python3 "$ROOT/Scripts/test-macos-testflight.py"
+python3 "$ROOT/Scripts/test-review-macos-app.py"
 
 echo "==> Release workflow reconciliation"
 bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"

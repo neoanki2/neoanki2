@@ -19,6 +19,7 @@ class InternalReviewSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder) / "review"
             cleanup = []
+            commands = []
             saves = 0
             original_save = review.release.save_json
 
@@ -30,6 +31,7 @@ class InternalReviewSafetyTests(unittest.TestCase):
                 original_save(path, value)
 
             def run(argv, **_kwargs):
+                commands.append(argv)
                 if argv[1:4] == ["simctl", "list", "runtimes"]:
                     return json.dumps({"runtimes": [{"isAvailable": True, "identifier": "fake.iOS-26-5", "version": "26.5"}]}).encode()
                 if argv[1:4] == ["simctl", "list", "devicetypes"]:
@@ -63,6 +65,13 @@ class InternalReviewSafetyTests(unittest.TestCase):
                  patch.object(review.subprocess, "run", side_effect=cleaned):
                 with self.assertRaises((review.release.ReleaseError, OSError)):
                     review.main()
+            self.assertFalse(any("wait-ios-test-services.py" in arg for c in commands for arg in c))
+            tests = [c for c in commands if "test-without-building" in c]
+            self.assertEqual(len(tests), 0 if fail_receipt else 1)
+            if tests:
+                boot = ["xcrun", "simctl", "bootstatus", "OWNED-SIMULATOR", "-b"]
+                self.assertLess(commands.index(boot), commands.index(tests[0]))
+                self.assertIn("-only-testing:" + review.TEST, tests[0])
             self.assertIn(["xcrun", "simctl", "shutdown", "OWNED-SIMULATOR"], cleanup)
             self.assertIn(["xcrun", "simctl", "delete", "OWNED-SIMULATOR"], cleanup)
             receipt = json.loads((output / "review.json").read_text())

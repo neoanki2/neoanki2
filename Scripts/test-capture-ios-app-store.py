@@ -129,6 +129,40 @@ class ScreenshotBuildSafetyTests(unittest.TestCase):
             self.assertIn("build-for-testing", calls[0])
             self.assertFalse((derived / "capture-build.json").exists())
 
+    def test_actual_capture_failure_uses_xcode_lifecycle_once_and_deletes_owned_simulator(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            derived = root / ".build/ios-store-ui"
+            self.products(derived)
+            self.record(derived)
+            commands, cleanup = [], []
+            def run(argv, **_):
+                commands.append(argv)
+                if argv[1:4] == ["simctl", "list", "runtimes"]:
+                    return json.dumps({"runtimes": [{"isAvailable": True, "identifier": "fake.iOS-26-5", "version": "26.5"}]}).encode()
+                if argv[1:4] == ["simctl", "list", "devicetypes"]:
+                    return json.dumps({"devicetypes": [{"name": name, "identifier": "fake.type"} for name in ["iPhone 16 Pro Max", "iPad Pro 13-inch (M4)"]]}).encode()
+                if argv[1:3] == ["simctl", "create"]: return b"OWNED-SIMULATOR"
+                if "test-without-building" in argv:
+                    raise capture.release.ReleaseError("Actual screenshot assertion failed")
+                return b""
+            def cleaned(argv, **_):
+                cleanup.append(argv)
+                return subprocess.CompletedProcess(argv, 0)
+            with patch.object(capture, "ROOT", root), patch.object(capture, "app_source", return_value="candidate-source"), \
+                 patch.object(capture.release, "source_snapshot", return_value=("source", [])), \
+                 patch.object(capture, "run", side_effect=run), patch.object(capture.subprocess, "run", side_effect=cleaned), \
+                 patch.object(sys, "argv", ["capture-ios-app-store.py", "--skip-build", "--output", str(root / "capture")]):
+                with self.assertRaisesRegex(capture.release.ReleaseError, "Actual screenshot assertion failed"):
+                    capture.main()
+            tests = [c for c in commands if "test-without-building" in c]
+            self.assertEqual(len(tests), 1)
+            self.assertIn("-only-testing:NeoAnki2MobileUITests/MobileAppStoreScreenshotUITests", tests[0])
+            self.assertLess(commands.index(["xcrun", "simctl", "bootstatus", "OWNED-SIMULATOR", "-b"]), commands.index(tests[0]))
+            self.assertFalse(any("wait-ios-test-services.py" in arg for c in commands for arg in c))
+            self.assertIn(["xcrun", "simctl", "delete", "OWNED-SIMULATOR"], cleanup)
+            self.assertFalse((root / "capture/screenshots.json").exists())
+
     def test_existing_screenshot_evidence_is_never_overwritten(self):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder)

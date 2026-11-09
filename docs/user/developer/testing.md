@@ -102,8 +102,9 @@ runs only on iPad: its compact-phone variant was removed because gestures over
 the embedded preview could not reliably scroll the outer Form. Compact-phone
 preview, inspector, advanced, and first-screen audits remain required; the
 removed variant no longer verifies Name/Answer Method traversal and overflow
-together on that phone. Assertion failures are not retried;
-the mobile runner retries only when XCTest records that no test started.
+together on that phone. Each mobile shard executes once. Assertion failures,
+runner-startup failures, and zero-test results are retained and fail the job;
+there is no automatic retry.
 
 The phone's combined legacy Studio journey was also removed after native menu
 selection remained unreliable despite bounds-based gestures. It no longer checks
@@ -188,3 +189,20 @@ pixels. It checks keyboard navigation, contained code blocks, and the absence
 of page-level horizontal overflow.
 
 The image attachment paste/save/replace regression owns the `phone-image-attachments` shard so no iOS batch exceeds five cases. Native Mac Store first-launch acceptance runs separately through `Scripts/review-macos-app.py` against the signed sandboxed candidate.
+
+### iOS XCTest startup
+
+The CI runner, ordinary Release review, and App Store screenshot capture boot a
+uniquely owned disposable Simulator with `simctl bootstatus -b`, then invoke
+`xcodebuild test-without-building` with the verified `.xctestrun` and destination.
+Xcode owns test-runner initialization. The supported split-build workflow is
+[documented by Apple](https://developer.apple.com/library/archive/technotes/tn2339/_index.html).
+
+Manual `launchctl kickstart` of private XCTest/AutomationMode services is an
+optional diagnostic, not a prerequisite for UI validation. The former required
+prewarming gate timed out before any UI case ran, including after cache
+preparation; it depended on undocumented service labels and endpoint state.
+Removing that gate removes no product tests. All scheduled cases, selected test
+counts, result bundles, ordinary Release fresh-install requirements, screenshots,
+and disposable-device cleanup remain required. An actual XCTest initialization
+failure still fails validation and must be diagnosed before another run.

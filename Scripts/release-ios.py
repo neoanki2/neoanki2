@@ -603,6 +603,12 @@ class Workflow:
     package_checksum = "ipa_sha256"
     listing_path = "Platforms/iOS/AppStore/en-US.json"
 
+    def reuse_binary_candidate(self, candidate, files, version, build):
+        return reuse_binary_candidate(candidate, files, version, build)
+
+    def binary_source(self, files):
+        return binary_source(files)
+
     def validate_review(self, review, context):
         return validate_internal_review(review, context, self.output)
 
@@ -623,11 +629,11 @@ class Workflow:
             "phases": {}, "created_at": dt.datetime.now(dt.timezone.utc).isoformat()
         }
         if args.reuse_build_from and not self.receipt.exists():
-            previous = reuse_binary_candidate(args.reuse_build_from, files, args.version, args.build)
+            previous = self.reuse_binary_candidate(args.reuse_build_from, files, args.version, args.build)
             self.state.update({key: previous[key] for key in ("build", "build_id", "app_id")})
             self.state["phases"] = {key: previous["phases"][key] for key in ("archive", "export", "upload")}
             self.state["binary_candidate"] = str(args.reuse_build_from)
-            self.state["binary_source_sha256"] = binary_source(files)
+            self.state["binary_source_sha256"] = self.binary_source(files)
             self.state["rejected_version_ids"] = previous.get("rejected_version_ids", [])
         if self.state["source_sha256"] != self.fingerprint:
             raise ReleaseError("Source changed; use a new output directory to preserve the existing release")
@@ -896,13 +902,13 @@ class Workflow:
         export = self.state["phases"].get("export", {})
         binary_candidate = Path(self.state.get("binary_candidate", self.output))
         if binary_candidate != self.output:
-            reuse_binary_candidate(binary_candidate, source_snapshot()[1], self.state["version"], self.state["build"])
+            self.reuse_binary_candidate(binary_candidate, source_snapshot()[1], self.state["version"], self.state["build"])
         ipa = binary_candidate / "export" / self.package_name
         if not ipa.is_file() or digest(ipa) != export.get(self.package_checksum):
             raise ReleaseError("Internal review requires the checksummed exported candidate IPA")
         context = {"schema_version": 1, "source_sha256": self.fingerprint,
                    "app_source_sha256": application_source(source_snapshot()[1]),
-                   "binary_source_sha256": binary_source(source_snapshot()[1]),
+                   "binary_source_sha256": self.binary_source(source_snapshot()[1]),
                    "version_id": version["id"], "build_id": build["id"],
                    "version": self.state["version"], "build": self.state["build"],
                    self.package_checksum: export[self.package_checksum],

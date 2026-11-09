@@ -28,6 +28,18 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         let display = try XCTUnwrap(NSScreen.main).visibleFrame
         let window = app.windows.firstMatch
         if display.width >= 1500 && display.height >= 950 {
+            let initial = window.frame
+            let screen = try XCTUnwrap(NSScreen.main).frame
+            let destinationOrigin = CGPoint(x: display.minX + 24, y: screen.maxY - display.maxY + 24)
+            let title = window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: initial.width / 2, dy: 10))
+            let movedTitle = title.withOffset(CGVector(dx: destinationOrigin.x - initial.minX,
+                                                       dy: destinationOrigin.y - initial.minY))
+            title.press(forDuration: 0.1, thenDragTo: movedTitle)
+            XCTAssertTrue(waitUntil(timeout: 5) {
+                abs(window.frame.minX - destinationOrigin.x) < 2
+                    && abs(window.frame.minY - destinationOrigin.y) < 2
+            }, "Position the ordinary window before enlarging it within the visible screen")
             let origin = window.frame.origin
             let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
                 .withOffset(CGVector(dx: -3, dy: -3))

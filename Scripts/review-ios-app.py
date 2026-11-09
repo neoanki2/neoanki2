@@ -80,7 +80,6 @@ def main():
             release.save_json(output / "review.json", receipt)
             release.run(["xcrun", "simctl", "boot", identifier])
             release.run(["xcrun", "simctl", "bootstatus", identifier, "-b"], timeout=240)
-            release.run(["python3", str(ROOT / "Scripts/wait-ios-test-services.py"), identifier], timeout=400)
             result = folder / "review.xcresult"
             entry["result_bundle"] = str(result)
             release.run(["xcodebuild", "test-without-building", "-quiet", "-xctestrun", str(runs[0]),
