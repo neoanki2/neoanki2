@@ -239,12 +239,21 @@ extension FastFunctionalJourneyTests {
         let mediaSave = mediaApp.buttons.identified("saveEditItem")
         try runJourneyActivity("AuthoringUITests.testMediaFieldAllowsOptionalDescription") {
             XCTAssertTrue(mediaSave.waitUntilExists(timeout: 5))
-            XCTAssertFalse(mediaSave.isEnabled)
+            let description = mediaApp.textFields.identified("field-Image-altText")
+            XCTAssertTrue(description.waitUntilExists(timeout: 5))
+            XCTAssertEqual(description.value as? String, "")
+            XCTAssertTrue(mediaSave.isEnabled, "A valid image must save without a description")
+            mediaSave.click()
+            XCTAssertTrue(mediaSave.waitUntilGone(timeout: 10))
+            openItemEditor(in: mediaApp)
         }
         try runJourneyActivity("LibraryUITests.testImageEditAllowsOptionalDescription") {
             let save = mediaApp.buttons.identified("saveEditItem")
             XCTAssertTrue(save.waitUntilExists(timeout: 5))
-            XCTAssertFalse(save.isEnabled)
+            XCTAssertTrue(save.isEnabled)
+            XCTAssertEqual(mediaApp.textFields.identified("field-Image-altText").value as? String, "")
+            XCTAssertTrue(mediaApp.buttons.identified("field-Image-removeFile").exists,
+                          "Saving an empty description must preserve the attached image")
         }
         mediaApp.buttons.identified("cancelEditItem").click()
         returnToLibrary(in: mediaApp)

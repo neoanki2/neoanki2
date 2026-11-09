@@ -111,3 +111,9 @@ and the original `review/` directory together. Download the artifact into
 `/tmp/neoanki2-mac-store-review` to retain those original paths. Resume Store
 commands from a detached checkout of the candidate's released source if the
 working branch has subsequently changed only review infrastructure.
+
+The optional `ios_service_probe` mode records both XCTest service states on an
+owned disposable iPad Simulator, before and after activating testmanagerd. It
+runs no UI validation and never starts packaging, signing, or publication jobs.
+Use its raw launchctl observations to diagnose initialization failures before
+changing or revalidating the readiness gate.

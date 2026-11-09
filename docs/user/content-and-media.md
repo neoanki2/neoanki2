@@ -14,6 +14,8 @@ On iPhone or iPad, use **Camera**, **Photos**, or **Files** in the Image field;
 on Mac, choose or drop an image file. You can attach the photo before typing
 its name. The editor shows a preview. Visual descriptions are optional for
 images, GIFs, and image occlusion; descriptions you enter are saved with the image.
+Leaving the description empty still lets you save and reopen an attached image.
+A description helps identify the image when using VoiceOver.
 
 An item type can define Text, Rich Text, Number, Cloze, Image Occlusion, Image, GIF, Audio, and
 Video fields. The field type controls authoring, validation, storage, and
