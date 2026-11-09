@@ -95,3 +95,19 @@ the package contents, cancels both panels, records and plays a real microphone
 response, verifies its persisted audio after restart, and enables the local API
 through Settings to check actual loopback health, authentication, and shutdown.
 These checks run after the five listing captures and never seed app storage.
+
+The hosted fixture creates a temporary 1440 × 900 virtual monitor when the VM's
+fixed display cannot provide an accepted Store size. The monitor is the actual
+WindowServer main display throughout XCTest; the helper restores the original
+geometry and releases it when the child exits. This CI-only tool uses private
+CoreGraphics display interfaces and is never linked into or bundled with the app.
+It refuses to run outside an isolated GitHub-hosted Mac.
+
+The display helper is fetched from the workflow event's exact revision, while
+checkout and app review remain bound to the `head` input. This lets review
+infrastructure fixes test an already signed released candidate without changing
+its source or binary. Preserve `environment/tooling-revision.txt`, `display.log`,
+and the original `review/` directory together. Download the artifact into
+`/tmp/neoanki2-mac-store-review` to retain those original paths. Resume Store
+commands from a detached checkout of the candidate's released source if the
+working branch has subsequently changed only review infrastructure.

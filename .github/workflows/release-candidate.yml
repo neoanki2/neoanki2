@@ -304,35 +304,31 @@ jobs:
             --pattern native-mac-store-review.zip --dir /tmp/neoanki2-mac-store-review
           printf '%s  %s\n' "$REVIEW_SHA256" /tmp/neoanki2-mac-store-review/native-mac-store-review.zip | shasum -a 256 -c -
           ditto -x -k /tmp/neoanki2-mac-store-review/native-mac-store-review.zip /tmp/neoanki2-mac-store-review
-      - name: Configure an actual App Store screenshot display mode
+      - name: Compile the isolated hosted-display fixture from the workflow revision
         run: |
-          swift - <<'SWIFT'
-          import CoreGraphics
-          import Foundation
-          let display = CGMainDisplayID()
-          let accepted = Set(["1280x800", "1440x900", "2560x1600", "2880x1800"])
-          let options = [kCGDisplayShowDuplicateLowResolutionModes as String: true] as CFDictionary
-          let modes = (CGDisplayCopyAllDisplayModes(display, options) as? [CGDisplayMode] ?? []).filter {
-              $0.width >= 1280 && $0.height >= 800 && accepted.contains("\($0.pixelWidth)x\($0.pixelHeight)")
-          }.sorted {
-              if $0.width * $0.height != $1.width * $1.height { return $0.width * $0.height < $1.width * $1.height }
-              return $0.pixelWidth > $1.pixelWidth
-          }
-          guard let mode = modes.first else { fatalError("No App Store screenshot display mode is available") }
-          guard CGDisplaySetDisplayMode(display, mode, nil) == .success else { fatalError("Could not set the review display mode") }
-          print("MACOS_STORE_REVIEW_DISPLAY=\(mode.width)x\(mode.height) pixels=\(mode.pixelWidth)x\(mode.pixelHeight)")
-          SWIFT
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir -p /tmp/neoanki2-mac-store-review/environment
+          gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/macos-review-display.m?ref=$GITHUB_SHA" \
+            --jq .content | base64 --decode > /tmp/neoanki2-mac-store-review/environment/display.m
+          printf '%s\n' "$GITHUB_SHA" > /tmp/neoanki2-mac-store-review/environment/tooling-revision.txt
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Cocoa -framework CoreGraphics \
+            /tmp/neoanki2-mac-store-review/environment/display.m \
+            -o /tmp/neoanki2-mac-store-review/environment/review-display
       - name: Run the ordinary sandboxed first-launch journey
         run: |
           env -u GH_TOKEN -u GITHUB_TOKEN -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            /tmp/neoanki2-mac-store-review/environment/review-display \
             python3 Scripts/review-macos-app.py \
             --candidate /tmp/neoanki2-mac-store-review/candidate \
-            --output /tmp/neoanki2-mac-store-review/review
+            --output /tmp/neoanki2-mac-store-review/review 2>&1 | \
+            tee /tmp/neoanki2-mac-store-review/environment/display.log
       - name: Retain original UI results, executable checksums, configuration, and screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: native-mac-store-review-${{ inputs.head }}
-          path: /tmp/neoanki2-mac-store-review/review/
+          path: |
+            /tmp/neoanki2-mac-store-review/review/
+            /tmp/neoanki2-mac-store-review/environment/
           if-no-files-found: error
           retention-days: 14
