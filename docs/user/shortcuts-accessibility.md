@@ -47,14 +47,15 @@ The app adds these commands to the standard macOS menu bar.
 ### File
 
 - **New Item** — **Command-N** — adds an item to the selected scope.
-- **Add from Vocabulary…** searches an installed offline vocabulary pack and
-  adds generated items to the selected deck.
+- **Add Word…** — **Command-Shift-N** — opens quick offline vocabulary capture.
+  Dictionary–deck setups are remembered. Arrow keys navigate matches, Return
+  selects one, and **Command-Return** adds a valid word without closing the sheet.
 - **Import…** opens a JSON or CSV file.
 - **Import Deck…** opens a `.neodeck` file or `.neoanki` bundle.
 - **Import Vocabulary Pack…** validates and installs a local `.neovocab`
   directory.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
-- **Build Deck…** opens the catalog containing Poem Deck and Prose Deck.
+- **Build Deck…** opens the catalog containing Poem Deck, Prose Deck, and Vocabulary Deck.
 
 There is no **New Window** or **New Tab**; NeoAnki2 has one library. Create decks
 with the controls in the sidebar.

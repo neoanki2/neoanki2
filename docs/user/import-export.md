@@ -100,15 +100,15 @@ receive the catalog and can choose **Download** to install a pack for offline
 use. **Remove from Device** keeps uploaded copies and saved cards. See
 [Dictionary packs]({{ '/user/sync-reminders-widgets/' | relative_url }}#dictionary-packs).
 
-Select the deck that should receive the cards, then choose **File → Add from
-Vocabulary…** or use **Add from Vocabulary** in the deck toolbar. Choose an
-installed pack, search its local index, review the forms, pronunciations,
-meanings, examples, and card paradigms, then choose **Add Cards**. The generated
-items are validated and appended atomically to the selected deck; no new deck is
-created. Existing deck-provided item types keep their order when a later entry
-needs a different vocabulary card type, so meaning, pronunciation, and example
-cards can be added to the same deck across separate sessions. The window stays
-open so another word can be added immediately.
+Choose **File → Add Word…** on Mac, or **Add Word** on iPhone/iPad Home,
+in Create, or inside a deck. Select an installed dictionary and a destination,
+then set up that pair once using an existing item type and field mappings.
+Look up a word, choose any relevant ambiguous content, and add the prepared
+item. The sheet stays open for another word. Each dictionary–deck pair keeps
+its own setup on this device. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
+
+The full vocabulary deck builder remains available through the deck-builder
+catalog for selecting card paradigms and generating a deck.
 
 Import and lookup work offline. Import reads and copies the selected local
 package; lookup reads only the installed SQLite index and local media.

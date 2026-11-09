@@ -89,6 +89,42 @@ While editing an existing item:
 
 Saving closes the form and refreshes the current library scope.
 
+## Add a word quickly
+
+Choose **Add Word** on iPhone or iPad Home, inside a deck, or in Create.
+On Mac, use **File → Add Word…** (**Command-Shift-N**) or **Add Word** in
+the scope toolbar. Opening inside a deck selects that destination; otherwise,
+the last dictionary–deck pair is restored.
+
+1. Choose a deck and an installed dictionary, then type or paste a word or phrase.
+2. On first use of a pair, choose **Set Up**. Select an existing item type and
+   choose the content for each field: typed word, dictionary headword/form,
+   pronunciation text/audio, meaning, example, or content you enter yourself.
+   Look up a word first to see actual examples and supplied pronunciation variants.
+3. Save the setup. A unique relevant match prepares the fields automatically;
+   choose the relevant entry, meaning, or pronunciation when several are supplied.
+4. Edit the prepared fields or fill required content, then choose **Add**.
+   Optional fields are under **More details**. The sheet stays open with an empty
+   word input so you can add another word; choose **Done** to finish.
+
+The app remembers each dictionary–deck combination separately on this device.
+Choosing a deck restores its last dictionary; choosing a dictionary keeps the
+current destination deck. Renames preserve the setup. Deleted or changed fields
+require reviewing the mappings. Edits to one word do not alter the saved setup.
+
+For example, a pronunciation field can receive just the dictionary’s stressed
+spelling or IPA rather than a complete dictionary entry. Meaning and example
+fields receive their selected content separately. Required fields still need
+values; the app does not invent missing meanings, examples, or pronunciations.
+
+Lookup uses installed dictionaries and works offline. Import a dictionary from
+the capture sheet if needed, or use **Enter Manually** when no suitable entry is
+available. On Mac, arrow keys navigate matches, Return chooses a highlighted
+match, **Command-Return** adds a valid word, and Escape requests closing the sheet.
+
+The general New Item editor and full vocabulary deck builder remain available
+for other authoring tasks.
+
 ## Fill fields from a dictionary
 
 On Mac, iPhone, and iPad, the ordinary Add Item editor offers an optional

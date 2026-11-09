@@ -115,13 +115,13 @@ struct ContentView: View {
 
     private var isAddingFromVocabulary: Bool {
         get {
-            if case .vocabularyBuilder = appSession.presentation { return true }
+            if case .wordCapture = appSession.presentation { return true }
             return false
         }
         nonmutating set {
-            if newValue, let deckID = decksModel.selectedDeckID {
-                appSession.show(.vocabularyBuilder(deckID: deckID))
-            } else if case .vocabularyBuilder = appSession.presentation {
+            if newValue {
+                appSession.show(.wordCapture(deckID: decksModel.selectedDeckID))
+            } else if case .wordCapture = appSession.presentation {
                 appSession.dismissPresentation()
             }
         }
@@ -303,15 +303,13 @@ struct ContentView: View {
                 onDone: { isShowingVocabularyPacks = false }
             )
         }
-        .sheet(isPresented: vocabularyBuilderPresentation) {
-            if let destination = selectedVocabularyDestination {
-                VocabularyDeckBuilderView(
-                    installedPacks: vocabularyLibraryModel.installedPacks,
-                    destinationDeck: destination,
-                    onImported: importGeneratedVocabulary,
-                    onCancel: { isAddingFromVocabulary = false }
-                )
-                .frame(minWidth: 640, minHeight: 620)
+        .sheet(isPresented: vocabularyBuilderPresentation, onDismiss: {
+            Task { await vocabularyLibraryModel.load() }
+        }) {
+            WordCaptureView(library: library, rootURL: vocabularyLibraryModel.rootURL,
+                            deckID: decksModel.selectedDeckID) {
+                await decksModel.load(asOf: .now)
+                await reloadScope()
             }
         }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
@@ -495,9 +493,7 @@ struct ContentView: View {
             canExportPortableDeck: canTransferPortableDeck && decksModel.selectedDeckID != nil,
             canImportVocabularyPack: canUseVocabularyUI,
             canOpenVocabularyPacks: canUseVocabularyUI,
-            canAddFromVocabulary: canUseVocabularyUI
-                && decksModel.selectedDeckID != nil
-                && !vocabularyLibraryModel.installedPacks.isEmpty,
+            canAddFromVocabulary: canUseVocabularyUI,
             canOpenDeckBuilder: canTransferPortableDeck && !deckBuilderRegistry.features.isEmpty,
             canOpenTemplates: !isStudying && !isManagingTemplates && !isAddingItem,
             canBrowse: !isBrowsing
@@ -533,13 +529,6 @@ struct ContentView: View {
             && !isShowingDeckBuilder
             && !isShowingVocabularyPacks
             && !isAddingFromVocabulary
-    }
-
-    private var selectedVocabularyDestination: DeckBuilderDeckOption? {
-        guard let deckID = decksModel.selectedDeckID,
-              let summary = decksModel.summaries.first(where: { $0.id == deckID })
-        else { return nil }
-        return DeckBuilderDeckOption(id: deckID, name: summary.name)
     }
 
     private var testingForcePortableBusy: Bool {
@@ -682,10 +671,7 @@ struct ContentView: View {
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
                 onAddItem: { openAddItem() },
-                onAddFromVocabulary: selectedVocabularyDestination != nil
-                    && !vocabularyLibraryModel.installedPacks.isEmpty
-                    ? { isAddingFromVocabulary = true }
-                    : nil,
+                onAddFromVocabulary: canUseVocabularyUI ? { isAddingFromVocabulary = true } : nil,
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
@@ -740,25 +726,6 @@ struct ContentView: View {
         panel.resolvesAliases = false
         guard panel.runModal() == .OK, let source = panel.url else { return }
         Task { _ = await vocabularyLibraryModel.importPack(from: source) }
-    }
-
-    @MainActor
-    private func importGeneratedVocabulary(_ generated: GeneratedDeckBundle) async throws -> Int {
-        defer { generated.cleanup() }
-        guard let destinationDeckID = generated.destinationDeckID else {
-            throw VocabularyDeckBuilderError.missingDestinationDeck
-        }
-        let result = try await library.importAuthoredItems(
-            from: generated.bundleURL,
-            into: destinationDeckID
-        )
-        let now = Date.now
-        await decksModel.load(asOf: now)
-        decksModel.selectedScope = .deck(destinationDeckID)
-        itemsModel.invalidateItemTypes()
-        await reloadScope(asOf: now)
-        await templatesModel?.load()
-        return result.itemCount
     }
 
 #if DEBUG

@@ -48,6 +48,7 @@ let package = Package(
             dependencies: [
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 "NeoAnkiApplication",
+                "NeoAnkiVocabularyKit",
             ],
             path: "Sources/NeoAnkiFeatures"
         ),
@@ -96,6 +97,7 @@ let package = Package(
             dependencies: [
                 "NeoAnkiTextEditing",
                 "NeoAnkiApplication",
+                "NeoAnkiFeatures",
                 "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
             ],
@@ -208,6 +210,7 @@ let package = Package(
             dependencies: [
                 "NeoAnkiFeatures",
                 "NeoAnkiApplication",
+                "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),
             ],

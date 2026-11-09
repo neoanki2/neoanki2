@@ -22,6 +22,11 @@ Shared native text-editing and vocabulary modules do not raise those minimums.
 The Prose Deck builder is included in the same app targets; it adds no platform
 requirement.
 
+To capture vocabulary after opening a library, choose **Add Word** on Home on
+iPhone/iPad, or **File → Add Word…** on Mac. Choose a destination and installed
+dictionary once; the app remembers each dictionary–deck setup on that device.
+See [Add a word quickly](../authoring-items/#add-a-word-quickly).
+
 After the library opens, the Mac Dock icon shows the library-wide number of
 cards due for study. It clears when no cards are due; choosing a deck does not
 narrow the badge. See [App icon due count](../sync-reminders-widgets/#app-icon-due-count)

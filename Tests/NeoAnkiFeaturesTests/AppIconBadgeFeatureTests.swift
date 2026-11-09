@@ -9,6 +9,34 @@ private actor RecordingBadgePublisher: AppIconBadgePublishing {
     func publish(_ badge: AppIconBadge) { badges.append(badge) }
 }
 
+private actor SuspendedBadgePublisher: AppIconBadgePublishing {
+    private var suspendsNextPublication = false
+    private var publication: CheckedContinuation<Void, Never>?
+    private var observer: CheckedContinuation<Void, Never>?
+
+    func suspendNextPublication() { suspendsNextPublication = true }
+
+    func publish(_ badge: AppIconBadge) async {
+        guard suspendsNextPublication else { return }
+        suspendsNextPublication = false
+        await withCheckedContinuation { continuation in
+            publication = continuation
+            observer?.resume()
+            observer = nil
+        }
+    }
+
+    func waitUntilSuspended() async {
+        guard publication == nil else { return }
+        await withCheckedContinuation { observer = $0 }
+    }
+
+    func resumePublication() {
+        publication?.resume()
+        publication = nil
+    }
+}
+
 private actor BadgeOnlyNotificationScheduler: NotificationSchedulingService {
     var requests = 0
     func authorizationStatus() -> NotificationAuthorizationStatus { .authorized }
@@ -108,4 +136,37 @@ private actor BadgeOnlyNotificationScheduler: NotificationSchedulingService {
     #expect(await publisher.badges.last?.label == "1")
     try await model.updateDeck(id: deck.id, name: deck.name, parentID: nil, newCardsPerDay: 1)
     #expect(await publisher.badges.last?.label == "2")
+}
+
+@Test @MainActor func studyStartsWhileBackgroundCountPublicationIsSuspended() async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("neoanki-study-during-refresh-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
+    let publisher = SuspendedBadgePublisher()
+    let model = LibraryFeatureModel(library: library, badgePublisher: publisher)
+    await model.bootstrap()
+    let type = try #require(model.itemTypes.first { $0.id == BuiltInItemTypes.basicID })
+    try await model.createItem(itemType: type, deckID: nil, values: [
+        BuiltInItemTypes.frontFieldID: .text("Question during refresh"),
+        BuiltInItemTypes.backFieldID: .text("Answer"),
+    ])
+
+    // Hold a real refresh at its publication boundary, without timing sleeps.
+    // Its ready study action must not depend on notification service latency.
+    await publisher.suspendNextPublication()
+    let refresh = Task { await model.refresh() }
+    await publisher.waitUntilSuspended()
+    #expect(model.isRefreshing)
+    #expect(model.allDecksSummary.dueNow == 1)
+    await model.beginStudy(scope: .allDecks, title: "All Decks")
+    #expect(model.activeStudy?.currentCard != nil)
+    #expect(model.activeStudy?.isLoading == false)
+    #expect(model.activeStudy?.error == nil)
+    #expect(!model.isStartingStudy)
+    #expect(model.isRefreshing)
+    await publisher.resumePublication()
+    await refresh.value
+    #expect(!model.isRefreshing)
 }

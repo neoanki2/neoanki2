@@ -178,6 +178,13 @@
       "screenshot": "assets/screenshots/item-detail.png"
     },
     {
+      "id": "quick-word-capture",
+      "name": "Add vocabulary with remembered dictionary–deck setups",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnkiFeatures/WordCaptureModel.swift", "Sources/NeoAnkiFeatures/VocabularyDeckConfiguration.swift", "Sources/NeoAnkiSharedUI/WordCaptureView.swift"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/WordCaptureTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "UITests/NeoAnki2UITests/VocabularyUITests.swift"]
+    },
+    {
       "id": "item-dictionary-lookup",
       "name": "Fill arbitrary item fields from a local dictionary",
       "article": "user/authoring-items.md",

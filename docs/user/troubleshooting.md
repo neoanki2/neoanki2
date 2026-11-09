@@ -15,6 +15,10 @@ requirement, or unavailable action.
 
 ## Find your symptom
 
+- **Add Word asks to repair its setup or cannot find its dictionary:** select
+  **Card Setup** to repair changed fields, or choose/import an installed
+  dictionary. The word you typed stays in the capture sheet. A failed save
+  retains your draft so you can correct the issue and retry.
 - **The app icon has no due-count badge:** confirm **All Decks** has cards due
   now, then let the library refresh. In system notification settings, allow
   **Badge application icon** on Mac or **Badges** on iPhone/iPad, then return

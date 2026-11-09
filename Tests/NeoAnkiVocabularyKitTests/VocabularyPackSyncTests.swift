@@ -217,7 +217,9 @@ private func workspace() throws -> URL {
     let model = VocabularyPackSyncModel(rootURL: root.appendingPathComponent("installed"), transport: cloud)
     model.setEnabled(true)
     defer { model.setEnabled(false) }
-    try await eventually { model.catalog.count == 1 }
+    // Catalog publication precedes local-pack scanning. Wait for that refresh to
+    // finish so the explicit account-change refresh below is not coalesced away.
+    try await eventually { model.catalog.count == 1 && !model.isRefreshing }
     await cloud.changeAccount()
     await model.refresh()
     try await eventually { model.catalog.isEmpty && !model.isRefreshing }

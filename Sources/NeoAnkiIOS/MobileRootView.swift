@@ -7,12 +7,24 @@ import SwiftUI
 
 #if os(iOS)
 import UIKit
+private struct OpenWordCaptureKey: EnvironmentKey {
+    static let defaultValue: @MainActor (UUID?) -> Void = { _ in }
+}
+private extension EnvironmentValues {
+    var openWordCapture: @MainActor (UUID?) -> Void {
+        get { self[OpenWordCaptureKey.self] }
+        set { self[OpenWordCaptureKey.self] = newValue }
+    }
+}
 public struct MobileRootView: View {
     @Bindable var model: MobileAppModel
     @State private var fixtureError: String?
+    @State private var showsWordCapture = false
+    @State private var wordCaptureDeckID: UUID?
     @State private var fixturesReady = false
     @State private var retriedFailureFixture = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("mobile-conceals-answers") private var concealsAnswers = true
     @State private var vocabularyLibrary: MobileVocabularyLibraryModel
@@ -47,6 +59,16 @@ public struct MobileRootView: View {
         }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .environment(\.vocabularyPackRootURL, vocabularyRootURL)
+        .environment(\.openWordCapture, { deckID in
+            wordCaptureDeckID = deckID
+            showsWordCapture = true
+        })
+        .sheet(isPresented: $showsWordCapture, onDismiss: { Task { await vocabularyLibrary.load() } }) {
+            WordCaptureView(library: model.library, rootURL: vocabularyRootURL, deckID: wordCaptureDeckID) {
+                await model.authoringDidCommit()
+            }
+            .dynamicTypeSize(dynamicTypeSize)
+        }
         .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
             Button("OK") { fixtureError = nil }
         } message: { Text(fixtureError ?? "") }
@@ -188,6 +210,7 @@ private extension AppSection {
 }
 
 private struct CreateHubView: View {
+    @Environment(\.openWordCapture) private var openWordCapture
     @Bindable var model: MobileAppModel
     @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
     @Binding var path: NavigationPath
@@ -198,6 +221,8 @@ private struct CreateHubView: View {
         NavigationStack(path: $path) {
             List {
                 Section("Add") {
+                    Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
+                        .accessibilityIdentifier("create-add-word")
                     Button { isAddingItem = true } label: { Label("New Item", systemImage: "rectangle.stack.badge.plus") }
                     Button { isAddingDeck = true } label: { Label("New Deck", systemImage: "folder.badge.plus") }
                 }
@@ -325,6 +350,7 @@ private struct SettingsView: View {
 }
 
 private struct HomeView: View {
+    @Environment(\.openWordCapture) private var openWordCapture
     @Bindable var model: MobileAppModel
     @Binding var path: NavigationPath
     @State private var isAddingDeck = false
@@ -338,7 +364,9 @@ private struct HomeView: View {
                     DueNowCard(
                         title: "Ready to study",
                         summary: model.allDecksSummary,
-                        isWorking: model.isRefreshing || model.isStartingStudy,
+                        // Background count refreshes do not prevent study.
+                        // Only starting a session must disable this action.
+                        isWorking: model.isStartingStudy,
                         action: { startStudy(.allDecks) }
                     )
                     .listRowInsets(EdgeInsets())
@@ -346,6 +374,11 @@ private struct HomeView: View {
                     if model.allDecksSummary.itemCount == 0 {
                         Button("Add First Item", systemImage: "plus") { isAddingItem = true }
                     }
+                }
+
+                Section {
+                    Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
+                        .accessibilityIdentifier("home-add-word")
                 }
 
                 Section {
@@ -487,6 +520,7 @@ private struct ScopeRow: View {
 }
 
 private struct ScopeDetailView: View {
+    @Environment(\.openWordCapture) private var openWordCapture
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     let scope: MobileScope
@@ -511,6 +545,9 @@ private struct ScopeDetailView: View {
 
                 Section {
                     NavigationLink("Browse Items") { LibraryView(model: model, scope: scope.filter, embedsNavigation: false) }
+                    Button("Add Word", systemImage: "character.book.closed") {
+                        if case let .deck(id) = scope { openWordCapture(id) } else { openWordCapture(nil) }
+                    }.accessibilityIdentifier("deck-add-word")
                     Button("Add Item", systemImage: "plus") { showsAddItem = true }
                 }
                 if case let .deck(id) = scope, model.decks.contains(where: { $0.parentID == id }) {

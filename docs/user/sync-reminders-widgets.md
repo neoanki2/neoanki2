@@ -13,6 +13,11 @@ iCloud sync is available in provisioned Mac, iPhone, and iPad builds. Daily
 reminders and the Due Cards widget are iPhone/iPad services. The library remains
 usable offline and each device keeps its own service preferences.
 
+Items saved through **Add Word** use ordinary library sync and update due counts,
+including badges and the widget. Saved dictionary–deck capture configurations
+remain local to each device and library; configure a pair separately on another
+device even when its items and dictionary packs have synced.
+
 This guide follows the current `main` source. Before relying on sync in an
 installed build, check that build's release notes and entitlements; an older
 public Mac release or unsigned contributor build can operate locally without a

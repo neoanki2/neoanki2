@@ -5,123 +5,54 @@ extension FastFunctionalJourneyTests {
     func runSharedVocabularyJourney() throws {
         let packURL = try makeVocabularyPackFixture()
         let app = launchApp()
-
         createDeck(named: "Ukrainian", in: app)
         selectScope("deckRow-Ukrainian", in: app)
-        assertMenuDisabled("Add from Vocabulary…", in: app)
 
         app.menuBarItems["Library"].click()
-        let packsMenuItem = app.menuItems.identified("Vocabulary Packs…")
-        XCTAssertTrue(packsMenuItem.waitUntilExists(timeout: 3))
-        XCTAssertTrue(packsMenuItem.isEnabled)
-        packsMenuItem.click()
-
+        app.menuItems.identified("Vocabulary Packs…").click()
         let importPack = app.buttons.identified("importVocabularyPackEmptyState")
         XCTAssertTrue(importPack.waitUntilHittable(timeout: 5))
         importPack.click()
         chooseFileInOpenPanel(packURL, in: app)
-
-        let installedPack = app.descendants(matching: .any)["vocabularyPack-ui.fixture.uk"]
-        let installedPackTitle = app.staticTexts["Ukrainian UI Fixture"]
-        XCTAssertTrue(
-            waitUntil(timeout: 20) { installedPack.exists || installedPackTitle.exists },
-            "The imported pack should appear in the managed pack library"
-        )
-
+        XCTAssertTrue(app.staticTexts["Ukrainian UI Fixture"].waitUntilExists(timeout: 20))
         app.buttons.identified("vocabularyPacksDone").click()
-        XCTAssertTrue(
-            app.buttons.identified("vocabularyPacksDone").waitUntilGone(timeout: 5)
-        )
-        if let noticeButton = firstExisting(
-            of: [app.buttons["action-button-1"], app.buttons["OK"]],
-            timeout: 1
-        ), noticeButton.isHittable {
-            noticeButton.click()
-        }
+        if let notice = firstExisting(of: [app.buttons["action-button-1"], app.buttons["OK"]], timeout: 1), notice.isHittable { notice.click() }
 
         selectScope("deckRow-Ukrainian", in: app)
-        let addFromVocabulary = app.buttons.identified("addFromVocabularyToolbar")
-        XCTAssertTrue(addFromVocabulary.waitUntilHittable(timeout: 5))
-        addFromVocabulary.click()
-
-        XCTAssertTrue(
-            app.textFields.identified("vocabularyBuilderSearchField")
-                .waitUntilExists(timeout: 5),
-            "The vocabulary builder should open for the selected destination deck"
-        )
+        app.buttons.identified("addFromVocabularyToolbar").click()
+        let query = app.textFields.identified("word-capture-query")
+        XCTAssertTrue(query.waitUntilExists(timeout: 5))
+        enterText("слово", into: query, app: app)
+        app.buttons.identified("word-capture-setup").click()
+        let typePicker = app.popUpButtons.identified("word-capture-setup-type")
+        if typePicker.exists {
+            typePicker.click()
+            app.menuItems["Basic"].click()
+        }
+        app.buttons.identified("word-capture-save-setup").click()
 
         for addition in 1 ... 2 {
-            let searchField = app.textFields.identified("vocabularyBuilderSearchField")
-            enterText("слово", into: searchField, app: app)
-
-            let search = app.buttons.identified("vocabularyBuilderSearch")
-            XCTAssertTrue(search.waitUntilHittable(timeout: 5))
-            search.click()
-
-            let entry = app.buttons.identified("vocabularyBuilderEntry-uk:слово:ui")
-            XCTAssertTrue(entry.waitUntilHittable(timeout: 10))
-            entry.click()
-
-            let identifiedAdd = app.buttons.identified("vocabularyBuilderAdd")
-            let labeledAdd = app.buttons["Add Cards"]
-            XCTAssertTrue(
-                waitUntil(timeout: 10) {
-                    (identifiedAdd.exists && identifiedAdd.isEnabled && identifiedAdd.isHittable)
-                        || (labeledAdd.exists && labeledAdd.isEnabled && labeledAdd.isHittable)
-                },
-                "The selected entry should produce addable cards"
-            )
-            let add = identifiedAdd.exists ? identifiedAdd : labeledAdd
+            if addition > 1 { enterText("слово", into: query, app: app) }
+            let add = app.buttons.identified("word-capture-add")
+            XCTAssertTrue(waitUntil(timeout: 10) { add.isEnabled && add.isHittable })
             add.click()
-
-            let identifiedSuccess = app.descendants(matching: .any)["vocabularyBuilderSuccess"]
-            let labeledSuccess = app.staticTexts.matching(
-                NSPredicate(format: "label CONTAINS %@", "3 items added to Ukrainian")
-            ).firstMatch
-            XCTAssertTrue(
-                waitUntil(timeout: 20) { identifiedSuccess.exists || labeledSuccess.exists },
-                "Vocabulary addition \(addition) should finish without closing the flow"
-            )
-            let success = identifiedSuccess.exists ? identifiedSuccess : labeledSuccess
-            XCTAssertTrue(
-                (success.label + " " + (success.value as? String ?? ""))
-                    .contains("3 items added to Ukrainian")
-            )
-            XCTAssertTrue(
-                searchField.waitUntilExists(timeout: 3),
-                "The vocabulary flow should remain open for another word"
-            )
+            let success = app.descendants(matching: .any)["word-capture-success"]
+            XCTAssertTrue(success.waitUntilExists(timeout: 10))
+            XCTAssertTrue((success.label + " " + (success.value as? String ?? "")).contains("Ukrainian"))
+            XCTAssertTrue(query.exists, "The flow stays open for another word")
         }
-
-        let identifiedCancel = app.buttons.identified("vocabularyBuilderCancel")
-        let labeledCancel = app.buttons["Cancel"]
-        let cancel = identifiedCancel.exists ? identifiedCancel : labeledCancel
-        XCTAssertTrue(cancel.waitUntilHittable(timeout: 5))
-        cancel.click()
-        XCTAssertTrue(
-            app.textFields.identified("vocabularyBuilderSearchField").waitUntilGone(timeout: 5)
-        )
-
+        app.buttons.identified("word-capture-done").click()
+        XCTAssertTrue(query.waitUntilGone(timeout: 5))
+        app.buttons.identified("addFromVocabularyToolbar").click()
+        XCTAssertTrue(waitUntil(timeout: 5) { (app.buttons.identified("word-capture-setup").value as? String) == "Basic" })
+        app.buttons.identified("word-capture-done").click()
         showSidebar(in: app)
-        let destination = app.descendants(matching: .any)["deckRow-Ukrainian"]
-        let dueHeadline = app.descendants(matching: .any)["scopeHomeDueHeadline"]
-        let browseLink = app.descendants(matching: .any)["scopeHomeBrowseLink"]
-        XCTAssertTrue(
-            waitUntil(timeout: 10) {
-                guard destination.exists, dueHeadline.exists, browseLink.exists else {
-                    return false
-                }
-                let dueText = dueHeadline.label + " " + (dueHeadline.value as? String ?? "")
-                let browseText = browseLink.label + " " + (browseLink.value as? String ?? "")
-                return dueText.contains("8 cards due")
-                    && browseText.contains("Browse 6 Items")
-            },
-            "Both additions should land in the one selected deck"
-        )
-        let deckRows = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH 'deckRow-'")
-        )
-        XCTAssertEqual(deckRows.count, 1, "Vocabulary additions must not create child decks")
+        let browse = app.descendants(matching: .any)["scopeHomeBrowseLink"]
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            (browse.label + " " + (browse.value as? String ?? "")).contains("Browse 2 Items")
+        })
+        let deckRows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'deckRow-'"))
+        XCTAssertEqual(deckRows.count, 1, "Word capture must not create child decks")
     }
 
     private func makeVocabularyPackFixture() throws -> URL {

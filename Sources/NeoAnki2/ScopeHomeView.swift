@@ -69,7 +69,7 @@ struct ScopeHomeView: View {
             }
             if let onAddFromVocabulary {
                 ToolbarItem(placement: .automatic) {
-                    Button("Add from Vocabulary", systemImage: "character.book.closed") {
+                    Button("Add Word", systemImage: "character.book.closed") {
                         onAddFromVocabulary()
                     }
                     .help("Find an entry in an installed offline vocabulary pack")

@@ -1,6 +1,6 @@
 {
   "appearance" : "dark",
-  "capturedAt" : "2026-11-04T12:11:47Z",
+  "capturedAt" : "2026-11-08T11:35:27Z",
   "schemaVersion" : 1,
   "screenshots" : [
     {
@@ -11,7 +11,7 @@
       "filename" : "decks-nested.png",
       "height" : 732,
       "scenario" : "library sidebar with nested Languages and French decks",
-      "sha256" : "ada41f067c3fef3fd654d69f3c8ef8601337d631bec9cfacbac89153d38e44b4",
+      "sha256" : "d824dba71a40011990c52f248171d654e155da584111dee595264b27245f0dd1",
       "width" : 1024
     },
     {
@@ -30,9 +30,9 @@
         "confirmImport"
       ],
       "filename" : "import-sheet.png",
-      "height" : 724,
+      "height" : 732,
       "scenario" : "CSV import mapping sheet",
-      "sha256" : "f74701111584cb98fc7966d06a6ae336fb3ac1d8700f18a5f484ecbbff4bc03d",
+      "sha256" : "f7f3e58c6b8722b4f6a57bd0e79320901b32c08ff2e295c2654fde575eeef91e",
       "width" : 1024
     },
     {
@@ -102,7 +102,7 @@
       "filename" : "library-empty.png",
       "height" : 732,
       "scenario" : "empty library",
-      "sha256" : "4d6b48c7fe2fc0de11aba7589cbadc4100b526e0c4e735f0df0bc2562d58abaa",
+      "sha256" : "45c959b0e25be11f217d9b660112d0342e14f3982f6594a646ac759c33d61ec7",
       "width" : 1024
     },
     {
@@ -125,7 +125,7 @@
       "filename" : "portable-conflict.png",
       "height" : 732,
       "scenario" : "portable deck item-type conflict",
-      "sha256" : "8b72c97e117d8759e062fabce737014797e7a0d74e38328ecafb5a2086397071",
+      "sha256" : "cdda23744329389e6b72ff081b450fc8481cceaac0f71d1dce8f7eb446928bb9",
       "width" : 1024
     },
     {
@@ -136,7 +136,7 @@
       "filename" : "scheduling-result.png",
       "height" : 732,
       "scenario" : "library after a session that refitted scheduling, with no prompt",
-      "sha256" : "1c68105840b0b7c416f64a0d5611446b3ec30d01acaec3efc3617f8c0f97174a",
+      "sha256" : "d5d0f6ddc38a7c6998b0b384e4f7ee7fb8a522094a98ad067b9764380cb11fb1",
       "width" : 1024
     },
     {
@@ -221,5 +221,5 @@
       "width" : 1024
     }
   ],
-  "sourceSHA" : "689fa95418306e05fc6adff038479451e5446d46"
+  "sourceSHA" : "d2700707e82cb41a7e5ea8979a04588eaec62639"
 }

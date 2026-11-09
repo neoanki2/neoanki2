@@ -41,7 +41,7 @@ public enum AppPresentation: Sendable, Hashable, Identifiable {
     case deckBuilder
     case poemBuilder
     case vocabularyPacks
-    case vocabularyBuilder(deckID: UUID)
+    case wordCapture(deckID: UUID?)
     case scheduling
     case syncIssues
     case reminderEditor
@@ -54,7 +54,7 @@ public enum AppPresentation: Sendable, Hashable, Identifiable {
         case .deckBuilder: "deck-builder"
         case .poemBuilder: "poem-builder"
         case .vocabularyPacks: "vocabulary-packs"
-        case let .vocabularyBuilder(deckID): "vocabulary-builder-\(deckID.uuidString)"
+        case let .wordCapture(deckID): "word-capture-\(deckID?.uuidString ?? "last")"
         case .scheduling: "scheduling"
         case .syncIssues: "sync-issues"
         case .reminderEditor: "reminder-editor"
