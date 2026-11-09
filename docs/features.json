@@ -63,7 +63,7 @@
       "name": "First launch and local library",
       "article": "user/getting-started.md",
       "sources": ["Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnki2/AppDatabase.swift", "Sources/NeoAnki2/MacCloudSyncSettings.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppLaunchSmokeTests.swift", "Tests/NeoAnki2Tests/AppStartupPerformanceTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/MacStoreProductionReviewJourneyTests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppLaunchSmokeTests.swift", "Tests/NeoAnki2Tests/AppStartupPerformanceTests.swift"],
       "screenshot": "assets/screenshots/library-empty.png"
     },
     {
