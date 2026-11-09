@@ -115,6 +115,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
     func scrollToAndTap(
         _ element: XCUIElement,
         in app: XCUIApplication,
+        surface: XCUIElement? = nil,
         preferredDirection: MobileScrollDirection? = nil,
         maximumSteps: Int = 8,
         acceptsPartialVisibility: Bool = false,
@@ -125,6 +126,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
         scrollTo(
             element,
             in: app,
+            surface: surface,
             preferredDirection: preferredDirection,
             maximumSteps: maximumSteps,
             acceptsPartialVisibility: acceptsPartialVisibility,
@@ -138,6 +140,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
     func scrollTo(
         _ element: XCUIElement,
         in app: XCUIApplication,
+        surface: XCUIElement? = nil,
         preferredDirection: MobileScrollDirection? = nil,
         maximumSteps: Int = 8,
         acceptsPartialVisibility: Bool = false,
@@ -187,7 +190,21 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             }
             return usableContent.contains(CGPoint(x: frame.midX, y: frame.midY))
         }
-        let scrollingSurface = scrollingSurface(for: element, in: app)
+        if let surface {
+            XCTAssertTrue(surface.waitUntilExists(timeout: 5), file: file, line: line)
+            let frame = surface.frame
+            XCTAssertTrue(
+                !frame.isEmpty && frame.minX.isFinite && frame.minY.isFinite
+                    && frame.maxX.isFinite && frame.maxY.isFinite
+                    && frame.intersects(app.frame),
+                "The explicit scrolling surface must have visible, finite bounds",
+                file: file, line: line
+            )
+        }
+        // A native Form container may not itself be a hittable accessibility
+        // element even when its visible children are. Known editors bind their
+        // real scroll surface instead of falling back to application gestures.
+        let scrollingSurface = surface ?? scrollingSurface(for: element, in: app)
         let navigationBottom = activeNavigationBars(in: app)
             .map(\.frame.maxY)
             .max() ?? app.frame.minY
@@ -926,21 +943,21 @@ final class MobileStudioValidationUITests: NeoAnki2MobileUITestCase {
 @MainActor
 final class MobileStudioCanvasAccessibilityUITests: NeoAnki2MobileUITestCase {
     @available(iOS 17.0, *)
-    func testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow() throws {
+    func testTabletCardSetupControlsHaveNoHorizontalOverflow() throws {
         let app = launchItemTypeStudioAuditApp()
-        let editor = app.descendants(matching: .any)["cardSetupEditor"]
+        let editor = app.collectionViews["cardSetupEditor"]
         XCTAssertTrue(editor.waitUntilExists(timeout: 15))
         XCTAssertGreaterThan(app.frame.width, app.frame.height)
         XCTAssertGreaterThanOrEqual(editor.frame.minX, app.frame.minX - 1)
         XCTAssertLessThanOrEqual(editor.frame.maxX, app.frame.maxX + 1)
         // The shipping mobile Form lazily mounts its sections. Bring the
         // focused controls into view before inspecting their traversal order.
-        let name = app.textFields["cardSetupEditor.name"]
-        let method = app.buttons["cardSetupEditor.answerMethod"]
-        scrollTo(name, in: app)
+        let name = editor.textFields["cardSetupEditor.name"]
+        let method = editor.buttons["cardSetupEditor.answerMethod"]
+        scrollTo(name, in: app, surface: editor)
         assertAccessibilityTraversalOrder([(name, .textField)], in: editor)
         assertNoHorizontalOverflow(in: editor, viewport: app)
-        scrollTo(method, in: app)
+        scrollTo(method, in: app, surface: editor)
         // At the largest size on a compact phone, the earlier name row may
         // unmount. Its visible traversal was checked before scrolling. Keep
         // the relative-order assertion whenever both rows remain mounted.
@@ -2127,9 +2144,25 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
     func testLargestTypeStudyAccessibilityRotationAndKeyboard() throws {
         let app = launchApp(additionalArguments: ["-NeoAnkiUITestingAccessibility"], environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
-        scrollToAndTap(app.staticTexts["Study Fixtures"], in: app, maximumSteps: 14)
-        scrollToAndTap(app.staticTexts["type"], in: app)
-        scrollToAndTap(app.buttons["Start Studying"], in: app)
+        func currentDeckList() throws -> XCUIElement {
+            XCTAssertTrue(app.buttons["Start Studying"].waitUntilExists(timeout: 5))
+            // Query by container position after navigation settles. Do not bind
+            // to a lazy child that scrolling can unmount, or to iPad's sidebar.
+            return try XCTUnwrap(app.collectionViews.allElementsBoundByIndex.filter {
+                $0.exists && $0.label != "Sidebar" && !$0.frame.isEmpty
+                    && $0.frame.intersects(app.frame)
+            }.max { $0.frame.maxX < $1.frame.maxX })
+        }
+        scrollToAndTap(app.staticTexts["Study Fixtures"], in: app, surface: try currentDeckList(), maximumSteps: 14)
+        // Wait for the destination before resolving its lazy List. A snapshot
+        // of Home's outgoing collection can disappear during the push.
+        XCTAssertTrue(app.navigationBars["Study Fixtures"].waitUntilExists(timeout: 5))
+        let fixtureDeckList = try currentDeckList()
+        let typedDeck = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "type,")).firstMatch
+        scrollToAndTap(typedDeck, in: app, surface: fixtureDeckList, maximumSteps: 16)
+        XCTAssertTrue(app.navigationBars["type"].waitUntilExists(timeout: 5))
+        scrollToAndTap(app.buttons["Start Studying"], in: app, surface: try currentDeckList())
+        XCTAssertTrue(app.buttons["endStudySession"].waitUntilExists(timeout: 10))
         let input = app.textFields["Typed answer"]
         scrollToAndTap(input, in: app); input.typeText("Paris")
         let check = app.buttons["Check Answer"]

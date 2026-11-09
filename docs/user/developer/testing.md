@@ -88,17 +88,21 @@ remote CI as the first functional UI pass.
 `Config/ci-ui-shards.json` is the executable source of truth for required UI
 coverage. macOS builds the app and test runner once, then runs five balanced
 functional shards from that exact-revision artifact. iOS also builds once:
-behavioral journeys run on the representative large phone, while the complete
-accessibility and responsive-layout matrix runs on both the compact phone and
-iPad. Small iOS shards run concurrently on separate hosted runners, with one
+behavioral journeys run on the representative large phone, while focused
+accessibility and responsive-layout checks run on the compact phone and iPad. Small iOS shards run concurrently on separate hosted runners, with one
 simulator per shard. Do not use parallel simulator clones inside a job: they
 compete for Accessibility and can turn fast assertions into AX IPC timeouts or
 test-runner bootstrap crashes.
 
 `FunctionalUICoverageManifestTests` compares the manifest with every declared
 macOS and iOS UI test method. Removing, renaming, or failing to schedule a test
-therefore fails the fast test lane. Accessibility tests must remain assigned to
-both compact and regular-width devices. Assertion failures are not retried;
+therefore fails the fast test lane. Accessibility section audits remain assigned
+to both compact and regular-width devices. The full card-setup control matrix
+runs only on iPad: its compact-phone variant was removed because gestures over
+the embedded preview could not reliably scroll the outer Form. Compact-phone
+preview, inspector, advanced, and first-screen audits remain required; the
+removed variant no longer verifies Name/Answer Method traversal and overflow
+together on that phone. Assertion failures are not retried;
 the mobile runner retries only when XCTest records that no test started.
 
 Each shared build and UI shard writes its elapsed time to the Actions step

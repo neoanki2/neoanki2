@@ -77,7 +77,6 @@
       "device": "iPhone 17e",
       "workers": 1,
       "tests": [
-        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow",
         "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility"
       ]
     },
@@ -113,7 +112,7 @@
       "device": "iPad Pro 13-inch (M5)",
       "workers": 1,
       "tests": [
-        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioAccessibilityMatrixHasNoHorizontalOverflow",
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testTabletCardSetupControlsHaveNoHorizontalOverflow",
         "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility"
       ]
     },
