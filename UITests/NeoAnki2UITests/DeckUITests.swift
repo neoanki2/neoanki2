@@ -237,14 +237,14 @@ extension FastFunctionalJourneyTests {
         openItemDetail(named: "Image", in: mediaApp)
         openItemEditor(in: mediaApp)
         let mediaSave = mediaApp.buttons.identified("saveEditItem")
-        // SwiftUI's enclosing media editor supplies the container identifier;
-        // query the native control's visible label rather than a child ID.
-        let imageDescription = mediaApp.textFields.matching(
-            NSPredicate(format: "label == %@", "Image description (optional)")
-        ).firstMatch
+        // SwiftUI propagates the enclosing media identifier to this native
+        // text field; its visible description is a separate StaticText.
+        let imageDescriptions = mediaApp.textFields.matching(identifier: "field-Image")
+        let imageDescription = imageDescriptions.firstMatch
         try runJourneyActivity("AuthoringUITests.testMediaFieldAllowsOptionalDescription") {
             XCTAssertTrue(mediaSave.waitUntilExists(timeout: 5))
             XCTAssertTrue(imageDescription.waitUntilExists(timeout: 5), mediaApp.debugDescription)
+            XCTAssertEqual(imageDescriptions.count, 1, "The image description must be unambiguous")
             XCTAssertEqual(imageDescription.value as? String, "")
             XCTAssertTrue(mediaSave.isEnabled, "A valid image must save without a description")
             mediaSave.click()
@@ -256,6 +256,7 @@ extension FastFunctionalJourneyTests {
             XCTAssertTrue(save.waitUntilExists(timeout: 5))
             XCTAssertTrue(save.isEnabled)
             XCTAssertTrue(imageDescription.waitUntilExists(timeout: 5), mediaApp.debugDescription)
+            XCTAssertEqual(imageDescriptions.count, 1, "The image description must be unambiguous")
             XCTAssertEqual(imageDescription.value as? String, "")
             XCTAssertTrue(mediaApp.buttons.matching(NSPredicate(format: "label == %@", "Remove")).firstMatch.exists,
                           "Saving an empty description must preserve the attached image")
