@@ -26,6 +26,11 @@ on:
         required: false
         default: false
         type: boolean
+      ios_probe_xcode27:
+        description: Diagnose the newer supported Xcode 27 host and runtime without running UI validation
+        required: false
+        default: false
+        type: boolean
       ios_prepare_dyld_cache:
         description: Opt-in diagnostic experiment using Apple runtime cache preparation before boot
         required: false
@@ -352,7 +357,9 @@ jobs:
   ios-service-probe:
     name: Diagnose disposable Simulator service activation
     if: inputs.ios_service_probe == true
-    runs-on: macos-26
+    runs-on: ${{ inputs.ios_probe_xcode27 && 'xcode-27' || 'macos-26' }}
+    env:
+      DEVELOPER_DIR: ${{ inputs.ios_probe_xcode27 && '/Applications/Xcode_27.2.app/Contents/Developer' || '/Applications/Xcode_26.6.app/Contents/Developer' }}
     timeout-minutes: 15
     permissions:
       contents: read
