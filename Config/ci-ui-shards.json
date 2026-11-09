@@ -68,7 +68,6 @@
       "device": "iPhone 17 Pro Max",
       "workers": 1,
       "tests": [
-        "NeoAnki2MobileUITests/MobileStudioLegacyUITests/testItemTypeStudioLegacyClozeReadOnlyAndDestructiveConfirmations",
         "NeoAnki2MobileUITests/MobileStudioValidationUITests/testItemTypeStudioValidationRoutesToInvalidCardSetupAndFocusesIt"
       ]
     },

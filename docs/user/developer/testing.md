@@ -105,6 +105,15 @@ removed variant no longer verifies Name/Answer Method traversal and overflow
 together on that phone. Assertion failures are not retried;
 the mobile runner retries only when XCTest records that no test started.
 
+The phone's combined legacy Studio journey was also removed after native menu
+selection remained unreliable despite bounds-based gestures. It no longer checks
+Cloze starter filtering, legacy additional-content navigation, read-only actions,
+or discard and field-removal confirmations together through the phone UI. The
+validation-route journey remains required, as do the separate authoring journeys,
+section accessibility audits, shared model tests, and Mac Studio checks. Do not
+rerun an unchanged failed check to obtain green: correct its cause or remove it,
+and record any coverage loss.
+
 Each shared build and UI shard writes its elapsed time to the Actions step
 summary. When adding coverage, rebalance existing shards before adding another
 macOS job: standard GitHub-hosted plans allow only five concurrent macOS jobs,
