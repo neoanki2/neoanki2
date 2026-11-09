@@ -217,8 +217,8 @@
       "id": "content-media",
       "name": "Image, GIF, audio, and video fields",
       "article": "user/content-and-media.md",
-      "sources": ["Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaAsset.swift"],
-      "tests": ["UITests/NeoAnki2UITests/AuthoringUITests.swift", "Tests/NeoAnki2Tests/MediaImageLoaderTests.swift", "Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift"],
+      "sources": ["Sources/NeoAnkiApplication/AttachmentImagePreparer.swift", "Sources/NeoAnkiSharedUI/ImageAttachmentTransfer.swift", "Sources/NeoAnkiIOS/MobileImageAttachmentUITestFixture.swift", "Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaAsset.swift"],
+      "tests": ["Tests/NeoAnkiApplicationTests/AttachmentImagePreparerTests.swift", "Tests/NeoAnki2Tests/ImageAttachmentTransferTests.swift", "UITests/NeoAnki2UITests/AuthoringUITests.swift", "Tests/NeoAnki2Tests/MediaImageLoaderTests.swift", "Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift"],
       "screenshot": "assets/screenshots/item-media.png"
     },
     {

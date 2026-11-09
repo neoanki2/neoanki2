@@ -91,7 +91,7 @@ moves to the newly revealed answer without changing that semantic order.
 ## Author and organize
 
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
-type, then fill its typed fields. Visual media requires a description. The
+type, then fill its typed fields. Visual descriptions are optional. The
 Library supports item detail, editing, multi-selection, bulk move, and bulk
 delete. In an empty library, **Add First Card** keeps a high-contrast 44-point
 target at the largest accessibility text size, including in landscape. The

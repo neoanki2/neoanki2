@@ -81,7 +81,7 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     package var additionalDescription: String? {
         switch self {
         case .createItem, .replaceItem, .validateItem:
-            "Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Each stable mask group generates a separate recall card."
+            "Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card."
         case .cardContent, .nextStudyCard:
             "Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal."
         case .bulkItems:

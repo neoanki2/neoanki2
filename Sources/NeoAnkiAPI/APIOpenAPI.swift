@@ -578,11 +578,11 @@ package enum APIOpenAPI {
                     "durationMs": nonnegative, "altText": ["type": "string"],
                     "reservationId": uuid,
                 ]),
-                object(["type", "mediaId", "kind", "sha256", "fileExtension", "altText", "occlusionMode", "masks", "nextGroup"], [
+                object(["type", "mediaId", "kind", "sha256", "fileExtension", "occlusionMode", "masks", "nextGroup"], [
                     "type": ["type": "string", "const": "imageOcclusion"],
                     "mediaId": uuid, "kind": ["type": "string", "const": "image"],
                     "sha256": sha256, "fileExtension": ["type": "string"],
-                    "altText": ["type": "string", "minLength": 1], "reservationId": uuid,
+                    "altText": ["type": "string"], "reservationId": uuid,
                     "occlusionMode": ["type": "string", "enum": ["hideAllRevealOne", "hideOneRevealOne"]],
                     "masks": array(reference("ImageOcclusionMask"), min: 1), "nextGroup": ["type": "integer", "minimum": 2],
                 ]),

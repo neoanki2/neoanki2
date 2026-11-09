@@ -31,6 +31,7 @@ documentation, and releases.
 ## Prepare a release
 
 - [macOS release procedure]({{ '/RELEASING/' | relative_url }})
+- [Mac App Store release]({{ '/MAC_APP_STORE_RELEASE/' | relative_url }})
 - [iOS and iPadOS release checklist]({{ '/IOS_RELEASE/' | relative_url }})
 - [Local API acceptance evidence]({{ '/reference/local-api-acceptance/' | relative_url }})
 

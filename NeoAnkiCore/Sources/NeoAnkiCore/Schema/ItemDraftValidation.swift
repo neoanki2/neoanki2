@@ -36,11 +36,6 @@ public enum ItemDraftValidation {
         itemType: ItemType
     ) -> [ItemDraftValidationIssue] {
         itemType.fields.compactMap { field in
-            if [.image, .gif].contains(field.type), draft.media[field.id] != nil {
-                let description = draft.mediaDescriptions[field.id, default: ""]
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if description.isEmpty { return .missingMediaDescription(field.id) }
-            }
             if field.type == .imageOcclusion, let content = draft.occlusions[field.id] {
                 do { try ImageOcclusionValidation.validate(content) }
                 catch { return .invalidOcclusion(field.id) }

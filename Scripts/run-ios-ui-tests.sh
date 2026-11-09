@@ -112,6 +112,7 @@ while [[ $attempt -le 2 ]]; do
   printf '%s\n' "$simulator_id" >> "$SIMULATOR_IDS_FILE"
   xcrun simctl boot "$simulator_id"
   xcrun simctl bootstatus "$simulator_id" -b
+  python3 "$ROOT/Scripts/wait-ios-test-services.py" "$simulator_id"
   # Supply the image used by the real Photos picker authoring journey.
   xcrun simctl addmedia "$simulator_id" "$ROOT/UITests/Fixtures/media/cover.png"
   # Use the supported Simulator UI setting so SwiftUI's read-only
@@ -137,7 +138,7 @@ while [[ $attempt -le 2 ]]; do
     xcodebuild test-without-building
     -quiet
     -xctestrun "$XCTESTRUN"
-    -destination "platform=iOS Simulator,id=$simulator_id"
+    -destination "platform=iOS Simulator,arch=arm64,id=$simulator_id"
     -resultBundlePath "$result_bundle"
     CODE_SIGNING_ALLOWED=NO
   )

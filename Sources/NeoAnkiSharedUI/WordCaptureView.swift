@@ -24,8 +24,8 @@ public struct WordCaptureView: View {
     @State private var confirmsDiscard = false
     @State private var pendingChange: (() -> Void)?
     @State private var highlightedIndex = 0
-    @FocusState private var queryFocused: Bool
-    @FocusState private var focusedFieldID: UUID?
+    private enum CaptureFocus: Hashable { case query, field(UUID) }
+    @FocusState private var focus: CaptureFocus?
     private let initialDeckID: UUID?
 
     public init(library: any LibraryRepository, rootURL: URL, deckID: UUID? = nil,
@@ -67,19 +67,19 @@ public struct WordCaptureView: View {
 #if os(iOS)
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Hide Keyboard") { queryFocused = false; focusedFieldID = nil }
+                    Button("Hide Keyboard") { focus = nil }
                 }
 #endif
             }
             .task {
                 await model.start(deckID: initialDeckID)
-                queryFocused = true
+                focus = .query
             }
             .task(id: model.requestKey) {
                 highlightedIndex = 0
                 await model.search()
             }
-            .onChange(of: model.focusGeneration) { _, _ in focusedFieldID = nil; queryFocused = true }
+            .onChange(of: model.focusGeneration) { _, _ in focus = .query }
             .onChange(of: model.successMessage) { _, message in
                 if let message { AccessibilityNotification.Announcement(message).post() }
             }
@@ -143,7 +143,7 @@ public struct WordCaptureView: View {
 
     private var setupButton: some View {
         Button {
-            queryFocused = false; focusedFieldID = nil
+            focus = nil
             showsSetup = true
         } label: {
             Text(model.configuration == nil ? "Set Up" : "Card Setup")
@@ -160,7 +160,7 @@ public struct WordCaptureView: View {
         TextField("Type or paste a word", text: $model.query)
             .textFieldStyle(.roundedBorder)
             .autocorrectionDisabled()
-            .focused($queryFocused)
+            .focused($focus, equals: .query)
             .onSubmit { chooseHighlightedEntry() }
             .onMoveCommand { direction in
                 guard !model.results.isEmpty, model.selectedEntry == nil else { return }
@@ -172,7 +172,7 @@ public struct WordCaptureView: View {
             .textFieldStyle(.roundedBorder)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
-            .focused($queryFocused)
+            .focused($focus, equals: .query)
             .submitLabel(.search)
             .onSubmit { chooseHighlightedEntry() }
 #endif
@@ -239,7 +239,7 @@ public struct WordCaptureView: View {
         if model.deckID == nil, !model.isLoading { Text("Choose a destination deck above.").foregroundStyle(.secondary) }
         if let issue = model.configurationIssue {
             Label(issue, systemImage: "exclamationmark.circle").foregroundStyle(.red)
-            Button("Repair Card Setup") { queryFocused = false; focusedFieldID = nil; showsSetup = true }
+            Button("Repair Card Setup") { focus = nil; showsSetup = true }
         }
         if model.lookup.isSearching { ProgressView("Looking up…") }
         if let error = model.lookup.errorMessage {
@@ -268,7 +268,13 @@ public struct WordCaptureView: View {
             }
         }
         if !model.query.isEmpty, !model.lookup.isSearching, model.selectedEntry == nil, !model.manualEntry {
-            Button("Enter Manually") { model.enterManually() }
+            Button("Enter Manually") {
+                model.enterManually()
+                if let field = model.requiredFields.first(where: {
+                    [.text, .richText, .number].contains($0.type)
+                        && model.text[$0.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }) { focus = .field(field.id) }
+            }
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("word-capture-manual")
         }
@@ -279,7 +285,7 @@ public struct WordCaptureView: View {
         if model.configuration == nil, model.selectedPack != nil, model.deckID != nil {
             Text("Set up this dictionary–deck pair once. The app will remember which content belongs in each field.")
                 .foregroundStyle(.secondary)
-            Button("Set Up This Pair") { queryFocused = false; focusedFieldID = nil; showsSetup = true }
+            Button("Set Up This Pair") { focus = nil; showsSetup = true }
         }
         if model.configurationIssue == nil, model.selectedEntry != nil || model.manualEntry {
             ForEach(model.requiredFields) { field in fieldEditor(field) }
@@ -316,7 +322,7 @@ public struct WordCaptureView: View {
                     set: { model.setText($0, fieldID: field.id) }), axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...5)
-                    .focused($focusedFieldID, equals: field.id)
+                    .focused($focus, equals: .field(field.id))
                     .accessibilityLabel(field.name)
                     .accessibilityHint(field.isRequired ? "Required" : "Optional")
                     .accessibilityIdentifier("word-capture-field-\(field.name)")
@@ -339,7 +345,7 @@ public struct WordCaptureView: View {
                 Spacer()
 #endif
                 if model.isSaving || model.isImporting { ProgressView().accessibilityLabel(model.isSaving ? "Adding word" : "Importing dictionary") }
-                Button { queryFocused = false; focusedFieldID = nil; Task { await model.save() } } label: {
+                Button { focus = nil; Task { await model.save() } } label: {
                     Text(model.deckID == nil ? "Add Word" : "Add to \(model.destinationName)")
 #if os(macOS)
                         .lineLimit(1)

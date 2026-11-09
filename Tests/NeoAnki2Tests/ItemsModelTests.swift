@@ -300,7 +300,7 @@ func importContextualDeck(
     #expect(stored.tags == ["language", "spanish"])
 }
 
-@Test @MainActor func itemsModelRequiresDescriptionsForImageContent() async throws {
+@Test @MainActor func itemsModelAllowsBlankDescriptionsForImageContent() async throws {
     let (model, store) = try await makeModel()
     let imageField = FieldDef(name: "Image", type: .image, isRequired: true)
     let captionField = FieldDef(name: "Caption", type: .text, isRequired: true)
@@ -321,23 +321,24 @@ func importContextualDeck(
     await model.load()
     model.addItemTypeID = itemType.id
 
+    let mediaStore = try #require(await store.media)
+    let reference = try await mediaStore.ingest(data: Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kind: .image, fileExtension: "png")
     let saved = await model.addItem(
         fieldSpans: [captionField.id: [Span("A mountain lake")]],
         fieldMedia: [
-            imageField.id: MediaRef(
-                kind: .image,
-                assetHash: String(repeating: "0", count: 64),
-                fileExtension: "png"
-            ),
+            imageField.id: reference,
         ]
     )
 
-    #expect(saved == false)
-    #expect(model.errorMessage == "Add a description for Image so it works with VoiceOver.")
-    #expect(model.items.isEmpty)
+    #expect(saved)
+    #expect(model.errorMessage == nil)
+    #expect(model.items.count == 1)
+    let itemID = try #require(model.items.first?.id)
+    let item = try #require(try await store.fetchItem(id: itemID)?.item)
+    #expect(item.value(for: imageField.id)?.mediaReference?.altText == nil)
 }
 
-@Test @MainActor func itemsModelRequiresDescriptionsForGIFContent() async throws {
+@Test @MainActor func itemsModelAllowsBlankDescriptionsForGIFContent() async throws {
     let (model, store) = try await makeModel()
     let gifField = FieldDef(name: "Animation", type: .gif, isRequired: true)
     let captionField = FieldDef(name: "Caption", type: .text, isRequired: true)
@@ -358,19 +359,20 @@ func importContextualDeck(
     await model.load()
     model.addItemTypeID = itemType.id
 
+    let mediaStore = try #require(await store.media)
+    let reference = try await mediaStore.ingest(data: Data("GIF89a".utf8), kind: .gif, fileExtension: "gif")
     let saved = await model.addItem(
         fieldSpans: [captionField.id: [Span("An animation")]],
         fieldMedia: [
-            gifField.id: MediaRef(
-                kind: .gif,
-                assetHash: String(repeating: "0", count: 64),
-                fileExtension: "gif"
-            ),
+            gifField.id: reference,
         ]
     )
 
-    #expect(saved == false)
-    #expect(model.errorMessage == "Add a description for Animation so it works with VoiceOver.")
+    #expect(saved)
+    #expect(model.errorMessage == nil)
+    let itemID = try #require(model.items.first?.id)
+    let item = try #require(try await store.fetchItem(id: itemID)?.item)
+    #expect(item.value(for: gifField.id)?.mediaReference?.altText == nil)
 }
 
 @Test @MainActor func itemsModelDeletesItemFromList() async throws {

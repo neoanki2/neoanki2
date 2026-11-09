@@ -51,8 +51,8 @@ Additional content rules are checked when needed:
 
 - A required number must parse as a numeric value.
 - A required cloze field needs text and at least one valid marked blank.
-- Every attached image or GIF needs a non-empty image description, even when
-  the media field itself is optional.
+- Image, GIF, and image occlusion descriptions are optional; adding one supplies
+  a more informative accessibility label.
 - A required media field needs an attached file of its declared kind.
 - Tags are trimmed, normalized, deduplicated in their original order, and
   limited to 256 non-empty values of at most 1,024 UTF-8 bytes each.

@@ -21,7 +21,7 @@ private func occlusionType() -> ItemType {
     ])
 }
 
-@Test func occlusionValidatesGeometryGroupsAndImageDescription() throws {
+@Test func occlusionValidatesGeometryGroupsAndAllowsOptionalDescription() throws {
     let valid = occlusionFixture()
     try ImageOcclusionValidation.validate(valid)
     for invalid in [
@@ -33,8 +33,10 @@ private func occlusionType() -> ItemType {
         var content = valid; content.masks[0].rect = invalid
         #expect(throws: DatabaseError.self) { try ImageOcclusionValidation.validate(content) }
     }
-    var missingDescription = valid; missingDescription.image.altText = " "
-    #expect(throws: DatabaseError.self) { try ImageOcclusionValidation.validate(missingDescription) }
+    for description: String? in [nil, "", " "] {
+        var withoutDescription = valid; withoutDescription.image.altText = description
+        try ImageOcclusionValidation.validate(withoutDescription)
+    }
     var duplicate = valid; duplicate.masks.append(duplicate.masks[0])
     #expect(throws: DatabaseError.self) { try ImageOcclusionValidation.validate(duplicate) }
     var badGroup = valid; badGroup.nextGroup = 2

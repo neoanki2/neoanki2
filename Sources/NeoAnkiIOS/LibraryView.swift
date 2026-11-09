@@ -1,3 +1,4 @@
+import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
@@ -12,7 +13,7 @@ import UIKit
 
 private func mediaDescriptionPrompt(_ type: FieldType) -> String {
     if type == .audio { return "Audio description (optional)" }
-    return [.image, .gif].contains(type) ? "Visual description (required)" : "Visual description (optional)"
+    return "Visual description (optional)"
 }
 // Mobile direction: calm native lists, prompt-led browsing, deliberate selection,
 // focused authoring, and a single blue forward action. Native toolbar sizing is
@@ -233,10 +234,16 @@ struct AddItemView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isImportingMediaFile = false
     @State private var isCapturingMedia = false
+    @State private var isPreparingMedia = false
+    @State private var processingAttachments = 0
+    @State private var isEditorActive = true
+    @State private var mediaImportTask: Task<Void, Never>?
     @State private var isSaving = false
     @State private var errorMessage: String?
 
     private func closeEditor() {
+        isEditorActive = false
+        mediaImportTask?.cancel()
         let refs = occlusionDraftReferences + occlusions.values.map(\.image)
         Task { for ref in refs { try? await model.mediaStore?.discardDraftReference(ref) } }
         dismiss()
@@ -273,6 +280,7 @@ struct AddItemView: View {
                             }
                         }
                         .accessibilityIdentifier("add-card-type")
+                        .disabled(isPreparingMedia || processingAttachments > 0)
                         Picker("Deck", selection: $selectedDeckID) {
                             Text("Unassigned").tag(Optional<UUID>.none)
                             ForEach(model.decks) { deck in
@@ -312,6 +320,11 @@ struct AddItemView: View {
                     }
                 }
             }
+            .disabled(isPreparingMedia)
+            .environment(\.attachmentProcessing, isPreparingMedia || processingAttachments > 0)
+            .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { processingAttachments = $0 }
+            .onAppear { isEditorActive = true }
+            .onDisappear { isEditorActive = false; mediaImportTask?.cancel() }
             .navigationTitle("New Item")
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
@@ -334,7 +347,7 @@ struct AddItemView: View {
                     } else {
                         Button("Save") { save() }
                             .accessibilityIdentifier("add-card-save")
-                            .disabled(!canSave)
+                            .disabled(!canSave || isPreparingMedia || processingAttachments > 0)
                     }
                 }
             }
@@ -350,17 +363,20 @@ struct AddItemView: View {
             }
             .onChange(of: selectedPhoto) { _, item in
                 guard let item, let field = selectedMediaField else { return }
-                Task { await ingest(item, for: field) }
+                mediaImportTask?.cancel()
+                mediaImportTask = Task { await ingest(item, for: field) }
             }
             .fileImporter(isPresented: $isImportingMediaFile, allowedContentTypes: allowedMediaTypes) { result in
                 guard let field = selectedMediaField else { return }
-                Task { await ingestFile(result, for: field) }
+                mediaImportTask?.cancel()
+                mediaImportTask = Task { await ingestFile(result, for: field) }
             }
             .sheet(isPresented: $isCapturingMedia) {
                 if let field = selectedMediaField {
                     MobileCameraPicker(allowsVideo: field.type == .video) { result in
                         isCapturingMedia = false
-                        Task { await ingestCapture(result, for: field) }
+                        mediaImportTask?.cancel()
+                        mediaImportTask = Task { await ingestCapture(result, for: field) }
                     }
                     .ignoresSafeArea()
                 }
@@ -370,6 +386,7 @@ struct AddItemView: View {
 
     @ViewBuilder
     private func fieldEditor(_ field: FieldDef) -> some View {
+        let photoTitle = mediaValues[field.id] == nil ? "Photos" : "Replace from Photos"
         switch field.type {
         case .number:
             TextField("Enter \(field.name.lowercased())", text: valueBinding(for: field.id))
@@ -388,7 +405,7 @@ struct AddItemView: View {
                     set: { description in
                         mediaDescriptions[field.id] = description
                         if var reference = mediaValues[field.id] {
-                            reference.altText = description
+                            reference.altText = description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
                             mediaValues[field.id] = reference
                         }
                     }
@@ -400,10 +417,20 @@ struct AddItemView: View {
                         get: { selectedPhoto },
                         set: { selectedMediaField = field; selectedPhoto = $0 }
                     ), matching: field.type == .image || field.type == .gif ? .images : .videos) {
-                        Label(mediaValues[field.id] == nil ? "Photos" : "Replace from Photos", systemImage: "photo.on.rectangle")
+                        Label(photoTitle, systemImage: "photo.on.rectangle")
                             .frame(minHeight: 44)
                     }
+                    .disabled(processingAttachments > 0)
                 }
+                if field.type == .image {
+                    ImageAttachmentPasteButton { result in
+                        do { try await ingestData(try result.get().data, for: field) }
+                        catch { errorMessage = MobileAppModel.message(for: error) }
+                    }
+                    .disabled(isPreparingMedia || model.mediaStore == nil)
+                    .accessibilityIdentifier("image-paste-\(field.name.lowercased())")
+                }
+                if isPreparingMedia { ProgressView("Preparing attachment…") }
                 MobileAdaptiveActionGroup {
                     Button {
                         selectedMediaField = field
@@ -417,6 +444,7 @@ struct AddItemView: View {
                         .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
                     }
                 }
+                .disabled(processingAttachments > 0)
                 if mediaValues[field.id] != nil {
                     if [.image, .gif].contains(field.type), let reference = mediaValues[field.id] {
                         MobileContentValueView(value: .media(reference), mediaStore: model.mediaStore, isAnswerRevealed: true)
@@ -428,6 +456,7 @@ struct AddItemView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Button(role: .destructive) { mediaValues[field.id] = nil } label: { Text("Remove Media").frame(minHeight: 44) }
+                        .disabled(processingAttachments > 0)
                 }
             }
         case .imageOcclusion:
@@ -457,10 +486,6 @@ struct AddItemView: View {
             let formatter = NumberFormatter(); formatter.locale = .current; formatter.numberStyle = .decimal
             if formatter.number(from: value) == nil { return "Enter a valid number." }
         }
-        if [.image, .gif].contains(field.type), mediaValues[field.id] != nil,
-           (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Add a visual description before saving."
-        }
         return nil
     }
 
@@ -487,7 +512,7 @@ struct AddItemView: View {
     }
 
     private func save() {
-        guard let selectedType else { return }
+        guard !isPreparingMedia, processingAttachments == 0, let selectedType else { return }
         isSaving = true
         Task {
             defer { isSaving = false }
@@ -498,7 +523,8 @@ struct AddItemView: View {
                     case .richText: content[field.id] = .rich(richValues[field.id] ?? [])
                     case .audio, .image, .gif, .video:
                         if var reference = mediaValues[field.id] {
-                            reference.altText = mediaDescriptions[field.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let description = (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            reference.altText = description.isEmpty ? nil : description
                             content[field.id] = .media(reference)
                         } else { content[field.id] = .empty }
                     case .number:
@@ -520,11 +546,17 @@ struct AddItemView: View {
     }
 
     private func ingest(_ item: PhotosPickerItem, for field: FieldDef) async {
+        guard !isPreparingMedia, isEditorActive else { return }
+        isPreparingMedia = true
+        defer { isPreparingMedia = false; selectedPhoto = nil }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else { return }
-            let kind: MediaKind = switch field.type { case .audio: .audio; case .image: .image; case .gif: .gif; case .video: .video; default: .image }
-            mediaValues[field.id] = try await model.reserveMedia(data: data, kind: kind, altText: mediaDescriptions[field.id] ?? "")
-        } catch { errorMessage = MobileAppModel.message(for: error) }
+            if field.type == .image {
+                guard let image = try await item.loadTransferable(type: ImportedAttachmentImage.self) else { throw MediaError.readFailed }
+                try await ingestData(image.image.data, for: field)
+            } else if let data = try await item.loadTransferable(type: Data.self) {
+                try await ingestData(data, for: field)
+            }
+        } catch { if isEditorActive && !Task.isCancelled { errorMessage = MobileAppModel.message(for: error) } }
     }
 
     private var allowedMediaTypes: [UTType] {
@@ -539,25 +571,43 @@ struct AddItemView: View {
     }
 
     private func ingestFile(_ result: Result<URL, Error>, for field: FieldDef) async {
+        guard !isPreparingMedia, isEditorActive else { return }
+        isPreparingMedia = true
+        defer { isPreparingMedia = false }
         do {
             let url = try result.get()
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
-            try await ingestData(Data(contentsOf: url, options: [.mappedIfSafe]), for: field)
-        } catch { if (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
+            if field.type == .image {
+                let image = try await AttachmentImagePreparer.prepare(url: url)
+                try await ingestData(image.data, for: field)
+            } else {
+                try await ingestData(Data(contentsOf: url, options: [.mappedIfSafe]), for: field)
+            }
+        } catch { if isEditorActive, !Task.isCancelled, (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
     }
 
     private func ingestCapture(_ result: Result<MobileCameraCapture, Error>, for field: FieldDef) async {
+        defer {
+            if case let .success(capture) = result, let url = capture.temporaryURL { try? FileManager.default.removeItem(at: url) }
+        }
+        guard !isPreparingMedia, isEditorActive else { return }
+        isPreparingMedia = true
+        defer { isPreparingMedia = false }
         do {
             let capture = try result.get()
-            defer { if let temporaryURL = capture.temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) } }
             try await ingestData(capture.data, for: field)
-        } catch { if (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
+        } catch { if isEditorActive, !Task.isCancelled, (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
     }
 
     private func ingestData(_ data: Data, for field: FieldDef) async throws {
         let kind: MediaKind = switch field.type { case .audio: .audio; case .image: .image; case .gif: .gif; case .video: .video; default: .image }
-        mediaValues[field.id] = try await model.reserveMedia(data: data, kind: kind, altText: mediaDescriptions[field.id] ?? "")
+        guard isEditorActive, !Task.isCancelled else { return }
+        var reference = try await model.reserveMedia(data: data, kind: kind, altText: mediaDescriptions[field.id] ?? "")
+        guard isEditorActive, !Task.isCancelled else { try? await model.mediaStore?.discardDraftReference(reference); return }
+        let description = (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        reference.altText = description.isEmpty ? nil : description
+        mediaValues[field.id] = reference
     }
 }
 
@@ -583,13 +633,21 @@ private struct MobileCameraPicker: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
         let completion: (Result<MobileCameraCapture, Error>) -> Void
+        private var encodingTask: Task<Void, Never>?
         init(completion: @escaping (Result<MobileCameraCapture, Error>) -> Void) { self.completion = completion }
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            encodingTask?.cancel()
             completion(.failure(CocoaError(.userCancelled)))
         }
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let image = info[.originalImage] as? UIImage, let data = image.jpegData(compressionQuality: 0.92) {
-                completion(.success(MobileCameraCapture(data: data, temporaryURL: nil)))
+            if let image = info[.originalImage] as? UIImage {
+                encodingTask?.cancel()
+                encodingTask = Task {
+                    let data = await Task.detached(priority: .userInitiated) { image.jpegData(compressionQuality: 0.92) }.value
+                    guard !Task.isCancelled else { return }
+                    if let data { completion(.success(MobileCameraCapture(data: data, temporaryURL: nil))) }
+                    else { completion(.failure(MediaError.readFailed)) }
+                }
             } else if let url = info[.mediaURL] as? URL {
                 do { completion(.success(MobileCameraCapture(data: try Data(contentsOf: url, options: [.mappedIfSafe]), temporaryURL: url))) }
                 catch { completion(.failure(error)) }
@@ -778,6 +836,10 @@ struct ItemEditMobileView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isImportingMediaFile = false
     @State private var isCapturingMedia = false
+    @State private var isPreparingMedia = false
+    @State private var processingAttachments = 0
+    @State private var isEditorActive = true
+    @State private var mediaImportTask: Task<Void, Never>?
     @State private var confirmsDiscard = false
     @State private var occlusionDraftReferences: [MediaRef] = []
 
@@ -813,12 +875,17 @@ struct ItemEditMobileView: View {
                     }
                 }
             }
+            .disabled(isPreparingMedia)
+            .environment(\.attachmentProcessing, isPreparingMedia || processingAttachments > 0)
+            .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { processingAttachments = $0 }
+            .onAppear { isEditorActive = true }
+            .onDisappear { isEditorActive = false; mediaImportTask?.cancel() }
             .navigationTitle("Edit Item").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { if item == originalItem { closeEditor() } else { confirmsDiscard = true } }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(itemType.fields.contains { fieldIssue($0) != nil }) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(isPreparingMedia || processingAttachments > 0 || itemType.fields.contains { fieldIssue($0) != nil }) }
             }
             .interactiveDismissDisabled(item != originalItem)
             .alert("Could Not Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
@@ -828,17 +895,20 @@ struct ItemEditMobileView: View {
             }
             .onChange(of: selectedPhoto) { _, selection in
                 guard let selection, let field = selectedMediaField else { return }
-                Task { await ingest(selection, for: field) }
+                mediaImportTask?.cancel()
+                mediaImportTask = Task { await ingest(selection, for: field) }
             }
             .fileImporter(isPresented: $isImportingMediaFile, allowedContentTypes: allowedMediaTypes) { result in
                 guard let field = selectedMediaField else { return }
-                Task { await ingestFile(result, for: field) }
+                mediaImportTask?.cancel()
+                mediaImportTask = Task { await ingestFile(result, for: field) }
             }
             .sheet(isPresented: $isCapturingMedia) {
                 if let field = selectedMediaField {
                     MobileCameraPicker(allowsVideo: field.type == .video) { result in
                         isCapturingMedia = false
-                        Task { await ingestCapture(result, for: field) }
+                        mediaImportTask?.cancel()
+                        mediaImportTask = Task { await ingestCapture(result, for: field) }
                     }
                     .ignoresSafeArea()
                 }
@@ -848,6 +918,7 @@ struct ItemEditMobileView: View {
 
     @ViewBuilder private func editor(_ field: FieldDef) -> some View {
         let value = item.value(for: field.id) ?? .empty
+        let photoTitle = mediaReference(field.id) == nil ? "Photos" : "Replace from Photos"
         switch field.type {
         case .richText:
             let spans: [Span] = if case let .rich(value) = value { value } else { [] }
@@ -869,7 +940,7 @@ struct ItemEditMobileView: View {
                     set: { description in
                         mediaDescriptions[field.id] = description
                         if case .media(var reference) = item.value(for: field.id) {
-                            reference.altText = description
+                            reference.altText = description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
                             set(.media(reference), field.id)
                         }
                     }
@@ -880,10 +951,20 @@ struct ItemEditMobileView: View {
                         get: { selectedPhoto },
                         set: { selectedMediaField = field; selectedPhoto = $0 }
                     ), matching: field.type == .image || field.type == .gif ? .images : .videos) {
-                        Label(mediaReference(field.id) == nil ? "Photos" : "Replace from Photos", systemImage: "photo.on.rectangle")
+                        Label(photoTitle, systemImage: "photo.on.rectangle")
                             .frame(minHeight: 44)
                     }
+                    .disabled(processingAttachments > 0)
                 }
+                if field.type == .image {
+                    ImageAttachmentPasteButton { result in
+                        do { try await ingestData(try result.get().data, for: field) }
+                        catch { errorMessage = MobileAppModel.message(for: error) }
+                    }
+                    .disabled(isPreparingMedia || model.mediaStore == nil)
+                    .accessibilityIdentifier("image-paste-\(field.name.lowercased())")
+                }
+                if isPreparingMedia { ProgressView("Preparing attachment…") }
                 MobileAdaptiveActionGroup {
                     Button { selectedMediaField = field; isImportingMediaFile = true } label: { Label("Files", systemImage: "folder").frame(minHeight: 44) }
                     if field.type == .image || field.type == .video {
@@ -891,6 +972,7 @@ struct ItemEditMobileView: View {
                             .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
                     }
                 }
+                .disabled(processingAttachments > 0)
                 if mediaReference(field.id) != nil {
                     if [.image, .gif].contains(field.type), let reference = mediaReference(field.id) {
                         MobileContentValueView(value: .media(reference), mediaStore: model.mediaStore, isAnswerRevealed: true)
@@ -901,6 +983,7 @@ struct ItemEditMobileView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Button(role: .destructive) { set(.empty, field.id) } label: { Text("Remove Media").frame(minHeight: 44) }
+                        .disabled(processingAttachments > 0)
                 }
             }
         case .number:
@@ -925,12 +1008,12 @@ struct ItemEditMobileView: View {
         if case let .imageOcclusion(content) = value {
             do { try ImageOcclusionValidation.validate(content) } catch { return error.localizedDescription }
         }
-        if [.image, .gif].contains(field.type), case let .media(reference) = value,
-           (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Add a visual description." }
         return nil
     }
 
     private func closeEditor() {
+        isEditorActive = false
+        mediaImportTask?.cancel()
         let refs = occlusionDraftReferences
         Task { for ref in refs { try? await model.mediaStore?.discardDraftReference(ref) } }
         dismiss()
@@ -951,37 +1034,59 @@ struct ItemEditMobileView: View {
         return switch field.type { case .audio: [.audio]; case .image: [.image]; case .gif: [.gif]; case .video: [.movie]; default: [.data] }
     }
     private func ingest(_ selection: PhotosPickerItem, for field: FieldDef) async {
-        do { if let data = try await selection.loadTransferable(type: Data.self) { try await ingestData(data, for: field) } }
-        catch { errorMessage = MobileAppModel.message(for: error) }
+        guard !isPreparingMedia, isEditorActive else { return }
+        isPreparingMedia = true
+        defer { isPreparingMedia = false; selectedPhoto = nil }
+        do {
+            if field.type == .image {
+                guard let image = try await selection.loadTransferable(type: ImportedAttachmentImage.self) else { throw MediaError.readFailed }
+                try await ingestData(image.image.data, for: field)
+            } else if let data = try await selection.loadTransferable(type: Data.self) {
+                try await ingestData(data, for: field)
+            }
+        } catch { if isEditorActive && !Task.isCancelled { errorMessage = MobileAppModel.message(for: error) } }
     }
+
     private func ingestFile(_ result: Result<URL, Error>, for field: FieldDef) async {
+        guard !isPreparingMedia, isEditorActive else { return }
+        isPreparingMedia = true
+        defer { isPreparingMedia = false }
         do {
             let url = try result.get()
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
-            try await ingestData(Data(contentsOf: url, options: [.mappedIfSafe]), for: field)
-        } catch { errorMessage = MobileAppModel.message(for: error) }
+            if field.type == .image {
+                let image = try await AttachmentImagePreparer.prepare(url: url)
+                try await ingestData(image.data, for: field)
+            } else {
+                try await ingestData(Data(contentsOf: url, options: [.mappedIfSafe]), for: field)
+            }
+        } catch { if isEditorActive, !Task.isCancelled, (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
     }
     private func ingestCapture(_ result: Result<MobileCameraCapture, Error>, for field: FieldDef) async {
+        defer {
+            if case let .success(capture) = result, let url = capture.temporaryURL { try? FileManager.default.removeItem(at: url) }
+        }
+        guard !isPreparingMedia, isEditorActive else { return }
+        isPreparingMedia = true
+        defer { isPreparingMedia = false }
         do {
             let capture = try result.get()
-            defer { if let url = capture.temporaryURL { try? FileManager.default.removeItem(at: url) } }
             try await ingestData(capture.data, for: field)
-        } catch { errorMessage = MobileAppModel.message(for: error) }
+        } catch { if isEditorActive, !Task.isCancelled, (error as NSError).code != CocoaError.userCancelled.rawValue { errorMessage = MobileAppModel.message(for: error) } }
     }
     private func ingestData(_ data: Data, for field: FieldDef) async throws {
         let kind: MediaKind = switch field.type { case .audio: .audio; case .image: .image; case .gif: .gif; case .video: .video; default: .image }
-        let reference = try await model.reserveMedia(data: data, kind: kind, altText: mediaDescriptions[field.id] ?? "")
+        guard isEditorActive, !Task.isCancelled else { return }
+        var reference = try await model.reserveMedia(data: data, kind: kind, altText: mediaDescriptions[field.id] ?? "")
+        guard isEditorActive, !Task.isCancelled else { try? await model.mediaStore?.discardDraftReference(reference); return }
+        let description = (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        reference.altText = description.isEmpty ? nil : description
         set(.media(reference), field.id)
     }
     private func save() async {
+        guard !isPreparingMedia, processingAttachments == 0 else { return }
         do {
-            for field in itemType.fields where [.image, .gif].contains(field.type) {
-                if let reference = item.value(for: field.id)?.mediaReference,
-                   (reference.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    throw ItemDraftError.missingMediaDescription(field.name)
-                }
-            }
             try await model.updateItem(item); onSaved((item, itemType)); closeEditor()
         } catch { errorMessage = MobileAppModel.message(for: error) }
     }

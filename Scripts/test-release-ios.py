@@ -571,6 +571,14 @@ class ReleaseTests(unittest.TestCase):
                 self.assertNotEqual(current, previous)
                 previous = current
 
+    def test_historical_rejection_cannot_satisfy_a_new_versions_rejection(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "rejection.json"
+            path.write_text(json.dumps({"version_id": "old-version"}))
+            release.require_rejection_record({}, "new-version", path)
+            with self.assertRaises(release.ReleaseError):
+                release.require_rejection_record({"rejected_version_ids": ["new-version"]}, "new-version", path)
+
     def test_existing_build_without_upload_receipt_is_not_claimed(self):
         flow = object.__new__(release.Workflow)
         flow.state = {"build": "1", "phases": {}}

@@ -87,7 +87,7 @@ extension FastFunctionalJourneyTests {
         app.buttons.identified("cancelAddItem").click()
     }
 
-    func checkAuthoringUITestsMediaFieldRequiresDescription() throws {
+    func checkAuthoringUITestsMediaFieldAllowsOptionalDescription() throws {
         let app = launchApp(scenario: "image-missing-description")
         waitForItem(named: "Image", in: app)
         openItemDetail(named: "Image", in: app)
@@ -95,7 +95,7 @@ extension FastFunctionalJourneyTests {
 
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
-        XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(save.isEnabled)
         app.buttons.identified("cancelEditItem").click()
         returnToLibrary(in: app)
     }

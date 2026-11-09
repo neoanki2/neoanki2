@@ -105,6 +105,7 @@ def main():
         try:
             run(["xcrun", "simctl", "boot", device])
             run(["xcrun", "simctl", "bootstatus", device, "-b"])
+            run(["python3", str(ROOT / "Scripts/wait-ios-test-services.py"), device])
             run(["xcrun", "simctl", "status_bar", device, "override", "--time", "9:41", "--dataNetwork", "wifi",
                  "--wifiMode", "active", "--wifiBars", "3", "--batteryState", "charged", "--batteryLevel", "100"])
             validate_capture_build(derived, app_fingerprint)

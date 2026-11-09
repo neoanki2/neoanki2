@@ -158,6 +158,7 @@
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureGenericMeaningAndManualFallback",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureLargestTypeKeepsContentAndAddReachable",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testPhotoCanBeSelectedBeforeNameAndDescription",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testOversizedImageCanBePastedSavedAndReplaced",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy"
       ]
     },

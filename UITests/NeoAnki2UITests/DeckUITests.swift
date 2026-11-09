@@ -237,11 +237,11 @@ extension FastFunctionalJourneyTests {
         openItemDetail(named: "Image", in: mediaApp)
         openItemEditor(in: mediaApp)
         let mediaSave = mediaApp.buttons.identified("saveEditItem")
-        try runJourneyActivity("AuthoringUITests.testMediaFieldRequiresDescription") {
+        try runJourneyActivity("AuthoringUITests.testMediaFieldAllowsOptionalDescription") {
             XCTAssertTrue(mediaSave.waitUntilExists(timeout: 5))
             XCTAssertFalse(mediaSave.isEnabled)
         }
-        try runJourneyActivity("LibraryUITests.testImageEditRequiresDescriptionBeforeSaving") {
+        try runJourneyActivity("LibraryUITests.testImageEditAllowsOptionalDescription") {
             let save = mediaApp.buttons.identified("saveEditItem")
             XCTAssertTrue(save.waitUntilExists(timeout: 5))
             XCTAssertFalse(save.isEnabled)

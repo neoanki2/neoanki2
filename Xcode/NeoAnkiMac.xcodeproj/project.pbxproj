@@ -84,10 +84,10 @@
 			files = ();
 			inputPaths = ("$(SRCROOT)/../Package.swift");
 			name = "Build Swift package executable";
-			outputPaths = ("$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)");
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)", "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/PrivacyInfo.xcprivacy");
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -euo pipefail\ncd \"$SRCROOT/..\"\nswift build -c release --arch arm64 --arch x86_64\nBIN_DIR=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)\nmkdir -p \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/MacOS\"\ncp \"$BIN_DIR/NeoAnki2\" \"$TARGET_BUILD_DIR/$EXECUTABLE_PATH\"\nchmod +x \"$TARGET_BUILD_DIR/$EXECUTABLE_PATH\"\n";
+			shellScript = "set -euo pipefail\ncd \"$SRCROOT/..\"\nswift build -c release --arch arm64 --arch x86_64\nBIN_DIR=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)\nmkdir -p \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/MacOS\"\ncp \"$BIN_DIR/NeoAnki2\" \"$TARGET_BUILD_DIR/$EXECUTABLE_PATH\"\nchmod +x \"$TARGET_BUILD_DIR/$EXECUTABLE_PATH\"\nmkdir -p \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\ncp \"$SRCROOT/../Packaging/AppStore/PrivacyInfo.xcprivacy\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/PrivacyInfo.xcprivacy\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -130,11 +130,32 @@
 			};
 			name = Release;
 		};
+
+        A10000000000000000000010 /* AppStore */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ARCHS = "arm64 x86_64";
+                CODE_SIGN_ENTITLEMENTS = ../Packaging/AppStore/NeoAnki2.entitlements;
+                CODE_SIGN_STYLE = Manual;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                ENABLE_HARDENED_RUNTIME = YES;
+                GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = ../Packaging/AppStore/Info.plist;
+                MACOSX_DEPLOYMENT_TARGET = 14.0;
+                MARKETING_VERSION = 1.0.1;
+                PRODUCT_BUNDLE_IDENTIFIER = com.neoanki2.ios;
+                PRODUCT_NAME = NeoAnki2;
+                SKIP_INSTALL = NO;
+            };
+            name = AppStore;
+        };
+        A10000000000000000000011 /* AppStore */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Manual; SYMROOT = "$(SRCROOT)/../.build/xcode-products/$(PROJECT_NAME)";}; name = AppStore;};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000005 = {isa = XCConfigurationList; buildConfigurations = (A1000000000000000000000B, A1000000000000000000000C); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
-		A10000000000000000000008 = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000009, A1000000000000000000000A); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		A10000000000000000000005 = {isa = XCConfigurationList; buildConfigurations = (A1000000000000000000000B, A1000000000000000000000C, A10000000000000000000010); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		A10000000000000000000008 = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000009, A1000000000000000000000A, A10000000000000000000011); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 /* End XCConfigurationList section */
 	};
 	rootObject = A10000000000000000000007 /* Project object */;

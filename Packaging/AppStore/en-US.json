@@ -1,0 +1,20 @@
+{
+  "name": "NeoAnki2",
+  "subtitle": "Study with spaced repetition",
+  "primaryCategory": "EDUCATION",
+  "locale": "en-US",
+  "copyright": "2026 Oleksii Grachov",
+  "keywords": "flashcards,study,memory,spaced repetition,vocabulary,poetry,learning,offline",
+  "description": "Build a study library that works the way you think. NeoAnki2 is a native flashcard and spaced-repetition app for Mac, iPhone, and iPad.\n\nCreate your own study items with text, cloze deletions, images, audio, and video. Organize them into decks and choose how each card presents its question and answer. Guided builders help you prepare vocabulary, poems, and prose for practice.\n\nStudy at your own pace with adaptive spaced repetition. Review answers, grade your recall, and record spoken responses. Keep track of due cards and return to your study library whenever you are ready.\n\nYour library works offline. Optional iCloud sync keeps supported library content, media, and imported vocabulary packs in your private Apple iCloud database. Pack catalogs sync across your devices; download dictionary files when you need them for offline use. Import and export NeoAnki2 deck files to move your work between devices.\n\nFree to use, with no ads or tracking. No NeoAnki2 account is required.\n\nNeoAnki2 uses its own native card and deck formats. It does not import Anki .apkg files or HTML/CSS card templates.",
+  "supportUrl": "https://neoanki2.github.io/user/support/",
+  "privacyPolicyUrl": "https://neoanki2.github.io/user/privacy/",
+  "marketingUrl": "https://neoanki2.github.io/user/",
+  "reviewContact": {
+    "firstName": "Oleksii",
+    "lastName": "Grachov",
+    "emailAddress": "grachov.alexey@gmail.com",
+    "phoneNumber": "+380500399776"
+  },
+  "reviewNotes": "NeoAnki2 for Mac is a native offline study app. No app account or login is required. Create a deck, add a Basic item with Front and Back text, and start Study. Import and export portable decks through the File menu using the system file picker. Optional iCloud sync requires an Apple iCloud account and explicit opt-in; the app uses the same private CloudKit container as iPhone and iPad. Microphone access is requested only for practice recording. The optional local HTTP API listens only on loopback, is disabled by default, and requires authentication. The Mac App Store app stores its library inside its sandbox; existing Homebrew libraries can be transferred using deck export/import or optional iCloud sync. No payments, tracking, or third-party account services are included.",
+  "whatsNew": "Native Mac support, improved image attachments and image occlusion, and more reliable word capture."
+}

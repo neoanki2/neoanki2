@@ -4553,7 +4553,8 @@ private extension Array where Element == String {
     ])
     _ = try await store.createItemType(type)
     let reservation = try await store.reserveMedia(data: Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kind: .image, altText: "Diagram")
-    let ref = reservation.reference
+    var ref = reservation.reference
+    ref.altText = nil
     var content = ImageOcclusionContent(image: ref)
     content.addMask(rect: .init(x: 0.1, y: 0.2, width: 0.3, height: 0.2))
     content.addMask(rect: .init(x: 0.5, y: 0.6, width: 0.2, height: 0.1))
@@ -4563,6 +4564,18 @@ private extension Array where Element == String {
     let token = try await pair(api, scopes: ["library.read", "items.write", "study.review"])
     let itemID = UUID().uuidString.lowercased()
     var value = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(dto)) as? [String: Any])
+    #expect(value["altText"] == nil)
+    let schemaResponse = await api.handle(request(.get, "/v1/openapi.json"))
+    let schemaDocument = try jsonObject(schemaResponse)
+    let components = try #require(schemaDocument["components"] as? [String: Any])
+    let schemas = try #require(components["schemas"] as? [String: Any])
+    let contentSchema = try #require(schemas["ContentValue"] as? [String: Any])
+    let variants = try #require(contentSchema["oneOf"] as? [[String: Any]])
+    let occlusionSchema = try #require(variants.first { variant in
+        let properties = variant["properties"] as? [String: Any]
+        return (properties?["type"] as? [String: Any])?["const"] as? String == "imageOcclusion"
+    })
+    #expect((occlusionSchema["required"] as? [String])?.contains("altText") == false)
     value["reservationId"] = reservation.reservationID.uuidString.lowercased()
     let input: [String: Any] = ["id": itemID, "itemTypeId": type.id.uuidString.lowercased(), "fields": [["fieldId": field.id.uuidString.lowercased(), "value": value]], "tags": []]
     let body = String(decoding: try JSONSerialization.data(withJSONObject: input), as: UTF8.self)

@@ -485,7 +485,7 @@ extension FastFunctionalJourneyTests {
         assertNoItem(named: "Changed", in: app)
     }
 
-    func checkLibraryUITestsImageEditRequiresDescriptionBeforeSaving() throws {
+    func checkLibraryUITestsImageEditAllowsOptionalDescription() throws {
         let app = launchApp(scenario: "image-missing-description")
         waitForItem(named: "Image", in: app)
         openItemDetail(named: "Image", in: app)
@@ -493,7 +493,7 @@ extension FastFunctionalJourneyTests {
         openItemEditor(in: app)
         let save = app.buttons.identified("saveEditItem")
         XCTAssertTrue(save.waitUntilExists(timeout: 5))
-        XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(save.isEnabled)
     }
 
     func checkLibraryUITestsDeleteItemFromDetail() throws {

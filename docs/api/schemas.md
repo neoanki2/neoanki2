@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485
+contract_digest: sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -1225,6 +1225,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485`.
+Contract digest: `sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

@@ -153,7 +153,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nAPP_SRC=\"${SRCROOT}/../.build/NeoAnki2.app\"\nAPP_DST=\"${BUILT_PRODUCTS_DIR}/NeoAnki2.app\"\nrm -rf \"$APP_DST\"\nditto \"$APP_SRC\" \"$APP_DST\"\nxattr -cr \"$APP_DST\" || true\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST/Contents/MacOS/NeoAnki2\"\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST\"\n";
+			shellScript = "set -e\nAPP_SRC=\"${NEOANKI_UI_APP_PATH:-${SRCROOT}/../.build/NeoAnki2.app}\"\nAPP_DST=\"${BUILT_PRODUCTS_DIR}/NeoAnki2.app\"\nrm -rf \"$APP_DST\"\nditto \"$APP_SRC\" \"$APP_DST\"\nxattr -cr \"$APP_DST\" || true\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST/Contents/MacOS/NeoAnki2\"\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

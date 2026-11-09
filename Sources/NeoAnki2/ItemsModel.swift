@@ -4,7 +4,6 @@ import NeoAnkiCore
 
 private enum ItemEditingError: Error {
     case missingItem
-    case missingMediaDescription(String)
 }
 
 @MainActor
@@ -361,9 +360,6 @@ final class ItemsModel {
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
             return false
-        } catch ItemEditingError.missingMediaDescription(let field) {
-            errorMessage = "Add a description for \(field) so it works with VoiceOver."
-            return false
         } catch {
             errorMessage = UserFacingError.message(from: error)
             return false
@@ -415,9 +411,6 @@ final class ItemsModel {
             return false
         } catch ItemEditingError.missingItem {
             errorMessage = "This item no longer exists."
-            return false
-        } catch ItemEditingError.missingMediaDescription(let field) {
-            errorMessage = "Add a description for \(field) so it works with VoiceOver."
             return false
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -473,9 +466,6 @@ final class ItemsModel {
             if var ref = fieldMedia[field.id] {
                 let alt = fieldMediaAltText[field.id, default: ""]
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                if [.image, .gif].contains(field.type), alt.isEmpty {
-                    throw ItemEditingError.missingMediaDescription(field.name)
-                }
                 ref.altText = alt.isEmpty ? nil : alt
                 return field.contentValue(from: ref)
             }
