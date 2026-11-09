@@ -39,7 +39,7 @@ defaults:
     shell: bash
 
 concurrency:
-  group: release-candidate
+  group: ${{ inputs.ios_service_probe && format('ios-service-probe-{0}', github.ref) || inputs.mac_store_review_tag != '' && format('mac-store-review-{0}', inputs.head) || 'release-candidate' }}
   cancel-in-progress: false
 
 jobs:
@@ -355,11 +355,13 @@ jobs:
         run: |
           gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/probe-ios-test-services.py?ref=$GITHUB_SHA" \
             --jq .content | base64 --decode > "$RUNNER_TEMP/probe-ios-test-services.py"
+          gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/wait-ios-test-services.py?ref=$GITHUB_SHA" \
+            --jq .content | base64 --decode > "$RUNNER_TEMP/wait-ios-test-services.py"
       - name: Record both services before and after activation
         run: |
           env -u GH_TOKEN -u GITHUB_TOKEN -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
             python3 "$RUNNER_TEMP/probe-ios-test-services.py" \
-            --helper Scripts/wait-ios-test-services.py --output "$RUNNER_TEMP/ios-service-probe"
+            --helper "$RUNNER_TEMP/wait-ios-test-services.py" --output "$RUNNER_TEMP/ios-service-probe"
       - name: Retain observations without declaring UI validation passed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
