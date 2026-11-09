@@ -81,6 +81,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         finishPortableImport(in: app)
         waitForItem(named: "Sandbox image question", in: app)
         showSidebar(in: app)
+        if !app.descendants(matching: .any)["deckRow-Images"].exists {
+            let disclosure = app.disclosureTriangles.firstMatch
+            XCTAssertTrue(disclosure.waitUntilExists(timeout: 5))
+            disclosure.click()
+        }
         selectScope("deckRow-Images", in: app)
         leaveBrowseMode(in: app)
         startStudyViaMenu(in: app)
