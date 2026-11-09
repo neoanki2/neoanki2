@@ -87,7 +87,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         )
         XCTAssertEqual(plan.schemaVersion, 1)
         XCTAssertEqual(plan.macos.count, 5)
-        XCTAssertEqual(plan.ios.count, 21)
+        XCTAssertEqual(plan.ios.count, 23)
 
         let macSource = try String(
             contentsOf: repositoryRoot.appendingPathComponent(
@@ -140,6 +140,12 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
             "Each iOS shard must own one simulator; parallel clones contend for Accessibility"
         )
         XCTAssertEqual(Set(plan.ios.map(\.id)).count, plan.ios.count)
+        // The former eleven-journey phone batch exceeded the 25-minute runner
+        // limit. Keep batches no larger than the existing stable five-case groups.
+        XCTAssertTrue(
+            plan.ios.allSatisfy { $0.tests.count <= 5 },
+            "Split oversized iOS groups into isolated shards rather than adding retries"
+        )
 
         let crossFormFactorTests = declaredIOSTests.filter {
             $0.contains("Accessibility")

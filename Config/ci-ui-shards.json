@@ -149,15 +149,29 @@
       "tests": [
         "NeoAnki2MobileUITests/MobileVisualRedesignUITests/testManagementScreenInventory",
         "NeoAnki2MobileUITests/MobileVisualRedesignUITests/testStudyAndStudioScreenInventory",
-        "NeoAnki2MobileUITests/MobileAppStoreScreenshotUITests/testCaptureAppStoreScreenshots",
+        "NeoAnki2MobileUITests/MobileAppStoreScreenshotUITests/testCaptureAppStoreScreenshots"
+      ]
+    },
+    {
+      "id": "phone-authoring-parity",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testAllFieldAuthoringMediaRemovalAndPickerCancellation",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testGenericDictionaryLookupInNewItemSavesToChosenDeck",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTypingUkrainianStressLookupRepeatedlySavesWithoutCrashing",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureRemembersPairAndSavesStressWithoutDefinition",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureGenericMeaningAndManualFallback",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureLargestTypeKeepsContentAndAddReachable",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testPhotoCanBeSelectedBeforeNameAndDescription",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy"
+      ]
+    },
+    {
+      "id": "phone-word-capture",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureRemembersPairAndSavesStressWithoutDefinition",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureGenericMeaningAndManualFallback",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testQuickWordCaptureLargestTypeKeepsContentAndAddReachable"
       ]
     },
     {

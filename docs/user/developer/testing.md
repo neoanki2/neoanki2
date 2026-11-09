@@ -121,6 +121,11 @@ the native navigation title during sampling. Other phone first-screen and
 authoring contrast audits remain required; this study journey no longer samples
 phone contrast.
 
+The former eleven-journey phone redesign batch exceeded its 25-minute runner
+limit. Inventory, authoring/lookup, and quick capture now run as separate groups
+with the same tests and device. The coverage manifest caps each iOS group at five
+journeys; the runner deadline is unchanged and no assertion retry is added.
+
 Each shared build and UI shard writes its elapsed time to the Actions step
 summary. When adding coverage, rebalance existing shards before adding another
 macOS job: standard GitHub-hosted plans allow only five concurrent macOS jobs,
