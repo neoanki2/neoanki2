@@ -103,14 +103,31 @@ def initialize_host(recorder):
     recorder.save()
 
 
-def validate_owned_simulator(simulator_id, recorder):
-    result = recorder.run(["xcrun", "simctl", "list", "devices", "-j"], check=True)
-    devices = json.loads(result.stdout)
-    device = next((d for values in devices["devices"].values() for d in values
-                   if d["udid"] == simulator_id), None)
-    if not device or not device["name"].startswith("NeoAnki2-") or device["state"] != "Booted":
-        raise RuntimeError("Expected the booted, disposable NeoAnki2 Simulator owned by the caller")
-    return device
+def validate_owned_simulator(simulator_id, recorder, timeout=180, clock=time.monotonic, pause=time.sleep):
+    """Poll responsive inventory inside the same pretest readiness budget."""
+    deadline = clock() + timeout
+    last_error = "inventory has not responded"
+    while clock() < deadline:
+        result = recorder.run(["xcrun", "simctl", "list", "devices", "-j"],
+                              timeout=min(20, deadline - clock()))
+        if result.returncode == 0:
+            try:
+                devices = json.loads(result.stdout)
+            except json.JSONDecodeError as error:
+                last_error = "invalid inventory JSON: " + str(error)
+            else:
+                device = next((d for values in devices["devices"].values() for d in values
+                               if d["udid"] == simulator_id), None)
+                if device:
+                    if not device["name"].startswith("NeoAnki2-") or device["state"] != "Booted":
+                        raise RuntimeError("Expected the booted, disposable NeoAnki2 Simulator owned by the caller")
+                    return device
+                last_error = "owned device is not yet present in inventory"
+        else:
+            last_error = f"inventory command returned {result.returncode}; raw command output retained"
+        if clock() < deadline:
+            pause(min(1, deadline - clock()))
+    raise RuntimeError("Simulator inventory readiness deadline expired: " + last_error)
 
 
 def wait_for_services(simulator_id, recorder, timeout=180, clock=time.monotonic, pause=time.sleep):
@@ -165,8 +182,12 @@ def main():
             initialize_host(recorder)
             recorder.run(["xcrun", "simctl", "list", "runtimes", "-j"], timeout=60, check=True)
         else:
-            recorder.proof["device"] = validate_owned_simulator(args.simulator_id, recorder)
-            wait_for_services(args.simulator_id, recorder, args.timeout)
+            deadline = time.monotonic() + args.timeout
+            recorder.proof["device"] = validate_owned_simulator(args.simulator_id, recorder, args.timeout)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("Simulator inventory consumed the pretest readiness deadline")
+            wait_for_services(args.simulator_id, recorder, remaining)
         recorder.proof["passed"] = True
     except Exception as error:
         recorder.proof["error"] = f"{type(error).__name__}: {error}"

@@ -18,6 +18,39 @@ def save(path, proof):
     temporary.replace(path)
 
 
+def select_runtime(runtimes, device):
+    """Select a compatible available iOS runtime, independent of inventory order.
+
+    Newer runtimes can be restricted to a single device. Version alone cannot
+    establish compatibility: simctl's supportedDeviceTypes is authoritative.
+    Equal numeric versions use identifier/build/record as deterministic ties.
+    Missing compatibility metadata fails closed instead of trying device create.
+    """
+    identifier = device.get("identifier")
+    if not isinstance(identifier, str) or not identifier:
+        raise ValueError("The requested Simulator device has no identifier")
+    candidates = []
+    for runtime in runtimes:
+        if runtime.get("isAvailable") is not True:
+            continue
+        runtime_id, version = runtime.get("identifier", ""), runtime.get("version", "")
+        if not isinstance(runtime_id, str) or not runtime_id.startswith("com.apple.CoreSimulator.SimRuntime.iOS-"):
+            continue
+        if not isinstance(version, str) or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", version):
+            continue
+        supported = runtime.get("supportedDeviceTypes")
+        if not isinstance(supported, list) or not any(isinstance(v, dict) and v.get("identifier") == identifier for v in supported):
+            continue
+        numeric_version = tuple(map(int, version.split(".")))
+        while len(numeric_version) > 1 and numeric_version[-1] == 0:
+            numeric_version = numeric_version[:-1]
+        candidates.append(((numeric_version, runtime_id, str(runtime.get("buildversion", "")),
+                            json.dumps(runtime, sort_keys=True)), runtime))
+    if not candidates:
+        raise ValueError("No available iOS runtime explicitly supports device " + identifier)
+    return max(candidates, key=lambda item: item[0])[1]
+
+
 def capture_host_diagnostics(recorder):
     """Bounded read-only evidence; no service resets or desktop interaction."""
     processes = recorder.run(["/bin/ps", "-axo", "pid,ppid,etime,state,comm"], timeout=10)
@@ -103,12 +136,17 @@ def run_probe(output, helper, recorder_class, wait, services, predicate, initial
         proof["phase"] = "runtime-discovery"; save(path, proof)
         result = recorder.run(["xcrun", "simctl", "list", "runtimes", "-j"], timeout=60, check=True)
         runtimes = json.loads(result.stdout)["runtimes"]
-        runtime = max((v for v in runtimes if v["isAvailable"] and ".iOS-" in v["identifier"]),
-                      key=lambda v: tuple(map(int, v["version"].split("."))))
         result = recorder.run(["xcrun", "simctl", "list", "devicetypes", "-j"], timeout=60, check=True)
         device = next(v for v in json.loads(result.stdout)["devicetypes"] if v["name"] == "iPad Pro 13-inch (M5)")
+        proof["device"] = device; save(path, proof)
+        runtime = select_runtime(runtimes, device)
         name = "NeoAnki2-ServiceProbe-" + uuid.uuid4().hex[:12]
-        proof.update(phase="create", runtime=runtime, simulator_name=name, simulator_deleted=False); save(path, proof)
+        compatibility = next(v for v in runtime["supportedDeviceTypes"]
+                             if isinstance(v, dict) and v.get("identifier") == device["identifier"])
+        proof.update(phase="create", runtime=runtime, simulator_name=name, simulator_deleted=False,
+                     runtime_selection={"rule": "available iOS runtime explicitly supporting the selected device; numeric version then identifier/build/record tie-break",
+                                        "compatibility_source": "supportedDeviceTypes", "matched_device": compatibility})
+        save(path, proof)
         creation_started = True
         identifier = recorder.run(["xcrun", "simctl", "create", name, device["identifier"], runtime["identifier"]],
                                   timeout=60, check=True).stdout.strip()

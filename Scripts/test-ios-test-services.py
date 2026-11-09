@@ -138,6 +138,52 @@ class ReadinessTests(unittest.TestCase):
             self.assertNotIn("host_initialized", recorder.proof)
             self.assertNotIn(["xcodebuild", "-runFirstLaunch"], [c["argv"] for c in recorder.proof["commands"]])
 
+    def test_inventory_timeouts_poll_until_positive_owned_booted_observation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder = FakeRecorder(temporary)
+            ticks, timeouts = [0], []
+            def run(command, timeout=20, check=False):
+                timeouts.append(timeout)
+                if len(timeouts) <= 2:
+                    ticks[0] += timeout
+                    return subprocess.CompletedProcess(command, 124, "partial inventory", "busy")
+                value = {"devices": {"runtime": [{"udid": OWNED_ID, "name": "NeoAnki2-owned", "state": "Booted"}]}}
+                return subprocess.CompletedProcess(command, 0, json.dumps(value), "")
+            recorder.run = run
+            device = readiness.validate_owned_simulator(OWNED_ID, recorder, timeout=45,
+                        clock=lambda: ticks[0], pause=lambda seconds: ticks.__setitem__(0, ticks[0]+seconds))
+            self.assertEqual(device["udid"], OWNED_ID)
+            self.assertEqual(timeouts, [20, 20, 3])
+
+    def test_inventory_polling_cannot_extend_the_absolute_deadline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder = FakeRecorder(temporary)
+            ticks, commands = [0], []
+            def run(command, timeout=20, check=False):
+                commands.append(command); ticks[0] += timeout
+                return subprocess.CompletedProcess(command, 124, "", "")
+            recorder.run = run
+            with self.assertRaisesRegex(RuntimeError, "inventory readiness deadline"):
+                readiness.validate_owned_simulator(OWNED_ID, recorder, timeout=45,
+                    clock=lambda: ticks[0], pause=lambda seconds: ticks.__setitem__(0, ticks[0]+seconds))
+            self.assertEqual(ticks[0], 45)
+            self.assertEqual(len(commands), 3)
+            self.assertTrue(all(c == ["xcrun", "simctl", "list", "devices", "-j"] for c in commands))
+
+    def test_inventory_time_is_subtracted_from_endpoint_readiness_budget(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            ticks = [0]
+            def inventory(*args):
+                ticks[0] = 25
+                return {"udid": OWNED_ID, "name": "NeoAnki2-owned", "state": "Booted"}
+            with patch("sys.argv", ["wait", OWNED_ID, "--timeout", "180", "--output", temporary]), \
+                 patch.object(readiness, "CommandRecorder", FakeRecorder), \
+                 patch.object(readiness, "validate_owned_simulator", side_effect=inventory), \
+                 patch.object(readiness.time, "monotonic", side_effect=lambda: ticks[0]), \
+                 patch.object(readiness, "wait_for_services") as endpoints:
+                readiness.main()
+                self.assertEqual(endpoints.call_args.args[2], 155)
+
     def test_rejects_nonowned_or_unbooted_device_before_kickstart(self):
         for name, state in [("Personal iPhone", "Booted"), ("NeoAnki2-owned", "Shutdown")]:
             with tempfile.TemporaryDirectory() as temporary:
@@ -160,7 +206,7 @@ class ProbeTests(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 0, "Caches ready", "")
                 if command[1:4] == ["simctl", "list", "runtimes"]:
                     if failure == "runtimes": raise RuntimeError("runtimes timed out")
-                    result = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-26-5", "version": "26.5"}]}
+                    result = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-26-5", "version": "26.5", "supportedDeviceTypes": [{"identifier": "TYPE"}]}]}
                 elif command[1:4] == ["simctl", "list", "devicetypes"]:
                     result = {"devicetypes": [{"name": "iPad Pro 13-inch (M5)", "identifier": "TYPE"}]}
                 elif command[1:3] == ["simctl", "create"]:

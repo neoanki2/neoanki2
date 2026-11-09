@@ -237,11 +237,15 @@ extension FastFunctionalJourneyTests {
         openItemDetail(named: "Image", in: mediaApp)
         openItemEditor(in: mediaApp)
         let mediaSave = mediaApp.buttons.identified("saveEditItem")
+        // SwiftUI's enclosing media editor supplies the container identifier;
+        // query the native control's visible label rather than a child ID.
+        let imageDescription = mediaApp.textFields.matching(
+            NSPredicate(format: "label == %@", "Image description (optional)")
+        ).firstMatch
         try runJourneyActivity("AuthoringUITests.testMediaFieldAllowsOptionalDescription") {
             XCTAssertTrue(mediaSave.waitUntilExists(timeout: 5))
-            let description = mediaApp.textFields.identified("field-Image-altText")
-            XCTAssertTrue(description.waitUntilExists(timeout: 5))
-            XCTAssertEqual(description.value as? String, "")
+            XCTAssertTrue(imageDescription.waitUntilExists(timeout: 5), mediaApp.debugDescription)
+            XCTAssertEqual(imageDescription.value as? String, "")
             XCTAssertTrue(mediaSave.isEnabled, "A valid image must save without a description")
             mediaSave.click()
             XCTAssertTrue(mediaSave.waitUntilGone(timeout: 10))
@@ -251,8 +255,9 @@ extension FastFunctionalJourneyTests {
             let save = mediaApp.buttons.identified("saveEditItem")
             XCTAssertTrue(save.waitUntilExists(timeout: 5))
             XCTAssertTrue(save.isEnabled)
-            XCTAssertEqual(mediaApp.textFields.identified("field-Image-altText").value as? String, "")
-            XCTAssertTrue(mediaApp.buttons.identified("field-Image-removeFile").exists,
+            XCTAssertTrue(imageDescription.waitUntilExists(timeout: 5), mediaApp.debugDescription)
+            XCTAssertEqual(imageDescription.value as? String, "")
+            XCTAssertTrue(mediaApp.buttons.matching(NSPredicate(format: "label == %@", "Remove")).firstMatch.exists,
                           "Saving an empty description must preserve the attached image")
         }
         mediaApp.buttons.identified("cancelEditItem").click()

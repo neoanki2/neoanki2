@@ -50,6 +50,7 @@ bash "$ROOT/Scripts/test-github-read-retry.sh"
 
 echo "==> iOS XCTest service readiness policy"
 python3 "$ROOT/Scripts/test-ios-test-services.py"
+python3 "$ROOT/Scripts/test-ios-runtime-selection.py"
 
 echo "==> iOS UI infrastructure retry policy"
 python3 "$ROOT/Scripts/test-ios-ui-retry.py"
