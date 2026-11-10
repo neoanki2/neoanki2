@@ -15,6 +15,24 @@ enum MacStoreCaptureGeometry {
         pointSizes.contains { abs($0.width - size.width) < 1 && abs($0.height - size.height) < 1 }
     }
 
+    // Native window drags can consume a few points before resizing begins.
+    // Learn that loss from the actual frame; stop immediately if input has no effect.
+    static func resizeExtent(_ initial: CGFloat, to target: CGFloat,
+                             applyDelta: (CGFloat) -> CGFloat) -> CGFloat {
+        var current = initial
+        var loss: CGFloat = 0
+        // One coarse move and at most two adjustments from measured frame loss.
+        for _ in 0..<3 {
+            if abs(target - current) < 1 { break }
+            let requested = target - current + loss
+            let updated = applyDelta(requested)
+            if abs(updated - current) < 0.5 { break }
+            loss = requested - (updated - current)
+            current = updated
+        }
+        return current
+    }
+
     static func acceptsPixels(width: Int, height: Int) -> Bool {
         [1, 2].contains { scale in
             pointSizes.contains { Int($0.width) * scale == width && Int($0.height) * scale == height }
@@ -235,6 +253,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
     }
 
     private func prepareStoreCaptureWindow(in app: XCUIApplication) throws {
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.neoanki2.ios"
+        }, "Store capture requires the actual Apple app in the foreground")
         let screen = try XCTUnwrap(NSScreen.main)
         let primaryTop = try XCTUnwrap(NSScreen.screens.first).frame.maxY
         let visible = CGRect(x: screen.visibleFrame.minX, y: primaryTop - screen.visibleFrame.maxY,
@@ -259,18 +282,34 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
                                                 y: visible.minY + (visible.height - target.height) / 2)
                 let destination = title.withOffset(CGVector(dx: destinationOrigin.x - initial.minX,
                                                             dy: destinationOrigin.y - initial.minY))
-                title.press(forDuration: 0.1, thenDragTo: destination)
+                title.click(forDuration: 0.3, thenDragTo: destination)
                 XCTAssertTrue(waitUntil(timeout: 5) {
                     let proposed = CGRect(origin: window.frame.origin, size: target)
                     return visible.insetBy(dx: -1, dy: -1).contains(proposed)
                 }, "The actual window origin must leave room for the full Store capture: \(window.frame), visible: \(visible)")
             }
-            if abs(window.frame.width - target.width) >= 1 || abs(window.frame.height - target.height) >= 1 {
-                let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-                    .withOffset(CGVector(dx: -3, dy: -3))
-                let destination = window.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: target.width - 3, dy: target.height - 3))
-                corner.press(forDuration: 0.1, thenDragTo: destination)
+            for horizontal in [true, false] {
+                let extent = horizontal ? window.frame.width : window.frame.height
+                let targetExtent = horizontal ? target.width : target.height
+                _ = MacStoreCaptureGeometry.resizeExtent(extent, to: targetExtent) { delta in
+                    let before = window.frame
+                    let edge = window.coordinate(withNormalizedOffset: horizontal
+                        ? CGVector(dx: 1, dy: 0.5) : CGVector(dx: 0.5, dy: 1))
+                        .withOffset(horizontal ? CGVector(dx: -1, dy: 0) : CGVector(dx: 0, dy: -1))
+                    edge.hover()
+                    edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(horizontal
+                        ? CGVector(dx: delta, dy: 0) : CGVector(dx: 0, dy: delta)))
+                    _ = waitUntil(timeout: 3) {
+                        let after = window.frame
+                        return abs(horizontal ? after.width - before.width : after.height - before.height) > 0.5
+                    }
+                    let after = window.frame
+                    let evidence = XCTAttachment(string: "before=\(before) requestedDelta=\(delta) after=\(after)")
+                    evidence.name = horizontal ? "capture-width-adjustment" : "capture-height-adjustment"
+                    evidence.lifetime = .keepAlways
+                    add(evidence)
+                    return horizontal ? after.width : after.height
+                }
             }
             XCTAssertTrue(waitUntil(timeout: 10) {
                 let frame = window.frame
