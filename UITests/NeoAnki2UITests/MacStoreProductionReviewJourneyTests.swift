@@ -70,7 +70,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         waitForItem(named: "What does spaced repetition improve?", in: app)
         try storeCapture("02-native-mac-library", app)
         leaveBrowseMode(in: app)
-        startStudyViaMenu(in: app)
+        startStoreStudy(in: app)
         try storeCapture("03-native-mac-study", app)
         let action = app.buttons.identified("primaryStudyAction")
         XCTAssertTrue(action.waitUntilExists(timeout: 5), "The new card must be available to study")
@@ -111,10 +111,12 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
              #"{"kind":"item","deck":"voice","type":"voice","fields":{"prompt":{"text":"Describe what you learned today"}}}"# + "\n")
             .write(to: bundle.appendingPathComponent("items.jsonl"), atomically: true, encoding: .utf8)
         app.menuBarItems["File"].click()
-        app.menuItems.identified("Import Deck…").click()
+        selectStoreMenuItem("Import Deck…", in: app)
         cancelFilePicker(in: app)
         waitForItem(named: "What does spaced repetition improve?", in: app)
-        choosePortableDeckImport(bundle, in: app)
+        app.menuBarItems["File"].click()
+        selectStoreMenuItem("Import Deck…", in: app)
+        chooseFileInOpenPanel(bundle, in: app)
         finishPortableImport(in: app)
         waitForItem(named: "Sandbox image question", in: app)
         showSidebar(in: app)
@@ -125,7 +127,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         }
         selectScope("deckRow-Images", in: app)
         leaveBrowseMode(in: app)
-        startStudyViaMenu(in: app)
+        startStoreStudy(in: app)
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.images["Store review cover"].waitUntilExists(timeout: 10))
         try evidenceCapture("sandbox-imported-image", app)
@@ -133,10 +135,12 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         finishStudySession(in: app)
         selectScope("deckRow-Store Import", in: app)
         app.menuBarItems["File"].click()
-        app.menuItems.identified("Export Deck…").click()
+        selectStoreMenuItem("Export Deck…", in: app)
         cancelFilePicker(in: app)
         let exported = directory.appendingPathComponent("roundtrip.neodeck")
-        chooseExportDestination(exported, in: app)
+        app.menuBarItems["File"].click()
+        selectStoreMenuItem("Export Deck…", in: app)
+        chooseFileInSavePanel(exported, in: app)
         XCTAssertTrue(waitUntil(timeout: 30) { FileManager.default.fileExists(atPath: exported.path) })
         _ = dismissPortableDeckNoticeIfPresent(titled: "Deck Exported", in: app)
         let query = Process()
@@ -174,7 +178,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         try evidenceCapture("sandbox-microphone-recording", app)
         stop.click()
         app.buttons.identified("audioSubmissionActions").click()
-        app.menuItems.identified("playAudioSubmission").click()
+        selectStoreMenuItem("playAudioSubmission", in: app)
         XCTAssertTrue(app.staticTexts["Playing your recording…"].waitUntilExists(timeout: 5))
         let save = app.buttons.identified("saveAudioSubmission")
         XCTAssertTrue(save.waitUntilHittable(timeout: 10))
@@ -193,6 +197,25 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertTrue(persistedStop.waitUntilExists(timeout: 5), "The saved response must play from library storage after restart")
         try evidenceCapture("sandbox-recording-persisted", app)
         if persistedStop.exists { persistedStop.click() }
+    }
+
+    private func selectStoreMenuItem(_ identifier: String, in app: XCUIApplication) {
+        let item = app.menuItems.identified(identifier)
+        XCTAssertTrue(item.waitUntilExists(timeout: 5))
+        XCTAssertTrue(item.isEnabled)
+        XCTAssertTrue(item.waitUntilHittable(timeout: 5), "Menu item must be visible: \(identifier), \(item.frame)")
+        XCTAssertFalse(item.frame.isEmpty)
+        // Semantic menu-item click traverses and reopens SwiftUI's generic
+        // menuAction: parent in Full Screen, then times out waiting for the
+        // already-open menu. Click the observed native item without retraversal.
+        item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    private func startStoreStudy(in app: XCUIApplication) {
+        app.menuBarItems["Study"].click()
+        selectStoreMenuItem("Start Study", in: app)
+        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitUntilExists(timeout: 5)
+            || app.buttons.identified("studySessionDone").waitUntilExists(timeout: 2))
     }
 
     private func verifySandboxLocalAPI(in app: XCUIApplication) async throws {
