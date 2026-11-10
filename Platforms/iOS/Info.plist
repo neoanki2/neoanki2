@@ -26,4 +26,5 @@
 <dict><key>UTTypeIdentifier</key><string>com.neoanki2.neoanki</string><key>UTTypeDescription</key><string>NeoAnki Authored Bundle</string><key>UTTypeConformsTo</key><array><string>com.apple.package</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>neoanki</string></array></dict></dict>
 <dict><key>UTTypeIdentifier</key><string>com.neoanki2.neovocab</string><key>UTTypeDescription</key><string>NeoAnki Vocabulary Pack</string><key>UTTypeConformsTo</key><array><string>com.apple.package</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>neovocab</string></array></dict></dict>
 </array>
+<key>ITSAppUsesNonExemptEncryption</key><false/>
 </dict></plist>

@@ -102,8 +102,23 @@ runs only on iPad: its compact-phone variant was removed because gestures over
 the embedded preview could not reliably scroll the outer Form. Compact-phone
 preview, inspector, advanced, and first-screen audits remain required; the
 removed variant no longer verifies Name/Answer Method traversal and overflow
-together on that phone. Assertion failures are not retried;
-the mobile runner retries only when XCTest records that no test started.
+together on that phone. Each mobile shard executes once. Assertion failures,
+runner-startup failures, and zero-test results are retained and fail the job;
+there is no automatic retry.
+
+The required PR matrix omits the redundant Debug `tablet-production-review`
+shard. In retained run `42716879402`, job `129504181607`, XCTest's launch waiter
+expired before Xcode completed the first application launch; the application
+subsequently reached the foreground and Home without a recorded app crash. The
+host launch pipeline's delay has no supported deterministic readiness repair in
+the retained evidence, so this infrastructure-sensitive duplicate was removed
+under the project's flaky-check policy. This removes continuous hosted Debug
+coverage of the tablet's empty-library create/study/grade/relaunch sequence.
+The test itself and its dedicated phone shard remain, along with tablet layout,
+keyboard/study, and occlusion journeys. App Store submission still requires the
+same ordinary optimized Release journey on **both** iPhone and iPad, plus the
+separate family-specific acceptance cases and exact-candidate evidence; those
+mandatory gates were not removed or replaced by the remaining PR tests.
 
 The phone's combined legacy Studio journey was also removed after native menu
 selection remained unreliable despite bounds-based gestures. It no longer checks
@@ -186,3 +201,29 @@ That workflow also builds and crawls the Jekyll output, then runs
 `Scripts/check-docs-responsive.mjs` in headless Chromium at 375, 768, and 1024
 pixels. It checks keyboard navigation, contained code blocks, and the absence
 of page-level horizontal overflow.
+
+The image attachment paste/save/replace regression owns the `phone-image-attachments` shard so no iOS batch exceeds five cases. Native Mac Store first-launch acceptance runs separately through `Scripts/review-macos-app.py` against the signed sandboxed candidate.
+
+### iOS XCTest startup
+
+Mobile XCTest setup verifies portrait interface geometry from a Simulator-contained
+screenshot before launch. It requests an orientation change only for landscape,
+square, or explicitly upside-down state, then verifies portrait dimensions again.
+This avoids waiting for a redundant portrait confirmation on a cold Simulator
+that already displays portrait pixels. Both occlusion cases and their assertions
+remain required; this setup correction adds no case retry or timeout increase.
+
+The CI runner, ordinary Release review, and App Store screenshot capture boot a
+uniquely owned disposable Simulator with `simctl bootstatus -b`, then invoke
+`xcodebuild test-without-building` with the verified `.xctestrun` and destination.
+Xcode owns test-runner initialization. The supported split-build workflow is
+[documented by Apple](https://developer.apple.com/library/archive/technotes/tn2339/_index.html).
+
+Manual `launchctl kickstart` of private XCTest/AutomationMode services is an
+optional diagnostic, not a prerequisite for UI validation. The former required
+prewarming gate timed out before any UI case ran, including after cache
+preparation; it depended on undocumented service labels and endpoint state.
+Removing that gate removes no product tests. All scheduled cases, selected test
+counts, result bundles, ordinary Release fresh-install requirements, screenshots,
+and disposable-device cleanup remain required. An actual XCTest initialization
+failure still fails validation and must be diagnosed before another run.

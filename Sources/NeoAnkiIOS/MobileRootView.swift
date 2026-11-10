@@ -80,6 +80,10 @@ public struct MobileRootView: View {
         }
         .task {
             await model.bootstrap()
+            #if DEBUG
+            do { try MobileImageAttachmentUITestFixture.seedIfRequested() }
+            catch { fixtureError = MobileAppModel.message(for: error) }
+            #endif
             if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
                 do { try await MobileRedesignUITestSeeder.seedIfRequested(library: model.library); await model.refresh() }
                 catch { fixtureError = MobileAppModel.message(for: error); await model.refresh() }

@@ -65,8 +65,8 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
         try runLegacyCheck("AuthoringUITests.testAddItemWithNumberField") { try checkAuthoringUITestsAddItemWithNumberField() }
         try runLegacyCheck("AuthoringUITests.testAddItemWithMultipleItemTypes") { try checkAuthoringUITestsAddItemWithMultipleItemTypes() }
         try runLegacyCheck("AuthoringUITests.testClozeAuthoringMarkBlank") { try checkAuthoringUITestsClozeAuthoringMarkBlank() }
-        try runLegacyCheck("AuthoringUITests.testMediaFieldRequiresDescription") { try checkAuthoringUITestsMediaFieldRequiresDescription() }
-        try runLegacyCheck("LibraryUITests.testImageEditRequiresDescriptionBeforeSaving") { try checkLibraryUITestsImageEditRequiresDescriptionBeforeSaving() }
+        try runLegacyCheck("AuthoringUITests.testMediaFieldAllowsOptionalDescription") { try checkAuthoringUITestsMediaFieldAllowsOptionalDescription() }
+        try runLegacyCheck("LibraryUITests.testImageEditAllowsOptionalDescription") { try checkLibraryUITestsImageEditAllowsOptionalDescription() }
         try runLegacyCheck("AuthoringUITests.testEmptyDeckAddItem") { try checkAuthoringUITestsEmptyDeckAddItem() }
         try runLegacyCheck("AuthoringUITests.testUnassignedScopeEmptyState") { try checkAuthoringUITestsUnassignedScopeEmptyState() }
         try runLegacyCheck("AuthoringUITests.testItemPreviewRendersRichText") { try checkAuthoringUITestsItemPreviewRendersRichText() }

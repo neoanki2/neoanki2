@@ -13,6 +13,30 @@ on:
         required: true
         type: string
 
+      mac_store_review_tag:
+        description: Optional private draft release containing the signed native Store review bundle
+        required: false
+        type: string
+      mac_store_review_sha256:
+        description: SHA-256 of native-mac-store-review.zip
+        required: false
+        type: string
+      ios_service_probe:
+        description: Diagnose owned Simulator service readiness without running UI validation
+        required: false
+        default: false
+        type: boolean
+      ios_probe_xcode27:
+        description: Diagnose the newer supported Xcode 27 host and runtime without running UI validation
+        required: false
+        default: false
+        type: boolean
+      ios_prepare_dyld_cache:
+        description: Opt-in diagnostic experiment using Apple runtime cache preparation before boot
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
 
@@ -25,13 +49,13 @@ defaults:
     shell: bash
 
 concurrency:
-  group: release-candidate
+  group: ${{ inputs.ios_service_probe && format('ios-service-probe-{0}', github.ref) || inputs.mac_store_review_tag != '' && format('mac-store-review-{0}', inputs.head) || 'release-candidate' }}
   cancel-in-progress: false
 
 jobs:
   package:
     name: Build candidate
-    if: github.ref_name == github.event.repository.default_branch
+    if: github.ref_name == github.event.repository.default_branch && inputs.mac_store_review_tag == '' && inputs.ios_service_probe != true
     runs-on: macos-26
     timeout-minutes: 45
     permissions:
@@ -247,3 +271,124 @@ jobs:
         run: |
           chmod +x Scripts/publish-release-candidate.sh
           ./Scripts/publish-release-candidate.sh .build/release-candidate
+
+
+  mac-store-review:
+    name: Review Apple TestFlight native Mac Store candidate
+    if: inputs.mac_store_review_tag != '' && inputs.ios_service_probe != true
+    runs-on: macos-26
+    timeout-minutes: 35
+    permissions:
+      # Draft release assets are visible only with repository push access.
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Validate the internal source and private review bundle request
+        env:
+          EXPECTED_PR: ${{ inputs.pr }}
+          EXPECTED_HEAD: ${{ inputs.head }}
+          REVIEW_TAG: ${{ inputs.mac_store_review_tag }}
+          REVIEW_SHA256: ${{ inputs.mac_store_review_sha256 }}
+        run: |
+          [[ "$EXPECTED_PR" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REVIEW_TAG" =~ ^mac-store-review-[0-9a-f]{12}-b[1-9][0-9]*$ ]]
+          [[ "$REVIEW_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          current_head=$(gh pr view "$EXPECTED_PR" --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid,isCrossRepository,baseRefName | \
+            jq -er --arg base "${{ github.event.repository.default_branch }}" \
+              'select(.isCrossRepository == false and .baseRefName == $base) | .headRefOid')
+          gh api "repos/$GITHUB_REPOSITORY/compare/$EXPECTED_HEAD...$current_head" \
+            | jq -e '.status == "ahead" or .status == "identical"'
+          gh release view "$REVIEW_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,targetCommitish | \
+            jq -e --arg head "$EXPECTED_HEAD" '.isDraft == true and .targetCommitish == $head'
+      - name: Check out the exact candidate source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download and verify the signed candidate without signing keys
+        env:
+          REVIEW_TAG: ${{ inputs.mac_store_review_tag }}
+          REVIEW_SHA256: ${{ inputs.mac_store_review_sha256 }}
+        run: |
+          mkdir -p /tmp/neoanki2-mac-store-review
+          gh release download "$REVIEW_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern native-mac-store-review.zip --dir /tmp/neoanki2-mac-store-review
+          printf '%s  %s\n' "$REVIEW_SHA256" /tmp/neoanki2-mac-store-review/native-mac-store-review.zip | shasum -a 256 -c -
+          ditto -x -k /tmp/neoanki2-mac-store-review/native-mac-store-review.zip /tmp/neoanki2-mac-store-review
+      - name: Compile the isolated hosted-display fixture from the workflow revision
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir -p /tmp/neoanki2-mac-store-review/environment
+          gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/macos-review-display.m?ref=$GITHUB_SHA" \
+            --jq .content | base64 --decode > /tmp/neoanki2-mac-store-review/environment/display.m
+          printf '%s\n' "$GITHUB_SHA" > /tmp/neoanki2-mac-store-review/environment/tooling-revision.txt
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Cocoa -framework CoreGraphics \
+            /tmp/neoanki2-mac-store-review/environment/display.m \
+            -o /tmp/neoanki2-mac-store-review/environment/review-display
+      - name: Run the ordinary sandboxed first-launch journey
+        run: |
+          env -u GH_TOKEN -u GITHUB_TOKEN -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            /tmp/neoanki2-mac-store-review/environment/review-display \
+            python3 Scripts/review-macos-app.py \
+            --candidate /tmp/neoanki2-mac-store-review/candidate \
+            --installed-app /tmp/neoanki2-mac-store-review/candidate/testflight/NeoAnki2.app \
+            --output /tmp/neoanki2-mac-store-review/review 2>&1 | \
+            tee /tmp/neoanki2-mac-store-review/environment/display.log
+      - name: Retain original UI results, executable checksums, configuration, and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-mac-store-review-${{ inputs.head }}
+          path: |
+            /tmp/neoanki2-mac-store-review/review/review.json
+            /tmp/neoanki2-mac-store-review/review/build.log
+            /tmp/neoanki2-mac-store-review/review/test.log
+            /tmp/neoanki2-mac-store-review/review/review.xcresult/
+            /tmp/neoanki2-mac-store-review/review/attachments/
+            /tmp/neoanki2-mac-store-review/review/derived-data/Build/Products/
+            /tmp/neoanki2-mac-store-review/environment/
+          if-no-files-found: error
+          retention-days: 14
+
+  ios-service-probe:
+    name: Diagnose disposable Simulator service activation
+    if: inputs.ios_service_probe == true
+    runs-on: ${{ inputs.ios_probe_xcode27 && 'xcode-27' || 'macos-26' }}
+    env:
+      DEVELOPER_DIR: ${{ inputs.ios_probe_xcode27 && '/Applications/Xcode_27.2.app/Contents/Developer' || '/Applications/Xcode_26.6.app/Contents/Developer' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the candidate readiness predicate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - name: Fetch the exact diagnostic implementation
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/probe-ios-test-services.py?ref=$GITHUB_SHA" \
+            --jq .content | base64 --decode > "$RUNNER_TEMP/probe-ios-test-services.py"
+          gh api "repos/$GITHUB_REPOSITORY/contents/Scripts/wait-ios-test-services.py?ref=$GITHUB_SHA" \
+            --jq .content | base64 --decode > "$RUNNER_TEMP/wait-ios-test-services.py"
+      - name: Record both services before and after activation
+        env:
+          PREPARE_DYLD_CACHE: ${{ inputs.ios_prepare_dyld_cache }}
+        run: |
+          probe_options=()
+          if [ "$PREPARE_DYLD_CACHE" = "true" ]; then probe_options+=(--prepare-dyld-cache); fi
+          env -u GH_TOKEN -u GITHUB_TOKEN -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            python3 "$RUNNER_TEMP/probe-ios-test-services.py" \
+            --helper "$RUNNER_TEMP/wait-ios-test-services.py" --output "$RUNNER_TEMP/ios-service-probe" "${probe_options[@]}"
+      - name: Retain observations without declaring UI validation passed
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ios-service-probe-${{ github.run_id }}
+          path: ${{ runner.temp }}/ios-service-probe/
+          if-no-files-found: error
+          retention-days: 14

@@ -41,7 +41,7 @@ import Testing
     #expect(snapshot.fieldClozeBlanks[cloze.id] == [blank])
 }
 
-@Test func itemEditorStateValidatesRequiredFieldsAndImageDescriptions() {
+@Test func itemEditorStateValidatesRequiredFieldsWithOptionalImageDescriptions() {
     let prompt = FieldDef(name: "Prompt", type: .text, isRequired: true)
     let image = FieldDef(name: "Image", type: .image)
     let audio = FieldDef(name: "Audio", type: .audio)
@@ -64,9 +64,9 @@ import Testing
     #expect(ItemEditorState.canSave(snapshot, itemType: itemType))
 
     snapshot.fieldMedia[image.id] = imageRef
-    #expect(ItemEditorState.canSave(snapshot, itemType: itemType) == false)
+    #expect(ItemEditorState.canSave(snapshot, itemType: itemType))
     snapshot.fieldMediaAltText[image.id] = "   "
-    #expect(ItemEditorState.canSave(snapshot, itemType: itemType) == false)
+    #expect(ItemEditorState.canSave(snapshot, itemType: itemType))
     snapshot.fieldMediaAltText[image.id] = "Map of France"
     #expect(ItemEditorState.canSave(snapshot, itemType: itemType))
 }
@@ -88,20 +88,19 @@ import Testing
     )
 }
 
-@Test func mediaFieldPolicyRequiresDescriptionsOnlyForVisualMedia() {
-    #expect(MediaFieldPolicy.requiresDescription(kind: .image, hasMedia: true))
-    #expect(MediaFieldPolicy.requiresDescription(kind: .gif, hasMedia: true))
-    #expect(MediaFieldPolicy.requiresDescription(kind: .audio, hasMedia: true) == false)
-    #expect(MediaFieldPolicy.requiresDescription(kind: .video, hasMedia: true) == false)
-    #expect(MediaFieldPolicy.requiresDescription(kind: .image, hasMedia: false) == false)
-    #expect(MediaFieldPolicy.descriptionLabel(for: .image) == "Image description (required)")
-    #expect(MediaFieldPolicy.descriptionLabel(for: .gif) == "Image description (required)")
+@Test func mediaFieldPolicyLabelsDescriptionsAsOptional() {
+    #expect(MediaFieldPolicy.descriptionLabel(for: .image) == "Image description (optional)")
+    #expect(MediaFieldPolicy.descriptionLabel(for: .gif) == "Image description (optional)")
     #expect(MediaFieldPolicy.descriptionLabel(for: .audio) == "Description (optional)")
     #expect(MediaFieldPolicy.descriptionLabel(for: .video) == "Description (optional)")
 }
 
-@Test func mediaPickerOffersOnlyFormatsAcceptedByCoreValidation() throws {
+@Test func mediaPickerOffersImagesForPreparationAndOtherStorageFormats() throws {
     for kind in [MediaKind.audio, .image, .gif, .video] {
+        if kind == .image {
+            #expect(MediaFieldPolicy.allowedContentTypes(for: kind) == [.image])
+            continue
+        }
         let acceptedExtensions = MediaValidation.allowedExtensions(for: kind)
         let offeredExtensions = MediaFieldPolicy.allowedFilenameExtensions(for: kind)
         #expect(
@@ -114,5 +113,18 @@ import Testing
                 "Picker offers \(fileExtension) for \(kind.rawValue), but core rejects it"
             )
         }
+    }
+}
+
+@Test(arguments: [MediaKind.image, .gif])
+func requiredVisualMediaNeedsAnAttachmentButNoDescription(kind: MediaKind) {
+    let field = FieldDef(name: "Visual", type: kind == .image ? .image : .gif, isRequired: true)
+    let type = ItemType(name: "Visual", fields: [field], templates: [])
+    var draft = ItemDraftContent()
+    #expect(!ItemDraftValidation.canSave(draft, itemType: type))
+    draft.media[field.id] = MediaRef(kind: kind, assetHash: String(repeating: "a", count: 64), fileExtension: kind == .image ? "png" : "gif")
+    for description: String? in [nil, "", "   ", "A diagram"] {
+        draft.mediaDescriptions[field.id] = description
+        #expect(ItemDraftValidation.canSave(draft, itemType: type))
     }
 }

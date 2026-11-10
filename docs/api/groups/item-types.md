@@ -2,7 +2,7 @@
 title: Item types
 description: Generated NeoAnki local API operations for item types.
 audience: api
-contract_digest: sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485
+contract_digest: sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2
 parent: Local API reference
 permalink: /api/item-types/
 ---
@@ -181,6 +181,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485`.
+Contract digest: `sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

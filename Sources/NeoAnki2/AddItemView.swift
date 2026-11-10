@@ -18,6 +18,7 @@ struct AddItemView: View {
     @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var selectedDeckID: UUID?
     @State private var isSaving = false
+    @State private var processingAttachments = 0
     @State private var didInitialize = false
     @State private var initialSnapshot: ItemEditorSnapshot?
     @State private var showDiscardConfirmation = false
@@ -94,6 +95,7 @@ struct AddItemView: View {
                         "Types included for this deck appear first. Ordinary Item Types are always available."
                     )
                     .accessibilityIdentifier("addItemTypePicker")
+                    .disabled(processingAttachments > 0)
 
                     if model.effectiveItemTypePolicy != nil,
                        model.addItemTypeID == nil {
@@ -127,6 +129,8 @@ struct AddItemView: View {
                 }
             }
         }
+        .environment(\.attachmentProcessing, processingAttachments > 0)
+        .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { processingAttachments = $0 }
         .formStyle(.grouped)
         .neoAnkiFormTypography()
         .navigationTitle(isEditing ? "Edit Item" : "Add Item")
@@ -143,7 +147,7 @@ struct AddItemView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
-                .disabled(isSaving || !canSave)
+                .disabled(isSaving || processingAttachments > 0 || !canSave)
                 .accessibilityIdentifier(isEditing ? "saveEditItem" : "saveAddItem")
             }
         }
@@ -403,7 +407,7 @@ struct AddItemView: View {
     }
 
     private func save() async {
-        guard !isSaving else { return }
+        guard !isSaving, processingAttachments == 0 else { return }
         isSaving = true
         defer { isSaving = false }
 

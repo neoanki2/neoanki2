@@ -22,6 +22,7 @@
 		A1000000000000000000000D /* FastFunctionalJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* FastFunctionalJourneyTests.swift */; };
 		A1000000000000000000000E /* ScopeHomeAndBrowseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ScopeHomeAndBrowseUITests.swift */; };
 		A1000000000000000000000F /* VocabularyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* VocabularyUITests.swift */; };
+		A10000000000000000000010 /* MacStoreProductionReviewJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* MacStoreProductionReviewJourneyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +46,7 @@
 		A20000000000000000000002 /* NeoAnki2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NeoAnki2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000004 /* NeoAnki2UITests.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = NeoAnki2UITests.xctestplan; sourceTree = "<group>"; };
+		A20000000000000000000015 /* MacStoreProductionReviewJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStoreProductionReviewJourneyTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -63,6 +65,7 @@
 			children = (
 				A20000000000000000000001 /* UITestHelpers.swift */,
 				A20000000000000000000010 /* FastFunctionalJourneyTests.swift */,
+				A20000000000000000000015 /* MacStoreProductionReviewJourneyTests.swift */,
 				A20000000000000000000013 /* ScopeHomeAndBrowseUITests.swift */,
 				A20000000000000000000014 /* VocabularyUITests.swift */,
 				A20000000000000000000005 /* LibraryUITests.swift */,
@@ -153,7 +156,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nAPP_SRC=\"${SRCROOT}/../.build/NeoAnki2.app\"\nAPP_DST=\"${BUILT_PRODUCTS_DIR}/NeoAnki2.app\"\nrm -rf \"$APP_DST\"\nditto \"$APP_SRC\" \"$APP_DST\"\nxattr -cr \"$APP_DST\" || true\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST/Contents/MacOS/NeoAnki2\"\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST\"\n";
+			shellScript = "set -e\nAPP_SRC=\"${NEOANKI_UI_APP_PATH:-${SRCROOT}/../.build/NeoAnki2.app}\"\nAPP_DST=\"${BUILT_PRODUCTS_DIR}/NeoAnki2.app\"\nrm -rf \"$APP_DST\"\nditto \"$APP_SRC\" \"$APP_DST\"\nxattr -cr \"$APP_DST\" || true\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST/Contents/MacOS/NeoAnki2\"\n/usr/bin/codesign --force --sign - --timestamp=none \\\n  --entitlements \"${SRCROOT}/AppBundle/NeoAnki2.entitlements\" \\\n  \"$APP_DST\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -185,6 +188,7 @@
 				A1000000000000000000000B /* NavigationGatingUITests.swift in Sources */,
 				A1000000000000000000000C /* DocumentationScreenshotTests.swift in Sources */,
 				A1000000000000000000000D /* FastFunctionalJourneyTests.swift in Sources */,
+				A10000000000000000000010 /* MacStoreProductionReviewJourneyTests.swift in Sources */,
 				A1000000000000000000000E /* ScopeHomeAndBrowseUITests.swift in Sources */,
 				A1000000000000000000000F /* VocabularyUITests.swift in Sources */,
 			);

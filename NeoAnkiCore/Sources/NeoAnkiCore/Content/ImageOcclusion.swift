@@ -130,9 +130,6 @@ public enum ImageOcclusionValidation {
         guard content.image.kind == .image, content.image.isValidStoredReference else {
             throw DatabaseError.invalidItem("Image occlusion requires a valid still image.")
         }
-        guard !(content.image.altText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw DatabaseError.invalidItem("Add an image description that does not give away the answers.")
-        }
         guard !content.masks.isEmpty,
               Set(content.masks.map(\.id)).count == content.masks.count,
               content.masks.allSatisfy({ $0.group > 0 && $0.rect.isValid }),

@@ -1,19 +1,18 @@
 import AppKit
+import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 import UniformTypeIdentifiers
 
 enum MediaFieldPolicy {
-    static func requiresDescription(kind: MediaKind, hasMedia: Bool) -> Bool {
-        hasMedia && [.image, .gif].contains(kind)
-    }
-
     static func descriptionLabel(for kind: MediaKind) -> String {
-        [.image, .gif].contains(kind) ? "Image description (required)" : "Description (optional)"
+        [.image, .gif].contains(kind) ? "Image description (optional)" : "Description (optional)"
     }
 
     static func allowedContentTypes(for kind: MediaKind) -> [UTType] {
-        allowedFilenameExtensions(for: kind).compactMap {
+        if kind == .image { return [.image] }
+        return allowedFilenameExtensions(for: kind).compactMap {
             UTType(filenameExtension: $0)
         }
     }
@@ -37,6 +36,10 @@ struct MediaFieldEditor: View {
     let accessibilityIdentifier: String
 
     @State private var isImporting = false
+    @State private var isActive = true
+    @State private var importTask: Task<Void, Never>?
+    @State private var pasteProcessing = 0
+    @Environment(\.attachmentProcessing) private var otherAttachmentProcessing
     @State private var errorMessage: String?
     @State private var fileName = ""
 
@@ -73,8 +76,18 @@ struct MediaFieldEditor: View {
                 Button("Choose File…") {
                     chooseFile()
                 }
-                .disabled(isImporting || mediaStore == nil)
+                .disabled(isImporting || pasteProcessing > 0 || mediaStore == nil)
                 .accessibilityIdentifier("\(accessibilityIdentifier)-chooseFile")
+
+                if kind == .image {
+                    ImageAttachmentPasteButton { result in
+                        do { try await attach(try result.get()) }
+                        catch { errorMessage = UserFacingError.message(from: error) }
+                    }
+                    .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { pasteProcessing = $0 }
+                    .disabled(isImporting || mediaStore == nil)
+                }
+                if isImporting { ProgressView("Preparing attachment…") }
 
                 if media != nil {
                     Button("Remove", role: .destructive) {
@@ -83,6 +96,7 @@ struct MediaFieldEditor: View {
                         fileName = ""
                     }
                     .accessibilityIdentifier("\(accessibilityIdentifier)-removeFile")
+                    .disabled(isImporting || pasteProcessing > 0)
                 }
 
                 Spacer()
@@ -98,20 +112,14 @@ struct MediaFieldEditor: View {
             TextField(descriptionLabel, text: $altText)
                 .accessibilityIdentifier("\(accessibilityIdentifier)-altText")
 
-            if requiresDescription, altText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Label(
-                    "Add a short description so the image is understandable with VoiceOver.",
-                    systemImage: "accessibility"
-                )
-                .font(DesignSystem.Typography.uiHint)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("\(accessibilityIdentifier)-descriptionRequired")
-            }
-
             if let errorMessage {
                 ErrorBanner(message: errorMessage)
             }
         }
+        .disabled(otherAttachmentProcessing && !isImporting && pasteProcessing == 0)
+        .preference(key: AttachmentProcessingPreferenceKey.self, value: (isImporting ? 1 : 0) + pasteProcessing)
+        .onAppear { isActive = true }
+        .onDisappear { isActive = false; importTask?.cancel() }
         .accessibilityIdentifier(accessibilityIdentifier)
     }
 
@@ -122,10 +130,6 @@ struct MediaFieldEditor: View {
         case .gif: "photo.stack"
         case .video: "film"
         }
-    }
-
-    private var requiresDescription: Bool {
-        MediaFieldPolicy.requiresDescription(kind: kind, hasMedia: media != nil)
     }
 
     private var descriptionLabel: String {
@@ -139,15 +143,20 @@ struct MediaFieldEditor: View {
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = MediaFieldPolicy.allowedContentTypes(for: kind)
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { await ingest(url: url) }
+        importTask?.cancel()
+        importTask = Task { await ingest(url: url) }
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
+        guard !isImporting, pasteProcessing == 0, let provider = providers.first else { return false }
         provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
             guard let data = item as? Data,
                   let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-            Task { await ingest(url: url) }
+            Task { @MainActor in
+                guard isActive, !isImporting, !otherAttachmentProcessing else { return }
+                importTask?.cancel()
+                importTask = Task { await ingest(url: url) }
+            }
         }
         return true
     }
@@ -158,22 +167,44 @@ struct MediaFieldEditor: View {
             errorMessage = "Media storage is unavailable."
             return
         }
+        guard !isImporting, isActive else { return }
         isImporting = true
         errorMessage = nil
         defer { isImporting = false }
 
         do {
+            if kind == .image {
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                try await attach(try await AttachmentImagePreparer.prepare(url: url))
+                return
+            }
             let trimmedAlt = altText.trimmingCharacters(in: .whitespacesAndNewlines)
             let ref = try await mediaStore.ingest(
                 url: url,
                 kind: kind,
                 altText: trimmedAlt.isEmpty ? nil : trimmedAlt
             )
+            guard isActive, !Task.isCancelled else { try? await mediaStore.discardDraftReference(ref); return }
             media = ref
             fileName = url.lastPathComponent
         } catch {
-            errorMessage = UserFacingError.message(from: error)
+            if isActive, !Task.isCancelled { errorMessage = UserFacingError.message(from: error) }
         }
+    }
+    @MainActor
+    private func attach(_ image: PreparedAttachmentImage) async throws {
+        guard let mediaStore, isActive, !Task.isCancelled else { return }
+        let description = altText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ref = try await mediaStore.ingest(data: image.data, kind: .image,
+            fileExtension: image.fileExtension, altText: description.isEmpty ? nil : description)
+        guard isActive, !Task.isCancelled else { try? await mediaStore.discardDraftReference(ref); return }
+        var updated = ref
+        let latestDescription = altText.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.altText = latestDescription.isEmpty ? nil : latestDescription
+        media = updated
+        fileName = "Image.\(image.fileExtension)"
+        errorMessage = nil
     }
 }
 

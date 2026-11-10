@@ -41,6 +41,18 @@ the local library. This is a build capability, not an iCloud account error.
 - [Due Cards widget](#due-cards-widget)
 </nav>
 
+## Mac App Store and Homebrew libraries
+
+The native Mac App Store build and Homebrew build use separate app identities
+and local libraries. A Store installation does not silently open the Homebrew
+library outside its sandbox. Transfer decks through portable export/import, or
+opt each installation into the same private iCloud library. Each installation
+keeps its own sync consent and notification permissions.
+
+Allowing the app icon badge does not enable iCloud sync or daily reminders.
+Daily reminders and the Due Cards widget remain iPhone/iPad services; the native
+Mac Store build provides its Dock badge and in-app due counts.
+
 ## Set up iCloud sync
 
 CloudKit is off until you opt in on each device:

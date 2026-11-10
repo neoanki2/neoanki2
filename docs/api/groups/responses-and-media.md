@@ -2,7 +2,7 @@
 title: Responses and media
 description: Generated NeoAnki local API operations for responses and media.
 audience: api
-contract_digest: sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485
+contract_digest: sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2
 parent: Local API reference
 permalink: /api/responses-and-media/
 ---
@@ -221,6 +221,6 @@ curl --request HEAD \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:0f24037c6e900cfb7854193b5497308a623297b73e3b627dd13140c31c4b8485`.
+Contract digest: `sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

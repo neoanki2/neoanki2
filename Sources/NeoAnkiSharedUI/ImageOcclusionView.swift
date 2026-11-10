@@ -1,4 +1,5 @@
 import ImageIO
+import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiTextEditing
 import SwiftUI
@@ -124,6 +125,9 @@ public struct ImageOcclusionFieldEditor: View {
     @State private var error: String?
     @State private var importedReference: MediaRef?
     @State private var importingBytes = false
+    @State private var pasteProcessing = 0
+    @State private var pendingPaste: PreparedAttachmentImage?
+    @Environment(\.attachmentProcessing) private var otherAttachmentProcessing
     @State private var importTask: Task<Void, Never>?
     @State private var isActive = true
     @State private var confirmsRemoval = false
@@ -148,10 +152,12 @@ public struct ImageOcclusionFieldEditor: View {
             }
             HStack {
                 Button(content == nil ? "Choose Image…" : "Replace Image…", systemImage: "photo") {
+                    pendingPaste = nil
                     if content?.masks.isEmpty == false { confirmReplacement = true }
                     else { importing = true }
                 }
                 .accessibilityIdentifier("occlusion-choose-image")
+                .disabled(pasteProcessing > 0)
                 #if os(iOS)
                 if content == nil {
                     PhotosPicker("Photos", selection: $selectedPhoto, matching: .images)
@@ -162,16 +168,30 @@ public struct ImageOcclusionFieldEditor: View {
                         }
                 }
                 #endif
-                if importingBytes { ProgressView() }
+                ImageAttachmentPasteButton { result in
+                    do {
+                        let image = try result.get()
+                        if content?.masks.isEmpty == false { pendingPaste = image; confirmReplacement = true }
+                        else { await ingestPrepared(image) }
+                    } catch { self.error = error.localizedDescription }
+                }
+                .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { pasteProcessing = $0 }
+                if importingBytes { ProgressView("Preparing image…") }
             }.disabled(mediaStore == nil || importingBytes)
             if content != nil {
                 Button("Remove Image", role: .destructive) { confirmsRemoval = true }
+                    .disabled(importingBytes || pasteProcessing > 0)
             }
             if let error { Text(error).foregroundStyle(.red) }
         }
         .confirmationDialog("Replace image and clear its masks?", isPresented: $confirmReplacement, titleVisibility: .visible) {
-            Button("Replace Image", role: .destructive) { importing = true }
-            Button("Cancel", role: .cancel) {}
+            Button("Replace Image", role: .destructive) {
+                if let image = pendingPaste {
+                    pendingPaste = nil
+                    importTask = Task { await ingestPrepared(image) }
+                } else { importing = true }
+            }
+            Button("Cancel", role: .cancel) { pendingPaste = nil }
         } message: { Text("The new regions will generate new cards. Canceling the mask editor keeps the original item.") }
         .confirmationDialog("Remove image and its masks?", isPresented: $confirmsRemoval, titleVisibility: .visible) {
             Button("Remove Image", role: .destructive) {
@@ -182,7 +202,7 @@ public struct ImageOcclusionFieldEditor: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.png, .jpeg, .heic, .tiff, UTType(filenameExtension: "webp") ?? .image]) { result in
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.image]) { result in
             switch result {
             case let .success(url):
                 importTask?.cancel()
@@ -195,6 +215,8 @@ public struct ImageOcclusionFieldEditor: View {
         #else
         .sheet(isPresented: $editing, onDismiss: cancelImport) { maskEditor }
         #endif
+        .disabled(otherAttachmentProcessing && !importingBytes && pasteProcessing == 0)
+        .preference(key: AttachmentProcessingPreferenceKey.self, value: (importingBytes ? 1 : 0) + pasteProcessing)
         .onAppear { isActive = true }
         .onDisappear { isActive = false; importTask?.cancel() }
     }
@@ -236,7 +258,19 @@ public struct ImageOcclusionFieldEditor: View {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
-            let ref = try await mediaStore.ingest(url: url, kind: .image)
+            let image = try await AttachmentImagePreparer.prepare(url: url)
+            let ref = try await mediaStore.ingest(data: image.data, kind: .image, fileExtension: image.fileExtension)
+            if Task.isCancelled || !isActive { try? await mediaStore.discardDraftReference(ref) }
+            else { accept(ref) }
+        } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+    }
+
+    @MainActor private func ingestPrepared(_ image: PreparedAttachmentImage) async {
+        guard let mediaStore, isActive, !Task.isCancelled else { return }
+        importingBytes = true; error = nil
+        defer { importingBytes = false }
+        do {
+            let ref = try await mediaStore.ingest(data: image.data, kind: .image, fileExtension: image.fileExtension)
             if Task.isCancelled || !isActive { try? await mediaStore.discardDraftReference(ref) }
             else { accept(ref) }
         } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
@@ -248,9 +282,8 @@ public struct ImageOcclusionFieldEditor: View {
         importingBytes = true; error = nil
         defer { importingBytes = false; selectedPhoto = nil }
         do {
-            guard let data = try await photo.loadTransferable(type: Data.self) else { throw MediaError.readFailed }
-            let ext = photo.supportedContentTypes.compactMap(\.preferredFilenameExtension).first ?? "jpg"
-            let ref = try await mediaStore.ingest(data: data, kind: .image, fileExtension: ext)
+            guard let imported = try await photo.loadTransferable(type: ImportedAttachmentImage.self) else { throw MediaError.readFailed }
+            let ref = try await mediaStore.ingest(data: imported.image.data, kind: .image, fileExtension: imported.image.fileExtension)
             if Task.isCancelled || !isActive { try? await mediaStore.discardDraftReference(ref) }
             else { accept(ref) }
         } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
@@ -433,7 +466,7 @@ public struct ImageOcclusionEditor: View {
 
     private var inspector: some View {
         VStack(alignment: .leading, spacing: 16) {
-            TextField("Image description (required)", text: Binding(get: { draft.image.altText ?? "" }, set: { text in change { $0.image.altText = text } }), axis: .vertical)
+            TextField("Image description (optional)", text: Binding(get: { draft.image.altText ?? "" }, set: { text in change { $0.image.altText = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text } }), axis: .vertical)
                 .accessibilityIdentifier("occlusion-image-description")
             Text("Describe the diagram without revealing the masked answers.").font(.caption).foregroundStyle(.secondary)
             Picker("Masking Mode", selection: Binding(get: { draft.mode }, set: { mode in change { $0.mode = mode } })) {

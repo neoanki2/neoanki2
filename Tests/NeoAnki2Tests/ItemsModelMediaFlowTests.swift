@@ -71,12 +71,13 @@ import Testing
 
     #expect(await model.updateItem(
         id: itemID,
-        fieldSpans: [captionField.id: [Span("Invalid")]],
+        fieldSpans: [captionField.id: [Span("No description")]],
         fieldMedia: [imageField.id: second],
         fieldMediaAltText: [imageField.id: "   "]
-    ) == false)
+    ))
     stored = try #require(try await store.fetchItem(id: itemID)?.item)
-    #expect(stored.value(for: captionField.id) == .text("Second"))
+    #expect(stored.value(for: captionField.id) == .text("No description"))
+    #expect(stored.value(for: imageField.id)?.mediaReference?.altText == nil)
 
     #expect(await model.deleteItem(id: itemID))
     #expect(try await store.mediaAsset(hash: first.assetHash) == nil)

@@ -72,6 +72,12 @@ editor; changing a unit's cue or answer retires that card and creates a new one.
 
 ## Edit fields and Card setups together
 
+An image field can hold a selected or pasted image with no description; the
+image description is optional. An image-occlusion item generates study cards
+from its masks or groups, so an image without masks does not yet produce cards.
+See [Images and image occlusion](../content-and-media/) for attachment,
+replacement, and mask-editing steps.
+
 On Mac, Studio takes over the Item Types window while a draft is open. The
 library navigator and its Done action return after Save or Cancel with the
 previous item type still selected. One compact rail contains the item-type

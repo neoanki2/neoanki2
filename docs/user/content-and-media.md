@@ -12,9 +12,10 @@ For photo-to-name cards, create an item type with an Image field and a Text
 field, then configure the image as the question and the name as the answer.
 On iPhone or iPad, use **Camera**, **Photos**, or **Files** in the Image field;
 on Mac, choose or drop an image file. You can attach the photo before typing
-its name and visual description. The editor shows a preview, and Save requires
-a visual description for any attached image or GIF, including optional fields.
-Description changes are saved with the image.
+its name. The editor shows a preview. Visual descriptions are optional for
+images, GIFs, and image occlusion; descriptions you enter are saved with the image.
+Leaving the description empty still lets you save and reopen an attached image.
+A description helps identify the image when using VoiceOver.
 
 An item type can define Text, Rich Text, Number, Cloze, Image Occlusion, Image, GIF, Audio, and
 Video fields. The field type controls authoring, validation, storage, and
@@ -107,7 +108,7 @@ when you choose it.
 
 1. Add an item, choose an image from Files (or Photos on iPhone/iPad), and open
    the mask editor.
-2. Enter an image description that explains the diagram without giving away
+2. Optionally enter an image description that explains the diagram without giving away
    the masked answers.
 3. Draw rectangles over the details to hide, or choose **Add Region** and edit
    its position and size as percentages of the image.
@@ -139,7 +140,7 @@ Media fields accept one file each.
 1. Drag a file from Finder onto the dashed drop area, or choose **Choose
    File…**.
 2. Wait for the preview or filename to appear.
-3. Enter a description when required.
+3. Optionally enter a description.
 4. Save the item.
 
 [![Media attached to an item]({{ site.baseurl }}/assets/screenshots/item-media.png)]({{ site.baseurl }}/assets/screenshots/item-media.png)
@@ -150,27 +151,41 @@ another file replaces the current attachment.
 The system file chooser offers these formats:
 
 - **Audio:** M4A, MP3, WAV, AAC, and CAF
-- **Image:** PNG, JPEG, HEIC, TIFF, and WebP
+- **Image:** raster formats supported by your device, including PNG, JPEG, HEIC, TIFF, WebP, and AVIF when available
 - **GIF:** GIF
 - **Video:** MP4, M4V, and QuickTime MOV
 
-Dropped, chosen, and imported media are checked against supported extensions
-and file signatures; renaming an unsupported file does not make it valid.
+Choose **Paste** beside an Image field to attach a copied image on Mac,
+iPhone, or iPad. Copy the image itself; copying its URL does not download it.
+Pasting is also available for image occlusion fields. Replacing an occlusion
+image still asks before clearing its masks.
 
-Size limits are:
+Photos, Files, camera images, pasted images, and Mac file drops are prepared
+on your device. Large images are resized proportionally to a maximum 4,096-pixel
+long edge and compressed to fit the stored-image limit. Transparency is preserved,
+and re-encoded images have their source metadata removed. Small supported images
+keep their original bytes. Your original photo or file is unchanged.
+
+The app checks actual image contents, so a misleading filename does not prevent
+a decodable image from attaching. Other media and deck imports retain their
+extension and file-signature checks.
+
+Stored attachment size limits are:
 
 - Audio: 20 MB
 - Image: 10 MB
 - GIF: 15 MB
 - Video: 100 MB
 
-Only regular local files are accepted. A format mismatch, unreadable file, or
-oversized file leaves the field unsaved and shows an error.
+Only regular local files are accepted through file selection. Unsupported or
+unreadable images show an error and preserve the existing attachment. Preparation
+shows progress, and saving waits until it finishes. Images in deck imports and
+other media retain their existing size limits without automatic optimization.
 
 ## Write useful descriptions
 
-An attached Image or GIF requires a short, non-whitespace **Image description
-(required)**. Save stays disabled without it. The description supplies the
+Image, GIF, and image occlusion descriptions are optional. You can save an
+attachment without a description. When provided, the description supplies the
 VoiceOver label and may also represent the media in item-list text.
 
 Audio and Video descriptions are optional, but adding one gives the player a
@@ -180,7 +195,7 @@ rename the source file.
 
 ## Understand media storage
 
-When a file is accepted, NeoAnki2 copies its bytes into:
+When an attachment is accepted, NeoAnki2 stores its prepared bytes in:
 
 ```text
 ~/Library/Application Support/neoanki2/media/

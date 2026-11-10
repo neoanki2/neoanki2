@@ -1,20 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v rg >/dev/null 2>&1; then
+  echo "Architecture validation requires ripgrep (rg); install it before running this gate." >&2
+  exit 127
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FAILURES=0
 
+reject_matches() {
+  local description="$1"
+  shift
+  local matches status=0
+  matches=$(rg -n "$@") || status=$?
+  case "$status" in
+    0)
+      echo "Architecture violation: $description" >&2
+      echo "$matches" >&2
+      FAILURES=1
+      ;;
+    1) ;; # ripgrep distinguishes no matches from a failed scan.
+    *)
+      echo "Architecture validation could not scan: $description (rg exit $status)." >&2
+      exit "$status"
+      ;;
+  esac
+}
+
 reject_imports() {
-  local directory="$1"
-  local expression="$2"
-  local description="$3"
-  local matches
-  matches=$(rg -n "^import ($expression)$" "$ROOT/$directory" || true)
-  if [ -n "$matches" ]; then
-    echo "Architecture violation: $description" >&2
-    echo "$matches" >&2
-    FAILURES=1
-  fi
+  reject_matches "$3" "^import ($2)$" "$ROOT/$1"
 }
 
 reject_imports "Sources/NeoAnkiApplication" "SwiftUI|AppKit|UIKit|CloudKit" \
@@ -30,39 +45,27 @@ reject_imports "Sources/NeoAnkiDeckBuilderCore" "SwiftUI|AppKit|UIKit" \
 reject_imports "NeoAnkiCore/Sources/NeoAnkiCore" "SwiftUI|AppKit|UIKit|CloudKit" \
   "NeoAnkiCore cannot depend on UI or cloud transports."
 
-if rg -n "@State private var is(AddingItem|ManagingTemplates|Studying|Browsing|ShowingImport|ShowingDeckBuilder|ShowingVocabularyPacks|AddingFromVocabulary)" \
-  "$ROOT/Sources/NeoAnki2/ContentView.swift" >/dev/null; then
-  echo "Architecture violation: ContentView navigation must use AppSession." >&2
-  FAILURES=1
-fi
+reject_matches "ContentView navigation must use AppSession." \
+  "@State private var is(AddingItem|ManagingTemplates|Studying|Browsing|ShowingImport|ShowingDeckBuilder|ShowingVocabularyPacks|AddingFromVocabulary)" \
+  "$ROOT/Sources/NeoAnki2/ContentView.swift"
 
-if rg -n "ItemStore" "$ROOT/Sources/NeoAnkiApplication" \
+reject_matches "Only SQLite repository adapters may mention ItemStore in Application." \
+  "ItemStore" "$ROOT/Sources/NeoAnkiApplication" \
   --glob '!LibraryRepository.swift' \
-  --glob '!LocalAPILibrary.swift' >/dev/null; then
-  echo "Architecture violation: only SQLite repository adapters may mention ItemStore in Application." >&2
-  FAILURES=1
-fi
+  --glob '!LocalAPILibrary.swift'
 
-if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnkiAPI" >/dev/null; then
-  echo "Architecture violation: the HTTP adapter must depend on LocalAPILibrary, not SQLite persistence." >&2
-  FAILURES=1
-fi
+reject_matches "The HTTP adapter must depend on LocalAPILibrary, not SQLite persistence." \
+  "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnkiAPI"
 
-if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnki2" \
-  --glob '!NeoAnki2App.swift' >/dev/null; then
-  echo "Architecture violation: UI features must receive application capabilities, not persistence." >&2
-  FAILURES=1
-fi
+reject_matches "UI features must receive application capabilities, not persistence." \
+  "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnki2" \
+  --glob '!NeoAnki2App.swift'
 
-if rg -n "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnkiFeatures" "$ROOT/Sources/NeoAnkiIOS" >/dev/null; then
-  echo "Architecture violation: shared features and mobile UI must use repository capabilities." >&2
-  FAILURES=1
-fi
+reject_matches "Shared features and mobile UI must use repository capabilities." \
+  "ItemStore|SQLiteLibraryRepository" "$ROOT/Sources/NeoAnkiFeatures" "$ROOT/Sources/NeoAnkiIOS"
 
-if rg -n "ItemStore" "$ROOT/Sources/NeoAnki2/NeoAnki2App.swift" >/dev/null; then
-  echo "Architecture violation: the composition root must construct SQLiteLibraryRepository, not ItemStore." >&2
-  FAILURES=1
-fi
+reject_matches "The composition root must construct SQLiteLibraryRepository, not ItemStore." \
+  "ItemStore" "$ROOT/Sources/NeoAnki2/NeoAnki2App.swift"
 
 if [ "$FAILURES" -ne 0 ]; then
   exit 1

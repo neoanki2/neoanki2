@@ -678,7 +678,16 @@ private struct MobileResolvedMediaView: View {
     var body: some View {
         Group {
             if let image {
-                MobileAnimatedImage(image: image).scaledToFit().frame(maxHeight: 420)
+                if reference.kind == .gif {
+                    MobileAnimatedImage(image: image).scaledToFit().frame(maxHeight: 420)
+                } else {
+                    // Still photos must accept SwiftUI's proposed size. A UIImageView's
+                    // intrinsic pixel size can otherwise cover the attachment controls.
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: 420)
+                }
             } else if let player {
                 VideoPlayer(player: player).frame(minHeight: reference.kind == .audio ? 64 : 220)
             } else if failed {

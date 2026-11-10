@@ -68,6 +68,8 @@ struct DeckSidebarView: View {
                         }
 
                         Section {
+                            topLevelDropTarget
+
                             if decksModel.deckTree.isEmpty {
                                 Text("No decks yet")
                                     .font(DesignSystem.Typography.uiCaption)
@@ -109,40 +111,6 @@ struct DeckSidebarView: View {
                                     .accessibilityIdentifier("deleteAllUnassignedMenu")
                                 }
                             }
-                        } header: {
-                            HStack(spacing: DesignSystem.Spacing.xs) {
-                                Text("Decks")
-                                if isTopLevelDropTargeted {
-                                    Image(systemName: "arrow.up.to.line")
-                                        .accessibilityHidden(true)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                            .foregroundStyle(
-                                isTopLevelDropTargeted ? DesignSystem.accent : Color.secondary
-                            )
-                            .overlay(alignment: .bottom) {
-                                if isTopLevelDropTargeted {
-                                    Rectangle()
-                                        .fill(DesignSystem.accent)
-                                        .frame(height: 2)
-                                }
-                            }
-                            .onDrop(
-                                of: [DeckDragPayload.contentType],
-                                delegate: TopLevelDeckDropDelegate(
-                                    draggingDeckID: $draggingDeckID,
-                                    isTargeted: $isTopLevelDropTargeted,
-                                    canMove: { decksModel.canMoveDeck(id: $0, to: .topLevel) },
-                                    move: { id in
-                                        Task { _ = await decksModel.moveDeck(id: id, to: .topLevel) }
-                                    }
-                                )
-                            )
-                            .accessibilityIdentifier("deckTopLevelDropTarget")
-                            .accessibilityLabel("Decks, top level drop target")
-                            .accessibilityHint("Drop a deck here to remove it from its parent")
                         }
                     }
                     .listStyle(.sidebar)
@@ -349,6 +317,47 @@ struct DeckSidebarView: View {
         }
         .contentShape(Rectangle())
         .tag(destination)
+    }
+
+    // A native List section header can route a drop to an adjacent deck row.
+    // An ordinary, nonselectable row owns a real drop surface at the release point.
+    private var topLevelDropTarget: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Text("Decks")
+            if isTopLevelDropTargeted {
+                Image(systemName: "arrow.up.to.line")
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .foregroundStyle(
+            isTopLevelDropTargeted ? DesignSystem.accent : Color.secondary
+        )
+        .overlay(alignment: .bottom) {
+            if isTopLevelDropTargeted {
+                Rectangle()
+                    .fill(DesignSystem.accent)
+                    .frame(height: 2)
+            }
+        }
+        .onDrop(
+            of: [DeckDragPayload.contentType],
+            delegate: TopLevelDeckDropDelegate(
+                draggingDeckID: $draggingDeckID,
+                isTargeted: $isTopLevelDropTargeted,
+                canMove: { decksModel.canMoveDeck(id: $0, to: .topLevel) },
+                move: { id in
+                    Task { _ = await decksModel.moveDeck(id: id, to: .topLevel) }
+                }
+            )
+        )
+        .accessibilityIdentifier("deckTopLevelDropTarget")
+        .accessibilityLabel("Decks, top level drop target")
+        .accessibilityHint("Drop a deck here to remove it from its parent")
+        .font(DesignSystem.Typography.uiCaption.weight(.semibold))
+        .selectionDisabled(true)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func dueCaption(_ count: Int) -> String {

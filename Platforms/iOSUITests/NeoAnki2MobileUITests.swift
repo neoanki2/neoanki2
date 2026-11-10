@@ -16,7 +16,19 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             }
         }
         MainActor.assumeIsolated {
-            XCUIDevice.shared.orientation = .portrait
+            // A fresh Simulator can report an unknown device orientation while
+            // its interface is already portrait. Reassigning portrait then waits
+            // for a redundant confirmation and can time out before app launch.
+            // Inspect the actual Simulator pixels and rotate only when necessary.
+            var interfaceSize = XCUIScreen.main.screenshot().image.size
+            if interfaceSize.width >= interfaceSize.height
+                || XCUIDevice.shared.orientation == .portraitUpsideDown {
+                XCUIDevice.shared.orientation = .portrait
+                interfaceSize = XCUIScreen.main.screenshot().image.size
+            }
+            XCTAssertGreaterThan(interfaceSize.width, 0, "The Simulator screen must be available")
+            XCTAssertGreaterThan(interfaceSize.height, interfaceSize.width,
+                                 "Each journey must begin with a portrait interface")
         }
     }
 
@@ -1814,8 +1826,10 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
         query.tap(); query.typeText("notaword")
         scrollToAndTap(app.buttons["word-capture-manual"], in: app)
-        if app.buttons["Hide Keyboard"].exists { app.buttons["Hide Keyboard"].tap() }
-        scrollToAndTap(answer, in: app); answer.typeText("My own definition")
+        scrollToAndTap(answer, in: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitUntilExists(timeout: 5), "Manual answer must accept keyboard input")
+        answer.typeText("My own definition")
+        XCTAssertTrue(waitUntil(timeout: 5) { (answer.value as? String) == "My own definition" })
         XCTAssertTrue(app.buttons["word-capture-add"].isEnabled)
         app.buttons["word-capture-add"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["word-capture-success"].waitUntilExists(timeout: 10))
@@ -1868,6 +1882,36 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         app.buttons["word-capture-done"].tap()
     }
 
+    func testOversizedImageCanBePastedSavedAndReplaced() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-item-lookup",
+                                         "NEOANKI_TEST_IMAGE_CLIPBOARD": "large"])
+        XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 20))
+        open("Create", in: app)
+        app.buttons["New Item"].tap()
+        app.buttons["add-card-type"].tap(); app.buttons["Photo Names"].tap()
+        let paste = app.buttons["image-paste-photo"]
+        scrollToAndTap(paste, in: app)
+        XCTAssertTrue(app.staticTexts["Media ready"].waitUntilExists(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["add-card-preview-photo"].exists)
+        let name = app.textFields["add-card-field-name"]
+        scrollToAndTap(name, in: app); name.typeText("Pasted photo")
+        app.buttons["add-card-keyboard-done"].tap()
+        XCTAssertTrue(app.buttons["add-card-save"].isEnabled, "An image must save without a visual description")
+        app.buttons["add-card-save"].tap()
+        XCTAssertTrue(app.navigationBars["Create"].waitUntilExists(timeout: 10))
+        open("Library", in: app)
+        let item = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Photo Names")).firstMatch
+        XCTAssertTrue(item.waitUntilExists(timeout: 10)); item.tap()
+        app.buttons["Edit"].tap()
+        XCTAssertTrue(app.navigationBars["Edit Item"].waitUntilExists(timeout: 10))
+        scrollToAndTap(app.buttons["image-paste-photo"], in: app)
+        XCTAssertTrue(app.staticTexts["Media ready"].waitUntilExists(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 20) { app.buttons["Save"].isEnabled })
+        XCTAssertEqual(app.textFields["edit-card-description-photo"].placeholderValue, "Visual description (optional)")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons["Edit"].waitUntilExists(timeout: 10))
+    }
+
     func testPhotoCanBeSelectedBeforeNameAndDescription() throws {
         // Initialize the disposable Simulator's system library before opening its extension.
         let photos = XCUIApplication(bundleIdentifier: "com.apple.mobileslideshow")
@@ -1893,7 +1937,7 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
         let name = app.textFields["add-card-field-name"]
         scrollToAndTap(name, in: app); name.typeText("Oak")
         app.buttons["add-card-keyboard-done"].tap()
-        XCTAssertFalse(app.buttons["add-card-save"].isEnabled, "An optional attached photo still needs a description")
+        XCTAssertTrue(app.buttons["add-card-save"].isEnabled, "Visual descriptions are optional")
         let description = app.textFields["add-card-description-photo"]
         scrollToAndTap(description, in: app); description.typeText("A tree with lobed leaves")
         XCTAssertTrue(app.buttons["add-card-save"].isEnabled)
@@ -2100,6 +2144,7 @@ final class MobileImageOcclusionUITests: NeoAnki2MobileUITestCase {
         tapOcclusionControl(add, in: app)
         tapOcclusionControl(add, in: app)
         capture("occlusion-editor-two-regions", app)
+        XCTAssertTrue(app.buttons["occlusion-done"].isEnabled, "Occlusion images do not need descriptions")
         app.buttons["occlusion-done"].tap()
         XCTAssertTrue(app.staticTexts["2 saved cards"].waitUntilExists(timeout: 10))
         edit.tap()

@@ -21,6 +21,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_ID = "com.neoanki2.ios"
@@ -69,6 +70,46 @@ def digest(path):
 
 def json_digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def validate_privacy_data(data, scope, required):
+    try:
+        manifest = plistlib.loads(data)
+    except (ValueError, plistlib.InvalidFileException) as error:
+        raise ReleaseError("Invalid " + scope + " privacy manifest") from error
+    reasons = {item.get("NSPrivacyAccessedAPIType"): set(item.get("NSPrivacyAccessedAPITypeReasons", []))
+               for item in manifest.get("NSPrivacyAccessedAPITypes", [])}
+    for category, values in required.items():
+        if not values <= reasons.get(category, set()):
+            raise ReleaseError(scope + " privacy manifest lacks required reasons for " + category)
+    if manifest.get("NSPrivacyTracking") is not False or manifest.get("NSPrivacyCollectedDataTypes") != []:
+        raise ReleaseError(scope + " privacy manifest differs from the no-tracking/no-collection declaration")
+
+
+def validate_ios_privacy_data(data, scope):
+    required = {"NSPrivacyAccessedAPICategoryUserDefaults": {"1C8F.1"} | ({"CA92.1"} if scope == "app" else set())}
+    if scope == "app":
+        required["NSPrivacyAccessedAPICategoryFileTimestamp"] = {"C617.1", "3B52.1"}
+    validate_privacy_data(data, scope, required)
+
+
+def validate_ios_archive_privacy(app):
+    for scope, path in [("app", app / "PrivacyInfo.xcprivacy"),
+                        ("widget", app / "PlugIns/NeoAnki2Widget.appex/PrivacyInfo.xcprivacy")]:
+        if not path.is_file():
+            raise ReleaseError("Missing " + scope + " privacy manifest in the actual archive")
+        validate_ios_privacy_data(path.read_bytes(), scope)
+
+
+def validate_ios_package_privacy(ipa):
+    with zipfile.ZipFile(ipa) as package:
+        for scope, path in [("app", "Payload/NeoAnki2.app/PrivacyInfo.xcprivacy"),
+                            ("widget", "Payload/NeoAnki2.app/PlugIns/NeoAnki2Widget.appex/PrivacyInfo.xcprivacy")]:
+            try:
+                data = package.read(path)
+            except KeyError as error:
+                raise ReleaseError("Missing " + scope + " privacy manifest in the actual exported IPA") from error
+            validate_ios_privacy_data(data, scope)
 
 
 def production_input(path):
@@ -329,8 +370,10 @@ def record_rejections(state, versions, submissions, items_by_submission):
 
 
 def require_rejection_record(state, version_id, rejection_path):
-    if version_id in state.get("rejected_version_ids", []) and not rejection_path.is_file():
-        raise ReleaseError("Preserve Apple's exact written rejection issues even after the version becomes Ready for Review")
+    if version_id in state.get("rejected_version_ids", []):
+        if (not rejection_path.is_file()
+                or json.loads(rejection_path.read_text()).get("version_id") != version_id):
+            raise ReleaseError("Preserve Apple's exact written rejection issues even after the version becomes Ready for Review")
 
 
 @contextlib.contextmanager
@@ -554,10 +597,29 @@ def installed_profiles(profiles):
 
 
 class Workflow:
+    platform = "IOS"
+    output_root = ".build/ios-release"
+    package_name = "NeoAnki2.ipa"
+    package_checksum = "ipa_sha256"
+    listing_path = "Platforms/iOS/AppStore/en-US.json"
+
+    def reuse_binary_candidate(self, candidate, files, version, build):
+        return reuse_binary_candidate(candidate, files, version, build)
+
+    def binary_source(self, files):
+        return binary_source(files)
+
+    def validate_review(self, review, context):
+        return validate_internal_review(review, context, self.output)
+
+    def validate_release_acceptance(self, evidence, build):
+        return validate_acceptance(evidence, self.output, self.fingerprint, build,
+                                   self.args.allow_physical_test_waivers)
+
     def __init__(self, args):
         self.args = args
         self.fingerprint, files = source_snapshot()
-        self.output = args.output or ROOT / ".build/ios-release" / self.fingerprint[:16]
+        self.output = args.output or ROOT / self.output_root / self.fingerprint[:16]
         self.output.mkdir(parents=True, exist_ok=True)
         self.receipt = self.output / "release.json"
         self.state = json.loads(self.receipt.read_text()) if self.receipt.exists() else {
@@ -567,11 +629,11 @@ class Workflow:
             "phases": {}, "created_at": dt.datetime.now(dt.timezone.utc).isoformat()
         }
         if args.reuse_build_from and not self.receipt.exists():
-            previous = reuse_binary_candidate(args.reuse_build_from, files, args.version, args.build)
+            previous = self.reuse_binary_candidate(args.reuse_build_from, files, args.version, args.build)
             self.state.update({key: previous[key] for key in ("build", "build_id", "app_id")})
             self.state["phases"] = {key: previous["phases"][key] for key in ("archive", "export", "upload")}
             self.state["binary_candidate"] = str(args.reuse_build_from)
-            self.state["binary_source_sha256"] = binary_source(files)
+            self.state["binary_source_sha256"] = self.binary_source(files)
             self.state["rejected_version_ids"] = previous.get("rejected_version_ids", [])
         if self.state["source_sha256"] != self.fingerprint:
             raise ReleaseError("Source changed; use a new output directory to preserve the existing release")
@@ -608,7 +670,8 @@ class Workflow:
 
     def builds(self):
         return self.api.list("builds", **{"filter[app]": self.state["app_id"],
-                                         "filter[preReleaseVersion.version]": self.state["version"]})
+                                         "filter[preReleaseVersion.version]": self.state["version"],
+                                         "filter[preReleaseVersion.platform]": self.platform})
 
     def exact_build(self):
         found = [b for b in self.builds() if b["attributes"]["version"] == self.state["build"]]
@@ -650,6 +713,7 @@ class Workflow:
         app = archive / "Products/Applications/NeoAnki2.app"
         saved = self.state["phases"].get("archive")
         if saved and app.exists() and digest(app / "NeoAnki2") == saved["executable_sha256"]:
+            validate_ios_archive_privacy(app)
             return
         self.mark("archive")
         if archive.exists():
@@ -665,6 +729,7 @@ class Workflow:
             if (info["CFBundleIdentifier"], info["CFBundleShortVersionString"], info["CFBundleVersion"]) != (
                     bundle, self.state["version"], self.state["build"]):
                 raise ReleaseError("Archived app/widget identity does not match the release")
+        validate_ios_archive_privacy(app)
         self.verify_source()
         self.state["phases"]["archive"] = {"executable_sha256": digest(app / "NeoAnki2"),
                                               "xcode": run(["xcodebuild", "-version"]).decode().strip()}
@@ -730,6 +795,7 @@ class Workflow:
         ipa = self.output / "export/NeoAnki2.ipa"
         saved = self.state["phases"].get("export")
         if saved and ipa.exists() and digest(ipa) == saved["ipa_sha256"]:
+            validate_ios_package_privacy(ipa)
             return ipa
         profiles, cert = self.profiles()
         identity = hashlib.sha1(cert).hexdigest().upper()
@@ -768,6 +834,7 @@ class Workflow:
         if not ipa.exists():
             raise ReleaseError("Xcode did not export NeoAnki2.ipa")
         self.verify_source()
+        validate_ios_package_privacy(ipa)
         self.state["phases"]["export"] = {"ipa_sha256": digest(ipa), "temporary_signing_cleaned": True}
         self.save()
         return ipa
@@ -811,8 +878,8 @@ class Workflow:
         self.mark("status")
         build = self.exact_build() if self.state["build"] else None
         versions = self.api.list("apps/" + self.state["app_id"] + "/appStoreVersions",
-                                 **{"filter[platform]": "IOS", "filter[versionString]": self.state["version"]})
-        submissions = self.api.list("reviewSubmissions", **{"filter[app]": self.state["app_id"], "filter[platform]": "IOS"})
+                                 **{"filter[platform]": self.platform, "filter[versionString]": self.state["version"]})
+        submissions = self.api.list("reviewSubmissions", **{"filter[app]": self.state["app_id"], "filter[platform]": self.platform})
         items = {s["id"]: self.api.list("reviewSubmissions/" + s["id"] + "/items", include="appStoreVersion") for s in submissions}
         record_rejections(self.state, versions, submissions, items)
         status = {"build": build, "versions": versions}
@@ -835,19 +902,19 @@ class Workflow:
         export = self.state["phases"].get("export", {})
         binary_candidate = Path(self.state.get("binary_candidate", self.output))
         if binary_candidate != self.output:
-            reuse_binary_candidate(binary_candidate, source_snapshot()[1], self.state["version"], self.state["build"])
-        ipa = binary_candidate / "export/NeoAnki2.ipa"
-        if not ipa.is_file() or digest(ipa) != export.get("ipa_sha256"):
+            self.reuse_binary_candidate(binary_candidate, source_snapshot()[1], self.state["version"], self.state["build"])
+        ipa = binary_candidate / "export" / self.package_name
+        if not ipa.is_file() or digest(ipa) != export.get(self.package_checksum):
             raise ReleaseError("Internal review requires the checksummed exported candidate IPA")
         context = {"schema_version": 1, "source_sha256": self.fingerprint,
                    "app_source_sha256": application_source(source_snapshot()[1]),
-                   "binary_source_sha256": binary_source(source_snapshot()[1]),
+                   "binary_source_sha256": self.binary_source(source_snapshot()[1]),
                    "version_id": version["id"], "build_id": build["id"],
                    "version": self.state["version"], "build": self.state["build"],
-                   "ipa_sha256": export["ipa_sha256"],
+                   self.package_checksum: export[self.package_checksum],
                    "version_attributes": {key: version["attributes"].get(key)
                                           for key in ("versionString", "copyright", "releaseType", "usesIdfa")},
-                   "local_listing_sha256": digest(ROOT / "Platforms/iOS/AppStore/en-US.json"),
+                   "local_listing_sha256": digest(ROOT / self.listing_path),
                    "localizations": [], "screenshots": []}
         localizations = self.api.list("appStoreVersions/" + version["id"] + "/appStoreVersionLocalizations")
         for localization in sorted(localizations, key=lambda item: item["attributes"]["locale"]):
@@ -865,7 +932,10 @@ class Workflow:
                         "display_type": screenshot_set["attributes"]["screenshotDisplayType"], "position": index,
                         "source_checksum": attributes["sourceFileChecksum"], "file_name": attributes.get("fileName"),
                         "image_asset": attributes.get("imageAsset")})
-        if not {"APP_IPHONE_67", "APP_IPAD_PRO_3GEN_129"} <= {s["display_type"] for s in context["screenshots"]}:
+        if self.platform == "MAC_OS":
+            if not context["screenshots"] or any(s["display_type"] != "APP_DESKTOP" for s in context["screenshots"]):
+                raise ReleaseError("Internal review requires native Mac screenshots")
+        elif not {"APP_IPHONE_67", "APP_IPAD_PRO_3GEN_129"} <= {s["display_type"] for s in context["screenshots"]}:
             # Apple also accepts newer large-display aliases for these required families.
             families = {"iphone" if "IPHONE" in s["display_type"] else "ipad" if "IPAD" in s["display_type"] else "other"
                         for s in context["screenshots"]}
@@ -905,8 +975,8 @@ class Workflow:
         context["compliance_evidence"] = compliance
         rejection_path = self.args.rejection_evidence
         require_rejection_record(self.state, version["id"], rejection_path)
-        if rejection_path.exists():
-            rejection = json.loads(rejection_path.read_text())
+        rejection = json.loads(rejection_path.read_text()) if rejection_path.exists() else None
+        if rejection and rejection.get("version_id") == version["id"]:
             if rejection.get("version_id") != version["id"] or not rejection.get("submission_id") or not rejection.get("issues"):
                 raise ReleaseError("Apple rejection evidence does not describe this release version")
             ids = set()
@@ -920,7 +990,8 @@ class Workflow:
             if not rejection.get("apple_evidence"):
                 raise ReleaseError("Apple rejection requires its original written message or screenshot evidence")
             context["rejection"] = rejection
-        elif version["attributes"]["appStoreState"] in ("REJECTED", "METADATA_REJECTED"):
+        elif (version["attributes"]["appStoreState"] in ("REJECTED", "METADATA_REJECTED")
+              or version["id"] in self.state.get("rejected_version_ids", [])):
             raise ReleaseError("Preserve Apple's exact rejection issues before internal review")
         return context
 
@@ -961,7 +1032,7 @@ class Workflow:
             raise ReleaseError("Missing mandatory candidate-bound internal-review.json; run review-context and independent reviews")
         context = self.internal_review_context(build, version)
         review = json.loads(review_path.read_text())
-        self.state["phases"]["internal-review"] = validate_internal_review(review, context, self.output)
+        self.state["phases"]["internal-review"] = self.validate_review(review, context)
         save_json(self.output / "submitted-review-context.json", context)
         self.save()
         self.mark("submit")
@@ -969,17 +1040,16 @@ class Workflow:
         if not evidence_path.exists():
             raise ReleaseError("Missing acceptance.json: production CloudKit, two-device sync, widgets, reminders, TestFlight install, and UI evidence")
         evidence = json.loads(evidence_path.read_text())
-        self.state["phases"]["acceptance"] = validate_acceptance(
-            evidence, self.output, self.fingerprint, build["id"], self.args.allow_physical_test_waivers)
+        self.state["phases"]["acceptance"] = self.validate_release_acceptance(evidence, build["id"])
         self.save()
         # Reconcile Apple's review submission resources before creating any remote object.
-        submissions = self.api.list("reviewSubmissions", **{"filter[app]": self.state["app_id"], "filter[platform]": "IOS"})
+        submissions = self.api.list("reviewSubmissions", **{"filter[app]": self.state["app_id"], "filter[platform]": self.platform})
         items = {s["id"]: self.api.list("reviewSubmissions/" + s["id"] + "/items", include="appStoreVersion")
                  for s in submissions}
         target, has_item = select_review_submission(submissions, items, version["id"], self.state.get("review_submission_id"))
         if target is None:
             target = self.api.request("reviewSubmissions", "POST", {"data": {"type": "reviewSubmissions",
-                "attributes": {"platform": "IOS"}, "relationships": {"app": {"data": {"type": "apps", "id": self.state["app_id"]}}}}})["data"]
+                "attributes": {"platform": self.platform}, "relationships": {"app": {"data": {"type": "apps", "id": self.state["app_id"]}}}}})["data"]
             self.state["review_submission_id"] = target["id"]
             self.save()
         if not has_item:

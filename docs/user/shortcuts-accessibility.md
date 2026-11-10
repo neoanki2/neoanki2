@@ -23,7 +23,7 @@ conformance:
 - concealed content policies cover every content/reveal combination without
   putting hidden answer text in accessibility labels;
 - Reduce Motion suppresses time-based audio/video autoplay and GIF animation;
-- image and GIF item validation requires a description; and
+- optional image and GIF descriptions provide meaningful VoiceOver labels; and
 - UI tests exercise selected keyboard paths: Space to reveal, `3` to grade
   Good, Command-Z to undo, Right Arrow to self-grade, and Command-Down Arrow
   during arrange.
@@ -229,10 +229,10 @@ available.
 
 ## Media descriptions
 
-An image or GIF cannot be saved to an item without a nonblank **Image
-description**. Write a short description that communicates the information the
-image contributes, not its filename. NeoAnki2 uses it as the image's VoiceOver
-label.
+Image, GIF, and image occlusion descriptions are optional. If you add one,
+write a short description that communicates the information the image contributes,
+not its filename. NeoAnki2 uses it as the image's VoiceOver label and uses a
+generic media label when no description is provided.
 
 Descriptions for audio and video are optional but recommended; they appear as
 supporting text and accessibility labels. A play-on-tap audio control includes

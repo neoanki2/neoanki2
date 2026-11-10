@@ -56,7 +56,8 @@ public struct MobileImageOcclusionTestHost: View {
                     UIColor.white.setFill(); context.fill(.init(x: 0, y: 0, width: 400, height: 300))
                     ("Diagram A     Diagram B" as NSString).draw(at: .init(x: 40, y: 60), withAttributes: [.font: UIFont.systemFont(ofSize: 24), .foregroundColor: UIColor.black])
                 }
-                let ref = try await model.library.reserveMedia(data: data, kind: .image, altText: "Two diagram labels", asOf: .now).reference
+                var ref = try await model.library.reserveMedia(data: data, kind: .image, altText: "", asOf: .now).reference
+                ref.altText = nil
                 image = .init(image: ref)
             } catch { self.error = error.localizedDescription }
         }

@@ -81,7 +81,7 @@ deck:
 
 - Drop near the top or bottom edge of another deck to insert before or after it.
 - Drop in the middle of another deck to make it a subdeck.
-- Drop on the **Decks** section heading to move it to the top level.
+- Drop on the **Decks** row above the deck list to move it to the top level.
 
 The insertion line or highlighted folder previews the result before you drop.
 NeoAnki2 prevents moves that would put a deck inside itself or one of its own
@@ -165,6 +165,10 @@ for editing opens the whole source passage, where you can preview changed cues
 before saving.
 
 ## Read the scope home
+
+On iPhone and iPad, library and maturity summaries refresh after authoring and
+study changes. A count refresh keeps the current study content available; wait
+for the refreshed summary when comparing totals after a change.
 
 Choosing a scope opens its home, which answers one question: is there anything
 to study right now?

@@ -31,6 +31,7 @@ echo "==> Generated API reference"
 swift run neoanki-api-reference check
 
 echo "==> Architecture boundaries"
+python3 "$ROOT/Scripts/test-validate-architecture.py"
 bash "$ROOT/Scripts/validate-architecture.sh"
 
 echo "==> Spotlight-safe Xcode build paths"
@@ -39,14 +40,23 @@ bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 echo "==> Mac release signing policy"
 python3 "$ROOT/Scripts/test-macos-signing.py"
 
+echo "==> Apple TestFlight candidate integrity"
+python3 "$ROOT/Scripts/test-macos-testflight.py"
+python3 "$ROOT/Scripts/test-review-macos-app.py"
+
 echo "==> Release workflow reconciliation"
 bash "$ROOT/Scripts/test-release-workflow-reconciliation.sh"
 
 echo "==> GitHub read retry response isolation"
 bash "$ROOT/Scripts/test-github-read-retry.sh"
 
+echo "==> iOS XCTest service readiness policy"
+python3 "$ROOT/Scripts/test-ios-test-services.py"
+python3 "$ROOT/Scripts/test-ios-runtime-selection.py"
+
 echo "==> iOS UI infrastructure retry policy"
 python3 "$ROOT/Scripts/test-ios-ui-retry.py"
+python3 "$ROOT/Scripts/test-ios-ui-runner.py"
 
 echo "==> iOS background refresh executor isolation"
 python3 "$ROOT/Scripts/test-ios-background-refresh.py"

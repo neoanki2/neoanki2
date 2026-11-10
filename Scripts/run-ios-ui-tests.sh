@@ -106,143 +106,108 @@ fi
 
 safe_device=$(printf '%s' "$DEVICE" | tr -cs '[:alnum:]' '-')
 attempt=1
-while [[ $attempt -le 2 ]]; do
-  simulator_name="NeoAnki2-CI-${safe_device}-${GITHUB_RUN_ID:-local}-${attempt}"
-  simulator_id=$(xcrun simctl create "$simulator_name" "$DEVICE_TYPE_ID" "$RUNTIME_ID")
-  printf '%s\n' "$simulator_id" >> "$SIMULATOR_IDS_FILE"
-  xcrun simctl boot "$simulator_id"
-  xcrun simctl bootstatus "$simulator_id" -b
-  # Supply the image used by the real Photos picker authoring journey.
-  xcrun simctl addmedia "$simulator_id" "$ROOT/UITests/Fixtures/media/cover.png"
-  # Use the supported Simulator UI setting so SwiftUI's read-only
-  # colorSchemeContrast environment reflects increased contrast. The simulator
-  # is deleted after this attempt, so no user or later-test state is retained.
-  xcrun simctl ui "$simulator_id" increase_contrast enabled
-  contrast_state=$(xcrun simctl ui "$simulator_id" increase_contrast)
-  if [[ "$contrast_state" != "enabled" ]]; then
-    echo "Simulator did not enable Increase Contrast: $contrast_state" >&2
-    exit 1
-  fi
+simulator_name="NeoAnki2-CI-${safe_device}-${GITHUB_RUN_ID:-local}-${attempt}"
+simulator_id=$(xcrun simctl create "$simulator_name" "$DEVICE_TYPE_ID" "$RUNTIME_ID")
+printf '%s\n' "$simulator_id" >> "$SIMULATOR_IDS_FILE"
+xcrun simctl boot "$simulator_id"
+xcrun simctl bootstatus "$simulator_id" -b
+# Supply the image used by the real Photos picker authoring journey.
+xcrun simctl addmedia "$simulator_id" "$ROOT/UITests/Fixtures/media/cover.png"
+# Use the supported Simulator UI setting so SwiftUI's read-only
+# colorSchemeContrast environment reflects increased contrast. The simulator
+# is deleted after this attempt, so no user or later-test state is retained.
+xcrun simctl ui "$simulator_id" increase_contrast enabled
+contrast_state=$(xcrun simctl ui "$simulator_id" increase_contrast)
+if [[ "$contrast_state" != "enabled" ]]; then
+  echo "Simulator did not enable Increase Contrast: $contrast_state" >&2
+  exit 1
+fi
 
-  result_bundle="$RESULT_ROOT/attempt-${attempt}.xcresult"
-  raw_log="$RESULT_ROOT/attempt-${attempt}.log"
-  compact_summary="$RESULT_ROOT/attempt-${attempt}-summary.json"
-  retry_classification="$RESULT_ROOT/attempt-${attempt}-retry.json"
-  text_summary="$RESULT_ROOT/attempt-${attempt}-summary.txt"
-  rm -rf "$result_bundle"
+result_bundle="$RESULT_ROOT/attempt-${attempt}.xcresult"
+raw_log="$RESULT_ROOT/attempt-${attempt}.log"
+compact_summary="$RESULT_ROOT/attempt-${attempt}-summary.json"
+retry_classification="$RESULT_ROOT/attempt-${attempt}-retry.json"
+text_summary="$RESULT_ROOT/attempt-${attempt}-summary.txt"
+rm -rf "$result_bundle"
 
-  test_started=$SECONDS
-  set +e
-  test_command=(
-    xcodebuild test-without-building
-    -quiet
-    -xctestrun "$XCTESTRUN"
-    -destination "platform=iOS Simulator,id=$simulator_id"
-    -resultBundlePath "$result_bundle"
-    CODE_SIGNING_ALLOWED=NO
+test_started=$SECONDS
+set +e
+test_command=(
+  xcodebuild test-without-building
+  -quiet
+  -xctestrun "$XCTESTRUN"
+  -destination "platform=iOS Simulator,arch=arm64,id=$simulator_id"
+  -resultBundlePath "$result_bundle"
+  CODE_SIGNING_ALLOWED=NO
+)
+if [[ "$PARALLEL_WORKERS" -eq 1 ]]; then
+  # Disabling parallel mode avoids XCTest's cloned-simulator provisioning
+  # path. A one-worker clone adds minutes and still competes for AX services
+  # without providing any concurrency.
+  test_command+=( -parallel-testing-enabled NO )
+else
+  test_command+=(
+    -parallel-testing-enabled YES
+    -maximum-parallel-testing-workers "$PARALLEL_WORKERS"
   )
-  if [[ "$PARALLEL_WORKERS" -eq 1 ]]; then
-    # Disabling parallel mode avoids XCTest's cloned-simulator provisioning
-    # path. A one-worker clone adds minutes and still competes for AX services
-    # without providing any concurrency.
-    test_command+=( -parallel-testing-enabled NO )
-  else
-    test_command+=(
-      -parallel-testing-enabled YES
-      -maximum-parallel-testing-workers "$PARALLEL_WORKERS"
-    )
-  fi
-  if [[ ${#TEST_ARGUMENTS[@]} -gt 0 ]]; then
-    test_command+=("${TEST_ARGUMENTS[@]}")
-  fi
-  "${test_command[@]}" 2>&1 | tee "$raw_log"
-  status=${PIPESTATUS[0]}
-  set -e
-  test_seconds=$((SECONDS - test_started))
+fi
+if [[ ${#TEST_ARGUMENTS[@]} -gt 0 ]]; then
+  test_command+=("${TEST_ARGUMENTS[@]}")
+fi
+"${test_command[@]}" 2>&1 | tee "$raw_log"
+status=${PIPESTATUS[0]}
+set -e
+test_seconds=$((SECONDS - test_started))
 
-  total_tests="unknown"
-  runner_exit_failure=false
-  accessibility_audit_timeout=false
-  app_launch_progress_timeout=false
-  app_background_assertion_timeout=false
-  retryable_infrastructure_failure=false
-  if [[ -d "$result_bundle" ]] && xcrun xcresulttool get test-results summary \
-      --path "$result_bundle" --compact > "$compact_summary"; then
-    total_tests=$(jq -r '.totalTestCount' "$compact_summary")
-    # The shared classifier recognizes both "Audit failed to complete in time"
-    # and "Timed out while running accessibility audit with config:", plus
-    # "Failed to get launch progress". Every recorded failure must match an
-    # incomplete infrastructure operation before a fresh-Simulator retry.
-    jq -f "$ROOT/Scripts/classify-ios-ui-result.jq" "$compact_summary" > "$retry_classification"
-    if jq -e '.runner_exit_failure' "$retry_classification" >/dev/null; then
-      runner_exit_failure=true
-    fi
-    if jq -e '.accessibility_audit_timeout' "$retry_classification" >/dev/null; then
-      accessibility_audit_timeout=true
-    fi
-    if jq -e '.app_launch_progress_timeout' "$retry_classification" >/dev/null; then
-      app_launch_progress_timeout=true
-    fi
-    if jq -e '.app_background_assertion_timeout' "$retry_classification" >/dev/null; then
-      app_background_assertion_timeout=true
-    fi
-    if jq -e '.retryable' "$retry_classification" >/dev/null; then
-      retryable_infrastructure_failure=true
-    fi
-    jq -r '
-      "result=\(.result) tests=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests)",
-      ([.testFailures] | flatten | .[]? | select(type == "object")
-       | "failure=\(.testName): \(.failureText)")
-    ' "$compact_summary" > "$text_summary"
-  else
-    printf 'result=unknown tests=unknown\n' > "$text_summary"
-  fi
+total_tests="unknown"
+if [[ -d "$result_bundle" ]] && xcrun xcresulttool get test-results summary \
+    --path "$result_bundle" --compact > "$compact_summary"; then
+  total_tests=$(jq -r '.totalTestCount' "$compact_summary")
+  # Retain infrastructure classification for diagnosis, never automatic reruns.
+  jq -f "$ROOT/Scripts/classify-ios-ui-result.jq" "$compact_summary" > "$retry_classification"
+  jq -r '
+    "result=\(.result) tests=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests)",
+    ([.testFailures] | flatten | .[]? | select(type == "object")
+     | "failure=\(.testName): \(.failureText)")
+  ' "$compact_summary" > "$text_summary"
+else
+  printf 'result=unknown tests=unknown\n' > "$text_summary"
+fi
 
-  echo "iOS UI timing: shard=$SHARD_ID device=$DEVICE workers=$PARALLEL_WORKERS attempt=$attempt test=${test_seconds}s total_tests=$total_tests"
-  cat "$text_summary"
-  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-    {
-      echo "### iOS UI — $SHARD_ID — $DEVICE — attempt $attempt"
-      echo
-      echo "- Test runtime: ${test_seconds}s"
-      echo "- Maximum parallel workers: $PARALLEL_WORKERS"
-      echo "- Provisioning and test time: $((SECONDS - TOTAL_STARTED))s"
-      echo "- Tests recorded: $total_tests"
-      echo '```text'
-      cat "$text_summary"
-      echo '```'
-    } >> "$GITHUB_STEP_SUMMARY"
-  fi
+echo "iOS UI timing: shard=$SHARD_ID device=$DEVICE workers=$PARALLEL_WORKERS attempt=$attempt test=${test_seconds}s total_tests=$total_tests"
+cat "$text_summary"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  {
+    echo "### iOS UI — $SHARD_ID — $DEVICE — attempt $attempt"
+    echo
+    echo "- Test runtime: ${test_seconds}s"
+    echo "- Maximum parallel workers: $PARALLEL_WORKERS"
+    echo "- Provisioning and test time: $((SECONDS - TOTAL_STARTED))s"
+    echo "- Tests recorded: $total_tests"
+    echo '```text'
+    cat "$text_summary"
+    echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
 
-  xcrun simctl shutdown "$simulator_id" >/dev/null 2>&1 || true
-  xcrun simctl delete "$simulator_id" >/dev/null 2>&1 || true
+xcrun simctl shutdown "$simulator_id" >/dev/null 2>&1 || true
+xcrun simctl delete "$simulator_id" >/dev/null 2>&1 || true
 
-  if [[ $status -eq 0 && $EXPECTED_TESTS -gt 0 && "$total_tests" != "$EXPECTED_TESTS" ]]; then
-    echo "Expected $EXPECTED_TESTS selected iOS UI tests, but XCTest recorded $total_tests." >&2
-    status=1
-  fi
-  if [[ $status -eq 0 ]]; then
-    echo "iOS UI total timing: shard=$SHARD_ID device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
-    exit 0
-  fi
-  if [[ $attempt -eq 1 && "$retryable_infrastructure_failure" == "true" ]]; then
-    if [[ "$runner_exit_failure" == "true" ]]; then
-      echo "The XCTest runner exited before finishing; retrying once with a newly provisioned simulator." >&2
-    elif [[ "$accessibility_audit_timeout" == "true" ]]; then
-      echo "The XCTest accessibility audit timed out; retrying once with a newly provisioned simulator." >&2
-    elif [[ "$app_launch_progress_timeout" == "true" ]]; then
-      echo "XCTest timed out while requesting app launch progress; retrying once with a newly provisioned simulator." >&2
-    elif [[ "$app_background_assertion_timeout" == "true" ]]; then
-      echo "XCTest timed out acquiring its app background assertion during launch; retrying once with a newly provisioned simulator." >&2
-    else
-      echo "No test started; retrying once with a newly provisioned simulator." >&2
-    fi
-    attempt=$((attempt + 1))
-    continue
-  fi
+if [[ $status -eq 0 && $EXPECTED_TESTS -gt 0 && "$total_tests" != "$EXPECTED_TESTS" ]]; then
+  echo "Expected $EXPECTED_TESTS selected iOS UI tests, but XCTest recorded $total_tests." >&2
+  status=1
+fi
+if [[ $status -eq 0 ]] && ! jq -e '
+    .result == "Passed" and (.totalTestCount > 0)
+    and .passedTests == .totalTestCount and .failedTests == 0 and .skippedTests == 0
+  ' "$compact_summary" >/dev/null; then
+  echo "Every selected UI case must actually pass; missing results or skipped cases cannot pass." >&2
+  status=1
+fi
+if [[ $status -eq 0 ]]; then
+  echo "iOS UI total timing: shard=$SHARD_ID device=$DEVICE total=$((SECONDS - TOTAL_STARTED))s attempts=$attempt"
+  exit 0
+fi
 
-  echo "iOS UI tests failed; assertions, app failures, and completed accessibility findings are never retried." >&2
-  exit "$status"
-done
-
-exit 1
+echo "iOS UI tests failed; inspect this attempt and correct its cause before another validation run." >&2
+exit "$status"

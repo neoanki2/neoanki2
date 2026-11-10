@@ -130,6 +130,17 @@ installation, actual Simulator identity, cleanup, retained executable/xctestrun
 checksums, and the exact
 `MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures`
 case. Fixture-based parity cases cannot substitute for that production journey.
+The hosted PR matrix keeps only the phone Debug copy of this journey: the
+redundant tablet Debug shard was removed after a retained Xcode launch timeout
+before app assertions. That CI reduction does not waive the mandatory optimized
+Release iPad journey or any per-family acceptance case in this submission gate.
+
+The production review and screenshot capture use Simulator `bootstatus -b`
+followed by Xcode's `test-without-building` lifecycle. They do not require manual
+activation of private AutomationMode/XCTest services. Those service probes remain
+optional diagnostics. Every actual review case must pass with its required count,
+retained evidence, and owned-device cleanup; removing prewarming does not waive a
+runner-startup failure or permit an unchanged automatic rerun.
 
 ### Rejected submissions and metadata-only fixes
 
@@ -244,3 +255,15 @@ deletes those devices even on failure. It never uses personal study libraries.
 
 The signed two-device CloudKit test and TestFlight upload are the only expected
 external blockers until a paid Apple Developer team is available.
+
+## Bundled privacy manifests
+
+The app declares both app-only UserDefaults (`CA92.1`) and shared App Group
+UserDefaults (`1C8F.1`). The widget bundles its own manifest declaring the shared
+App Group access used to read the due-card snapshot. Archive and exported-IPA
+checks inspect both actual bundled manifests before upload; source-file presence
+alone does not establish that a manifest was packaged.
+
+Both app distributions also declare `3B52.1` for reading metadata of files the
+user selected, alongside `C617.1` for app/group/CloudKit container files. The
+widget's manifest is narrower because it reads only shared preferences.

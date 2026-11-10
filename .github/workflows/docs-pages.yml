@@ -194,6 +194,8 @@ jobs:
       - name: Dispatch canonical-site deployment
         env:
           GH_TOKEN: ${{ secrets.ROOT_DOCS_DISPATCH_TOKEN }}
+          DOCUMENTATION_SOURCE_SHA: ${{ github.sha }}
+          DOCUMENTATION_RUN_ID: ${{ github.run_id }}
         run: |
           test -n "$GH_TOKEN" || {
             echo "ROOT_DOCS_DISPATCH_TOKEN must dispatch neoanki2/neoanki2.github.io workflows" >&2
@@ -201,7 +203,9 @@ jobs:
           }
           gh workflow run root-docs.yml \
             --repo neoanki2/neoanki2.github.io \
-            --ref main
+            --ref main \
+            -f source_sha="$DOCUMENTATION_SOURCE_SHA" \
+            -f documentation_run_id="$DOCUMENTATION_RUN_ID"
       - name: Wait for the exact source revision and smoke-test API pages
         env:
           EXPECTED_SHA: ${{ github.sha }}

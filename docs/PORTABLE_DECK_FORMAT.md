@@ -686,7 +686,7 @@ object), `mode` (`hideAllRevealOne` or `hideOneRevealOne`), `masks`, and
 `nextGroup`. Each mask contains a UUID `id`, positive integer `group`, a `rect`
 with normalized `x`, `y`, `width`, `height`, and optional `answerText`.
 
-Image descriptions are required. Rectangles must have finite coordinates,
+Image descriptions are optional. Rectangles must have finite coordinates,
 positive area, and lie within the image. Mask IDs are unique and `nextGroup`
 exceeds every used group. The image bytes participate in ordinary media
 validation, deduplication, and transfer. Versions 1–5 remain readable but must
