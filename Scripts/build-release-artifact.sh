@@ -39,11 +39,14 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$PAYLOAD_DIR"
+# Keep the universal release graph separate from concurrent native debug tests.
+# SwiftPM otherwise serializes both jobs on the root .build workspace lock.
 NEOANKI_INSTALL_CONFIG=release \
 NEOANKI_INSTALL_DIR="$PAYLOAD_DIR" \
 NEOANKI_INSTALL_VERSION="$VERSION" \
 NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
 NEOANKI_INSTALL_UNIVERSAL=1 \
+NEOANKI_INSTALL_SCRATCH_PATH="${NEOANKI_INSTALL_SCRATCH_PATH:-$ROOT/.build/release-universal}" \
 NEOANKI_INSTALL_ALLOW_RUNNING=1 \
 NEOANKI_INSTALL_SIGNED=1 \
 NEOANKI_INSTALL_NOTARIZE=1 \

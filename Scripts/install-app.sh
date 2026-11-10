@@ -34,6 +34,7 @@ Environment: NEOANKI_INSTALL_CONFIG (default release),
              NEOANKI_INSTALL_VERSION (default 1.0),
              NEOANKI_INSTALL_BUILD_NUMBER (default Git revision count),
              NEOANKI_INSTALL_UNIVERSAL (0 or 1; default 0),
+             NEOANKI_INSTALL_SCRATCH_PATH (optional SwiftPM build directory),
              NEOANKI_INSTALL_ALLOW_RUNNING (0 or 1; packaging only),
              NEOANKI_INSTALL_SIGNED (default 1; 0 for development only),
              NEOANKI_INSTALL_NOTARIZE (default 0; releases require 1),
@@ -121,6 +122,9 @@ fi
 echo "Building NeoAnki2 ($CONFIG)..."
 cd "$ROOT"
 BUILD_ARGUMENTS=(-c "$CONFIG")
+if [ -n "${NEOANKI_INSTALL_SCRATCH_PATH:-}" ]; then
+  BUILD_ARGUMENTS+=(--scratch-path "$NEOANKI_INSTALL_SCRATCH_PATH")
+fi
 if [ "$UNIVERSAL" -eq 1 ]; then
   BUILD_ARGUMENTS+=(--arch arm64 --arch x86_64)
 fi
