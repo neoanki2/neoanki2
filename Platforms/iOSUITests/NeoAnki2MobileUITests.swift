@@ -16,7 +16,19 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             }
         }
         MainActor.assumeIsolated {
-            XCUIDevice.shared.orientation = .portrait
+            // A fresh Simulator can report an unknown device orientation while
+            // its interface is already portrait. Reassigning portrait then waits
+            // for a redundant confirmation and can time out before app launch.
+            // Inspect the actual Simulator pixels and rotate only when necessary.
+            var interfaceSize = XCUIScreen.main.screenshot().image.size
+            if interfaceSize.width >= interfaceSize.height
+                || XCUIDevice.shared.orientation == .portraitUpsideDown {
+                XCUIDevice.shared.orientation = .portrait
+                interfaceSize = XCUIScreen.main.screenshot().image.size
+            }
+            XCTAssertGreaterThan(interfaceSize.width, 0, "The Simulator screen must be available")
+            XCTAssertGreaterThan(interfaceSize.height, interfaceSize.width,
+                                 "Each journey must begin with a portrait interface")
         }
     }
 

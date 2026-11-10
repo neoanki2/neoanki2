@@ -206,6 +206,13 @@ The image attachment paste/save/replace regression owns the `phone-image-attachm
 
 ### iOS XCTest startup
 
+Mobile XCTest setup verifies portrait interface geometry from a Simulator-contained
+screenshot before launch. It requests an orientation change only for landscape,
+square, or explicitly upside-down state, then verifies portrait dimensions again.
+This avoids waiting for a redundant portrait confirmation on a cold Simulator
+that already displays portrait pixels. Both occlusion cases and their assertions
+remain required; this setup correction adds no case retry or timeout increase.
+
 The CI runner, ordinary Release review, and App Store screenshot capture boot a
 uniquely owned disposable Simulator with `simctl bootstatus -b`, then invoke
 `xcodebuild test-without-building` with the verified `.xctestrun` and destination.
