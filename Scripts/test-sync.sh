@@ -22,4 +22,4 @@ done
 
 # Includes named regression tests as well as state-machine/fault/property tests.
 # Everything uses temporary databases and in-process CloudKit record objects.
-swift test --filter 'SyncStateMachineTests|SyncMetadataStoreTests|SyncMergePolicyTests|OfflineFirstSyncServiceTests|CKSyncEngineTransportTests|sqliteSyncAdapter|syncAdapter|initialMerge|linkedLibraries|itemTypeSyncEnvelope|syncMetadataStages|synchronized'
+swift test --filter 'SyncStateMachineTests|SyncMetadataStoreTests|SyncMergePolicyTests|OfflineFirstSyncServiceTests|CKSyncEngineTransportTests|LibraryZoneChangeFetcherTests|sqliteSyncAdapter|syncAdapter|initialMerge|linkedLibraries|itemTypeSyncEnvelope|syncMetadataStages|synchronized'

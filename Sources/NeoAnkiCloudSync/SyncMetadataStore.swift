@@ -4,6 +4,8 @@ import NeoAnkiApplication
 
 public struct SyncMetadata: Codable, Sendable {
     public var engineState: CKSyncEngine.State.Serialization?
+    /// Independent cursor for explicit library reads, including missed pushes.
+    public var libraryZoneChangeToken: Data?
     public var deviceID: String
     public var outboundCursor: Int64
     public var stagedInbound: [SyncRecordEnvelope]
@@ -18,6 +20,7 @@ public struct SyncMetadata: Codable, Sendable {
 
     public init(
         engineState: CKSyncEngine.State.Serialization? = nil,
+        libraryZoneChangeToken: Data? = nil,
         deviceID: String = UUID().uuidString,
         outboundCursor: Int64 = 0,
         stagedInbound: [SyncRecordEnvelope] = [],
@@ -29,6 +32,7 @@ public struct SyncMetadata: Codable, Sendable {
         didCompleteInitialMerge: Bool? = nil
     ) {
         self.engineState = engineState
+        self.libraryZoneChangeToken = libraryZoneChangeToken
         self.deviceID = deviceID
         self.outboundCursor = outboundCursor
         self.stagedInbound = stagedInbound
@@ -69,6 +73,7 @@ public actor SyncMetadataStore {
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let current = try load()
             metadata.engineState = current.engineState
+            metadata.libraryZoneChangeToken = current.libraryZoneChangeToken
             // Only completeIncoming may remove delivered records. A stale
             // service snapshot cannot erase a concurrent transport callback.
             metadata.stagedInbound = current.stagedInbound
@@ -97,10 +102,22 @@ public actor SyncMetadataStore {
         try persist(metadata)
     }
 
+    func resetLibraryZoneChangeToken() throws {
+        var metadata = try load()
+        metadata.libraryZoneChangeToken = nil
+        try persist(metadata)
+    }
+
     /// Commit delivered records before the engine may persist its next fetch
     /// token. On process death, the service can replay this durable inbox.
     func receive(_ records: [SyncRecordEnvelope]) throws {
         guard !records.isEmpty else { return }
+        try receiveZonePage(records, token: nil)
+    }
+
+    /// Stage payloads and advance the explicit fetch cursor in the same write.
+    /// A failed page (including asset staging) must leave the old cursor intact.
+    func receiveZonePage(_ records: [SyncRecordEnvelope], token: Data?) throws {
         let staged = try stageAssets(in: records)
         var metadata = try load()
         var latest: [String: SyncRecordEnvelope] = [:]
@@ -111,6 +128,7 @@ public actor SyncMetadataStore {
             latest["\(old.resourceKind):\(old.id)"]?.stagedFileURL != old.stagedFileURL
         }
         metadata.stagedInbound = Array(latest.values)
+        if let token { metadata.libraryZoneChangeToken = token }
         try persist(metadata)
         removeStagedAssets(in: obsolete)
     }
@@ -119,6 +137,7 @@ public actor SyncMetadataStore {
         var committed = metadata
         let current = try load()
         committed.engineState = current.engineState
+        committed.libraryZoneChangeToken = current.libraryZoneChangeToken
         committed.stagedInbound = current.stagedInbound.filter { !consumed.contains($0) }
         committed.serverBaseline = current.serverBaseline
         committed.resolvedConflictCopies = mergedArchive(current, committed)
