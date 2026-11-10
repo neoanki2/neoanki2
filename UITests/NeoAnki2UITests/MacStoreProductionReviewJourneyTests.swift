@@ -110,11 +110,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         try (#"{"kind":"item","deck":"images","type":"image","fields":{"prompt":{"text":"Sandbox image question"},"image":{"media":{"path":"media/cover.png","alt":"Store review cover"}}}}"# + "\n" +
              #"{"kind":"item","deck":"voice","type":"voice","fields":{"prompt":{"text":"Describe what you learned today"}}}"# + "\n")
             .write(to: bundle.appendingPathComponent("items.jsonl"), atomically: true, encoding: .utf8)
-        app.menuBarItems["File"].click()
+        openStoreMenu("File", in: app)
         selectStoreMenuItem("Import Deck…", in: app)
         cancelFilePicker(in: app)
         waitForItem(named: "What does spaced repetition improve?", in: app)
-        app.menuBarItems["File"].click()
+        openStoreMenu("File", in: app)
         selectStoreMenuItem("Import Deck…", in: app)
         chooseFileInOpenPanel(bundle, in: app)
         finishPortableImport(in: app)
@@ -134,11 +134,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         clickOrType("gradeEasy", shortcut: "4", in: app)
         finishStudySession(in: app)
         selectScope("deckRow-Store Import", in: app)
-        app.menuBarItems["File"].click()
+        openStoreMenu("File", in: app)
         selectStoreMenuItem("Export Deck…", in: app)
         cancelFilePicker(in: app)
         let exported = directory.appendingPathComponent("roundtrip.neodeck")
-        app.menuBarItems["File"].click()
+        openStoreMenu("File", in: app)
         selectStoreMenuItem("Export Deck…", in: app)
         chooseFileInSavePanel(exported, in: app)
         XCTAssertTrue(waitUntil(timeout: 30) { FileManager.default.fileExists(atPath: exported.path) })
@@ -199,6 +199,22 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         if persistedStop.exists { persistedStop.click() }
     }
 
+    private func openStoreMenu(_ title: String, in app: XCUIApplication) {
+        let menu = app.menuBarItems[title]
+        XCTAssertTrue(menu.waitUntilExists(timeout: 5))
+        if !menu.isHittable {
+            // Full Screen hides the system menu bar. A hidden menu still has
+            // AX entries, so reveal the real bar before selecting its item.
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: window.frame.width / 2, dy: 1)).hover()
+        }
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            menu.exists && menu.isHittable && !menu.frame.isEmpty
+        }, "The native menu bar must be visible before selecting \(title)")
+        menu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
     private func selectStoreMenuItem(_ identifier: String, in app: XCUIApplication) {
         let item = app.menuItems.identified(identifier)
         XCTAssertTrue(item.waitUntilExists(timeout: 5))
@@ -212,7 +228,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
     }
 
     private func startStoreStudy(in app: XCUIApplication) {
-        app.menuBarItems["Study"].click()
+        openStoreMenu("Study", in: app)
         selectStoreMenuItem("Start Study", in: app)
         XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitUntilExists(timeout: 5)
             || app.buttons.identified("studySessionDone").waitUntilExists(timeout: 2))
