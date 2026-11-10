@@ -1269,10 +1269,10 @@ class NeoAnkiUITestCase: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 10) {
             guard !loading.exists, libraryIsReady(in: app) else { return false }
             guard let expectedTitle else { return true }
-            let title = app.windows.firstMatch.label
+            let title = app.windows.firstMatch.title
             return title == expectedTitle || title.hasPrefix(expectedTitle + " – ")
                 || title.hasPrefix(expectedTitle + " — ")
-        }, "Selected scope did not become ready: \(expectedTitle ?? "selected sidebar scope")")
+        }, "Selected scope did not become ready: \(expectedTitle ?? "selected sidebar scope"); actual title: \(app.windows.firstMatch.title)")
     }
 
     func createDeck(named name: String, in app: XCUIApplication) {
