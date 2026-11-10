@@ -55,7 +55,7 @@
 
 static BOOL ready(CGDirectDisplayID display) {
     return CGDisplayIsOnline(display) && CGMainDisplayID() == display &&
-        CGDisplayPixelsWide(display) == 1440 && CGDisplayPixelsHigh(display) == 900;
+        CGDisplayPixelsWide(display) == 1280 && CGDisplayPixelsHigh(display) == 800;
 }
 
 int main(int argc, const char *argv[]) {
@@ -80,7 +80,7 @@ int main(int argc, const char *argv[]) {
         descriptor.vendorID = 505; descriptor.productID = 1;
         descriptor.serialNum = 731461; descriptor.serialNumber = 731461;
         descriptor.queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
-        descriptor.maxPixelsWide = 1440; descriptor.maxPixelsHigh = 900;
+        descriptor.maxPixelsWide = 1280; descriptor.maxPixelsHigh = 800;
         descriptor.sizeInMillimeters = CGSizeMake(304.8, 190.5);
         descriptor.redPrimary = CGPointMake(0.64, 0.33);
         descriptor.greenPrimary = CGPointMake(0.30, 0.60);
@@ -89,7 +89,7 @@ int main(int argc, const char *argv[]) {
         __attribute__((objc_precise_lifetime)) CGVirtualDisplay *virtualDisplay = [[NSClassFromString(@"CGVirtualDisplay") alloc] initWithDescriptor:descriptor];
         if (!virtualDisplay) { fprintf(stderr, "Could not create the CI virtual monitor.\n"); return 4; }
         CGVirtualDisplaySettings *settings = [[NSClassFromString(@"CGVirtualDisplaySettings") alloc] init];
-        CGVirtualDisplayMode *mode = [[NSClassFromString(@"CGVirtualDisplayMode") alloc] initWithWidth:1440 height:900 refreshRate:60];
+        CGVirtualDisplayMode *mode = [[NSClassFromString(@"CGVirtualDisplayMode") alloc] initWithWidth:1280 height:800 refreshRate:60];
         settings.modes = @[mode]; settings.hiDPI = 0; settings.rotation = 0;
         if (![virtualDisplay applySettings:settings]) return 5;
         CGDirectDisplayID identifier = virtualDisplay.displayID;
@@ -100,14 +100,14 @@ int main(int argc, const char *argv[]) {
         CGDisplayConfigRef configuration;
         if (CGBeginDisplayConfiguration(&configuration) != kCGErrorSuccess) return 6;
         CGConfigureDisplayOrigin(configuration, identifier, 0, 0);
-        for (uint32_t i = 0; i < count; i++) CGConfigureDisplayOrigin(configuration, originals[i], 1440 + (int)(i * 2048), 0);
+        for (uint32_t i = 0; i < count; i++) CGConfigureDisplayOrigin(configuration, originals[i], 1280 + (int)(i * 2048), 0);
         if (CGCompleteDisplayConfiguration(configuration, kCGConfigureForSession) != kCGErrorSuccess) return 7;
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:20];
         while (!ready(identifier) && deadline.timeIntervalSinceNow > 0)
             [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
         int status = 8;
         if (ready(identifier)) {
-            fprintf(stdout, "MACOS_STORE_REVIEW_DISPLAY=%u pixels=1440x900 main=1 virtual=1\n", identifier); fflush(stdout);
+            fprintf(stdout, "MACOS_STORE_REVIEW_DISPLAY=%u pixels=1280x800 main=1 virtual=1\n", identifier); fflush(stdout);
             NSTask *task = [[NSTask alloc] init]; task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/env"];
             NSMutableArray *arguments = [NSMutableArray array];
             for (int i = 1; i < argc; i++) [arguments addObject:[NSString stringWithUTF8String:argv[i]]];
@@ -117,10 +117,10 @@ int main(int argc, const char *argv[]) {
                 while (task.running) [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
                 [task waitUntilExit]; status = task.terminationStatus;
             } else { fprintf(stderr, "Review process could not start.\n"); status = 9; }
-        } else fprintf(stderr, "Virtual monitor never became the actual 1440x900 main display.\n");
+        } else fprintf(stderr, "Virtual monitor never became the actual 1280x800 main display.\n");
         // Restore original geometry before ARC releases the temporary monitor.
         if (CGBeginDisplayConfiguration(&configuration) == kCGErrorSuccess) {
-            CGConfigureDisplayOrigin(configuration, identifier, 1440, 0);
+            CGConfigureDisplayOrigin(configuration, identifier, 1280, 0);
             for (uint32_t i = 0; i < count; i++)
                 CGConfigureDisplayOrigin(configuration, originals[i], (int)origins[i].x, (int)origins[i].y);
             CGCompleteDisplayConfiguration(configuration, kCGConfigureForSession);
