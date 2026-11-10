@@ -114,6 +114,19 @@ first uses `{passed, evidence: {path, sha256}}`; the latter uses
 `{passed, evidence_file, sha256}`, together with `source_sha256` and `build_id`.
 Mac checks cannot be waived. No report may turn an unperformed check into a pass.
 
+Exercise export through the actual Save panel to an external test document,
+including both a new file and replacement of an existing file. Validate the
+exported deck and image bytes afterward. A sandboxed file selection does not
+authorize sibling temporary files; keep Core's temporary SQLite work inside the
+Mac adapter's Foundation replacement directory. Unsandboxed unit tests alone
+cannot establish this selected-file access behavior.
+
+Complete the app's expected microphone consent through the ordinary system
+dialog before its recording acceptance run. Retain the actual consent
+observation. Do not click the disabled whole application to trigger an
+interruption handler or bypass system permission controls. The recording check
+still requires actual recording, playback, saving, and playback after restart.
+
 Report uploaded, submitted, Apple-approved, and publicly available states
 separately. Automatic release does not establish approval or storefront
 availability.

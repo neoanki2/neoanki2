@@ -144,6 +144,36 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         chooseFileInSavePanel(exported, in: app)
         XCTAssertTrue(waitUntil(timeout: 30) { FileManager.default.fileExists(atPath: exported.path) })
         _ = dismissPortableDeckNoticeIfPresent(titled: "Deck Exported", in: app)
+        try assertStoreExport(exported, image: image)
+        try evidenceCapture("sandbox-new-export-complete", app)
+        // A file grant must also permit safe replacement. A known old document
+        // makes stale output distinguishable from an actual second export.
+        let previous = Data("Controlled old export for replacement acceptance".utf8)
+        try previous.write(to: exported)
+        openStoreMenu("File", in: app)
+        selectStoreMenuItem("Export Deck…", in: app)
+        chooseFileInSavePanel(exported, in: app)
+        let replace = try XCTUnwrap(firstExisting(of: [
+            app.sheets.firstMatch.buttons["Replace"],
+            app.dialogs.firstMatch.buttons["Replace"],
+            app.buttons["Replace"],
+        ], timeout: 10), "Replacing the controlled existing export must require the native confirmation")
+        XCTAssertTrue(replace.waitUntilHittable(timeout: 5))
+        replace.click()
+        XCTAssertTrue(waitUntil(timeout: 30) {
+            guard let bytes = try? Data(contentsOf: exported) else { return false }
+            return bytes.starts(with: Data("SQLite format 3\0".utf8))
+        }, "Actual replacement must publish a complete SQLite deck instead of leaving the old document")
+        _ = dismissPortableDeckNoticeIfPresent(titled: "Deck Exported", in: app)
+        try assertStoreExport(exported, image: image)
+        try evidenceCapture("sandbox-replaced-export-complete", app)
+        selectScope("deckRow-Voice", in: app)
+        leaveBrowseMode(in: app)
+        startStudy(in: app)
+        try verifyStoreRecording(in: app)
+    }
+
+    private func assertStoreExport(_ exported: URL, image: Data) throws {
         let query = Process()
         query.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         query.arguments = [exported.path, "SELECT count(*) FROM items; SELECT lower(hex(digest)) FROM media_assets;"]
@@ -157,30 +187,38 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertTrue(exportedContent.hasPrefix("2\n"), exportedContent)
         let expectedHash = SHA256.hash(data: image).map { String(format: "%02x", $0) }.joined()
         XCTAssertTrue(exportedContent.contains(expectedHash), "Export must retain the selected external image bytes")
-        try evidenceCapture("sandbox-export-complete", app)
-        selectScope("deckRow-Voice", in: app)
-        leaveBrowseMode(in: app)
-        startStudy(in: app)
+    }
+
+    private func verifyStoreRecording(in app: XCUIApplication) throws {
         let start = app.buttons.identified("startAudioSubmission")
         XCTAssertTrue(start.waitUntilHittable(timeout: 10))
-        addUIInterruptionMonitor(withDescription: "Microphone permission") { alert in
-            if alert.buttons["Allow"].exists { alert.buttons["Allow"].click(); return true }
-            if alert.buttons["OK"].exists { alert.buttons["OK"].click(); return true }
-            return false
-        }
         start.click()
-        app.click()
         let stop = app.buttons.identified("stopAudioSubmission")
-        XCTAssertTrue(stop.waitUntilHittable(timeout: 15), "Actual microphone recording must start")
-        let duration = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Recording duration ")).firstMatch
+        XCTAssertTrue(stop.waitUntilHittable(timeout: 15),
+                      "Actual microphone recording must start after the reviewer grants the expected system consent")
+        let prefix = "Recording duration "
+        let duration = app.staticTexts.matching(NSPredicate(
+            format: "value BEGINSWITH %@ OR label BEGINSWITH %@", prefix, prefix
+        )).firstMatch
         XCTAssertTrue(waitUntil(timeout: 10) {
-            duration.exists && !["00:00", "00:01", "00:02"].contains(where: duration.label.hasSuffix)
+            guard duration.exists else { return false }
+            let text = duration.value as? String ?? duration.label
+            guard text.hasPrefix(prefix) else { return false }
+            let parts = text.dropFirst(prefix.count).split(separator: ":")
+            guard parts.count == 2, let minutes = Int(parts[0]), let seconds = Int(parts[1]),
+                  (0..<60).contains(seconds) else { return false }
+            return minutes * 60 + seconds >= 3
         })
         try evidenceCapture("sandbox-microphone-recording", app)
         stop.click()
-        app.buttons.identified("audioSubmissionActions").click()
+        let actions = app.menuButtons.identified("audioSubmissionActions")
+        XCTAssertTrue(actions.waitUntilHittable(timeout: 5))
+        actions.click()
         selectStoreMenuItem("playAudioSubmission", in: app)
-        XCTAssertTrue(app.staticTexts["Playing your recording…"].waitUntilExists(timeout: 5))
+        let status = app.staticTexts.identified("audioSubmissionStatus")
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            status.exists && (status.value as? String ?? status.label) == "Playing your recording…"
+        })
         let save = app.buttons.identified("saveAudioSubmission")
         XCTAssertTrue(save.waitUntilHittable(timeout: 10))
         save.click()
@@ -247,10 +285,19 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         port.typeKey("a", modifierFlags: [.command])
         port.typeText(String(number))
         app.buttons["Apply"].click()
-        let toggle = app.checkBoxes["Enable local automation API"]
+        let settings = app.windows.matching(NSPredicate(format: "title == %@", "Local API")).firstMatch
+        XCTAssertTrue(settings.waitUntilExists(timeout: 5))
+        XCTAssertEqual(settings.switches.count, 1, "The Local API settings must expose one unambiguous enable switch")
+        let toggle = settings.switches.firstMatch
         XCTAssertTrue(toggle.waitUntilHittable(timeout: 5))
+        let initial = toggle.value as? String ?? (toggle.value as? NSNumber)?.stringValue
+        XCTAssertEqual(initial, "0", "The fresh Store configuration must keep the API disabled until explicit opt-in")
         toggle.click()
-        XCTAssertTrue(app.staticTexts["Listening on the configured loopback port"].waitUntilExists(timeout: 10))
+        let listening = settings.staticTexts.matching(NSPredicate(
+            format: "value == %@ OR label == %@",
+            "Listening on the configured loopback port", "Listening on the configured loopback port"
+        )).firstMatch
+        XCTAssertTrue(listening.waitUntilExists(timeout: 10))
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 3
         let session = URLSession(configuration: configuration)
@@ -262,7 +309,10 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertEqual((unauthorized as? HTTPURLResponse)?.statusCode, 401)
         try evidenceCapture("sandbox-local-api-listening", app)
         toggle.click()
-        XCTAssertTrue(app.staticTexts["Not listening"].waitUntilExists(timeout: 10))
+        let stopped = settings.staticTexts.matching(NSPredicate(
+            format: "value == %@ OR label == %@", "Not listening", "Not listening"
+        )).firstMatch
+        XCTAssertTrue(stopped.waitUntilExists(timeout: 10))
         do {
             _ = try await session.data(from: XCTUnwrap(URL(string: address + "/health")))
             XCTFail("Disabling the API must stop the actual sandboxed listener")
