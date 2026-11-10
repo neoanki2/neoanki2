@@ -96,10 +96,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("store-documents-\(UUID().uuidString)")
         let bundle = directory.appendingPathComponent("Store Review.neoanki")
         try FileManager.default.createDirectory(at: bundle.appendingPathComponent("media"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: bundle.appendingPathComponent("items"), withIntermediateDirectories: true)
         let image = try Data(contentsOf: fixturesDirectory().appendingPathComponent("media/cover.png"))
         try image.write(to: bundle.appendingPathComponent("media/cover.png"))
         let records = [
-            #"{"kind":"neoanki","version":4,"root":"root","parts":["items.jsonl"]}"#,
+            #"{"kind":"neoanki","version":4,"root":"root","parts":["items/review.jsonl"]}"#,
             #"{"kind":"type","id":"image","name":"Store Image","fields":[{"id":"prompt","name":"Prompt","type":"text","required":true},{"id":"image","name":"Image","type":"image","required":true}],"templates":[{"name":"Image","prompt":[{"field":"prompt"}],"answer":[{"field":"image"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}"#,
             #"{"kind":"type","id":"voice","name":"Store Voice","fields":[{"id":"prompt","name":"Prompt","type":"text","required":true}],"templates":[{"name":"Private Response","prompt":[{"field":"prompt"}],"answer":[],"interaction":"audioSubmission","skill":{"input":"text","output":"audio","operation":"reproduce"}}]}"#,
             #"{"kind":"deck","id":"root","name":"Store Import","itemTypes":["image","voice"],"defaultType":"image"}"#,
@@ -109,7 +110,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         try (records.joined(separator: "\n") + "\n").write(to: bundle.appendingPathComponent("deck.jsonl"), atomically: true, encoding: .utf8)
         try (#"{"kind":"item","deck":"images","type":"image","fields":{"prompt":{"text":"Sandbox image question"},"image":{"media":{"path":"media/cover.png","alt":"Store review cover"}}}}"# + "\n" +
              #"{"kind":"item","deck":"voice","type":"voice","fields":{"prompt":{"text":"Describe what you learned today"}}}"# + "\n")
-            .write(to: bundle.appendingPathComponent("items.jsonl"), atomically: true, encoding: .utf8)
+            .write(to: bundle.appendingPathComponent("items/review.jsonl"), atomically: true, encoding: .utf8)
         openStoreMenu("File", in: app)
         selectStoreMenuItem("Import Deck…", in: app)
         cancelFilePicker(in: app)
