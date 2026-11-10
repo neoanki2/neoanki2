@@ -21,10 +21,10 @@ jq -e '
     and (.workers | type == "number" and . >= 1 and . <= 4)
     and (.tests | type == "array" and length > 0))
   and ([.ios[] | select(any(.tests[]; startswith("NeoAnki2MobileUITests/MobileProductionReviewJourneyUITests/")))]
-    | length == 2
+    | length == 1
     and all(.[]; .workers == 1 and (.tests | length == 1))
-    and ([.[].id] | sort == ["phone-production-review", "tablet-production-review"])
-    and ([.[].device] | sort == ["iPad Pro 13-inch (M5)", "iPhone 17 Pro Max"]))
+    and ([.[].id] == ["phone-production-review"])
+    and ([.[].device] == ["iPhone 17 Pro Max"]))
 ' "$MANIFEST" >/dev/null
 
 jq -c --arg platform "$PLATFORM" '

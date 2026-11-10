@@ -106,6 +106,20 @@ together on that phone. Each mobile shard executes once. Assertion failures,
 runner-startup failures, and zero-test results are retained and fail the job;
 there is no automatic retry.
 
+The required PR matrix omits the redundant Debug `tablet-production-review`
+shard. In retained run `42716879402`, job `129504181607`, XCTest's launch waiter
+expired before Xcode completed the first application launch; the application
+subsequently reached the foreground and Home without a recorded app crash. The
+host launch pipeline's delay has no supported deterministic readiness repair in
+the retained evidence, so this infrastructure-sensitive duplicate was removed
+under the project's flaky-check policy. This removes continuous hosted Debug
+coverage of the tablet's empty-library create/study/grade/relaunch sequence.
+The test itself and its dedicated phone shard remain, along with tablet layout,
+keyboard/study, and occlusion journeys. App Store submission still requires the
+same ordinary optimized Release journey on **both** iPhone and iPad, plus the
+separate family-specific acceptance cases and exact-candidate evidence; those
+mandatory gates were not removed or replaced by the remaining PR tests.
+
 The phone's combined legacy Studio journey was also removed after native menu
 selection remained unreliable despite bounds-based gestures. It no longer checks
 Cloze starter filtering, legacy additional-content navigation, read-only actions,

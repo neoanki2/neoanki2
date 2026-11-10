@@ -223,14 +223,6 @@
       ]
     },
     {
-      "id": "tablet-production-review",
-      "device": "iPad Pro 13-inch (M5)",
-      "workers": 1,
-      "tests": [
-        "NeoAnki2MobileUITests/MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures"
-      ]
-    },
-    {
       "id": "phone-occlusion",
       "device": "iPhone 17 Pro Max",
       "workers": 1,

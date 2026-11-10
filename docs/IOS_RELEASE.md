@@ -130,6 +130,10 @@ installation, actual Simulator identity, cleanup, retained executable/xctestrun
 checksums, and the exact
 `MobileProductionReviewJourneyUITests/testCleanInstallCreateStudyAndPersistenceWithoutFixtures`
 case. Fixture-based parity cases cannot substitute for that production journey.
+The hosted PR matrix keeps only the phone Debug copy of this journey: the
+redundant tablet Debug shard was removed after a retained Xcode launch timeout
+before app assertions. That CI reduction does not waive the mandatory optimized
+Release iPad journey or any per-family acceptance case in this submission gate.
 
 The production review and screenshot capture use Simulator `bootstatus -b`
 followed by Xcode's `test-without-building` lifecycle. They do not require manual
