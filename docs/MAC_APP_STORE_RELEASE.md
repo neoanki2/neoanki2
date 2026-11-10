@@ -131,10 +131,18 @@ packaging/attestation path is skipped in review mode.
 Use the stable `/tmp/neoanki2-mac-store-review/candidate` and
 `/tmp/neoanki2-mac-store-review/review` paths both locally and on the runner so
 retained receipts and xctestrun paths remain unchanged when results are downloaded.
-The runner configures an actual supported display mode and enters Full Screen
-through the standard keyboard command. On a larger local display, the test resizes
-the ordinary window to 1440 × 900 points through its window chrome. Screenshots
-retain native app pixels without resampling or display-preference changes.
+Use an actual supported display mode for listing captures. On a 1280 × 800
+screen, the test enters Full Screen through **View → Enter Full Screen** once
+and preserves exact Full Screen geometry for later captures. On a larger display,
+the test can resize the ordinary window to an accepted 1440 × 900 or 1280 × 800
+size through its native window chrome. Every listing capture still requires exact
+accepted raw PNG dimensions and a fully onscreen window; pixels are never resampled.
+
+For an authorized local review, record the original display resolution before
+temporarily choosing a supported real resolution in macOS Display settings.
+Restore the original resolution after the final capture or if review stops.
+Retain the original and temporary resolution with the actual frame/pixel evidence;
+a display change is presentation setup, not a fresh-install or feature-test pass.
 
 The ordinary native journey also selects an external authored deck through the
 Open panel, verifies its image in study, exports through the Save panel and checks
@@ -143,7 +151,7 @@ response, verifies its persisted audio after restart, and enables the local API
 through Settings to check actual loopback health, authentication, and shutdown.
 These checks run after the five listing captures and never seed app storage.
 
-The hosted fixture creates a temporary 1440 × 900 virtual monitor when the VM's
+The hosted fixture creates a temporary 1280 × 800 virtual monitor when the VM's
 fixed display cannot provide an accepted Store size. The monitor is the actual
 WindowServer main display throughout XCTest; the helper restores the original
 geometry and releases it when the child exits. This CI-only tool uses private

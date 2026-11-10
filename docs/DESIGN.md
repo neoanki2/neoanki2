@@ -166,7 +166,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 | Browse table | Full detail width | Dense state columns; the reading measure governs card text, not tables |
 | Window default | 960×640pt | Comfortable split at launch |
 
-**Spacing rhythm (8pt grid):** 8 / 12 / 16 / 24 / 32pt — padding in study header (12×20), card area (24×32), and footer actions (12pt top, 20pt horizontal/bottom). Resizable Mac windows remain within the current screen's visible frame with 16pt clearance below the window, keeping the fixed footer clear of the display edge.
+**Spacing rhythm (8pt grid):** 8 / 12 / 16 / 24 / 32pt — padding in study header (12×20), card area (24×32), and footer actions (12pt top, 20pt horizontal/bottom). Resizable Mac windows remain within the current screen's visible frame with 16pt clearance below the window, keeping the fixed footer clear of the display edge. Full Screen uses the complete screen without that clearance. AppKit owns window geometry during entry and exit; ordinary bounds resume after exit without a stored maximum-height cap.
 
 **Study pane structure (top → bottom):**
 

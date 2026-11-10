@@ -178,6 +178,12 @@ browse mode. Browse mode is where you search items and open one for editing;
 open it with **Command-Option-B** and leave it with **Escape**. The sidebar can
 also be shown or hidden with the standard macOS split-view controls.
 
+On Mac, choose **View → Enter Full Screen** to use the entire display, including
+space normally reserved below an ordinary window. Choose **View → Exit Full
+Screen** to return to the windowed layout. Ordinary windows stay inside the
+screen's visible area with a small clearance below the study footer; that
+clearance does not shrink Full Screen or interrupt its transition.
+
 When the scope home reports cards that have been forgotten repeatedly, choose
 **Review Affected Items** to open Browse with only their source items showing.
 Open a row to inspect or edit it. If the content is already clear, select its

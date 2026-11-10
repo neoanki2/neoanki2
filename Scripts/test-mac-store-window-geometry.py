@@ -31,6 +31,15 @@ for pixels in [(1280, 800), (1440, 900), (2560, 1600), (2880, 1800)] {
 for pixels in [(3456, 2234), (1280, 900), (1280, 799)] {
     precondition(!MacStoreCaptureGeometry.acceptsPixels(width: pixels.0, height: pixels.1), "Reject desktop, mixed-ratio, or clipped pixels")
 }
+let fullScreen = CGRect(x: 0, y: 0, width: 1280, height: 800)
+precondition(MacStoreCaptureGeometry.isAcceptedScreenFrame(fullScreen, screen: fullScreen), "Repeated captures must leave exact Full Screen geometry unchanged")
+for invalid in [CGRect(x: 0, y: 0, width: 1279, height: 796),
+                CGRect(x: 0, y: 30, width: 1280, height: 754),
+                CGRect(x: 1, y: 0, width: 1280, height: 800)] {
+    precondition(!MacStoreCaptureGeometry.isAcceptedScreenFrame(invalid, screen: fullScreen), "Short, clipped, or offset frames must not bypass preparation")
+}
+let unsupportedDisplay = CGRect(x: 0, y: 0, width: 1728, height: 1117)
+precondition(!MacStoreCaptureGeometry.isAcceptedScreenFrame(unsupportedDisplay, screen: unsupportedDisplay))
 // Reproduce the measured mouse response: +160 moved width +156, +100 moved height +94.
 for (initial, target, loss) in [(960.0, 1280.0, 4.0), (640.0, 800.0, 6.0), (1440.0, 1280.0, -4.0)] {
     var current = initial

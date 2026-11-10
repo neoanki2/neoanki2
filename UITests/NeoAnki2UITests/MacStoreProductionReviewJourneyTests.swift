@@ -15,6 +15,10 @@ enum MacStoreCaptureGeometry {
         pointSizes.contains { abs($0.width - size.width) < 1 && abs($0.height - size.height) < 1 }
     }
 
+    static func isAcceptedScreenFrame(_ frame: CGRect, screen: CGRect) -> Bool {
+        frame == screen && acceptsPointSize(frame.size)
+    }
+
     // Native window drags can consume a few points before resizing begins.
     // Learn that loss from the actual frame; stop immediately if input has no effect.
     static func resizeExtent(_ initial: CGFloat, to target: CGFloat,
@@ -264,6 +268,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
                              width: screen.visibleFrame.width, height: screen.visibleFrame.height)
         let window = app.windows.firstMatch
         let initial = window.frame
+        let screenBounds = CGRect(x: screen.frame.minX, y: primaryTop - screen.frame.maxY,
+                                  width: screen.frame.width, height: screen.frame.height)
+        // An existing Full Screen window must remain untouched at later captures,
+        // even when this process still reports the windowed visible frame.
+        if MacStoreCaptureGeometry.isAcceptedScreenFrame(initial, screen: screenBounds) { return }
         // Prefer a supported size at the existing origin before moving chrome.
         // In the retained regression frame (384,212), 1280x800 fits completely.
         let target = MacStoreCaptureGeometry.preferredSize(at: initial.origin, within: visible)
@@ -317,11 +326,22 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
                     && visible.insetBy(dx: -1, dy: -1).contains(frame)
             }, "The review window must have native Store dimensions and remain fully visible: \(window.frame)")
         } else {
-            app.typeKey("f", modifierFlags: [.control, .command])
+            // Enter once from an ordinary window. Never toggle an existing but
+            // incorrectly sized Full Screen window back out to conceal the defect.
+            guard !app.menuItems["Exit Full Screen"].exists else {
+                XCTFail("Existing Full Screen geometry must equal the accepted screen bounds: \(window.frame)")
+                return
+            }
+            let view = app.menuBars.menuBarItems["View"]
+            XCTAssertTrue(view.waitUntilExists(timeout: 5))
+            view.click()
+            let enter = app.menuItems["Enter Full Screen"]
+            XCTAssertTrue(enter.waitUntilExists(timeout: 5), app.debugDescription)
+            XCTAssertTrue(enter.isEnabled)
+            enter.click()
             XCTAssertTrue(waitUntil(timeout: 10) {
-                let frame = window.frame
-                return MacStoreCaptureGeometry.acceptsPointSize(frame.size)
-            }, "Full Screen must supply an accepted native Mac Store capture size on this display")
+                MacStoreCaptureGeometry.isAcceptedScreenFrame(window.frame, screen: screenBounds)
+            }, "Full Screen must supply exact accepted native Mac Store bounds on this display: \(window.frame)")
         }
     }
 
