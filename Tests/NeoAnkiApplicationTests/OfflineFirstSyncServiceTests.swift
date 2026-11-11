@@ -109,7 +109,72 @@ private actor SuspendedUploadTransport: CloudSyncTransport {
     func finish() { release?.resume(); release = nil }
 }
 
+/// Models the observed CloudKit 1/2005 "Client went away" failure: another
+/// request on the same client fails until stop/start replaces that client.
+private actor InvalidatedClientTransport: CloudSyncTransport {
+    let failDuringSend: Bool
+    private var invalidated = true
+    private(set) var starts = 0
+    private(set) var stops = 0
+    private(set) var sent: [SyncRecordEnvelope] = []
+
+    init(failDuringSend: Bool) { self.failDuringSend = failDuringSend }
+    func start() async throws { starts += 1 }
+    func stop() async { stops += 1; invalidated = false }
+    private func checkConnection() throws {
+        if invalidated {
+            throw NSError(domain: CKErrorDomain, code: CKError.Code.internalError.rawValue,
+                userInfo: [NSLocalizedDescriptionKey: "Client went away before operation could be validated; failing"])
+        }
+    }
+    func enqueue(_ records: [SyncRecordEnvelope]) async throws {
+        if failDuringSend { try checkConnection() }
+        sent += records
+    }
+    func fetchPendingChanges() async throws -> [SyncRecordEnvelope] {
+        try checkConnection()
+        return []
+    }
+}
+
 struct OfflineFirstSyncServiceTests {
+    @Test(arguments: [false, true])
+    func invalidatedCloudClientRestartsWithoutLosingQueuedChanges(failDuringSend: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let outgoing = SyncRecordEnvelope(id: "local", resourceKind: "deck", revision: 1,
+            deviceID: "mac", order: 1, isTombstone: false, payload: Data())
+        let incoming = SyncRecordEnvelope(id: "remote", resourceKind: "deck", revision: 1,
+            deviceID: "phone", order: 1, isTombstone: false, payload: Data())
+        let metadata = SyncMetadataStore(directory: directory)
+        try await metadata.save(SyncMetadata(stagedInbound: [incoming], pendingOutbound: [outgoing],
+            didCreateInitialBackup: true, didCompleteInitialMerge: true))
+        let transport = InvalidatedClientTransport(failDuringSend: failDuringSend)
+        let adapter = SyncAdapterStub()
+        let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []),
+            adapter: adapter, transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") })
+
+        await service.synchronize()
+        #expect(await transport.starts == 1)
+        #expect(await transport.stops == 1)
+        #expect(try await metadata.load().stagedInbound == [incoming])
+        if failDuringSend { #expect(try await metadata.load().pendingOutbound == [outgoing]) }
+        #expect(await service.status() == .needsAttention(issueCount: 1))
+
+        await service.synchronize()
+        #expect(await transport.starts == 2)
+        #expect(await transport.sent == [outgoing])
+        #expect(await adapter.counts().apply == 1)
+        #expect(try await metadata.load().stagedInbound.isEmpty)
+        #expect(try await metadata.load().pendingOutbound?.isEmpty == true)
+        #expect(await service.issues().isEmpty)
+        guard case .current = await service.status() else {
+            Issue.record("Expected recovery through a fresh CloudKit client")
+            return
+        }
+    }
+
     @Test func stopWinsOverAnInFlightUploadAndOverlappingSyncIsCoalesced() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

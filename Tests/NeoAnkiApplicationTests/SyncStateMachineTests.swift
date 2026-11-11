@@ -162,6 +162,48 @@ private func textItem(id: UUID, type: ItemType, text: String, deckID: UUID?) -> 
 }
 
 struct SyncStateMachineTests {
+    @Test func phoneOnlyReviewsReachAnIdleMacAfterFetchFailureAndRestart() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cloud = TestCloud()
+        var phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud, seed: 101)
+        var mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud, seed: 102)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let deck = try await phone.repository.createDeck(Deck(name: "Phone reviews", newCardsPerDay: 1))
+        let type = try #require(try await phone.repository.loadItemTypes().itemTypes.first)
+        let item = textItem(id: UUID(), type: type, text: "Review on phone", deckID: deck.id)
+        _ = try await phone.repository.createItem(item, asOf: now)
+        await phone.service.synchronize()
+        await mac.service.synchronize()
+        await phone.service.synchronize()
+        let card = try #require(try await phone.repository.cards().first { $0.itemID == item.id })
+
+        for index in 0..<3 {
+            // The receiver never reviews or edits. Both processes can restart
+            // between deliveries without creating a scheduling conflict.
+            try await phone.restart(cloud: cloud, seed: UInt64(103 + index))
+            let date = now.addingTimeInterval(Double(index * 86_400))
+            let review = try await phone.repository.submitReview(
+                cardID: card.id, rating: .good, asOf: date, durationMilliseconds: 800
+            )
+            await phone.service.synchronize()
+            await mac.transport.inject(.fetch)
+            await mac.service.synchronize()
+            #expect(await mac.service.status() == .offline)
+            try await mac.restart(cloud: cloud, seed: UInt64(107 + index))
+            await mac.service.synchronize()
+            #expect(try await mac.repository.card(id: card.id) == phone.repository.card(id: card.id))
+            #expect(try await mac.repository.reviewLog(id: review.reviewLogID) == phone.repository.reviewLog(id: review.reviewLogID))
+            #expect(try await mac.repository.scopeSummary(scope: .deck(deck.id), asOf: date)
+                == phone.repository.scopeSummary(scope: .deck(deck.id), asOf: date))
+            #expect(await mac.service.issues().isEmpty)
+            guard case .current = await mac.service.status() else {
+                Issue.record("The Mac did not recover after receiving the phone's reviews")
+                return
+            }
+        }
+    }
+
     @Test func independentEquivalentItemTypesMustConvergeAcrossCloudAndRestart() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

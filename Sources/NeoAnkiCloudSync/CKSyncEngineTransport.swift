@@ -91,7 +91,7 @@ actor TransportBuffers {
 
 /// Private-database transport for NeoAnki's fixed custom library zone.
 /// Local SQLite remains authoritative; this type only moves durable envelopes.
-public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate, @unchecked Sendable {
+public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     public static let containerIdentifier = "iCloud.com.neoanki2.app"
     public static let zoneName = "NeoAnkiLibrary"
     private static let containerIdentifiersEntitlement =
@@ -112,9 +112,19 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     private let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
     private let buffers = TransportBuffers()
     private let metadataStore: SyncMetadataStore
-    private let initialState: CKSyncEngine.State.Serialization?
-    private lazy var engine: CKSyncEngine = {
-        let container = CKContainer(identifier: Self.containerIdentifier)
+    private var initialState: CKSyncEngine.State.Serialization?
+    private var activeContainer: CKContainer?
+    private var activeEngine: CKSyncEngine?
+
+    private var container: CKContainer {
+        if let activeContainer { return activeContainer }
+        let created = CKContainer(identifier: Self.containerIdentifier)
+        activeContainer = created
+        return created
+    }
+
+    private var engine: CKSyncEngine {
+        if let activeEngine { return activeEngine }
         var configuration = CKSyncEngine.Configuration(
             database: container.privateCloudDatabase,
             stateSerialization: initialState,
@@ -123,8 +133,10 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
         // Explicit zone reads drive receiving. Automatic engine fetches rely on
         // notification hints and can deliver an older page after a direct read.
         configuration.automaticallySync = false
-        return CKSyncEngine(configuration)
-    }()
+        let created = CKSyncEngine(configuration)
+        activeEngine = created
+        return created
+    }
 
     private init(metadataStore: SyncMetadataStore, initialState: CKSyncEngine.State.Serialization?) {
         self.metadataStore = metadataStore
@@ -159,15 +171,21 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     }
 
     public func start() async throws {
+        initialState = try await metadataStore.load().engineState
         let zone = CKRecordZone(zoneID: zoneID)
         // The first explicit read must wait until the custom zone exists.
-        _ = try await CKContainer(identifier: Self.containerIdentifier)
-            .privateCloudDatabase.save(zone)
+        _ = try await container.privateCloudDatabase.save(zone)
         try await fetchLibraryZoneChanges()
     }
 
     public func stop() async {
-        await engine.cancelOperations()
+        await activeEngine?.cancelOperations()
+        // An invalidated CloudKit client can keep returning internalError on
+        // every operation. Release the engine and its database/container so the
+        // next start builds a new client from the durable checkpoint.
+        activeEngine = nil
+        activeContainer = nil
+        _ = await buffers.takeDeliveryFailure()
     }
 
     public func enqueue(_ records: [SyncRecordEnvelope]) async throws {
@@ -179,7 +197,7 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
             let id = recordID(for: envelope)
             if await buffers.serverRecord(for: id) == nil, !(await buffers.isAbsent(id)) { missing.append(id) }
         }
-        let database = CKContainer(identifier: Self.containerIdentifier).privateCloudDatabase
+        let database = container.privateCloudDatabase
         for offset in stride(from: 0, to: missing.count, by: 200) {
             let batch = Array(missing[offset..<min(offset + 200, missing.count)])
             let results = try await database.records(for: batch)
@@ -244,7 +262,7 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     }
 
     private func fetchLibraryZoneChanges() async throws {
-        let database = CKContainer(identifier: Self.containerIdentifier).privateCloudDatabase
+        let database = container.privateCloudDatabase
         let fetcher = LibraryZoneChangeFetcher(metadataStore: metadataStore)
         let isFullSnapshot = try await metadataStore.load().libraryZoneChangeToken == nil
         do {
@@ -279,6 +297,7 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     }
 
     public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+        guard syncEngine === activeEngine else { return }
         switch event {
         case let .stateUpdate(update):
             guard !(await buffers.hasDeliveryFailure()) else { return }
