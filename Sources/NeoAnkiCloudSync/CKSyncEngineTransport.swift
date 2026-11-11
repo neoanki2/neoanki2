@@ -115,11 +115,14 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     private let initialState: CKSyncEngine.State.Serialization?
     private lazy var engine: CKSyncEngine = {
         let container = CKContainer(identifier: Self.containerIdentifier)
-        let configuration = CKSyncEngine.Configuration(
+        var configuration = CKSyncEngine.Configuration(
             database: container.privateCloudDatabase,
             stateSerialization: initialState,
             delegate: self
         )
+        // Explicit zone reads drive receiving. Automatic engine fetches rely on
+        // notification hints and can deliver an older page after a direct read.
+        configuration.automaticallySync = false
         return CKSyncEngine(configuration)
     }()
 
@@ -157,12 +160,10 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
 
     public func start() async throws {
         let zone = CKRecordZone(zoneID: zoneID)
-        // Await zone creation itself: the engine can coalesce a manual send
-        // with its automatic send, otherwise the first fetch races creation.
+        // The first explicit read must wait until the custom zone exists.
         _ = try await CKContainer(identifier: Self.containerIdentifier)
             .privateCloudDatabase.save(zone)
-        try await engine.fetchChanges(.init(scope: .zoneIDs([zoneID])))
-        if initialState == nil { await buffers.completedInitialFetch() }
+        try await fetchLibraryZoneChanges()
     }
 
     public func stop() async {
@@ -237,9 +238,44 @@ public final class CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelega
     }
 
     public func fetchPendingChanges() async throws -> [SyncRecordEnvelope] {
-        try await engine.fetchChanges(.init(scope: .zoneIDs([zoneID])))
         if let error = await buffers.takeDeliveryFailure() { throw error }
+        try await fetchLibraryZoneChanges()
         return await buffers.drainIncoming()
+    }
+
+    private func fetchLibraryZoneChanges() async throws {
+        let database = CKContainer(identifier: Self.containerIdentifier).privateCloudDatabase
+        let fetcher = LibraryZoneChangeFetcher(metadataStore: metadataStore)
+        let isFullSnapshot = try await metadataStore.load().libraryZoneChangeToken == nil
+        do {
+            let received = try await fetcher.fetch { [self] data in
+                let token = try data.flatMap {
+                    try NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
+                }
+                let page = try await database.recordZoneChanges(inZoneWith: zoneID, since: token)
+                // A per-record failure must not be hidden by advancing the page.
+                let records = try page.modificationResultsByID.values.map { try $0.get().record }
+                let deleted = page.deletions.map(\.recordID)
+                let incoming = records.map { Self.receivedEnvelope(from: $0) }
+                    + deleted.compactMap { Self.tombstone(from: $0) }
+                let tokenData = try NSKeyedArchiver.archivedData(
+                    withRootObject: page.changeToken, requiringSecureCoding: true
+                )
+                await buffers.remember(records)
+                await buffers.forget(deleted)
+                // The fetcher durably stages the page before advancing its token.
+                // The service consumes that inbox even if the process exits here.
+                return LibraryZoneChangeFetcher.Page(
+                    records: incoming, token: tokenData, moreComing: page.moreComing
+                )
+            }
+            await buffers.appendIncoming(received)
+            if isFullSnapshot { await buffers.completedInitialFetch() }
+        } catch let error as CKError where error.code == .changeTokenExpired {
+            try await metadataStore.resetLibraryZoneChangeToken()
+            // Let the service retry from a full snapshot on its next cycle.
+            throw error
+        }
     }
 
     public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {

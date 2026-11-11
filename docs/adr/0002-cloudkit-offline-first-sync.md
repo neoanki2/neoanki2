@@ -23,6 +23,14 @@ outbound position, inbound staging, device identity, mutation origin, and issues
 outside domain tables. Remote changes are staged, validated, and transactionally
 applied through repository capabilities with outbound echo suppression.
 
+Library receiving explicitly fetches paginated record-zone changes on every sync
+cycle. `CKSyncEngine.fetchChanges` can return without querying the server when
+its push/foreground hints indicate no pending zone changes. Keep an independent
+zone token and commit each page's token atomically with its staged payloads;
+legacy metadata starts with a full snapshot. Use the engine for explicit sends
+with automatic syncing disabled, so an older automatic fetch cannot overwrite a
+newer explicit delivery. Dictionary assets remain in their separate zone.
+
 Immutable reviews/reverts union-merge using deterministic device/order identity.
 Mutable conflicts accept the server value and preserve the other side as a
 recoverable conflict copy. Media deduplicates by content hash. Initial setup makes

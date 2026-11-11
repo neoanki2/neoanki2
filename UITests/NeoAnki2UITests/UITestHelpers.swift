@@ -471,8 +471,8 @@ class NeoAnkiUITestCase: XCTestCase {
             return false
         }
 
-        // Compatibility fallback for an older test build or the brief interval
-        // before SwiftUI exposes the route-level readiness marker.
+        // Ordinary Release builds omit the Debug-only readiness marker. Use
+        // their public route controls after loading placeholders disappear.
         // A loading placeholder means the window exists but has not settled.
         if app.staticTexts["Starting…"].exists || app.staticTexts["Loading items…"].exists
             || app.staticTexts["Loading decks…"].exists {
@@ -1211,10 +1211,13 @@ class NeoAnkiUITestCase: XCTestCase {
 
     func selectScope(_ identifier: String, in app: XCUIApplication) {
         showSidebar(in: app)
+        let expectedTitle: String? = identifier.hasPrefix("deckRow-")
+            ? String(identifier.dropFirst("deckRow-".count))
+            : ["scopeRow-AllDecks": "All Decks", "scopeRow-Unassigned": "Unassigned"][identifier]
         let row = app.descendants(matching: .any).identified(identifier)
         if row.waitUntilExists(timeout: 5) {
             row.click()
-            waitForScopeSelection(in: app)
+            waitForScopeSelection(in: app, expectedTitle: expectedTitle)
             return
         }
         // Fallback: match deck name from identifier deckRow-Name
@@ -1224,7 +1227,7 @@ class NeoAnkiUITestCase: XCTestCase {
             let match = app.descendants(matching: .any).matching(label).firstMatch
             XCTAssertTrue(match.waitUntilExists(timeout: 5))
             match.click()
-            waitForScopeSelection(in: app)
+            waitForScopeSelection(in: app, expectedTitle: expectedTitle)
             return
         }
         if identifier == "scopeRow-AllDecks" {
@@ -1233,7 +1236,7 @@ class NeoAnkiUITestCase: XCTestCase {
             ).firstMatch
             XCTAssertTrue(match.waitUntilExists(timeout: 5))
             match.click()
-            waitForScopeSelection(in: app)
+            waitForScopeSelection(in: app, expectedTitle: expectedTitle)
             return
         }
         if identifier == "scopeRow-Unassigned" {
@@ -1242,7 +1245,7 @@ class NeoAnkiUITestCase: XCTestCase {
             ).firstMatch
             XCTAssertTrue(match.waitUntilExists(timeout: 5))
             match.click()
-            waitForScopeSelection(in: app)
+            waitForScopeSelection(in: app, expectedTitle: expectedTitle)
             return
         }
         XCTFail("Could not find scope row \(identifier)")
@@ -1253,22 +1256,23 @@ class NeoAnkiUITestCase: XCTestCase {
     /// selection predicate here can only ever burn its whole timeout. What the
     /// callers actually need is for the new scope's content to have caught up.
     ///
-    /// `libraryIsReady` can be satisfied by a marker that outlives the switch
-    /// (the toolbar's Add button never goes away), so it alone can return while
-    /// the scope-specific controls are still being built. Waiting for the
-    /// placeholder to appear and clear is what actually tracks the reload; when
-    /// no placeholder shows up at all the load was already synchronous.
-    private func waitForScopeSelection(in app: XCUIApplication) {
+    /// The toolbar can outlive a switch. Require the selected scope's actual
+    /// window title and settled public content; ordinary Release builds have
+    /// no `libraryReady` marker. Browser subtitles may append an item count.
+    private func waitForScopeSelection(in app: XCUIApplication, expectedTitle: String?) {
         let loading = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier IN %@", ["scopeHomeLoading", "itemBrowserLoading"])
         ).firstMatch
         if loading.waitUntilExists(timeout: 0.5) {
             XCTAssertTrue(loading.waitUntilGone(timeout: 10))
         }
-        XCTAssertTrue(
-            app.descendants(matching: .any)["libraryReady"].waitUntilExists(timeout: 3),
-            "Selected scope did not become ready"
-        )
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            guard !loading.exists, libraryIsReady(in: app) else { return false }
+            guard let expectedTitle else { return true }
+            let title = app.windows.firstMatch.title
+            return title == expectedTitle || title.hasPrefix(expectedTitle + " – ")
+                || title.hasPrefix(expectedTitle + " — ")
+        }, "Selected scope did not become ready: \(expectedTitle ?? "selected sidebar scope"); actual title: \(app.windows.firstMatch.title)")
     }
 
     func createDeck(named name: String, in app: XCUIApplication) {

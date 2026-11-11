@@ -41,7 +41,7 @@ for unmapped files with stable UI markers. Add a narrow exclusion only for
 non-product infrastructure such as the screenshot capture suite.
 
 `requiredScreenshotFeatureIDs` is the explicit minimum visual-evidence set.
-Every listed feature must name a screenshot. With `--require-screenshots`, the
+Every listed feature must name a screenshot. With `--require-screenshots --check-screenshot-freshness`, the
 validator also compares the capture's source SHA with the current tree and
 rejects an image when any source owned by that feature changed after capture.
 Updating a hash or timestamp without recapturing the UI does not satisfy this
@@ -90,23 +90,24 @@ clean against both light and dark documentation surfaces. Capture rejects
 partially clipped expected controls. Images are not captured during normal
 local testing.
 
-The **Documentation screenshots** workflow compares the pull-request revision
-with the source revision in the promoted manifest. When a screenshot-backed
-source, screenshot scenario, or capture input changed, isolated macOS CI:
+Native screenshot capture and promotion no longer run in CI. Automatic gates
+validate existing PNGs, dimensions, checksums, provenance metadata, and display
+caps without requiring a fresh UI capture for every mapped source change.
+This removes automatic visual freshness coverage; the contributor owns reviewing
+whether changed UI needs new images.
 
-1. Captures the complete screenshot set from the pull-request head.
-2. Validates every expected file, visible accessibility identifier, dimension,
-   source revision, and checksum.
-3. Promotes the generated images and `manifest.json` into
-   `docs/assets/screenshots/`.
-4. Commits the generated set to the pull-request branch.
-5. Starts the required documentation and test workflows for that new revision.
+For an explicitly requested screenshot refresh, use the capture and promotion
+scripts on an isolated runner, then validate the generated set:
 
-The documentation gate remains failing until the generated commit is present.
-The merge therefore contains the exact images later built and deployed from
-`main`. A capture failure or a branch that CI cannot update blocks the merge;
-there is no stale-screenshot exception. Never edit `sourceSHA`, timestamps, or
-checksums by hand.
+```bash
+./Scripts/capture-doc-screenshots.sh /tmp/neoanki2-doc-screenshots
+./Scripts/promote-doc-screenshots.sh /tmp/neoanki2-doc-screenshots
+swift Scripts/validate-docs.swift --require-screenshots --check-screenshot-freshness
+```
+
+Review and commit the generated images and manifest together. Never edit
+`sourceSHA`, timestamps, or checksums by hand. Follow the workspace desktop
+isolation policy when choosing an environment for capture.
 
 When a refreshed capture is pixel-for-pixel identical, Git may record only the
 new manifest rather than a binary PNG change. The manifest's source commit and

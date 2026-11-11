@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Validate feature coverage and links
-        run: swift Scripts/validate-docs.swift
+        run: swift Scripts/validate-docs.swift --require-screenshots
       - name: Check changed features have documentation updates
         if: github.event_name == 'pull_request'
         env:

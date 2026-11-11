@@ -70,7 +70,9 @@ final class PortableDeckTransferModel {
             try await library.importAuthoredDeck(from: source)
         }
         exportOperation = { deckID, destination in
-            try await library.exportPortableDeck(id: deckID, to: destination)
+            try await PortableDeckExportFile.write(to: destination) { staged in
+                try await library.exportPortableDeck(id: deckID, to: staged)
+            }
         }
         self.scopedAccess = scopedAccess
     }

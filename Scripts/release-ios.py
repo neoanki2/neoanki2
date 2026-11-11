@@ -523,10 +523,13 @@ class AppleAPI:
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as error:
             try:
-                codes = [e.get("code", "UNKNOWN") for e in json.loads(error.read()).get("errors", [])]
+                errors = json.loads(error.read()).get("errors", [])
+                codes = [e.get("code", "UNKNOWN") for e in errors]
+                details = "; ".join(e.get("detail", "") for e in errors)[:1000]
             except (ValueError, KeyError):
-                codes = []
-            raise ReleaseError(f"Apple API {method} {parsed.path}: HTTP {error.code}, {', '.join(codes)}") from None
+                codes, details = [], ""
+            raise ReleaseError(f"Apple API {method} {parsed.path}: HTTP {error.code}, {', '.join(codes)}"
+                               + (": " + details if details else "")) from None
 
     def list(self, resource, **filters):
         query = urllib.parse.urlencode({"limit": 200, **filters})
@@ -699,6 +702,10 @@ class Workflow:
             self.verify_source()
             self.state["phases"][name] = {"log_sha256": digest(log), "passed": True}
             self.save()
+        self.archive()
+
+    def archive(self):
+        """Build/validate the archive; the unified controller owns verification."""
         if not self.state["build"]:
             if self.api:
                 self.require_api()
@@ -1065,63 +1072,7 @@ class Workflow:
         self.save()
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", nargs="?", default="prepare", choices=["prepare", "export", "upload", "review-context", "submit", "status", "all"])
-    parser.add_argument("--prepare-only", action="store_true", help="alias for the prepare stage; no Apple writes")
-    parser.add_argument("--config", type=Path, default=SIGNING / "app-store-connect.json")
-    parser.add_argument("--signing-dir", type=Path, default=SIGNING)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--version", default="1.0.0")
-    parser.add_argument("--build", help="unused numeric Apple build number")
-    parser.add_argument("--reuse-build-from", type=Path,
-                        help="retain a verified uploaded binary for metadata/test-only remediation; production inputs must match")
-    parser.add_argument("--rejection-evidence", type=Path, default=ROOT / ".build/ios-review-rejection/rejection.json",
-                        help="retained exact Apple issues and original message evidence; mandatory after rejection")
-    parser.add_argument("--allow-physical-test-waivers", action="store_true",
-                        help="accept explicitly documented user-approved physical-test gaps; never marks them passed")
-    args = parser.parse_args()
-    if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", args.version) or (args.build and not re.fullmatch(r"[1-9]\d{0,3}", args.build)):
-        parser.error("Use a numeric marketing version and a build number from 1 to 9999")
-    args.config, args.signing_dir = args.config.expanduser().resolve(), args.signing_dir.expanduser().resolve()
-    args.rejection_evidence = args.rejection_evidence.expanduser().resolve()
-    if args.output:
-        args.output = args.output.expanduser().resolve()
-    if args.reuse_build_from:
-        args.reuse_build_from = args.reuse_build_from.expanduser().resolve()
-        if args.stage not in ("status", "review-context", "submit"):
-            parser.error("--reuse-build-from is limited to status, review-context, and submit; it never rebuilds or uploads")
-    base = ROOT / ".build/ios-release"
-    base.mkdir(parents=True, exist_ok=True)
-    started, flow = time.monotonic(), None
-    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
-    with (base / "workflow.lock").open("w") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            flow = Workflow(args)
-            stages = ["prepare", "upload", "submit"] if args.stage == "all" else [args.stage]
-            if args.prepare_only:
-                stages = ["prepare"]
-            for stage in stages:
-                getattr(flow, stage.replace("-", "_"))()
-            state = flow.state["phases"].get("submission", {}).get("state")
-            status = ("available" if state in ("READY_FOR_SALE", "READY_FOR_DISTRIBUTION")
-                      else "submitted_for_review" if state else stages[-1] + "_complete")
-            print("IOS_RELEASE_STATUS=" + status)
-            print(f"IOS_RELEASE_RECEIPT={flow.receipt}")
-            print(f"IOS_RELEASE_SOURCE_SHA256={flow.fingerprint}")
-            print(f"IOS_RELEASE_VERSION={flow.state['version']}")
-            print(f"IOS_RELEASE_BUILD={flow.state['build']}")
-            print(f"IOS_RELEASE_ELAPSED_SECONDS={time.monotonic() - started:.1f}")
-        except (ReleaseError, SIGNER.DeploymentError, OSError, ValueError, KeyError, urllib.error.URLError, KeyboardInterrupt) as error:
-            message = "Interrupted" if isinstance(error, KeyboardInterrupt) else str(error)
-            print(f"IOS_RELEASE_BLOCKED_PHASE={flow.phase if flow else 'preflight'}", file=sys.stderr)
-            print(f"IOS_RELEASE_ERROR={message}", file=sys.stderr)
-            if flow:
-                print(f"IOS_RELEASE_RECEIPT={flow.receipt}", file=sys.stderr)
-            return 1
-    return 0
-
 
 if __name__ == "__main__":
-    sys.exit(main())
+    print("Internal archive/signing adapter. Use ./Scripts/release.sh for all publication.", file=sys.stderr)
+    sys.exit(2)

@@ -224,6 +224,8 @@ The Mac Dock icon and the iPhone/iPad Home Screen icon show the number of cards
 currently available to study across the whole library. Selecting one deck does
 not narrow this count. Suspended cards and new cards deferred by daily limits
 are excluded. The badge clears when no cards are due.
+Switching the Mac window into or out of [Full Screen](../getting-started/#navigate-the-library)
+does not change the library-wide due count shown by its Dock badge.
 
 On Mac, iPhone, and iPad, NeoAnki2 requests badge permission when cards are first due.
 Badges work with daily reminders and iCloud sync turned off. If badges are

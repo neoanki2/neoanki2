@@ -15,6 +15,28 @@ enum MacStoreCaptureGeometry {
         pointSizes.contains { abs($0.width - size.width) < 1 && abs($0.height - size.height) < 1 }
     }
 
+    static func isAcceptedScreenFrame(_ frame: CGRect, screen: CGRect) -> Bool {
+        frame == screen && acceptsPointSize(frame.size)
+    }
+
+    // Native window drags can consume a few points before resizing begins.
+    // Learn that loss from the actual frame; stop immediately if input has no effect.
+    static func resizeExtent(_ initial: CGFloat, to target: CGFloat,
+                             applyDelta: (CGFloat) -> CGFloat) -> CGFloat {
+        var current = initial
+        var loss: CGFloat = 0
+        // One coarse move and at most two adjustments from measured frame loss.
+        for _ in 0..<3 {
+            if abs(target - current) < 1 { break }
+            let requested = target - current + loss
+            let updated = applyDelta(requested)
+            if abs(updated - current) < 0.5 { break }
+            loss = requested - (updated - current)
+            current = updated
+        }
+        return current
+    }
+
     static func acceptsPixels(width: Int, height: Int) -> Bool {
         [1, 2].contains { scale in
             pointSizes.contains { Int($0.width) * scale == width && Int($0.height) * scale == height }
@@ -48,7 +70,7 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         waitForItem(named: "What does spaced repetition improve?", in: app)
         try storeCapture("02-native-mac-library", app)
         leaveBrowseMode(in: app)
-        startStudyViaMenu(in: app)
+        startStoreStudy(in: app)
         try storeCapture("03-native-mac-study", app)
         let action = app.buttons.identified("primaryStudyAction")
         XCTAssertTrue(action.waitUntilExists(timeout: 5), "The new card must be available to study")
@@ -74,10 +96,11 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("store-documents-\(UUID().uuidString)")
         let bundle = directory.appendingPathComponent("Store Review.neoanki")
         try FileManager.default.createDirectory(at: bundle.appendingPathComponent("media"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: bundle.appendingPathComponent("items"), withIntermediateDirectories: true)
         let image = try Data(contentsOf: fixturesDirectory().appendingPathComponent("media/cover.png"))
         try image.write(to: bundle.appendingPathComponent("media/cover.png"))
         let records = [
-            #"{"kind":"neoanki","version":4,"root":"root","parts":["items.jsonl"]}"#,
+            #"{"kind":"neoanki","version":4,"root":"root","parts":["items/review.jsonl"]}"#,
             #"{"kind":"type","id":"image","name":"Store Image","fields":[{"id":"prompt","name":"Prompt","type":"text","required":true},{"id":"image","name":"Image","type":"image","required":true}],"templates":[{"name":"Image","prompt":[{"field":"prompt"}],"answer":[{"field":"image"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}"#,
             #"{"kind":"type","id":"voice","name":"Store Voice","fields":[{"id":"prompt","name":"Prompt","type":"text","required":true}],"templates":[{"name":"Private Response","prompt":[{"field":"prompt"}],"answer":[],"interaction":"audioSubmission","skill":{"input":"text","output":"audio","operation":"reproduce"}}]}"#,
             #"{"kind":"deck","id":"root","name":"Store Import","itemTypes":["image","voice"],"defaultType":"image"}"#,
@@ -87,12 +110,14 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         try (records.joined(separator: "\n") + "\n").write(to: bundle.appendingPathComponent("deck.jsonl"), atomically: true, encoding: .utf8)
         try (#"{"kind":"item","deck":"images","type":"image","fields":{"prompt":{"text":"Sandbox image question"},"image":{"media":{"path":"media/cover.png","alt":"Store review cover"}}}}"# + "\n" +
              #"{"kind":"item","deck":"voice","type":"voice","fields":{"prompt":{"text":"Describe what you learned today"}}}"# + "\n")
-            .write(to: bundle.appendingPathComponent("items.jsonl"), atomically: true, encoding: .utf8)
-        app.menuBarItems["File"].click()
-        app.menuItems.identified("Import Deck…").click()
+            .write(to: bundle.appendingPathComponent("items/review.jsonl"), atomically: true, encoding: .utf8)
+        openStoreMenu("File", in: app)
+        selectStoreMenuItem("Import Deck…", in: app)
         cancelFilePicker(in: app)
         waitForItem(named: "What does spaced repetition improve?", in: app)
-        choosePortableDeckImport(bundle, in: app)
+        openStoreMenu("File", in: app)
+        selectStoreMenuItem("Import Deck…", in: app)
+        chooseFileInOpenPanel(bundle, in: app)
         finishPortableImport(in: app)
         waitForItem(named: "Sandbox image question", in: app)
         showSidebar(in: app)
@@ -103,20 +128,52 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         }
         selectScope("deckRow-Images", in: app)
         leaveBrowseMode(in: app)
-        startStudyViaMenu(in: app)
+        startStoreStudy(in: app)
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.images["Store review cover"].waitUntilExists(timeout: 10))
         try evidenceCapture("sandbox-imported-image", app)
         clickOrType("gradeEasy", shortcut: "4", in: app)
         finishStudySession(in: app)
         selectScope("deckRow-Store Import", in: app)
-        app.menuBarItems["File"].click()
-        app.menuItems.identified("Export Deck…").click()
+        openStoreMenu("File", in: app)
+        selectStoreMenuItem("Export Deck…", in: app)
         cancelFilePicker(in: app)
         let exported = directory.appendingPathComponent("roundtrip.neodeck")
-        chooseExportDestination(exported, in: app)
+        openStoreMenu("File", in: app)
+        selectStoreMenuItem("Export Deck…", in: app)
+        chooseFileInSavePanel(exported, in: app)
         XCTAssertTrue(waitUntil(timeout: 30) { FileManager.default.fileExists(atPath: exported.path) })
         _ = dismissPortableDeckNoticeIfPresent(titled: "Deck Exported", in: app)
+        try assertStoreExport(exported, image: image)
+        try evidenceCapture("sandbox-new-export-complete", app)
+        // A file grant must also permit safe replacement. A known old document
+        // makes stale output distinguishable from an actual second export.
+        let previous = Data("Controlled old export for replacement acceptance".utf8)
+        try previous.write(to: exported)
+        openStoreMenu("File", in: app)
+        selectStoreMenuItem("Export Deck…", in: app)
+        chooseFileInSavePanel(exported, in: app)
+        let replace = try XCTUnwrap(firstExisting(of: [
+            app.sheets.firstMatch.buttons["Replace"],
+            app.dialogs.firstMatch.buttons["Replace"],
+            app.buttons["Replace"],
+        ], timeout: 10), "Replacing the controlled existing export must require the native confirmation")
+        XCTAssertTrue(replace.waitUntilHittable(timeout: 5))
+        replace.click()
+        XCTAssertTrue(waitUntil(timeout: 30) {
+            guard let bytes = try? Data(contentsOf: exported) else { return false }
+            return bytes.starts(with: Data("SQLite format 3\0".utf8))
+        }, "Actual replacement must publish a complete SQLite deck instead of leaving the old document")
+        _ = dismissPortableDeckNoticeIfPresent(titled: "Deck Exported", in: app)
+        try assertStoreExport(exported, image: image)
+        try evidenceCapture("sandbox-replaced-export-complete", app)
+        selectScope("deckRow-Voice", in: app)
+        leaveBrowseMode(in: app)
+        startStudy(in: app)
+        try verifyStoreRecording(in: app)
+    }
+
+    private func assertStoreExport(_ exported: URL, image: Data) throws {
         let query = Process()
         query.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         query.arguments = [exported.path, "SELECT count(*) FROM items; SELECT lower(hex(digest)) FROM media_assets;"]
@@ -130,30 +187,38 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertTrue(exportedContent.hasPrefix("2\n"), exportedContent)
         let expectedHash = SHA256.hash(data: image).map { String(format: "%02x", $0) }.joined()
         XCTAssertTrue(exportedContent.contains(expectedHash), "Export must retain the selected external image bytes")
-        try evidenceCapture("sandbox-export-complete", app)
-        selectScope("deckRow-Voice", in: app)
-        leaveBrowseMode(in: app)
-        startStudy(in: app)
+    }
+
+    private func verifyStoreRecording(in app: XCUIApplication) throws {
         let start = app.buttons.identified("startAudioSubmission")
         XCTAssertTrue(start.waitUntilHittable(timeout: 10))
-        addUIInterruptionMonitor(withDescription: "Microphone permission") { alert in
-            if alert.buttons["Allow"].exists { alert.buttons["Allow"].click(); return true }
-            if alert.buttons["OK"].exists { alert.buttons["OK"].click(); return true }
-            return false
-        }
         start.click()
-        app.click()
         let stop = app.buttons.identified("stopAudioSubmission")
-        XCTAssertTrue(stop.waitUntilHittable(timeout: 15), "Actual microphone recording must start")
-        let duration = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Recording duration ")).firstMatch
+        XCTAssertTrue(stop.waitUntilHittable(timeout: 15),
+                      "Actual microphone recording must start after the reviewer grants the expected system consent")
+        let prefix = "Recording duration "
+        let duration = app.staticTexts.matching(NSPredicate(
+            format: "value BEGINSWITH %@ OR label BEGINSWITH %@", prefix, prefix
+        )).firstMatch
         XCTAssertTrue(waitUntil(timeout: 10) {
-            duration.exists && !["00:00", "00:01", "00:02"].contains(where: duration.label.hasSuffix)
+            guard duration.exists else { return false }
+            let text = duration.value as? String ?? duration.label
+            guard text.hasPrefix(prefix) else { return false }
+            let parts = text.dropFirst(prefix.count).split(separator: ":")
+            guard parts.count == 2, let minutes = Int(parts[0]), let seconds = Int(parts[1]),
+                  (0..<60).contains(seconds) else { return false }
+            return minutes * 60 + seconds >= 3
         })
         try evidenceCapture("sandbox-microphone-recording", app)
         stop.click()
-        app.buttons.identified("audioSubmissionActions").click()
-        app.menuItems.identified("playAudioSubmission").click()
-        XCTAssertTrue(app.staticTexts["Playing your recording…"].waitUntilExists(timeout: 5))
+        let actions = app.menuButtons.identified("audioSubmissionActions")
+        XCTAssertTrue(actions.waitUntilHittable(timeout: 5))
+        actions.click()
+        selectStoreMenuItem("playAudioSubmission", in: app)
+        let status = app.staticTexts.identified("audioSubmissionStatus")
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            status.exists && (status.value as? String ?? status.label) == "Playing your recording…"
+        })
         let save = app.buttons.identified("saveAudioSubmission")
         XCTAssertTrue(save.waitUntilHittable(timeout: 10))
         save.click()
@@ -173,6 +238,41 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         if persistedStop.exists { persistedStop.click() }
     }
 
+    private func openStoreMenu(_ title: String, in app: XCUIApplication) {
+        let menu = app.menuBarItems[title]
+        XCTAssertTrue(menu.waitUntilExists(timeout: 5))
+        if !menu.isHittable {
+            // Full Screen hides the system menu bar. A hidden menu still has
+            // AX entries, so reveal the real bar before selecting its item.
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: window.frame.width / 2, dy: 1)).hover()
+        }
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            menu.exists && menu.isHittable && !menu.frame.isEmpty
+        }, "The native menu bar must be visible before selecting \(title)")
+        menu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    private func selectStoreMenuItem(_ identifier: String, in app: XCUIApplication) {
+        let item = app.menuItems.identified(identifier)
+        XCTAssertTrue(item.waitUntilExists(timeout: 5))
+        XCTAssertTrue(item.isEnabled)
+        XCTAssertTrue(item.waitUntilHittable(timeout: 5), "Menu item must be visible: \(identifier), \(item.frame)")
+        XCTAssertFalse(item.frame.isEmpty)
+        // Semantic menu-item click traverses and reopens SwiftUI's generic
+        // menuAction: parent in Full Screen, then times out waiting for the
+        // already-open menu. Click the observed native item without retraversal.
+        item.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    }
+
+    private func startStoreStudy(in app: XCUIApplication) {
+        openStoreMenu("Study", in: app)
+        selectStoreMenuItem("Start Study", in: app)
+        XCTAssertTrue(app.buttons.identified("primaryStudyAction").waitUntilExists(timeout: 5)
+            || app.buttons.identified("studySessionDone").waitUntilExists(timeout: 2))
+    }
+
     private func verifySandboxLocalAPI(in app: XCUIApplication) async throws {
         app.typeKey(",", modifierFlags: [.command])
         let apiTab = app.buttons["Local API"]
@@ -185,10 +285,19 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         port.typeKey("a", modifierFlags: [.command])
         port.typeText(String(number))
         app.buttons["Apply"].click()
-        let toggle = app.checkBoxes["Enable local automation API"]
+        let settings = app.windows.matching(NSPredicate(format: "title == %@", "Local API")).firstMatch
+        XCTAssertTrue(settings.waitUntilExists(timeout: 5))
+        XCTAssertEqual(settings.switches.count, 1, "The Local API settings must expose one unambiguous enable switch")
+        let toggle = settings.switches.firstMatch
         XCTAssertTrue(toggle.waitUntilHittable(timeout: 5))
+        let initial = toggle.value as? String ?? (toggle.value as? NSNumber)?.stringValue
+        XCTAssertEqual(initial, "0", "The fresh Store configuration must keep the API disabled until explicit opt-in")
         toggle.click()
-        XCTAssertTrue(app.staticTexts["Listening on the configured loopback port"].waitUntilExists(timeout: 10))
+        let listening = settings.staticTexts.matching(NSPredicate(
+            format: "value == %@ OR label == %@",
+            "Listening on the configured loopback port", "Listening on the configured loopback port"
+        )).firstMatch
+        XCTAssertTrue(listening.waitUntilExists(timeout: 10))
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 3
         let session = URLSession(configuration: configuration)
@@ -200,7 +309,10 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
         XCTAssertEqual((unauthorized as? HTTPURLResponse)?.statusCode, 401)
         try evidenceCapture("sandbox-local-api-listening", app)
         toggle.click()
-        XCTAssertTrue(app.staticTexts["Not listening"].waitUntilExists(timeout: 10))
+        let stopped = settings.staticTexts.matching(NSPredicate(
+            format: "value == %@ OR label == %@", "Not listening", "Not listening"
+        )).firstMatch
+        XCTAssertTrue(stopped.waitUntilExists(timeout: 10))
         do {
             _ = try await session.data(from: XCTUnwrap(URL(string: address + "/health")))
             XCTFail("Disabling the API must stop the actual sandboxed listener")
@@ -235,12 +347,22 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
     }
 
     private func prepareStoreCaptureWindow(in app: XCUIApplication) throws {
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.neoanki2.ios"
+        }, "Store capture requires the actual Apple app in the foreground")
         let screen = try XCTUnwrap(NSScreen.main)
         let primaryTop = try XCTUnwrap(NSScreen.screens.first).frame.maxY
         let visible = CGRect(x: screen.visibleFrame.minX, y: primaryTop - screen.visibleFrame.maxY,
                              width: screen.visibleFrame.width, height: screen.visibleFrame.height)
         let window = app.windows.firstMatch
         let initial = window.frame
+        let screenBounds = CGRect(x: screen.frame.minX, y: primaryTop - screen.frame.maxY,
+                                  width: screen.frame.width, height: screen.frame.height)
+        // An existing Full Screen window must remain untouched at later captures,
+        // even when this process still reports the windowed visible frame.
+        if MacStoreCaptureGeometry.isAcceptedScreenFrame(initial, screen: screenBounds) { return }
         // Prefer a supported size at the existing origin before moving chrome.
         // In the retained regression frame (384,212), 1280x800 fits completely.
         let target = MacStoreCaptureGeometry.preferredSize(at: initial.origin, within: visible)
@@ -259,18 +381,34 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
                                                 y: visible.minY + (visible.height - target.height) / 2)
                 let destination = title.withOffset(CGVector(dx: destinationOrigin.x - initial.minX,
                                                             dy: destinationOrigin.y - initial.minY))
-                title.press(forDuration: 0.1, thenDragTo: destination)
+                title.click(forDuration: 0.3, thenDragTo: destination)
                 XCTAssertTrue(waitUntil(timeout: 5) {
                     let proposed = CGRect(origin: window.frame.origin, size: target)
                     return visible.insetBy(dx: -1, dy: -1).contains(proposed)
                 }, "The actual window origin must leave room for the full Store capture: \(window.frame), visible: \(visible)")
             }
-            if abs(window.frame.width - target.width) >= 1 || abs(window.frame.height - target.height) >= 1 {
-                let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-                    .withOffset(CGVector(dx: -3, dy: -3))
-                let destination = window.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: target.width - 3, dy: target.height - 3))
-                corner.press(forDuration: 0.1, thenDragTo: destination)
+            for horizontal in [true, false] {
+                let extent = horizontal ? window.frame.width : window.frame.height
+                let targetExtent = horizontal ? target.width : target.height
+                _ = MacStoreCaptureGeometry.resizeExtent(extent, to: targetExtent) { delta in
+                    let before = window.frame
+                    let edge = window.coordinate(withNormalizedOffset: horizontal
+                        ? CGVector(dx: 1, dy: 0.5) : CGVector(dx: 0.5, dy: 1))
+                        .withOffset(horizontal ? CGVector(dx: -1, dy: 0) : CGVector(dx: 0, dy: -1))
+                    edge.hover()
+                    edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(horizontal
+                        ? CGVector(dx: delta, dy: 0) : CGVector(dx: 0, dy: delta)))
+                    _ = waitUntil(timeout: 3) {
+                        let after = window.frame
+                        return abs(horizontal ? after.width - before.width : after.height - before.height) > 0.5
+                    }
+                    let after = window.frame
+                    let evidence = XCTAttachment(string: "before=\(before) requestedDelta=\(delta) after=\(after)")
+                    evidence.name = horizontal ? "capture-width-adjustment" : "capture-height-adjustment"
+                    evidence.lifetime = .keepAlways
+                    add(evidence)
+                    return horizontal ? after.width : after.height
+                }
             }
             XCTAssertTrue(waitUntil(timeout: 10) {
                 let frame = window.frame
@@ -278,11 +416,22 @@ final class MacStoreProductionReviewJourneyTests: NeoAnkiUITestCase {
                     && visible.insetBy(dx: -1, dy: -1).contains(frame)
             }, "The review window must have native Store dimensions and remain fully visible: \(window.frame)")
         } else {
-            app.typeKey("f", modifierFlags: [.control, .command])
+            // Enter once from an ordinary window. Never toggle an existing but
+            // incorrectly sized Full Screen window back out to conceal the defect.
+            guard !app.menuItems["Exit Full Screen"].exists else {
+                XCTFail("Existing Full Screen geometry must equal the accepted screen bounds: \(window.frame)")
+                return
+            }
+            let view = app.menuBars.menuBarItems["View"]
+            XCTAssertTrue(view.waitUntilExists(timeout: 5))
+            view.click()
+            let enter = app.menuItems["Enter Full Screen"]
+            XCTAssertTrue(enter.waitUntilExists(timeout: 5), app.debugDescription)
+            XCTAssertTrue(enter.isEnabled)
+            enter.click()
             XCTAssertTrue(waitUntil(timeout: 10) {
-                let frame = window.frame
-                return MacStoreCaptureGeometry.acceptsPointSize(frame.size)
-            }, "Full Screen must supply an accepted native Mac Store capture size on this display")
+                MacStoreCaptureGeometry.isAcceptedScreenFrame(window.frame, screen: screenBounds)
+            }, "Full Screen must supply exact accepted native Mac Store bounds on this display: \(window.frame)")
         }
     }
 

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "version": "1.0.319",
+  "migration_note": "Last independently numbered releases. New releases share the next global version; unchanged platforms keep their previous version.",
+  "channels": {
+    "ios": {"version": "1.0.2", "build": "3", "revision": "3c68267219ab1200cabdbe2b4894ecbe67675204"},
+    "mac": {"version": "1.0.1", "build": "5", "revision": "3c68267219ab1200cabdbe2b4894ecbe67675204"},
+    "homebrew": {"version": "1.0.319", "build": "319", "revision": "3c68267219ab1200cabdbe2b4894ecbe67675204"}
+  }
+}

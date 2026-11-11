@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT_DIR="${1:-$ROOT/.build/release-artifacts}"
-BUILD_NUMBER="${NEOANKI_RELEASE_BUILD_NUMBER:-$(git -C "$ROOT" rev-list --count HEAD)}"
-VERSION="${NEOANKI_RELEASE_VERSION:-1.0.$BUILD_NUMBER}"
+BUILD_NUMBER="${NEOANKI_RELEASE_BUILD_NUMBER:?Use Scripts/release.sh to allocate the shared build number}"
+VERSION="${NEOANKI_RELEASE_VERSION:?Use Scripts/release.sh to allocate the shared version}"
 ARTIFACT_NAME="NeoAnki2-$VERSION-mac-universal.dmg"
 
 # Published artifacts always carry real signing capabilities. Never silently
@@ -39,11 +39,14 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$PAYLOAD_DIR"
+# Keep the universal release graph separate from concurrent native debug tests.
+# SwiftPM otherwise serializes both jobs on the root .build workspace lock.
 NEOANKI_INSTALL_CONFIG=release \
 NEOANKI_INSTALL_DIR="$PAYLOAD_DIR" \
 NEOANKI_INSTALL_VERSION="$VERSION" \
 NEOANKI_INSTALL_BUILD_NUMBER="$BUILD_NUMBER" \
 NEOANKI_INSTALL_UNIVERSAL=1 \
+NEOANKI_INSTALL_SCRATCH_PATH="${NEOANKI_INSTALL_SCRATCH_PATH:-$ROOT/.build/release-universal}" \
 NEOANKI_INSTALL_ALLOW_RUNNING=1 \
 NEOANKI_INSTALL_SIGNED=1 \
 NEOANKI_INSTALL_NOTARIZE=1 \
@@ -54,8 +57,12 @@ installed_version=$(
   /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
     "$APP_PATH/Contents/Info.plist"
 )
-if [ "$installed_version" != "$VERSION" ]; then
-  echo "Packaged version $installed_version does not match $VERSION." >&2
+installed_build=$(
+  /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' \
+    "$APP_PATH/Contents/Info.plist"
+)
+if [ "$installed_version" != "$VERSION" ] || [ "$installed_build" != "$BUILD_NUMBER" ]; then
+  echo "Packaged identity $installed_version ($installed_build) does not match $VERSION ($BUILD_NUMBER)." >&2
   exit 1
 fi
 

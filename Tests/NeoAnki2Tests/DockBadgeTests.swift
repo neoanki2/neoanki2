@@ -169,3 +169,49 @@ func windowFrameIsPreservedWhenAlreadyVisible() {
         ) == frame
     )
 }
+
+@Test("Full Screen keeps the complete 1280x800 frame despite the menu-bar visible area")
+func fullScreenWindowPreservesActualScreenFrame() {
+    let screen = NSRect(x: 0, y: 0, width: 1280, height: 800)
+    let visible = NSRect(x: 0, y: 0, width: 1280, height: 770)
+    #expect(WindowFramePolicy.constrainedFrame(
+        screen, in: visible, bottomClearance: 16, isFullScreen: true
+    ) == screen)
+    // The previous policy reduced this exact screen to 754 points high.
+    #expect(WindowFramePolicy.constrainedFrame(
+        screen, in: visible, bottomClearance: 16
+    ) == NSRect(x: 0, y: 16, width: 1280, height: 754))
+}
+
+@Test("Entry and exit notifications suspend ordinary clamping until AppKit finishes")
+func fullScreenTransitionPreservesFramesAndRestoresOrdinaryClearance() {
+    let visible = NSRect(x: 0, y: 0, width: 1280, height: 770)
+    let screen = NSRect(x: 0, y: 0, width: 1280, height: 800)
+    var presentation = WindowFramePolicy.Presentation()
+    presentation.observe(NSWindow.willEnterFullScreenNotification)
+    #expect(presentation.isTransitioning)
+    // The style bit need not have changed when the first transition resize arrives.
+    #expect(WindowFramePolicy.constrainedFrame(
+        screen, in: visible, bottomClearance: 16, presentation: presentation
+    ) == screen)
+    presentation.observe(NSWindow.didEnterFullScreenNotification)
+    #expect(!presentation.isTransitioning)
+    #expect(WindowFramePolicy.constrainedFrame(
+        screen, in: visible, bottomClearance: 16, isFullScreen: true, presentation: presentation
+    ) == screen)
+    presentation.observe(NSWindow.willExitFullScreenNotification)
+    #expect(presentation.isTransitioning)
+    // Keep the transition frame even if AppKit clears the style bit before animation ends.
+    #expect(WindowFramePolicy.constrainedFrame(
+        screen, in: visible, bottomClearance: 16, presentation: presentation
+    ) == screen)
+    presentation.observe(NSWindow.didExitFullScreenNotification)
+    #expect(!presentation.isTransitioning)
+    #expect(WindowFramePolicy.constrainedFrame(
+        screen, in: visible, bottomClearance: 16, presentation: presentation
+    ) == NSRect(x: 0, y: 16, width: 1280, height: 754))
+    let normal = NSRect(x: 100, y: 80, width: 960, height: 640)
+    #expect(WindowFramePolicy.constrainedFrame(
+        normal, in: visible, bottomClearance: 16, presentation: presentation
+    ) == normal)
+}

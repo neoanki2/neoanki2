@@ -23,35 +23,36 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
 
 ## Release workflow
 
-- A user request to `release` runs `./Scripts/release.sh` directly. The command
-  treats current local changes as release input and owns committing, local
-  verification, packaging, PR creation and non-blocking merge, publication,
-  official-tap update, Homebrew installation, and exact-path launch.
-- Mac releases require Developer ID signing, production CloudKit provisioning,
-  and accepted Apple notarization. Never downgrade signing or remove quarantine
-  to meet the release budget. Saved signing inputs are validated before work.
-- The default release has a 300-second SLO. Do not run the full UI suite or wait
-  for GitHub checks on its critical path; the merge starts exhaustive Test and
-  Documentation workflows automatically.
-- Use `./Scripts/release.sh --verified ...` only when the user explicitly waives
-  the five-minute requirement in favor of pre-publication hosted checks and an
-  attested GitHub candidate.
-- Preserve and report the emitted `FAST_RELEASE_*` telemetry.
-
-## iOS App Store review
-
-- App Store releases use `Scripts/release-ios.sh`, separately from the Mac and
-  Homebrew release workflow.
-- Before submission or resubmission, complete the mandatory internal review
-  described in `docs/IOS_RELEASE.md`. Review the exact candidate's ordinary
-  Release first launch, iPhone/iPad journeys, listing, screenshots, privacy,
-  support, and reviewer instructions. Preserve independent findings and evidence.
-- Retrieve Apple's written rejection and attachments before claiming a rejected
-  issue is fixed. Map each issue to a verified correction and regression evidence;
-  do not substitute an API status or speculative checklist for the message.
-- A passed internal review reduces known rejection risks; it never guarantees
-  Apple approval. Report uploaded, submitted, approved, and publicly available
-  states separately, and never bypass a failed review gate.
+- `./Scripts/release.sh` is the only release command. It detects changed app
+  inputs and publishes iOS, Mac App Store, and Homebrew together when affected.
+  iOS-only changes publish only iOS; Mac-only changes publish Mac Store and
+  Homebrew; shared app dependencies publish all three. Docs/tests/release tooling
+  alone do not trigger app publication.
+- All artifacts in a release use one shared marketing version and build number.
+  Unchanged platforms retain their previous version and skip that release number.
+  `.release/baseline.json` bootstraps the migration; the GitHub release asset
+  `release-state.json` is the ongoing per-channel baseline and checkpoint.
+- Current local changes are release input. The command captures an immutable
+  worktree, runs only relevant headless checks once, builds affected artifacts in
+  parallel, uploads/submits Store builds with automatic release, and updates the
+  official Homebrew cask. Apple processing/review and public availability are
+  reported separately. Actual simultaneous Store availability cannot be promised.
+- Preview with `./Scripts/release.sh --plan`. Resume the exact saved version with
+  `./Scripts/release.sh --resume VERSION`; inspect with `--status`. Never repeat an
+  uncertain upload, overwrite a reserved version, or downgrade a published channel.
+- Developer ID, production CloudKit, accepted Mac notarization, App Store
+  distribution signing, archive/privacy validation, and Apple processing remain
+  required. Never weaken signing or strip quarantine to speed up publication.
+- Do not run GUI journeys, screenshot captures, fresh browser privacy reviews,
+  physical-device acceptance, or independent review ceremonies as routine release
+  gates. Run focused additional checks only for a relevant change or an explicit
+  request. Preserve Apple's written rejection before claiming its issues fixed.
+- Use authenticated `gh` for GitHub and the official App Store Connect API through
+  saved credentials. Publication does not install TestFlight, touch Store app
+  containers, replace the local Homebrew app, or launch GUI applications. Local
+  Homebrew upgrades remain an explicit `brew upgrade --cask neoanki2/tap/neoanki2`.
+- Read `docs/RELEASING.md` for the workflow and recovery rules. Retired release
+  entry points must not be used to allocate independent versions or bypass state.
 
 ## iPhone deployment
 

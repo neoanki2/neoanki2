@@ -1,84 +1,46 @@
 ---
 name: release
-description: Release current NeoAnki2 local changes to GitHub and the official Homebrew tap, install and verify the app, and launch the exact installed path within a five-minute SLO. Use when asked to release, ship, publish, merge-and-release, update the Homebrew cask, install a new NeoAnki2 version, or resume a release.
+description: Publish affected NeoAnki2 apps to iOS App Store, Mac App Store, and Homebrew with one shared version; preview, resume, or inspect that release. Use for release, ship, publish, or Homebrew/app-store release requests. Physical iPhone installation uses deploy-iphone instead.
 ---
 
 # Release NeoAnki2
 
-Use the repository command; do not reconstruct its GitHub, tap, or installation
-steps manually.
-
-For a physical iPhone installation, use [deploy-iphone](../deploy-iphone/SKILL.md)
-and `./Scripts/deploy-iphone.sh`; this macOS/Homebrew release flow does not apply.
-
-## Default: local changes to Brew in five minutes
-
-When the user says `release`, immediately run:
+For a release request, run the repository's single command:
 
 ```bash
 ./Scripts/release.sh
 ```
 
-The dirty working tree is intentional release input. Do not ask for a title,
-body, confirmation, clean tree, or advance preparation. The command stages and
-commits all non-ignored local changes, includes already committed work ahead of
-`main`, and creates a release branch automatically when invoked on `main`.
+Current local changes are intentional input. The command handles snapshot/PR,
+change detection, version reservation, relevant headless checks, parallel builds,
+signing, Store upload/submission, Homebrew publication, and receipts.
+Do not reconstruct these phases or invoke the retired per-platform/fast/ship
+entry points. Do not run a release merely because the user asks to develop or
+edit the release process.
 
-The command runs the complete headless fast suite and universal artifact build
-in parallel. It pushes with authenticated `gh`, creates or reuses a PR,
-attempts to merge the exact locally verified revision, publishes the
-DMG/checksum/manifest, updates `neoanki2/homebrew-tap`, upgrades the cask,
-verifies the installed version/revision/signature, and performs at most one
-exact-path launch. The merge automatically starts exhaustive Test and
-Documentation workflows in the background; never wait for those hosted jobs on
-the five-minute critical path and do not run the full UI suite locally.
+- iOS-only changes publish iOS. Mac-only changes publish Mac Store and Homebrew.
+  Shared app dependencies select both. Docs/tests/controller changes alone do
+  not release apps. `--plan` previews without publication.
+- Every selected artifact uses the same marketing version and build. Unchanged
+  apps retain their last version and skip that release number. Do not allocate
+  independent Store/Homebrew versions.
+- The controller runs relevant headless tests once. Do not add broad UI journeys,
+  screenshot capture, fresh privacy browser reviews, physical acceptance, or
+  independent review ceremonies to routine publication. Add checks only for the
+  actual changed behavior or an explicit request.
+- Store processing/review is external. Report uploaded, submitted, and available
+  separately; automatic release after approval is not an approval guarantee.
+- Resume with `./Scripts/release.sh --resume VERSION`; inspect with `--status`.
+  Never blindly resend an uncertain upload, overwrite a reserved version, rerun
+  an unchanged failed check, or downgrade a channel. Keep receipts and logs.
+- Preserve Developer ID/Store signing, production CloudKit, privacy/package
+  validation, and accepted Mac notarization. Do not strip quarantine or weaken
+  signing. Use `gh` authentication for GitHub; never the GitHub connector.
+- Publication does not install or launch apps. Do not install TestFlight,
+  manipulate Store containers, replace the local Homebrew app, or launch GUI
+  applications as part of release. A requested local upgrade is separate.
 
-Keep NeoAnki2 running until the command's just-in-time Homebrew replacement.
-Do not separately stop, install, or launch the app.
-
-## Explicit slower recovery
-
-Only when the user explicitly waives the five-minute requirement and requests
-pre-publication hosted validation, run the legacy path:
-
-```bash
-./Scripts/release.sh --verified \
-  --title "Concise release title" \
-  --body-file .build/release-pr.md
-```
-
-Resume it with `./Scripts/release.sh --verified --pr NUMBER`. That path may wait
-for protected checks, screenshot promotion, hosted UI matrices, and the
-GitHub-attested candidate.
-
-## Required Apple signing
-
-The default Mac build uses saved Developer ID and production CloudKit material
-in `~/Library/Application Support/NeoAnki2 Signing/` (or `NEOANKI_SIGNING_DIR`),
-a disposable signing Keychain, and App Store Connect API notarization.
-Missing signing inputs or unaccepted notarization block publication. Never
-set `NEOANKI_RELEASE_SIGNED=0`, strip quarantine, unlock the existing signing
-Keychain, or bypass the release notarization gate to meet the SLO. Local source installation via
-`Scripts/install-app.sh` remains properly signed and CloudKit-provisioned, but
-does not wait for notarization; release packaging always enables notarization.
-Apple processing can
-exceed the budget; preserve and report that failure.
-
-## Guardrails
-
-- Use authenticated `gh` only; never use a GitHub connector.
-- Do not manually edit the Homebrew tap or infer a checksum.
-- Do not bypass either local fast gate even when the build artifact succeeds.
-- Do not start publication when the command reports insufficient remaining
-  budget.
-- Never use `SIGKILL`, `open -a NeoAnki2`, or a second launch attempt.
-- If a local gate fails, correct the branch and run the default command again.
-- If a remote phase partially completes, inspect the emitted phase and resume
-  without deleting a valid release or overwriting a divergent branch.
-
-## Report
-
-Return the PR URL, release tag and URL, source revision, official tap version,
-installed version and embedded revision, signature result, exact running app
-path when launched, and the `FAST_RELEASE_*` timing fields. If blocked, name
-the exact phase and invariant that stopped the command.
+Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
+checkpoint behavior, and recovery. Return selected versions/source, each channel's
+actual state, and the receipt path. Name concrete blockers without inventing
+acceptance passes or requesting confirmation already granted by the release request.

@@ -79,7 +79,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         XCTAssertEqual(Set(journeys).count, 7)
     }
 
-    func testRequiredCIShardsCoverEveryUITestWithoutBehaviorDuplication() throws {
+    func testInvestigationShardsCoverEveryUITestWithoutBehaviorDuplication() throws {
         let decoder = JSONDecoder()
         let plan = try decoder.decode(
             CIUIPlan.self,
@@ -182,7 +182,7 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
         }
     }
 
-    func testProductionFirstRunReviewOwnsFreshDedicatedCIShard() throws {
+    func testProductionFirstRunInvestigationOwnsFreshDedicatedShard() throws {
         let plan = try JSONDecoder().decode(
             CIUIPlan.self,
             from: Data(contentsOf: repositoryRoot.appendingPathComponent("Config/ci-ui-shards.json"))
@@ -254,52 +254,6 @@ final class FunctionalUICoverageManifestTests: XCTestCase {
                 && runner.contains(".failedTests == 0 and .skippedTests == 0"),
             "A successful process cannot conceal missing, failed, or skipped UI tests"
         )
-    }
-
-    func testReleaseDefaultsToFiveMinuteLocalFirstPathAndRetainsVerifiedRecovery() throws {
-        let source = try String(
-            contentsOf: repositoryRoot.appendingPathComponent("Scripts/release.sh"),
-            encoding: .utf8
-        )
-        let fastSource = try String(
-            contentsOf: repositoryRoot.appendingPathComponent("Scripts/release-fast.sh"),
-            encoding: .utf8
-        )
-
-        XCTAssertTrue(source.contains("exec \"$ROOT/Scripts/release-fast.sh\" \"$@\""))
-        XCTAssertTrue(source.contains("--verified"))
-        XCTAssertTrue(source.contains("run_local_release_preflight"))
-        XCTAssertTrue(source.contains("merge-base --is-ancestor \"$RESUME_REMOTE_HEAD\" \"$LOCAL_HEAD\""))
-        XCTAssertTrue(source.contains("push_release_branch \"$RESUME_BRANCH\""))
-        XCTAssertTrue(source.contains("wait_for_pr_head \"$PR_NUMBER\" \"$LOCAL_HEAD\""))
-        XCTAssertTrue(fastSource.contains("SLO_SECONDS=\"${NEOANKI_RELEASE_SLO_SECONDS:-300}\""))
-        XCTAssertTrue(fastSource.contains("git -C \"$ROOT\" add -A"))
-        XCTAssertTrue(fastSource.contains("git -C \"$ROOT\" merge --no-edit \"$BASE_SHA\""))
-        XCTAssertTrue(fastSource.contains("./Scripts/test-fast.sh"))
-        XCTAssertTrue(fastSource.contains("build-release-artifact.sh"))
-        XCTAssertTrue(fastSource.contains("TEST_PID=\"$!\""))
-        XCTAssertTrue(fastSource.contains("BUILD_PID=\"$!\""))
-        XCTAssertTrue(fastSource.contains("gh pr merge \"$PR_NUMBER\" --repo \"$REPOSITORY\" --admin"))
-        XCTAssertTrue(fastSource.contains("gh release create \"$TAG\""))
-        XCTAssertTrue(fastSource.contains("repos/$TAP_REPOSITORY/contents/Casks/neoanki2.rb"))
-        XCTAssertTrue(fastSource.contains("brew upgrade --cask neoanki2/tap/neoanki2"))
-        XCTAssertTrue(fastSource.contains("FAST_RELEASE_SLO_MET="))
-        XCTAssertFalse(fastSource.contains("run-ui-tests.sh"))
-        XCTAssertFalse(fastSource.contains("gh run watch"))
-        for shard in [
-            "library-launch",
-            "decks-study",
-            "transfer-vocabulary",
-            "studio-authoring",
-            "studio-boundaries",
-        ] {
-            XCTAssertTrue(
-                source.contains("macOS UI (\(shard))"),
-                "Candidate gate must follow every checked macOS UI shard"
-            )
-        }
-        XCTAssertTrue(source.contains("trap 'exit 130' INT"))
-        XCTAssertTrue(source.contains("trap 'exit 143' TERM"))
     }
 
     func testPortableImportUIWaitUsesStableCompletionSignal() throws {

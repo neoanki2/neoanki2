@@ -102,7 +102,10 @@ let screenshotManifestURL = docs.appendingPathComponent("assets/screenshots/mani
 let generatedURL = docs.appendingPathComponent("features.md")
 let arguments = Set(CommandLine.arguments.dropFirst())
 let writeGenerated = arguments.contains("--write")
-let requireScreenshots = arguments.contains("--require-screenshots")
+// Image integrity remains a CI gate. Recapture freshness requires an explicit
+// UI investigation, because hosted XCTest is not an automatic CI dependency.
+let checkScreenshotFreshness = arguments.contains("--check-screenshot-freshness")
+let requireScreenshots = arguments.contains("--require-screenshots") || checkScreenshotFreshness
 var failures: [String] = []
 
 func exists(_ relativePath: String, under base: URL = root) -> Bool {
@@ -159,7 +162,7 @@ func fail(_ message: String) {
 }
 
 if arguments.contains("--allow-headless-screenshot-deferral") {
-    fail("Screenshot deferrals are not supported; capture and promote current CI screenshots")
+    fail("Screenshot deferrals are not supported; capture and promote screenshots explicitly")
 }
 if exists("headless-screenshot-deferral.json", under: docs) {
     fail("docs/headless-screenshot-deferral.json is forbidden; stale screenshots cannot be deferred")
@@ -368,31 +371,33 @@ if requireScreenshots {
     } catch {
         fail("Could not verify screenshot manifest source revision")
     }
-    do {
-        let changedSinceCapture = try gitOutput(
-            arguments: ["diff", "--name-only", screenshotManifest.sourceSHA, "--"]
-        )
-        if changedSinceCapture.status != 0 {
-            fail("Could not compare screenshot evidence with its source revision")
-        } else {
-            let changedPaths = Set(
-                String(decoding: changedSinceCapture.data, as: UTF8.self)
-                    .split(separator: "\n")
-                    .map(String.init)
+    if checkScreenshotFreshness {
+        do {
+            let changedSinceCapture = try gitOutput(
+                arguments: ["diff", "--name-only", screenshotManifest.sourceSHA, "--"]
             )
-            for feature in manifest.features where feature.screenshot != nil {
-                let changedEvidenceSources = changedPaths.intersection(feature.sources)
-                if !changedEvidenceSources.isEmpty {
-                    fail(
-                        "Screenshot for feature '\(feature.id)' is stale because its "
-                            + "source changed after capture: "
-                            + changedEvidenceSources.sorted().joined(separator: ", ")
-                    )
+            if changedSinceCapture.status != 0 {
+                fail("Could not compare screenshot evidence with its source revision")
+            } else {
+                let changedPaths = Set(
+                    String(decoding: changedSinceCapture.data, as: UTF8.self)
+                        .split(separator: "\n")
+                        .map(String.init)
+                )
+                for feature in manifest.features where feature.screenshot != nil {
+                    let changedEvidenceSources = changedPaths.intersection(feature.sources)
+                    if !changedEvidenceSources.isEmpty {
+                        fail(
+                            "Screenshot for feature '\(feature.id)' is stale because its "
+                                + "source changed after capture: "
+                                + changedEvidenceSources.sorted().joined(separator: ", ")
+                        )
+                    }
                 }
             }
+        } catch {
+            fail("Could not run git for screenshot freshness: \(error.localizedDescription)")
         }
-    } catch {
-        fail("Could not run git for screenshot freshness: \(error.localizedDescription)")
     }
     let expectedFilenames = Set(
         manifest.features.compactMap(\.screenshot).map {
@@ -768,7 +773,7 @@ if let baseIndex = CommandLine.arguments.firstIndex(of: "--base-ref"),
                             + "relevant documentation slightly better."
                     )
                 }
-                if let screenshot = feature.screenshot {
+                if checkScreenshotFreshness, let screenshot = feature.screenshot {
                     if !changed.contains("docs/assets/screenshots/manifest.json") {
                         fail(
                             "Feature '\(feature.id)' changed without promoting a fresh "

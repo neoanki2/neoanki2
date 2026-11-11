@@ -315,6 +315,15 @@ reservations, and commit item types, decks, items, cards, and references in one
 database transaction. Authored source intentionally carries no scheduling or
 portable provenance.
 
+On macOS, a Save panel grants access to the selected file rather than arbitrary
+siblings in its parent directory. The Mac export adapter asks Foundation for an
+`itemReplacementDirectory` on the destination volume, runs the unchanged Core
+exporter inside that staging directory, and commits the completed file to the
+selected URL. Existing exports use atomic replacement; new files use a move.
+The security scope stays open through staging and commit. Failed exports clean
+their staging files, while any original-file recovery location reported by
+Foundation is retained. No broader folder entitlement is required.
+
 See [`AUTHORED_DECK_FORMAT.md`]({{ '/AUTHORED_DECK_FORMAT/' | relative_url }}) and
 [`PORTABLE_DECK_FORMAT.md`]({{ '/PORTABLE_DECK_FORMAT/' | relative_url }}).
 

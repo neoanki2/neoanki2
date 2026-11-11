@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Leaves a visible strip below the window even when the Dock is hidden,
     /// so the fixed study action footer can never sit on the display edge.
     private static let windowBottomClearance: CGFloat = 16
+    private var windowPresentations: [ObjectIdentifier: WindowFramePolicy.Presentation] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -39,6 +40,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.didResizeNotification,
             object: nil
         )
+        // Preserve SwiftUI's NSWindow delegate. AppKit owns the frame throughout
+        // Full Screen entry/exit, including resize notifications during animation.
+        for name in [NSWindow.willEnterFullScreenNotification, NSWindow.didEnterFullScreenNotification,
+                     NSWindow.willExitFullScreenNotification, NSWindow.didExitFullScreenNotification] {
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(windowFullScreenDidChange(_:)), name: name, object: nil
+            )
+        }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(windowWillClose(_:)), name: NSWindow.willCloseNotification, object: nil
+        )
     }
 
     func applicationDidChangeScreenParameters(_ notification: Notification) {
@@ -57,21 +69,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         constrainToVisibleScreen(window)
     }
 
+    @objc private func windowFullScreenDidChange(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        let identifier = ObjectIdentifier(window)
+        var presentation = windowPresentations[identifier] ?? .init()
+        presentation.observe(notification.name)
+        if presentation.isTransitioning {
+            windowPresentations[identifier] = presentation
+        } else {
+            windowPresentations.removeValue(forKey: identifier)
+        }
+        constrainToVisibleScreen(window)
+    }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        windowPresentations.removeValue(forKey: ObjectIdentifier(window))
+    }
+
     private func constrainToVisibleScreen(_ window: NSWindow) {
         guard window.styleMask.contains(.resizable),
               let visibleFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         else { return }
 
-        let maximumHeight = WindowFramePolicy.maximumHeight(
-            in: visibleFrame,
-            bottomClearance: Self.windowBottomClearance
-        )
-        window.maxSize = NSSize(width: window.maxSize.width, height: maximumHeight)
-
+        // Do not persist a visible-frame height in maxSize: AppKit also uses
+        // that cap when entering Full Screen, before its first resize callback.
         let constrainedFrame = WindowFramePolicy.constrainedFrame(
             window.frame,
             in: visibleFrame,
-            bottomClearance: Self.windowBottomClearance
+            bottomClearance: Self.windowBottomClearance,
+            isFullScreen: window.styleMask.contains(.fullScreen),
+            presentation: windowPresentations[ObjectIdentifier(window)] ?? .init()
         )
         if constrainedFrame != window.frame {
             window.setFrame(constrainedFrame, display: true)
@@ -145,6 +173,21 @@ final class DockBadgeController {
 }
 
 enum WindowFramePolicy {
+    struct Presentation {
+        private(set) var isTransitioning = false
+
+        mutating func observe(_ notification: Notification.Name) {
+            switch notification {
+            case NSWindow.willEnterFullScreenNotification, NSWindow.willExitFullScreenNotification:
+                isTransitioning = true
+            case NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification:
+                isTransitioning = false
+            default:
+                break
+            }
+        }
+    }
+
     static func maximumHeight(in visibleFrame: NSRect, bottomClearance: CGFloat) -> CGFloat {
         max(1, visibleFrame.height - max(0, bottomClearance))
     }
@@ -152,9 +195,12 @@ enum WindowFramePolicy {
     static func constrainedFrame(
         _ frame: NSRect,
         in visibleFrame: NSRect,
-        bottomClearance: CGFloat
+        bottomClearance: CGFloat,
+        isFullScreen: Bool = false,
+        presentation: Presentation = .init()
     ) -> NSRect {
-        guard visibleFrame.width > 0, visibleFrame.height > 0 else { return frame }
+        guard !isFullScreen, !presentation.isTransitioning,
+              visibleFrame.width > 0, visibleFrame.height > 0 else { return frame }
 
         var constrained = frame
         constrained.size.height = min(

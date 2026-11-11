@@ -253,6 +253,10 @@ a destination; NeoAnki2 adds the `.neodeck` extension when needed. Export is
 disabled for **All Decks** and **Unassigned**, and while another modal workflow
 or transfer is active.
 
+On Mac, you can save a new file or replace an existing `.neodeck` file. Canceling
+the Save panel leaves your files unchanged. NeoAnki2 prepares the complete deck
+before replacing an existing export.
+
 The file contains the selected deck and its subdecks, items, tags, required item
 types and templates, and referenced media. The selected deck becomes the root
 of the exported tree. Unrelated library items are not loaded into the export snapshot.
