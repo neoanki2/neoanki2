@@ -37,8 +37,9 @@ swift test --filter NeoAnki2Tests --parallel
 
 Use the narrowest relevant suite while iterating, then run `test-fast.sh`
 before proposing a change. UI and performance workflows are slower and have
-dedicated scripts under `Scripts/`; their GitHub Actions jobs remain the source
-of truth for release acceptance.
+dedicated scripts under `Scripts/`. The [unified release process](../../RELEASING.md)
+selects relevant headless checks; UI journeys are additional targeted evidence,
+not a ceremony required for every release.
 
 ### Headless sync regression and stress tests
 
@@ -72,16 +73,17 @@ container. They verify the repository and transport decisions headlessly;
 Apple provisioning, push delivery, and SDK/server integration remain platform
 acceptance checks rather than claims made by the simulated server.
 
-For a UI-bearing release, run its targeted journey and then all seven local UI
-journeys before the first push:
+For an explicitly requested UI investigation or a change requiring visual
+regression evidence, run its focused journey:
 
 ```bash
 ./Scripts/run-ui-tests.sh FastFunctionalJourneyTests/testRelevantJourney
-./Scripts/run-ui-tests.sh
 ```
 
-If local UI automation is unavailable, stop before release rather than using
-remote CI as the first functional UI pass.
+These optional journeys are separate from the unified release critical path.
+Do not add all UI journeys, screenshot capture, or physical acceptance to an
+unrelated release. Failed checks retain their evidence and require a diagnosed
+application, test, or workflow correction before another validation run.
 
 ## Required CI UI plan
 

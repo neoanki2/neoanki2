@@ -17,13 +17,13 @@ brew upgrade --cask neoanki2
 
 New release artifacts require Developer ID signatures, production CloudKit
 provisioning, and accepted Apple notarization. They are universal and
-checksummed; candidates prepared in GitHub Actions are also provenance-attested.
+checksummed.
 Older published downloads retain their original signing status.
 
-Maintainers run `Scripts/release.sh` to verify local changes, package and
-notarize the app, publish, and upgrade Homebrew. The slower attested CI path is
-available explicitly with `--verified`; see
-[the release procedure](docs/RELEASING.md).
+Maintainers run `Scripts/release.sh` to publish affected apps to iOS App Store,
+Mac App Store, and Homebrew with one shared version. iOS-only changes leave Mac
+alone; Mac-only changes publish both Mac distributions. See
+[the release procedure](docs/RELEASING.md) for preview and resume commands.
 
 For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the
 repository and run the supported headless loop:

@@ -15,6 +15,7 @@ import re
 import secrets
 import shutil
 import signal
+import sys
 import tempfile
 import time
 import urllib.error
@@ -324,6 +325,12 @@ class Workflow(release.Workflow):
                 self.verify_source()
                 self.state["phases"][name] = {"passed": True, "log_sha256": digest(log)}
                 self.save()
+        self.archive()
+
+    def archive(self):
+        """Build/validate the archive after unified, relevant verification."""
+        environment = os.environ.copy()
+        environment["SDKROOT"] = run(["xcrun", "--sdk", "macosx", "--show-sdk-path"]).decode().strip()
         if not self.state["build"]:
             self.require_api()
             builds = [int(b["attributes"]["version"]) for b in self.builds() if b["attributes"]["version"].isdigit()]
@@ -515,50 +522,7 @@ class Workflow(release.Workflow):
         return {"passed_checks": ["production_cloudkit", "sandbox", "macos_ui"], "waived_checks": []}
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", nargs="?", default="prepare", choices=["prepare", "export", "upload", "review-context", "submit", "status"])
-    parser.add_argument("--config", type=Path, default=SIGNING / "app-store-connect.json")
-    parser.add_argument("--signing-dir", type=Path, default=SIGNING)
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--version", default="1.0.1")
-    parser.add_argument("--build")
-    parser.add_argument("--reuse-build-from", type=Path,
-                        help="retain the exact uploaded binary for metadata/test-only remediation; all shipping inputs must match")
-    parser.add_argument("--rejection-evidence", type=Path, default=ROOT / ".build/macos-review-rejection/rejection.json")
-    args = parser.parse_args()
-    if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", args.version) or (args.build and not re.fullmatch(r"[1-9]\d{0,3}", args.build)):
-        parser.error("Use a numeric marketing version and a build number from 1 to 9999")
-    args.config, args.signing_dir = args.config.expanduser().resolve(), args.signing_dir.expanduser().resolve()
-    args.rejection_evidence = args.rejection_evidence.expanduser().resolve()
-    args.output = args.output.expanduser().resolve() if args.output else None
-    if args.reuse_build_from:
-        args.reuse_build_from = args.reuse_build_from.expanduser().resolve()
-        if args.stage not in REUSE_STAGES:
-            parser.error("--reuse-build-from is limited to status, review-context, and submit; it never rebuilds or uploads")
-    args.allow_physical_test_waivers = False
-    base = ROOT / Workflow.output_root
-    base.mkdir(parents=True, exist_ok=True)
-    started, flow = time.monotonic(), None
-    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
-    with (base / "workflow.lock").open("w") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            flow = Workflow(args)
-            getattr(flow, args.stage.replace("-", "_"))()
-            state = flow.state["phases"].get("submission", {}).get("state")
-            status = ("available" if state in ("READY_FOR_SALE", "READY_FOR_DISTRIBUTION") else "submitted_for_review" if state else args.stage + "_complete")
-            for key, value in {"STATUS": status, "RECEIPT": flow.receipt, "SOURCE_SHA256": flow.fingerprint,
-                               "VERSION": flow.state["version"], "BUILD": flow.state["build"],
-                               "ELAPSED_SECONDS": f"{time.monotonic() - started:.1f}"}.items():
-                print(f"MACOS_APP_STORE_{key}={value}")
-        except (ReleaseError, RuntimeError, release.SIGNER.DeploymentError, OSError, ValueError, KeyError, urllib.error.URLError, KeyboardInterrupt) as error:
-            print("MACOS_APP_STORE_BLOCKED_PHASE=" + (flow.phase if flow else "preflight"))
-            print("MACOS_APP_STORE_ERROR=" + ("Interrupted" if isinstance(error, KeyboardInterrupt) else str(error)))
-            if flow: print("MACOS_APP_STORE_RECEIPT=" + str(flow.receipt))
-            return 1
-    return 0
-
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    print("Internal archive/signing adapter. Use ./Scripts/release.sh for all publication.", file=sys.stderr)
+    sys.exit(2)

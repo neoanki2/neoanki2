@@ -37,6 +37,9 @@ bash "$ROOT/Scripts/validate-architecture.sh"
 echo "==> Spotlight-safe Xcode build paths"
 bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 
+echo "==> Unified release contracts"
+python3 "$ROOT/Scripts/test-release.py"
+
 echo "==> Mac release signing policy"
 python3 "$ROOT/Scripts/test-macos-signing.py"
 
