@@ -85,6 +85,8 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
 5. Validates signed packages and uploads each selected Store binary once. It
    preserves current listing/screenshots, updates release notes/reviewer details,
    attaches the exact processed build, and submits with automatic release enabled.
+   What's New is sent only for updates after that platform's first public release;
+   Apple forbids the field for an initial release regardless of its version number.
    A superseded in-review build is withdrawn only when its replacement is ready.
 6. Publishes the signed/notarized DMG and checksum and updates the official tap.
    iOS-only tracking releases do not replace GitHub's latest Mac download.

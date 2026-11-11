@@ -256,6 +256,15 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.receipt['status'],'submitted')
         self.assertEqual(self.receipt['apple_state'],'WAITING_FOR_REVIEW')
         self.assertEqual(self.api.versions[0]['attributes']['releaseType'],'AFTER_APPROVAL')
+    def test_first_public_release_omits_whats_new_despite_high_marketing_version(self):
+        self.publisher.submit()
+        localization=next(m[2]['data']['attributes'] for m in self.api.mutations if m[1]=='appStoreVersionLocalizations')
+        self.assertNotIn('whatsNew',localization)
+    def test_version_update_includes_whats_new_after_public_platform_history(self):
+        self.api.versions.append({'id':'public','attributes':{'versionString':'1.0.319','appStoreState':'READY_FOR_SALE'}})
+        self.publisher.submit()
+        localization=next(m[2]['data']['attributes'] for m in self.api.mutations if m[1]=='appStoreVersionLocalizations')
+        self.assertEqual(localization['whatsNew'],'Sync fix')
     def test_resume_does_not_duplicate_submissions_or_edit_reviewing_version(self):
         self.publisher.submit();before=copy.deepcopy(self.api.mutations)
         self.publisher.submit();self.assertEqual(self.api.mutations,before)

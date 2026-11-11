@@ -152,7 +152,10 @@ class AppStorePublisher:
         locale = self.listing["locale"]
         matches = [v for v in localizations if v["attributes"]["locale"] == locale]
         attrs = {k: self.listing[k] for k in ("description", "keywords", "supportUrl", "marketingUrl")}
-        attrs["whatsNew"] = self.notes
+        # Apple forbids What's New on a platform's first public release, even
+        # when its marketing number was increased during pre-release review.
+        if any(v["id"] != vid and version_state(v) in HISTORICAL for v in self.versions()):
+            attrs["whatsNew"] = self.notes
         if matches:
             self.patch("appStoreVersionLocalizations", matches[0]["id"], attrs)
         else:

@@ -523,10 +523,13 @@ class AppleAPI:
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as error:
             try:
-                codes = [e.get("code", "UNKNOWN") for e in json.loads(error.read()).get("errors", [])]
+                errors = json.loads(error.read()).get("errors", [])
+                codes = [e.get("code", "UNKNOWN") for e in errors]
+                details = "; ".join(e.get("detail", "") for e in errors)[:1000]
             except (ValueError, KeyError):
-                codes = []
-            raise ReleaseError(f"Apple API {method} {parsed.path}: HTTP {error.code}, {', '.join(codes)}") from None
+                codes, details = [], ""
+            raise ReleaseError(f"Apple API {method} {parsed.path}: HTTP {error.code}, {', '.join(codes)}"
+                               + (": " + details if details else "")) from None
 
     def list(self, resource, **filters):
         query = urllib.parse.urlencode({"limit": 200, **filters})
