@@ -33,19 +33,15 @@ format, limit, compatibility rule, storage location, scheduling default, or
 destructive consequence changes, update the claims registry and its
 production-backed test.
 
-Screenshot capture and promotion run on isolated macOS CI whenever mapped UI
-sources or capture inputs change. The workflow commits the complete generated
-set to the pull-request branch, and the documentation gate rejects the revision
-until its provenance is current. Follow the full
+Screenshot capture and promotion are explicit investigations using
+`Scripts/capture-doc-screenshots.sh` and `Scripts/promote-doc-screenshots.sh`.
+They do not run in CI or commit automatically to pull-request branches. CI checks
+committed screenshot integrity; source freshness is checked only with
+`swift Scripts/validate-docs.swift --require-screenshots --check-screenshot-freshness`.
+Follow the full
 [screenshot and claims procedure]({{ '/user/maintaining-documentation/' | relative_url }})
-and never replace provenance metadata by hand.
-
-Screenshot filenames are stable documentation contracts even when the
-interface changes. For example, the Item Type Studio continues to capture
-`item-types.png`, `template-editor.png`, and `template-advanced.png`. Update the
-isolated CI scenarios and expected accessibility identifiers, then let CI
-capture and promote the complete set; never edit PNGs, hashes, or provenance
-manually.
+and never replace provenance metadata by hand. Screenshot filenames remain
+stable documentation contracts even when the interface changes.
 
 ## Page ownership
 

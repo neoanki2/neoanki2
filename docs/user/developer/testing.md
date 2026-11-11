@@ -22,8 +22,8 @@ release-workflow reconciliation tests, the generated API-reference check, and
 documentation validation.
 
 The fast headless lane is designed to finish inside five minutes on a fresh CI
-runner. The complete protected gate also includes real UI automation and has a
-larger latency budget; it must not be represented as a sub-five-minute check.
+runner. The protected gate also includes shared-platform builds and an unsigned iOS
+archive. Native XCTest UI journeys do not run automatically in CI.
 
 ## Focused suites
 
@@ -85,79 +85,40 @@ Do not add all UI journeys, screenshot capture, or physical acceptance to an
 unrelated release. Failed checks retain their evidence and require a diagnosed
 application, test, or workflow correction before another validation run.
 
-## Required CI UI plan
+## CI reliability and optional UI investigations
 
-`Config/ci-ui-shards.json` is the executable source of truth for required UI
-coverage. macOS builds the app and test runner once, then runs five balanced
-functional shards from that exact-revision artifact. iOS also builds once:
-behavioral journeys run on the representative large phone, while focused
-accessibility and responsive-layout checks run on the compact phone and iPad. Small iOS shards run concurrently on separate hosted runners, with one
-simulator per shard. Do not use parallel simulator clones inside a job: they
-compete for Accessibility and can turn fast assertions into AX IPC timeouts or
-test-runner bootstrap crashes.
+Automatic CI runs all root-package Swift tests and all NeoAnkiCore tests,
+architecture and release contracts, documentation checks, shared macOS/iOS
+builds, and the unsigned iOS app/widget archive. Performance benchmarks remain
+opt-in. No native XCTest UI test, screenshot capture, or screenshot-promotion
+workflow runs automatically. The launch smoke test was deleted: it slept for two
+seconds and accepted both normal exit and a crash, providing no readiness check.
+The obsolete test of the retired release orchestrator was also deleted; the
+current controller is covered by `Scripts/test-release.py`.
 
-`FunctionalUICoverageManifestTests` compares the manifest with every declared
-macOS and iOS UI test method. Removing, renaming, or failing to schedule a test
-therefore fails the fast test lane. Accessibility section audits remain assigned
-to both compact and regular-width devices. The full card-setup control matrix
-runs only on iPad: its compact-phone variant was removed because gestures over
-the embedded preview could not reliably scroll the outer Form. Compact-phone
-preview, inspector, advanced, and first-screen audits remain required; the
-removed variant no longer verifies Name/Answer Method traversal and overflow
-together on that phone. Each mobile shard executes once. Assertion failures,
-runner-startup failures, and zero-test results are retained and fail the job;
-there is no automatic retry.
+Hosted UI runs failed across unrelated tests in screenshot requests, orientation
+confirmation, application launch, accessibility audits, keyboard focus, and
+native menu actions. Examples include Actions runs `42831394331`, `42821536861`,
+`42730552467`, `42716879402`, and `42995563218`. These failures persisted after
+simulator isolation and removal of private-service prewarming. Removing the UI
+jobs removes continuous end-to-end verification of navigation, editing, media,
+lookup, study, transfers, Studio, occlusion, layouts, and accessibility on Mac,
+iPhone, and iPad. Headless model and contract tests cover behavior but do not
+replace real-control, pixel-contrast, layout, or assistive-technology evidence.
 
-The required PR matrix omits the redundant Debug `tablet-production-review`
-shard. In retained run `42716879402`, job `129504181607`, XCTest's launch waiter
-expired before Xcode completed the first application launch; the application
-subsequently reached the foreground and Home without a recorded app crash. The
-host launch pipeline's delay has no supported deterministic readiness repair in
-the retained evidence, so this infrastructure-sensitive duplicate was removed
-under the project's flaky-check policy. This removes continuous hosted Debug
-coverage of the tablet's empty-library create/study/grade/relaunch sequence.
-The test itself and its dedicated phone shard remain, along with tablet layout,
-keyboard/study, and occlusion journeys. App Store submission still requires the
-same ordinary optimized Release journey on **both** iPhone and iPad, plus the
-separate family-specific acceptance cases and exact-candidate evidence; those
-mandatory gates were not removed or replaced by the remaining PR tests.
+`Config/ci-ui-shards.json` remains the inventory for explicit investigations.
+`FunctionalUICoverageManifestTests` checks that it covers the declared journeys;
+it does not schedule them in CI. Use the existing CLI runners for a relevant,
+explicitly requested investigation. Each mobile run owns one disposable Simulator
+and cleans it up on exit. Failed assertions and infrastructure errors fail that
+run without retries or skipped-test success.
 
-The phone's combined legacy Studio journey was also removed after native menu
-selection remained unreliable despite bounds-based gestures. It no longer checks
-Cloze starter filtering, legacy additional-content navigation, read-only actions,
-or discard and field-removal confirmations together through the phone UI. The
-validation-route journey remains required, as do the separate authoring journeys,
-section accessibility audits, shared model tests, and Mac Studio checks. Do not
-rerun an unchanged failed check to obtain green: correct its cause or remove it,
-and record any coverage loss.
-
-The largest-type study journey retains keyboard, grading, rotation, hit-region,
-and description checks on both devices, plus contrast on iPad. Its phone pixel
-contrast audit was removed after a Springboard Apple Intelligence banner covered
-the native navigation title during sampling. Other phone first-screen and
-authoring contrast audits remain required; this study journey no longer samples
-phone contrast.
-
-The former eleven-journey phone redesign batch exceeded its 25-minute runner
-limit. Inventory, authoring/lookup, and quick capture now run as separate groups
-with the same tests and device. The coverage manifest caps each iOS group at five
-journeys; the runner deadline is unchanged and no assertion retry is added.
-
-Each shared build and UI shard writes its elapsed time to the Actions step
-summary. When adding coverage, rebalance existing shards before adding another
-macOS job: standard GitHub-hosted plans allow only five concurrent macOS jobs,
-so excess sharding creates queue time instead of faster feedback.
-
-Keep the intrinsic runtime of each required UI shard below five minutes. Split
-long iOS groups before adding in-process simulator workers; CI-level isolation
-is both faster and more reliable for Accessibility-heavy journeys. Use
-stable completion state for async work rather than waiting for transient busy
-indicators, combine accessibility audit kinds into one tree traversal, and use
-short-cadence waits that evaluate the ready state immediately. Put exhaustive
-enum and input combinations in parameterized Swift tests; UI journeys should
-prove that every option is exposed and exercise representative mutations
-through the real control. This preserves behavior coverage without repeating
-the same expensive accessibility snapshots and menu choreography.
+Documentation CI still verifies committed screenshot files, checksums,
+dimensions, provenance metadata, and display density. Screenshot freshness
+against application source is opt-in through `--check-screenshot-freshness`;
+UI source changes no longer require a hosted capture or an automatic bot commit.
+This removes automatic visual freshness coverage. Refresh screenshots through
+the capture and promotion scripts when explicitly requested.
 
 ## Mobile visual acceptance
 
@@ -213,9 +174,9 @@ screenshot before launch. It requests an orientation change only for landscape,
 square, or explicitly upside-down state, then verifies portrait dimensions again.
 This avoids waiting for a redundant portrait confirmation on a cold Simulator
 that already displays portrait pixels. Both occlusion cases and their assertions
-remain required; this setup correction adds no case retry or timeout increase.
+remain available for focused investigations; this setup correction adds no case retry or timeout increase.
 
-The CI runner, ordinary Release review, and App Store screenshot capture boot a
+The optional UI runner, ordinary Release review, and App Store screenshot capture boot a
 uniquely owned disposable Simulator with `simctl bootstatus -b`, then invoke
 `xcodebuild test-without-building` with the verified `.xctestrun` and destination.
 Xcode owns test-runner initialization. The supported split-build workflow is
@@ -225,7 +186,6 @@ Manual `launchctl kickstart` of private XCTest/AutomationMode services is an
 optional diagnostic, not a prerequisite for UI validation. The former required
 prewarming gate timed out before any UI case ran, including after cache
 preparation; it depended on undocumented service labels and endpoint state.
-Removing that gate removes no product tests. All scheduled cases, selected test
-counts, result bundles, ordinary Release fresh-install requirements, screenshots,
-and disposable-device cleanup remain required. An actual XCTest initialization
+Removing that gate removes no product tests. For explicit UI investigations, selected test counts, result bundles, and
+disposable-device cleanup remain required. An actual XCTest initialization
 failure still fails validation and must be diagnosed before another run.
