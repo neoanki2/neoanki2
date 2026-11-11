@@ -147,6 +147,11 @@ this controller requires a deliberate, evidence-backed baseline migration.
 
 ## Signing setup
 
+Enable GitHub auto-merge once with `gh repo edit neoanki2/neoanki2 --enable-auto-merge`.
+Required checks and branch protections still govern merging. If GitHub declines
+the request, the command reports `PR_AUTO_MERGE_PENDING` without hiding it or
+rolling back published channels.
+
 Saved inputs remain in `~/Library/Application Support/NeoAnki2 Signing/`.
 `--signing-dir` and `--config` select another configured location. Keep all private
 keys and API credentials outside the repository.

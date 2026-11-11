@@ -137,7 +137,8 @@ class PlanningTests(unittest.TestCase):
                 return {},{}
         original_run=controller.run
         def run(args,**kwargs):
-            if args[:3]==['gh','pr','merge']:calls.append(('merge',));return None
+            if args[:3]==['gh','pr','merge']:
+                calls.append(('merge',));return subprocess.CompletedProcess(args,0,'','')
             return original_run(args,**kwargs)
         # All effects are confined to this temporary Git repo and these fakes.
         with patch.object(controller,'ROOT',self.root),patch.object(controller,'WORK',self.root/'.build/releases'),\

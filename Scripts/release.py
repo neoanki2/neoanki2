@@ -593,8 +593,10 @@ def main(argv=None):
         release.save(remote=True)
         errors, waiting = release.publish_until_ready(args.wait_seconds)
         # Hosted checks may gate the merge; publication never silently bypasses it.
-        run(["gh", "pr", "merge", state["pull_request"], "--repo", github.repository,
-             "--auto", "--merge"], check=False)
+        merge = run(["gh", "pr", "merge", state["pull_request"], "--repo", github.repository,
+                     "--auto", "--merge"], check=False)
+        if merge.returncode:
+            print("PR_AUTO_MERGE_PENDING=" + merge.stderr.strip(), file=sys.stderr)
         print(json.dumps(status(state, api, app_id), indent=2))
         print("RELEASE_RECEIPT=" + str(release.path))
         for channel, message in {**waiting, **errors}.items():
