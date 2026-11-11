@@ -32,7 +32,10 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   Unchanged platforms retain their previous version and skip that release number.
   `.release/baseline.json` bootstraps the migration; the GitHub release asset
   `release-state.json` is the ongoing per-channel baseline and checkpoint.
-- Current local changes are release input. The command captures an immutable
+- Current local changes are release input. Commit and merge them into `main`
+  before invoking publication; a queued auto-merge is insufficient. The command
+  requires a clean checkout matching remote `main`, records that main revision,
+  and rejects old branch-built candidates on resume. It captures an immutable
   worktree, runs only relevant headless checks once, builds affected artifacts in
   parallel, uploads/submits Store builds with automatic release, and updates the
   official Homebrew cask. Apple processing/review and public availability are

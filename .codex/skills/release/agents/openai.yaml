@@ -1,4 +1,4 @@
 interface:
   display_name: "Release"
-  short_description: "Publish affected NeoAnki2 apps with one shared version"
-  default_prompt: "Use $release to publish affected NeoAnki2 apps through the unified release command."
+  short_description: "Merge to main, then publish affected NeoAnki2 apps"
+  default_prompt: "Use $release to merge the requested changes into main, then publish affected NeoAnki2 apps from the resulting main revision through the unified release command."
