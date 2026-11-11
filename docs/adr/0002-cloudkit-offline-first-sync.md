@@ -31,6 +31,13 @@ legacy metadata starts with a full snapshot. Use the engine for explicit sends
 with automatic syncing disabled, so an older automatic fetch cannot overwrite a
 newer explicit delivery. Dictionary assets remain in their separate zone.
 
+CloudKit can invalidate a long-lived client with an internal error (including
+"Client went away before operation could be validated"). The next sync cycle
+must recreate the container and engine from durable metadata instead of issuing
+another request through the failed client. Keep staged inbound records and
+pending uploads intact; callbacks from a discarded engine must not update the
+replacement session.
+
 Immutable reviews/reverts union-merge using deterministic device/order identity.
 Mutable conflicts accept the server value and preserve the other side as a
 recoverable conflict copy. Media deduplicates by content hash. Initial setup makes

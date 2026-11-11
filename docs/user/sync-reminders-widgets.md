@@ -171,6 +171,11 @@ restarting or retrying does not create additional copies of the same conflict.
 Transfer and validation failures retry automatically; a failure that cannot be
 safely recovered remains visible in the sync status.
 
+If iCloud invalidates its connection, NeoAnki2 reconnects on the next sync
+attempt while preserving pending uploads and downloaded changes. Reviews made
+only on an iPhone or iPad can then continue syncing to an idle Mac without
+turning sync off or resetting either library.
+
 The iPhone and iPad **Sync Issues** view remains available for unresolved
 operational failures. **Retry** attempts synchronization again; **Dismiss**
 removes an issue record.

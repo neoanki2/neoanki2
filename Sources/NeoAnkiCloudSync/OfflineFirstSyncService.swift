@@ -120,7 +120,17 @@ public actor OfflineFirstSyncService: SyncService {
         } catch is CancellationError {
             currentStatus = .offline
         } catch {
-            if generation == lifecycle { await preserveFailure(error) }
+            if generation == lifecycle {
+                if (error as? CKError)?.code == .internalError {
+                    // CloudKit can invalidate a long-lived client connection.
+                    // Repeating fetch/send on that session never reconnects.
+                    // Keep the durable inbox/outbox and restart on the next
+                    // ordinary sync cycle instead of retrying inside this one.
+                    transportStarted = false
+                    await transport.stop()
+                }
+                if generation == lifecycle { await preserveFailure(error) }
+            }
         }
     }
 
