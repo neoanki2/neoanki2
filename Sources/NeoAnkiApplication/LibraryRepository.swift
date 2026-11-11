@@ -388,6 +388,7 @@ public protocol LibraryTransferring: Sendable {
 }
 
 public protocol LibraryChangePersisting: Sendable {
+    func changeNotifications() async -> AsyncStream<Int64>
     func currentChangeCursor() async throws -> Int64
     func changes(after cursor: Int64, limit: Int) async throws -> [LibraryChange]
     func createBackup(at destination: URL) async throws
@@ -395,6 +396,7 @@ public protocol LibraryChangePersisting: Sendable {
 }
 
 public extension LibraryChangePersisting {
+    func changeNotifications() async -> AsyncStream<Int64> { AsyncStream { $0.finish() } }
     func verifyBackup(at destination: URL) async throws {
         let values = try destination.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
         guard values.isRegularFile == true, (values.fileSize ?? 0) > 0 else {
@@ -936,6 +938,9 @@ public actor SQLiteLibraryRepository:
 
     public func currentChangeCursor() async throws -> Int64 {
         try await store.currentChangeCursor()
+    }
+    public func changeNotifications() async -> AsyncStream<Int64> {
+        await store.libraryChangeNotifications()
     }
     public func recordLibraryAlias(_ aliasID: UUID, canonicalID: UUID) async throws {
         try await store.recordLibraryAlias(aliasID, canonicalID: canonicalID)

@@ -14,7 +14,13 @@ public actor OfflineFirstSyncService: SyncService {
     private var currentStatus: SyncStatus = .offline
     private var currentIssues: [SyncIssue] = []
     private var isSynchronizing = false
+    private var synchronizationRequested = false
+    private var completionWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
+    private var nextAllowedSync: Date?
     private var automaticSyncTask: Task<Void, Never>?
+    private var localChangeMonitor: Task<Void, Never>?
+    private var localSyncTask: Task<Void, Never>?
+    private let libraryChangeEvents = SyncLibraryChanges()
     private var transportStarted = false
     private var lifecycle = 0
 
@@ -34,6 +40,16 @@ public actor OfflineFirstSyncService: SyncService {
 
     public func start() async {
         let generation = lifecycle
+        if localChangeMonitor == nil {
+            let stream = await repository.changeNotifications()
+            guard generation == lifecycle else { return }
+            localChangeMonitor = Task { [weak self] in
+                for await cursor in stream {
+                    guard !Task.isCancelled else { return }
+                    await self?.scheduleLocalSync(after: cursor)
+                }
+            }
+        }
         await synchronize()
         guard generation == lifecycle else { return }
         if automaticSyncTask == nil {
@@ -48,9 +64,45 @@ public actor OfflineFirstSyncService: SyncService {
     }
 
     public func synchronize() async {
-        guard !isSynchronizing else { return }
+        guard nextAllowedSync.map({ $0 <= .now }) ?? true else { return }
+        guard !isSynchronizing else { synchronizationRequested = true; return }
         isSynchronizing = true
-        defer { isSynchronizing = false }
+        defer {
+            isSynchronizing = false
+            finishWaiters()
+        }
+        let generation = lifecycle
+        repeat {
+            synchronizationRequested = false
+            await synchronizeOnce()
+        } while synchronizationRequested && generation == lifecycle && !Task.isCancelled
+            && (nextAllowedSync.map({ $0 <= .now }) ?? true)
+    }
+
+    /// Background pushes need to await an already-running cycle, including its
+    /// coalesced catch-up fetch, before telling the OS their work is complete.
+    public func synchronizeAndWait() async {
+        guard isSynchronizing else { await synchronize(); return }
+        synchronizationRequested = true
+        let id = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled { continuation.resume() }
+                else { completionWaiters[id] = continuation }
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID) { completionWaiters.removeValue(forKey: id)?.resume() }
+    private func finishWaiters() {
+        let waiters = completionWaiters.values
+        completionWaiters = [:]
+        for waiter in waiters { waiter.resume() }
+    }
+
+    private func synchronizeOnce() async {
         currentStatus = .syncing
         let generation = lifecycle
         do {
@@ -96,6 +148,7 @@ public actor OfflineFirstSyncService: SyncService {
                 metadata.stagedInbound = []
                 metadata.issues = currentIssues
                 metadata = try await metadataStore.completeIncoming(recovered, metadata: metadata)
+                if !recovered.isEmpty { await libraryChangeEvents.publish() }
             }
             // Resolve both newly discovered conflicts and copies retained by
             // older app versions. Commit each decision before advancing, and
@@ -114,6 +167,7 @@ public actor OfflineFirstSyncService: SyncService {
             metadata.issues = currentIssues
             try await metadataStore.save(metadata)
             try checkLifecycle(generation)
+            nextAllowedSync = nil
             currentStatus = !currentIssues.isEmpty ? .needsAttention(issueCount: currentIssues.count)
                 : !metadata.stagedInbound.isEmpty || !(metadata.pendingOutbound ?? []).isEmpty ? .syncing
                 : .current(lastSync: .now)
@@ -121,6 +175,9 @@ public actor OfflineFirstSyncService: SyncService {
             currentStatus = .offline
         } catch {
             if generation == lifecycle {
+                if let delay = (error as? CKError)?.retryAfterSeconds, delay > 0 {
+                    nextAllowedSync = Date.now.addingTimeInterval(delay)
+                }
                 if (error as? CKError)?.code == .internalError {
                     // CloudKit can invalidate a long-lived client connection.
                     // Repeating fetch/send on that session never reconnects.
@@ -132,6 +189,31 @@ public actor OfflineFirstSyncService: SyncService {
                 if generation == lifecycle { await preserveFailure(error) }
             }
         }
+    }
+
+    public func libraryChanges() async -> AsyncStream<Void> { await libraryChangeEvents.stream() }
+
+    private func scheduleLocalSync(after cursor: Int64) {
+        localSyncTask?.cancel()
+        let generation = lifecycle
+        localSyncTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(600))
+                try await self?.synchronizeLocalChanges(after: cursor, generation: generation)
+            } catch {}
+        }
+    }
+
+    private func synchronizeLocalChanges(after cursor: Int64, generation: Int) async throws {
+        // Applying remote data also writes the journal. Once those echoes have
+        // been staged, they must not initiate another read.
+        let stagedCursor = try await metadataStore.load().outboundCursor
+        try checkLifecycle(generation)
+        guard stagedCursor < cursor else { return }
+        // Debounce only pending work. A later local edit must never cancel an
+        // upload that has already started; it requests a catch-up cycle instead.
+        localSyncTask = nil
+        await synchronize()
     }
 
     private func stageLocalChanges(metadata: inout SyncMetadata) async throws {
@@ -193,6 +275,12 @@ public actor OfflineFirstSyncService: SyncService {
         lifecycle += 1
         automaticSyncTask?.cancel()
         automaticSyncTask = nil
+        localChangeMonitor?.cancel()
+        localChangeMonitor = nil
+        localSyncTask?.cancel()
+        localSyncTask = nil
+        synchronizationRequested = false
+        finishWaiters()
         await transport.stop()
         transportStarted = false
         currentStatus = .offline

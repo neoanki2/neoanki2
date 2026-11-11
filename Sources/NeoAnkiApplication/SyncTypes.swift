@@ -191,8 +191,10 @@ public extension LibrarySyncAdapter {
 }
 
 public protocol SyncService: Sendable {
+    func libraryChanges() async -> AsyncStream<Void>
     func start() async
     func synchronize() async
+    func synchronizeAndWait() async
     func stop() async
     func status() async -> SyncStatus
     func issues() async -> [SyncIssue]
@@ -202,12 +204,31 @@ public protocol SyncService: Sendable {
 }
 
 public extension SyncService {
+    func synchronizeAndWait() async { await synchronize() }
+    func libraryChanges() async -> AsyncStream<Void> { AsyncStream { $0.finish() } }
     func retryIssue(id: UUID) async { _ = id; await synchronize() }
     func dismissIssue(id: UUID) async { _ = id }
     func restoreConflictCopy(forIssueID id: UUID) async throws {
         _ = id
         throw UserFacingError(title: "Conflict Can’t Be Restored", message: "No restorable copy is available.")
     }
+}
+
+/// Broadcasts committed inbound changes to each native presentation independently.
+/// A slow observer needs only one refresh to read the newest repository state.
+public actor SyncLibraryChanges {
+    private var observers: [UUID: AsyncStream<Void>.Continuation] = [:]
+    public init() {}
+    deinit { for observer in observers.values { observer.finish() } }
+    public func stream() -> AsyncStream<Void> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        observers[id] = continuation
+        continuation.onTermination = { [weak self] _ in Task { await self?.remove(id) } }
+        return stream
+    }
+    public func publish() { for observer in observers.values { observer.yield(()) } }
+    private func remove(_ id: UUID) { observers[id] = nil }
 }
 
 public actor DisabledSyncService: SyncService {

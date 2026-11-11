@@ -1,6 +1,6 @@
 ---
 name: release
-description: Merge release changes into main, then publish affected NeoAnki2 apps from main to iOS App Store, Mac App Store, and Homebrew with one shared version; preview, resume, or inspect that release. Use for release, ship, publish, or Homebrew/app-store release requests. Physical iPhone installation uses deploy-iphone instead.
+description: Merge release changes into main, publish affected NeoAnki2 apps to the Stores and Homebrew with one shared version, and upgrade the local Mac; preview, resume, or inspect a release. Use for release, ship, publish, or Homebrew/app-store release requests. Physical iPhone installation uses deploy-iphone instead.
 ---
 
 # Release NeoAnki2
@@ -70,11 +70,15 @@ edit the release process.
 - Preserve Developer ID/Store signing, production CloudKit, privacy/package
   validation, and accepted Mac notarization. Do not strip quarantine or weaken
   signing. Use `gh` authentication for GitHub; never the GitHub connector.
-- Publication does not install or launch apps. Do not install TestFlight,
-  manipulate Store containers, replace the local Homebrew app, or launch GUI
-  applications as part of release. A requested local upgrade is separate.
+- A release request includes upgrading this Mac after Homebrew publication.
+  Refresh the tap, run `brew upgrade --cask neoanki2/tap/neoanki2`, verify the
+  installed version and signature, and launch NeoAnki2 exactly once. Terminate
+  the running app if necessary for a safe upgrade, preserving its library and
+  settings. Perform this step rather than handing the user a command. An iOS-only
+  release with no newer Mac version needs no local upgrade. Do not install
+  TestFlight or manipulate Store containers; no other GUI interaction is allowed.
 
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's
-actual state, and the receipt path. Name concrete blockers without inventing
+actual state, the local installed version, and the receipt path. Name concrete blockers without inventing
 acceptance passes or requesting confirmation already granted by the release request.

@@ -31,6 +31,23 @@ legacy metadata starts with a full snapshot. Use the engine for explicit sends
 with automatic syncing disabled, so an older automatic fetch cannot overwrite a
 newer explicit delivery. Dictionary assets remain in their separate zone.
 
+A silent `CKRecordZoneSubscription` for the library zone wakes that same
+explicit reader. Both native hosts register for remote notifications and route
+only that subscription's notifications to the service. Pushes received during
+an active cycle coalesce into a follow-up cycle, so a notification cannot be
+lost behind the synchronization guard. Foreground reads and the 10-second
+recovery poll cover delayed or missing notifications. Server retry-after delays
+still take precedence over a push or local-change trigger.
+
+Committed SQLite journal changes produce buffered cursor notifications. They
+debounce local uploads by 600 milliseconds on both platforms; rolled-back or
+read-only work emits no notification. The service broadcasts inbound commits to
+each presentation after validation and repository application. Mac counts and
+already-loaded Browse rows, mobile summaries, badges, and widgets refresh from
+those events. Tests verify matching review identity, card state, and counts
+before the recovery poll, rather than treating a successful status as evidence
+that the visible data is current.
+
 CloudKit can invalidate a long-lived client with an internal error (including
 "Client went away before operation could be validated"). The next sync cycle
 must recreate the container and engine from durable metadata instead of issuing

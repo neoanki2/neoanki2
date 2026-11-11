@@ -98,9 +98,14 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
 7. Saves per-channel progress after external operations and checks that its
    recorded main source remains in remote `main` before publishing. It never
    publishes an unmerged branch or bypasses branch protection.
-8. Reports actual channel states and the checkpoint path. Publication does not
-   install apps or interrupt the running desktop. Upgrade locally when wanted
-   with `brew upgrade --cask neoanki2/tap/neoanki2`.
+8. Reports actual channel states and the checkpoint path. After Homebrew
+   publication, the agent completes the release request by refreshing the tap
+   and running `brew upgrade --cask neoanki2/tap/neoanki2` on this Mac. It verifies
+   the installed version and signature, then launches NeoAnki2 exactly once,
+   terminating the previous process if needed for a safe upgrade. The local
+   library and settings are preserved. An iOS-only release with no newer Mac
+   version skips this step. Local installation and Store availability are
+   reported separately; Apple's review can still be pending.
 
 “Together” means one coordinated command and one source/version assignment.
 Homebrew can become available immediately; Apple controls processing, review,

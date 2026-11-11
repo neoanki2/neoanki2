@@ -13,6 +13,7 @@ final class MacCloudSyncStatusModel {
     private(set) var status: SyncStatus = .offline
     @ObservationIgnored private var service: (any SyncService)?
     @ObservationIgnored private var monitor: Task<Void, Never>?
+    @ObservationIgnored private var changesMonitor: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
     private let interval: Duration
 
@@ -20,11 +21,20 @@ final class MacCloudSyncStatusModel {
         self.interval = interval
     }
 
-    deinit { monitor?.cancel() }
+    deinit { monitor?.cancel(); changesMonitor?.cancel() }
 
-    func observe(_ service: any SyncService) {
+    func observe(_ service: any SyncService, onLibraryChange: @escaping @MainActor () async -> Void = {}) async {
         stop()
         self.service = service
+        let expectedGeneration = generation
+        let changes = await service.libraryChanges()
+        guard expectedGeneration == generation else { return }
+        changesMonitor = Task { [weak self] in
+            for await _ in changes {
+                guard !Task.isCancelled, self?.generation == expectedGeneration else { return }
+                await onLibraryChange()
+            }
+        }
         let interval = interval
         monitor = Task { [weak self] in
             while !Task.isCancelled {
@@ -48,6 +58,8 @@ final class MacCloudSyncStatusModel {
         generation += 1
         monitor?.cancel()
         monitor = nil
+        changesMonitor?.cancel()
+        changesMonitor = nil
         service = nil
         updateStatus(status)
     }

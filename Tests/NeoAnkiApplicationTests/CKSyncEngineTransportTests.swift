@@ -5,6 +5,22 @@ import NeoAnkiApplication
 import Testing
 
 struct CKSyncEngineTransportTests {
+    @Test func silentLibraryPushesAreScopedToTheLibrarySubscription() throws {
+        let zone = CKRecordZone.ID(zoneName: CKSyncEngineTransport.zoneName)
+        let subscription = CKSyncEngineTransport.librarySubscription(zoneID: zone)
+        #expect(subscription.zoneID == zone)
+        #expect(subscription.notificationInfo?.shouldSendContentAvailable == true)
+        #expect(subscription.notificationInfo?.alertBody == nil)
+        func payload(_ id: String, container: String = CKSyncEngineTransport.containerIdentifier) -> [AnyHashable: Any] {
+            ["ck": ["cid": container, "fet": ["sid": id,
+                "zid": ["zon": CKSyncEngineTransport.zoneName, "zoid": CKCurrentUserDefaultName]]]]
+        }
+        #expect(CKSyncEngineTransport.isLibraryNotification(payload(subscription.subscriptionID)))
+        #expect(!CKSyncEngineTransport.isLibraryNotification(payload("unrelated-dictionary-subscription")))
+        #expect(!CKSyncEngineTransport.isLibraryNotification(payload(subscription.subscriptionID, container: "iCloud.other.app")))
+        #expect(!CKSyncEngineTransport.isLibraryNotification([:]))
+    }
+
     @Test func malformedCloudRecordsArePreservedInsteadOfSilentlyDiscarded() {
         let malformed = CKRecord(recordType: "LibraryResource", recordID: .init(recordName: "deck__malformed"))
         malformed["resourceKind"] = "deck" as CKRecordValue

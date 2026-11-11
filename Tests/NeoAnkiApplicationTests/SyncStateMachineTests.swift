@@ -36,8 +36,9 @@ private actor TestCloud {
     struct Version: Sendable { var tag: Int; var record: SyncRecordEnvelope }
     var resources: [String: Version] = [:]
     var generation = 0
+    let pushes = SyncLibraryChanges()
     func snapshot() -> [String: Version] { resources }
-    func save(_ record: SyncRecordEnvelope, expected: Int?) -> SyncRecordEnvelope? {
+    func save(_ record: SyncRecordEnvelope, expected: Int?) async -> SyncRecordEnvelope? {
         let key = resourceKey(record)
         if let old = resources[key] {
             if old.record.payload == record.payload && old.record.isTombstone == record.isTombstone {
@@ -47,6 +48,7 @@ private actor TestCloud {
         }
         generation += 1
         resources[key] = Version(tag: generation, record: record)
+        await pushes.publish()
         return nil
     }
 }
@@ -162,6 +164,57 @@ private func textItem(id: UUID, type: ItemType, text: String, deckID: UUID?) -> 
 }
 
 struct SyncStateMachineTests {
+    @Test func committedPhoneReviewUploadsAndRefreshesMacBeforeTheRecoveryPoll() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cloud = TestCloud()
+        let phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud, seed: 201)
+        let mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud, seed: 202)
+        defer { Task { await phone.service.stop(); await mac.service.stop() } }
+        let now = Date.now
+        let type = try #require(try await phone.repository.loadItemTypes().itemTypes.first)
+        let item = textItem(id: UUID(), type: type, text: "Push review", deckID: nil)
+        _ = try await phone.repository.createItem(item, asOf: now)
+        await phone.service.start()
+        await mac.service.start()
+        await phone.service.synchronize()
+        let card = try #require(try await phone.repository.cards().first { $0.itemID == item.id })
+        let pushes = await cloud.pushes.stream()
+        let receiver = Task {
+            for await _ in pushes {
+                guard !Task.isCancelled else { return }
+                await mac.service.synchronize()
+            }
+        }
+        defer { receiver.cancel() }
+        let applied = await mac.service.libraryChanges()
+        let started = ContinuousClock.now
+        let review = try await phone.repository.submitReview(
+            cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 700
+        )
+        // No explicit phone send or Mac fetch here: a committed local journal
+        // wakes the sender and the cloud notification wakes the receiver.
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await _ in applied {
+                    if (try? await mac.repository.reviewLog(id: review.reviewLogID)) != nil { return }
+                }
+                throw CancellationError()
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(5))
+                throw CancellationError()
+            }
+            defer { group.cancelAll() }
+            try await group.next()
+        }
+        #expect(started.duration(to: .now) < .seconds(5))
+        #expect(try await mac.repository.reviewLog(id: review.reviewLogID) == phone.repository.reviewLog(id: review.reviewLogID))
+        #expect(try await mac.repository.card(id: card.id) == phone.repository.card(id: card.id))
+        #expect(try await mac.repository.scopeSummary(scope: .allDecks, asOf: now)
+            == phone.repository.scopeSummary(scope: .allDecks, asOf: now))
+    }
+
     @Test func phoneOnlyReviewsReachAnIdleMacAfterFetchFailureAndRestart() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

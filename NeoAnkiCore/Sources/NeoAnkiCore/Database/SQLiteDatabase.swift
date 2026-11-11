@@ -134,6 +134,8 @@ actor SQLiteDatabase {
     private let decoder = JSONDecoder()
     private var localRevision: UInt64 = 0
     private var changeTrackingReady = false
+    private var changeObservers: [UUID: AsyncStream<Int64>.Continuation] = [:]
+    private var lastNotifiedChangeCursor: Int64 = 0
 
     init(path: URL) throws {
         databaseURL = path.standardizedFileURL
@@ -156,6 +158,7 @@ actor SQLiteDatabase {
     }
 
     deinit {
+        for observer in changeObservers.values { observer.finish() }
         if let handle {
             sqlite3_close(handle)
         }
@@ -826,6 +829,27 @@ actor SQLiteDatabase {
     func currentChangeCursor() throws -> Int64 {
         try query("SELECT COALESCE(MAX(cursor), 0) AS cursor FROM api_changes;")
             .first?["cursor"] as? Int64 ?? 0
+    }
+
+    func libraryChangeNotifications() -> AsyncStream<Int64> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<Int64>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        lastNotifiedChangeCursor = (try? currentChangeCursor()) ?? lastNotifiedChangeCursor
+        changeObservers[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeChangeObserver(id) }
+        }
+        return stream
+    }
+
+    private func removeChangeObserver(_ id: UUID) { changeObservers[id] = nil }
+
+    private func publishCommittedChanges() {
+        guard !changeObservers.isEmpty, changeTrackingReady, let handle,
+              sqlite3_get_autocommit(handle) != 0,
+              let cursor = try? currentChangeCursor(), cursor > lastNotifiedChangeCursor else { return }
+        lastNotifiedChangeCursor = cursor
+        for observer in changeObservers.values { observer.yield(cursor) }
     }
 
     func oldestChangeCursor() throws -> Int64? {
@@ -7549,6 +7573,7 @@ actor SQLiteDatabase {
             throw DatabaseError.executeFailed(errorMessage(from: handle))
         }
         localRevision &+= 1
+        publishCommittedChanges()
     }
 
     private func prepareStatement(_ sql: String) throws -> OpaquePointer {
@@ -7578,6 +7603,7 @@ actor SQLiteDatabase {
             throw DatabaseError.executeFailed(errorMessage(from: handle))
         }
         localRevision &+= 1
+        publishCommittedChanges()
     }
 
     private func query(_ sql: String, bindings: [Binding] = []) throws -> [[String: Any?]] {
