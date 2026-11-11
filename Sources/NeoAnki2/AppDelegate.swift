@@ -1,5 +1,6 @@
 import AppKit
 import NeoAnkiApplication
+import NeoAnkiCloudSync
 import OSLog
 
 @MainActor
@@ -8,6 +9,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// so the fixed study action footer can never sit on the display edge.
     private static let windowBottomClearance: CGFloat = 16
     private var windowPresentations: [ObjectIdentifier: WindowFramePolicy.Presentation] = [:]
+    var synchronizeCloudChanges: (@MainActor () async -> Void)?
+    private static let cloudPushLogger = Logger(subsystem: "com.neoanki2.app", category: "CloudSyncPush")
+
+    func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Self.cloudPushLogger.notice("Registered for remote change notifications")
+    }
+
+    func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
+        Self.cloudPushLogger.error("Remote notification registration failed: \((error as NSError).code, privacy: .public)")
+    }
+
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        guard CKSyncEngineTransport.isLibraryNotification(userInfo) else { return }
+        Self.cloudPushLogger.notice("Received library change notification")
+        Task { await synchronizeCloudChanges?() }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)

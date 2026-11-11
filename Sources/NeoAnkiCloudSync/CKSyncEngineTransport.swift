@@ -94,6 +94,22 @@ actor TransportBuffers {
 public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     public static let containerIdentifier = "iCloud.com.neoanki2.app"
     public static let zoneName = "NeoAnkiLibrary"
+    public static let librarySubscriptionID = "neoanki-library-changes-v1"
+
+    public static func librarySubscription(zoneID: CKRecordZone.ID) -> CKRecordZoneSubscription {
+        let subscription = CKRecordZoneSubscription(zoneID: zoneID, subscriptionID: librarySubscriptionID)
+        let info = CKSubscription.NotificationInfo()
+        info.shouldSendContentAvailable = true
+        subscription.notificationInfo = info
+        return subscription
+    }
+
+    public static func isLibraryNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
+              notification.notificationType == .recordZone,
+              notification.subscriptionID == librarySubscriptionID else { return false }
+        return notification.containerIdentifier == nil || notification.containerIdentifier == containerIdentifier
+    }
     private static let containerIdentifiersEntitlement =
         "com.apple.developer.icloud-container-identifiers"
 
@@ -175,6 +191,14 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         let zone = CKRecordZone(zoneID: zoneID)
         // The first explicit read must wait until the custom zone exists.
         _ = try await container.privateCloudDatabase.save(zone)
+        // A zone notification is only a wake-up hint. All data still goes
+        // through the explicit, token-based reader and its durable inbox.
+        let database = container.privateCloudDatabase
+        do {
+            _ = try await database.subscription(for: Self.librarySubscriptionID)
+        } catch let error as CKError where error.code == .unknownItem {
+            _ = try await database.save(Self.librarySubscription(zoneID: zoneID))
+        }
         try await fetchLibraryZoneChanges()
     }
 

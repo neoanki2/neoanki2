@@ -51,9 +51,15 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   gates. Run focused additional checks only for a relevant change or an explicit
   request. Preserve Apple's written rejection before claiming its issues fixed.
 - Use authenticated `gh` for GitHub and the official App Store Connect API through
-  saved credentials. Publication does not install TestFlight, touch Store app
-  containers, replace the local Homebrew app, or launch GUI applications. Local
-  Homebrew upgrades remain an explicit `brew upgrade --cask neoanki2/tap/neoanki2`.
+  saved credentials. Publication does not install TestFlight or touch Store app
+  containers. A release request also authorizes upgrading this Mac's Homebrew
+  installation after Homebrew publication: refresh the tap, run
+  `brew upgrade --cask neoanki2/tap/neoanki2`, verify the installed version and
+  signature, and launch NeoAnki2 exactly once. Terminate the running app if needed
+  for a safe upgrade; preserve its library and settings. Complete this step rather
+  than giving the user an upgrade command. Skip it for an iOS-only release when
+  there is no newer Mac version. Report local installation separately from Store
+  submission and public availability.
 - Read `docs/RELEASING.md` for the workflow and recovery rules. Retired release
   entry points must not be used to allocate independent versions or bypass state.
 
@@ -77,4 +83,4 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
 - Use headless command-line and test workflows only.
 - If verification requires GUI automation, Accessibility, Screen Recording, or opening a window, report it as blocked instead of attempting a manual fallback.
 - Exception: CLI-only `xcodebuild`/XCTest UI automation may boot, test, and delete a uniquely named, disposable Simulator device. Simulator-contained XCTest screenshots, recordings, and result bundles are allowed, but do not open or control Simulator.app, use an existing or user-managed Simulator device, request host Accessibility or Screen Recording access, or capture or interact with the host desktop. Clean up the disposable device even when verification fails.
-- Exception: when the user explicitly requests installation or an upgrade, NeoAnki2 may be terminated if needed for a safe upgrade and launched exactly once after the upgrade completes. Do not perform any other GUI interaction or relaunch it more than once.
+- Exception: an installation, upgrade, or release request authorizes terminating NeoAnki2 if needed for a safe local upgrade and launching it exactly once after the upgrade completes. Do not perform any other GUI interaction or relaunch it more than once.

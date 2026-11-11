@@ -137,7 +137,99 @@ private actor InvalidatedClientTransport: CloudSyncTransport {
     }
 }
 
+private actor SuspendedFetchTransport: CloudSyncTransport {
+    private var entered = false
+    private var observer: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, Never>?
+    private(set) var fetches = 0
+    func start() async throws {}
+    func stop() async {}
+    func enqueue(_ records: [SyncRecordEnvelope]) async throws {}
+    func fetchPendingChanges() async throws -> [SyncRecordEnvelope] {
+        fetches += 1
+        if fetches == 1 {
+            await withCheckedContinuation { continuation in
+                release = continuation
+                entered = true
+                observer?.resume(); observer = nil
+            }
+        }
+        return []
+    }
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { observer = $0 }
+    }
+    func finish() { release?.resume(); release = nil }
+}
+
+private actor ThrottledTransport: CloudSyncTransport {
+    private(set) var fetches = 0
+    func start() async throws {}
+    func stop() async {}
+    func enqueue(_ records: [SyncRecordEnvelope]) async throws {}
+    func fetchPendingChanges() async throws -> [SyncRecordEnvelope] {
+        fetches += 1
+        throw NSError(domain: CKErrorDomain, code: CKError.Code.requestRateLimited.rawValue,
+            userInfo: [CKErrorRetryAfterKey: 60.0])
+    }
+}
+
 struct OfflineFirstSyncServiceTests {
+    @Test func pushesRespectCloudKitRetryAfterInsteadOfRepeatingAThrottledRequest() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let metadata = SyncMetadataStore(directory: directory)
+        try await metadata.save(SyncMetadata(didCreateInitialBackup: true, didCompleteInitialMerge: true))
+        let transport = ThrottledTransport()
+        let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []),
+            adapter: SyncAdapterStub(), transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") })
+        await service.synchronize()
+        for _ in 0..<10 { await service.synchronize() }
+        #expect(await transport.fetches == 1)
+        #expect(await service.status() == .offline)
+    }
+
+    @Test func cancelingABackgroundPushWaitDoesNotCancelTheActiveSync() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let metadata = SyncMetadataStore(directory: directory)
+        try await metadata.save(SyncMetadata(didCreateInitialBackup: true, didCompleteInitialMerge: true))
+        let transport = SuspendedFetchTransport()
+        let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []),
+            adapter: SyncAdapterStub(), transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") })
+        let active = Task { await service.synchronize() }
+        await transport.waitUntilEntered()
+        let background = Task { await service.synchronizeAndWait() }
+        background.cancel()
+        await background.value
+        await transport.finish()
+        await active.value
+        guard case .current = await service.status() else {
+            Issue.record("The active sync must survive a canceled background observer")
+            return
+        }
+    }
+
+    @Test func pushDuringAnInFlightFetchSchedulesOneFollowUpCycle() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let metadata = SyncMetadataStore(directory: directory)
+        try await metadata.save(SyncMetadata(didCreateInitialBackup: true, didCompleteInitialMerge: true))
+        let transport = SuspendedFetchTransport()
+        let service = OfflineFirstSyncService(repository: ChangeRepositoryStub(values: []),
+            adapter: SyncAdapterStub(), transport: transport, metadataStore: metadata,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") })
+        let cycle = Task { await service.synchronize() }
+        await transport.waitUntilEntered()
+        for _ in 0..<10 { await service.synchronize() }
+        await transport.finish()
+        await cycle.value
+        #expect(await transport.fetches == 2)
+    }
+
     @Test(arguments: [false, true])
     func invalidatedCloudClientRestartsWithoutLosingQueuedChanges(failDuringSend: Bool) async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

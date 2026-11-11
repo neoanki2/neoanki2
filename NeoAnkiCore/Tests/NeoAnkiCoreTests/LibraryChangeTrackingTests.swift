@@ -27,6 +27,48 @@ private func trackedBasicItem(deckID: UUID? = nil) -> Item {
     )
 }
 
+private func nextCommittedCursor(_ stream: AsyncStream<Int64>) async throws -> Int64 {
+    try await withThrowingTaskGroup(of: Int64.self) { group in
+        group.addTask {
+            var iterator = stream.makeAsyncIterator()
+            return try #require(await iterator.next())
+        }
+        group.addTask { try await Task.sleep(for: .seconds(2)); throw CancellationError() }
+        defer { group.cancelAll() }
+        return try #require(try await group.next())
+    }
+}
+
+@Test func changeNotificationsExposeOnlyCommittedJournalCursors() async throws {
+    let store = try await changeTrackingStore()
+    let changes = await store.libraryChangeNotifications()
+    let item = trackedBasicItem()
+    _ = try await store.createItem(item)
+    #expect(try await nextCommittedCursor(changes) == store.currentChangeCursor())
+    let card = try #require(try await store.fetchDueCards().first)
+    let reviews = await store.libraryChangeNotifications()
+    _ = try await store.submitReview(cardID: card.id, rating: .good, now: .now)
+    #expect(try await nextCommittedCursor(reviews) == store.currentChangeCursor())
+}
+
+@Test func aRolledBackBatchCannotNotifySubscribers() async throws {
+    let database = try SQLiteDatabase(path: changeTrackingDatabaseURL())
+    try await database.migrate()
+    let changes = await database.libraryChangeNotifications()
+    let failed = Deck(name: "Rolled back")
+    await #expect(throws: (any Error).self) {
+        try await database.applySynchronizedBatch([
+            .deck(failed), .deck(Deck(name: "Missing parent", parentID: UUID()))
+        ])
+    }
+    // A later committed write must be the first notification, rather than
+    // an event from the failed transaction still sitting in the stream.
+    try await database.applySynchronizedBatch([.deck(Deck(name: "Committed"))])
+    let cursor = try await nextCommittedCursor(changes)
+    #expect(cursor == (try await database.currentChangeCursor()))
+    #expect(try await database.fetchDeck(id: failed.id) == nil)
+}
+
 @Test func singleResourceWritesCreateDurableRevisionsAndEvents() async throws {
     let url = changeTrackingDatabaseURL()
     let store = try await changeTrackingStore(at: url)

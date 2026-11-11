@@ -11,6 +11,10 @@ parent: User Guide
 An item stores one structured fact or prompt. Its item type determines the
 fields you fill in and the Card setups that generate study cards.
 
+With [iCloud sync](../sync-reminders-widgets/) enabled, a committed save starts
+syncing after a short debounce. Another device refreshes its loaded Browse rows
+when the change arrives. Offline edits remain queued locally.
+
 ## Add an item
 
 1. Select the destination deck if you want the new item preassigned there.

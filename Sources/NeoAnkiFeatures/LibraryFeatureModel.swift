@@ -59,7 +59,23 @@ public final class LibraryFeatureModel {
     private let badgePublisher: (any AppIconBadgePublishing)?
     private let settingsStore: (any MobileSettingsStoring)?
     private let errorMapper: any UserFacingErrorMapping
-    private var deferredSyncTask: Task<Void, Never>?
+    @ObservationIgnored private var deferredSyncTask: Task<Void, Never>?
+    @ObservationIgnored private var syncChangesTask: Task<Void, Never>?
+    @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
+
+    deinit { deferredSyncTask?.cancel(); syncChangesTask?.cancel(); bootstrapTask?.cancel() }
+
+    private func observeSyncChanges() async {
+        syncChangesTask?.cancel()
+        let changes = await syncService.libraryChanges()
+        syncChangesTask = Task { [weak self] in
+            for await _ in changes {
+                guard !Task.isCancelled, let self else { return }
+                await self.refresh()
+                await self.refreshSyncStatus()
+            }
+        }
+    }
 
     public init(
         library: any LibraryRepository,
@@ -99,6 +115,16 @@ public final class LibraryFeatureModel {
     }
 
     public func bootstrap(startSync: Bool? = nil) async {
+        if let bootstrapTask { await bootstrapTask.value; return }
+        let task = Task<Void, Never> { [weak self] in
+            await self?.performBootstrap(startSync: startSync)
+        }
+        bootstrapTask = task
+        await task.value
+        bootstrapTask = nil
+    }
+
+    private func performBootstrap(startSync: Bool?) async {
         loadState = .loading
         do {
             if let settingsStore {
@@ -110,6 +136,7 @@ public final class LibraryFeatureModel {
             try await reload()
             loadState = .ready
             if startSync ?? syncEnabled {
+                await observeSyncChanges()
                 await syncService.start()
                 await refreshSyncStatus()
                 try await reload()
@@ -149,7 +176,7 @@ public final class LibraryFeatureModel {
 
     public func synchronize() async {
         guard syncEnabled else { return }
-        await syncService.synchronize()
+        await syncService.synchronizeAndWait()
         await refreshSyncStatus()
         await refresh()
     }
@@ -157,7 +184,14 @@ public final class LibraryFeatureModel {
     public func setSyncEnabled(_ enabled: Bool) async {
         syncEnabled = enabled
         await settingsStore?.saveSyncEnabled(enabled)
-        if enabled { await syncService.start() } else { await syncService.stop() }
+        if enabled {
+            await observeSyncChanges()
+            await syncService.start()
+        } else {
+            syncChangesTask?.cancel()
+            syncChangesTask = nil
+            await syncService.stop()
+        }
         await refreshSyncStatus()
         if enabled { await refresh() }
     }
@@ -479,6 +513,7 @@ public final class LibraryFeatureModel {
         deferredSyncTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(600))
             guard !Task.isCancelled, let self else { return }
+            deferredSyncTask = nil
             await self.syncService.synchronize()
             await self.refreshSyncStatus()
         }

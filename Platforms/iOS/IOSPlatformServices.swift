@@ -106,6 +106,8 @@ actor MobileSyncCoordinator: SyncService {
     private let paths: MobilePaths
     private var service: (any SyncService)?
     private var fallbackStatus: SyncStatus = .offline
+    private let libraryChangeEvents = SyncLibraryChanges()
+    private var changesMonitor: Task<Void, Never>?
 
     init(repository: SQLiteLibraryRepository, paths: MobilePaths) {
         self.repository = repository
@@ -113,6 +115,7 @@ actor MobileSyncCoordinator: SyncService {
     }
 
     func start() async {
+        if let service { await service.start(); return }
         do {
             let metadata = SyncMetadataStore(directory: paths.syncMetadataDirectory)
             let transport = try await CKSyncEngineTransport.make(metadataStore: metadata)
@@ -125,11 +128,26 @@ actor MobileSyncCoordinator: SyncService {
                 backupURL: { [paths] in paths.backupURL }
             )
             self.service = service
+            let changes = await service.libraryChanges()
+            changesMonitor = Task { [libraryChangeEvents] in
+                for await _ in changes {
+                    guard !Task.isCancelled else { return }
+                    await libraryChangeEvents.publish()
+                }
+            }
             await service.start()
         } catch { fallbackStatus = .accountUnavailable }
     }
     func synchronize() async { await service?.synchronize() }
-    func stop() async { await service?.stop(); fallbackStatus = .offline }
+    func synchronizeAndWait() async { await service?.synchronizeAndWait() }
+    func stop() async {
+        await service?.stop()
+        changesMonitor?.cancel()
+        changesMonitor = nil
+        service = nil
+        fallbackStatus = .offline
+    }
+    func libraryChanges() async -> AsyncStream<Void> { await libraryChangeEvents.stream() }
     func status() async -> SyncStatus { if let service { return await service.status() }; return fallbackStatus }
     func issues() async -> [SyncIssue] { await service?.issues() ?? [] }
     func retryIssue(id: UUID) async { await service?.retryIssue(id: id) }

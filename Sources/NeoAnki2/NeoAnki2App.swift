@@ -43,6 +43,7 @@ struct NeoAnki2App: App {
     @State private var bootstrapError: String?
     @State private var syncService: OfflineFirstSyncService?
     @State private var syncStatusModel = MacCloudSyncStatusModel()
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppPreferences.cloudSyncEnabled) private var cloudSyncEnabled = false
 #if DEBUG
     @State private var testConfiguration: UITestRuntimeConfiguration?
@@ -149,6 +150,10 @@ struct NeoAnki2App: App {
                 // startup on the stable root so that it cannot cancel sync.
                 await bootstrap()
                 installUITestControlIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await syncService?.synchronize() }
             }
             .preferredColorScheme(documentationScreenshotColorScheme)
             .alert(
@@ -299,6 +304,7 @@ struct NeoAnki2App: App {
     @MainActor
     private func updateCloudSync(enabled: Bool, library: SQLiteLibraryRepository) async {
         guard enabled else {
+            appDelegate.synchronizeCloudChanges = nil
             vocabularyLibraryModel?.sync.setEnabled(false)
             syncStatusModel.stop()
             await syncService?.stop()
@@ -323,7 +329,13 @@ struct NeoAnki2App: App {
                 backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
             )
             syncService = service
-            syncStatusModel.observe(service)
+            appDelegate.synchronizeCloudChanges = { [weak service] in await service?.synchronize() }
+            NSApplication.shared.registerForRemoteNotifications()
+            await syncStatusModel.observe(service) {
+                let now = Date.now
+                await decksModel?.refreshCounts(asOf: now)
+                await itemsModel?.refreshAfterSync(asOf: now)
+            }
             await service.start()
             await syncStatusModel.refresh()
             vocabularyLibraryModel?.sync.setEnabled(true)

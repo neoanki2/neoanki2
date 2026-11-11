@@ -98,6 +98,11 @@ public extension ItemStore {
         try await database.currentChangeCursor()
     }
 
+    /// Emits only after a journal change commits, including implicit writes.
+    func libraryChangeNotifications() async -> AsyncStream<Int64> {
+        await database.libraryChangeNotifications()
+    }
+
     /// The oldest retained event cursor, or nil when the change log is empty.
     func oldestChangeCursor() async throws -> Int64? {
         try await database.oldestChangeCursor()

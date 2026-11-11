@@ -78,9 +78,17 @@ library is silently replaced wholesale. Local SQLite remains authoritative, so
 authoring and study continue when the network or iCloud is unavailable.
 
 Use **Sync Now** for an immediate attempt. NeoAnki2 also synchronizes when it
-becomes active, after debounced local changes, and during system-granted
-background refresh. Background timing is controlled by iOS and is not an exact
-schedule.
+becomes active, about 600 milliseconds after committed local changes, and when
+iCloud sends a silent change notification. Incoming changes refresh Home,
+Browse schedules, and due counts as soon as they commit, rather than waiting
+for the ordinary count timer. A 10-second recovery poll catches missed change
+notifications while the app is running.
+
+Updates can arrive within a few seconds while both apps are active, but there
+is no fixed delivery-time guarantee. iOS controls background execution and can
+delay or coalesce silent notifications; opening the app performs a catch-up
+sync. System-granted background refresh remains available as another recovery
+path.
 
 Turning off **Sync this device** on iOS or **Sync this Mac** on macOS stops that
 device's sync and leaves its local library intact. It does not erase the private

@@ -654,6 +654,18 @@ final class ItemsModel {
         }
     }
 
+    /// Sync can change row content and schedules as well as the headline. Keep
+    /// an unloaded browser lazy; update already-visible rows without a spinner.
+    func refreshAfterSync(asOf now: Date = .now) async {
+        invalidateItemTypes()
+        browseDataInvalidated = true
+        if loadedItemsScope != nil {
+            await load(scope: cachedScope, asOf: now)
+        } else {
+            await refreshCounts(asOf: now)
+        }
+    }
+
     /// Patches browse schedule columns for specific items without reloading the
     /// whole list. Used after study when titles and membership are unchanged.
     func refreshSchedules(for itemIDs: Set<UUID>, asOf now: Date = .now) async {

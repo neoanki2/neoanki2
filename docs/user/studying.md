@@ -138,6 +138,10 @@ allowance on Mac, iPhone, and iPad; a deferred new card stays out of the ready
 queue even if its due date has arrived. Undoing that first review releases
 its allowance. See [Daily limits](../library-and-decks/#set-a-daily-new-card-limit).
 
+A review received from another device refreshes the Home due count and loaded
+Browse schedules as soon as it is applied. Your current study response remains
+local while sync works in the background. See [Sync timing](../sync-reminders-widgets/#set-up-icloud-sync).
+
 ## Card interactions
 
 Every ordinary review interaction ends with self-grading. Automatic feedback is
