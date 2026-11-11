@@ -244,7 +244,8 @@ class AppleFake:
 class StoreTests(unittest.TestCase):
     def setUp(self):
         self.api=AppleFake();self.receipt={'status':'uploaded'};self.saves=[]
-        self.listing=dict(copyright='2026',locale='en-US',description='Study',keywords='study',supportUrl='https://example.test/support',marketingUrl='https://example.test',reviewNotes='NeoAnki2 1.0.2 works offline',reviewContact={'firstName':'Tester'})
+        self.listing=dict(copyright='2026',locale='en-US',description='Study',keywords='study',supportUrl='https://example.test/support',marketingUrl='https://example.test',reviewNotes='NeoAnki2 1.0.2 works offline',reviewContact={
+            'firstName':'Tester','lastName':'Release','emailAddress':'release@example.test','phoneNumber':'+12025550123'})
         self.publisher=AppStorePublisher(self.api,'app','IOS','1.0.320','320',self.receipt,lambda:self.saves.append(copy.deepcopy(self.receipt)),self.listing,'Sync fix')
     def test_processing_does_not_create_or_submit_anything(self):
         self.api.builds[0]['attributes']['processingState']='PROCESSING'
@@ -265,6 +266,12 @@ class StoreTests(unittest.TestCase):
         self.publisher.submit()
         localization=next(m[2]['data']['attributes'] for m in self.api.mutations if m[1]=='appStoreVersionLocalizations')
         self.assertEqual(localization['whatsNew'],'Sync fix')
+    def test_listing_contact_fields_use_the_app_store_review_api_schema(self):
+        self.publisher.submit()
+        details=self.api.detail['attributes']
+        self.assertEqual({k:v for k,v in details.items() if k.startswith('contact')},{
+            'contactFirstName':'Tester','contactLastName':'Release','contactEmail':'release@example.test',
+            'contactPhone':'+12025550123'})
     def test_resume_does_not_duplicate_submissions_or_edit_reviewing_version(self):
         self.publisher.submit();before=copy.deepcopy(self.api.mutations)
         self.publisher.submit();self.assertEqual(self.api.mutations,before)

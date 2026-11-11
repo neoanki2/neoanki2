@@ -166,7 +166,10 @@ class AppStorePublisher:
         # Screenshots and privacy declarations are maintained when the product
         # changes; recreating them on every code release is not a release gate.
         detail = self.api.request("appStoreVersions/" + vid + "/appStoreReviewDetail").get("data")
-        contact = {"contact" + k[0].upper() + k[1:]: value for k, value in self.listing["reviewContact"].items()}
+        contact = {destination: self.listing["reviewContact"][source] for source, destination in (
+            ("firstName", "contactFirstName"), ("lastName", "contactLastName"),
+            ("emailAddress", "contactEmail"), ("phoneNumber", "contactPhone"),
+        )}
         notes = re.sub(r"NeoAnki2 \d+\.\d+\.\d+", "NeoAnki2 " + self.version, self.listing["reviewNotes"])
         attrs = dict(contact, notes=notes, demoAccountRequired=False)
         if detail:
