@@ -8,13 +8,14 @@ permalink: /RELEASING/
 
 # Releasing NeoAnki2
 
-Run one command from the repository on the configured signing Mac:
+Merge the requested local changes into `main`, update a clean local `main`
+checkout, then run the release command on the configured signing Mac:
 
 ```bash
 ./Scripts/release.sh
 ```
 
-It includes current local changes, detects affected apps, verifies relevant code,
+It uses that merged main revision, detects affected apps, verifies relevant code,
 then builds and publishes the selected distributions. It does not run broad UI
 journeys, physical acceptance, screenshot capture, or browser review ceremonies.
 This replaces the separate Homebrew/iOS/Mac Store release processes. The old
@@ -73,9 +74,13 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
 
 ## What the command does
 
-1. Captures local changes on a fresh `release/*` branch, integrates current
-   `main`, pushes with `gh` authentication, and creates a PR for the exact source.
-2. Atomically reserves the version tag and a draft release. Builds run from a
+1. Requires the requested changes to be merged first. Commit local release input,
+   push and merge its PRs using authenticated `gh`, then update a clean `main`
+   checkout. A queued auto-merge is insufficient. The command checks that its
+   checkout is clean, on `main`, and exactly matches remote `main`; a blocked
+   merge stops the release before version reservation, signing or publication.
+2. Records that `main` SHA, then atomically reserves the version tag and a draft
+   release. Builds run from a
    detached worktree pinned to that source, so later edits cannot contaminate them.
 3. Runs the headless test targets that depend on changed modules, once. A shared
    Core change can select many unit suites; docs-only work selects no app release.
@@ -90,8 +95,9 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
    A superseded in-review build is withdrawn only when its replacement is ready.
 6. Publishes the signed/notarized DMG and checksum and updates the official tap.
    iOS-only tracking releases do not replace GitHub's latest Mac download.
-7. Saves per-channel progress after external operations. It requests PR auto-merge
-   without waiting for exhaustive hosted checks or bypassing branch protection.
+7. Saves per-channel progress after external operations and checks that its
+   recorded main source remains in remote `main` before publishing. It never
+   publishes an unmerged branch or bypasses branch protection.
 8. Reports actual channel states and the checkpoint path. Publication does not
    install apps or interrupt the running desktop. Upgrade locally when wanted
    with `brew upgrade --cask neoanki2/tap/neoanki2`.
@@ -147,10 +153,13 @@ this controller requires a deliberate, evidence-backed baseline migration.
 
 ## Signing setup
 
-Enable GitHub auto-merge once with `gh repo edit neoanki2/neoanki2 --enable-auto-merge`.
-Required checks and branch protections still govern merging. If GitHub declines
-the request, the command reports `PR_AUTO_MERGE_PENDING` without hiding it or
-rolling back published channels.
+Required checks and branch protections govern merging before release starts.
+Confirm that GitHub reports the source PRs as merged, then run the controller
+from the resulting clean `main` checkout. It does not request auto-merge after
+publication. Old branch-built checkpoints cannot resume publication under this
+policy: preserve their artifacts and published history, merge the changes, and
+prepare a new release from `main` if app changes still need publication. Use
+`--status` to inspect an older release without resuming it.
 
 Saved inputs remain in `~/Library/Application Support/NeoAnki2 Signing/`.
 `--signing-dir` and `--config` select another configured location. Keep all private

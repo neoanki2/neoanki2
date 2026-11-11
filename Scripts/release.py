@@ -4,7 +4,6 @@ import argparse
 import base64
 import concurrent.futures
 import copy
-import datetime as dt
 import fcntl
 import hashlib
 import importlib.util
@@ -108,31 +107,33 @@ class GitHub:
                 raise RuntimeError("Latest release has no unified checkpoint; migrate .release/baseline.json first")
         return baseline, history
 
-    def snapshot(self, version):
-        # Every release gets a fresh branch; bot commits on a previous release
-        # branch cannot cause a force-push or overwrite another person's work.
-        branch = "release/" + version + "-" + dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d%H%M%S")
-        run(["git", "switch", "-c", branch])
-        run(["git", "add", "-A"])
-        if run(["git", "diff", "--cached", "--quiet"], check=False).returncode:
-            run(["git", "commit", "-m", "Release NeoAnki2 " + version])
+    def fetch_main(self):
         run(["git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential",
              "fetch", "https://github.com/" + self.repository + ".git", "refs/heads/main"])
-        base = run(["git", "rev-parse", "FETCH_HEAD"])
-        if run(["git", "merge-base", "--is-ancestor", base, "HEAD"], check=False).returncode:
-            run(["git", "merge", "--no-edit", base])
+        return run(["git", "rev-parse", "FETCH_HEAD"])
+
+    def main_source(self):
+        # Source integration happens before this command, through the release
+        # skill. Never turn a main invocation into an unmerged release branch.
+        if run(["git", "branch", "--show-current"]) != "main":
+            raise ValueError("Merge release changes first, then run ./Scripts/release.sh from main")
+        if run(["git", "status", "--porcelain"]):
+            raise ValueError("Commit and merge local changes before releasing from a clean main checkout")
         revision = run(["git", "rev-parse", "HEAD"])
-        run(["git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential",
-             "push", "https://github.com/" + self.repository + ".git", "HEAD:refs/heads/" + branch])
-        body = WORK / "pr-body.md"
-        body.write_text("Publish affected distributions from exact source `" + revision + "`.\n\n"
-                        "The unified release runs relevant headless checks, validates signed artifacts, "
-                        "and records per-channel publication in the release checkpoint.\n")
-        url = run(["gh", "pr", "create", "--repo", self.repository, "--base", "main", "--head", branch,
-                   "--title", "Release NeoAnki2 " + version, "--body-file", str(body)])
-        return revision, branch, url
+        if revision != self.fetch_main():
+            raise ValueError("Update the clean main checkout to remote main before releasing")
+        return revision
+
+    def verify_release_source(self, state):
+        if state.get("source_origin") != "main" or state.get("branch") != "main":
+            raise ValueError("This candidate was not prepared from main after merge; preserve its history "
+                             "and prepare a new release from main instead of resuming publication")
+        remote = self.fetch_main()
+        if run(["git", "merge-base", "--is-ancestor", state["revision"], remote], check=False).returncode:
+            raise ValueError("Release source is not contained in remote main; publication blocked")
 
     def reserve(self, state):
+        self.verify_release_source(state)
         tag = "v" + state["version"]
         # Creating a Git ref is atomic even before the draft is published.
         # Another machine cannot reserve this version for a different source.
@@ -413,6 +414,7 @@ class Release:
             self.save(remote=True)
 
     def publish(self):
+        self.github.verify_release_source(self.state)
         self.verify_source()
         history = self.github.history()
         if history and version_tuple(history[0]["tagName"]) > version_tuple(self.state["version"]):
@@ -508,12 +510,10 @@ def main(argv=None):
             state = json.loads(path.read_text()) if path.exists() else copy.deepcopy(baseline)
             if state["version"] != args.abandon or "selected" not in state:
                 raise ValueError("No checkpoint exists for that version")
-            if not state.get("reserved"):
-                github.reserve(state)
-                state["reserved"] = True
             state.update(complete=True, abandoned=True)
             write_json(path, state)
-            github.checkpoint(path, state)
+            if state.get("reserved"):
+                github.checkpoint(path, state)
             print("Stopped release " + args.abandon + "; published channels and evidence retained.")
             return 0
         # Explicit recovery uses the pinned worktree even if today's manifest
@@ -541,7 +541,8 @@ def main(argv=None):
                 proposal["version"], proposal["build"] = allocate(baseline, history, api, app_id, args.version)
             print(json.dumps({k: v for k, v in proposal.items() if k != "inputs"}, indent=2))
             return 0
-        if not args.status and not args.resume and not proposal["channels"] and not pending_state:
+        main_revision = github.main_source()
+        if not args.resume and not proposal["channels"] and not pending_state:
             print("No application changes; nothing to release.")
             return 0
         api, app_id = make_api(args.config)
@@ -562,19 +563,19 @@ def main(argv=None):
             version, build = allocate(baseline, history, api, app_id, args.version)
             checked_channels = set(proposal["channels"])
             preflight(proposal["channels"], args.signing_dir)
-            revision, branch, url = github.snapshot(version)
+            revision = main_revision
             if tree(ROOT) != tree(ROOT, revision):
-                raise ValueError("Working tree changed during snapshot; release not reserved")
-            # Integration may introduce additional app changes/dependencies.
+                raise ValueError("Working tree changed since main verification; release not reserved")
             proposal = plan(ROOT, baseline, AppInputs.load(ROOT))
             if set(proposal["channels"]) - checked_channels:
                 preflight(proposal["channels"], args.signing_dir)
             state = dict(schema_version=1, version=version, build=build, revision=revision,
-                         repository=github.repository, branch=branch, pull_request=url, notes=args.notes,
+                         repository=github.repository, branch="main", source_origin="main", notes=args.notes,
                          selected=proposal["channels"], inputs=proposal["inputs"], tests=proposal["tests"],
                          changed_paths=proposal["changed_paths"], channels=copy.deepcopy(baseline["channels"]),
                          app_id=app_id, phases={c: {"status": "planned"} for c in proposal["channels"]}, complete=False)
             write_json(WORK / version / "release.json", state)
+        github.verify_release_source(state)
         write_json(active_path, {"version": state["version"]})
         if not state.get("reserved"):
             github.reserve(state)
@@ -592,11 +593,6 @@ def main(argv=None):
             release.export(channel)
         release.save(remote=True)
         errors, waiting = release.publish_until_ready(args.wait_seconds)
-        # Hosted checks may gate the merge; publication never silently bypasses it.
-        merge = run(["gh", "pr", "merge", state["pull_request"], "--repo", github.repository,
-                     "--auto", "--merge"], check=False)
-        if merge.returncode:
-            print("PR_AUTO_MERGE_PENDING=" + merge.stderr.strip(), file=sys.stderr)
         print(json.dumps(status(state, api, app_id), indent=2))
         print("RELEASE_RECEIPT=" + str(release.path))
         for channel, message in {**waiting, **errors}.items():

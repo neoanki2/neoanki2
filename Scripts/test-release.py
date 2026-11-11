@@ -35,7 +35,7 @@ class PlanningTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        self.git('init','-q');self.git('config','user.name','Release tests');self.git('config','user.email','release@example.test')
+        self.git('init','-q','-b','main');self.git('config','user.name','Release tests');self.git('config','user.email','release@example.test')
         for name in ['Sources/NeoAnki2/App.swift','Sources/NeoAnkiIOS/Home.swift','Sources/Shared/Library.swift',
                      'Sources/MacOnly/API.swift','Sources/CloudSync/Sync.swift','Sources/CLIOnly/main.swift',
                      'NeoAnkiCore/Sources/Core/Item.swift','NeoAnkiCore/Sources/CoreCLI/main.swift',
@@ -102,6 +102,7 @@ class PlanningTests(unittest.TestCase):
     def test_noop_command_does_not_contact_apple_build_commit_or_publish(self):
         class Hub:
             def baseline(inner):return self.baseline,[]
+            def main_source(inner):return self.rev
         with patch.object(controller,'ROOT',self.root),patch.object(controller,'WORK',self.root/'.build/releases'),\
              patch.object(controller,'GitHub',Hub),patch.object(controller.AppInputs,'load',return_value=self.inputs),\
              patch.object(controller,'make_api',side_effect=AssertionError('Apple must not be contacted')):
@@ -113,9 +114,14 @@ class PlanningTests(unittest.TestCase):
         class Hub:
             repository='example/app'
             def baseline(inner):return copy.deepcopy(owner.baseline),[]
-            def snapshot(inner,version):
-                calls.append(('snapshot',version));owner.git('add','.');owner.git('commit','-qm','release')
-                return owner.git('rev-parse','HEAD'),'release/test','https://github.com/example/app/pull/1'
+            def main_source(inner):
+                owner.assertEqual(owner.git('branch','--show-current'),'main')
+                owner.assertEqual(owner.git('status','--porcelain'),'')
+                return owner.git('rev-parse','HEAD')
+            def verify_release_source(inner,state):
+                owner.assertEqual(state['branch'],'main');owner.assertEqual(state['source_origin'],'main')
+                owner.assertEqual(state['revision'],owner.git('rev-parse','HEAD'))
+                calls.append(('main-provenance',state['revision']))
             def reserve(inner,state):calls.append(('reserve',state['version'],state['build']))
             def checkpoint(inner,path,state):owner.baseline=copy.deepcopy(state)
         class API:
@@ -135,26 +141,71 @@ class PlanningTests(unittest.TestCase):
                     'revision':inner.state['revision'],'inputs':inner.state['inputs']['ios']}
                 inner.state['complete']=True;inner.save(remote=True)
                 return {},{}
-        original_run=controller.run
-        def run(args,**kwargs):
-            if args[:3]==['gh','pr','merge']:
-                calls.append(('merge',));return subprocess.CompletedProcess(args,0,'','')
-            return original_run(args,**kwargs)
         # All effects are confined to this temporary Git repo and these fakes.
         with patch.object(controller,'ROOT',self.root),patch.object(controller,'WORK',self.root/'.build/releases'),\
              patch.object(controller,'GitHub',Hub),patch.object(controller,'Release',Release),\
              patch.object(controller.AppInputs,'load',return_value=self.inputs),\
              patch.object(controller,'preflight'),patch.object(controller,'make_api',return_value=(API(),'app')),\
-             patch.object(controller,'status',return_value={}),patch.object(controller,'run',side_effect=run):
+             patch.object(controller,'status',return_value={}):
             self.write('.gitignore','.build/\n')
+            self.git('add','.');self.git('commit','-qm','merged release input')
             self.assertEqual(controller.main([]),0)
             before=copy.deepcopy(calls)
             self.assertEqual(controller.main([]),0)
             self.assertEqual(calls,before)
+        self.assertLess(next(i for i,c in enumerate(calls) if c[0]=='main-provenance'),next(i for i,c in enumerate(calls) if c[0]=='reserve'))
         self.assertIn(('reserve','1.0.320','320'),calls)
         self.assertIn(('build','ios','1.0.320','320'),calls)
         self.assertIn(('verify',{'':['MobileTests']}),calls)
         self.assertEqual([c for c in calls if c[0]=='publish'],[('publish',['ios'])])
+
+
+    def test_clean_synchronized_main_is_the_release_source(self):
+        hub=object.__new__(controller.GitHub)
+        with patch.object(controller,'ROOT',self.root),patch.object(hub,'fetch_main',return_value=self.rev):
+            self.assertEqual(hub.main_source(),self.rev)
+
+    def test_feature_branch_and_dirty_main_stop_before_remote_access(self):
+        hub=object.__new__(controller.GitHub)
+        with patch.object(controller,'ROOT',self.root),patch.object(hub,'fetch_main',side_effect=AssertionError('remote accessed')):
+            self.git('switch','-qc','release/not-merged')
+            with self.assertRaisesRegex(ValueError,'Merge release changes'):hub.main_source()
+            self.git('switch','-q','main');self.write('README.md','uncommitted')
+            with self.assertRaisesRegex(ValueError,'clean main'):hub.main_source()
+
+    def test_stale_main_cannot_supply_a_new_release(self):
+        hub=object.__new__(controller.GitHub)
+        with patch.object(controller,'ROOT',self.root),patch.object(hub,'fetch_main',return_value='new-remote-main'):
+            with self.assertRaisesRegex(ValueError,'Update the clean main'):hub.main_source()
+
+    def test_legacy_branch_candidate_cannot_reserve_a_tag_or_resume_publication(self):
+        hub=object.__new__(controller.GitHub)
+        state={'version':'1.0.320','revision':self.rev,'branch':'release/old'}
+        with patch.object(hub,'fetch_main',side_effect=AssertionError('remote accessed')),patch.object(hub,'api',side_effect=AssertionError('tag created')):
+            with self.assertRaisesRegex(ValueError,'not prepared from main'):hub.verify_release_source(state)
+            with self.assertRaisesRegex(ValueError,'not prepared from main'):hub.reserve(state)
+
+    def test_main_prepared_revision_must_still_belong_to_remote_main(self):
+        hub=object.__new__(controller.GitHub)
+        state={'branch':'main','source_origin':'main','revision':self.rev}
+        with patch.object(controller,'ROOT',self.root),patch.object(hub,'fetch_main',return_value=self.rev):
+            hub.verify_release_source(state)
+            self.git('switch','-qc','release/unmerged');self.write('README.md','feature')
+            self.git('add','.');self.git('commit','-qm','unmerged change');state['revision']=self.git('rev-parse','HEAD')
+            with self.assertRaisesRegex(ValueError,'not contained in remote main'):hub.verify_release_source(state)
+
+    def test_main_blocker_prevents_apple_access_and_all_release_phases(self):
+        owner=self
+        class Hub:
+            def baseline(inner):return owner.baseline,[]
+            def main_source(inner):raise ValueError('merge blocked')
+            def reserve(inner,state):raise AssertionError('tag reserved')
+        self.write('Sources/NeoAnkiIOS/Home.swift','after')
+        with patch.object(controller,'ROOT',self.root),patch.object(controller,'WORK',self.root/'.build/releases'),\
+             patch.object(controller,'GitHub',Hub),patch.object(controller.AppInputs,'load',return_value=self.inputs),\
+             patch.object(controller,'make_api',side_effect=AssertionError('Apple accessed')),\
+             patch.object(controller,'Release',side_effect=AssertionError('artifacts built')):
+            with self.assertRaisesRegex(ValueError,'merge blocked'):controller.main([])
 
 
 class VersionTests(unittest.TestCase):
@@ -352,8 +403,14 @@ class RecoveryTests(unittest.TestCase):
                      'channels':{},'phases':{c:{'status':'uploaded'} for c in selected},'notes':'Fix'}
         value.api=object();value.app_id='app';value.save=lambda remote=False:None
         value.verify_source=lambda:None
-        value.github=type('Hub',(),{'history':lambda self:[{'tagName':'v1.0.320'}]})()
+        value.github=type('Hub',(),{'history':lambda self:[{'tagName':'v1.0.320'}],'verify_release_source':lambda self,state:None})()
         return value
+    def test_lost_main_provenance_blocks_every_publication_channel(self):
+        r=self.release(['ios','mac','homebrew'])
+        r.github.verify_release_source=lambda state:(_ for _ in ()).throw(ValueError('source left main'))
+        r.publish_store=lambda c:(_ for _ in ()).throw(AssertionError('Store published'))
+        r.publish_homebrew=lambda:(_ for _ in ()).throw(AssertionError('Homebrew published'))
+        with self.assertRaisesRegex(ValueError,'source left main'):r.publish()
     def test_apple_processing_does_not_roll_back_brew_or_repeat_finished_channel(self):
         r=self.release(['ios','mac','homebrew']);calls=[]
         def store(c):
