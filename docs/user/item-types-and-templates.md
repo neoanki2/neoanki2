@@ -26,6 +26,10 @@ items. An item with multiple Card setups can therefore contribute more than
 one due card. After saving a definition, library refreshes update those counts
 to reflect the cards that are currently eligible for study.
 
+Saved item-type definitions use the same [iCloud sync](../sync-reminders-widgets/)
+path as items and reviews. Committed edits start an upload after a short debounce;
+offline edits remain queued until a connection is available.
+
 [![The Item Types manager]({{ site.baseurl }}/assets/screenshots/item-types.png)]({{ site.baseurl }}/assets/screenshots/item-types.png)
 
 <nav class="local-toc" aria-label="On this page" markdown="1">
