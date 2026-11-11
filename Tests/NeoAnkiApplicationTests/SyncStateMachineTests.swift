@@ -125,7 +125,10 @@ private struct SyncDevice {
     var service: OfflineFirstSyncService
     var transport: FaultTransport
 
-    static func make(at directory: URL, cloud: TestCloud, seed: UInt64) async throws -> SyncDevice {
+    static func make(
+        at directory: URL, cloud: TestCloud, seed: UInt64,
+        recoveryPollInterval: Duration = .seconds(10)
+    ) async throws -> SyncDevice {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let repository = try SQLiteLibraryRepository(databaseURL: directory.appendingPathComponent("library.sqlite"))
         try await repository.bootstrap()
@@ -133,7 +136,8 @@ private struct SyncDevice {
         let transport = FaultTransport(cloud: cloud, seed: seed, metadata: metadata)
         let service = OfflineFirstSyncService(repository: repository,
             adapter: SQLiteLibrarySyncAdapter(repository: repository), transport: transport,
-            metadataStore: metadata, backupURL: { directory.appendingPathComponent("backup.sqlite") })
+            metadataStore: metadata, recoveryPollInterval: recoveryPollInterval,
+            backupURL: { directory.appendingPathComponent("backup.sqlite") })
         return SyncDevice(directory: directory, repository: repository, metadata: metadata,
             service: service, transport: transport)
     }
@@ -164,12 +168,14 @@ private func textItem(id: UUID, type: ItemType, text: String, deckID: UUID?) -> 
 }
 
 struct SyncStateMachineTests {
-    @Test func committedPhoneReviewUploadsAndRefreshesMacBeforeTheRecoveryPoll() async throws {
+    @Test func committedPhoneReviewUploadsAndRefreshesMacWithRecoveryPollingDeferred() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let cloud = TestCloud()
-        let phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud, seed: 201)
-        let mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud, seed: 202)
+        let phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud,
+            seed: 201, recoveryPollInterval: .seconds(3_600))
+        let mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud,
+            seed: 202, recoveryPollInterval: .seconds(3_600))
         defer { Task { await phone.service.stop(); await mac.service.stop() } }
         let now = Date.now
         let type = try #require(try await phone.repository.loadItemTypes().itemTypes.first)
@@ -202,13 +208,15 @@ struct SyncStateMachineTests {
                 throw CancellationError()
             }
             group.addTask {
-                try await Task.sleep(for: .seconds(5))
+                try await Task.sleep(for: .seconds(60))
                 throw CancellationError()
             }
             defer { group.cancelAll() }
             try await group.next()
         }
-        #expect(started.duration(to: .now) < .seconds(5))
+        // The watchdog only bounds a broken test. Deferring both recovery
+        // polls proves event-driven delivery even on a contended CI runner.
+        print("Review-to-commit latency in push fixture: \(started.duration(to: .now))")
         #expect(try await mac.repository.reviewLog(id: review.reviewLogID) == phone.repository.reviewLog(id: review.reviewLogID))
         #expect(try await mac.repository.card(id: card.id) == phone.repository.card(id: card.id))
         #expect(try await mac.repository.scopeSummary(scope: .allDecks, asOf: now)

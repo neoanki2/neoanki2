@@ -11,6 +11,7 @@ public actor OfflineFirstSyncService: SyncService {
     private let transport: any CloudSyncTransport
     private let metadataStore: SyncMetadataStore
     private let backupURL: @Sendable () -> URL
+    private let recoveryPollInterval: Duration
     private var currentStatus: SyncStatus = .offline
     private var currentIssues: [SyncIssue] = []
     private var isSynchronizing = false
@@ -29,6 +30,7 @@ public actor OfflineFirstSyncService: SyncService {
         adapter: any LibrarySyncAdapter,
         transport: any CloudSyncTransport,
         metadataStore: SyncMetadataStore,
+        recoveryPollInterval: Duration = .seconds(10),
         backupURL: @escaping @Sendable () -> URL
     ) {
         self.repository = repository
@@ -36,6 +38,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.transport = transport
         self.metadataStore = metadataStore
         self.backupURL = backupURL
+        self.recoveryPollInterval = recoveryPollInterval
     }
 
     public func start() async {
@@ -53,9 +56,10 @@ public actor OfflineFirstSyncService: SyncService {
         await synchronize()
         guard generation == lifecycle else { return }
         if automaticSyncTask == nil {
+            let interval = recoveryPollInterval
             automaticSyncTask = Task { [weak self] in
                 while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(10)) }
+                    do { try await Task.sleep(for: interval) }
                     catch { return }
                     await self?.synchronize()
                 }
