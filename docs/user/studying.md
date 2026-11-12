@@ -8,6 +8,10 @@ parent: User Guide
 
 # Studying
 
+Item-type availability controls new-item authoring, not the study queue.
+Automatically organizing types or removing a deck attachment preserves existing
+cards and their ordering. Moving an item retains its type and scheduling history.
+
 Every active card uses a predefined **Study Stage**. Its flexible card region
 yields space to the response and status region, and the fixed interaction or
 grading footer reserves its full height with bottom breathing room. The stage

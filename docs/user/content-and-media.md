@@ -19,7 +19,11 @@ A description helps identify the image when using VoiceOver.
 
 An item type can define Text, Rich Text, Number, Cloze, Image Occlusion, Image, GIF, Audio, and
 Video fields. The field type controls authoring, validation, storage, and
-native rendering.
+native rendering. Creating the definition inside a deck makes those fields
+available when adding items there. Reusing the same type in another deck links
+its fields and Card setups; choose an independent copy when the decks need to
+change separately. Detaching a type does not convert or remove stored numbers,
+text, cloze blanks, or media from existing items.
 
 ## Text
 

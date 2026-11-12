@@ -91,7 +91,10 @@ moves to the newly revealed answer without changing that semantic order.
 ## Author and organize
 
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
-type, then fill its typed fields. Visual descriptions are optional. The
+type, then fill its typed fields. The primary picker shows this deck's types;
+**Use another type…** opens common types and explicit linked reuse. Changing
+decks with entered content asks before attaching the type or clearing the draft.
+Visual descriptions are optional. The
 Library supports item detail, editing, multi-selection, bulk move, and bulk
 delete. In an empty library, **Add First Card** keeps a high-contrast 44-point
 target at the largest accessibility text size, including in landscape. The
@@ -108,6 +111,10 @@ so controls and text remain inside the screen.
 Deck-provided item types start read-only. Unlock the original for editing when
 changes should affect its existing items and decks, or duplicate it for an
 independent editable type.
+
+**Deck Settings → Manage Item Types** controls attachments, the default, and
+parent inheritance. Unlocking an imported type keeps it scoped to its deck;
+**Make Available Everywhere** is a separate action.
 
 Deck settings support rename, nesting, daily new-card limits, progress reset,
 and deletion policies. After **Delete and Unassign Items** succeeds, NeoAnki2

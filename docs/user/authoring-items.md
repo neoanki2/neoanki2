@@ -21,8 +21,8 @@ when the change arrives. Offline edits remain queued locally.
 2. Choose **Add Item** in the empty state or toolbar, choose **File ▸ New Item**,
    or press Command-N.
 3. Choose a **Deck** or **Unassigned**.
-4. Confirm the recommended type under **For This Deck**, or deliberately choose
-   a reusable type under **Item Types**.
+4. Choose from this deck’s item types. Use **Use another type…** to attach a
+   common type, link one from another deck, or create a type for this deck.
 5. Complete the required fields.
 6. Choose **Save** or press Return when Save is enabled.
 
@@ -30,9 +30,9 @@ when the change arrives. Offline edits remain queued locally.
 
 The first text-capable field receives keyboard focus. Tab and Shift-Tab move
 between controls. A manual item-type change that would clear entered content
-asks for confirmation. Changing deck while fields are empty resolves the new
-deck's policy; changing deck after entering content retains the current type
-and values.
+asks for confirmation. Empty drafts resolve the destination deck's types. If
+a populated draft's type is unavailable in another deck, choose **Attach Type
+and Keep Content**, **Keep Original Deck**, or explicitly clear the content.
 
 The selected item type is fixed when the item is created. The current UI
 cannot change an existing item's type later. To use a different type, create a
@@ -101,7 +101,7 @@ the scope toolbar. Opening inside a deck selects that destination; otherwise,
 the last dictionary–deck pair is restored.
 
 1. Choose a deck and an installed dictionary, then type or paste a word or phrase.
-2. On first use of a pair, choose **Set Up**. Select an existing item type and
+2. On first use of a pair, choose **Set Up**. Select one of this deck’s item types and
    choose the content for each field: typed word, dictionary headword/form,
    pronunciation text/audio, meaning, example, or content you enter yourself.
    Look up a word first to see actual examples and supplied pronunciation variants.
@@ -238,3 +238,7 @@ Media no longer referenced by any item is eligible for cleanup. Choose
 Deleting a deck is broader, not gentler: it deletes the deck's subdecks and every
 item inside them too. See [Delete a
 deck](../library-and-decks/#delete-a-deck).
+
+Add Word's setup offers **Use another type…** for explicit reuse. An existing
+pair mapping remains readable if its type is later detached from the deck;
+detaching does not rewrite stored field mappings or existing words.

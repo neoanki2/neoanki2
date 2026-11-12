@@ -17,7 +17,9 @@ struct ItemTypesMobileView: View {
     init(model: MobileAppModel) {
         self.model = model
         _studioModel = State(initialValue: model.itemTypeStudioLibrary.map {
-            ItemTypesFeatureModel(library: $0)
+            let studio = ItemTypesFeatureModel(library: $0)
+            if case let .deck(deckID, _) = model.selectedScope { studio.creationDeckID = deckID }
+            return studio
         })
     }
 

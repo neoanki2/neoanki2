@@ -221,7 +221,7 @@ struct MacItemTypeStudioView: View {
                 Section {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                         if model.studioDraft?.originalSnapshot == nil {
-                            Picker("Create in", selection: $model.destinationDeckID) {
+                            Picker("Create in", selection: $model.creationDeckID) {
                                 Text("Available Everywhere").tag(UUID?.none)
                                 ForEach(model.decks) { deck in Text(deck.name).tag(Optional(deck.id)) }
                             }

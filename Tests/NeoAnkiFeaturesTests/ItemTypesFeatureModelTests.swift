@@ -1246,3 +1246,22 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
 
     #expect(studioModel.loadState == .ready)
 }
+
+@Test @MainActor func creatingForCurrentDeckDoesNotChangeTheGlobalCatalogContext() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("scoped-studio-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
+    try await repository.bootstrap()
+    let deck = try await repository.createDeck(Deck(name: "Human Body"))
+    let model = ItemTypesFeatureModel(library: repository)
+    model.creationDeckID = deck.id
+    await model.load()
+    model.beginCreatingItemType()
+    model.studioDraft?.name = "Organ"
+    let preparation = try await model.prepareSave()
+    let saved = try await model.commitSave(preparation)
+    #expect(model.destinationDeckID == nil)
+    #expect(!model.itemTypes.contains { $0.id == saved.id })
+    #expect(try await repository.authoringItemTypes(for: deck.id).itemTypes.map(\.id) == [saved.id])
+    #expect(try await repository.loadItemTypeCatalog().itemTypes.contains { $0.id == saved.id } == false)
+}
