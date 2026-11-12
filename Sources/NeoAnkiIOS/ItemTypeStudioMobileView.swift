@@ -446,7 +446,7 @@ struct ItemTypeStudioMobileView: View {
     private var identitySection: some View {
         Section("Item Type") {
             if model.studioDraft?.originalSnapshot == nil {
-                Picker("Create in", selection: $model.destinationDeckID) {
+                Picker("Create in", selection: $model.creationDeckID) {
                     Text("Available Everywhere").tag(UUID?.none)
                     ForEach(model.decks) { deck in Text(deck.name).tag(Optional(deck.id)) }
                 }

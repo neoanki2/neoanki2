@@ -1102,6 +1102,7 @@ struct ContentView: View {
             else { return }
             templatesModel = ItemTypesFeatureModel(library: studioLibrary)
         }
+        templatesModel?.creationDeckID = decksModel.selectedDeckID
         selectedItemID = nil
         isEditingTemplate = false
         isManagingTemplates = true

@@ -182,6 +182,7 @@ public final class ItemTypesFeatureModel {
     public var studioDraft: ItemTypeStudioDraft?
     public private(set) var decks: [DeckSummary] = []
     public var destinationDeckID: UUID?
+    public var creationDeckID: UUID?
     public var createsSharedType = true
     public private(set) var needsOrganization: [ItemType] = []
     private var readOnlyIDs: Set<UUID> = []
@@ -241,6 +242,7 @@ public final class ItemTypesFeatureModel {
     }
 
     public func beginCreatingItemType(id: UUID = UUID(), imageOcclusion: Bool = false) {
+        if let destinationDeckID { creationDeckID = destinationDeckID }
         selectedItemTypeID = nil
         studioDraft = imageOcclusion ? .newImageOcclusion(id: id) : .new(id: id)
     }
@@ -337,7 +339,7 @@ public final class ItemTypesFeatureModel {
 
         let saved: ItemType
         if preparation.createsItemType {
-            saved = try await library.createItemType(preparation.candidate, deckID: destinationDeckID, availableEverywhere: destinationDeckID == nil && createsSharedType)
+            saved = try await library.createItemType(preparation.candidate, deckID: creationDeckID, availableEverywhere: creationDeckID == nil && createsSharedType)
         } else {
             guard isReadOnlyItemType(id: preparation.candidate.id) == false else {
                 throw ItemTypesFeatureError.readOnlyItemType
