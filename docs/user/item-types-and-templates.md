@@ -243,14 +243,42 @@ changing existing due dates merely because the cohort was created.
 
 ## Use item types included with decks
 
-Imported deck-specific schemas appear under **From Decks**, grouped by owning
-deck. They start read-only and do not crowd the main editable list. You can
-inspect their fields and Card setups.
+Custom item types belong to decks. Open a deck's settings and choose **Manage
+Item Types** to create a type, attach an existing definition, choose a default,
+or remove an attachment. Subdecks inherit their parent's choices until you turn
+off **Use parent’s types**. An empty custom set uses the types available everywhere.
 
-Choose **Unlock for Editing…** to adopt the same definition. Its identity stays
-the same, so existing items and deck policies continue using it. Choose
-**Duplicate as Item Type…** for an independent editable copy instead; existing
-items keep using the original.
+The Add Item picker shows this deck's types. **Use another type…** opens common
+types and explicit reuse from another deck. Reuse links the same definition;
+**Make an independent copy** keeps future changes separate. Type changes ask
+before clearing entered content. When switching decks, you can attach the current
+type and keep the draft, keep the original deck, or clear the draft and choose again.
+
+**Available Everywhere** is a deliberately small collection, initially Basic and
+Cloze. Creating a type asks where it belongs. **Make Available Everywhere** is an
+explicit action; unlocking an imported definition does not change its availability.
+Imported definitions start protected until you unlock or duplicate them.
+
+Existing libraries are organized automatically using imported ownership and item
+usage. Types used in several decks retain one linked identity. Unused types and
+types used only by unassigned items appear under **Needs Organization**, where you
+can attach them to a deck or make them available everywhere. No items, generated
+card identities, scheduling, or review history are changed by this organization.
+
+Removing an attachment changes future authoring choices. Existing items stay
+editable. Moving an item preserves its type without automatically adding that
+type to the destination picker. Deck deletion retains definitions used elsewhere;
+orphaned definitions appear under Needs Organization.
+
+Linked definitions display their deck usage. Saving edits that affect multiple
+attached decks lists those decks and offers an independent copy. Existing
+field-change and generated-card safeguards still apply.
+
+Scope and editing protection sync independently from the definition. Update all
+devices to this version before changing type organization; older clients do not
+understand the new scope records. Portable format 7 preserves defaults and empty
+inheritance overrides, and the importer continues reading supported older formats.
+Imported types remain scoped to their decks.
 
 ## Repair or delete an item type
 

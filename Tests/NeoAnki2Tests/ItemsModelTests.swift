@@ -75,7 +75,8 @@ func importContextualDeck(
 
     #expect(model.itemType?.name == "Special Type")
     #expect(model.policyItemTypes.map(\.name) == ["Special Type"])
-    #expect(model.normalItemTypes.contains { $0.name == "Basic" })
+    #expect(model.normalItemTypes.isEmpty)
+    #expect(!model.policyItemTypes.contains { $0.name == "Basic" })
     #expect(!model.normalItemTypes.contains { $0.name == "Special Type" })
     #expect(model.isRecommendedItemType(try #require(model.itemType?.id)))
 }

@@ -228,7 +228,7 @@ struct TemplatesView: View {
                     Text(error.message)
                 }
             case .ready:
-                if model.itemTypes.isEmpty && model.includedItemTypeGroups.isEmpty {
+                if model.itemTypes.isEmpty && model.needsOrganization.isEmpty {
                     SidebarEmptyState(
                         title: "No Item Types",
                         message: "Create an Item Type with fields and a ready-to-use Card setup.",
@@ -239,22 +239,23 @@ struct TemplatesView: View {
                     )
                 } else {
                     List(selection: selection) {
-                        Section {
+                        Section(model.destinationDeckID == nil ? "Available Everywhere" : "This Deck") {
                             ForEach(model.itemTypes) { itemType in
                                 itemTypeRow(itemType, readOnly: false).tag(itemType.id)
                             }
                         }
-                        if !model.includedItemTypeGroups.isEmpty {
-                            Section("From Decks") {
-                                ForEach(model.includedItemTypeGroups) { group in
-                                    includedGroupButton(group)
-                                    if expandedIncludedGroupIDs.contains(group.id) {
-                                        ForEach(group.itemTypes) { itemType in
-                                            itemTypeRow(itemType, readOnly: true)
-                                                .tag(itemType.id)
-                                                .padding(.leading, DesignSystem.Spacing.lg)
+                        if !model.needsOrganization.isEmpty, model.destinationDeckID == nil {
+                            DisclosureGroup("Needs Organization") {
+                                ForEach(model.needsOrganization) { type in
+                                    itemTypeRow(type, readOnly: false).tag(type.id)
+                                        .contextMenu {
+                                            Button("Make Available Everywhere") { model.selectItemType(id: type.id); Task { do { try await model.makeSelectedTypeAvailableEverywhere() } catch { actionError = error.localizedDescription } } }
+                                            Menu("Attach to Deck") {
+                                                ForEach(model.decks) { deck in
+                                                    Button(deck.name) { model.selectItemType(id: type.id); Task { do { try await model.attachSelectedType(to: deck.id) } catch { actionError = error.localizedDescription } } }
+                                                }
+                                            }
                                         }
-                                    }
                                 }
                             }
                         }
@@ -337,7 +338,7 @@ struct TemplatesView: View {
                     Text("\(fieldCount(itemType.fields.count)) · \(cardSetupCount(itemType.templates.count))")
                         .foregroundStyle(.secondary)
                     if let group = model.selectedIncludedGroup {
-                        Text("From \(group.deckPath) · Read-only")
+                        Text("From \(group.deckPath)" + (model.isSelectedItemTypeReadOnly ? " · Read-only" : ""))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("includedItemTypeOwner")

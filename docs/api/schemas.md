@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2
+contract_digest: sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -316,6 +316,16 @@ Type: **object**.
 
 - `deckId` — string; required
 
+## DeckItemTypePolicyInput {#schema-deckitemtypepolicyinput}
+
+Type: **object**.
+
+### Properties
+
+- `defaultItemTypeId` — string or null; optional
+- `inherits` — boolean; required
+- `itemTypeIds` — array of string; required
+
 ## DeckResetCommitResult {#schema-deckresetcommitresult}
 
 Type: **object**.
@@ -579,6 +589,14 @@ Type: **object**.
 - `revision` — integer; required
 - `templates` — array of TemplateDefinition; required
 
+## ItemTypeAvailabilityInput {#schema-itemtypeavailabilityinput}
+
+Type: **object**.
+
+### Properties
+
+- `availableEverywhere` — boolean; required
+
 ## ItemTypeCollection {#schema-itemtypecollection}
 
 Type: **object**.
@@ -594,6 +612,8 @@ Type: **object**.
 
 ### Properties
 
+- `availableEverywhere` — boolean; optional
+- `deckId` — string or null; optional
 - `fields` — array of FieldDefinition; required
 - `id` — string; optional
 - `name` — string; required
@@ -1225,6 +1245,6 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2`.
+Contract digest: `sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

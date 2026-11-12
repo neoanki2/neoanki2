@@ -198,3 +198,11 @@ tries again.
 
 The 400-outcome threshold and other documented limits are checked against
 production constants by the automated [documentation claims registry](../maintaining-documentation/#high-risk-factual-claims).
+
+## Deck types and scheduling
+
+A deck's item-type inheritance controls what you can add. It is separate from
+the daily new-card limit inherited by its study subtree. Attaching, detaching,
+or automatically organizing a type does not change card identities, due dates,
+maturity, or review history. Editing a linked definition still uses the existing
+card-reconciliation safeguards and can affect cards in every deck using it.

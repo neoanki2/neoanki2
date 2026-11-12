@@ -90,6 +90,7 @@ public actor NeoAnkiLocalAPIServer {
     }
 
     public var isRunning: Bool { listener != nil }
+    var listeningPort: NWEndpoint.Port? { listener?.port }
     var activeConnectionCount: Int { connections.count }
 }
 

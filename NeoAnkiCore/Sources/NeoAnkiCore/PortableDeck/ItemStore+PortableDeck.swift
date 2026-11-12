@@ -35,6 +35,22 @@ extension ItemStore {
             throw PortableDeckError.limitExceeded("Selected hierarchy contains too many items.")
         }
 
+        var exportedSettings = librarySnapshot.deckTypeSettings.filter { selectedIDs.contains($0.deckID) && $0.deckID != rootDeckID }
+        let configurations = Dictionary(uniqueKeysWithValues: librarySnapshot.deckTypeSettings.map { ($0.deckID, $0) })
+        let legacyPolicies = Dictionary(grouping: librarySnapshot.itemTypePolicies, by: \.deckID)
+        var source: UUID? = rootDeckID
+        var settingsVisited: Set<UUID> = []
+        while let id = source, settingsVisited.insert(id).inserted {
+            if let value = configurations[id], !value.inherits {
+                exportedSettings.append(.init(deckID: rootDeckID, itemTypeIDs: value.itemTypeIDs, defaultItemTypeID: value.defaultItemTypeID))
+                break
+            }
+            if configurations[id] == nil, let legacy = legacyPolicies[id], !legacy.isEmpty {
+                exportedSettings.append(.init(deckID: rootDeckID, itemTypeIDs: legacy.sorted { $0.ordinal < $1.ordinal }.map(\.itemTypeID), defaultItemTypeID: legacy.first(where: \.isDefault)?.itemTypeID))
+                break
+            }
+            source = byID[id]?.parentID
+        }
         let explicitPoliciesByDeck = Dictionary(
             grouping: librarySnapshot.itemTypePolicies,
             by: \.deckID
@@ -81,6 +97,7 @@ extension ItemStore {
         let typeIDs = directlyUsedTypeIDs
             .union(ownedTypeIDs)
             .union(exportedPolicies.map(\.itemTypeID))
+            .union(exportedSettings.flatMap(\.itemTypeIDs))
         guard typeIDs.count <= limits.maximumItemTypes else {
             throw PortableDeckError.limitExceeded("Selected hierarchy references too many item types.")
         }
@@ -158,7 +175,7 @@ extension ItemStore {
             types: types,
             items: records,
             media: media,
-            itemTypePolicies: exportedPolicies
+            itemTypePolicies: exportedPolicies, deckTypeSettings: exportedSettings
         )
     }
 
@@ -346,7 +363,7 @@ extension ItemStore {
             let includedItemTypes: [IncludedItemTypeOwner]
             let libraryItemTypeIDs: Set<UUID>
             let itemTypePolicies: [DeckItemTypePolicyEntry]
-            if package.formatVersion >= 3 {
+            if package.formatVersion >= 1 {
                 libraryItemTypeIDs = []
                 includedItemTypes = resolvedTypeIDs
                     .sorted { $0.uuidString < $1.uuidString }
@@ -410,7 +427,11 @@ extension ItemStore {
                         )
                     },
                     includedItemTypes: includedItemTypes,
-                    itemTypePolicies: itemTypePolicies
+                    itemTypePolicies: itemTypePolicies,
+                    deckTypeSettings: package.deckTypeSettings.compactMap { value in
+                        guard let deckID = deckMap[value.deckID] else { return nil }
+                        return .init(deckID: deckID, inherits: value.inherits, itemTypeIDs: value.itemTypeIDs.compactMap { typeMap[$0]?.id }, defaultItemTypeID: value.defaultItemTypeID.flatMap { typeMap[$0]?.id })
+                    }
                 ),
                 now: now
             )

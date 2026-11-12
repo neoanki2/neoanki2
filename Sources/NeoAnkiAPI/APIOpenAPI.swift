@@ -289,7 +289,9 @@ package enum APIOpenAPI {
         add("/v1/deck-reset-plans/{id}/commits", .post, .commitDeckResetPlan, authorization: .scope(.studyReview), request: "RequiredConfirmInput", response: "DeckResetCommitResult")
         add("/v1/decks/{id}/item-type-policy", .get, .deckItemTypePolicy, authorization: .scope(.libraryRead), response: "ItemTypePolicy")
 
-        add("/v1/item-types", .get, .listItemTypes, authorization: .scope(.libraryRead), response: "ItemTypeCollection", query: ["cursor", "limit"])
+        add("/v1/decks/{id}/item-type-policy", .put, .setDeckItemTypePolicy, authorization: .scope(.schemasWrite), request: "DeckItemTypePolicyInput", response: "ItemTypePolicy")
+        add("/v1/item-types/{id}/availability", .put, .setItemTypeAvailability, authorization: .scope(.schemasWrite), request: "ItemTypeAvailabilityInput", response: "ItemType")
+        add("/v1/item-types", .get, .listItemTypes, authorization: .scope(.libraryRead), response: "ItemTypeCollection", query: ["cursor", "limit", "deckId", "scope"])
         add("/v1/item-types", .post, .createItemType, authorization: .scope(.schemasWrite), success: 201, request: "ItemTypeInput", response: "ItemType")
         add("/v1/item-types/validate", .post, .validateItemType, authorization: .scope(.schemasWrite), success: 204, request: "ItemTypeInput", response: nil)
         add("/v1/item-types/{id}", .get, .getItemType, authorization: .scope(.libraryRead), response: "ItemType")
@@ -820,7 +822,9 @@ package enum APIOpenAPI {
                  "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "imageOcclusion", "arrange"]],
                  "skill": reference("Skill"), "generateWhen": reference("Condition")]
             ),
-            "ItemTypeInput": object(["name", "fields", "templates"], itemTypeInputProperties),
+            "ItemTypeInput": object(["name", "fields", "templates"], itemTypeInputProperties.merging(["deckId": nullableUUID, "availableEverywhere": ["type": "boolean"]]) { _, new in new }),
+            "DeckItemTypePolicyInput": object(["inherits", "itemTypeIds"], ["inherits": ["type": "boolean"], "itemTypeIds": array(uuid), "defaultItemTypeId": nullableUUID]),
+            "ItemTypeAvailabilityInput": object(["availableEverywhere"], ["availableEverywhere": ["type": "boolean"]]),
             "DuplicateItemTypeInput": object(["name"], ["name": ["type": "string", "minLength": 1]]),
             "ItemType": object(
                 ["id", "revision", "name", "fields", "templates", "provenance", "itemCount"],

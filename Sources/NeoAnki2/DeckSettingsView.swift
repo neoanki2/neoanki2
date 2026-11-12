@@ -1,3 +1,6 @@
+import NeoAnkiApplication
+import NeoAnkiFeatures
+import NeoAnkiSharedUI
 import NeoAnkiCore
 import NeoAnkiTextEditing
 import SwiftUI
@@ -9,6 +12,9 @@ struct DeckSettingsView: View {
     let onSaved: () async -> Void
     let onProgressReset: () async -> Void
 
+    @State private var typesRevision = 0
+    @State private var typeStudio: ItemTypesFeatureModel?
+    @State private var showsTypes = false
     @State private var dismissal = DraftDismissal()
     @State private var isLimited: Bool
     @State private var newCardsPerDay: Int
@@ -38,6 +44,33 @@ struct DeckSettingsView: View {
                     ErrorBanner(message: errorMessage)
                 }
 
+                if let library = decksModel.library as? any LibraryRepository {
+                    Section("Item Types") {
+                        Button("Manage Item Types…") { showsTypes = true }
+                    }
+                    .sheet(isPresented: $showsTypes) {
+                        NavigationStack {
+                            DeckItemTypesView(library: library, deckID: deck.id, refreshToken: typesRevision, onEdit: { type in
+                                if let studioLibrary = library as? any LibraryBrowsing & LibraryItemTypeManaging & LibraryItemTypeEditingSafeguarding & LibraryItemTypeStudioSaving {
+                                    let studio = ItemTypesFeatureModel(library: studioLibrary)
+                                    studio.destinationDeckID = deck.id
+                                    Task { await studio.load(); studio.selectItemType(id: type.id); if !studio.isSelectedItemTypeReadOnly { studio.beginEditingSelectedItemType() }; typeStudio = studio }
+                                }
+                            }, onChanged: onSaved)
+                            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { showsTypes = false } } }
+                        }.frame(minWidth: 520, minHeight: 450)
+                        .sheet(isPresented: Binding(get: { typeStudio != nil }, set: { if !$0 { typeStudio = nil } }), onDismiss: { typesRevision += 1 }) {
+                            if let typeStudio {
+                                NavigationStack {
+                                    TemplatesView(model: typeStudio, onTemplatesChanged: onSaved)
+                                        .toolbar { if typeStudio.studioDraft == nil { ToolbarItem(placement: .cancellationAction) { Button("Done") { self.typeStudio = nil } } } }
+                                }
+                                .interactiveDismissDisabled(typeStudio.studioDraft != nil)
+                                .frame(minWidth: 900, minHeight: 650)
+                            }
+                        }
+                    }
+                }
                 Section {
                     Toggle("Limit new cards per day", isOn: $isLimited)
 

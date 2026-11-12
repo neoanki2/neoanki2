@@ -105,6 +105,13 @@ later refresh; opening the app remains the way to request a current summary.
 
 ## What syncs
 
+Deck type attachments, defaults, inheritance overrides, explicit global
+availability, and imported editing protection sync independently of the schema.
+Unlocking a type does not make it global. Update other devices before changing
+type organization because older clients do not understand these scope records.
+Organization alone leaves card identities and due dates unchanged, so reminder,
+widget, and app-icon counts continue to describe the same existing cards.
+
 Private CloudKit sync includes decks, item types and their persisted templates
 (shown as Card setups), items, card
 state, immutable review and revert history, and shared content-addressed media.

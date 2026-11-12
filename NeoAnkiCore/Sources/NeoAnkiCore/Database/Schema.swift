@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 30
+    static let version = 31
 
     static let createStatements: [String] = [
         """
@@ -613,7 +613,17 @@ enum Schema {
             eventStem: "media",
             idColumn: "hash"
         )
+        + migrationV31Statements
+        + scopeChangeTrackingStatements
         + syncResourceChangeTrackingStatements
+
+    static let migrationV31Statements: [String] = [
+        "CREATE TABLE IF NOT EXISTS item_type_settings (id TEXT PRIMARY KEY NOT NULL REFERENCES item_types(id) ON DELETE CASCADE, definition BLOB NOT NULL);",
+        "CREATE TABLE IF NOT EXISTS deck_item_type_settings (id TEXT PRIMARY KEY NOT NULL REFERENCES decks(id) ON DELETE CASCADE, definition BLOB NOT NULL);",
+    ]
+    static let scopeChangeTrackingStatements: [String] =
+        compoundTrackedTableStatements(table: "item_type_settings", resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'scope:' || NEW.id", oldIDExpression: "'scope:' || OLD.id")
+        + compoundTrackedTableStatements(table: "deck_item_type_settings", resourceType: "itemTypeMembership", eventStem: "itemTypeMembership", newIDExpression: "'configuration:' || NEW.id", oldIDExpression: "'configuration:' || OLD.id")
 
     static func syncChangeTrackingStatements(forExistingTable table: String) -> [String] {
         switch table {

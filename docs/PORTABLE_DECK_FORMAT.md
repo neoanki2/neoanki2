@@ -10,12 +10,12 @@ parent: Reference
 ## 1. Status and scope
 
 This document is the normative specification for **NeoAnki Portable Deck
-Format version 6**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
+Format version 7**. The key words **MUST**, **MUST NOT**, **REQUIRED**,
 **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described by
 RFC 2119 and RFC 8174.
 
 A `.neodeck` file is one SQLite database containing deck structure, item-type
-definitions, deck item-type policies, item content, tags, and media bytes. Version 6 is a
+definitions, deck item-type policies, item content, tags, and media bytes. Version 7 is a
 **content-only** interchange format. It never contains cards, scheduling
 state, review history, statistics, scheduler parameters, suspension state, or
 other learner progress.
@@ -109,7 +109,7 @@ additional tables, columns, views, triggers, and virtual tables are not.
 CREATE TABLE manifest (
     singleton          INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
     format_name        TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-    format_version     INTEGER NOT NULL CHECK (format_version = 6),
+    format_version     INTEGER NOT NULL CHECK (format_version = 7),
     created_at         TEXT NOT NULL,
     exporter           TEXT NOT NULL,
     source_library_id  TEXT NOT NULL,
@@ -503,7 +503,7 @@ the file.
 
 No table or JSON value may contain card IDs, review logs, due dates, memory
 state, scheduler parameters, suspension flags, study statistics, or deletion
-tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 6 has no progress-export
+tombstones, learner study responses, or response-only media. `content_only` is always `1`; version 7 has no progress-export
 option.
 
 ### 8.2 Import validation and type resolution
@@ -692,3 +692,23 @@ exceeds every used group. The image bytes participate in ordinary media
 validation, deduplication, and transfer. Versions 1–5 remain readable but must
 not declare occlusion fields, interactions, or values. Format 6 remains
 content-only and does not export learner scheduling history.
+
+## Version 7 deck-scoped authoring
+
+Version 7 retains the version 6 content representation and adds `deck_type_settings`:
+
+```sql
+CREATE TABLE deck_type_settings(
+    deck_id TEXT PRIMARY KEY NOT NULL REFERENCES decks(id),
+    definition TEXT NOT NULL
+);
+```
+
+`definition` is the JSON encoding of a deck's authoring settings: `deckID`,
+`inherits`, `itemTypeIDs`, and optional `defaultItemTypeID`. Type identifiers must
+reference package definitions, the default must occur in the unique ordered type
+list, and `deckID` must match the row's deck. An empty override is meaningful.
+The exported root materializes inherited settings so importing a subtree does not
+require its original parent. Descendant overrides preserve inheritance choices.
+Global availability is recipient-local and is not granted by an imported package.
+Readers continue accepting supported earlier versions without this table.

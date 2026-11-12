@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ImportView: View {
     @Bindable var model: ImportModel
     let itemTypes: [ItemType]
+    var decks: [DeckSummary] = []
     let scope: StudyScope
     let onCancel: () -> Void
     let onImported: (Int) -> Void
@@ -17,9 +18,13 @@ struct ImportView: View {
                     LabeledContent("File", value: model.selectedFileName)
                     LabeledContent("Format", value: model.format?.rawValue ?? "")
 
+                    Picker("Deck", selection: $model.destinationDeckID) {
+                        Text("Unassigned").tag(UUID?.none)
+                        ForEach(decks) { Text($0.name).tag(Optional($0.id)) }
+                    }
                     if model.needsItemTypeSelection {
                         Picker("Item Type", selection: $model.selectedItemTypeID) {
-                            ForEach(itemTypes) { itemType in
+                            ForEach(model.availableItemTypes) { itemType in
                                 Text(itemType.name).tag(Optional(itemType.id))
                             }
                         }
@@ -118,5 +123,6 @@ struct ImportView: View {
                 _ = model.selectMediaDirectory(directory)
             }
         }
+        .task(id: model.destinationDeckID) { await model.configureTypes() }
     }
 }

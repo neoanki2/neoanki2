@@ -150,13 +150,16 @@ Decks** or **Unassigned**, a new item defaults to **Unassigned**. If the
 library has decks, use the Deck picker in the add form to choose any deck or
 Unassigned before saving.
 
-The form asks for **Deck** before **Item Type** because imported decks can
-provide purpose-built types. Under **For This Deck**, a declared default is
-marked Recommended and selected automatically; a sole included type is also
-selected automatically. If several included types have no default, choose one
-before entering content. Ordinary reusable types remain available under
-**Item Types**, including Basic as an intentional alternative. Types included
-only with unrelated decks never appear.
+The form asks for **Deck** before **Item type**. Its primary type picker shows
+only that deck's effective choices. A valid last successful choice is remembered
+on this device; otherwise the default or sole attached type is selected. Use
+**Use another type…** for common types or deliberate linked reuse from another deck.
+
+Open **Deck Settings → Manage Item Types** to manage attachments and the default.
+Subdecks inherit their parent's choices unless **Use parent’s types** is turned
+off. Removing an attachment changes future authoring choices; it does not remove
+items, generated cards, maturity state, or review history. Moving an item keeps
+its type without adding it to the destination deck's new-item picker.
 
 The **Unassigned** empty state intentionally has no Add Item button; use the
 toolbar's **Add Item** action instead.

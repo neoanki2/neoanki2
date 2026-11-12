@@ -116,6 +116,11 @@ NeoAnki2 creates a local library and seeds two starter item types:
 - **Basic**, with required Front and Back text fields
 - **Cloze**, with a required cloze Text field and optional rich-text Context
 
+Basic and Cloze are available everywhere. Custom types belong to their decks;
+find them through the deck's settings or the explicit **Use another type…** action.
+The global Item Types screen contains **Available Everywhere** and a secondary
+**Needs Organization** list for types whose destination is still undecided.
+
 The starter types define how items generate cards. They do not add sample
 items or decks, so a new library opens to **All Decks** with an empty state.
 

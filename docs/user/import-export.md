@@ -123,6 +123,11 @@ setups. On iPhone and iPad, install the pack through
 
 ## Import JSON or CSV
 
+Choose a destination deck before choosing the CSV item type. Its picker uses
+that deck's types, with common types as the fallback when no types are attached.
+An explicit import into a deck attaches the types it uses without changing the
+deck's default. An ordinary item move does not add an authoring attachment.
+
 Choose **File → Import…**, select one `.json` or `.csv` file, review the import
 sheet, and choose **Import**. Import is unavailable while studying, adding an
 item, managing item types, showing another import sheet, or while a deck
@@ -281,6 +286,11 @@ Choose **File → Import Deck…**, then select either format.
 
 ### Portable `.neodeck`
 
+Portable format 7 preserves deck-scoped type attachments, defaults, and explicit
+empty inheritance overrides. Exporting a subtree materializes the root's inherited
+choices. Supported older formats remain readable; imported definitions stay
+scoped to their decks rather than expanding Available Everywhere.
+
 NeoAnki2 validates the entire portable database—including its format version,
 schema, limits, item-type digests, and media—before changing the library.
 Imported decks, items, and cards receive fresh local identifiers. Media and
@@ -311,6 +321,9 @@ conflict left unresolved, media error, size limit, disk error, or cancellation
 does not leave a partial deck behind.
 
 ### Authored `.neoanki`
+
+Authored batches imported into an existing deck preserve its default and extend
+its attachments.
 
 A `.neoanki` source is a directory bundle whose name ends in `.neoanki`. It has
 this shape:

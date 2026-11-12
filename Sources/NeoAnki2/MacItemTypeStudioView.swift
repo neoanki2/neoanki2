@@ -135,10 +135,16 @@ struct MacItemTypeStudioView: View {
             }
             .accessibilityLabel(saveImpactConfirmationLabel)
             .accessibilityIdentifier("confirmItemTypeStudioSaveImpact")
+            if (pendingSave?.impact.linkedDeckPaths.count ?? 0) > 1 {
+                Button("Make an Independent Copy") {
+                    pendingSave = nil
+                    Task { do { try await model.makeIndependentCopyForCurrentDeck() } catch { errorMessage = error.localizedDescription } }
+                }
+            }
             Button("Review Changes", role: .cancel) { pendingSave = nil }
                 .accessibilityIdentifier("cancelItemTypeStudioSaveImpact")
         } message: {
-            if let impact = pendingSave?.impact { Text(saveImpactMessage(impact)) }
+            if let impact = pendingSave?.impact { Text((impact.linkedDeckPaths.isEmpty ? "" : "Changes affect: " + impact.linkedDeckPaths.joined(separator: ", ") + ".\n") + saveImpactMessage(impact)) }
         }
         .confirmationDialog(
             "Remove \(pendingFieldRemoval?.name ?? "field")?",
@@ -214,6 +220,12 @@ struct MacItemTypeStudioView: View {
             List(selection: $selectedCardSetupID) {
                 Section {
                     VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                        if model.studioDraft?.originalSnapshot == nil {
+                            Picker("Create in", selection: $model.creationDeckID) {
+                                Text("Available Everywhere").tag(UUID?.none)
+                                ForEach(model.decks) { deck in Text(deck.name).tag(Optional(deck.id)) }
+                            }
+                        }
                         Text("Item Type Name").font(.caption).foregroundStyle(.secondary)
                         TextField("Item Type Name", text: draft.name)
                             .textFieldStyle(.roundedBorder)

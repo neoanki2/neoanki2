@@ -281,6 +281,7 @@ struct ContentView: View {
                 ImportView(
                     model: importModel,
                     itemTypes: itemsModel.itemTypes,
+                    decks: decksModel.summaries,
                     scope: decksModel.studyScope,
                     onCancel: { isShowingImport = false },
                     onImported: finishImport
@@ -1101,6 +1102,7 @@ struct ContentView: View {
             else { return }
             templatesModel = ItemTypesFeatureModel(library: studioLibrary)
         }
+        templatesModel?.creationDeckID = decksModel.selectedDeckID
         selectedItemID = nil
         isEditingTemplate = false
         isManagingTemplates = true

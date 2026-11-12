@@ -54,8 +54,10 @@ public struct ItemTypeEditingImpact: Sendable, Equatable {
     public let itemCount: Int
     public let deckCount: Int
     public let unassignedItemCount: Int
+    public let deckPaths: [String]
 
-    public init(itemCount: Int, deckCount: Int, unassignedItemCount: Int) {
+    public init(itemCount: Int, deckCount: Int, unassignedItemCount: Int, deckPaths: [String] = []) {
+        self.deckPaths = deckPaths
         self.itemCount = itemCount
         self.deckCount = deckCount
         self.unassignedItemCount = unassignedItemCount
@@ -103,6 +105,8 @@ public struct IncludedItemTypeGroup: Sendable, Equatable, Identifiable {
 /// The user-facing item-type catalog. `itemTypes` are the unqualified,
 /// reusable definitions; imported definitions are progressively disclosed.
 public struct ItemTypeCatalog: Sendable, Equatable {
+    public let needsOrganization: [ItemType]
+    public let readOnlyIDs: Set<UUID>
     public let itemTypes: [ItemType]
     public let includedWithDecks: [IncludedItemTypeGroup]
     public let corruptions: [QuarantinedItemTypeDefinition]
@@ -110,8 +114,12 @@ public struct ItemTypeCatalog: Sendable, Equatable {
     public init(
         itemTypes: [ItemType],
         includedWithDecks: [IncludedItemTypeGroup],
-        corruptions: [QuarantinedItemTypeDefinition]
+        corruptions: [QuarantinedItemTypeDefinition],
+        needsOrganization: [ItemType] = [],
+        readOnlyIDs: Set<UUID> = []
     ) {
+        self.needsOrganization = needsOrganization
+        self.readOnlyIDs = readOnlyIDs
         self.itemTypes = itemTypes
         self.includedWithDecks = includedWithDecks
         self.corruptions = corruptions
@@ -120,7 +128,7 @@ public struct ItemTypeCatalog: Sendable, Equatable {
     public var allItemTypes: [ItemType] {
         let included = includedWithDecks.flatMap(\.itemTypes)
         var byID: [UUID: ItemType] = [:]
-        for itemType in itemTypes + included {
+        for itemType in itemTypes + included + needsOrganization {
             byID[itemType.id] = itemType
         }
         return byID.values
@@ -202,5 +210,49 @@ private func duplicatedCondition(
         .all(children.map { duplicatedCondition($0, fieldMap: fieldMap) })
     case let .any(children):
         .any(children.map { duplicatedCondition($0, fieldMap: fieldMap) })
+    }
+}
+
+/// Visibility and protection are independent of a definition's schema identity.
+public struct ItemTypeSettings: Codable, Sendable, Equatable {
+    public let itemTypeID: UUID
+    public var isShared: Bool
+    public var isEditable: Bool
+    public init(itemTypeID: UUID, isShared: Bool = false, isEditable: Bool = true) {
+        self.itemTypeID = itemTypeID
+        self.isShared = isShared
+        self.isEditable = isEditable
+    }
+}
+
+/// One atomic sync record owns a deck's complete override, including an empty set.
+public struct DeckItemTypeSettings: Codable, Sendable, Equatable {
+    public let deckID: UUID
+    public var inherits: Bool
+    public var itemTypeIDs: [UUID]
+    public var defaultItemTypeID: UUID?
+    public init(deckID: UUID, inherits: Bool = false, itemTypeIDs: [UUID] = [], defaultItemTypeID: UUID? = nil) {
+        self.deckID = deckID
+        self.inherits = inherits
+        self.itemTypeIDs = itemTypeIDs
+        self.defaultItemTypeID = defaultItemTypeID
+    }
+}
+
+public struct AuthoringItemTypes: Sendable, Equatable {
+    public let deckID: UUID?
+    public let sourceDeckID: UUID?
+    public let itemTypes: [ItemType]
+    public let defaultItemTypeID: UUID?
+    public let usesSharedFallback: Bool
+    public init(deckID: UUID?, sourceDeckID: UUID?, itemTypes: [ItemType], defaultItemTypeID: UUID?, usesSharedFallback: Bool) {
+        self.deckID = deckID
+        self.sourceDeckID = sourceDeckID
+        self.itemTypes = itemTypes
+        self.defaultItemTypeID = defaultItemTypeID
+        self.usesSharedFallback = usesSharedFallback
+    }
+    public var automaticItemTypeID: UUID? {
+        defaultItemTypeID ?? (itemTypes.count == 1 ? itemTypes.first?.id : nil)
     }
 }
