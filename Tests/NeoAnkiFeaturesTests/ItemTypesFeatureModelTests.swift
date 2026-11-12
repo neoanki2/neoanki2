@@ -1264,4 +1264,10 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     #expect(!model.itemTypes.contains { $0.id == saved.id })
     #expect(try await repository.authoringItemTypes(for: deck.id).itemTypes.map(\.id) == [saved.id])
     #expect(try await repository.loadItemTypeCatalog().itemTypes.contains { $0.id == saved.id } == false)
+    try await model.makeIndependentCopyForCurrentDeck()
+    let copy = try #require(model.selectedItemType)
+    #expect(copy.id != saved.id)
+    #expect(try await repository.authoringItemTypes(for: deck.id).itemTypes.contains { $0.id == copy.id })
+    #expect(try await repository.loadItemTypeCatalog().itemTypes.contains { $0.id == copy.id } == false)
+
 }

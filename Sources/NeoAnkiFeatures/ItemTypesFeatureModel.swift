@@ -424,7 +424,8 @@ public final class ItemTypesFeatureModel {
             throw ItemTypesFeatureError.includedItemTypeRequired
         }
         guard let original = itemType(id: selectedItemTypeID) else { throw ItemTypesFeatureError.itemTypeNotFound(selectedItemTypeID) }
-        let duplicate = try await library.createItemType(original.duplicated(name: name), deckID: destinationDeckID, availableEverywhere: destinationDeckID == nil)
+        let targetDeckID = destinationDeckID ?? creationDeckID
+        let duplicate = try await library.createItemType(original.duplicated(name: name), deckID: targetDeckID, availableEverywhere: targetDeckID == nil)
         try await reloadCatalog(selecting: duplicate.id)
         loadState = .ready
         return duplicate
@@ -477,7 +478,8 @@ public final class ItemTypesFeatureModel {
     public func makeIndependentCopyForCurrentDeck() async throws {
         guard let type = selectedItemType else { throw ItemTypesFeatureError.noSelection }
         let source = try studioDraft?.candidateItemType() ?? type
-        let copy = try await library.createItemType(source.duplicated(), deckID: destinationDeckID, availableEverywhere: destinationDeckID == nil)
+        let targetDeckID = destinationDeckID ?? creationDeckID
+        let copy = try await library.createItemType(source.duplicated(), deckID: targetDeckID, availableEverywhere: targetDeckID == nil)
         try await reloadCatalog(selecting: copy.id)
         studioDraft = ItemTypeStudioDraft(itemType: copy)
     }
