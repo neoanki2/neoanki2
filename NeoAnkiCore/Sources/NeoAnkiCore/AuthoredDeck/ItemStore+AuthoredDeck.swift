@@ -183,6 +183,7 @@ extension ItemStore {
             }
             try await database.importPortableDeck(
                 .init(
+                    attachmentDeckID: destinationDeckID,
                     itemTypes: createdTypes,
                     libraryItemTypeIDs: package.usesIncludedItemTypes
                         ? []
@@ -190,11 +191,11 @@ extension ItemStore {
                     decks: destinationDeckID == nil ? package.decks : [],
                     items: importedItems,
                     mappings: [],
-                    includedItemTypes: package.usesIncludedItemTypes ? includedItemTypes : [],
+                    includedItemTypes: includedItemTypes,
                     // A generated item batch must not replace or conflict with
                     // the existing deck's authoring policy. Its types remain
                     // owned by that deck and can still be reused by later batches.
-                    itemTypePolicies: destinationDeckID == nil && package.usesIncludedItemTypes
+                    itemTypePolicies: destinationDeckID == nil
                         ? resolvedPolicies
                         : []
                 ),

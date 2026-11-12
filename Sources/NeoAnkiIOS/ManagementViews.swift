@@ -54,6 +54,10 @@ struct TransferToolsView: View {
     @Bindable var model: MobileAppModel
     @State private var isChoosingFile = false
     @State private var isWorking = false
+    @State private var importDeckID: UUID?
+    @State private var importTypeID: UUID?
+    @State private var importTypes: [ItemType] = []
+    @State private var showImportTypeChooser = false
     @State private var pendingImport: MobileImportPreview?
     @State private var stagedDirectory: URL?
     @State private var progressMessage: String?
@@ -88,6 +92,19 @@ struct TransferToolsView: View {
                         LabeledContent("Format", value: preview.url.pathExtension.uppercased())
                     }
                     if let payload = preview.payload {
+                        Section("Destination") {
+                            Picker("Deck", selection: $importDeckID) {
+                                Text("Unassigned").tag(UUID?.none)
+                                ForEach(model.decks) { Text($0.name).tag(Optional($0.id)) }
+                            }
+                            if preview.url.pathExtension.lowercased() == "csv" {
+                                Picker("Item type", selection: $importTypeID) {
+                                    Text("Choose a type").tag(UUID?.none)
+                                    ForEach(importTypes) { Text($0.name).tag(Optional($0.id)) }
+                                }
+                                Button("Use another type…") { showImportTypeChooser = true }
+                            }
+                        }
                         Section("Preview") {
                             LabeledContent("Item Type", value: payload.itemTypeName)
                             LabeledContent("Items", value: payload.rows.count.formatted())
@@ -111,6 +128,21 @@ struct TransferToolsView: View {
                     ToolbarItem(placement: .confirmationAction) { Button("Import") { Task { await importPreview(preview) } }.disabled(isWorking) }
                 }
                 .interactiveDismissDisabled(isWorking)
+                .task(id: importDeckID) {
+                    let deckID = importDeckID
+                    do {
+                        let choices = try await model.library.authoringItemTypes(for: deckID)
+                        guard deckID == importDeckID else { return }
+                        importTypes = choices.itemTypes
+                        if !importTypes.contains(where: { $0.id == importTypeID }) { importTypeID = choices.automaticItemTypeID }
+                    } catch { errorMessage = error.localizedDescription }
+                }
+                .sheet(isPresented: $showImportTypeChooser) {
+                    ItemTypeChooserView(library: model.library, deckID: importDeckID) { type in
+                        importTypes = (try? await model.library.authoringItemTypes(for: importDeckID).itemTypes) ?? []
+                        importTypeID = type.id
+                    }
+                }
             }
         }
         .alert("Import Failed", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please verify the file and try again.") }
@@ -164,8 +196,10 @@ struct TransferToolsView: View {
             let url = preview.url
             let count: Int
             switch url.pathExtension.lowercased() {
-            case "json": count = try await model.importJSON(Data(contentsOf: url), itemTypeID: nil, deckID: nil)
-            case "csv": count = try await model.importCSV(Data(contentsOf: url), itemTypeID: nil, itemTypeName: "Imported", deckID: nil)
+            case "json": count = try await model.importJSON(Data(contentsOf: url), itemTypeID: nil, deckID: importDeckID)
+            case "csv":
+                guard let type = importTypes.first(where: { $0.id == importTypeID }) else { throw DatabaseError.invalidItemType("Choose an item type for this CSV file.") }
+                count = try await model.importCSV(Data(contentsOf: url), itemTypeID: type.id, itemTypeName: type.name, deckID: importDeckID)
             case "neoanki": count = try await model.importAuthoredBundle(from: url).itemCount
             default: count = try await model.importPortableDeck(from: url, conflict: .useMatchingSchema).itemCount
             }

@@ -2,7 +2,7 @@
 title: Decks
 description: Generated NeoAnki local API operations for decks.
 audience: api
-contract_digest: sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2
+contract_digest: sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092
 parent: Local API reference
 permalink: /api/decks/
 ---
@@ -228,7 +228,33 @@ curl --request GET \
   'http://127.0.0.1:8766/v1/decks/{id}/item-type-policy' \
   --header 'Authorization: Bearer <token>'
 ```
+## `PUT /v1/decks/{id}/item-type-policy`
 
-Contract digest: `sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2`.
+Set deck item type policy through the loopback-only NeoAnki API.
+
+- **Operation ID:** `setDeckItemTypePolicy`
+- **Authorization:** Bearer token with `schemas.write`
+- **Success:** `200` with [ItemTypePolicy]({{ '/api/schemas/#schema-itemtypepolicy' | relative_url }})
+- **Request body:** [DeckItemTypePolicyInput]({{ '/api/schemas/#schema-deckitemtypepolicyinput' | relative_url }})
+- **Success headers:** `X-NeoAnki-Change-Cursor`
+- **Errors:** `default` using the [shared problem format]({{ '/api/errors/' | relative_url }})
+
+### Parameters
+
+- `id` — path; required. Resource identifier.
+- `Idempotency-Key` — header; optional. Caller-generated key used to replay a mutation safely.
+- `If-Match` — header; required. Current quoted resource revision.
+
+### Example request
+
+```bash
+curl --request PUT \
+  'http://127.0.0.1:8766/v1/decks/{id}/item-type-policy' \
+  --header 'Authorization: Bearer <token>' \
+  --header 'Content-Type: application/json' \
+  --data '<request-json>'
+```
+
+Contract digest: `sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

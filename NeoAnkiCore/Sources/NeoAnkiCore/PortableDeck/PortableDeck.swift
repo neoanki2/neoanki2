@@ -135,9 +135,11 @@ struct PortableDeckPackage: Sendable {
     var items: [PortableDeckPersistedItem]
     let media: [PortableDeckMediaRecord]
     let itemTypePolicies: [DeckItemTypePolicyEntry]
+    var deckTypeSettings: [DeckItemTypeSettings] = []
 }
 
 struct PortableDeckImportPlan: Sendable {
+    var attachmentDeckID: UUID? = nil
     let itemTypes: [ItemType]
     let libraryItemTypeIDs: Set<UUID>
     let decks: [Deck]
@@ -145,6 +147,7 @@ struct PortableDeckImportPlan: Sendable {
     let mappings: [PortableDeckTypeMapping]
     let includedItemTypes: [IncludedItemTypeOwner]
     let itemTypePolicies: [DeckItemTypePolicyEntry]
+    var deckTypeSettings: [DeckItemTypeSettings] = []
 }
 
 struct PortableDeckLibrarySnapshot: Sendable {
@@ -155,6 +158,7 @@ struct PortableDeckLibrarySnapshot: Sendable {
     let mappings: [PortableDeckTypeMapping]
     let includedItemTypes: [IncludedItemTypeOwner]
     let itemTypePolicies: [DeckItemTypePolicyEntry]
+    var deckTypeSettings: [DeckItemTypeSettings] = []
 }
 
 struct PortableDeckTypeMapping: Sendable {
@@ -167,7 +171,7 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 6
+    public static let version = 7
     fileprivate static let supportedVersions = 1...version
 
     public static func export(
@@ -425,6 +429,10 @@ private final class PortableDeckDatabase {
                     ]
                 )
             }
+            for settings in package.deckTypeSettings {
+                let json = String(decoding: try JSONEncoder().encode(settings), as: UTF8.self)
+                try execute("INSERT INTO deck_type_settings(deck_id, definition) VALUES (?, ?);", [.text(settings.deckID.uuidString.lowercased()), .text(json)])
+            }
             for record in package.items {
                 let itemID = record.item.id.uuidString.lowercased()
                 try execute(
@@ -521,6 +529,7 @@ private final class PortableDeckDatabase {
         if version >= 3 {
             required.insert("deck_item_types")
         }
+        if version >= 7 { required.insert("deck_type_settings") }
         let actual = Set(try query(
             "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%';"
         ).compactMap { $0.text(0) })
@@ -577,6 +586,7 @@ private final class PortableDeckDatabase {
                 "digest", "kind", "mime_type", "file_extension", "byte_size", "data",
             ],
         ]
+        if formatVersion >= 7 { expected["deck_type_settings"] = ["deck_id", "definition"] }
         if formatVersion >= 3 {
             expected["deck_item_types"] = [
                 "deck_id", "item_type_id", "ordinal", "is_default",
@@ -1046,11 +1056,26 @@ private final class PortableDeckDatabase {
             ))
         }
         try validateMediaReferences(items: items, media: media)
+        var configurations: [DeckItemTypeSettings] = []
+        if formatVersion >= 7 {
+            for row in try query("SELECT deck_id, definition FROM deck_type_settings;") {
+                guard let deckText = row.text(0), let json = row.text(1),
+                      let value = try? JSONDecoder().decode(DeckItemTypeSettings.self, from: Data(json.utf8)),
+                      UUID(uuidString: deckText) == value.deckID, decks.contains(where: { $0.id == value.deckID }),
+                      value.itemTypeIDs.count <= limits.maximumItemTypes,
+                      Set(value.itemTypeIDs).count == value.itemTypeIDs.count,
+                      value.itemTypeIDs.allSatisfy({ id in types.contains { $0.itemType.id == id } }),
+                      value.defaultItemTypeID.map(value.itemTypeIDs.contains) ?? true else {
+                    throw PortableDeckError.invalidPackage("Invalid deck type configuration.")
+                }
+                configurations.append(value)
+            }
+        }
         return .init(
             formatVersion: formatVersion,
             sourceLibraryID: sourceLibraryID, rootDeckID: rootDeckID,
             decks: decks, types: types, items: items, media: media,
-            itemTypePolicies: policies
+            itemTypePolicies: policies, deckTypeSettings: configurations
         )
     }
 
@@ -1759,11 +1784,12 @@ private extension Data {
 }
 
 private let schema = [
+    "CREATE TABLE deck_type_settings(deck_id TEXT PRIMARY KEY NOT NULL REFERENCES decks(id), definition TEXT NOT NULL);",
     """
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 6),
+        format_version INTEGER NOT NULL CHECK (format_version = 7),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),

@@ -684,9 +684,9 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
 }
 
 @Test func loopbackServerServesHTTPAndStopsCleanly() async throws {
-    let portValue = UInt16.random(in: 30_000 ... 50_000)
-    let port = try #require(NWEndpoint.Port(rawValue: portValue))
-    let authority = "127.0.0.1:\(portValue)"
+    // Let the kernel allocate a port atomically; guessing can collide with parallel test runs.
+    let port: NWEndpoint.Port = .any
+    let authority = "127.0.0.1:8766"
     let api = try await makeAPI(authority: authority)
     let unsafeServer = NeoAnkiLocalAPIServer(
         service: api,
@@ -709,8 +709,11 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
 
     try await server.start()
     #expect(await server.isRunning)
-    let url = try #require(URL(string: "http://\(authority)/health"))
-    let (data, response) = try await URLSession.shared.data(from: url)
+    let actualPort = try #require(await server.listeningPort)
+    let url = try #require(URL(string: "http://127.0.0.1:\(actualPort.rawValue)/health"))
+    var healthRequest = URLRequest(url: url)
+    healthRequest.setValue(authority, forHTTPHeaderField: "Host")
+    let (data, response) = try await URLSession.shared.data(for: healthRequest)
     #expect((response as? HTTPURLResponse)?.statusCode == 200)
     let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
     #expect(body == ["status": "ok"])
@@ -720,9 +723,9 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
 }
 
 @Test func openEventStreamClosesAfterClientRevocation() async throws {
-    let portValue = UInt16.random(in: 30_000 ... 50_000)
-    let port = try #require(NWEndpoint.Port(rawValue: portValue))
-    let authority = "127.0.0.1:\(portValue)"
+    // Let the kernel allocate a port atomically; guessing can collide with parallel test runs.
+    let port: NWEndpoint.Port = .any
+    let authority = "127.0.0.1:8766"
     let store = try ItemStore(databaseURL: apiTestDatabaseURL(), starterItemTypes: [])
     try await store.bootstrap()
     let authorization = APIAuthorizationStore(
@@ -746,7 +749,8 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
     )
     try await server.start()
 
-    let connection = NWConnection(host: "127.0.0.1", port: port, using: .tcp)
+    let actualPort = try #require(await server.listeningPort)
+    let connection = NWConnection(host: "127.0.0.1", port: actualPort, using: .tcp)
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
         connection.stateUpdateHandler = { state in
             switch state {
@@ -4607,4 +4611,34 @@ private extension Array where Element == String {
     let rejected = await api.handle(request(.post, "/v1/items", headers: auth.merging(["Idempotency-Key": UUID().uuidString]) { _, new in new }, body: String(decoding: try JSONSerialization.data(withJSONObject: invalid), as: UTF8.self)))
     #expect(rejected.status == 422)
     #expect(try await store.listItems().count == 1)
+}
+
+@Test func itemTypeScopeRoutesKeepDeckDefinitionsOutOfGlobalAuthoring() async throws {
+    let (api, store) = try await makeAPIAndStore()
+    let deck = try await store.createDeck(Deck(name: "Human Body"))
+    let type = try await store.createItemType(BuiltInItemTypes.basic.duplicated(name: "Organ"), deckID: deck.id, availableEverywhere: false)
+    let token = try await pair(api, scopes: ["library.read", "schemas.write"])
+    let headers = ["Authorization": "Bearer \(token)"]
+    let global = await api.handle(request(.get, "/v1/item-types", headers: headers))
+    #expect(global.status == 200)
+    let globalRows = try #require(try jsonObject(global)["data"] as? [[String: Any]])
+    #expect(!globalRows.contains { $0["name"] as? String == "Organ" })
+    let scoped = await api.handle(APIRequest(method: .get, path: "/v1/item-types", query: ["deckId": [deck.id.uuidString.lowercased()]], headers: headers.merging(["Host": "127.0.0.1:8766"]) { _, new in new }))
+    #expect(scoped.status == 200)
+    let scopedRows = try #require(try jsonObject(scoped)["data"] as? [[String: Any]])
+    #expect(scopedRows.map { $0["name"] as? String } == ["Organ"])
+    let override = await api.handle(request(.put, "/v1/decks/\(deck.id.uuidString.lowercased())/item-type-policy", headers: headers,
+        body: """
+        {"inherits":false,"itemTypeIds":["\(type.id.uuidString.lowercased())"],"defaultItemTypeId":"\(type.id.uuidString.lowercased())"}
+        """))
+    #expect(override.status == 200)
+    #expect(try await store.authoringItemTypes(for: deck.id).defaultItemTypeID == type.id)
+    let share = await api.handle(request(.put, "/v1/item-types/\(type.id.uuidString.lowercased())/availability", headers: headers,
+        body: "{\"availableEverywhere\":true}"))
+    #expect(share.status == 200)
+    #expect(try await store.authoringItemTypes(for: nil).itemTypes.contains { $0.id == type.id })
+    let empty = await api.handle(request(.put, "/v1/decks/\(deck.id.uuidString.lowercased())/item-type-policy", headers: headers,
+        body: "{\"inherits\":false,\"itemTypeIds\":[]}"))
+    #expect(empty.status == 200)
+    #expect(try await store.authoringItemTypes(for: deck.id).usesSharedFallback)
 }

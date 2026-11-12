@@ -119,6 +119,9 @@ final class ImportModel {
     private(set) var isImporting = false
     private(set) var errorMessage: String?
     private(set) var importedCount: Int?
+    var destinationDeckID: UUID?
+    private(set) var availableItemTypes: [ItemType] = []
+    private var typesGeneration = 0
     var selectedItemTypeID: ItemType.ID?
 
     private let itemsModel: ItemsModel
@@ -136,6 +139,19 @@ final class ImportModel {
         self.library = library
         self.scopedAccess = scopedAccess
         self.fileInspector = fileInspector
+    }
+
+    func configureTypes() async {
+        typesGeneration += 1
+        let generation = typesGeneration
+        do {
+            let result = try await itemsModel.library.authoringItemTypes(for: destinationDeckID)
+            guard generation == typesGeneration else { return }
+            availableItemTypes = result.itemTypes
+            if !availableItemTypes.contains(where: { $0.id == selectedItemTypeID }) {
+                selectedItemTypeID = result.automaticItemTypeID
+            }
+        } catch { errorMessage = error.localizedDescription }
     }
 
     var selectedFileName: String {
@@ -277,6 +293,10 @@ final class ImportModel {
                 )
             }
 
+            if let destinationDeckID {
+                for id in Set(imported.map(\.itemTypeID)) { try await itemsModel.library.attachItemType(id: id, to: destinationDeckID) }
+                for item in imported { _ = try await itemsModel.library.moveItem(id: item.id, to: destinationDeckID) }
+            }
             importedCount = imported.count
             await itemsModel.applyImportedItems(imported, scope: scope)
             return true

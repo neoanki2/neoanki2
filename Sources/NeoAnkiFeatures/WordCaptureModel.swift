@@ -21,6 +21,7 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
 /// Shared capture state. Search and per-entry choices never become saved pair configuration.
 @MainActor @Observable public final class WordCaptureModel {
     public private(set) var decks: [DeckSummary] = []
+    public private(set) var authoringTypes: [ItemType] = []
     public private(set) var itemTypes: [ItemType] = []
     public private(set) var packs: [InstalledVocabularyPack] = []
     public private(set) var deckID: UUID?
@@ -47,7 +48,7 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
     public private(set) var focusGeneration = 0
     public private(set) var manualEntry = false
     public let lookup: DictionaryLookupModel
-    private let library: any LibraryRepository
+    public let library: any LibraryRepository
     private let rootURL: URL
     private let configurationStore: any VocabularyDeckConfigurationStoring
     private let onSaved: @MainActor () async -> Void
@@ -105,6 +106,7 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
             if let id = deckID, !decks.contains(where: { $0.id == id }) { deckID = nil }
             dictionaryID = deckID.flatMap { preferences.lastDictionaryByDeck[$0] } ?? packs.first?.id
             rememberPair()
+            await refreshAuthoringTypes()
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -113,14 +115,30 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
         itemTypes = catalog.allItemTypes
         decks = try await library.deckSummaries(asOf: .now)
         packs = try await InstalledVocabularyPackStore(rootURL: rootURL).installedPacks()
+        await refreshAuthoringTypes()
     }
 
     public func selectDeck(_ id: UUID?) {
         guard !isSaving, id != deckID else { return }
         clearDerivedDraft()
         deckID = id
+        Task { await refreshAuthoringTypes() }
         if let id, let previous = preferences.lastDictionaryByDeck[id] { dictionaryID = previous }
         rememberPair()
+    }
+
+    public func refreshAuthoringTypes() async {
+        let requested = deckID
+        do {
+            let choices = try await library.authoringItemTypes(for: requested)
+            guard requested == deckID else { return }
+            authoringTypes = choices.itemTypes
+        } catch { errorMessage = error.localizedDescription }
+    }
+    public func attachAuthoringType(_ type: ItemType) async throws {
+        guard let deckID else { return }
+        try await library.attachItemType(id: type.id, to: deckID)
+        try await reloadCatalog()
     }
 
     public func selectDictionary(_ id: String?) {

@@ -631,6 +631,8 @@ private struct DeckSettingsMobileView: View {
     @State private var limitEnabled = false
     @State private var newCardLimit = 20
     @State private var errorMessage: String?
+    @State private var typesRevision = 0
+    @State private var typeStudio: ItemTypesFeatureModel?
     @State private var deletionImpact: DeckDeletionImpact?
     @State private var resetImpact: DeckResetImpact?
 
@@ -644,6 +646,17 @@ private struct DeckSettingsMobileView: View {
                         ForEach(model.decks.filter { $0.id != deckID }) { Text($0.name).tag(Optional($0.id)) }
                     }
                 }
+                Section("Item Types") {
+                    NavigationLink("Manage Item Types") {
+                        DeckItemTypesView(library: model.library, deckID: deckID, refreshToken: typesRevision, onEdit: { type in
+                            if let library = model.itemTypeStudioLibrary {
+                                let studio = ItemTypesFeatureModel(library: library)
+                                studio.destinationDeckID = deckID
+                                Task { await studio.load(); studio.selectItemType(id: type.id); studio.beginEditingSelectedItemType(); typeStudio = studio }
+                            }
+                        }, onChanged: { await model.authoringDidCommit() })
+                    }
+                }
                 Section("Daily New Cards") {
                     Toggle("Limit new cards", isOn: $limitEnabled)
                     Stepper("\(newCardLimit) per day", value: $newCardLimit, in: 0...999).disabled(!limitEnabled)
@@ -654,6 +667,9 @@ private struct DeckSettingsMobileView: View {
                 Section { Button("Delete Deck", role: .destructive) { Task { deletionImpact = try? await model.deckDeletionImpact(id: deckID, policy: .unassignItems) } } }
             }
             .navigationTitle("Deck Settings").navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: Binding(get: { typeStudio != nil }, set: { if !$0 { typeStudio = nil } }), onDismiss: { typesRevision += 1 }) {
+                if let typeStudio { NavigationStack { ItemTypeStudioMobileView(model: typeStudio, reloadLibrary: { await model.authoringDidCommit() }) } }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }

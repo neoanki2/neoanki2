@@ -80,7 +80,7 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     // Digest reuse must never remove the destination's existing normal status.
     let catalog = try await destination.loadItemTypeCatalog()
     #expect(catalog.itemTypes.contains { $0.id == policy.itemTypes[0].id })
-    #expect(catalog.includedWithDecks.isEmpty)
+    #expect(!catalog.includedWithDecks.isEmpty)
 }
 
 @Test func portableDeckExportScopesItemsToSelectedHierarchyInLargeLibrary() async throws {
