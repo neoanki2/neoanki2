@@ -16,6 +16,11 @@ struct AddItemView: View {
     @State private var occlusionDraftReferences: [MediaRef] = []
     @State private var fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
     @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
+    @State private var actionError: String?
+    @State private var showTypeChooser = false
+    @State private var deckRequestGeneration = 0
+    @State private var pendingDeckID: UUID?
+    @State private var showDeckChangeConfirmation = false
     @State private var selectedDeckID: UUID?
     @State private var isSaving = false
     @State private var processingAttachments = 0
@@ -48,62 +53,20 @@ struct AddItemView: View {
 
     var body: some View {
         Form {
-            if !isEditing, !decksModel.summaries.isEmpty || selectedDeckID != nil {
-                Section("Deck") {
-                    Picker("Deck", selection: $selectedDeckID) {
-                        Text("Unassigned").tag(UUID?.none)
-                        ForEach(decksModel.summaries) { deck in
-                            Text(deck.name).tag(Optional(deck.id))
-                        }
-                    }
-                    .accessibilityIdentifier("addItemDeckPicker")
-                }
-            }
-
             if !isEditing {
-                Section("Item Type") {
-                    Picker("Type", selection: addItemTypeBinding) {
-                        Text("Choose an Item Type")
-                            .tag(ItemType.ID?.none)
-                        if !model.policyItemTypes.isEmpty {
-                            Section("For This Deck") {
-                                ForEach(model.policyItemTypes) { type in
-                                    if model.isRecommendedItemType(type.id) {
-                                        Text("\(type.name) — Recommended")
-                                            .tag(Optional(type.id))
-                                    } else {
-                                        Text(type.name)
-                                            .tag(Optional(type.id))
-                                    }
-                                }
-                            }
-                        }
-                        if let retained = model.retainedItemType {
-                            Section("Current Item Type") {
-                                Text("\(retained.name) — Retained")
-                                    .tag(Optional(retained.id))
-                            }
-                        }
-                        Section("Item Types") {
-                            ForEach(model.normalItemTypes) { type in
-                                Text(type.name).tag(Optional(type.id))
-                            }
-                        }
+                Section {
+                    Picker("Deck", selection: deckBinding) {
+                        Text("Unassigned").tag(UUID?.none)
+                        ForEach(decksModel.summaries) { deck in Text(deck.name).tag(Optional(deck.id)) }
+                    }.accessibilityIdentifier("addItemDeckPicker")
+                    Picker("Item type", selection: addItemTypeBinding) {
+                        Text("Choose a type").tag(ItemType.ID?.none)
+                        ForEach(model.policyItemTypes) { type in Text(type.name).tag(Optional(type.id)) }
                     }
-                    .accessibilityLabel("Item Type")
-                    .accessibilityHint(
-                        "Types included for this deck appear first. Ordinary Item Types are always available."
-                    )
                     .accessibilityIdentifier("addItemTypePicker")
                     .disabled(processingAttachments > 0)
-
-                    if model.effectiveItemTypePolicy != nil,
-                       model.addItemTypeID == nil {
-                        Text("Choose the item type that matches what you want to add.")
-                            .font(DesignSystem.Typography.uiCaption)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("addItemTypeChoiceRequired")
-                    }
+                    Button("Use another type…") { showTypeChooser = true }
+                        .disabled(processingAttachments > 0)
                 }
             }
 
@@ -116,14 +79,14 @@ struct AddItemView: View {
                         )
                     }.id(itemType.id)
                 }
-                Section(itemType.name) {
+                Section {
                     ForEach(itemType.fields) { field in
                         fieldEditor(for: field)
                     }
                 }
             }
 
-            if let errorMessage = model.errorMessage {
+            if let errorMessage = actionError ?? model.errorMessage {
                 Section {
                     ErrorBanner(message: errorMessage)
                 }
@@ -160,22 +123,38 @@ struct AddItemView: View {
             guard !isEditing else { return }
             await model.configureAddItem(for: selectedDeckID)
         }
-        .onChange(of: selectedDeckID) { _, deckID in
-            guard didInitialize, !isEditing else { return }
-            model.addItemDeckID = deckID
-            let shouldResolve = !hasEnteredContent
-            Task {
-                await model.configureAddItem(
-                    for: deckID,
-                    resolveSelection: shouldResolve
-                )
-            }
-        }
         .onChange(of: model.addItemTypeID) { _, _ in
             guard !isEditing else { return }
             resetFields()
             initialSnapshot = currentSnapshot
         }
+        .sheet(isPresented: $showTypeChooser) {
+            ItemTypeChooserView(library: model.library, deckID: selectedDeckID) { type in
+                await model.configureAddItem(for: selectedDeckID, resolveSelection: false)
+                addItemTypeBinding.wrappedValue = type.id
+            }
+        }
+        .confirmationDialog("Use this type in the new deck?", isPresented: $showDeckChangeConfirmation, titleVisibility: .visible) {
+            if pendingDeckID != nil {
+                Button("Attach Type and Keep Content") {
+                    Task {
+                        do {
+                            if let id = itemType?.id, let deck = pendingDeckID { try await model.library.attachItemType(id: id, to: deck) }
+                            selectedDeckID = pendingDeckID; model.addItemDeckID = pendingDeckID
+                            await model.configureAddItem(for: selectedDeckID, resolveSelection: false)
+                        } catch { actionError = error.localizedDescription }
+                    }
+                }
+            }
+            Button("Clear Content and Change Deck", role: .destructive) {
+                Task {
+                    selectedDeckID = pendingDeckID; model.addItemDeckID = pendingDeckID
+                    await model.configureAddItem(for: selectedDeckID)
+                    resetFields()
+                }
+            }
+            Button("Keep Original Deck", role: .cancel) {}
+        } message: { Text("The current type is not available in that deck. Your entered content has been kept.") }
         .confirmationDialog(
             "Discard item changes?",
             isPresented: $showDiscardConfirmation,
@@ -248,6 +227,26 @@ struct AddItemView: View {
             )
             .focused($focusedFieldID, equals: field.id)
         }
+    }
+
+    private var deckBinding: Binding<UUID?> {
+        Binding(get: { selectedDeckID }, set: { deckID in
+            guard deckID != selectedDeckID, !isSaving, processingAttachments == 0 else { return }
+            deckRequestGeneration += 1
+            let generation = deckRequestGeneration
+            Task {
+                do {
+                    let choices = try await model.library.authoringItemTypes(for: deckID)
+                    guard generation == deckRequestGeneration, !isSaving else { return }
+                    if hasEnteredContent, let id = itemType?.id, !choices.itemTypes.contains(where: { $0.id == id }) {
+                        pendingDeckID = deckID; showDeckChangeConfirmation = true
+                    } else {
+                        selectedDeckID = deckID; model.addItemDeckID = deckID
+                        await model.configureAddItem(for: deckID, resolveSelection: !hasEnteredContent)
+                    }
+                } catch { if generation == deckRequestGeneration { actionError = error.localizedDescription } }
+            }
+        })
     }
 
     private var addItemTypeBinding: Binding<ItemType.ID?> {

@@ -15,6 +15,7 @@ public protocol LibraryBrowsing: Sendable {
     func libraryID() async throws -> UUID
     func loadItemTypes() async throws -> ItemTypeLoadResult
     func loadItemTypeCatalog() async throws -> ItemTypeCatalog
+    func authoringItemTypes(for deckID: UUID?) async throws -> AuthoringItemTypes
     func effectiveItemTypePolicy(for deckID: UUID) async throws -> DeckItemTypePolicy?
     func items(
         scope: DeckScope,
@@ -74,6 +75,10 @@ public protocol LibraryDeckManaging: Sendable {
 }
 
 public protocol LibraryItemTypeManaging: Sendable {
+    func createItemType(_ type: ItemType, deckID: UUID?, availableEverywhere: Bool) async throws -> ItemType
+    func attachItemType(id: UUID, to deckID: UUID) async throws
+    func setDeckItemTypes(_ settings: DeckItemTypeSettings) async throws
+    func setItemTypeAvailability(id: UUID, availableEverywhere: Bool) async throws
     func createItemType(_ itemType: ItemType) async throws -> ItemType
     func updateItemType(_ itemType: ItemType, asOf: Date) async throws -> ItemType
     func duplicateItemType(id: UUID, name: String) async throws -> ItemType
@@ -712,6 +717,14 @@ public actor SQLiteLibraryRepository:
         try await store.resetDeckProgress(id: id, now: asOf)
     }
 
+    public func authoringItemTypes(for deckID: UUID?) async throws -> AuthoringItemTypes { try await store.authoringItemTypes(for: deckID) }
+    public func createItemType(_ type: ItemType, deckID: UUID?, availableEverywhere: Bool) async throws -> ItemType {
+        try await store.createItemType(type, deckID: deckID, availableEverywhere: availableEverywhere)
+    }
+    public func attachItemType(id: UUID, to deckID: UUID) async throws { try await store.attachItemType(id: id, to: deckID) }
+    public func setDeckItemTypes(_ settings: DeckItemTypeSettings) async throws { try await store.setDeckItemTypes(settings) }
+    public func setItemTypeAvailability(id: UUID, availableEverywhere: Bool) async throws { try await store.setItemTypeAvailability(id: id, availableEverywhere: availableEverywhere) }
+
     public func createItemType(_ itemType: ItemType) async throws -> ItemType {
         try await store.createItemType(itemType)
     }
@@ -1009,4 +1022,29 @@ extension SQLiteLibraryRepository: LibraryScenarioSeeding {
     public func corruptItemTypeDefinitionForTesting(id: UUID) async throws {
         try await store.testingCorruptItemTypeDefinition(id: id)
     }
+}
+
+
+// Compatibility defaults for read-only/older repository implementations.
+public extension LibraryBrowsing {
+    func authoringItemTypes(for deckID: UUID?) async throws -> AuthoringItemTypes {
+        let policy: DeckItemTypePolicy?
+        if let deckID { policy = try await effectiveItemTypePolicy(for: deckID) } else { policy = nil }
+        let catalog = try await loadItemTypeCatalog()
+        let fallback = policy?.itemTypes.isEmpty != false
+        let choices = fallback ? catalog.itemTypes : policy!.itemTypes
+        return AuthoringItemTypes(deckID: deckID, sourceDeckID: policy?.sourceDeckID, itemTypes: choices,
+            defaultItemTypeID: fallback ? choices.first { $0.id == BuiltInItemTypes.basicID }?.id : policy?.defaultItemTypeID,
+            usesSharedFallback: fallback)
+    }
+}
+public extension LibraryItemTypeManaging {
+    func createItemType(_ type: ItemType, deckID: UUID?, availableEverywhere: Bool) async throws -> ItemType {
+        let created = try await createItemType(type)
+        if let deckID { try await attachItemType(id: created.id, to: deckID) }
+        return created
+    }
+    func attachItemType(id: UUID, to deckID: UUID) async throws { throw DatabaseError.invalidItemType("This library does not support deck attachments.") }
+    func setDeckItemTypes(_ settings: DeckItemTypeSettings) async throws { throw DatabaseError.invalidItemType("This library does not support deck type settings.") }
+    func setItemTypeAvailability(id: UUID, availableEverywhere: Bool) async throws { throw DatabaseError.invalidItemType("This library does not support type availability settings.") }
 }

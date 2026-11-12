@@ -467,7 +467,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
         fields: [front, back, notes],
         templates: [basic, audio]
     )
-    _ = try await repository.createItemType(itemType)
+    _ = try await repository.createItemType(itemType, deckID: nil, availableEverywhere: true)
     let item = Item(
         itemTypeID: itemType.id,
         fields: [
@@ -650,7 +650,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
     try await repository.bootstrap()
     let cloze = BuiltInItemTypes.cloze.duplicated(name: "Cloze impact")
-    _ = try await repository.createItemType(cloze)
+    _ = try await repository.createItemType(cloze, deckID: nil, availableEverywhere: true)
     let textID = try #require(cloze.field(named: "Text")?.id)
     _ = try await repository.createItem(Item(itemTypeID: cloze.id, fields: [
         FieldValue(
@@ -1104,7 +1104,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     }
 
     let impact = try await model.editingImpactForSelectedIncludedItemType()
-    #expect(impact == .init(itemCount: 0, deckCount: 0, unassignedItemCount: 0))
+    #expect(impact == .init(itemCount: 0, deckCount: 0, unassignedItemCount: 0, deckPaths: ["Included"]))
     let exactImpact = try await model.editingImpactForIncludedItemType(id: included.id)
     #expect(exactImpact == impact)
     let duplicate = try await model.duplicateSelectedIncludedItemType(name: "Editable Study")
@@ -1201,7 +1201,8 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     #expect(try await model.itemTypeEditingImpact(id: included.id) == .init(
         itemCount: 0,
         deckCount: 0,
-        unassignedItemCount: 0
+        unassignedItemCount: 0,
+        deckPaths: ["Included"]
     ))
     var riskyEdit = included
     riskyEdit.fields.removeLast()
@@ -1210,7 +1211,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     #expect(impact.requiresConfirmation == false)
 
     try await model.unlockItemType(id: included.id)
-    #expect(model.includedItemTypeOwner(id: included.id) == nil)
+    #expect(model.includedItemTypeOwner(id: included.id) != nil)
     #expect(model.itemTypes.contains { $0.id == included.id })
 }
 

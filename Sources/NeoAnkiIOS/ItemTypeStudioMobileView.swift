@@ -89,22 +89,26 @@ struct ItemTypeStudioCatalogMobileView: View {
     private var catalog: some View {
         List {
             if !model.itemTypes.isEmpty {
-                Section("My Item Types") {
+                Section(model.destinationDeckID == nil ? "Available Everywhere" : "This Deck") {
                     ForEach(model.itemTypes) { itemType in
                         itemTypeButton(itemType, owner: nil)
                     }
                 }
             }
 
-            ForEach(model.includedItemTypeGroups) { group in
-                Section {
-                    ForEach(group.itemTypes) { itemType in
-                        itemTypeButton(itemType, owner: group)
+            if !model.needsOrganization.isEmpty, model.destinationDeckID == nil {
+                DisclosureGroup("Needs Organization") {
+                    ForEach(model.needsOrganization) { type in
+                        itemTypeButton(type, owner: nil)
+                            .contextMenu {
+                                Button("Make Available Everywhere") { model.selectItemType(id: type.id); Task { do { try await model.makeSelectedTypeAvailableEverywhere() } catch { errorMessage = error.localizedDescription } } }
+                                Menu("Attach to Deck") {
+                                    ForEach(model.decks) { deck in
+                                        Button(deck.name) { model.selectItemType(id: type.id); Task { do { try await model.attachSelectedType(to: deck.id) } catch { errorMessage = error.localizedDescription } } }
+                                    }
+                                }
+                            }
                     }
-                } header: {
-                    Text(group.deckPath)
-                } footer: {
-                    Text("Deck-provided item types are read-only until you unlock or duplicate them.")
                 }
             }
 
@@ -129,7 +133,7 @@ struct ItemTypeStudioCatalogMobileView: View {
                 }
             }
 
-            if model.itemTypes.isEmpty && model.includedItemTypeGroups.isEmpty
+            if model.itemTypes.isEmpty && model.needsOrganization.isEmpty
                 && model.corruptedDefinitions.isEmpty {
                 ContentUnavailableView(
                     "No Item Types",
@@ -274,9 +278,12 @@ struct ItemTypeStudioMobileView: View {
                 pendingSave = nil
                 Task { await commit(preparation) }
             }
+            if (pendingSave?.impact.linkedDeckPaths.count ?? 0) > 1 {
+                Button("Make an Independent Copy") { pendingSave = nil; Task { do { try await model.makeIndependentCopyForCurrentDeck() } catch { errorMessage = error.localizedDescription } } }
+            }
             Button("Keep Editing", role: .cancel) { pendingSave = nil }
         } message: {
-            if let pendingSave { Text(saveImpactMessage(pendingSave.impact)) }
+            if let pendingSave { Text((pendingSave.impact.linkedDeckPaths.isEmpty ? "" : "Changes affect: " + pendingSave.impact.linkedDeckPaths.joined(separator: ", ") + ".\n") + saveImpactMessage(pendingSave.impact)) }
         }
         .confirmationDialog(
             "Unlock this item type?",
@@ -438,6 +445,12 @@ struct ItemTypeStudioMobileView: View {
 
     private var identitySection: some View {
         Section("Item Type") {
+            if model.studioDraft?.originalSnapshot == nil {
+                Picker("Create in", selection: $model.destinationDeckID) {
+                    Text("Available Everywhere").tag(UUID?.none)
+                    ForEach(model.decks) { deck in Text(deck.name).tag(Optional(deck.id)) }
+                }
+            }
             if let draftBinding {
                 TextField("Name", text: draftBinding.name)
                     .focused($textFocus, equals: .name)

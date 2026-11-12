@@ -2,7 +2,7 @@
 title: Vocabulary
 description: Generated NeoAnki local API operations for vocabulary.
 audience: api
-contract_digest: sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2
+contract_digest: sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092
 parent: Local API reference
 permalink: /api/vocabulary/
 ---
@@ -315,6 +315,6 @@ curl --request HEAD \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:68c58baff8b3a9c015f582d8d665fd171fd78084987de6e9f903a77c4c49f4c2`.
+Contract digest: `sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

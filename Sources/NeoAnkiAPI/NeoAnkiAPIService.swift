@@ -603,11 +603,26 @@ public actor NeoAnkiAPIService {
                 default:
                     break
                 }
+            } else if components.count == 4, components[3] == "availability", request.method == .put {
+                try require(grant, scope: .schemasWrite)
+                let input = try APIJSON.decodeStrict(ItemTypeAvailabilityInput.self, from: request.body, allowedKeys: ["availableEverywhere"])
+                try await store.setItemTypeAvailability(id: itemTypeID, availableEverywhere: input.availableEverywhere)
+                return try await getItemType(itemTypeID)
             } else if components.count == 4, components[3] == "duplicate",
                       request.method == .post {
                 try require(grant, scope: .schemasWrite)
                 return try await duplicateItemType(itemTypeID, request: request)
             }
+        }
+
+        if components.count == 4, components[0] == "v1", components[1] == "decks",
+           components[3] == "item-type-policy", request.method == .put {
+            try require(grant, scope: .schemasWrite)
+            let deckID = try parseUUID(components[2], pointer: "/id")
+            let input = try APIJSON.decodeStrict(DeckItemTypePolicyInput.self, from: request.body, allowedKeys: ["inherits", "itemTypeIds", "defaultItemTypeId"])
+            let ids = try input.itemTypeIds.map { try parseUUID($0, pointer: "/itemTypeIds") }
+            try await store.setDeckItemTypes(.init(deckID: deckID, inherits: input.inherits, itemTypeIDs: ids, defaultItemTypeID: try input.defaultItemTypeId.map { try parseUUID($0, pointer: "/defaultItemTypeId") }))
+            return try await deckItemTypePolicy(deckID)
         }
 
         if components.count == 4, components[0] == "v1", components[1] == "decks",
@@ -2942,22 +2957,35 @@ public actor NeoAnkiAPIService {
     }
 
     private func listItemTypes(_ request: APIRequest) async throws -> APIResponse {
-        try validateQuery(request.query, allowed: ["cursor", "limit"])
+        try validateQuery(request.query, allowed: ["cursor", "limit", "deckId", "scope"])
         let limit = try pageLimit(request.query)
         let catalog = try await store.loadItemTypeCatalog()
         var provenance: [UUID: String] = [:]
         for itemType in catalog.itemTypes { provenance[itemType.id] = "library" }
         for group in catalog.includedWithDecks {
-            for itemType in group.itemTypes {
+            for itemType in group.itemTypes where provenance[itemType.id] == nil {
                 provenance[itemType.id] = "deck:\(group.rootDeck.id.uuidString.lowercased())"
             }
         }
-        let types = try await store.listItemTypes().sorted {
+        for type in catalog.needsOrganization { provenance[type.id] = "needsOrganization" }
+        let cursorRoute = "/v1/item-types:" + (request.query["deckId"]?.first.map { "deck:\($0)" } ?? "scope:\(request.query["scope"]?.first ?? "shared")")
+        let scoped: [ItemType]
+        if let id = request.query["deckId"]?.first {
+            scoped = try await store.authoringItemTypes(for: parseUUID(id, pointer: "/deckId")).itemTypes
+        } else {
+            switch request.query["scope"]?.first ?? "shared" {
+            case "shared": scoped = catalog.itemTypes
+            case "all": scoped = catalog.allItemTypes
+            case "needsOrganization": scoped = catalog.needsOrganization
+            default: throw APIServiceError.validation("Choose shared, all, or needsOrganization.", pointer: "/scope")
+            }
+        }
+        let types = scoped.sorted {
             $0.name == $1.name ? $0.id.uuidString < $1.id.uuidString : $0.name < $1.name
         }
         let offset: Int
         if let cursor = request.query["cursor"]?.first {
-            offset = try await decodeCursor(cursor, route: "/v1/item-types")
+            offset = try await decodeCursor(cursor, route: cursorRoute)
         } else { offset = 0 }
         guard offset <= types.count else { throw invalidCursor() }
         let end = min(offset + limit, types.count)
@@ -2965,11 +2993,11 @@ public actor NeoAnkiAPIService {
         for itemType in types[offset ..< end] {
             data.append(try await itemTypeRepresentation(
                 itemType,
-                provenance: provenance[itemType.id] ?? "library"
+                provenance: provenance[itemType.id] ?? "needsOrganization"
             ))
         }
         let next = end < types.count
-            ? try await encodedCursor(route: "/v1/item-types", offset: end)
+            ? try await encodedCursor(route: cursorRoute, offset: end)
             : nil
         return try .json(APICollection(data: data, page: .init(nextCursor: next, limit: limit)))
     }
@@ -2986,7 +3014,7 @@ public actor NeoAnkiAPIService {
             )
         }
         let itemType = try domainItemType(input, id: id)
-        _ = try await store.createItemType(itemType)
+        _ = try await store.createItemType(itemType, deckID: try input.deckId.map { try parseUUID($0, pointer: "/deckId") }, availableEverywhere: input.availableEverywhere ?? false)
         let representation = try await itemTypeRepresentation(itemType)
         return try .json(
             status: 201,
@@ -3121,7 +3149,7 @@ public actor NeoAnkiAPIService {
         return try APIJSON.decodeStrict(
             ItemTypeInput.self,
             from: body,
-            allowedKeys: ["id", "name", "fields", "templates"]
+            allowedKeys: ["id", "name", "fields", "templates", "deckId", "availableEverywhere"]
         )
     }
 
@@ -3140,16 +3168,20 @@ public actor NeoAnkiAPIService {
 
     private func itemTypeRepresentation(
         _ itemType: ItemType,
-        provenance: String = "library"
+        provenance: String? = nil
     ) async throws -> APIItemType {
-        APIItemType(
-            itemType,
-            revision: try await revision(
-                resourceType: "itemType", resourceID: itemType.id.uuidString
-            ),
-            itemCount: try await store.countItems(itemTypeID: itemType.id),
-            provenance: provenance
-        )
+        let resolvedProvenance: String
+        if let provenance { resolvedProvenance = provenance }
+        else {
+            let catalog = try await store.loadItemTypeCatalog()
+            if catalog.itemTypes.contains(where: { $0.id == itemType.id }) { resolvedProvenance = "library" }
+            else if let group = catalog.includedWithDecks.first(where: { $0.itemTypes.contains { $0.id == itemType.id } }) {
+                resolvedProvenance = "deck:\(group.rootDeck.id.uuidString.lowercased())"
+            } else { resolvedProvenance = "needsOrganization" }
+        }
+        return APIItemType(itemType,
+            revision: try await revision(resourceType: "itemType", resourceID: itemType.id.uuidString),
+            itemCount: try await store.countItems(itemTypeID: itemType.id), provenance: resolvedProvenance)
     }
 
     private func itemTypeImpact(

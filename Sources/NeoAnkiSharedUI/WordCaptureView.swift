@@ -391,6 +391,7 @@ private struct WordCaptureSetupView: View {
     @State private var bindings: [VocabularyFieldBinding] = []
     @State private var errorMessage: String?
     @State private var didInitialize = false
+    @State private var showsTypeChooser = false
     private var type: ItemType? { model.itemTypes.first { $0.id == typeID } }
 
     var body: some View {
@@ -404,8 +405,17 @@ private struct WordCaptureSetupView: View {
                 Section("Card setup") {
                     Picker("Item type", selection: $typeID) {
                         Text("Choose an item type").tag(UUID?.none)
-                        ForEach(model.itemTypes) { type in Text(type.name).tag(Optional(type.id)) }
+                        ForEach(model.authoringTypes) { type in Text(type.name).tag(Optional(type.id)) }
+                        if let current = model.itemTypes.first(where: { $0.id == typeID }), !model.authoringTypes.contains(where: { $0.id == current.id }) {
+                            Text("\(current.name) — Current setup").tag(Optional(current.id))
+                        }
                     }.accessibilityIdentifier("word-capture-setup-type")
+                    Button("Use another type…") { showsTypeChooser = true }
+                        .sheet(isPresented: $showsTypeChooser) {
+                            ItemTypeChooserView(library: model.library, deckID: model.deckID) { selected in
+                                try? await model.reloadCatalog(); typeID = selected.id
+                            }
+                        }
                 }
                 if let type {
                     ForEach(type.fields) { field in
@@ -463,7 +473,7 @@ private struct WordCaptureSetupView: View {
             .onAppear {
                 guard !didInitialize else { return }
                 didInitialize = true
-                typeID = model.configuration?.itemTypeID ?? (model.itemTypes.count == 1 ? model.itemTypes.first?.id : nil)
+                typeID = model.configuration?.itemTypeID ?? (model.authoringTypes.count == 1 ? model.authoringTypes.first?.id : nil)
                 resetBindings()
             }
             .onChange(of: typeID) { _, _ in resetBindings() }

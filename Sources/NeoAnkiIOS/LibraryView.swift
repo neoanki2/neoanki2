@@ -221,6 +221,14 @@ struct AddItemView: View {
     @FocusState private var focusedField: UUID?
     @Bindable var model: MobileAppModel
     @State private var confirmsDiscard = false
+    @State private var typeChoices: [ItemType] = []
+    @State private var showTypeChooser = false
+    @State private var pendingTypeID: UUID?
+    @State private var confirmsTypeChange = false
+    @State private var pendingDeckID: UUID?
+    @State private var confirmsDeckChange = false
+    @State private var deckRequestGeneration = 0
+    @State private var typeLoadGeneration = 0
     @State private var selectedTypeID: UUID?
     @State private var selectedDeckID: UUID?
     @State private var values: [UUID: String] = [:]
@@ -254,40 +262,31 @@ struct AddItemView: View {
     }
 
     private var selectedType: ItemType? {
-        model.itemTypes.first(where: { $0.id == selectedTypeID }) ?? model.itemTypes.first
+        model.itemTypes.first(where: { $0.id == selectedTypeID }) ?? typeChoices.first(where: { $0.id == selectedTypeID })
     }
 
     init(model: MobileAppModel, deckID: UUID? = nil) {
         self.model = model
         _selectedDeckID = State(initialValue: deckID)
-        _selectedTypeID = State(initialValue: model.itemTypes.first?.id)
+        _selectedTypeID = State(initialValue: nil)
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                if model.itemTypes.isEmpty {
-                    ContentUnavailableView(
-                        "No Item Types",
-                        systemImage: "square.stack.3d.up.slash",
-                        description: Text("Create an item type from the Create tab or import a deck before adding items here.")
-                    )
-                } else {
-                    Section("Item") {
-                        Picker("Item type", selection: $selectedTypeID) {
-                            ForEach(model.itemTypes) { type in
-                                Text(type.name).tag(Optional(type.id))
-                            }
-                        }
-                        .accessibilityIdentifier("add-card-type")
-                        .disabled(isPreparingMedia || processingAttachments > 0)
-                        Picker("Deck", selection: $selectedDeckID) {
+                Group {
+                    Section {
+                        Picker("Deck", selection: deckBinding) {
                             Text("Unassigned").tag(Optional<UUID>.none)
-                            ForEach(model.decks) { deck in
-                                Text(deck.name).tag(Optional(deck.id))
-                            }
-                        }
-                        .accessibilityIdentifier("add-card-deck")
+                            ForEach(model.decks) { Text($0.name).tag(Optional($0.id)) }
+                        }.accessibilityIdentifier("add-card-deck")
+                        Picker("Item type", selection: typeBinding) {
+                            Text("Choose a type").tag(Optional<UUID>.none)
+                            ForEach(typeChoices) { Text($0.name).tag(Optional($0.id)) }
+                        }.accessibilityIdentifier("add-card-type")
+                        .disabled(isPreparingMedia || processingAttachments > 0)
+                        Button("Use another type…") { showTypeChooser = true }
+                            .disabled(isPreparingMedia || processingAttachments > 0)
                     }
 
                     if let selectedType {
@@ -324,6 +323,34 @@ struct AddItemView: View {
             .environment(\.attachmentProcessing, isPreparingMedia || processingAttachments > 0)
             .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { processingAttachments = $0 }
             .onAppear { isEditorActive = true }
+            .task { await loadChoices() }
+            .sheet(isPresented: $showTypeChooser) {
+                ItemTypeChooserView(library: model.library, deckID: selectedDeckID) { type in
+                    await model.refresh()
+                    await loadChoices(resolve: false)
+                    typeBinding.wrappedValue = type.id
+                }
+            }
+            .confirmationDialog("Change type and clear entered content?", isPresented: $confirmsTypeChange, titleVisibility: .visible) {
+                Button("Change Item Type", role: .destructive) { clearFields(); selectedTypeID = pendingTypeID }
+                Button("Keep Current Type", role: .cancel) {}
+            }
+            .confirmationDialog("Use this type in the new deck?", isPresented: $confirmsDeckChange, titleVisibility: .visible) {
+                if pendingDeckID != nil {
+                    Button("Attach Type and Keep Content") {
+                        Task {
+                            do {
+                                if let id = selectedTypeID, let deck = pendingDeckID { try await model.library.attachItemType(id: id, to: deck) }
+                                selectedDeckID = pendingDeckID; await loadChoices(resolve: false)
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                }
+                Button("Clear Content and Change Deck", role: .destructive) {
+                    clearFields(); selectedDeckID = pendingDeckID; Task { await loadChoices() }
+                }
+                Button("Keep Original Deck", role: .cancel) {}
+            } message: { Text("The current type is not available in that deck. Your entered content has been kept.") }
             .onDisappear { isEditorActive = false; mediaImportTask?.cancel() }
             .navigationTitle("New Item")
             .navigationBarTitleDisplayMode(.inline)
@@ -511,6 +538,48 @@ struct AddItemView: View {
         )
     }
 
+    private var typeBinding: Binding<UUID?> {
+        Binding(get: { selectedTypeID }, set: { id in
+            guard id != selectedTypeID else { return }
+            if hasChanges { pendingTypeID = id; confirmsTypeChange = true }
+            else { clearFields(); selectedTypeID = id }
+        })
+    }
+    private var deckBinding: Binding<UUID?> {
+        Binding(get: { selectedDeckID }, set: { id in
+            guard id != selectedDeckID, !isSaving, !isPreparingMedia, processingAttachments == 0 else { return }
+            deckRequestGeneration += 1
+            let generation = deckRequestGeneration
+            Task {
+                do {
+                    let choices = try await model.library.authoringItemTypes(for: id)
+                    guard generation == deckRequestGeneration, !isSaving else { return }
+                    if hasChanges, let selectedTypeID, !choices.itemTypes.contains(where: { $0.id == selectedTypeID }) {
+                        pendingDeckID = id; confirmsDeckChange = true
+                    } else { selectedDeckID = id; await loadChoices(resolve: !hasChanges) }
+                } catch { errorMessage = error.localizedDescription }
+            }
+        })
+    }
+    private func clearFields() {
+        values = [:]; richValues = [:]; mediaValues = [:]; mediaDescriptions = [:]; occlusions = [:]; clozeBlanks = [:]
+    }
+    private func loadChoices(resolve: Bool = true) async {
+        typeLoadGeneration += 1
+        let generation = typeLoadGeneration
+        let deckID = selectedDeckID
+        do {
+            let choices = try await model.library.authoringItemTypes(for: deckID)
+            let libraryID = try await model.library.libraryID()
+            guard generation == typeLoadGeneration, deckID == selectedDeckID else { return }
+            typeChoices = choices.itemTypes
+            if resolve {
+                let remembered = UserDefaults.standard.string(forKey: "authoring.type.\(libraryID).\(deckID?.uuidString ?? "unassigned")").flatMap(UUID.init(uuidString:))
+                selectedTypeID = remembered.flatMap { id in choices.itemTypes.contains { $0.id == id } ? id : nil } ?? choices.automaticItemTypeID
+            }
+        } catch { if generation == typeLoadGeneration { errorMessage = error.localizedDescription } }
+    }
+
     private func save() {
         guard !isPreparingMedia, processingAttachments == 0, let selectedType else { return }
         isSaving = true
@@ -538,6 +607,8 @@ struct AddItemView: View {
                     }
                 }
                 try await model.createItem(itemType: selectedType, deckID: selectedDeckID, values: content)
+                let libraryID = try await model.library.libraryID()
+                UserDefaults.standard.set(selectedType.id.uuidString, forKey: "authoring.type.\(libraryID).\(selectedDeckID?.uuidString ?? "unassigned")")
                 closeEditor()
             } catch {
                 errorMessage = MobileAppModel.message(for: error)

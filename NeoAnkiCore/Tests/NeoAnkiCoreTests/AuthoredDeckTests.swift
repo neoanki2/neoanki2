@@ -99,7 +99,7 @@ private let authoredV3RootDeck =
     #expect(Set(copy.fields.map(\.id)).isDisjoint(with: included.fields.map(\.id)))
     #expect(Set(copy.templates.map(\.id)).isDisjoint(with: included.templates.map(\.id)))
     let afterDuplicate = try await store.loadItemTypeCatalog()
-    #expect(afterDuplicate.itemTypes.contains { $0.id == copy.id })
+    #expect(afterDuplicate.needsOrganization.contains { $0.id == copy.id })
     #expect(afterDuplicate.includedWithDecks.flatMap(\.itemTypes).contains { $0.id == included.id })
 }
 
@@ -122,14 +122,15 @@ private let authoredV3RootDeck =
 
     #expect(
         try await store.itemTypeEditingImpact(id: included.id)
-            == ItemTypeEditingImpact(itemCount: 1, deckCount: 1, unassignedItemCount: 0)
+            == ItemTypeEditingImpact(itemCount: 1, deckCount: 1, unassignedItemCount: 0, deckPaths: [try await store.deck(id: rootID).name])
     )
     let unlocked = try await store.unlockItemType(id: included.id)
     #expect(unlocked.id == included.id)
 
     let catalog = try await store.loadItemTypeCatalog()
-    #expect(catalog.itemTypes.contains { $0.id == included.id })
-    #expect(!catalog.includedWithDecks.flatMap(\.itemTypes).contains { $0.id == included.id })
+    #expect(!catalog.itemTypes.contains { $0.id == included.id })
+    #expect(!catalog.readOnlyIDs.contains(included.id))
+    #expect(catalog.includedWithDecks.flatMap(\.itemTypes).contains { $0.id == included.id })
     let policy = try #require(try await store.effectiveItemTypePolicy(for: rootID))
     #expect(policy.itemTypes.map(\.id) == [included.id])
 
@@ -185,9 +186,9 @@ private let authoredV3RootDeck =
     let result = try await AuthoredDeck.importDeck(from: legacy, into: store)
     let rootID = try #require(result.deckIDs.first)
     let catalog = try await store.loadItemTypeCatalog()
-    #expect(catalog.itemTypes.contains { $0.name == "Authored Study" })
-    #expect(catalog.includedWithDecks.isEmpty)
-    #expect(try await store.effectiveItemTypePolicy(for: rootID) == nil)
+    #expect(catalog.includedWithDecks.flatMap(\.itemTypes).contains { $0.name == "Authored Study" })
+    #expect(!catalog.includedWithDecks.isEmpty)
+    #expect(try await store.effectiveItemTypePolicy(for: rootID) != nil)
 }
 
 @Test func deletingIncludedDeckPromotesTypeStillUsedByMovedItem() async throws {
@@ -213,7 +214,7 @@ private let authoredV3RootDeck =
     try await store.deleteDeck(id: importedRootID)
 
     let catalog = try await store.loadItemTypeCatalog()
-    #expect(catalog.itemTypes.contains { $0.id == stored.itemType.id })
+    #expect(catalog.needsOrganization.contains { $0.id == stored.itemType.id })
     #expect(catalog.includedWithDecks.isEmpty)
     #expect(try await store.fetchItem(id: summary.id) != nil)
 }

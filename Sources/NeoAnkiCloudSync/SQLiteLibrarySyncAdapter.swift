@@ -285,7 +285,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 let replacement = components.enumerated().map { index, component -> String in
                     guard let id = UUID(uuidString: String(component)) else { return String(component) }
                     if record.resourceKind == LibraryResourceKind.itemTypeMembership.rawValue {
-                        let isDeck = components.first != "library" && index == 1
+                        let isDeck = components.first != "library" && components.first != "scope" && index == 1
                         return mapped(id, kind: isDeck ? .deck : .itemType).uuidString
                     }
                     if record.resourceKind == LibraryResourceKind.portableTypeMapping.rawValue,
@@ -388,6 +388,14 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 transformed = .reviewRevert(value); transformedID = value.id.uuidString
             case let .itemTypeMembership(membership):
                 switch membership {
+                case let .typeSettings(value):
+                    let remapped = ItemTypeSettings(itemTypeID: mapped(value.itemTypeID, kind: .itemType), isShared: value.isShared, isEditable: value.isEditable)
+                    let result = ItemTypeMembershipRecord.typeSettings(remapped)
+                    transformed = .itemTypeMembership(result); transformedID = result.id
+                case let .deckSettings(value):
+                    let remapped = DeckItemTypeSettings(deckID: mapped(value.deckID, kind: .deck), inherits: value.inherits, itemTypeIDs: value.itemTypeIDs.map { mapped($0, kind: .itemType) }, defaultItemTypeID: value.defaultItemTypeID.map { mapped($0, kind: .itemType) })
+                    let result = ItemTypeMembershipRecord.deckSettings(remapped)
+                    transformed = .itemTypeMembership(result); transformedID = result.id
                 case let .library(itemTypeID):
                     let value = ItemTypeMembershipRecord.library(itemTypeID: mapped(itemTypeID, kind: .itemType))
                     transformed = .itemTypeMembership(value); transformedID = value.id

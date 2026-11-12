@@ -483,6 +483,11 @@ actor SQLiteDatabase {
                 try restoreMissingLegacyReviewIntroductions()
             }
 
+            if current < 31, try tableExists("item_types"), try tableExists("decks") {
+                for sql in Schema.migrationV31Statements + Schema.scopeChangeTrackingStatements { try execute(sql) }
+                try organizeLegacyItemTypes()
+            }
+
             try execute(
                 "UPDATE schema_version SET version = ?;",
                 bindings: [.int(Int64(Schema.version))]
@@ -1138,7 +1143,8 @@ actor SQLiteDatabase {
                 itemTypes: try fetchAllItemTypes(),
                 mappings: try allPortableItemTypeMappings(),
                 includedItemTypes: try fetchIncludedItemTypeOwners(),
-                itemTypePolicies: try fetchDeckItemTypePolicyEntries()
+                itemTypePolicies: try fetchDeckItemTypePolicyEntries(),
+                deckTypeSettings: try fetchDeckTypeSettings()
             )
             try execute("COMMIT;")
             return snapshot
@@ -1659,6 +1665,8 @@ actor SQLiteDatabase {
                 "UPDATE item_types SET name = ?, definition = ? WHERE id = ?;",
                 bindings: [.text(repaired.name), .blob(repairedData), .text(id.uuidString)]
             )
+            let oldSettings = try fetchTypeSettings().first { $0.itemTypeID == id }
+            try saveTypeSettings(.init(itemTypeID: id, isShared: oldSettings?.isShared ?? BuiltInItemTypes.isBuiltIn(id), isEditable: true))
             for entry in try fetchItems(itemTypeID: id) {
                 let cards = CardGenerator.cards(for: entry.item, type: repaired, now: now)
                 try insertCards(cards)
@@ -2260,6 +2268,10 @@ actor SQLiteDatabase {
                         .int(entry.isDefault ? 1 : 0),
                     ]
                 )
+            }
+            for settings in plan.deckTypeSettings { try saveDeckTypeSettings(settings) }
+            if let destination = plan.attachmentDeckID {
+                for owner in plan.includedItemTypes { try attachTypeInTransaction(owner.itemTypeID, to: destination) }
             }
             var itemTypesByID = Dictionary(uniqueKeysWithValues: plan.itemTypes.map { ($0.id, $0) })
             for itemTypeID in Set(plan.items.map(\.item.itemTypeID))
@@ -5351,10 +5363,14 @@ actor SQLiteDatabase {
     }
 
     func deleteItemType(id: UUID) throws {
-        try execute(
-            "DELETE FROM item_types WHERE id = ?;",
-            bindings: [.text(id.uuidString)]
-        )
+        try inTransaction {
+            for var settings in try fetchDeckTypeSettings() where settings.itemTypeIDs.contains(id) {
+                settings.itemTypeIDs.removeAll { $0 == id }
+                if settings.defaultItemTypeID == id { settings.defaultItemTypeID = nil }
+                try saveDeckTypeSettings(settings)
+            }
+            try execute("DELETE FROM item_types WHERE id = ?;", bindings: [.text(id.uuidString)])
+        }
     }
 
     func fetchCards(for itemID: UUID) throws -> [Card] {
@@ -7230,6 +7246,12 @@ actor SQLiteDatabase {
     func fetchItemTypeMembershipRecord(id: String) throws -> ItemTypeMembershipRecord? {
         let parts = id.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
         switch parts.first {
+        case "scope" where parts.count == 2:
+            guard let id = UUID(uuidString: parts[1]) else { return nil }
+            return try fetchTypeSettings().first { $0.itemTypeID == id }.map(ItemTypeMembershipRecord.typeSettings)
+        case "configuration" where parts.count == 2:
+            guard let id = UUID(uuidString: parts[1]) else { return nil }
+            return try fetchDeckTypeSettings().first { $0.deckID == id }.map(ItemTypeMembershipRecord.deckSettings)
         case "library" where parts.count == 2:
             guard let typeID = UUID(uuidString: parts[1]) else { return nil }
             let found = try query(
@@ -7311,7 +7333,9 @@ actor SQLiteDatabase {
             // can put a parent after its child. Validate references against the
             // complete atomic batch rather than each intermediate statement.
             try execute("PRAGMA defer_foreign_keys = ON;")
-            for mutation in mutations {
+            let scopeRecords = mutations.filter { if case .itemTypeMembership(.deckSettings(_)) = $0 { return true }; return false }
+            let otherRecords = mutations.filter { if case .itemTypeMembership(.deckSettings(_)) = $0 { return false }; return true }
+            for mutation in otherRecords + scopeRecords {
                 switch mutation {
                 case let .deck(deck):
                     try execute(
@@ -7353,6 +7377,8 @@ actor SQLiteDatabase {
                     )
                 case let .itemTypeMembership(record):
                     switch record {
+                    case let .typeSettings(value): try saveTypeSettings(value)
+                    case let .deckSettings(value): try saveDeckTypeSettings(value)
                     case let .library(itemTypeID):
                         try execute("INSERT OR IGNORE INTO library_item_types (item_type_id) VALUES (?);", bindings: [.text(itemTypeID.uuidString)])
                     case let .included(rootDeckID, itemTypeID, ordinal):
@@ -7480,6 +7506,8 @@ actor SQLiteDatabase {
             if let uuid = UUID(uuidString: id) { try execute("DELETE FROM review_reverts WHERE id = ?;", bindings: [.text(uuid.uuidString)]) }
         case .itemTypeMembership:
             let parts = id.split(separator: ":").map(String.init)
+            if parts.count == 2, parts[0] == "scope" { try execute("DELETE FROM item_type_settings WHERE id = ?;", bindings: [.text(parts[1])]) }
+            if parts.count == 2, parts[0] == "configuration" { try execute("DELETE FROM deck_item_type_settings WHERE id = ?;", bindings: [.text(parts[1])]) }
             if parts.count == 2, parts[0] == "library" { try execute("DELETE FROM library_item_types WHERE item_type_id = ?;", bindings: [.text(parts[1])]) }
             if parts.count == 3, parts[0] == "included" { try execute("DELETE FROM deck_included_item_types WHERE root_deck_id = ? AND item_type_id = ?;", bindings: [.text(parts[1]), .text(parts[2])]) }
             if parts.count == 3, parts[0] == "policy" { try execute("DELETE FROM deck_item_type_policy_entries WHERE deck_id = ? AND item_type_id = ?;", bindings: [.text(parts[1]), .text(parts[2])]) }
@@ -7745,3 +7773,105 @@ actor SQLiteDatabase {
 }
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+
+extension SQLiteDatabase {
+    func fetchTypeSettings() throws -> [ItemTypeSettings] {
+        try query("SELECT definition FROM item_type_settings;").compactMap { row in
+            guard let data = payload(row, "definition") else { return nil }
+            return try decode(ItemTypeSettings.self, from: data)
+        }
+    }
+    func fetchDeckTypeSettings() throws -> [DeckItemTypeSettings] {
+        try query("SELECT definition FROM deck_item_type_settings;").compactMap { row in
+            guard let data = payload(row, "definition") else { return nil }
+            return try decode(DeckItemTypeSettings.self, from: data)
+        }
+    }
+    func saveTypeSettings(_ value: ItemTypeSettings) throws {
+        try execute("INSERT INTO item_type_settings(id, definition) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET definition = excluded.definition;",
+            bindings: [.text(value.itemTypeID.uuidString), .blob(try encode(value))])
+    }
+    func saveDeckTypeSettings(_ value: DeckItemTypeSettings) throws {
+        guard Set(value.itemTypeIDs).count == value.itemTypeIDs.count,
+              value.defaultItemTypeID.map(value.itemTypeIDs.contains) ?? true else {
+            throw DatabaseError.invalidItemType("Choose a default from this deck's item types and remove duplicate attachments.")
+        }
+        guard try fetchDeck(id: value.deckID) != nil else { throw DatabaseError.deckNotFound(value.deckID) }
+        for id in value.itemTypeIDs {
+            guard try fetchItemType(id: id) != nil else { throw DatabaseError.itemTypeNotFound(id) }
+        }
+        try execute("INSERT INTO deck_item_type_settings(id, definition) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET definition = excluded.definition;",
+            bindings: [.text(value.deckID.uuidString), .blob(try encode(value))])
+    }
+    func createScopedType(_ type: ItemType, deckID: UUID?, shared: Bool) throws {
+        try inTransaction {
+            try insertItemType(type)
+            try markItemTypeAsLibrary(type.id)
+            try saveTypeSettings(.init(itemTypeID: type.id, isShared: shared))
+            if let deckID { try attachTypeInTransaction(type.id, to: deckID) }
+        }
+    }
+    func attachType(_ id: UUID, to deckID: UUID) throws {
+        try inTransaction { try attachTypeInTransaction(id, to: deckID) }
+    }
+    private func attachTypeInTransaction(_ id: UUID, to deckID: UUID) throws {
+            let policy = try resolvedTypePolicy(deckID: deckID)
+            var ids = policy?.itemTypes.map(\.id) ?? []
+            if !ids.contains(id) { ids.append(id) }
+            try saveDeckTypeSettings(.init(deckID: deckID, itemTypeIDs: ids, defaultItemTypeID: policy?.defaultItemTypeID))
+    }
+    func resolvedTypePolicy(deckID: UUID) throws -> DeckItemTypePolicy? {
+        let decks = Dictionary(uniqueKeysWithValues: try fetchAllDecks().map { ($0.id, $0) })
+        guard decks[deckID] != nil else { throw DatabaseError.deckNotFound(deckID) }
+        let configurations = Dictionary(uniqueKeysWithValues: try fetchDeckTypeSettings().map { ($0.deckID, $0) })
+        let entries = Dictionary(grouping: try fetchDeckItemTypePolicyEntries(), by: \.deckID)
+        let owners = Dictionary(grouping: try fetchIncludedItemTypeOwners(), by: \.rootDeckID)
+        let types = Dictionary(uniqueKeysWithValues: try fetchAllItemTypes().map { ($0.id, $0) })
+        var current: UUID? = deckID
+        var visited: Set<UUID> = []
+        while let id = current, visited.insert(id).inserted {
+            if let settings = configurations[id] {
+                if !settings.inherits {
+                    let available = settings.itemTypeIDs.compactMap { types[$0] }
+                    return .init(sourceDeckID: id, itemTypes: available, defaultItemTypeID: settings.defaultItemTypeID.flatMap { types[$0] == nil ? nil : $0 })
+                }
+            } else if let local = entries[id], !local.isEmpty {
+                return .init(sourceDeckID: id, itemTypes: local.sorted { $0.ordinal < $1.ordinal }.compactMap { types[$0.itemTypeID] }, defaultItemTypeID: local.first(where: \.isDefault)?.itemTypeID)
+            } else if let included = owners[id], !included.isEmpty {
+                return .init(sourceDeckID: id, itemTypes: included.sorted { $0.ordinal < $1.ordinal }.compactMap { types[$0.itemTypeID] }, defaultItemTypeID: nil)
+            }
+            current = decks[id]?.parentID
+        }
+        return nil
+    }
+    /// Migration changes availability only; content and scheduling rows are untouched.
+    func organizeLegacyItemTypes() throws {
+        let libraryIDs = try fetchLibraryItemTypeIDs()
+        let owners = try fetchIncludedItemTypeOwners()
+        let policyEntries = try fetchDeckItemTypePolicyEntries()
+        for type in try fetchAllItemTypes() {
+            try saveTypeSettings(.init(itemTypeID: type.id, isShared: BuiltInItemTypes.isBuiltIn(type.id),
+                isEditable: libraryIDs.contains(type.id) || !owners.contains { $0.itemTypeID == type.id }))
+        }
+        var byDeck = Dictionary(grouping: policyEntries, by: \.deckID)
+        let explicitDecks = Set(byDeck.keys)
+        for owner in owners where !explicitDecks.contains(owner.rootDeckID) {
+            byDeck[owner.rootDeckID, default: []].append(.init(deckID: owner.rootDeckID, itemTypeID: owner.itemTypeID, ordinal: owner.ordinal, isDefault: false))
+        }
+        let usage = try tableExists("items") ? query("SELECT DISTINCT deck_id, item_type_id FROM items WHERE deck_id IS NOT NULL ORDER BY deck_id, item_type_id;") : []
+        var additions: [UUID: [UUID]] = [:]
+        for row in usage {
+            guard let deck = (row["deck_id"] as? String).flatMap(UUID.init(uuidString:)),
+                  let type = (row["item_type_id"] as? String).flatMap(UUID.init(uuidString:)),
+                  !BuiltInItemTypes.isBuiltIn(type), byDeck[deck] == nil else { continue }
+            additions[deck, default: []].append(type)
+        }
+        for (deck, entries) in byDeck {
+            try saveDeckTypeSettings(.init(deckID: deck, itemTypeIDs: entries.sorted { $0.ordinal < $1.ordinal }.map(\.itemTypeID), defaultItemTypeID: entries.first(where: \.isDefault)?.itemTypeID))
+        }
+        for (deck, ids) in additions {
+            try saveDeckTypeSettings(.init(deckID: deck, itemTypeIDs: ids))
+        }
+    }
+}

@@ -1108,7 +1108,16 @@ public struct APIItemType: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+struct DeckItemTypePolicyInput: Decodable {
+    let inherits: Bool
+    let itemTypeIds: [String]
+    let defaultItemTypeId: String?
+}
+struct ItemTypeAvailabilityInput: Decodable { let availableEverywhere: Bool }
+
 struct ItemTypeInput: Decodable {
+    let deckId: String?
+    let availableEverywhere: Bool?
     let id: String?
     let name: String
     let fields: [APIFieldDefinition]

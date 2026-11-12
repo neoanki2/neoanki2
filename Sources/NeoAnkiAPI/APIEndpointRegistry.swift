@@ -57,7 +57,7 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     case health, meta, openapi, pair, currentClient, revokeCurrentClient
     case listDecks, createDeck, getDeck, updateDeck
     case createDeckDeletionPlan, commitDeckDeletionPlan
-    case createDeckResetPlan, commitDeckResetPlan, deckItemTypePolicy
+    case createDeckResetPlan, commitDeckResetPlan, deckItemTypePolicy, setDeckItemTypePolicy, setItemTypeAvailability
     case listItemTypes, createItemType, validateItemType, getItemType
     case replaceItemType, deleteItemType, duplicateItemType
     case listItems, createItem, validateItem, bulkItems, getItem, replaceItem, deleteItem

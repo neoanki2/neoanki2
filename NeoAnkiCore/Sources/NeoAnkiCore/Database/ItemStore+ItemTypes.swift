@@ -15,7 +15,7 @@ public extension ItemStore {
     @discardableResult
     func createItemType(_ itemType: ItemType) async throws -> ItemType {
         try ItemTypeValidation.validate(itemType)
-        try await database.insertLibraryItemType(itemType)
+        try await database.createScopedType(itemType, deckID: nil, shared: false)
         return itemType
     }
 
@@ -29,65 +29,67 @@ public extension ItemStore {
 
     func loadItemTypeCatalog() async throws -> ItemTypeCatalog {
         let result = try await database.fetchItemTypesWithCorruption()
+        let settings = Dictionary(uniqueKeysWithValues: try await database.fetchTypeSettings().map { ($0.itemTypeID, $0) })
         let libraryIDs = try await database.fetchLibraryItemTypeIDs()
         let owners = try await database.fetchIncludedItemTypeOwners()
         let decks = try await database.fetchAllDecks()
         let typesByID = Dictionary(uniqueKeysWithValues: result.itemTypes.map { ($0.id, $0) })
         let decksByID = Dictionary(uniqueKeysWithValues: decks.map { ($0.id, $0) })
-
-        let libraryTypes = result.itemTypes
-            .filter { libraryIDs.contains($0.id) }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        let ownersByRoot = Dictionary(grouping: owners, by: \.rootDeckID)
-        let includedGroups = ownersByRoot.compactMap { rootID, associations -> IncludedItemTypeGroup? in
-            guard let rootDeck = decksByID[rootID] else { return nil }
-            let included = associations
-                .sorted { $0.ordinal < $1.ordinal }
-                .compactMap { association -> ItemType? in
-                    guard !libraryIDs.contains(association.itemTypeID) else { return nil }
-                    return typesByID[association.itemTypeID]
-                }
-            guard !included.isEmpty else { return nil }
-            return IncludedItemTypeGroup(
-                rootDeck: rootDeck,
-                deckPath: itemStoreDeckPath(for: rootDeck.id, decksByID: decksByID),
-                itemTypes: included
-            )
-        }.sorted {
-            $0.rootDeck.name.localizedCaseInsensitiveCompare($1.rootDeck.name) == .orderedAscending
+        let shared = result.itemTypes.filter { settings[$0.id]?.isShared ?? BuiltInItemTypes.isBuiltIn($0.id) }
+        var groups: [IncludedItemTypeGroup] = []
+        var attached: Set<UUID> = []
+        for deck in decks {
+            guard let policy = try await database.resolvedTypePolicy(deckID: deck.id), policy.sourceDeckID == deck.id else { continue }
+            let local = policy.itemTypes
+            attached.formUnion(local.map(\.id))
+            if !local.isEmpty { groups.append(.init(rootDeck: deck, deckPath: itemStoreDeckPath(for: deck.id, decksByID: decksByID), itemTypes: local)) }
         }
-
-        return ItemTypeCatalog(
-            itemTypes: libraryTypes,
-            includedWithDecks: includedGroups,
-            corruptions: result.corruptions
-        )
+        // Provenance remains discoverable even when an override excludes an imported type.
+        for owner in owners where !attached.contains(owner.itemTypeID) {
+            guard let deck = decksByID[owner.rootDeckID], let type = typesByID[owner.itemTypeID], !shared.contains(type) else { continue }
+            if let index = groups.firstIndex(where: { $0.id == deck.id }) {
+                groups[index] = .init(rootDeck: deck, deckPath: groups[index].deckPath, itemTypes: groups[index].itemTypes + [type])
+            } else { groups.append(.init(rootDeck: deck, deckPath: itemStoreDeckPath(for: deck.id, decksByID: decksByID), itemTypes: [type])) }
+            attached.insert(type.id)
+        }
+        let protected = Set(result.itemTypes.filter { type in
+            !(settings[type.id]?.isEditable ?? (libraryIDs.contains(type.id) || !owners.contains { owner in owner.itemTypeID == type.id }))
+        }.map(\.id))
+        return .init(itemTypes: shared, includedWithDecks: groups.sorted { $0.deckPath < $1.deckPath }, corruptions: result.corruptions,
+            needsOrganization: result.itemTypes.filter { !attached.contains($0.id) && !shared.contains($0) }, readOnlyIDs: protected)
     }
 
     func effectiveItemTypePolicy(for deckID: UUID) async throws -> DeckItemTypePolicy? {
-        let decks = try await database.fetchAllDecks()
-        let decksByID = Dictionary(uniqueKeysWithValues: decks.map { ($0.id, $0) })
-        guard decksByID[deckID] != nil else { throw DatabaseError.deckNotFound(deckID) }
-        let entries = try await database.fetchDeckItemTypePolicyEntries()
-        let byDeck = Dictionary(grouping: entries, by: \.deckID)
-        let typesByID = Dictionary(
-            uniqueKeysWithValues: try await database.fetchAllItemTypes().map { ($0.id, $0) }
-        )
+        try await database.resolvedTypePolicy(deckID: deckID)
+    }
 
-        var currentID: UUID? = deckID
-        var visited: Set<UUID> = []
-        while let candidateID = currentID, visited.insert(candidateID).inserted {
-            if let local = byDeck[candidateID], !local.isEmpty {
-                let sorted = local.sorted { $0.ordinal < $1.ordinal }
-                return DeckItemTypePolicy(
-                    sourceDeckID: candidateID,
-                    itemTypes: sorted.compactMap { typesByID[$0.itemTypeID] },
-                    defaultItemTypeID: sorted.first(where: \.isDefault)?.itemTypeID
-                )
-            }
-            currentID = decksByID[candidateID]?.parentID
-        }
-        return nil
+    func authoringItemTypes(for deckID: UUID?) async throws -> AuthoringItemTypes {
+        let policy: DeckItemTypePolicy?
+        if let deckID { policy = try await database.resolvedTypePolicy(deckID: deckID) } else { policy = nil }
+        let useShared = policy?.itemTypes.isEmpty != false
+        let choices: [ItemType]
+        if useShared {
+            let settings = Dictionary(uniqueKeysWithValues: try await database.fetchTypeSettings().map { ($0.itemTypeID, $0) })
+            choices = try await database.fetchAllItemTypes().filter { settings[$0.id]?.isShared ?? BuiltInItemTypes.isBuiltIn($0.id) }
+        } else { choices = policy!.itemTypes }
+        let defaultID = useShared ? choices.first { $0.id == BuiltInItemTypes.basicID }?.id : policy?.defaultItemTypeID
+        return .init(deckID: deckID, sourceDeckID: policy?.sourceDeckID, itemTypes: choices,
+            defaultItemTypeID: defaultID, usesSharedFallback: useShared)
+    }
+
+    @discardableResult
+    func createItemType(_ type: ItemType, deckID: UUID?, availableEverywhere: Bool) async throws -> ItemType {
+        try ItemTypeValidation.validate(type)
+        try await database.createScopedType(type, deckID: deckID, shared: availableEverywhere)
+        return type
+    }
+
+    func attachItemType(id: UUID, to deckID: UUID) async throws { try await database.attachType(id, to: deckID) }
+    func setDeckItemTypes(_ settings: DeckItemTypeSettings) async throws { try await database.saveDeckTypeSettings(settings) }
+    func setItemTypeAvailability(id: UUID, availableEverywhere: Bool) async throws {
+        let catalog = try await loadItemTypeCatalog()
+        guard catalog.allItemTypes.contains(where: { $0.id == id }) else { throw DatabaseError.itemTypeNotFound(id) }
+        try await database.saveTypeSettings(.init(itemTypeID: id, isShared: availableEverywhere, isEditable: !catalog.readOnlyIDs.contains(id)))
     }
 
     @discardableResult
@@ -111,7 +113,19 @@ public extension ItemStore {
         guard try await database.fetchItemType(id: id) != nil else {
             throw DatabaseError.itemTypeNotFound(id)
         }
-        return try await database.itemTypeEditingImpact(itemTypeID: id)
+        let impact = try await database.itemTypeEditingImpact(itemTypeID: id)
+        let decks = try await database.fetchAllDecks()
+        let byID = Dictionary(uniqueKeysWithValues: decks.map { ($0.id, $0) })
+        let usage = Set(try await database.fetchItems(itemTypeID: id).compactMap { $0.item.deckID })
+        let shared = try await loadItemTypeCatalog().itemTypes.contains { $0.id == id }
+        var paths: [String] = []
+        for deck in decks {
+            let policy = try await database.resolvedTypePolicy(deckID: deck.id)
+            if usage.contains(deck.id) || policy?.itemTypes.contains(where: { $0.id == id }) == true || (shared && policy?.itemTypes.isEmpty != false) {
+                paths.append(itemStoreDeckPath(for: deck.id, decksByID: byID))
+            }
+        }
+        return .init(itemCount: impact.itemCount, deckCount: impact.deckCount, unassignedItemCount: impact.unassignedItemCount, deckPaths: paths.sorted())
     }
 
     /// Adopts the existing definition into the user's editable catalog without
@@ -121,7 +135,8 @@ public extension ItemStore {
         guard let itemType = try await database.fetchItemType(id: id) else {
             throw DatabaseError.itemTypeNotFound(id)
         }
-        try await database.markItemTypeAsLibrary(id)
+        let catalog = try await loadItemTypeCatalog()
+        try await database.saveTypeSettings(.init(itemTypeID: id, isShared: catalog.itemTypes.contains { $0.id == id }, isEditable: true))
         return itemType
     }
 

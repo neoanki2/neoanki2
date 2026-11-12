@@ -13,6 +13,7 @@ final class ItemsModel {
         didSet { refreshVisibleItems() }
     }
     private(set) var itemTypes: [ItemType] = []
+    private var authoringLoadGeneration = 0
     private(set) var normalItemTypes: [ItemType] = []
     private(set) var effectiveItemTypePolicy: DeckItemTypePolicy?
     /// The one scheduling snapshot for the selected scope. Everything the app
@@ -302,23 +303,24 @@ final class ItemsModel {
     /// Resolves authoring choices only after the destination deck is known.
     /// An ambiguous imported policy intentionally leaves the selection empty.
     func configureAddItem(for deckID: UUID?, resolveSelection: Bool = true) async {
+        authoringLoadGeneration += 1
+        let generation = authoringLoadGeneration
         errorMessage = nil
         do {
             let catalog = try await library.loadItemTypeCatalog()
+            let choices = try await library.authoringItemTypes(for: deckID)
+            let libraryID = try await library.libraryID()
+            guard generation == authoringLoadGeneration else { return }
             itemTypes = catalog.allItemTypes
-            normalItemTypes = catalog.itemTypes
-            effectiveItemTypePolicy = if let deckID {
-                try await library.effectiveItemTypePolicy(for: deckID)
-            } else {
-                nil
-            }
+            normalItemTypes = []
+            effectiveItemTypePolicy = DeckItemTypePolicy(sourceDeckID: choices.sourceDeckID ?? deckID ?? libraryID,
+                itemTypes: choices.itemTypes, defaultItemTypeID: choices.defaultItemTypeID)
             guard resolveSelection else { return }
-            if let policy = effectiveItemTypePolicy {
-                addItemTypeID = policy.automaticItemTypeID
-            } else {
-                addItemTypeID = normalItemTypes.first?.id
-            }
+            let key = "authoring.type.\(libraryID).\(deckID?.uuidString ?? "unassigned")"
+            let remembered = UserDefaults.standard.string(forKey: key).flatMap(UUID.init(uuidString:))
+            addItemTypeID = remembered.flatMap { id in choices.itemTypes.contains { $0.id == id } ? id : nil } ?? choices.automaticItemTypeID
         } catch {
+            guard generation == authoringLoadGeneration else { return }
             errorMessage = UserFacingError.message(from: error)
         }
     }
@@ -353,6 +355,8 @@ final class ItemsModel {
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
             let saved = try await library.createItem(item)
+            let libraryID = try await library.libraryID()
+            UserDefaults.standard.set(itemType.id.uuidString, forKey: "authoring.type.\(libraryID).\(resolvedDeckID?.uuidString ?? "unassigned")")
             items.append(saved)
             items.sort(using: tableSort)
             scopeSummary = try await library.scopeSummary(scope: currentScopeFilter())

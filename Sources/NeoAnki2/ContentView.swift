@@ -281,6 +281,7 @@ struct ContentView: View {
                 ImportView(
                     model: importModel,
                     itemTypes: itemsModel.itemTypes,
+                    decks: decksModel.summaries,
                     scope: decksModel.studyScope,
                     onCancel: { isShowingImport = false },
                     onImported: finishImport

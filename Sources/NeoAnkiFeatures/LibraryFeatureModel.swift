@@ -372,6 +372,7 @@ public final class LibraryFeatureModel {
             asOf: .now
         )
         if let deckID {
+            for id in Set(imported.map(\.itemTypeID)) { try await library.attachItemType(id: id, to: deckID) }
             for item in imported { _ = try await library.moveItem(id: item.id, to: deckID) }
         }
         try await didMutate()
@@ -387,6 +388,7 @@ public final class LibraryFeatureModel {
             asOf: .now
         )
         if let deckID {
+            for id in Set(imported.map(\.itemTypeID)) { try await library.attachItemType(id: id, to: deckID) }
             for item in imported { _ = try await library.moveItem(id: item.id, to: deckID) }
         }
         try await didMutate()

@@ -81,6 +81,7 @@ public struct ItemTypeStudioCardSetupRemoval: Sendable, Equatable, Identifiable 
 }
 
 public struct ItemTypeStudioSaveImpact: Sendable, Equatable {
+    public let linkedDeckPaths: [String]
     public let removedFields: [FieldDef]
     public let changedFields: [ItemTypeStudioFieldUpdate]
     public let schemaChange: ItemTypeSchemaChangeImpact
@@ -96,8 +97,10 @@ public struct ItemTypeStudioSaveImpact: Sendable, Equatable {
         schemaChange: ItemTypeSchemaChangeImpact,
         removedCardSetups: [ItemTypeStudioCardSetupRemoval],
         generatedCardRetirementCount: Int,
-        persistentSpokenResponseCount: Int
+        persistentSpokenResponseCount: Int,
+        linkedDeckPaths: [String] = []
     ) {
+        self.linkedDeckPaths = linkedDeckPaths
         self.removedFields = removedFields
         self.changedFields = changedFields
         self.schemaChange = schemaChange
@@ -120,7 +123,8 @@ public struct ItemTypeStudioSaveImpact: Sendable, Equatable {
     }
 
     public var requiresConfirmation: Bool {
-        schemaChange.requiresConfirmation
+        linkedDeckPaths.count > 1
+            || schemaChange.requiresConfirmation
             || !removedCardSetups.isEmpty
             || generatedCardRetirementCount > 0
             || persistentSpokenResponseCount > 0
@@ -176,6 +180,11 @@ public final class ItemTypesFeatureModel {
     public private(set) var loadState: ItemTypesFeatureLoadState = .loading
     public private(set) var selectedItemTypeID: UUID?
     public var studioDraft: ItemTypeStudioDraft?
+    public private(set) var decks: [DeckSummary] = []
+    public var destinationDeckID: UUID?
+    public var createsSharedType = true
+    public private(set) var needsOrganization: [ItemType] = []
+    private var readOnlyIDs: Set<UUID> = []
 
     private let library: any LibraryBrowsing
         & LibraryItemTypeManaging
@@ -197,6 +206,7 @@ public final class ItemTypesFeatureModel {
     public var selectedItemType: ItemType? {
         guard let selectedItemTypeID else { return nil }
         return itemTypes.first { $0.id == selectedItemTypeID }
+            ?? needsOrganization.first { $0.id == selectedItemTypeID }
             ?? includedItemTypeGroups.lazy
                 .flatMap(\.itemTypes)
                 .first { $0.id == selectedItemTypeID }
@@ -209,7 +219,7 @@ public final class ItemTypesFeatureModel {
         }
     }
 
-    public var isSelectedItemTypeReadOnly: Bool { selectedIncludedGroup != nil }
+    public var isSelectedItemTypeReadOnly: Bool { selectedItemTypeID.map(readOnlyIDs.contains) ?? false }
 
     public func load() async {
         loadState = .loading
@@ -273,7 +283,7 @@ public final class ItemTypesFeatureModel {
         guard isReadOnlyItemType(id: original.id) == false else {
             throw ItemTypesFeatureError.readOnlyItemType
         }
-        guard itemTypes.contains(where: { $0.id == original.id }) else {
+        guard itemType(id: original.id) != nil else {
             throw ItemTypesFeatureError.itemTypeNotFound(original.id)
         }
 
@@ -292,6 +302,7 @@ public final class ItemTypesFeatureModel {
             guard candidateSetupIDs.contains(template.id) == false else { return nil }
             return ItemTypeStudioCardSetupRemoval(id: template.id, name: template.name)
         }
+        let linkedPaths = candidate == original ? [] : try await library.itemTypeEditingImpact(id: original.id).deckPaths
         return ItemTypeStudioSavePreparation(
             candidate: candidate,
             originalSnapshot: original,
@@ -301,7 +312,8 @@ public final class ItemTypesFeatureModel {
                 schemaChange: authorization.schemaChangeImpact,
                 removedCardSetups: removedCardSetups,
                 generatedCardRetirementCount: authorization.expectedGeneratedCardRetirementCount,
-                persistentSpokenResponseCount: authorization.expectedStudyResponseDeletionCount
+                persistentSpokenResponseCount: authorization.expectedStudyResponseDeletionCount,
+                linkedDeckPaths: linkedPaths
             ),
             updateAuthorization: authorization
         )
@@ -325,7 +337,7 @@ public final class ItemTypesFeatureModel {
 
         let saved: ItemType
         if preparation.createsItemType {
-            saved = try await library.createItemType(preparation.candidate)
+            saved = try await library.createItemType(preparation.candidate, deckID: destinationDeckID, availableEverywhere: destinationDeckID == nil && createsSharedType)
         } else {
             guard isReadOnlyItemType(id: preparation.candidate.id) == false else {
                 throw ItemTypesFeatureError.readOnlyItemType
@@ -409,7 +421,8 @@ public final class ItemTypesFeatureModel {
         guard isReadOnlyItemType(id: selectedItemTypeID) else {
             throw ItemTypesFeatureError.includedItemTypeRequired
         }
-        let duplicate = try await library.duplicateItemType(id: selectedItemTypeID, name: name)
+        guard let original = itemType(id: selectedItemTypeID) else { throw ItemTypesFeatureError.itemTypeNotFound(selectedItemTypeID) }
+        let duplicate = try await library.createItemType(original.duplicated(name: name), deckID: destinationDeckID, availableEverywhere: destinationDeckID == nil)
         try await reloadCatalog(selecting: duplicate.id)
         loadState = .ready
         return duplicate
@@ -454,21 +467,44 @@ public final class ItemTypesFeatureModel {
         loadState = .ready
     }
 
+    public func attachSelectedType(to deckID: UUID) async throws {
+        guard let id = selectedItemTypeID else { throw ItemTypesFeatureError.noSelection }
+        try await library.attachItemType(id: id, to: deckID)
+        try await reloadCatalog(selecting: id)
+    }
+    public func makeIndependentCopyForCurrentDeck() async throws {
+        guard let type = selectedItemType else { throw ItemTypesFeatureError.noSelection }
+        let source = try studioDraft?.candidateItemType() ?? type
+        let copy = try await library.createItemType(source.duplicated(), deckID: destinationDeckID, availableEverywhere: destinationDeckID == nil)
+        try await reloadCatalog(selecting: copy.id)
+        studioDraft = ItemTypeStudioDraft(itemType: copy)
+    }
+
+    public func makeSelectedTypeAvailableEverywhere() async throws {
+        guard let id = selectedItemTypeID else { throw ItemTypesFeatureError.noSelection }
+        try await library.setItemTypeAvailability(id: id, availableEverywhere: true)
+        try await reloadCatalog(selecting: id)
+    }
+
     private func itemType(id: UUID) -> ItemType? {
         itemTypes.first { $0.id == id }
+            ?? needsOrganization.first { $0.id == id }
             ?? includedItemTypeGroups.lazy.flatMap(\.itemTypes).first { $0.id == id }
     }
 
     private func isReadOnlyItemType(id: UUID) -> Bool {
-        includedItemTypeGroups.contains { group in
-            group.itemTypes.contains { $0.id == id }
-        }
+        readOnlyIDs.contains(id)
     }
 
     private func reloadCatalog(selecting preferredID: UUID?) async throws {
         let catalog = try await library.loadItemTypeCatalog()
-        itemTypes = catalog.itemTypes
-        includedItemTypeGroups = catalog.includedWithDecks
+        if let deckLibrary = library as? any LibraryDeckManaging { decks = try await deckLibrary.deckSummaries(asOf: .now) }
+        needsOrganization = catalog.needsOrganization
+        readOnlyIDs = catalog.readOnlyIDs
+        if let destinationDeckID {
+            itemTypes = try await library.authoringItemTypes(for: destinationDeckID).itemTypes
+        } else { itemTypes = catalog.itemTypes }
+        includedItemTypeGroups = destinationDeckID == nil ? catalog.includedWithDecks : []
         corruptedDefinitions = catalog.corruptions
 
         if let preferredID, itemType(id: preferredID) != nil {
@@ -477,7 +513,7 @@ public final class ItemTypesFeatureModel {
             selectedItemTypeID = current
         } else {
             selectedItemTypeID = itemTypes.first?.id
-                ?? includedItemTypeGroups.lazy.flatMap(\.itemTypes).first?.id
+                ?? needsOrganization.first?.id
         }
     }
 }

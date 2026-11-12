@@ -114,12 +114,16 @@ public struct ReviewRevertRecord: Codable, Sendable, Equatable, Identifiable {
 }
 
 public enum ItemTypeMembershipRecord: Codable, Sendable, Equatable, Identifiable {
+    case typeSettings(ItemTypeSettings)
+    case deckSettings(DeckItemTypeSettings)
     case library(itemTypeID: UUID)
     case included(rootDeckID: UUID, itemTypeID: UUID, ordinal: Int)
     case policy(deckID: UUID, itemTypeID: UUID, ordinal: Int, isDefault: Bool)
 
     public var id: String {
         switch self {
+        case let .typeSettings(value): "scope:\(value.itemTypeID.uuidString)"
+        case let .deckSettings(value): "configuration:\(value.deckID.uuidString)"
         case let .library(itemTypeID): "library:\(itemTypeID.uuidString)"
         case let .included(rootDeckID, itemTypeID, _):
             "included:\(rootDeckID.uuidString):\(itemTypeID.uuidString)"
