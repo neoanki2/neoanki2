@@ -8,6 +8,11 @@ parent: User Guide
 
 # Content and media
 
+During native study, playing audio or video and actively recording keep the
+learning timer active beyond its two-minute inactivity cutoff. Animated images
+do not suspend that cutoff. Previewing media in the library or editing media
+fields does not count as learning time. See [Learning time](../learning-time/).
+
 For photo-to-name cards, create an item type with an Image field and a Text
 field, then configure the image as the question and the name as the answer.
 On iPhone or iPad, use **Camera**, **Photos**, or **Files** in the Image field;

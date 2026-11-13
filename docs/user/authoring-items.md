@@ -8,6 +8,11 @@ parent: User Guide
 
 # Authoring items
 
+Deleting an item also preserves its recorded learning time under **Deleted
+Content** in All Decks. Moving an item transfers its previous time to the current
+deck, and regenerating its cards preserves that history. Time spent authoring or
+editing is excluded. See [Learning time](../learning-time/).
+
 An item stores one structured fact or prompt. Its item type determines the
 fields you fill in and the Card setups that generate study cards.
 

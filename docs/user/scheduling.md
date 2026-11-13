@@ -8,6 +8,12 @@ parent: User Guide
 
 # Scheduling
 
+Learning-time totals measure active study independently of FSRS review-duration
+samples, maturity, daily new-card limits, and due dates. A skipped or unfinished
+attempt keeps its learning time; undoing a grade or resetting scheduling does
+not erase it. Reporting days use the same configured study-day rollover. See
+[Learning time](../learning-time/).
+
 NeoAnki2 uses FSRS-6 (Free Spaced Repetition Scheduler) to decide when each card
 is due. You do not set an interval while studying. Instead, reveal the answer
 and describe your recall:

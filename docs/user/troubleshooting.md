@@ -8,6 +8,18 @@ parent: User Guide
 
 # Troubleshooting
 
+## Learning time is missing or still saving
+
+Learning time starts with new study sessions and excludes browsing, editing,
+background time, and idle time beyond two minutes. Check the selected reporting
+period and study-day rollover first. A library report labels remote time as
+waiting for synced content until its item or deletion record arrives.
+
+**Saving learning time…** means a checkpoint is still being written. If a save
+fails, its message remains on completion and totals screens. Keep the app open
+for automatic retry, or choose **Retry Saving**. See
+[Learning time](../learning-time/) for counting and cross-device rules.
+
 NeoAnki2 reports recoverable problems in an error banner or alert. With
 VoiceOver, the message is announced and focused. Read the complete message
 before retrying; it normally identifies the missing file, invalid field, data

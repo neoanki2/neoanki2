@@ -9,6 +9,13 @@ permalink: /user/iphone-ipad/
 
 # iPhone and iPad
 
+Home and each deck show Today and All time learning totals. **View Learning
+Time** opens period filters and an expandable deck breakdown. During study,
+**Pause Timer** takes a deliberate break and **Resume Timer** returns to timing;
+completion shows the session duration. The timer also pauses after two minutes
+without interaction and while the app is inactive. See
+[Learning time](../learning-time/) for recording, playback, and sync rules.
+
 NeoAnki2 has a native app for iOS and iPadOS 17 or newer. It shares the same
 library model, FSRS scheduler, item types, Card setups, and portable formats as
 the Mac app. The interface adapts to the device instead of reproducing the Mac

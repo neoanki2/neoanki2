@@ -8,6 +8,13 @@ parent: User Guide
 
 # Library and decks
 
+Each deck home shows learning time for Today and All time. In the detailed
+report, a parent's total includes descendants; expand it to distinguish **This
+deck only** from subdeck totals. Time follows each item's current assignment,
+so moving an item or subdeck updates historical rollups. Deleted items retain
+time under **Deleted Content** in the library report. See
+[Learning time](../learning-time/) for period and rollover rules.
+
 The sidebar controls which items and due cards appear in the detail area.
 Decks organize items without changing their item type or generated cards.
 
