@@ -4578,6 +4578,9 @@ actor SQLiteDatabase {
     /// Run at bootstrap too: an already acknowledged stale snapshot will never
     /// be delivered again merely because both replicas report Current.
     func reconcileReviewedCardScheduling() throws {
+        // Legacy imports and migration fixtures may not yet contain the full
+        // card shape, just as with versioned scheduler replay at bootstrap.
+        guard try supportsVersionedCardReplay() else { return }
         try inTransaction {
             for card in try fetchAllCards() {
                 try reconcileReviewedCardScheduling(cardID: card.id)
