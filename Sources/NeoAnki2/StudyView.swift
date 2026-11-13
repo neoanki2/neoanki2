@@ -7,8 +7,6 @@ import NeoAnkiTextEditing
 import SwiftUI
 
 struct StudyView: View {
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var recordingActivityID = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var model: StudyModel
@@ -30,23 +28,11 @@ struct StudyView: View {
     @AccessibilityFocusState private var recordingErrorAccessibilityFocused: Bool
 
     var body: some View {
-        studyContent
-        .background(StudyWindowActivity(tracker: model.learningTime).frame(width: 0, height: 0))
-        .environment(\.learningTimeActivity, LearningTimeMediaActivity { id, active in
-            model.learningTime.setMediaActivity(sourceID: id, isActive: active)
-        })
-        .onAppear {
-            model.learningTime.setActive(scenePhase == .active)
-        }
-        .onDisappear { model.learningTime.setVisible(false) }
-        .onChange(of: scenePhase) { _, phase in model.learningTime.setActive(phase == .active) }
-        .onChange(of: isEditingCard) { _, value in model.learningTime.setEditing(value) }
-        .onChange(of: recording.state) { _, value in
-            model.learningTime.setMediaActivity(sourceID: recordingActivityID, isActive: value == .recording || value == .playing)
-        }
-        .simultaneousGesture(TapGesture().onEnded { model.learningTime.interaction() })
-        .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.learningTime.interaction() })
-        .onKeyPress { _ in model.learningTime.interaction(); return .ignored }
+        studyContent.modifier(StudyLearningTimeModifier(
+            tracker: model.learningTime,
+            isEditing: isEditingCard,
+            recordingActive: recording.state == .recording || recording.state == .playing
+        ))
     }
 
     private var studyContent: some View {

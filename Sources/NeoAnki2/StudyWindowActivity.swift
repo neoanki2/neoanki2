@@ -1,5 +1,6 @@
 import AppKit
 import NeoAnkiApplication
+import NeoAnkiSharedUI
 import SwiftUI
 
 /// Observes only the study view's own window; no global input monitoring.
@@ -44,5 +45,37 @@ final class StudyWindowActivityView: NSView {
         for observer in sleepObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         sleepObservers = []
         tracker.setVisible(false)
+    }
+}
+
+
+/// Keep lifecycle and input modifiers separately typed for shipping Xcode versions.
+struct StudyLearningTimeModifier: ViewModifier {
+    let tracker: LearningTimeTracker
+    let isEditing: Bool
+    let recordingActive: Bool
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var recordingActivityID = UUID()
+
+    func body(content: Content) -> some View {
+        lifecycle(content)
+            .onChange(of: isEditing) { _, value in tracker.setEditing(value) }
+            .onChange(of: recordingActive) { _, value in
+                tracker.setMediaActivity(sourceID: recordingActivityID, isActive: value)
+            }
+            .simultaneousGesture(TapGesture().onEnded { tracker.interaction() })
+            .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in tracker.interaction() })
+            .onKeyPress { _ in tracker.interaction(); return KeyPress.Result.ignored }
+    }
+
+    private func lifecycle(_ content: Content) -> some View {
+        content
+            .background(StudyWindowActivity(tracker: tracker).frame(width: 0, height: 0))
+            .environment(\.learningTimeActivity, LearningTimeMediaActivity { id, active in
+                tracker.setMediaActivity(sourceID: id, isActive: active)
+            })
+            .onAppear { tracker.setActive(scenePhase == .active) }
+            .onDisappear { tracker.setVisible(false) }
+            .onChange(of: scenePhase) { _, phase in tracker.setActive(phase == .active) }
     }
 }
