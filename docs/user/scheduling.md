@@ -22,6 +22,9 @@ and describe your recall:
 Each grade updates that card's memory state and appends a review outcome. A new
 or newly imported card starts never-reviewed and is due immediately. Portable
 and authored deck imports do not carry scheduling history.
+Synced review outcomes take precedence over older card schedules. Automatic
+repair keeps the recorded grade and interval rather than scheduling a new
+review, and respects explicit scheduling resets.
 Words saved through **Add Word** follow these same rules: the selected item
 type generates the cards, and the destination deck's daily limits determine
 when new cards are available. Dictionary setup does not change scheduling.

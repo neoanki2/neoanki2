@@ -60,6 +60,9 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   than giving the user an upgrade command. Skip it for an iOS-only release when
   there is no newer Mac version. Report local installation separately from Store
   submission and public availability.
+- Finish successful releases by cleaning their disposable build outputs and
+  pinned worktrees after the local upgrade. Keep receipts, original logs, and
+  production debug symbols; preserve pending/failed release recovery inputs.
 - Read `docs/RELEASING.md` for the workflow and recovery rules. Retired release
   entry points must not be used to allocate independent versions or bypass state.
 

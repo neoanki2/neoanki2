@@ -18,6 +18,9 @@ NeoAnki2 has four native ways to bring in content:
 Anki `.apkg` and `.colpkg` packages, shared-deck imports, HTML/CSS cards, and
 Anki template markup are not supported.
 
+Automatic repair of synced schedules uses reviews already saved in your library.
+It does not import review history from portable or authored deck files.
+
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
 
