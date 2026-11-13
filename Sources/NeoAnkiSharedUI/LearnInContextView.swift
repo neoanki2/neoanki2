@@ -56,7 +56,9 @@ public struct LearnInContextView: View {
                         if model.decks.isEmpty {
                             Text("Create a deck in the library before adding cards.").foregroundStyle(.secondary)
                         }
-                        TextField("Word or phrase", text: Binding(get: { model.draft.target.expression }, set: model.updateExpression))
+                        // An explicit closure avoids a Swift 6.3.3 IRGen crash when an
+                        // actor-isolated method reference is reabstracted as Binding's setter.
+                        TextField("Word or phrase", text: Binding(get: { model.draft.target.expression }, set: { model.updateExpression($0) }))
                         .textFieldStyle(.roundedBorder).focused($expressionFocused)
                         .submitLabel(model.selectedExamples.isEmpty ? .go : .done)
                         .onSubmit {
