@@ -8,6 +8,10 @@ parent: User Guide
 
 # Studying
 
+Grades and review undo outcomes remain effective across iCloud sync even when
+card snapshots arrive late. An older schedule cannot put a completed review
+back into the due queue.
+
 Item-type availability controls new-item authoring, not the study queue.
 Automatically organizing types or removing a deck attachment preserves existing
 cards and their ordering. Moving an item retains its type and scheduling history.

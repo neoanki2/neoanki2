@@ -4579,6 +4579,77 @@ actor SQLiteDatabase {
         }
     }
 
+    /// Repairs old mutable card snapshots using immutable review evidence.
+    /// Run at bootstrap too: an already acknowledged stale snapshot will never
+    /// be delivered again merely because both replicas report Current.
+    func reconcileReviewedCardScheduling() throws {
+        // Legacy imports and migration fixtures may not yet contain the full
+        // card shape, just as with versioned scheduler replay at bootstrap.
+        guard try supportsVersionedCardReplay() else { return }
+        try inTransaction {
+            for card in try fetchAllCards() {
+                try reconcileReviewedCardScheduling(cardID: card.id)
+            }
+        }
+    }
+
+    private func reconcileReviewedCardScheduling(cardID: UUID) throws {
+        guard let card = try fetchCard(id: cardID) else { return }
+        let rows = try query(
+            """
+            SELECT review_logs.log, review_logs.memory_before,
+                   review_reverts.id AS revert_id
+            FROM review_logs
+            LEFT JOIN review_reverts ON review_reverts.review_log_id = review_logs.id
+            WHERE review_logs.card_id = ?
+              AND (? IS NULL OR review_logs.reviewed_at >= ?)
+            ORDER BY review_logs.reviewed_at DESC, review_logs.id DESC;
+            """,
+            bindings: [
+                .text(cardID.uuidString),
+                card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
+                card.schedulingHistoryOrigin.map { .double($0.timeIntervalSince1970) } ?? .null,
+            ]
+        )
+        let history = rows.compactMap { row -> (log: ReviewLog, before: MemoryState?, reverted: Bool)? in
+            guard let data = payload(row, "log"),
+                  let log = try? decode(ReviewLog.self, from: data) else { return nil }
+            let before = payload(row, "memory_before").flatMap {
+                try? decode(MemoryState.self, from: $0)
+            }
+            return (log, before, row["revert_id"] is String)
+        }
+        let latest = history.first { !$0.reverted }
+        let undoneSnapshot = history.contains {
+            $0.reverted && $0.log.reviewedAt == card.memory.lastReview
+        }
+        if undoneSnapshot, let undo = history.prefix(while: { $0.reverted }).last,
+           let before = undo.before {
+            // Restore the recorded pre-grade state, including any parameter
+            // replay performed before the undone grade. Several undos unwind
+            // to the earliest event in the consecutively reverted tail.
+            if let audit = undo.log.schedulingAudit {
+                try updateCardSchedulingMemory(
+                    cardID, memory: before,
+                    modelVersion: audit.modelVersion, parameterSetID: audit.parameterSetID
+                )
+            } else {
+                try updateCardMemory(cardID, memory: before)
+            }
+            return
+        }
+        if let latest, let audit = latest.log.schedulingAudit,
+           audit.memoryAfter.lastReview == latest.log.reviewedAt,
+           undoneSnapshot || (card.memory.lastReview.map { $0 < latest.log.reviewedAt } ?? true) {
+            try updateCardSchedulingMemory(
+                cardID, memory: audit.memoryAfter,
+                modelVersion: audit.modelVersion, parameterSetID: audit.parameterSetID
+            )
+        }
+        // Keep a same-review lazy parameter replay and snapshots newer than
+        // the available history. A scheduling reset bounds the query above.
+    }
+
     func persistReview(
         cardID: UUID,
         memoryBefore: MemoryState,
@@ -7426,10 +7497,24 @@ actor SQLiteDatabase {
                     try applySynchronizedTombstone(kind: kind, id: id)
                 }
             }
+            var schedulingCardIDs = Set<UUID>()
             for mutation in mutations {
-                if case let .review(record) = mutation {
+                switch mutation {
+                case let .card(card): schedulingCardIDs.insert(card.id)
+                case let .review(record):
+                    schedulingCardIDs.insert(record.log.cardID)
                     try persistSynchronizedReviewIntroduction(record)
+                case let .reviewRevert(record):
+                    if let log = try fetchReviewLog(id: record.reviewLogID) {
+                        schedulingCardIDs.insert(log.cardID)
+                    }
+                default: break
                 }
+            }
+            // Apply the complete history union first. Record delivery order and
+            // a stale mutable card must not undo a newer grade or its undo.
+            for cardID in schedulingCardIDs {
+                try reconcileReviewedCardScheduling(cardID: cardID)
             }
         }
     }
