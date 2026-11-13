@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiApplication
 import NeoAnkiSharedUI
 import PoemDeckBuilder
 import ProseDeckBuilder
@@ -6,6 +7,8 @@ import NeoAnkiTextEditing
 import SwiftUI
 
 struct StudyView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var recordingActivityID = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @Bindable var model: StudyModel
@@ -27,6 +30,26 @@ struct StudyView: View {
     @AccessibilityFocusState private var recordingErrorAccessibilityFocused: Bool
 
     var body: some View {
+        studyContent
+        .background(StudyWindowActivity(tracker: model.learningTime).frame(width: 0, height: 0))
+        .environment(\.learningTimeActivity, LearningTimeMediaActivity { id, active in
+            model.learningTime.setMediaActivity(sourceID: id, isActive: active)
+        })
+        .onAppear {
+            model.learningTime.setActive(scenePhase == .active)
+        }
+        .onDisappear { model.learningTime.setVisible(false) }
+        .onChange(of: scenePhase) { _, phase in model.learningTime.setActive(phase == .active) }
+        .onChange(of: isEditingCard) { _, value in model.learningTime.setEditing(value) }
+        .onChange(of: recording.state) { _, value in
+            model.learningTime.setMediaActivity(sourceID: recordingActivityID, isActive: value == .recording || value == .playing)
+        }
+        .simultaneousGesture(TapGesture().onEnded { model.learningTime.interaction() })
+        .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.learningTime.interaction() })
+        .onKeyPress { _ in model.learningTime.interaction(); return .ignored }
+    }
+
+    private var studyContent: some View {
         Group {
             if model.isLoading {
                 loadingView
@@ -42,6 +65,7 @@ struct StudyView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.detailBackground)
+
         .task {
             await model.startSession(scope: scope)
         }
@@ -246,6 +270,8 @@ struct StudyView: View {
             Label("Session Complete", systemImage: "checkmark.circle")
         } description: {
             Text(model.queue.isEmpty ? "No more due cards in this session." : model.completionSummary)
+            Text("Learning time: " + LearningTimeFormat.duration(model.learningTime.sessionMilliseconds))
+            LearningTimeSaveStatusView()
         } actions: {
             if model.canUndoLastGrade {
                 Button("Undo Last Grade") {
@@ -306,6 +332,7 @@ struct StudyView: View {
 
     private var studyHeader: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
+            LearningTimePauseButton(tracker: model.learningTime)
             Text(model.headerLabel)
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)

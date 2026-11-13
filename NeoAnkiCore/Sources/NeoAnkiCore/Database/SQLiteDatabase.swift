@@ -132,6 +132,7 @@ actor SQLiteDatabase {
     private let databaseURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var learningTimeObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
     private var localRevision: UInt64 = 0
     private var changeTrackingReady = false
     private var changeObservers: [UUID: AsyncStream<Int64>.Continuation] = [:]
@@ -486,6 +487,10 @@ actor SQLiteDatabase {
             if current < 31, try tableExists("item_types"), try tableExists("decks") {
                 for sql in Schema.migrationV31Statements + Schema.scopeChangeTrackingStatements { try execute(sql) }
                 try organizeLegacyItemTypes()
+            }
+
+            if current < 32 {
+                for sql in Schema.learningTimeStatements { try execute(sql) }
             }
 
             try execute(
@@ -7872,6 +7877,149 @@ extension SQLiteDatabase {
         }
         for (deck, ids) in additions {
             try saveDeckTypeSettings(.init(deckID: deck, itemTypeIDs: ids))
+        }
+    }
+}
+
+
+extension SQLiteDatabase {
+    func learningTimeNotifications() -> AsyncStream<Void> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            learningTimeObservers[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeLearningTimeObserver(id) }
+            }
+        }
+    }
+
+    private func removeLearningTimeObserver(_ id: UUID) { learningTimeObservers[id] = nil }
+
+    func insertLearningTime(_ segments: [LearningTimeSegment]) throws {
+        try inTransaction {
+            for segment in segments {
+                guard segment.durationMilliseconds > 0,
+                      segment.startedAt.timeIntervalSince1970.isFinite,
+                      segment.endedAt.timeIntervalSince1970.isFinite,
+                      segment.endedAt > segment.startedAt,
+                      abs(segment.endedAt.timeIntervalSince(segment.startedAt) * 1000
+                          - Double(segment.durationMilliseconds)) < 2 else {
+                    throw DatabaseError.invalidItem("Invalid learning-time interval.")
+                }
+                if let data = try query("SELECT payload FROM learning_time_segments WHERE id = ?;",
+                                        bindings: [.text(segment.id.uuidString)]).first?["payload"] as? Data {
+                    guard try decoder.decode(LearningTimeSegment.self, from: data) == segment else {
+                        throw DatabaseError.idempotencyConflict
+                    }
+                    continue
+                }
+                try execute("""
+                    INSERT INTO learning_time_segments(id, item_id, source_library_id, started_at, ended_at, duration_ms, payload)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    """, bindings: [.text(segment.id.uuidString), .text(segment.itemID.uuidString), .text(segment.sourceLibraryID.uuidString),
+                        .double(segment.startedAt.timeIntervalSince1970), .double(segment.endedAt.timeIntervalSince1970),
+                        .int(segment.durationMilliseconds), .blob(try encoder.encode(segment))])
+            }
+        }
+        if !segments.isEmpty { for observer in learningTimeObservers.values { observer.yield(()) } }
+    }
+
+    func learningTimeSegments(after sequence: Int64, limit: Int) throws -> [LearningTimeStoredSegment] {
+        try query("SELECT sequence, payload FROM learning_time_segments WHERE sequence > ? ORDER BY sequence LIMIT ?;",
+                  bindings: [.int(sequence), .int(Int64(limit))]).map { row in
+            guard let sequence = row["sequence"] as? Int64, let data = row["payload"] as? Data else {
+                throw DatabaseError.decodingFailed
+            }
+            return LearningTimeStoredSegment(sequence: sequence, segment: try decoder.decode(LearningTimeSegment.self, from: data))
+        }
+    }
+
+    func learningTimeSummary(scope: DeckScope, range: DateInterval) throws -> LearningTimeSummary {
+        try inReadTransaction {
+            // Missing remote items are staged logically: only explicit tombstones
+            // classify deleted content. The event remains durable either way.
+            let rows = try query("""
+                SELECT CASE WHEN items.id IS NOT NULL THEN COALESCE(items.deck_id, 'unassigned')
+                            WHEN revisions.is_deleted = 1 THEN 'deleted' ELSE 'pending' END AS bucket,
+                       SUM(segments.duration_ms *
+                           MAX(0.0, MIN(segments.ended_at, ?) - MAX(segments.started_at, ?)) /
+                           (segments.ended_at - segments.started_at)) AS duration
+                FROM learning_time_segments AS segments
+                LEFT JOIN learning_time_item_aliases AS aliases
+                  ON aliases.source_library_id = segments.source_library_id AND aliases.original_item_id = segments.item_id
+                LEFT JOIN items ON items.id = COALESCE(aliases.resolved_item_id, segments.item_id)
+                LEFT JOIN resource_revisions AS revisions
+                  ON revisions.resource_type = 'item' AND revisions.resource_id = COALESCE(aliases.resolved_item_id, segments.item_id)
+                WHERE segments.ended_at > ? AND segments.started_at < ?
+                GROUP BY bucket;
+                """, bindings: [.double(range.end.timeIntervalSince1970), .double(range.start.timeIntervalSince1970),
+                                 .double(range.start.timeIntervalSince1970), .double(range.end.timeIntervalSince1970)])
+            var amounts: [String: Int64] = [:]
+            for row in rows {
+                if let key = row["bucket"] as? String, let value = row["duration"] as? Double {
+                    amounts[key] = Int64(value.rounded())
+                }
+            }
+            let decks = try fetchAllDecks()
+            let sortPositions = try fetchDeckSortPositions()
+            let summaries = decks.map { DeckSummary(id: $0.id, name: $0.name, parentID: $0.parentID,
+                sortPosition: sortPositions[$0.id, default: 0], itemCount: 0, dueCount: 0) }
+            let children = Dictionary(grouping: summaries, by: \.parentID)
+            var rollups: [UUID: Int64] = [:]
+            func total(for deck: DeckSummary) -> Int64 {
+                if let cached = rollups[deck.id] { return cached }
+                let result = children[deck.id, default: []].reduce(amounts[deck.id.uuidString, default: 0]) {
+                    $0 + total(for: $1)
+                }
+                rollups[deck.id] = result
+                return result
+            }
+            let totals = summaries.sorted(by: DeckTree.areInDisplayOrder).map { deck in
+                LearningTimeDeckTotal(id: deck.id, name: deck.name, parentID: deck.parentID,
+                    directMilliseconds: amounts[deck.id.uuidString, default: 0], totalMilliseconds: total(for: deck))
+            }
+            let unassigned = amounts["unassigned", default: 0]
+            let deleted = amounts["deleted", default: 0]
+            let total: Int64
+            let direct: Int64
+            switch scope {
+            case .allDecks:
+                total = totals.filter { $0.parentID == nil }.reduce(unassigned + deleted) { $0 + $1.totalMilliseconds }
+                direct = unassigned
+            case .unassigned: total = unassigned; direct = unassigned
+            case let .deck(id, includeDescendants):
+                let deck = totals.first { $0.id == id }
+                direct = deck?.directMilliseconds ?? 0
+                total = includeDescendants ? deck?.totalMilliseconds ?? 0 : direct
+            }
+            let first = try query("SELECT MIN(started_at) AS first FROM learning_time_segments;").first?["first"] as? Double
+            return LearningTimeSummary(range: range, totalMilliseconds: total, directMilliseconds: direct,
+                descendantMilliseconds: max(0, total - direct), unassignedMilliseconds: unassigned,
+                deletedMilliseconds: deleted, pendingMilliseconds: amounts["pending", default: 0], decks: totals, trackingStartedAt: first.map(Date.init(timeIntervalSince1970:)))
+        }
+    }
+}
+
+
+extension SQLiteDatabase {
+    func recordLearningTimeAliases(_ aliases: [LearningTimeItemAlias]) throws {
+        try inTransaction {
+            for alias in aliases {
+                let prior = try query("SELECT resolved_item_id FROM learning_time_item_aliases WHERE source_library_id = ? AND original_item_id = ?;",
+                    bindings: [.text(alias.sourceLibraryID.uuidString), .text(alias.originalItemID.uuidString)]).first?["resolved_item_id"] as? String
+                guard prior == nil || prior == alias.resolvedItemID.uuidString else { throw DatabaseError.idempotencyConflict }
+                try execute("INSERT OR IGNORE INTO learning_time_item_aliases VALUES (?, ?, ?);",
+                    bindings: [.text(alias.sourceLibraryID.uuidString), .text(alias.originalItemID.uuidString), .text(alias.resolvedItemID.uuidString)])
+            }
+        }
+        if !aliases.isEmpty { for observer in learningTimeObservers.values { observer.yield(()) } }
+    }
+    func learningTimeItemAliases() throws -> [LearningTimeItemAlias] {
+        try query("SELECT * FROM learning_time_item_aliases;").map { row in
+            guard let source = row["source_library_id"] as? String, let sourceID = UUID(uuidString: source),
+                  let original = row["original_item_id"] as? String, let originalID = UUID(uuidString: original),
+                  let resolved = row["resolved_item_id"] as? String, let resolvedID = UUID(uuidString: resolved) else { throw DatabaseError.decodingFailed }
+            return LearningTimeItemAlias(sourceLibraryID: sourceID, originalItemID: originalID, resolvedItemID: resolvedID)
         }
     }
 }

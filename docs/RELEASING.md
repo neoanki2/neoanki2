@@ -156,6 +156,30 @@ The same configured Mac and retained local logs are the normal resume path.
 Keep the receipt directory until release completion. Manual publication outside
 this controller requires a deliberate, evidence-backed baseline migration.
 
+## Cleanup after a successful release
+
+The release agent cleans disposable outputs after the controller records
+`complete: true`, every selected channel is published or submitted, and the
+local Mac upgrade is verified. Apple review may still be pending. Older
+successfully completed releases can be cleaned in the same pass. Hold the
+release lock and preserve recovery inputs for pending, failed, abandoned, or
+uncertain uploads.
+
+Keep release/platform checkpoints, local-upgrade receipts, original validation
+and delivery logs, checksums, signing/notarization evidence, and production debug
+symbols. Preserve dSYMs and symbol maps in a verified compressed archive first;
+keep exact shipped executables when matching symbols are unavailable. Original
+hash-referenced logs remain unchanged for resume validation.
+
+Remove release-owned derived data, build caches, archives, exported binaries,
+temporary tap clones, and clean pinned Git worktrees. Verify worktree revisions
+and inspect ignored files before removing generated outputs. A local DMG can
+be removed once authenticated `gh` confirms its published asset digest matches
+the release receipt. Keep the installed app, library/settings, saved credentials,
+remote assets, unrelated worktrees, and shared development caches intact.
+Record removed paths and reclaimed space in `cleanup.json` beside the retained
+release receipt and report the cleanup result.
+
 ## Signing setup
 
 Required checks and branch protections govern merging before release starts.

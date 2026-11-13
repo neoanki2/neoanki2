@@ -125,6 +125,8 @@ actor MobileSyncCoordinator: SyncService {
                 adapter: adapter,
                 transport: transport,
                 metadataStore: metadata,
+                learningTime: try await LearningTimeSyncService.make(repository: repository,
+                    directory: paths.syncMetadataDirectory.appendingPathComponent("Learning Time", isDirectory: true)),
                 backupURL: { [paths] in paths.backupURL }
             )
             self.service = service

@@ -41,6 +41,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private var echoedResources: [String: SyncRecordEnvelope] = [:]
+    private var learningTimeAliases: [LearningTimeItemAlias] = []
     private var conflictCopies: [SyncConflictCopy] = []
 
     public init(repository: SQLiteLibraryRepository) {
@@ -192,6 +193,8 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         )
         conflictCopies.append(contentsOf: merge.conflictCopies)
         try await applyRemote(merge.accepted, origin: .initialMerge)
+        try await repository.recordLearningTimeAliases(learningTimeAliases)
+        learningTimeAliases = []
         let serverByKey = Dictionary(
             remote.map { (key(kind: $0.resourceKind, id: $0.id), $0) },
             uniquingKeysWith: { $0.order >= $1.order ? $0 : $1 }
@@ -270,6 +273,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 guard !knownAliases.contains(sourceLibraryID)
                     || localByKey["\(record.resourceKind):\(replacement.uuidString)"] != nil else { continue }
                 collisionRemaps[record.resourceKind, default: [:]][id] = replacement
+                if record.resourceKind == LibraryResourceKind.item.rawValue {
+                    learningTimeAliases.append(LearningTimeItemAlias(sourceLibraryID: sourceLibraryID,
+                        originalItemID: id, resolvedItemID: replacement))
+                }
             }
         }
 

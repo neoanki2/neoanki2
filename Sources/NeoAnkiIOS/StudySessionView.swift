@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import ImageIO
 import NeoAnkiCore
+import NeoAnkiApplication
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import PoemDeckBuilder
@@ -19,6 +20,7 @@ struct StudySessionView: View {
     @Bindable var model: MobileAppModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
+    @State private var recordingActivityID = UUID()
     @State private var footerWidth: CGFloat = 0
     @State private var showsFullContent = false
     @State private var isEditing = false
@@ -28,6 +30,24 @@ struct StudySessionView: View {
     @AccessibilityFocusState private var answerFocused: Bool
 
     var body: some View {
+        sessionContent
+        .environment(\.learningTimeActivity, LearningTimeMediaActivity { id, active in
+            session.learningTime.setMediaActivity(sourceID: id, isActive: active)
+        })
+        .onAppear {
+            session.learningTime.setActive(scenePhase == .active)
+            session.learningTime.setVisible(true)
+        }
+        .onDisappear { session.learningTime.setVisible(false) }
+        .onChange(of: isEditing) { _, value in session.learningTime.setEditing(value) }
+        .onChange(of: recorder.isRecording || recorder.isPlaying) { _, value in
+            session.learningTime.setMediaActivity(sourceID: recordingActivityID, isActive: value)
+        }
+        .simultaneousGesture(TapGesture().onEnded { session.learningTime.interaction() })
+        .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in session.learningTime.interaction() })
+    }
+
+    private var sessionContent: some View {
         NavigationStack {
             Group {
                 if session.isComplete {
@@ -36,6 +56,8 @@ struct StudySessionView: View {
                             Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
                             Text("Session Complete").font(.title.weight(.semibold))
                             VStack(alignment: .leading, spacing: 8) {
+                                Text("Learning time: " + LearningTimeFormat.duration(session.learningTime.sessionMilliseconds))
+                                LearningTimeSaveStatusView()
                                 Text("\(session.completion.reviews) \(session.completion.reviews == 1 ? "review" : "reviews")")
                                 Text("\(session.completion.uniqueCards) \(session.completion.uniqueCards == 1 ? "card" : "cards") · \(session.completion.uniqueItems) \(session.completion.uniqueItems == 1 ? "item" : "items")")
                                 if session.completion.savedSubmissions > 0 {
@@ -67,6 +89,7 @@ struct StudySessionView: View {
                 }
                 if !session.isComplete {
                     ToolbarItemGroup(placement: .topBarTrailing) {
+                        LearningTimePauseButton(tracker: session.learningTime)
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
                         Menu("More", systemImage: "ellipsis.circle") {
                             Button("Skip", systemImage: "forward") { skipCurrentCard() }
@@ -91,6 +114,7 @@ struct StudySessionView: View {
                 Text(session.error?.message ?? "Please try again.")
             }
         }
+
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission)
         .onChange(of: scenePhase) { _, phase in
@@ -697,6 +721,7 @@ private struct MobileResolvedMediaView: View {
             }
         }
         .accessibilityLabel(reference.altText ?? "Media")
+        .trackingLearningTimePlayback(player)
         .task(id: reference.assetHash) { await load() }
         .onDisappear { player?.pause() }
     }

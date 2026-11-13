@@ -162,6 +162,66 @@ private func paintedTextBounds<V: View>(_ view: V) throws -> CGRect {
     return bounds
 }
 
+@Test("Portrait and landscape diagrams aspect-fit every study layout with controls visible")
+@MainActor func studyDiagramsFitAvailableHeight() throws {
+    // Use a synchronous bitmap with the same resizable/aspect-fit rendering as
+    // OcclusionImage. This exercises the real viewport and wireframe without
+    // depending on an asynchronous media load or opening an application window.
+    for imageSize in [CGSize(width: 200, height: 800), CGSize(width: 800, height: 200)] {
+        let bitmap = try #require(CGContext(data: nil, width: Int(imageSize.width), height: Int(imageSize.height),
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        bitmap.setFillColor(NSColor.red.cgColor)
+        bitmap.fill(CGRect(origin: .zero, size: imageSize))
+        let image = try #require(bitmap.makeImage())
+        let component = ResolvedTemplateComponent(id: UUID(), region: .media, purpose: .question,
+            value: .media(MediaRef(kind: .image, assetHash: String(repeating: "a", count: 64), fileExtension: "png")),
+            presentation: Presentation())
+        for layout in CardLayoutID.allCases {
+            for size in [CGSize(width: 960, height: 640), CGSize(width: 800, height: 500), CGSize(width: 500, height: 400)] {
+                let view = AdaptiveStudyStage(layout: layout) {
+                    StudyStageContent(spacing: 16) {
+                        StudyCardViewport(fitsMedia: true) {
+                            CardWireframeView(layout: layout, components: [component], isAnswerRevealed: false) { _, _ in
+                                Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: .fit)
+                            }
+                        }
+                        .frame(maxWidth: 820)
+                        .padding(.horizontal, 20).padding(.vertical, 24)
+                    } response: { Color.blue.frame(height: 44) }
+                } footer: { Color.green.frame(height: 60) }
+                let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height))
+                let rendered = try #require(renderer.cgImage)
+                var pixels = [UInt8](repeating: 0, count: rendered.width * rendered.height * 4)
+                let bounds = try pixels.withUnsafeMutableBytes { buffer -> CGRect in
+                    let context = try #require(CGContext(data: buffer.baseAddress, width: rendered.width, height: rendered.height,
+                        bitsPerComponent: 8, bytesPerRow: rendered.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                    context.draw(rendered, in: CGRect(x: 0, y: 0, width: rendered.width, height: rendered.height))
+                    var minX = rendered.width, minY = rendered.height, maxX = -1, maxY = -1
+                    for y in 0 ..< rendered.height {
+                        for x in 0 ..< rendered.width {
+                            let offset = (y * rendered.width + x) * 4
+                            if buffer[offset] > 200 && buffer[offset + 1] < 40 && buffer[offset + 2] < 40 {
+                                minX = min(minX, x); maxX = max(maxX, x)
+                                minY = min(minY, y); maxY = max(maxY, y)
+                            }
+                        }
+                    }
+                    return CGRect(x: minX, y: minY, width: max(0, maxX - minX + 1), height: max(0, maxY - minY + 1))
+                }
+                #expect(bounds.height >= 40, "The diagram must render in \(layout) at \(size)")
+                #expect(abs(bounds.width - bounds.height * imageSize.width / imageSize.height) <= 4,
+                        "The complete diagram must retain its aspect ratio in \(layout) at \(size)")
+                // The bitmap rows run from top to bottom. Keep the complete
+                // diagram above the fixed response/footer and inside padding.
+                #expect(bounds.minY >= 23)
+                #expect(bounds.maxY <= size.height - 44 - 60 - 16 - 23)
+            }
+        }
+    }
+}
+
 @Test("Poetry prompts and revealed answers retain the native study type sizes")
 @MainActor func studyTextRetainsReadableQuestionAndAnswerFonts() throws {
     // Exercise the real composition, not a duplicated font-selection helper.

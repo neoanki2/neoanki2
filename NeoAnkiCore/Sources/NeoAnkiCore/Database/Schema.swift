@@ -1,9 +1,35 @@
 import Foundation
 
 enum Schema {
-    static let version = 31
+    static let version = 32
 
-    static let createStatements: [String] = [
+    static let learningTimeStatements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS learning_time_segments (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT NOT NULL UNIQUE,
+            item_id TEXT NOT NULL,
+            source_library_id TEXT NOT NULL,
+            started_at REAL NOT NULL,
+            ended_at REAL NOT NULL,
+            duration_ms INTEGER NOT NULL CHECK(duration_ms > 0),
+            payload BLOB NOT NULL
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS learning_time_item_aliases (
+            source_library_id TEXT NOT NULL,
+            original_item_id TEXT NOT NULL,
+            resolved_item_id TEXT NOT NULL,
+            PRIMARY KEY(source_library_id, original_item_id)
+        );
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_learning_time_item ON learning_time_segments(item_id);",
+        "CREATE INDEX IF NOT EXISTS idx_learning_time_start ON learning_time_segments(started_at);",
+        "CREATE INDEX IF NOT EXISTS idx_learning_time_range ON learning_time_segments(ended_at, started_at);",
+    ]
+
+    static let createStatements: [String] = learningTimeStatements + [
         """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL

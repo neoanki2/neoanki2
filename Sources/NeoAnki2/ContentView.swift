@@ -234,6 +234,7 @@ struct ContentView: View {
             setAddItemFocus(adding)
         }
         .onChange(of: decksModel.selectedScope) { _, _ in
+            if case .learningTime = appSession.route { appSession.route = .learningTime(decksModel.studyScope.filter) }
             selectedItemID = nil
             if isShowingSavedResponses { isShowingSavedResponses = false }
             Task { await reloadScope() }
@@ -602,7 +603,15 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if isShowingSavedResponses {
+        if case let .learningTime(scope) = appSession.route {
+            LearningTimeView(library: library, scope: scope)
+                .id(scope)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Back to Deck") { appSession.route = .scopeHome }
+                    }
+                }
+        } else if isShowingSavedResponses {
             SavedResponsesView(library: library)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if isManagingTemplates, let templatesModel {
@@ -667,7 +676,9 @@ struct ContentView: View {
         } else {
             ScopeHomeView(
                 itemsModel: itemsModel,
+                learningTimeLibrary: library,
                 scope: decksModel.studyScope,
+                onLearningTime: { appSession.route = .learningTime(decksModel.studyScope.filter) },
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },

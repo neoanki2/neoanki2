@@ -34,6 +34,8 @@ primary:
         url: /user/content-and-media/
       - title: Studying
         url: /user/studying/
+      - title: Learning time
+        url: /user/learning-time/
       - title: Import and export
         url: /user/import-export/
       - title: Scheduling
@@ -42,6 +44,8 @@ primary:
         url: /user/sync-reminders-widgets/
       - title: Local automation API
         url: /user/local-api/
+      - title: Chrome companion
+        url: /user/chrome-companion/
   - title: Understand
     url: /user/concepts/
     children:

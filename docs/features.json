@@ -52,6 +52,27 @@
   },
   "features": [
     {
+      "id": "learning-time",
+      "name": "Track active learning time by deck and subdeck",
+      "article": "user/learning-time.md",
+      "sources": [
+        "NeoAnkiCore/Sources/NeoAnkiCore/Models/LearningTime.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+LearningTime.swift",
+        "Sources/NeoAnkiApplication/LearningTime.swift",
+        "Sources/NeoAnkiCloudSync/LearningTimeSyncService.swift",
+        "Sources/NeoAnkiFeatures/LearningTimeFeatureModel.swift",
+        "Sources/NeoAnkiSharedUI/LearningTimeActivity.swift",
+        "Sources/NeoAnkiSharedUI/LearningTimeView.swift",
+        "Sources/NeoAnki2/StudyWindowActivity.swift"
+      ],
+      "tests": [
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/LearningTimeTests.swift",
+        "Tests/NeoAnkiApplicationTests/LearningTimeTrackerTests.swift",
+        "Tests/NeoAnkiApplicationTests/LearningTimeSyncTests.swift",
+        "Tests/NeoAnkiFeaturesTests/LearningTimeFeatureTests.swift"
+      ]
+    },
+    {
       "id": "content-image-occlusion",
       "name": "Create, group, and study image occlusion masks",
       "article": "user/content-and-media.md",

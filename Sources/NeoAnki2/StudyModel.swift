@@ -32,22 +32,22 @@ struct StudyStartTiming: Sendable, Equatable {
 @MainActor
 @Observable
 final class StudyModel {
-    private(set) var queue: [DueCard] = []
-    private(set) var index = 0
+    private(set) var queue: [DueCard] = [] { didSet { updateLearningTime() } }
+    private(set) var index = 0 { didSet { updateLearningTime() } }
     private(set) var isAnswerRevealed = false
-    private(set) var isLoading = false
+    private(set) var isLoading = false { didSet { updateLearningTime() } }
     /// The first card is readable while the rest of the exact session queue is
     /// being validated. Persistence and queue mutations remain disabled until
     /// this becomes false.
     private(set) var isPreparingQueue = false
-    private(set) var isGrading = false
-    private(set) var isCompletingSubmission = false
+    private(set) var isGrading = false { didSet { updateLearningTime() } }
+    private(set) var isCompletingSubmission = false { didSet { updateLearningTime() } }
     private(set) var errorMessage: String?
-    private(set) var isFinished = false
+    private(set) var isFinished = false { didSet { updateLearningTime() } }
     /// Set only when the queue could not be read at all. Without it a failed
     /// load is indistinguishable from an empty one, and a session that never
     /// opened reports itself complete.
-    private(set) var didFailToLoad = false
+    private(set) var didFailToLoad = false { didSet { updateLearningTime() } }
     private(set) var scopeLabel = ""
     private(set) var pendingGradeUndo: PendingGradeUndo?
     private(set) var typedAnswer = ""
@@ -68,6 +68,7 @@ final class StudyModel {
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
     private var repairQueue: [PendingRepeat] = []
+    let learningTime: LearningTimeTracker
     private var reviewTiming = ReviewTimingTracker()
     private var expectedQueueCount = 0
     private var startGeneration: UInt64 = 0
@@ -78,6 +79,7 @@ final class StudyModel {
         remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
     ) {
         self.library = library
+        self.learningTime = LearningTimeTracker(library: library as? any LibraryLearningTime)
         self.remainingQueueLoadGate = remainingQueueLoadGate
     }
 
@@ -259,12 +261,12 @@ final class StudyModel {
         }
     }
 
-    func revealAnswer() {
+    func revealAnswer() { learningTime.interaction();
         guard currentCard != nil else { return }
         isAnswerRevealed = true
     }
 
-    func updateTypedAnswer(_ answer: String) {
+    func updateTypedAnswer(_ answer: String) { learningTime.interaction();
         guard !isAnswerRevealed else { return }
         typedAnswer = answer
         answerEvaluation = nil
@@ -286,7 +288,7 @@ final class StudyModel {
         isAnswerRevealed = true
     }
 
-    func selectChoice(_ option: String) {
+    func selectChoice(_ option: String) { learningTime.interaction();
         guard choiceOptions.contains(option), !isAnswerRevealed else { return }
         selectedChoice = option
         interactionMessage = nil
@@ -306,13 +308,13 @@ final class StudyModel {
         isAnswerRevealed = true
     }
 
-    func selectArrangementItem(at index: Int) {
+    func selectArrangementItem(at index: Int) { learningTime.interaction();
         guard arrangedItems.indices.contains(index), !isAnswerRevealed else { return }
         selectedArrangementIndex = index
         interactionMessage = nil
     }
 
-    func moveSelectedArrangementItem(by offset: Int) {
+    func moveSelectedArrangementItem(by offset: Int) { learningTime.interaction();
         guard let selectedArrangementIndex else {
             interactionMessage = "Select an item before moving it."
             return
@@ -344,7 +346,7 @@ final class StudyModel {
         isAnswerRevealed = true
     }
 
-    func performPrimaryAction() {
+    func performPrimaryAction() { learningTime.interaction();
         guard let interaction = currentCard?.template.interaction else { return }
         switch interaction {
         case .reveal, .cloze, .imageOcclusion:
@@ -387,7 +389,7 @@ final class StudyModel {
         }
     }
 
-    func grade(_ rating: ReviewRating) async {
+    func grade(_ rating: ReviewRating) async { learningTime.interaction();
         guard !isGrading, !isPreparingQueue else { return }
         errorMessage = nil
         guard let card = currentCard else { return }
@@ -436,7 +438,7 @@ final class StudyModel {
         }
     }
 
-    func undoLastGrade() async {
+    func undoLastGrade() async { learningTime.interaction();
         guard !isGrading else { return }
         guard let undo = pendingGradeUndo else { return }
 
@@ -476,8 +478,14 @@ final class StudyModel {
         pendingGradeUndo = nil
     }
 
-    func pauseReviewTiming() { reviewTiming.pause() }
-    func resumeReviewTiming() { reviewTiming.resume() }
+    private func updateLearningTime() {
+        learningTime.setBusy(isLoading || isGrading || isCompletingSubmission)
+        let card = currentCard
+        learningTime.setCard(itemID: card?.item.id, cardID: card?.id)
+    }
+
+    func pauseReviewTiming() { reviewTiming.pause(); learningTime.setActive(false) }
+    func resumeReviewTiming() { reviewTiming.resume(); learningTime.setActive(true) }
 
     /// Re-reads the item behind the current card after it was edited mid-session,
     /// so the rest of the session shows the correction rather than the copy the

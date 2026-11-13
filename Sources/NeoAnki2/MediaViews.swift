@@ -1,6 +1,7 @@
 import AVKit
 import AppKit
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import SwiftUI
 
 enum MediaPlaybackPolicy {
@@ -73,6 +74,7 @@ struct AudioPlayerView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .trackingLearningTimePlayback(player)
         .onAppear {
             configurePlayer()
         }
@@ -278,6 +280,7 @@ struct VideoPlayerView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .trackingLearningTimePlayback(player)
         .onAppear { configurePlayer() }
         .onDisappear {
             player?.pause()

@@ -95,9 +95,11 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     public static let containerIdentifier = "iCloud.com.neoanki2.app"
     public static let zoneName = "NeoAnkiLibrary"
     public static let librarySubscriptionID = "neoanki-library-changes-v1"
+    public static let learningTimeZoneName = "NeoAnkiLearningTimeV1"
+    public static let learningTimeSubscriptionID = "neoanki-learning-time-changes-v1"
 
-    public static func librarySubscription(zoneID: CKRecordZone.ID) -> CKRecordZoneSubscription {
-        let subscription = CKRecordZoneSubscription(zoneID: zoneID, subscriptionID: librarySubscriptionID)
+    public static func librarySubscription(zoneID: CKRecordZone.ID, subscriptionID: String = librarySubscriptionID) -> CKRecordZoneSubscription {
+        let subscription = CKRecordZoneSubscription(zoneID: zoneID, subscriptionID: subscriptionID)
         let info = CKSubscription.NotificationInfo()
         info.shouldSendContentAvailable = true
         subscription.notificationInfo = info
@@ -107,7 +109,7 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     public static func isLibraryNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
         guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
               notification.notificationType == .recordZone,
-              notification.subscriptionID == librarySubscriptionID else { return false }
+              [librarySubscriptionID, learningTimeSubscriptionID].contains(notification.subscriptionID ?? "") else { return false }
         return notification.containerIdentifier == nil || notification.containerIdentifier == containerIdentifier
     }
     private static let containerIdentifiersEntitlement =
@@ -125,7 +127,8 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
 #endif
     }
 
-    private let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+    private let zoneID: CKRecordZone.ID
+    private let subscriptionID: String
     private let buffers = TransportBuffers()
     private let metadataStore: SyncMetadataStore
     private var initialState: CKSyncEngine.State.Serialization?
@@ -154,15 +157,17 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         return created
     }
 
-    private init(metadataStore: SyncMetadataStore, initialState: CKSyncEngine.State.Serialization?) {
+    private init(metadataStore: SyncMetadataStore, initialState: CKSyncEngine.State.Serialization?, zoneName: String) {
         self.metadataStore = metadataStore
         self.initialState = initialState
+        zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+        subscriptionID = zoneName == Self.learningTimeZoneName ? Self.learningTimeSubscriptionID : Self.librarySubscriptionID
     }
 
-    public static func make(metadataStore: SyncMetadataStore) async throws -> CKSyncEngineTransport {
+    public static func make(metadataStore: SyncMetadataStore, zoneName: String = zoneName) async throws -> CKSyncEngineTransport {
         try validateCurrentProcessEntitlements()
         let metadata = try await metadataStore.load()
-        return CKSyncEngineTransport(metadataStore: metadataStore, initialState: metadata.engineState)
+        return CKSyncEngineTransport(metadataStore: metadataStore, initialState: metadata.engineState, zoneName: zoneName)
     }
 
     static func validateContainerIdentifiers(_ identifiers: [String]?) throws {
@@ -195,9 +200,9 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         // through the explicit, token-based reader and its durable inbox.
         let database = container.privateCloudDatabase
         do {
-            _ = try await database.subscription(for: Self.librarySubscriptionID)
+            _ = try await database.subscription(for: subscriptionID)
         } catch let error as CKError where error.code == .unknownItem {
-            _ = try await database.save(Self.librarySubscription(zoneID: zoneID))
+            _ = try await database.save(Self.librarySubscription(zoneID: zoneID, subscriptionID: subscriptionID))
         }
         try await fetchLibraryZoneChanges()
     }

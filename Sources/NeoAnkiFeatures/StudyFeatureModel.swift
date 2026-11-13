@@ -23,13 +23,13 @@ public struct StudyCompletion: Sendable, Equatable {
 public final class StudyFeatureModel: Identifiable {
     public let id = UUID()
     public let title: String
-    public private(set) var queue: [DueCard] = []
-    public private(set) var index = 0
+    public private(set) var queue: [DueCard] = [] { didSet { updateLearningTime() } }
+    public private(set) var index = 0 { didSet { updateLearningTime() } }
     public private(set) var isAnswerRevealed = false
-    public private(set) var isLoading = false
+    public private(set) var isLoading = false { didSet { updateLearningTime() } }
     public private(set) var isPreparingQueue = false
-    public private(set) var isGrading = false
-    public private(set) var isCompletingSubmission = false
+    public private(set) var isGrading = false { didSet { updateLearningTime() } }
+    public private(set) var isCompletingSubmission = false { didSet { updateLearningTime() } }
     public private(set) var error: UserFacingError?
     public private(set) var typedAnswer = ""
     public private(set) var answerEvaluation: NeoAnkiCore.AnswerEvaluation?
@@ -50,6 +50,7 @@ public final class StudyFeatureModel: Identifiable {
     private var reviewedItems: Set<UUID> = []
     private var pendingUndo: (reviewID: UUID, index: Int, rating: ReviewRating, requeuedID: UUID?)?
     private var generation: UInt64 = 0
+    public let learningTime: LearningTimeTracker
     private var reviewTiming = ReviewTimingTracker()
 
     public init(
@@ -61,6 +62,7 @@ public final class StudyFeatureModel: Identifiable {
         errorMapper: any UserFacingErrorMapping = DefaultUserFacingErrorMapper()
     ) {
         self.library = library
+        self.learningTime = LearningTimeTracker(library: library as? any LibraryLearningTime)
         self.scope = scope
         self.title = title
         self.mediaStore = mediaStore
@@ -111,16 +113,16 @@ public final class StudyFeatureModel: Identifiable {
         }
     }
 
-    public func revealAnswer() { if currentCard != nil { isAnswerRevealed = true } }
-    public func updateTypedAnswer(_ value: String) { typedAnswer = value; answerEvaluation = nil }
-    public func selectChoice(_ value: String) { guard choiceOptions.contains(value) else { return }; selectedChoice = value }
-    public func selectArrangementItem(at value: Int) { guard arrangedItems.indices.contains(value) else { return }; selectedArrangementIndex = value }
-    public func moveSelectedArrangementItem(by offset: Int) {
+    public func revealAnswer() { learningTime.interaction(); if currentCard != nil { isAnswerRevealed = true } }
+    public func updateTypedAnswer(_ value: String) { learningTime.interaction(); typedAnswer = value; answerEvaluation = nil }
+    public func selectChoice(_ value: String) { learningTime.interaction(); guard choiceOptions.contains(value) else { return }; selectedChoice = value }
+    public func selectArrangementItem(at value: Int) { learningTime.interaction(); guard arrangedItems.indices.contains(value) else { return }; selectedArrangementIndex = value }
+    public func moveSelectedArrangementItem(by offset: Int) { learningTime.interaction();
         guard let source = selectedArrangementIndex, arrangedItems.indices.contains(source + offset) else { return }
         arrangedItems.swapAt(source, source + offset); selectedArrangementIndex = source + offset
     }
 
-    public func performPrimaryAction() {
+    public func performPrimaryAction() { learningTime.interaction();
         guard let card = currentCard else { return }
         switch card.template.interaction {
         case .reveal, .cloze, .imageOcclusion: revealAnswer()
@@ -174,7 +176,7 @@ public final class StudyFeatureModel: Identifiable {
         }
     }
 
-    public func grade(_ rating: ReviewRating) async {
+    public func grade(_ rating: ReviewRating) async { learningTime.interaction();
         guard let card = currentCard, !isGrading, !isPreparingQueue else { return }
         isGrading = true
         defer { isGrading = false }
@@ -195,7 +197,7 @@ public final class StudyFeatureModel: Identifiable {
         } catch { self.error = errorMapper.map(error) }
     }
 
-    public func undoLastGrade() async {
+    public func undoLastGrade() async { learningTime.interaction();
         guard let undo = pendingUndo, !isGrading else { return }
         isGrading = true
         defer { isGrading = false }
@@ -218,7 +220,7 @@ public final class StudyFeatureModel: Identifiable {
         } catch { self.error = errorMapper.map(error) }
     }
 
-    public func skip() {
+    public func skip() { learningTime.interaction();
         guard queue.indices.contains(index), !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
         pendingUndo = nil
         materializePendingRepeats()
@@ -240,8 +242,8 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func dismissError() { error = nil }
-    public func pauseReviewTiming() { reviewTiming.pause() }
-    public func resumeReviewTiming() { reviewTiming.resume() }
+    public func pauseReviewTiming() { reviewTiming.pause(); learningTime.setActive(false) }
+    public func resumeReviewTiming() { reviewTiming.resume(); learningTime.setActive(true) }
 
     private func advance() {
         isAnswerRevealed = false
@@ -261,6 +263,12 @@ public final class StudyFeatureModel: Identifiable {
             }
         }
         repairQueue = []
+    }
+
+    private func updateLearningTime() {
+        learningTime.setBusy(isLoading || isGrading || isCompletingSubmission)
+        let card = currentCard
+        learningTime.setCard(itemID: card?.item.id, cardID: card?.id)
     }
 
     private func prepareInteraction() {

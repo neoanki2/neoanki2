@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NeoAnki2 Companion Settings</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="settings.js"></script>
+</head>
+<body class="settings">
+  <main>
+    <h1>NeoAnki2 Companion</h1>
+    <p>Select text. Add an answer. Keep it.</p>
+    <h2>Connect to NeoAnki2</h2>
+    <p>Keep NeoAnki2 running on this Mac. In its Settings → Local API, turn on <strong>Enable local automation API</strong>.</p>
+    <form id="connection-form">
+      <label for="port">Local API port</label>
+      <input id="port" type="number" min="1024" max="65535" value="8766" required disabled>
+      <p class="hint">Use the port shown in NeoAnki2. The default is 8766.</p>
+      <div class="actions"><button id="connect" type="submit" disabled>Loading…</button><button id="disconnect" class="secondary" type="button" hidden>Disconnect</button></div>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section aria-labelledby="dictionary-heading">
+      <h2 id="dictionary-heading">Dictionary suggestions</h2>
+      <label for="pack">Installed vocabulary pack</label>
+      <select id="pack" disabled><option value="">None — type answers manually</option></select>
+      <p class="hint">Suggestions come from your local NeoAnki2 vocabulary packs. You can always edit the answer.</p>
+      <p id="dictionary-status" class="hint" role="status"></p>
+    </section>
+    <section aria-labelledby="capture-heading">
+      <h2 id="capture-heading">Add your first card</h2>
+      <p>Pin this extension in Chrome. Highlight a word or phrase, then click its toolbar icon. Review the answer, choose a deck, and save.</p>
+      <p class="hint">Selectable YouTube transcript text works too. Captions playing over a video are not captured automatically.</p>
+    </section>
+    <p class="hint privacy">Selected text and source links stay on this Mac and are sent only to NeoAnki2 when you save. Dictionary lookups also use its local API. Cards follow your NeoAnki2 sync settings.</p>
+  </main>
+</body>
+</html>
