@@ -1,6 +1,6 @@
 ---
 name: release
-description: Merge release changes into main, publish affected NeoAnki2 apps to the Stores and Homebrew with one shared version, and upgrade the local Mac; preview, resume, or inspect a release. Use for release, ship, publish, or Homebrew/app-store release requests. Physical iPhone installation uses deploy-iphone instead.
+description: Merge release changes into main, publish affected NeoAnki2 apps to the Stores and Homebrew with one shared version, upgrade the local Mac, and clean up disposable release artifacts; preview, resume, or inspect a release. Use for release, ship, publish, or Homebrew/app-store release requests. Physical iPhone installation uses deploy-iphone instead.
 ---
 
 # Release NeoAnki2
@@ -78,7 +78,35 @@ edit the release process.
   release with no newer Mac version needs no local upgrade. Do not install
   TestFlight or manipulate Store containers; no other GUI interaction is allowed.
 
+## Cleanup
+
+Finish a release by reclaiming its disposable outputs, including older completed
+releases. Acquire the release lock and confirm `release.json` has `complete: true`
+and every selected channel is `published`, `submitted`, or `available`. Complete
+the current release's local Mac upgrade first. Pending Apple review does not
+require retaining build directories; pending processing, failed/abandoned
+releases, and uncertain uploads must retain their recovery inputs.
+
+- Keep receipts/checkpoints, local-upgrade verification, original validation and
+  delivery logs, checksums, signing/notarization evidence, and production debug
+  symbols. Preserve matching dSYMs/symbol maps before deleting archives or build
+  trees; retain exact shipped executables when no matching symbols exist. A
+  verified compressed symbols archive is sufficient. Leave hash-referenced logs
+  unchanged so resume can still validate them.
+- Remove release-owned derived data, build caches, `.xcarchive` bundles, exported
+  apps/IPA/PKG files, and temporary tap clones. Remove the pinned source worktree
+  through Git after verifying its revision and clean tracked/untracked state;
+  force removal only when remaining ignored files are known generated outputs.
+  Delete a local published DMG only after authenticated `gh` confirms the remote
+  asset's SHA-256 matches the release receipt.
+- Limit deletion to completed version directories and scratch outputs created by
+  this release. Preserve unrelated worktrees/caches, the installed app, library
+  data, saved signing material, and remote release assets. Record removed paths
+  and reclaimed space in a small local cleanup receipt, verify retained evidence,
+  and report the space recovered with the release result.
+
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's
-actual state, the local installed version, and the receipt path. Name concrete blockers without inventing
+actual state, the local installed version, cleanup result, and the receipt path.
+Name concrete blockers without inventing
 acceptance passes or requesting confirmation already granted by the release request.

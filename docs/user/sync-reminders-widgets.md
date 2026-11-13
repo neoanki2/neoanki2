@@ -105,6 +105,11 @@ later refresh; opening the app remains the way to request a current summary.
 
 ## What syncs
 
+Card schedules are checked against their saved review history when sync commits
+and when a library opens. A delayed card snapshot cannot replace a newer grade;
+previously affected libraries repair their due counts automatically. Review
+undo records remain effective even if the old reviewed card arrives later.
+
 Deck type attachments, defaults, inheritance overrides, explicit global
 availability, and imported editing protection sync independently of the schema.
 Unlocking a type does not make it global. Update other devices before changing

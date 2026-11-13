@@ -33,6 +33,10 @@ so the sidebar and the detail pane always agree.
 
 Selecting a scope opens its **scope home**, described below.
 
+With iCloud sync, due counts use the latest saved review outcomes. Opening a
+library also repairs schedules left behind by older synced card snapshots;
+this preserves the review history and does not require reviewing cards again.
+
 Background count updates keep **Start Studying** available when cards are ready.
 The action is disabled while a study session is starting, preventing duplicate
 starts without making you wait for badge or count refreshes.

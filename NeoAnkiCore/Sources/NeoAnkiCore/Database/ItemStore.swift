@@ -263,6 +263,7 @@ public actor ItemStore {
         try await database.seedStarterItemTypesIfNeeded(starterItemTypes)
         try await ensureVersionedSchedulingBootstrap(now: bootstrapTime)
         try await migrateLegacyCardSchedulingIfNeeded(now: bootstrapTime)
+        try await database.reconcileReviewedCardScheduling()
         try await database.markStaleSchedulerCohortsDirty(now: bootstrapTime)
         requestAutomaticSchedulingMaintenance(after: 0)
     }

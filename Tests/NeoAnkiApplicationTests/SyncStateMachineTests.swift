@@ -168,6 +168,55 @@ private func textItem(id: UUID, type: ItemType, text: String, deckID: UUID?) -> 
 }
 
 struct SyncStateMachineTests {
+    @Test func staleServerCardsWithNewerReviewsConvergeToSixDueAcrossRestart() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cloud = TestCloud()
+        let phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud, seed: 91)
+        var mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud, seed: 92)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let type = try #require(try await phone.repository.loadItemTypes().itemTypes.first)
+        for index in 0..<8 {
+            _ = try await phone.repository.createItem(
+                textItem(id: UUID(), type: type, text: "Card \(index)", deckID: nil), asOf: now
+            )
+        }
+        await phone.service.synchronize()
+        await mac.service.synchronize()
+        #expect(try await mac.repository.scopeSummary(scope: .allDecks, asOf: now).dueNow == 8)
+        let oldServer = await cloud.snapshot()
+        let cards = try await phone.repository.cards().prefix(2)
+        var reviewIDs: [UUID] = []
+        for card in cards {
+            let review = try await phone.repository.submitReview(
+                cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 500
+            )
+            reviewIDs.append(review.reviewLogID)
+        }
+        await phone.service.synchronize()
+        for card in cards {
+            let key = "card:\(card.id.uuidString)"
+            let stale = try #require(oldServer[key]?.record)
+            let latest = try #require(await cloud.snapshot()[key])
+            // A delayed mutable card write wins its server tag while the
+            // immutable reviews remain present. This used to report Current
+            // with eight due on Mac and six on the reviewing phone.
+            _ = await cloud.save(stale, expected: latest.tag)
+        }
+        await mac.service.synchronize()
+        #expect(try await mac.repository.scopeSummary(scope: .allDecks, asOf: now).dueNow == 6)
+        for id in reviewIDs { _ = try await mac.repository.synchronizedReviewRecord(id: id) }
+        await phone.service.synchronize()
+        await mac.service.synchronize()
+        try await mac.restart(cloud: cloud, seed: 93)
+        await mac.service.synchronize()
+        #expect(try await mac.repository.scopeSummary(scope: .allDecks, asOf: now).dueNow == 6)
+        for card in cards {
+            #expect(try await mac.repository.card(id: card.id) == phone.repository.card(id: card.id))
+        }
+        #expect(await mac.service.issues().isEmpty)
+    }
+
     @Test func committedPhoneReviewUploadsAndRefreshesMacWithRecoveryPollingDeferred() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

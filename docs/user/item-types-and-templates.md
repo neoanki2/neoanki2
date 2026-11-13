@@ -19,7 +19,8 @@ and iPad. The Item Type Studio edits fields and Card setups together and saves
 the complete definition as one change.
 Each generated card has its own maturity status. Editing a Card setup preserves
 that status when the card identity survives reconciliation; a newly generated
-card starts Not started.
+card starts Not started. Sync repairs stale schedules on surviving cards from
+their review history without replacing their Card setups or suspension settings.
 
 Due counts, including the app icon badge, count generated cards rather than
 items. An item with multiple Card setups can therefore contribute more than
