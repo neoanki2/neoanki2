@@ -8,6 +8,11 @@ parent: User Guide
 
 # Getting started
 
+Deck homes also show Today and All time learning totals. Choose **View Learning
+Time** for a deck breakdown and reporting periods. Tracking begins with new
+native study sessions; older review durations are not imported. See
+[Learning time](../learning-time/).
+
 NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and
 iPad. Homebrew is the recommended Mac installation because it verifies the
 release and simplifies updates. The same official Mac build is also available as a direct DMG from the

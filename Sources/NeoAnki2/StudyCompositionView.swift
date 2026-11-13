@@ -3,7 +3,6 @@ import NeoAnkiSharedUI
 import SwiftUI
 
 struct StudyCompositionView: View {
-    @State private var showsFullCard = false
     let template: Template
     let item: Item
     let isAnswerRevealed: Bool
@@ -20,39 +19,25 @@ struct StudyCompositionView: View {
     }
 
     var body: some View {
-        ViewThatFits(in: .vertical) {
+        StudyCardViewport(fitsMedia: hasVisibleVisualMedia) {
             wireframe
-                .cardWireframeIntrinsicSizing()
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(spacing: DesignSystem.Spacing.sm) {
-                Text("This card needs more room.")
-                    .font(DesignSystem.Typography.uiBody)
-                Button("Read Full Card") { showsFullCard = true }
-                    .accessibilityIdentifier("readFullStudyCard")
-            }
         }
         .frame(maxWidth: 820)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
         .padding(.vertical, DesignSystem.Spacing.lg)
-        .sheet(isPresented: $showsFullCard) {
-            VStack(spacing: 0) {
-                ScrollView {
-                    wireframe
-                        .cardWireframeIntrinsicSizing()
-                        .padding(DesignSystem.Spacing.lg)
+    }
+
+    private var hasVisibleVisualMedia: Bool {
+        CardWireframeDescriptor.descriptor(for: effectiveLayout)
+            .renderedComponents(from: components, answerRevealed: isAnswerRevealed)
+            .contains { rendered in
+                switch rendered.component.value {
+                case .imageOcclusion: true
+                case let .media(ref): ref.kind != .audio
+                default: false
                 }
-                Divider()
-                HStack {
-                    Spacer()
-                    Button("Done") { showsFullCard = false }
-                        .keyboardShortcut(.cancelAction)
-                }
-                .padding(DesignSystem.Spacing.md)
             }
-            .frame(minWidth: 480, idealWidth: 640, minHeight: 360, idealHeight: 560)
-        }
     }
 
     private var wireframe: some View {
@@ -84,6 +69,28 @@ struct StudyCompositionView: View {
             DesignSystem.Typography.cardAnswerPointSize
         case .instruction, .media, .context:
             DesignSystem.Typography.richTextPointSize
+        }
+    }
+}
+
+/// Images need a finite height proposal to aspect-fit. Measuring the entire
+/// card with fixedSize first instead gives tall diagrams their natural height.
+struct StudyCardViewport<Card: View>: View {
+    let fitsMedia: Bool
+    @ViewBuilder let card: Card
+
+    var body: some View {
+        if fitsMedia {
+            card
+        } else {
+            ViewThatFits(in: .vertical) {
+                card
+                    .cardWireframeIntrinsicSizing()
+                    .fixedSize(horizontal: false, vertical: true)
+                ScrollView {
+                    card.cardWireframeIntrinsicSizing()
+                }
+            }
         }
     }
 }

@@ -8,6 +8,11 @@ parent: User Guide
 
 # Item Types and Card Setups
 
+Learning-time history belongs to the studied item, rather than a generated card
+or Card setup definition. Regenerating cards for a surviving item preserves its
+time. Editing item types or Card setups is excluded from active study timing.
+See [Learning time](../learning-time/).
+
 An **item type** defines the fields that store one piece of knowledge. Its
 **Card setups** decide which fields appear on a study card, which of five
 static layouts presents them, and how the learner answers. The saved data model

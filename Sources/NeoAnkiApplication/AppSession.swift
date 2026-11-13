@@ -13,6 +13,7 @@ public enum AppSection: String, Codable, CaseIterable, Sendable, Hashable, Ident
 }
 
 public enum AppRoute: Sendable, Hashable {
+    case learningTime(DeckScope)
     case scopeHome
     case scope(DeckScope)
     case browse

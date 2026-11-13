@@ -8,6 +8,13 @@ parent: User Guide
 
 # Shortcuts and accessibility
 
+Learning Time uses native period pickers, disclosure controls, and labeled deck
+durations. The study header's **Pause Timer** and **Resume Timer** controls have
+accessible action names; an idle pause includes a text explanation. Save errors
+and retry actions remain available on completion and totals screens. These are
+implemented semantics, not a claim of live assistive-technology verification.
+See [Learning time](../learning-time/).
+
 NeoAnki2 uses standard macOS menus, controls, focus behavior, and semantic
 system colors. Menu items are disabled when their action is unsafe—for example,
 imports are disabled during study and portable export requires a selected

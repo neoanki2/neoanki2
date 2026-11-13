@@ -10,6 +10,7 @@ public actor OfflineFirstSyncService: SyncService {
     private let adapter: any LibrarySyncAdapter
     private let transport: any CloudSyncTransport
     private let metadataStore: SyncMetadataStore
+    private let learningTime: LearningTimeSyncService?
     private let backupURL: @Sendable () -> URL
     private let recoveryPollInterval: Duration
     private var currentStatus: SyncStatus = .offline
@@ -30,6 +31,7 @@ public actor OfflineFirstSyncService: SyncService {
         adapter: any LibrarySyncAdapter,
         transport: any CloudSyncTransport,
         metadataStore: SyncMetadataStore,
+        learningTime: LearningTimeSyncService? = nil,
         recoveryPollInterval: Duration = .seconds(10),
         backupURL: @escaping @Sendable () -> URL
     ) {
@@ -37,6 +39,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.adapter = adapter
         self.transport = transport
         self.metadataStore = metadataStore
+        self.learningTime = learningTime
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
     }
@@ -165,6 +168,11 @@ public actor OfflineFirstSyncService: SyncService {
             try await flushOutbound(metadata: &metadata, generation: generation)
 
             try checkLifecycle(generation)
+            if let learningTime {
+                do { try await learningTime.synchronize() }
+                catch { throw UserFacingError(title: "Learning Time Could Not Sync", message: error.localizedDescription) }
+            }
+            try checkLifecycle(generation)
             metadata = try await metadataStore.load()
             currentIssues = metadata.issues
             currentIssues.removeAll { $0.resourceID == "sync-batch" && $0.conflictCopy == nil }
@@ -286,6 +294,7 @@ public actor OfflineFirstSyncService: SyncService {
         synchronizationRequested = false
         finishWaiters()
         await transport.stop()
+        await learningTime?.stop()
         transportStarted = false
         currentStatus = .offline
     }

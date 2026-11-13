@@ -159,6 +159,15 @@ let package = Package(
             dependencies: ["NeoAnkiAPI"],
             path: "Tools/NeoAnkiAPIReferenceGenerator"
         ),
+        // Isolated headless browser-test server; never opens the user's library.
+        .executableTarget(
+            name: "neoanki-chrome-fixture",
+            dependencies: [
+                "NeoAnkiAPI", "NeoAnkiApplication", "NeoAnkiVocabularyKit",
+                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
+            ],
+            path: "Tools/ChromeCompanionFixture"
+        ),
         .target(
             name: "NeoAnkiTemplateMigration",
             dependencies: [.product(name: "NeoAnkiCore", package: "NeoAnkiCore")],

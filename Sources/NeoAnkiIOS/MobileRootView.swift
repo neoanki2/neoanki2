@@ -357,6 +357,7 @@ private struct HomeView: View {
     @Environment(\.openWordCapture) private var openWordCapture
     @Bindable var model: MobileAppModel
     @Binding var path: NavigationPath
+    @State private var showsLearningTime = false
     @State private var isAddingDeck = false
     @State private var isAddingItem = false
     @State private var errorMessage: String?
@@ -380,6 +381,9 @@ private struct HomeView: View {
                     }
                 }
 
+                Section {
+                    LearningTimeHomeSection(library: model.library, scope: .allDecks) { showsLearningTime = true }
+                }
                 Section {
                     Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
                         .accessibilityIdentifier("home-add-word")
@@ -422,6 +426,9 @@ private struct HomeView: View {
                 }
             }
             .navigationTitle("Home")
+            .navigationDestination(isPresented: $showsLearningTime) {
+                LearningTimeView(library: model.library, scope: .allDecks)
+            }
             .modifier(MobileTabBarVisibility())
             .navigationDestination(for: MobileScope.self) { scope in
                 ScopeDetailView(model: model, scope: scope)
@@ -528,6 +535,7 @@ private struct ScopeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     let scope: MobileScope
+    @State private var showsLearningTime = false
     @State private var summary: ScopeSummary?
     @State private var errorMessage: String?
     @State private var showsDeckSettings = false
@@ -547,6 +555,9 @@ private struct ScopeDetailView: View {
                     .listRowBackground(Color.clear)
                 }
 
+                Section {
+                    LearningTimeHomeSection(library: model.library, scope: scope.filter) { showsLearningTime = true }
+                }
                 Section {
                     NavigationLink("Browse Items") { LibraryView(model: model, scope: scope.filter, embedsNavigation: false) }
                     Button("Add Word", systemImage: "character.book.closed") {
@@ -576,6 +587,9 @@ private struct ScopeDetailView: View {
             AddItemView(model: model, deckID: { if case let .deck(id) = scope { return id }; return nil }())
         }
         .navigationTitle(model.scopeTitle(scope))
+        .navigationDestination(isPresented: $showsLearningTime) {
+            LearningTimeView(library: model.library, scope: scope.filter)
+        }
         .toolbar {
             if case let .deck(id) = scope {
                 Button("Deck Settings", systemImage: "ellipsis.circle") { showsDeckSettings = true }

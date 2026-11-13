@@ -1,4 +1,5 @@
 import NeoAnkiCore
+import NeoAnkiApplication
 import NeoAnkiSharedUI
 import PoemDeckBuilder
 import ProseDeckBuilder
@@ -27,6 +28,14 @@ struct StudyView: View {
     @AccessibilityFocusState private var recordingErrorAccessibilityFocused: Bool
 
     var body: some View {
+        studyContent.modifier(StudyLearningTimeModifier(
+            tracker: model.learningTime,
+            isEditing: isEditingCard,
+            recordingActive: recording.state == .recording || recording.state == .playing
+        ))
+    }
+
+    private var studyContent: some View {
         Group {
             if model.isLoading {
                 loadingView
@@ -42,6 +51,7 @@ struct StudyView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.detailBackground)
+
         .task {
             await model.startSession(scope: scope)
         }
@@ -246,6 +256,8 @@ struct StudyView: View {
             Label("Session Complete", systemImage: "checkmark.circle")
         } description: {
             Text(model.queue.isEmpty ? "No more due cards in this session." : model.completionSummary)
+            Text("Learning time: " + LearningTimeFormat.duration(model.learningTime.sessionMilliseconds))
+            LearningTimeSaveStatusView()
         } actions: {
             if model.canUndoLastGrade {
                 Button("Undo Last Grade") {
@@ -306,6 +318,7 @@ struct StudyView: View {
 
     private var studyHeader: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
+            LearningTimePauseButton(tracker: model.learningTime)
             Text(model.headerLabel)
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)

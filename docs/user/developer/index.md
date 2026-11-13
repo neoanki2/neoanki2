@@ -44,6 +44,7 @@ documentation, and releases.
 - [Application library boundary ADR]({{ '/adr/0003-application-library-boundary/' | relative_url }})
 - [Current documentation audit]({{ '/audits/documentation-2026-08-15/' | relative_url }})
 - [macOS editing and interaction audit]({{ '/audits/macos-editing-2026-10-23/' | relative_url }})
+- [Migaku competitor research and replacement requirements]({{ '/audits/migaku-competitor-2026-11-11/' | relative_url }})
 - [Persistent spoken-response proposal]({{ '/proposals/persistent-spoken-responses/' | relative_url }})
 - [Legacy documentation-maintenance guide]({{ '/user/maintaining-documentation/' | relative_url }})
 

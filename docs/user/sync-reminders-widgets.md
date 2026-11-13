@@ -9,6 +9,14 @@ permalink: /user/sync-reminders-widgets/
 
 # iCloud, Reminders, and Widgets
 
+Updated apps also synchronize active learning-time segments through a separate
+private iCloud zone. Offline study joins combined totals after syncing, and
+repeated delivery never duplicates time. Older apps keep ordinary library sync
+but require an update to record or display learning time. A library report labels
+time whose item has not arrived yet as waiting for synced content. This history
+is separate from review scheduling, reminders, widgets, and app-icon due counts.
+See [Learning time](../learning-time/).
+
 iCloud sync is available in provisioned Mac, iPhone, and iPad builds. Daily
 reminders and the Due Cards widget are iPhone/iPad services. The library remains
 usable offline and each device keeps its own service preferences.

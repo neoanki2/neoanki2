@@ -1048,3 +1048,18 @@ public extension LibraryItemTypeManaging {
     func setDeckItemTypes(_ settings: DeckItemTypeSettings) async throws { throw DatabaseError.invalidItemType("This library does not support deck type settings.") }
     func setItemTypeAvailability(id: UUID, availableEverywhere: Bool) async throws { throw DatabaseError.invalidItemType("This library does not support type availability settings.") }
 }
+
+extension SQLiteLibraryRepository: LibraryLearningTime {
+    public func recordLearningTimeAliases(_ aliases: [LearningTimeItemAlias]) async throws { try await store.recordLearningTimeAliases(aliases) }
+    public func learningTimeItemAliases() async throws -> [LearningTimeItemAlias] { try await store.learningTimeItemAliases() }
+    public func learningTimeLibraryID() async throws -> UUID { try await store.libraryID() }
+    public func recordLearningTime(_ segments: [LearningTimeSegment]) async throws { try await store.recordLearningTime(segments) }
+    public func learningTimeSegments(after sequence: Int64, limit: Int) async throws -> [LearningTimeStoredSegment] {
+        try await store.learningTimeSegments(after: sequence, limit: limit)
+    }
+    public func learningTimeNotifications() async -> AsyncStream<Void> { await store.learningTimeNotifications() }
+    public func learningTimeSummary(scope: DeckScope, period: LearningTimePeriod, asOf: Date,
+                                    calendar: Calendar) async throws -> LearningTimeSummary {
+        try await store.learningTimeSummary(scope: scope, period: period, asOf: asOf, calendar: calendar)
+    }
+}

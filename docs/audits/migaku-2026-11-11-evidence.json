@@ -1,0 +1,691 @@
+{
+  "title": "Migaku competitor research evidence",
+  "research_dates": [
+    "2026-11-11",
+    "2026-11-12"
+  ],
+  "assessment_date": "2026-11-12",
+  "repository_base_revision": "a097a74b6ab7f0fd5b135e8e64cc1c3caa987941",
+  "neoanki_scope": "Current local working tree, including uncommitted Chrome companion; source inspection, not shipped-version or GUI acceptance claim.",
+  "method": "Primary public pages, official written video-guide descriptions, release histories, store listings, and headless inspection of official images. No paid-account or live streaming acceptance.",
+  "sources": [
+    {
+      "url": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "resolved_url": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "retrieved_date": "2026-11-12",
+      "sha256": "0f8243891cf03490746fa55dadaa81cf1833c9dfc7e00a1fa5a17b85210630e6",
+      "bytes": 669914,
+      "content_type": "text/html",
+      "local_snapshot": ".local/migaku-research/source-8a173d8ee14cf8db.html",
+      "title": "‎Migaku: Really Learn Languages App - App Store",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://chromewebstore.google.com/detail/migaku-languages/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "resolved_url": "https://chromewebstore.google.com/detail/migaku-really-learn-langu/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "retrieved_date": "2026-11-12",
+      "sha256": "64ef42bafb406bc7ffe546345188adee373b87d1d9c08fe5c1090775b412c876",
+      "bytes": 840310,
+      "content_type": "text/html; charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-15a742e1fb9e3b42.html",
+      "title": "Migaku: Really Learn Languages - Chrome Web Store",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/",
+      "resolved_url": "https://migaku.com/",
+      "retrieved_date": "2026-11-12",
+      "sha256": "e843625649759a1a659f4a11b8b54a93e6ece8f5f9d8e06ae4c5ca54d6aa715b",
+      "bytes": 669158,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-f216a451962fd5e2.html",
+      "title": "Migaku - The fastest way to really learn a languageJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglishCantoneseChineseEnglishFrenchGermanItalianJapaneseKoreanPortugueseSpanishVietnamese",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/assets/srs2.webp",
+      "resolved_url": "https://migaku.com/assets/srs2.webp",
+      "retrieved_date": "2026-11-12",
+      "sha256": "7be3e57b24551d48645269e73cb79da0061afd72605aeec77fb624dec9c5ceea",
+      "bytes": 453254,
+      "content_type": "image/webp",
+      "local_snapshot": ".local/migaku-research/source-4fd7b0a0dbec84e3.bin"
+    },
+    {
+      "url": "https://migaku.com/blog/changelog",
+      "resolved_url": "https://migaku.com/blog/changelog",
+      "retrieved_date": "2026-11-12",
+      "sha256": "ae9706e6dad36e09fa64540f21f29802387ed0b0a7c0514fed8e7292caf5df5e",
+      "bytes": 736138,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-d1e082e1371bd901.html",
+      "title": "Migaku Changelog Blog: Language Learning Updates & New FeaturesJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/card-creation-from-text-content-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/card-creation-from-text-content-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "68253374bd47a3ab40fe8669908c24e190db3e1a8bc5733387c0c78491f9a40c",
+      "bytes": 137740,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-45f9811682db3d5b.html",
+      "title": "Card creation from text content | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/byxpGqUQNEs"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/card-creation-from-video-content-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/card-creation-from-video-content-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "e0af2d04cb0d89063a4c1c666693fbf80b94554ba1bd1b2b9f72f260de99d88f",
+      "bytes": 138117,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-28630801af237202.html",
+      "title": "Card creation from video content | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/rsh9JaP5akM"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/french-specific-features-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/french-specific-features-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "239a57d35a30bac1c9a37cf87fa4b11c6ece529745ea8fbfad1a3f60ba0a3bc2",
+      "bytes": 137931,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-04794d253782294c.html",
+      "title": "French Specific Features | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/HtatnjROC8E"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/german-specific-features-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/german-specific-features-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "0410812176a558c85eb23b34a154b29aa3f31bd9aeeb82135922c69bcdc7e764",
+      "bytes": 138286,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-28eff26fd3374193.html",
+      "title": "German Specific Features | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/IR5M1ODOHT4"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/installation-guide-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/installation-guide-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "6a8ca5c8417e1edb01002ae1696e98efbc442e771c980528954e4f1d7b9e2b5b",
+      "bytes": 137913,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-83f0d0fd3a65232a.html",
+      "title": "Installation Guide | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/SXjqsWCNy3g"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/japanese-specific-features-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/japanese-specific-features-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "6dd40e671dbf83248f236a6539b393c395b552842dbbfa7ba320da336bb690cf",
+      "bytes": 138076,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-b8005ca489baf48a.html",
+      "title": "Japanese Specific Features | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/kGWbT1y0jVI"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/mandarin-specific-features-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/mandarin-specific-features-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "e9686826bf563a37cd38914f85ab5805b88c3a3d6e2fb64c3ed7f56291b697a1",
+      "bytes": 138279,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-0091190ce61200fb.html",
+      "title": "Mandarin Specific Features | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/CtSVo-LcqFk"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/supercharge-your-language-learning-tracking-learned-words",
+      "resolved_url": "https://migaku.com/blog/youtube/supercharge-your-language-learning-tracking-learned-words",
+      "retrieved_date": "2026-11-12",
+      "sha256": "e66669c220ac9a04752ada48a963ba52e252adb15885acd5545813eba4159527",
+      "bytes": 138356,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-74cb8602468b3632.html",
+      "title": "Supercharge Your Language Learning: Tracking Learned WordsJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/vART7YuZG38"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-card-creator-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-card-creator-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "840ef1bcbd85b9551c3769d62773dbb79671efee6bb2ad9f9320018ebf02d4f9",
+      "bytes": 138215,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-65807fa4276b7333.html",
+      "title": "The Card Creator | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/kp5OSU99QSU"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-clipboard-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-clipboard-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "028a7dbc5f1f6128cf4a43c286dcf18d5ef23c482edf6519797fda3441a06b96",
+      "bytes": 138190,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-c9b56ebfde391404.html",
+      "title": "The Clipboard | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/QfeMsW5atyc"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-dashboard-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-dashboard-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "37c94d288d18bedde0e48eff776143610f788051bb54238f6a153fca20bfc59f",
+      "bytes": 137606,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-db0ca3c4b7da448d.html",
+      "title": "The Dashboard | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/-daPG_zaXRc"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-dictionary-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-dictionary-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "4513c846677a49750605c0f8813c0e7c0c6f587948a07d1f08de3422ee7d1c72",
+      "bytes": 137695,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-8e11946aca2e9b0d.html",
+      "title": "The Dictionary | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/pS3yfobyRqU"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-learning-statuses-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-learning-statuses-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "c0f5b57391b82fe63893002ec7509ed76cd94becebebe935016ffcd925b37d76",
+      "bytes": 137765,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-7702291d9c56795a.html",
+      "title": "The Learning Statuses | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/17Q41u9J24Y"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-popup-dictionary-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-popup-dictionary-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "29fdb7f3a334a5fbe2778e8a0a4abbc13fced0979abfe126129c1b1e43c5b017",
+      "bytes": 137936,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-377fbf066ec4a89a.html",
+      "title": "The Popup Dictionary | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/iTl89q9qapo"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-settings-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-settings-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "5b54b03cb867b4f93bd951b4dc24418e85736c27c555375380fcb212f877392d",
+      "bytes": 137781,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-e9f2287ef8baf8dc.html",
+      "title": "The Settings | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/U6BKD3UNXlI"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-toolbar-on-text-sites-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-toolbar-on-text-sites-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "b7aaa5762c39417d22f70dd90d1e2dd5e47bb309ec35e8006b689d4ad5cf6fec",
+      "bytes": 137996,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-cb98e2f6010bb9ee.html",
+      "title": "The Toolbar on Text Sites | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/RGcWOwF8MM8"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/the-toolbar-on-video-sites-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/the-toolbar-on-video-sites-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "4710131c0c1562bc10c9e2a48ec33a14482948575903f46cfb8bd0e27a6c7278",
+      "bytes": 138150,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-b29fbd9263764aaf.html",
+      "title": "The Toolbar on Video Sites | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/hZcE5lNbljE"
+      ]
+    },
+    {
+      "url": "https://migaku.com/blog/youtube/video-controls-migaku-browser-extension",
+      "resolved_url": "https://migaku.com/blog/youtube/video-controls-migaku-browser-extension",
+      "retrieved_date": "2026-11-12",
+      "sha256": "d63a5901093341efd87d92d9305524ba523e51e7ab70ee86438223233469cb75",
+      "bytes": 137674,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-e5be4b4189e2d131.html",
+      "title": "Video Controls | Migaku Browser ExtensionJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": [
+        "https://www.youtube.com/embed/XiVF-F2saXg"
+      ]
+    },
+    {
+      "url": "https://migaku.com/faq/courses",
+      "resolved_url": "https://migaku.com/faq/courses",
+      "retrieved_date": "2026-11-12",
+      "sha256": "cf6fb879eb2b87794ceeb9e64936f8aa483956306e3ac068abeb7abb76a77913",
+      "bytes": 179391,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-c9f085f3aea05ba6.html",
+      "title": "Migaku Language Courses: Fundamentals, Academy, Vocab & More for All LevelsJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/faq/features",
+      "resolved_url": "https://migaku.com/faq/features",
+      "retrieved_date": "2026-11-12",
+      "sha256": "3cedb10cefc539e9418bff83d8fa8c23c351e7b29ee285b2930f0ba4a2222213",
+      "bytes": 173693,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-29046d23796f2299.html",
+      "title": "Migaku: How to Start Learning a Language with Immersive Tools & Native ContentJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/faq/getting-started",
+      "resolved_url": "https://migaku.com/faq/getting-started",
+      "retrieved_date": "2026-11-12",
+      "sha256": "76b2486fdffcbf639b95b41b1d9212efeb86dddaf57fcb98df2757b280e34dd8",
+      "bytes": 184564,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-790480c4fa35fcee.html",
+      "title": "What is Migaku? Learn Languages Naturally with Native Content & Immersive ToolsJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/faq/goals",
+      "resolved_url": "https://migaku.com/faq/goals",
+      "retrieved_date": "2026-11-12",
+      "sha256": "b6abe1eb297724ada591fa856de42c0da9716df4b6f53f40411af1187a7aa70a",
+      "bytes": 253954,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-96ee5c93a51c2fee.html",
+      "title": "Migaku for Language Goals: Master Native Media, Books, Games & MoreJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/getting-started",
+      "resolved_url": "https://migaku.com/getting-started",
+      "retrieved_date": "2026-11-12",
+      "sha256": "06fa604facfc85401b9ce76dcb19c740a43b5973381dfdb1e8bfa7042c76f496",
+      "bytes": 170170,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-53654766c589d334.html",
+      "title": "Getting StartedJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/grammar",
+      "resolved_url": "https://migaku.com/grammar",
+      "retrieved_date": "2026-11-12",
+      "sha256": "9de21b2a467bc5d29bc8ebf4f6a12f03529bb7b90b1c7534413867724ba8bc83",
+      "bytes": 13280597,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-77a4ca9706eeb6d6.html",
+      "title": "Migaku Grammar ReferenceJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/grammar/japanese/nouns",
+      "resolved_url": "https://migaku.com/grammar/japanese/nouns",
+      "retrieved_date": "2026-11-12",
+      "sha256": "ae688205d001d692ef4ad4234cf8f39cce5fa9d6206a00d31cc354c3fcafa0fe",
+      "bytes": 154168,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-319cc030bb95254d.html",
+      "title": "[JLPT N5] | Japanese Nouns | Japanese GrammarJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://migaku.com/pricing",
+      "resolved_url": "https://migaku.com/pricing",
+      "retrieved_date": "2026-11-12",
+      "sha256": "77d7f18c5a916709bc1fcc7ca3a8548a6cf6564a0d8fecd08a345e9bd29d8440",
+      "bytes": 142627,
+      "content_type": "text/html;charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-7ff6d8dcfd8c6c6e.html",
+      "title": "PricingJapaneseMandarinKoreanSpanishCantoneseEnglishGermanPortugueseVietnameseItalianFrenchEnglish日本語EspañolEnglish",
+      "official_guide_video_urls": []
+    },
+    {
+      "url": "https://play.google.com/store/apps/details?id=com.migaku.android&hl=en_US",
+      "resolved_url": "https://play.google.com/store/apps/details?id=com.migaku.android&hl=en_US",
+      "retrieved_date": "2026-11-12",
+      "sha256": "a407d53bc5a91bd08d88165106d04710301432a2c985f2f8441034108b52ba2e",
+      "bytes": 1248478,
+      "content_type": "text/html; charset=utf-8",
+      "local_snapshot": ".local/migaku-research/source-44bc5d456229aaa2.html",
+      "title": "Migaku: Really Learn Languages - Apps on Google Play",
+      "official_guide_video_urls": []
+    }
+  ],
+  "inspected_official_images": [
+    {
+      "name": "web-welcomeExtension",
+      "url": "https://migaku.com/assets/japanese/welcomeExtension.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-welcomeExtension.webp",
+      "bytes": 51110,
+      "sha256": "60721fa67caf7c5f23025875a601b609a0f9113a15e3f54bcbbfd6cfe7701ac6",
+      "width": 1546,
+      "height": 879,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Japanese video with dual subtitles and readings; marketing composite."
+    },
+    {
+      "name": "web-anfang",
+      "url": "https://migaku.com/assets/anfang.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-anfang.webp",
+      "bytes": 902726,
+      "sha256": "fa871b8f85b95cdcdebc5fc7d7ddf5dd28e0204f374d89f7bf0f92327c273bd6",
+      "width": 1378,
+      "height": 800,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Source-film frame used in homepage composite; no application UI is visible."
+    },
+    {
+      "name": "web-website",
+      "url": "https://migaku.com/assets/website.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-website.webp",
+      "bytes": 75150,
+      "sha256": "809a08fd0de65d7ba7399ee06bb893809d9cfad760e405334b55c0c1d632380c",
+      "width": 1302,
+      "height": 846,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Social page with learning toolbar and word annotations."
+    },
+    {
+      "name": "web-twitterStatisticsHome",
+      "url": "https://migaku.com/assets/twitterStatisticsHome.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-twitterStatisticsHome.webp",
+      "bytes": 27814,
+      "sha256": "71925b6b47df0af100fc1d0c2591c81a643fbefeffc9ad52f8e12826ece1ef6a",
+      "width": 542,
+      "height": 654,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Coverage, unique-word categories and recommended-sentence analysis."
+    },
+    {
+      "name": "web-srs1",
+      "url": "https://migaku.com/assets/srs1.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-srs1.webp",
+      "bytes": 48198,
+      "sha256": "9810d425b31787e6dc0667dba35f8986c37cf02676f65670ebe2d9fc92f6b20e",
+      "width": 750,
+      "height": 1624,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Deck dashboard and review/new counts; historical marketing UI."
+    },
+    {
+      "name": "web-srs2",
+      "url": "https://migaku.com/assets/srs2.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-srs2.webp",
+      "bytes": 453254,
+      "sha256": "7be3e57b24551d48645269e73cb79da0061afd72605aeec77fb624dec9c5ceea",
+      "width": 750,
+      "height": 1624,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Review card with word, sentence, two audio actions, translation, frame and explanation."
+    },
+    {
+      "name": "web-srs3",
+      "url": "https://migaku.com/assets/srs3.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-srs3.webp",
+      "bytes": 335836,
+      "sha256": "c40258b3bde23b3c72dab91efc5b957891b912568f653cbfb17611d8864945ac",
+      "width": 750,
+      "height": 1624,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Passing a review in the pictured interface."
+    },
+    {
+      "name": "web-srs4",
+      "url": "https://migaku.com/assets/srs4.webp",
+      "source": "https://migaku.com/",
+      "path": ".local/migaku-research/web-srs4.webp",
+      "bytes": 48542,
+      "sha256": "3b6579f6e2c83a00136ab0f7e36819fbf4c028b4ed2711e3ca1d74957416f46f",
+      "width": 750,
+      "height": 1624,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Card collection with text previews and new-card markers."
+    },
+    {
+      "name": "ios-1",
+      "url": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/05/56/33/0556337f-0368-5fee-8eff-0a56aee6991d/1.jpg/600x1300bb.webp",
+      "source": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "path": ".local/migaku-research/ios-1.webp",
+      "bytes": 66352,
+      "sha256": "ecd4c9769391971ad0ed7ad51a2d57fcc2689856ce95e7ce64fc932805c370d8",
+      "width": 600,
+      "height": 1298,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Store marketing artwork; no detailed workflow evidence."
+    },
+    {
+      "name": "ios-2",
+      "url": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/5b/73/4b/5b734b06-a2dc-514c-0fd5-6ba162d606e2/2.jpg/600x1300bb.webp",
+      "source": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "path": ".local/migaku-research/ios-2.webp",
+      "bytes": 70510,
+      "sha256": "39cb163a9cf43039bd71b3826be11cf6f11c98e9fe86f8769f7685f89d04bae7",
+      "width": 600,
+      "height": 1298,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Language marketing artwork; not proof of per-language feature parity."
+    },
+    {
+      "name": "ios-3",
+      "url": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/7d/f0/0c/7df00c5c-a17c-19e2-cdf8-9d78101befc3/3.jpg/600x1300bb.webp",
+      "source": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "path": ".local/migaku-research/ios-3.webp",
+      "bytes": 59654,
+      "sha256": "31e57f2684330a54a87797b20100bc7c6be6822e7333a0a0310a36e649e3f63c",
+      "width": 600,
+      "height": 1298,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Grammar lesson examples pictured inside course marketing."
+    },
+    {
+      "name": "ios-4",
+      "url": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/eb/af/fc/ebaffc66-b398-6c66-3bf3-7a463931d3ee/4.jpg/600x1300bb.webp",
+      "source": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "path": ".local/migaku-research/ios-4.webp",
+      "bytes": 68708,
+      "sha256": "1e03c1231bae1718c2a1ec20c9dbb2c2e9c5bab3eb6951e017def2553eacb920",
+      "width": 600,
+      "height": 1298,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Source-video frame associated with a media-rich study card."
+    },
+    {
+      "name": "ios-5",
+      "url": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/db/f9/14/dbf914b8-cb62-d76d-053f-461435a2ad00/5.jpg/600x1300bb.webp",
+      "source": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "path": ".local/migaku-research/ios-5.webp",
+      "bytes": 62920,
+      "sha256": "f2364acc7f5b71a4ee24506f457a68d5ff51396258fd6b062fced51364ec5aa5",
+      "width": 600,
+      "height": 1298,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Illustrated desktop and mobile lookup contexts; marketing composite."
+    },
+    {
+      "name": "ios-6",
+      "url": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f1/c2/45/f1c24513-0378-0d1d-7a60-fd018dffc4e4/6.jpg/600x1300bb.webp",
+      "source": "https://apps.apple.com/us/app/migaku-really-learn-languages/id1664096855",
+      "path": ".local/migaku-research/ios-6.webp",
+      "bytes": 76064,
+      "sha256": "d32a5c8502f339433b3ab0f19899aa92be68d0c212af4bd746470bb8e72ce728",
+      "width": 600,
+      "height": 1298,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Photo/OCR example showing Japanese vertical text and extracted selectable text."
+    },
+    {
+      "name": "chrome-1",
+      "url": "https://lh3.googleusercontent.com/8IhGe3BhIg8bJkihl7N8HqK4l0AS8tBcdrSNVq8DFehuv2lwJHpYq51SCs_XTLDoZkwoj5oJp50NT25JIoTsEBz_n7o",
+      "source": "https://chromewebstore.google.com/detail/migaku-languages/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "path": ".local/migaku-research/chrome-1.webp",
+      "bytes": 93749,
+      "sha256": "5088153c748be3de4e28394b68105b7a62144ff5bdd07cf1056fa2416a3e052e",
+      "width": 512,
+      "height": 320,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Web reading with page vocabulary statistics; depicted labels may be historical."
+    },
+    {
+      "name": "chrome-2",
+      "url": "https://lh3.googleusercontent.com/ZZYjBrSp3V3btuDMQr5-v9yyBAmbPQ15slyXGEGAVKJjHmAOb9jGfS9uaTFSF3Eg1L-8TfuduvTrLjN0zJB574o0Bg",
+      "source": "https://chromewebstore.google.com/detail/migaku-languages/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "path": ".local/migaku-research/chrome-2.webp",
+      "bytes": 121345,
+      "sha256": "4afafb3395eac40d82fd728a6bdf1210a07ad3c1daf98e14ce5b531d0ab45f6c",
+      "width": 512,
+      "height": 320,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Dashboard with content links and visibly dated 2023 release entry; not current UI proof."
+    },
+    {
+      "name": "chrome-3",
+      "url": "https://lh3.googleusercontent.com/n2SMm8zLDWRFGvMiKqCzXpuIa9OMvwP8ejokyV5Jg3GnvE3tro5TXLkdVDMXMQw5LT-FnlPv1WkxQcJ0ZNZXuN_eJgk",
+      "source": "https://chromewebstore.google.com/detail/migaku-languages/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "path": ".local/migaku-research/chrome-3.webp",
+      "bytes": 122231,
+      "sha256": "aef020554b5e790a9095e76ad39a1adec6391f3e655280c62554fa74b0aa4711",
+      "width": 512,
+      "height": 320,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Site enablement and source image/audio capture toggle."
+    },
+    {
+      "name": "chrome-4",
+      "url": "https://lh3.googleusercontent.com/6S4_CILoX3G5t-cbylhRTi5JW_KpsQ8h2itTihwlUG60_qaVZCxPTVOlhGiUvkCuYLs8gd-LhBcL1AIt6i4bjFxcXA",
+      "source": "https://chromewebstore.google.com/detail/migaku-languages/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "path": ".local/migaku-research/chrome-4.webp",
+      "bytes": 115945,
+      "sha256": "dbafc8868b6f48deb9ce0b3ed2d26ae8962a9039312ee0743ea331bdc38db9dc",
+      "width": 512,
+      "height": 320,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Dictionary popup anchored to a word in video subtitles."
+    },
+    {
+      "name": "chrome-5",
+      "url": "https://lh3.googleusercontent.com/_ePQlXH3BpWhFFht6K-I7v6vtocSAEc4iAzg6ulo_g4TOkhm2r6Bkwn3FuGPlMmvauVvZx4emdUq4MCeccbcyKqjYDE",
+      "source": "https://chromewebstore.google.com/detail/migaku-languages/lkhiljgmbeecmljiogckofcalncmfnfo",
+      "path": ".local/migaku-research/chrome-5.webp",
+      "bytes": 120431,
+      "sha256": "dd35c3cf41d4f62f2a1dd0ded27853790a8fe1bb6540dfa7e97cec183d20ca2f",
+      "width": 512,
+      "height": 320,
+      "retrieved_date": "2026-11-11",
+      "inspection": "Viewed in a local contact sheet; primary UI examples also compared with official written guides.",
+      "observation": "Dictionary assets beside editable card draft and original video context."
+    }
+  ],
+  "local_contact_sheets": [
+    ".local/migaku-research/screenshots-contact-sheet.jpg",
+    ".local/migaku-research/chrome-contact-sheet.jpg"
+  ],
+  "limits": [
+    "Official screenshots include historical marketing interfaces.",
+    "The public changelog is older than current store release histories.",
+    "No lossless Migaku migration or universal language quality claim is established.",
+    "Source HTML and downloaded images are local ignored research artifacts; URLs and hashes are retained here."
+  ],
+  "rendered_public_pages": [
+    {
+      "url": "https://migaku.com/grammar/japanese/nouns",
+      "retrieved_date": "2026-11-12",
+      "method": "Isolated Playwright Chromium headless context; no user profile or desktop interaction. Readiness used loaded lesson content or visible plan text.",
+      "text_snapshot": ".local/migaku-research/grammar-rendered.txt",
+      "text_sha256": "f14063bea7bc56a313afe71ac007717b8365f740f01f7418185ebf5e74e354e8",
+      "screenshot": ".local/migaku-research/grammar-rendered.png",
+      "screenshot_sha256": "49d798fbe551b7a81532953e26bbd66b6d0d082ba4369396d414d175f324e6ba",
+      "width": 1440,
+      "height": 3866,
+      "observation": "Read the public lesson and inspected examples with ruby, translations, audio controls and related-lesson links."
+    },
+    {
+      "url": "https://migaku.com/pricing",
+      "retrieved_date": "2026-11-12",
+      "method": "Isolated Playwright Chromium headless context; no user profile or desktop interaction. Readiness used loaded lesson content or visible plan text.",
+      "text_snapshot": ".local/migaku-research/pricing-rendered.txt",
+      "text_sha256": "4fef6bfa55e14446bba190e5c82ab7af18e27a77e78a664d7dbede48df190743",
+      "screenshot": ".local/migaku-research/pricing-rendered.png",
+      "screenshot_sha256": "ae3858856b326ce55b1b52ed024edf7ae78bbe726ac4d063e1a008e3837a6509",
+      "width": 1440,
+      "height": 2472,
+      "observation": "Displayed Standard USD 10/month, Early Access USD 15/month, Lifetime USD 499; yearly toggle advertises 20 percent savings."
+    }
+  ],
+  "source_counts": {
+    "linked_primary_pages": 31,
+    "linked_primary_image_assets": 1,
+    "official_video_guide_descriptions": 18,
+    "inspected_official_images": 19,
+    "additional_rendered_public_pages": 2
+  }
+}

@@ -88,8 +88,9 @@ NeoAnki2 expresses brand through **precision and calm** — correct split-view s
 
 - Content-first: the selected Focus, Split, Media Aside, Media Hero, or Action
   Stage composition dominates the detail pane
-- The active Mac Study Stage does not scroll; its action/grading footer is fixed.
-  Measured overflow opens a separate full-content sheet.
+- The active Mac Study Stage fits images proportionally into the available space;
+  long text scrolls inline at its natural type size. Its response controls and
+  action/grading footer stay fixed.
 - Presets own responsive geometry. Authored data selects named regions and
   semantic purposes but never supplies arbitrary layout or markup.
 - Mac-native: `NavigationSplitView`, menus, keyboard shortcuts, tooltips
@@ -171,7 +172,7 @@ The sidebar has one selection model and two clear groups. **Library** contains A
 **Study pane structure (top → bottom):**
 
 1. Session header — progress + transient grade/Undo feedback + visible End Session control
-2. Non-scrolling adaptive card stage — prompt, divider, answer; measured overflow opens a full-content sheet
+2. Adaptive card stage — prompt, divider, answer; images fit the viewport and long text scrolls inline
 3. Optional error banner — full width, subtle fill  
 4. Fixed footer — Show Answer or grade row  
 

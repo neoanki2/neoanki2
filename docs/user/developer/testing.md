@@ -41,6 +41,25 @@ dedicated scripts under `Scripts/`. The [unified release process](../../RELEASIN
 selects relevant headless checks; UI journeys are additional targeted evidence,
 not a ceremony required for every release.
 
+### Chrome companion
+
+The extension needs no build step. Its JavaScript and packaged-browser checks run
+separately from the Swift fast lane:
+
+```bash
+cd Extensions/Chrome
+npm ci
+npm test
+npx playwright install chromium --no-shell
+npm run test:integration
+```
+
+The integration test loads the production extension into headless Chrome for
+Testing with a disposable profile and a real, isolated NeoAnki2 API server. It
+checks pairing, selection capture, dictionary suggestions, study-card creation,
+and replay after a lost save response. See the extension README for fixture
+cleanup and the [user guide]({{ '/user/chrome-companion/' | relative_url }}) for local installation.
+
 ### Headless sync regression and stress tests
 
 ```bash

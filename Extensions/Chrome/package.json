@@ -1,0 +1,12 @@
+{
+  "name": "neoanki2-chrome-companion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/unit.test.js",
+    "test:integration": "node tests/integration.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0"
+  }
+}

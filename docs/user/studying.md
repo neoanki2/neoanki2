@@ -8,6 +8,13 @@ parent: User Guide
 
 # Studying
 
+Active study is timed automatically, including skipped cards and unfinished
+attempts. **Pause Timer** and **Resume Timer** control deliberate breaks; two
+minutes without interaction pauses automatically. Editing, saving, hidden
+windows, and background time are excluded. Completion shows session duration,
+and deck homes link to per-deck and subdeck reports. Save failures remain visible
+after a session ends. See [Learning time](../learning-time/) for counting rules.
+
 Grades and review undo outcomes remain effective across iCloud sync even when
 card snapshots arrive late. An older schedule cannot put a completed review
 back into the due queue.
@@ -19,7 +26,9 @@ cards and their ordering. Moving an item retains its type and scheduling history
 Every active card uses a predefined **Study Stage**. Its flexible card region
 yields space to the response and status region, and the fixed interaction or
 grading footer reserves its full height with bottom breathing room. The stage
-does not scroll or scale. On Mac, the study window is limited to the visible
+does not scroll or scale. Text that exceeds the available card region scrolls
+inside that region while the footer stays visible; visual media receives a finite
+height proposal so it can aspect-fit. On Mac, the study window is limited to the visible
 screen and keeps clearance above its bottom edge, so every region and the
 primary action remain fully visible on short displays. Focus, Split, Media
 Aside, Media Hero, and Action Stage compositions rearrange at compact widths

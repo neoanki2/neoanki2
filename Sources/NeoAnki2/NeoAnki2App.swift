@@ -326,6 +326,8 @@ struct NeoAnki2App: App {
                 adapter: SQLiteLibrarySyncAdapter(repository: library),
                 transport: transport,
                 metadataStore: metadata,
+                learningTime: try await LearningTimeSyncService.make(repository: library,
+                    directory: root.appendingPathComponent("Learning Time Sync", isDirectory: true)),
                 backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
             )
             syncService = service

@@ -1,5 +1,6 @@
 import Charts
 import NeoAnkiCore
+import NeoAnkiApplication
 import NeoAnkiSharedUI
 import SwiftUI
 
@@ -7,7 +8,9 @@ import SwiftUI
 /// start. Enumerating items is a separate, deliberate mode.
 struct ScopeHomeView: View {
     @Bindable var itemsModel: ItemsModel
+    let learningTimeLibrary: any LibraryRepository
     let scope: StudyScope
+    var onLearningTime: () -> Void = {}
     let onStudy: () -> Void
     let onBrowse: () -> Void
     let onBrowseItemsNeedingAttention: () -> Void
@@ -41,7 +44,10 @@ struct ScopeHomeView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("scopeHomeLoading")
                 } else if summary.itemCount == 0 {
-                    emptyState
+                    VStack(spacing: DesignSystem.Spacing.lg) {
+                        emptyState
+                        learningTimeSection.padding()
+                    }
                 } else {
                     home
                 }
@@ -103,6 +109,11 @@ struct ScopeHomeView: View {
         }
     }
 
+    private var learningTimeSection: some View {
+        LearningTimeHomeSection(library: learningTimeLibrary, scope: scope.filter, onDetails: onLearningTime)
+            .id(scope.filter)
+    }
+
     // MARK: - Home
 
     private var home: some View {
@@ -113,6 +124,7 @@ struct ScopeHomeView: View {
                 // position carries hierarchy that type size is not allowed to.
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
+                learningTimeSection
                 cardStateSection
                 if summary.leechCount > 0 {
                     leechCallout
