@@ -43,6 +43,7 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileNavigationUITests/testTopLevelProductNavigation",
+        "NeoAnki2MobileUITests/MobileNavigationUITests/testLearnInContextOnlyRequiresDeckAndPhraseAndExplainsUnavailableGeneration",
         "NeoAnki2MobileUITests/MobileDeckUITests/testDeckCreateRenameAndDeleteJourney"
       ]
     },

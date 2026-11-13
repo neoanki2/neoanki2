@@ -75,6 +75,19 @@ private struct BulkCardIdentity: Hashable {
 }
 
 public extension ItemStore {
+    /// Deletes a freshly added batch only while its content and never-reviewed
+    /// cards still match. Preconditions and deletion share one write transaction.
+    func deleteUnchangedUnreviewedItems(
+        _ expectedItems: [Item],
+        now: Date = .now
+    ) async throws -> [ItemBulkOperationResult] {
+        guard !expectedItems.isEmpty, expectedItems.count <= 500,
+              Set(expectedItems.map(\.id)).count == expectedItems.count else {
+            throw DatabaseError.invalidItem("Undo requires a unique batch of 1 to 500 items.")
+        }
+        return try await database.deleteUnchangedUnreviewedItems(expectedItems, now: now)
+    }
+
     /// Reconciles an ordered generated deck in one transaction. Only New cards
     /// receive reordered due times; reviewed cards retain their schedules.
     func reconcileOrderedDeckItems(

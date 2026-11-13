@@ -43,6 +43,37 @@ The selected item type is fixed when the item is created. The current UI
 cannot change an existing item's type later. To use a different type, create a
 new item and delete the old one after checking the result.
 
+## Learn a word or phrase in context
+
+Choose **Learn in Context** in Create on iPhone/iPad, or from the Mac toolbar or
+File menu. Add and Edit Item also offer **Learn in Context** for a text field.
+The original item remains open while you create separate examples.
+
+1. Choose a deck and enter a word or phrase.
+2. Choose **Find Examples**. The app detects the language and finds local dictionary
+   examples, then uses Apple Intelligence to fill the set with up to three examples.
+   Each sentence gets its own contextual meaning and automatic phrase highlighting.
+3. Preview the sentences and play their audio, then choose **Add Cards**.
+
+Each example becomes an ordinary Context Example item with its own review schedule.
+Speech is added automatically when an installed voice for the example’s language
+is available. An interrupted add preserves the draft for retry. **Undo** removes
+the last added batch while its items remain unchanged and unstudied. Rewriting a
+saved sentence detaches its old recording unless you replace it with matching media.
+To change the expression, type in the same input; the preview updates after you
+choose **Find Examples** again. Saved items can be edited in the ordinary item editor.
+
+This capture flow has no language or meaning fields, target-marking controls,
+source import setup, or extra practice options. It uses Apple capabilities and
+installed dictionary examples on this device, without online video search or cloud
+generation. When no suitable local examples or supported Apple model are available,
+the app explains that instead of silently stopping. Text cards can still be saved
+when no voice is installed.
+
+Initial dictionary, voice, and system-model installation is separate from offline
+authoring. Accepted items and media follow existing sync and export settings.
+Unfinished drafts remain device-local and are restored when you reopen the flow.
+
 ## Create image occlusion items
 
 Choose the **Image Occlusion** starter in Item Types, then create an item of

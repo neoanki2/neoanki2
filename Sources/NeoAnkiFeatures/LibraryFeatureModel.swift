@@ -327,7 +327,11 @@ public final class LibraryFeatureModel {
     }
 
     public func updateItem(_ item: Item) async throws {
-        _ = try await library.updateItem(item, asOf: .now)
+        let updated: Item
+        if let stored = try await library.item(id: item.id) {
+            updated = ContextDerivedContent.invalidatingSpeech(in: item, original: stored.item, type: stored.itemType)
+        } else { updated = item }
+        _ = try await library.updateItem(updated, asOf: .now)
         try await didMutate()
     }
 

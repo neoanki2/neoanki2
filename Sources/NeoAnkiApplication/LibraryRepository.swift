@@ -48,6 +48,10 @@ public protocol LibraryItemMutating: Sendable {
 /// Narrow capability for workflows that must extend an item type and rewrite
 /// its dependent items as one atomic, history-preserving transaction.
 public protocol LibraryCoordinatedItemEditing: Sendable {
+    func deleteUnchangedUnreviewedItems(
+        _ expectedItems: [Item],
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult]
     func reconcileItemTypeAndItems(
         expectedItemType: ItemType,
         updatedItemType: ItemType,
@@ -428,6 +432,14 @@ public protocol LibraryRepository:
 {}
 
 public extension LibraryCoordinatedItemEditing {
+    func deleteUnchangedUnreviewedItems(
+        _: [Item],
+        asOf _: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        // A fallback made from separate reads and deletes would be unsafe.
+        throw DatabaseError.invalidItem("This library cannot safely undo an added batch. Manage its items in the library instead.")
+    }
+
     func reconcileItemTypeAndItems(
         expectedItemType _: ItemType,
         updatedItemType _: ItemType,
@@ -672,6 +684,12 @@ public actor SQLiteLibraryRepository:
         asOf: Date
     ) async throws -> [ItemBulkOperationResult] {
         try await store.reconcileOrderedDeckItems(operations, order: order, now: asOf)
+    }
+    public func deleteUnchangedUnreviewedItems(
+        _ expectedItems: [Item],
+        asOf: Date
+    ) async throws -> [ItemBulkOperationResult] {
+        try await store.deleteUnchangedUnreviewedItems(expectedItems, now: asOf)
     }
     public func deleteItem(id: UUID, asOf: Date) async throws -> Bool {
         try await store.deleteItem(id: id, now: asOf)

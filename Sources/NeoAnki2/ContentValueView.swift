@@ -50,7 +50,7 @@ struct ContentValueView: View {
                         accessibilityLabel: decision.accessibilityLabel ?? "Media concealed until answer"
                     )
                 } else {
-                    Text(ref.altText ?? FieldTypeLabels.name(for: fieldType(for: ref.kind)))
+                    Text("\(FieldTypeLabels.name(for: fieldType(for: ref.kind))) unavailable")
                         .font(DesignSystem.Typography.uiSecondary)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

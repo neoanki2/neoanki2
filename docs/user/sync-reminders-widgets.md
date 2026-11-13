@@ -21,6 +21,12 @@ iCloud sync is available in provisioned Mac, iPhone, and iPad builds. Daily
 reminders and the Due Cards widget are iPhone/iPad services. The library remains
 usable offline and each device keeps its own service preferences.
 
+Cards accepted through **Learn in Context**, including their saved speech, use
+ordinary item and media sync. Unfinished capture drafts and original source
+libraries stay on their device. Adding or undoing a set refreshes the normal due
+counts, badges, reminders, and widget data.
+
+
 Items saved through **Add Word** use ordinary library sync and update due counts,
 including badges and the widget. Saved dictionary–deck capture configurations
 remain local to each device and library; configure a pair separately on another

@@ -18,6 +18,12 @@ time under **Deleted Content** in the library report. See
 The sidebar controls which items and due cards appear in the detail area.
 Decks organize items without changing their item type or generated cards.
 
+**Learn in Context** adds each example as a separate item in the chosen deck.
+Each has its own card maturity and review schedule. Undo removes the added batch
+only while every item is unchanged and unstudied; otherwise manage it in the
+library.
+
+
 [![A populated library and its item list]({{ site.baseurl }}/assets/screenshots/library-populated.png)]({{ site.baseurl }}/assets/screenshots/library-populated.png)
 
 ## Choose a scope

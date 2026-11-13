@@ -550,6 +550,35 @@ class NeoAnki2MobileUITestCase: XCTestCase {
 
 @MainActor
 final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
+    func testLearnInContextOnlyRequiresDeckAndPhraseAndExplainsUnavailableGeneration() throws {
+        let app = launchApp()
+        open("Create", in: app)
+        app.buttons["New Deck"].tap()
+        let deckName = app.textFields["e.g. Spanish vocabulary"]
+        XCTAssertTrue(deckName.waitUntilExists(timeout: 10))
+        deckName.tap(); deckName.typeText("Expressions")
+        app.buttons["new-deck-create"].tap()
+        let entry = app.buttons["create-learn-in-context"]
+        XCTAssertTrue(entry.waitUntilExists(timeout: 10)); entry.tap()
+        let expression = app.textFields["context-expression"]
+        XCTAssertTrue(expression.waitUntilExists(timeout: 10))
+        expression.tap(); expression.typeText("take into account")
+        XCTAssertFalse(app.descendants(matching: .any)["context-meaning"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["context-language"].exists)
+        XCTAssertFalse(app.buttons["Options"].exists)
+        let find = app.buttons["context-find-examples"]
+        XCTAssertTrue(find.isEnabled && find.isHittable)
+        find.tap()
+        // Simulator has no Apple Intelligence model. A completed request must explain the missing resource.
+        let error = app.descendants(matching: .any)["context-error"].firstMatch
+        XCTAssertTrue(error.waitUntilExists(timeout: 15))
+        XCTAssertTrue(error.label.contains("Apple Intelligence"))
+        XCTAssertFalse(error.label.contains("GenerationError"))
+        XCTAssertTrue(find.isEnabled)
+        let preview = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        preview.name = "Learn in Context minimal inputs"; preview.lifetime = .keepAlways; self.add(preview)
+    }
+
     func testTopLevelProductNavigation() throws {
         let app = launchApp()
         for title in ["Home", "Library", "Create", "Settings"] {
