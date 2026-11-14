@@ -80,15 +80,23 @@ edit the release process.
   TestFlight or manipulate Store containers; no other GUI interaction is allowed.
 - Every release also includes updating the user's paired iPhone. The controller
   invokes `./Scripts/deploy-iphone.sh` with pinned source and the latest released
-  iOS version/build, verifies installation and a single launch, and saves local
-  receipts and `IPHONE_DEPLOY_*` telemetry. A Mac-only release keeps the latest
-  iOS version. Do not run a second standalone deployment after this succeeds.
+  iOS version/build, verifies the device-reported installed version, and saves
+  local receipts and live `IPHONE_DEPLOY_*` telemetry. A Mac-only release keeps
+  the latest iOS version. An already-current phone skips installation. Do not
+  launch the app as a delivery gate or repeat a successful deployment.
+  Preparation requires no phone. Do not request connection/unlock before CI,
+  publication, build, and signing finish. Do not ask the user to keep the phone
+  awake or confirm readiness. An available wired/wireless paired phone is used
+  automatically. Only if the installer emits `waiting_for_device`, tell the user
+  the update is ready and to connect the phone; connection is detected without a
+  reply. An unlock is requested only for an actual Apple-reported requirement.
   Use `./Scripts/release.sh --resume VERSION --device NAME_OR_IDENTIFIER` if the
   user must choose among multiple available phones. An unavailable phone or
-  signing/install/launch failure blocks local completion; resolve the stated
-  cause and resume without repeating Store uploads. An interrupted install or
-  launch requires inspecting its receipt before recovery; never repeat it
-  automatically. Do not claim release completion or clean up its recovery inputs
+  signing/install failure blocks local completion; resolve the stated cause and
+  resume without repeating Store uploads or preparing the signed package again.
+  A successful install resumes verification alone. An uncertain install requires
+  inspecting its receipt before recovery; never send it again blindly.
+  Do not claim release completion or clean up its recovery inputs
   until both applicable local installations are verified. This installation is
   part of release delivery, not a physical acceptance test.
 

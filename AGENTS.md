@@ -61,14 +61,21 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   there is no newer Mac version. Report local installation separately from Store
   submission and public availability.
 - Every release also installs the latest released iOS version on the user's
-  paired iPhone and launches it once through `./Scripts/deploy-iphone.sh`.
+  paired iPhone through `./Scripts/deploy-iphone.sh` and verifies the version
+  reported by the device. Do not launch the app as an installation gate.
   The controller uses its pinned source and the iOS channel's version/build;
   Mac-only releases retain the latest iOS version rather than inventing a new
   one. Use `--device NAME_OR_IDENTIFIER` if multiple iPhones are available.
-  An unavailable phone or signing/install/launch failure leaves local delivery
-  blocked; report it and resume the saved release after resolving the cause.
-  Preserve successful publication and device receipts; never automatically
-  repeat an interrupted install/launch. Release completion requires both the
+  Build/sign without the phone. Finish CI, publication, and phone preparation
+  before asking for any phone interaction. The installer automatically
+  uses an available wired/wireless paired phone, skips an already-current app,
+  and waits for connection only after the signed update is ready. Do not ask for
+  an early unlock, a readiness confirmation, or keeping the phone awake during
+  builds. Ask for an unlock only when Apple reports it is actually required.
+  Resume reuses the signed package; successful installation followed by failed
+  verification resumes verification alone. Preserve successful publication and
+  device receipts; never repeat an installation with an uncertain outcome.
+  Release completion requires both the
   applicable Mac upgrade and the verified iPhone installation.
 - Finish successful releases by cleaning their disposable build outputs and
   pinned worktrees after both local installations are verified. Keep receipts,
@@ -83,7 +90,8 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   `./Scripts/deploy-iphone.sh` directly; see `.codex/skills/deploy-iphone/SKILL.md`.
 - Current local changes are deployment input. The command builds, signs using
   saved local certificate/key material in a disposable Keychain, installs as
-  an update, and launches once. It does not publish or reset app data.
+  an update, and verifies the device-reported version without launching the app.
+  Preparation needs no connected phone. It does not publish or reset app data.
 - Do not ask for Mac, Apple ID, or Keychain passwords or unlock the existing
   `NeoAnki2-signing` Keychain. The command owns temporary signing and cleanup.
 - If there are multiple available iPhones and the user did not select one,

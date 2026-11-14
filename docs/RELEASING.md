@@ -111,24 +111,33 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
 9. Once all selected channels are published/submitted, the controller runs
    `./Scripts/deploy-iphone.sh` using its pinned source and the iOS channel's
    exact marketing version and build number. It signs with the saved Ad Hoc
-   profiles, installs in place on the paired iPhone, and launches once. Both the
-   app and widget versions are checked before installation. This preserves app
+   profiles before contacting the phone, installs in place on the paired iPhone,
+   and verifies the version/build reported by the device. An already-current
+   phone skips installation. Both the app and widget versions are checked before
+   installation. The app is not launched as a delivery gate. This preserves app
    data and does not require TestFlight or waiting for Store approval. Mac-only
    releases install the latest existing iOS version; they do not advance its
    version number. Every release requires this verified iPhone installation as
    well as the applicable local Mac upgrade before the agent reports completion.
 
-Connect and unlock the paired iPhone with Developer Mode enabled before a release.
-If several phones are available, select the intended target:
+No phone interaction is needed during CI, publication, building, or signing.
+The installer uses an available wired/wireless paired iPhone automatically. If
+none is reachable after the signed update is ready, it emits
+`IPHONE_DEPLOY_STATUS=waiting_for_device` and waits up to ten minutes for a
+connection. Connect the phone at that point; no readiness confirmation or
+keeping the screen awake is required. An unlock is requested only if Apple
+actually requires it for an operation. The user opens the app normally later.
+Developer Mode and initial pairing remain prerequisites. If several phones are
+available, select the intended target:
 
 ```bash
 ./Scripts/release.sh --device NAME_OR_IDENTIFIER
 ```
 
-Missing devices, signing problems, and failed installs/launches block local
+Missing devices, signing problems, and failed installations block local
 completion and return a nonzero exit status. Publication receipts remain intact.
-`IPHONE_DEPLOY_*` telemetry is printed and retained in the release's
-`iphone-N.log`; deployment and device receipts live in `iphone-N/`. Device details
+The ready-to-connect signal is streamed immediately. `IPHONE_DEPLOY_*` telemetry
+is retained in `iphone-N-delivery-M.log`; deployment and device receipts live in `iphone-N/`. Device details
 stay in local receipts and are excluded from the public release checkpoint.
 
 “Together” means one coordinated command and one source/version assignment.
@@ -158,11 +167,12 @@ An unfinished iPhone update remains pending locally even after publication's
 `complete: true` checkpoint. Connect the phone or resolve the reported signing
 blocker, then run `./Scripts/release.sh --resume VERSION` (with `--device` when
 needed). The normal release command also detects this pending local delivery.
-Resuming local delivery skips completed publication and reuses a verified
-successful deployment without another install or launch. If an install/launch
-was interrupted or failed after its durable intent was recorded, the controller
-stops for receipt inspection instead of automatically repeating the device
-operation. `--status` includes this Mac's saved iPhone delivery state.
+Resuming local delivery skips completed publication and reuses the prepared
+signed package without rebuilding or re-signing. A successful installation with
+incomplete verification resumes only the version query, not the installation.
+A saved successful device install response can reconcile an interrupted local
+checkpoint; uncertain outcomes stop for receipt inspection instead of sending
+another installation. `--status` includes this Mac's saved iPhone delivery state.
 
 If code needs fixing after a failed local gate, stop that reserved release before
 starting a new source/version:

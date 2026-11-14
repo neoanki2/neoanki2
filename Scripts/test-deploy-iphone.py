@@ -39,9 +39,71 @@ def profile():
 
 
 class DeploymentTests(unittest.TestCase):
-    def test_release_delivery_persists_intent_before_each_device_mutation(self):
-        for failure in (None, 'install', 'launch', 'widget-version'):
+    def test_ready_package_detects_connection_without_user_confirmation(self):
+        flow = deploy.Workflow(Path('unused'))
+        replies = [{'result': {'devices': []}}, {'result': {'devices': [device()]}}]
+        with patch.object(flow, 'device_command', side_effect=replies) as query, \
+             patch.object(deploy.time, 'monotonic', side_effect=[0, 0]), patch.object(deploy.time, 'sleep') as sleep:
+            self.assertEqual(flow.wait_for_device(None, 10)['identifier'], 'device-1')
+        self.assertEqual(query.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_ambiguous_device_selection_is_not_polled_as_readiness(self):
+        flow = deploy.Workflow(Path('unused'))
+        with patch.object(flow, 'device_command', return_value={'result': {'devices': [device(), device('Other', 'device-2')]}}), \
+             patch.object(deploy.time, 'sleep', side_effect=AssertionError('selection error was polled')):
+            with self.assertRaisesRegex(deploy.DeploymentError, 'Multiple'):
+                flow.wait_for_device(None, 10)
+
+    def test_unknown_install_outcome_is_not_repeated_and_successful_receipt_reconciles(self):
+        for outcome in ('missing', 'failed', 'success'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder); flow = deploy.Workflow(output)
+                receipt = {'version': '1.0.400', 'build': '401', 'phase': 'install',
+                           'deviceIdentifier': 'device-1', 'installed': False}
+                if outcome != 'missing':
+                    deploy.save_receipt(output / 'install.json', {'info': {'outcome': outcome}, 'result': {
+                        'deviceIdentifier': 'device-1', 'installedApplications': [{'bundleID': deploy.APP_ID}]}})
+                def query(name, command, *unused):
+                    self.assertEqual(name, 'installed-apps', 'recovery must only query the installed version')
+                    return {'result': {'deviceIdentifier': 'device-1', 'apps': [{
+                        'bundleIdentifier': deploy.APP_ID, 'version': '1.0.400', 'bundleVersion': '401'}]}}
+                with patch.object(flow, 'wait_for_device', return_value=device()), patch.object(flow, 'device_command', side_effect=query), \
+                     patch.object(flow, 'run', side_effect=AssertionError('recovery rebuilt or reinstalled')):
+                    args = SimpleNamespace(version='1.0.400', build='401', device=None, wait_seconds=0)
+                    if outcome == 'success':
+                        flow.deliver(args, receipt)
+                        self.assertTrue(receipt['installedVersionVerified'])
+                    else:
+                        with self.assertRaises(deploy.DeploymentError):
+                            flow.deliver(args, receipt)
+
+    def test_changed_prepared_package_is_rejected_before_contacting_phone(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder); app = output / 'NeoAnki2.app'; app.mkdir()
+            binary = app / 'NeoAnki2'; binary.write_bytes(b'signed')
+            receipt = {'version': '1.0.400', 'build': '401', 'signedBundleSHA256': deploy.bundle_digest(app)}
+            binary.write_bytes(b'changed')
+            flow = deploy.Workflow(output)
+            with patch.object(flow, 'device_command', side_effect=AssertionError('phone contacted')):
+                with self.assertRaisesRegex(deploy.DeploymentError, 'missing or changed'):
+                    flow.deliver(SimpleNamespace(version=None, device=None), receipt)
+
+    def test_installed_version_requires_exact_device_bundle_version_and_build(self):
+        receipt = {'version': '1.0.400', 'build': '401'}
+        good = {'result': {'deviceIdentifier': 'device-1', 'apps': [{
+            'bundleIdentifier': deploy.APP_ID, 'version': '1.0.400', 'bundleVersion': '401'}]}}
+        self.assertTrue(deploy.installed_app_matches(good, 'device-1', receipt))
+        for field in ('bundleIdentifier', 'version', 'bundleVersion'):
+            wrong = copy.deepcopy(good); wrong['result']['apps'][0][field] = 'wrong'
+            self.assertFalse(deploy.installed_app_matches(wrong, 'device-1', receipt))
+        self.assertFalse(deploy.installed_app_matches(good, 'other-device', receipt))
+
+    def test_preparation_precedes_device_contact_and_delivery_never_launches(self):
+        for failure in (None, 'install', 'verify', 'widget-version', 'offline', 'prepare-only', 'already-current', 'standalone'):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as folder:
+                scenario = failure
+                online = failure != 'offline'
                 root = Path(folder); output = root / 'output'; output.mkdir()
                 signing = root / 'signing'; signing.mkdir()
                 for name in ('Apple-Distribution.cert.pem', 'Apple-Distribution.key.pem', 'AppleWWDRCAG3.cer',
@@ -50,17 +112,21 @@ class DeploymentTests(unittest.TestCase):
                 for name in ('Platforms/iOS/NeoAnki2.entitlements', 'Platforms/iOSWidget/NeoAnkiWidget.entitlements'):
                     path = root / name; path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(plistlib.dumps({}))
-                flow = deploy.Workflow(output, root); mutations = []
-                args = SimpleNamespace(signing_dir=signing, device=None, version='1.0.400', build='401', prepare_only=False)
+                flow = deploy.Workflow(output, root); mutations = []; builds = []
+                args = SimpleNamespace(signing_dir=signing, device=None, version='1.0.400', build='401',
+                                       prepare_only=failure == 'prepare-only', resume=None, wait_seconds=0)
+                if scenario == 'standalone':
+                    args.version = args.build = None
                 def run(command, **kwargs):
                     if command[:3] == ['openssl', 'x509', '-in']:
                         return b'certificate'
                     if command[:3] == ['security', 'cms', '-D']:
                         p = profile()
-                        if command[-1].endswith('Widget-AdHoc.mobileprovision'):
+                        if command[-1].endswith('Widget-AdHoc.mobileprovision') or 'NeoAnki2Widget.appex' in command[-1]:
                             p['Entitlements']['application-identifier'] = 'TEAM.' + deploy.WIDGET_ID
                         return plistlib.dumps(p)
                     if command[0] == 'xcodebuild':
+                        builds.append(command)
                         app = output / 'DerivedData/Build/Products/Release-iphoneos/NeoAnki2.app'
                         widget = app / 'PlugIns/NeoAnki2Widget.appex'; widget.mkdir(parents=True)
                         for path, bundle in ((app, deploy.APP_ID), (widget, deploy.WIDGET_ID)):
@@ -73,19 +139,31 @@ class DeploymentTests(unittest.TestCase):
                     return b''
                 def device_command(name, command, *unused):
                     if name == 'devices':
-                        return {'result': {'devices': [device()]}}
+                        prepared = json.loads((output / 'deployment.json').read_text())
+                        self.assertTrue(prepared['temporarySigningKeychainRemoved'])
+                        self.assertEqual(len(builds), 1)
+                        self.assertFalse(args.prepare_only)
+                        return {'result': {'devices': [device()] if online else []}}
                     receipt = json.loads((output / 'deployment.json').read_text())
-                    self.assertEqual(receipt['phase'], name)
-                    self.assertEqual(receipt['installed'], name == 'launch')
+                    if name == 'installed-apps-before':
+                        version = '1.0.400' if scenario in ('already-current', 'standalone') else '1.0.399'
+                        return {'result': {'deviceIdentifier': 'device-1', 'apps': [{
+                            'bundleIdentifier': deploy.APP_ID, 'version': version, 'bundleVersion': '401'}]}}
+                    if name == 'installed-apps':
+                        self.assertEqual(receipt['phase'], 'verify')
+                        self.assertTrue(receipt['installed'])
+                        if failure == 'verify':
+                            raise deploy.DeploymentError('injected verification failure')
+                        return {'result': {'deviceIdentifier': 'device-1', 'apps': [{
+                            'bundleIdentifier': deploy.APP_ID, 'version': '1.0.400', 'bundleVersion': '401'}]}}
+                    self.assertEqual(name, 'install', 'delivery must never launch the app')
+                    self.assertEqual(receipt['phase'], 'install')
+                    self.assertFalse(receipt['installed'])
                     self.assertFalse(receipt['launched'])
                     mutations.append(name)
                     if name == failure:
                         raise deploy.DeploymentError('injected ' + name + ' failure')
-                    result = {'deviceIdentifier': 'device-1'}
-                    if name == 'install':
-                        result['installedApplications'] = [{'bundleID': deploy.APP_ID}]
-                    else:
-                        result['process'] = {'processIdentifier': 42, 'executable': '/NeoAnki2.app/NeoAnki2'}
+                    result = {'deviceIdentifier': 'device-1', 'installedApplications': [{'bundleID': deploy.APP_ID}]}
                     return {'info': {'outcome': 'success'}, 'result': result}
                 def codesign(command, **kwargs):
                     kind = 'widget' if command[-1].endswith('.appex') else 'app'
@@ -93,15 +171,20 @@ class DeploymentTests(unittest.TestCase):
                 with patch.object(flow, 'run', side_effect=run), patch.object(flow, 'device_command', side_effect=device_command), \
                      patch.object(flow, 'signing_keychain', return_value=contextlib.nullcontext(Path('temporary-keychain'))), \
                      patch.object(deploy.subprocess, 'run', side_effect=codesign):
-                    if failure:
+                    if failure and failure not in ('prepare-only', 'already-current', 'standalone'):
                         with self.assertRaises(deploy.DeploymentError):
                             flow.execute(args)
                     else:
                         flow.execute(args)
-                self.assertEqual(mutations, [] if failure == 'widget-version' else ['install'] if failure == 'install' else ['install', 'launch'])
-                if not failure:
+                    if scenario in ('offline', 'verify'):
+                        failure = None; online = True; args.resume = output
+                        flow.execute(args)
+                self.assertEqual(len(builds), 1)
+                self.assertEqual(mutations, [] if scenario in ('widget-version', 'prepare-only', 'already-current') else ['install'])
+                if scenario in (None, 'offline', 'verify', 'already-current'):
                     receipt = json.loads((output / 'deployment.json').read_text())
-                    self.assertTrue(receipt['installed'] and receipt['launched'])
+                    self.assertTrue(receipt['installed'] and receipt['installedVersionVerified'])
+                    self.assertFalse(receipt['launched'])
                     self.assertEqual(receipt['sourceRevision'], 'merged-sha')
                     self.assertEqual((receipt['version'], receipt['build']), ('1.0.400', '401'))
 

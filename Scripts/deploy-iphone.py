@@ -27,6 +27,37 @@ class DeploymentError(Exception):
     pass
 
 
+class DeviceUnavailable(DeploymentError):
+    pass
+
+
+def save_receipt(path, value):
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(value, indent=2) + '\n')
+    temporary.replace(path)
+
+
+def bundle_digest(app):
+    digest = hashlib.sha256()
+    for path in sorted(app.rglob('*')):
+        if path.is_symlink():
+            value = ('symlink:' + str(path.readlink())).encode()
+        elif path.is_file():
+            value = hashlib.sha256(path.read_bytes()).digest()
+        else:
+            continue
+        digest.update(str(path.relative_to(app)).encode() + b'\0' + value + b'\0')
+    return digest.hexdigest()
+
+
+def installed_app_matches(data, device_id, receipt):
+    result = data.get('result', {})
+    apps = result.get('apps', [])
+    return (result.get('deviceIdentifier') == device_id and len(apps) == 1 and
+            (apps[0].get('bundleIdentifier'), apps[0].get('version'), apps[0].get('bundleVersion')) ==
+            (APP_ID, receipt['version'], receipt['build']))
+
+
 def select_device(devices, requested=None):
     candidates = [d for d in devices
                   if d.get("hardwareProperties", {}).get("deviceType") == "iPhone"
@@ -39,7 +70,7 @@ def select_device(devices, requested=None):
             d["identifier"], d.get("deviceProperties", {}).get("name"),
             d.get("hardwareProperties", {}).get("udid"))]
     if not candidates:
-        raise DeploymentError("No available paired iPhone. Connect/unlock the target phone" +
+        raise DeviceUnavailable("Update ready. Connect the paired iPhone" +
                               (f" ({requested})." if requested else "."))
     if len(candidates) != 1:
         names = ", ".join(d["deviceProperties"]["name"] for d in candidates)
@@ -64,7 +95,9 @@ def validate_profile(profile, bundle_id, udid, certificate_der, now=None):
         raise DeploymentError(f"Provisioning profile does not match {bundle_id}.")
     if ent.get("com.apple.developer.team-identifier") != team:
         raise DeploymentError(f"Provisioning profile team mismatch for {bundle_id}.")
-    if udid not in profile.get("ProvisionedDevices", []):
+    if not profile.get("ProvisionedDevices"):
+        raise DeploymentError(f"No registered devices in {bundle_id} profile.")
+    if udid is not None and udid not in profile.get("ProvisionedDevices", []):
         raise DeploymentError(f"Selected iPhone is not registered in {bundle_id} profile.")
     if certificate_der not in profile.get("DeveloperCertificates", []):
         raise DeploymentError(f"Saved distribution certificate is not in {bundle_id} profile.")
@@ -216,18 +249,12 @@ class Workflow:
                     raise DeploymentError("Temporary signing cleanup failed: " + "; ".join(cleanup_errors))
                 print("IPHONE_DEPLOY_SIGNING_CLEANUP=complete", flush=True)
 
-    def execute(self, args):
+    def prepare(self, args):
         signing = args.signing_dir.expanduser().resolve()
         for name in ("Apple-Distribution.cert.pem", "Apple-Distribution.key.pem", "AppleWWDRCAG3.cer",
                      "iOS-AdHoc.mobileprovision", "Widget-AdHoc.mobileprovision"):
             if not (signing / name).is_file():
                 raise DeploymentError(f"Missing signing material: {signing / name}.")
-        devices = self.device_command("devices", ["list", "devices"])["result"]["devices"]
-        device = select_device(devices, args.device)
-        device_id = device["identifier"]
-        udid = device["hardwareProperties"]["udid"]
-        name = device["deviceProperties"]["name"]
-        print(f"IPHONE_DEPLOY_DEVICE={name}", flush=True)
         certificate = self.run(["openssl", "x509", "-in", str(signing / "Apple-Distribution.cert.pem"), "-outform", "DER"])
         self.run(["openssl", "x509", "-in", str(signing / "Apple-Distribution.cert.pem"), "-checkend", "0", "-noout"])
         identity = hashlib.sha1(certificate).hexdigest().upper()
@@ -236,7 +263,7 @@ class Workflow:
         for kind, file, bundle in (("app", "iOS-AdHoc.mobileprovision", APP_ID),
                                    ("widget", "Widget-AdHoc.mobileprovision", WIDGET_ID)):
             profiles[kind] = plistlib.loads(self.run(["security", "cms", "-D", "-i", str(signing / file)]))
-            teams.append(validate_profile(profiles[kind], bundle, udid, certificate))
+            teams.append(validate_profile(profiles[kind], bundle, None, certificate))
         if teams[0] != teams[1]:
             raise DeploymentError("App and widget profiles have different teams.")
         team = teams[0]
@@ -276,43 +303,110 @@ class Workflow:
                 if raw.returncode or start < 0 or end < 0 or plistlib.loads(xml[start:end + 8]) != entitlements[kind]:
                     raise DeploymentError(f"Signed entitlements do not match {bundle}.")
         info = plistlib.loads((app / "Info.plist").read_bytes())
-        receipt = {"device": name, "deviceIdentifier": device_id, "deviceUDID": udid, "bundleIdentifier": APP_ID,
+        receipt = {"bundleIdentifier": APP_ID,
                    "configuration": "Release", "version": info["CFBundleShortVersionString"],
                    "build": info["CFBundleVersion"], "team": team, "cloudKitEnvironment": "Production",
                    "sourceRevision": self.run(["git", "rev-parse", "HEAD"]).decode().strip(),
                    "executableSHA256": hashlib.sha256((app / "NeoAnki2").read_bytes()).hexdigest(),
-                   "installed": False, "launched": False, "temporarySigningKeychainRemoved": True}
-        receipt_path = self.output / "deployment.json"
-        def save():
-            receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
-        save()
-        if not args.prepare_only:
-            # Persist intent before device mutations, so release recovery never
-            # automatically repeats an install or launch with an uncertain result.
+                   "signedBundleSHA256": bundle_digest(app), "phase": "prepared",
+                   "installed": False, "installedVersionVerified": False,
+                   "launched": False, "temporarySigningKeychainRemoved": True}
+        save_receipt(self.output / "deployment.json", receipt)
+        return receipt
+
+    def wait_for_device(self, requested, wait_seconds):
+        self.mark("connect")
+        deadline = time.monotonic() + wait_seconds
+        announced = False
+        while True:
+            devices = self.device_command("devices", ["list", "devices"])["result"]["devices"]
+            try:
+                return select_device(devices, requested)
+            except DeviceUnavailable:
+                if not announced:
+                    print("IPHONE_DEPLOY_STATUS=waiting_for_device", flush=True)
+                    print("IPHONE_DEPLOY_ACTION=Update ready. Connect the paired iPhone; installation starts automatically.", flush=True)
+                    announced = True
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise DeviceUnavailable("Signed update retained. Connect the paired iPhone and resume this deployment.") from None
+                time.sleep(min(2, remaining))
+
+    def deliver(self, args, receipt):
+        path = self.output / "deployment.json"
+        app = self.output / "NeoAnki2.app"
+        if args.version and (receipt["version"], receipt["build"]) != (args.version, args.build):
+            raise DeploymentError("Prepared update differs from the requested version/build.")
+        if receipt.get('installed') and args.device and args.device not in (
+                receipt.get('device'), receipt.get('deviceIdentifier'), receipt.get('deviceUDID')):
+            raise DeploymentError('Installed receipt belongs to another iPhone; verification blocked.')
+        if receipt.get("phase") == "install" and not receipt.get("installed"):
+            # Reconcile the device's successful response after a crash, without
+            # sending a second installation with an uncertain outcome.
+            install = self.output / "install.json"
+            if not install.exists():
+                raise DeploymentError("Installation outcome is uncertain; inspect the saved device receipts before recovery.")
+            validate_receipt(json.loads(install.read_text()), receipt["deviceIdentifier"], "Install")
+            receipt.update(installed=True, phase="verify")
+            save_receipt(path, receipt)
+        if receipt.get("installedVersionVerified"):
+            return
+        if not receipt.get("installed"):
+            if not app.is_dir() or bundle_digest(app) != receipt.get("signedBundleSHA256"):
+                raise DeploymentError("Prepared signed app is missing or changed; installation blocked.")
+            self.run(["codesign", "--verify", "--deep", "--strict", str(app)])
+        requested = args.device or receipt.get("deviceIdentifier")
+        device = self.wait_for_device(requested, args.wait_seconds)
+        device_id = device["identifier"]
+        udid = device["hardwareProperties"]["udid"]
+        receipt.update(device=device["deviceProperties"]["name"], deviceIdentifier=device_id, deviceUDID=udid)
+        print("IPHONE_DEPLOY_DEVICE=" + receipt["device"], flush=True)
+        if not receipt.get("installed"):
+            before = self.device_command('installed-apps-before', ['device', 'info', 'apps', '--device', device_id,
+                                         '--bundle-id', APP_ID, '--include-default-apps'])
+            # Local development builds can reuse project version numbers for
+            # different dirty source. Only explicit release identities can skip.
+            if args.version and installed_app_matches(before, device_id, receipt):
+                receipt.update(installed=True, installedVersionVerified=True, phase='complete', installationSkipped='already-current')
+                save_receipt(path, receipt)
+                return
+            signing = args.signing_dir.expanduser().resolve()
+            certificate = self.run(["openssl", "x509", "-in", str(signing / "Apple-Distribution.cert.pem"), "-outform", "DER"])
+            self.run(["openssl", "x509", "-in", str(signing / "Apple-Distribution.cert.pem"), "-checkend", "0", "-noout"])
+            for target, bundle in ((app, APP_ID), (app / 'PlugIns/NeoAnki2Widget.appex', WIDGET_ID)):
+                profile = plistlib.loads(self.run(["security", "cms", "-D", "-i", str(target / "embedded.mobileprovision")]))
+                validate_profile(profile, bundle, udid, certificate)
             receipt["phase"] = "install"
-            save()
+            save_receipt(path, receipt)
             self.mark("install")
             data = self.device_command("install", ["device", "install", "app", "--device", device_id, str(app)], 60)
             validate_receipt(data, device_id, "Install")
-            receipt["installed"] = True
-            receipt["phase"] = "launch"
-            save()
-            self.mark("launch")
-            data = self.device_command("launch", ["device", "process", "launch", "--device", device_id, APP_ID])
-            launched = validate_receipt(data, device_id, "Launch")
-            receipt.update(launched=True, processIdentifier=launched["process"]["processIdentifier"])
-            receipt["phase"] = "complete"
-            save()
+            receipt.update(installed=True, phase="verify")
+            save_receipt(path, receipt)
+        self.mark("verify")
+        data = self.device_command("installed-apps", ["device", "info", "apps", "--device", device_id,
+                                  "--bundle-id", APP_ID, "--include-default-apps"])
+        if not installed_app_matches(data, device_id, receipt):
+            raise DeploymentError("Device-reported installed app does not match the prepared update.")
+        receipt.update(installedVersionVerified=True, phase="complete")
+        save_receipt(path, receipt)
+
+    def execute(self, args):
+        receipt = json.loads((self.output / "deployment.json").read_text()) if args.resume else self.prepare(args)
+        if not args.prepare_only:
+            self.deliver(args, receipt)
         self.mark("complete")
-        print(f"IPHONE_DEPLOY_STATUS={'prepared' if args.prepare_only else 'installed_and_launched'}")
-        print(f"IPHONE_DEPLOY_RECEIPT={receipt_path}")
+        print(f"IPHONE_DEPLOY_STATUS={'prepared' if args.prepare_only else 'installed'}")
+        print(f"IPHONE_DEPLOY_RECEIPT={self.output / 'deployment.json'}")
         print(f"IPHONE_DEPLOY_ELAPSED_SECONDS={time.monotonic() - self.started:.1f}")
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", help="paired iPhone name, CoreDevice identifier, or UDID")
-    parser.add_argument("--prepare-only", action="store_true", help="build/sign without install or launch")
+    parser.add_argument("--prepare-only", action="store_true", help="build/sign without a connected phone")
+    parser.add_argument("--resume", type=Path, help="deliver an existing prepared deployment without rebuilding")
+    parser.add_argument("--wait-seconds", type=int, default=600, help="wait for a paired phone after preparation (default 600)")
     parser.add_argument("--source-dir", type=Path, default=ROOT, help="source checkout (release uses its pinned worktree)")
     parser.add_argument("--output", type=Path, help="new directory for deployment artifacts and receipts")
     parser.add_argument("--version", help="release marketing version; requires --build")
@@ -320,6 +414,10 @@ def main(argv=None):
     parser.add_argument("--signing-dir", type=Path,
                         default=Path.home() / "Library/Application Support/NeoAnki2 Signing")
     args = parser.parse_args(argv)
+    if args.resume and args.output:
+        parser.error("--resume and --output cannot be combined")
+    if args.wait_seconds < 0:
+        parser.error("--wait-seconds must be nonnegative")
     if bool(args.version) != bool(args.build):
         parser.error("--version and --build must be supplied together")
     if args.version and (not re.fullmatch(r"\d+\.\d+\.\d+", args.version) or not re.fullmatch(r"[1-9]\d*", args.build)):
@@ -332,8 +430,10 @@ def main(argv=None):
         except BlockingIOError:
             print("IPHONE_DEPLOY_ERROR=Another deployment is already running.", file=sys.stderr)
             return 1
-        output = args.output.expanduser().resolve() if args.output else base / (dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8])
-        output.mkdir(parents=True)
+        destination = args.resume or args.output
+        output = destination.expanduser().resolve() if destination else base / (dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8])
+        if not args.resume:
+            output.mkdir(parents=True)
         flow = Workflow(output, args.source_dir.expanduser().resolve())
         # Raise through context managers so interruption cleans up signing secrets.
         signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
