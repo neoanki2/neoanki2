@@ -152,7 +152,7 @@ class GitHub:
             raise RuntimeError("Reserved release source does not match the checkpoint")
 
     def checkpoint(self, path, state):
-        public = {k: v for k, v in state.items() if k not in ("directory", "worktree")}
+        public = {k: v for k, v in state.items() if k not in ("directory", "worktree", "local_iphone")}
         asset = Path(path).parent / STATE_ASSET
         write_json(asset, public)
         run(["gh", "release", "upload", "v" + state["version"], str(asset),
@@ -451,8 +451,74 @@ class Release:
         return errors, waiting
 
 
+def install_release_iphone(release, device=None):
+    """Finish local delivery independently of the already published channels."""
+    state = release.state
+    ios = state["channels"]["ios"]
+    identity = {"version": ios["version"], "build": ios["build"], "sourceRevision": state["revision"]}
+    local = state.setdefault("local_iphone", {"status": "planned"})
+    device = device or local.get("requested_device")
+    if device:
+        local["requested_device"] = device
+
+    def verified(path):
+        receipt = json.loads(path.read_text())
+        if any(receipt.get(k) != v for k, v in identity.items()):
+            raise RuntimeError("iPhone deployment receipt differs from the released source/version")
+        if receipt.get("installed") is True and receipt.get("launched") is True:
+            if device and device not in (receipt.get("device"), receipt.get("deviceIdentifier"), receipt.get("deviceUDID")):
+                raise RuntimeError("iPhone receipt belongs to another device; inspect the saved deployment")
+            local.update(status="installed", installed_and_launched=True, **identity, receipt=str(path))
+            release.save()
+            print("IPHONE_DEPLOY_STATUS=installed_and_launched", flush=True)
+            print("IPHONE_DEPLOY_DEVICE=" + receipt["device"], flush=True)
+            print("IPHONE_DEPLOY_RECEIPT=" + str(path), flush=True)
+            return True
+        if receipt.get("phase") in ("install", "launch"):
+            raise RuntimeError("iPhone install/launch was interrupted or failed; inspect " + str(path) +
+                               " before recovery. The device operation will not be repeated automatically.")
+        return False
+
+    try:
+        if local.get("receipt"):
+            path = Path(local["receipt"])
+            if path.exists() and verified(path):
+                return
+            if local.get("installed_and_launched") or local.get("status") == "installed":
+                raise RuntimeError("Verified iPhone receipt is missing; refusing an automatic reinstall")
+        release.verify_source()
+        # For Mac-only releases the planner established identical iOS inputs;
+        # keep the last released iOS version/build while using pinned source.
+        attempt = int(local.get("attempt", 0)) + 1
+        output = release.directory / f"iphone-{attempt}"
+        path = output / "deployment.json"
+        local.update(status="attempting", attempt=attempt, receipt=str(path), **identity)
+        local.pop("error", None)
+        release.save()
+        command = [str(ROOT / "Scripts/deploy-iphone.sh"), "--source-dir", str(release.source),
+                   "--output", str(output), "--version", ios["version"], "--build", ios["build"],
+                   "--signing-dir", str(release.signing)]
+        if device:
+            command += ["--device", device]
+        log = release.directory / f"iphone-{attempt}.log"
+        try:
+            run(command, log=log)
+        finally:
+            if log.exists():
+                # Preserve the deployment command's status, timing and blockers.
+                print(log.read_text(), end="", flush=True)
+        if not path.exists() or not verified(path):
+            raise RuntimeError("iPhone deployment did not verify installation and launch; see " + str(log))
+    except Exception as error:
+        local.update(status="blocked", error=str(error))
+        release.save()
+        raise
+
+
 def status(state, api, app_id):
     result = {"version": state["version"], "revision": state.get("revision"), "channels": {}}
+    if "local_iphone" in state:
+        result["local_iphone"] = state["local_iphone"]
     for channel, released in state["channels"].items():
         receipt = state.get("phases", {}).get(channel, {})
         version = state["version"] if channel in state.get("selected", []) else released["version"]
@@ -486,6 +552,7 @@ def main(argv=None):
                         help="bounded Apple processing/cancellation wait (default 600; 0 returns a checkpoint immediately)")
     parser.add_argument("--config", type=Path, default=SIGNING / "app-store-connect.json")
     parser.add_argument("--signing-dir", type=Path, default=SIGNING)
+    parser.add_argument("--device", help="target iPhone name, CoreDevice identifier, or UDID for local installation")
     args = parser.parse_args(argv)
     args.config = args.config.expanduser().resolve()
     args.signing_dir = args.signing_dir.expanduser().resolve()
@@ -503,7 +570,13 @@ def main(argv=None):
         baseline, history = (json.loads((ROOT / ".release/baseline.json").read_text()), []) if args.offline else github.baseline()
         if args.status:
             api, app_id = make_api(args.config)
-            print(json.dumps(status(baseline, api, app_id), indent=2))
+            local_path = WORK / baseline["version"] / "release.json"
+            latest = dict(baseline)
+            if local_path.exists():
+                saved = json.loads(local_path.read_text())
+                if saved.get("revision") == baseline.get("revision") and "local_iphone" in saved:
+                    latest["local_iphone"] = saved["local_iphone"]
+            print(json.dumps(status(latest, api, app_id), indent=2))
             return 0
         if args.abandon:
             path = WORK / args.abandon / "release.json"
@@ -526,7 +599,8 @@ def main(argv=None):
             path = WORK / pointer["version"] / "release.json"
             if path.exists():
                 candidate = json.loads(path.read_text())
-                if not candidate.get("complete"):
+                if not candidate.get("abandoned") and (not candidate.get("complete") or
+                        candidate.get("local_iphone", {}).get("status", "installed") != "installed"):
                     local = candidate
         pending_state = local or (baseline if baseline.get("complete") is False else None)
         if local and version_tuple(local["version"]) < version_tuple(baseline["version"]):
@@ -573,7 +647,8 @@ def main(argv=None):
                          repository=github.repository, branch="main", source_origin="main", notes=args.notes,
                          selected=proposal["channels"], inputs=proposal["inputs"], tests=proposal["tests"],
                          changed_paths=proposal["changed_paths"], channels=copy.deepcopy(baseline["channels"]),
-                         app_id=app_id, phases={c: {"status": "planned"} for c in proposal["channels"]}, complete=False)
+                         app_id=app_id, phases={c: {"status": "planned"} for c in proposal["channels"]}, complete=False,
+                         local_iphone={"status": "planned"})
             write_json(WORK / version / "release.json", state)
         github.verify_release_source(state)
         write_json(active_path, {"version": state["version"]})
@@ -584,20 +659,27 @@ def main(argv=None):
             github.checkpoint(WORK / state["version"] / "release.json", state)
         release = Release(github, api, app_id, state, WORK / state["version"], args.config.resolve(), args.signing_dir.resolve())
         print("Release " + state["version"] + ": " + ", ".join(state["selected"]), flush=True)
-        release.validate()
-        # Build unsigned Store archives and the notarized DMG concurrently;
-        # serialize Keychain exports, then publish independent channels together.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-            list(pool.map(release.build, state["selected"]))
-        for channel in state["selected"]:
-            release.export(channel)
-        release.save(remote=True)
-        errors, waiting = release.publish_until_ready(args.wait_seconds)
+        errors, waiting = {}, {}
+        if not state.get("complete"):
+            release.validate()
+            # Build unsigned Store archives and the notarized DMG concurrently;
+            # serialize Keychain exports, then publish independent channels together.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+                list(pool.map(release.build, state["selected"]))
+            for channel in state["selected"]:
+                release.export(channel)
+            release.save(remote=True)
+            errors, waiting = release.publish_until_ready(args.wait_seconds)
+        if state.get("complete"):
+            try:
+                install_release_iphone(release, args.device)
+            except Exception as error:
+                errors["iphone"] = str(error)
         print(json.dumps(status(state, api, app_id), indent=2))
         print("RELEASE_RECEIPT=" + str(release.path))
         for channel, message in {**waiting, **errors}.items():
             print(channel + ": " + message)
-        if waiting:
+        if waiting or "iphone" in errors:
             print("Resume with ./Scripts/release.sh --resume " + state["version"])
         return 1 if errors else 0
 

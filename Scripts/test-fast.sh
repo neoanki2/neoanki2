@@ -23,6 +23,7 @@ bash "$ROOT/Scripts/validate-xcode-build-paths.sh"
 
 echo "==> Unified release contracts"
 python3 "$ROOT/Scripts/test-release.py"
+python3 "$ROOT/Scripts/test-deploy-iphone.py"
 
 echo "==> Mac release signing policy"
 python3 "$ROOT/Scripts/test-macos-signing.py"

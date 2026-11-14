@@ -67,6 +67,7 @@ jobs:
             Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh || failures=1
           python3 Scripts/test-release.py || failures=1
+          python3 Scripts/test-deploy-iphone.py || failures=1
           python3 Scripts/test-release-ios.py || failures=1
           python3 Scripts/test-release-macos-app-store.py || failures=1
           python3 Scripts/test-macos-testflight.py || failures=1

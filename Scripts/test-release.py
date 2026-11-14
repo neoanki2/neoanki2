@@ -4,6 +4,7 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -109,6 +110,12 @@ class PlanningTests(unittest.TestCase):
             self.assertEqual(controller.main([]),0)
         self.assertEqual(self.git('rev-parse','HEAD'),self.rev)
     def test_one_command_releases_only_ios_then_unchanged_source_is_a_noop(self):
+        self.one_command_release()
+
+    def test_phone_blocker_keeps_release_pending_without_repeating_publication(self):
+        self.one_command_release(block_phone=True)
+
+    def one_command_release(self, block_phone=False):
         self.write('Sources/NeoAnkiIOS/Home.swift','after')
         calls=[];owner=self
         class Hub:
@@ -141,15 +148,26 @@ class PlanningTests(unittest.TestCase):
                     'revision':inner.state['revision'],'inputs':inner.state['inputs']['ios']}
                 inner.state['complete']=True;inner.save(remote=True)
                 return {},{}
+        def install(release, device):
+            calls.append(('iphone',release.state['channels']['ios']['version']))
+            if block_phone and len([c for c in calls if c[0]=='iphone']) == 1:
+                release.state['local_iphone']={'status':'blocked'}
+                release.save()
+                raise RuntimeError('No available paired iPhone')
+            release.state['local_iphone']={'status':'installed'}
+            release.save()
         # All effects are confined to this temporary Git repo and these fakes.
         with patch.object(controller,'ROOT',self.root),patch.object(controller,'WORK',self.root/'.build/releases'),\
              patch.object(controller,'GitHub',Hub),patch.object(controller,'Release',Release),\
              patch.object(controller.AppInputs,'load',return_value=self.inputs),\
              patch.object(controller,'preflight'),patch.object(controller,'make_api',return_value=(API(),'app')),\
+             patch.object(controller,'install_release_iphone',side_effect=install),\
              patch.object(controller,'status',return_value={}):
             self.write('.gitignore','.build/\n')
             self.git('add','.');self.git('commit','-qm','merged release input')
-            self.assertEqual(controller.main([]),0)
+            self.assertEqual(controller.main([]),1 if block_phone else 0)
+            if block_phone:
+                self.assertEqual(controller.main([]),0)
             before=copy.deepcopy(calls)
             self.assertEqual(controller.main([]),0)
             self.assertEqual(calls,before)
@@ -158,6 +176,7 @@ class PlanningTests(unittest.TestCase):
         self.assertIn(('build','ios','1.0.320','320'),calls)
         self.assertIn(('verify',{'':['MobileTests']}),calls)
         self.assertEqual([c for c in calls if c[0]=='publish'],[('publish',['ios'])])
+        self.assertEqual([c for c in calls if c[0]=='iphone'],[('iphone','1.0.320')] * (2 if block_phone else 1))
 
 
     def test_clean_synchronized_main_is_the_release_source(self):
@@ -206,6 +225,107 @@ class PlanningTests(unittest.TestCase):
              patch.object(controller,'make_api',side_effect=AssertionError('Apple accessed')),\
              patch.object(controller,'Release',side_effect=AssertionError('artifacts built')):
             with self.assertRaisesRegex(ValueError,'merge blocked'):controller.main([])
+
+
+class LocalIPhoneTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        self.directory = Path(self.temp.name)
+        self.release = type('Release', (), {})()
+        self.release.directory = self.directory
+        self.release.source = self.directory / 'source'
+        self.release.signing = self.directory / 'signing'
+        self.release.state = {'revision': 'merged-sha', 'version': '1.0.322',
+                              'channels': {'ios': {'version': '1.0.321', 'build': '321'}}}
+        self.release.save = lambda: controller.write_json(self.directory / 'release.json', self.release.state)
+        self.release.verify_source = lambda: None
+        self.calls = []
+
+    def deploy(self, command, **kwargs):
+        self.calls.append(command)
+        output = Path(command[command.index('--output') + 1]); output.mkdir()
+        receipt = {'version': command[command.index('--version') + 1],
+                   'build': command[command.index('--build') + 1], 'sourceRevision': 'merged-sha',
+                   'device': 'My phone', 'deviceIdentifier': 'phone-id', 'deviceUDID': 'udid',
+                   'installed': True, 'launched': True, 'phase': 'complete'}
+        controller.write_json(output / 'deployment.json', receipt)
+        Path(kwargs['log']).write_text('IPHONE_DEPLOY_ELAPSED_SECONDS=12\n')
+
+    def test_mac_only_installs_latest_ios_version_from_pinned_source_and_retains_receipt(self):
+        with patch.object(controller, 'run', side_effect=self.deploy):
+            controller.install_release_iphone(self.release, 'udid')
+            controller.install_release_iphone(self.release, 'udid')
+        self.assertEqual(len(self.calls), 1)
+        command = self.calls[0]
+        self.assertEqual(command[command.index('--source-dir') + 1], str(self.release.source))
+        self.assertEqual(command[command.index('--signing-dir') + 1], str(self.release.signing))
+        self.assertEqual(command[command.index('--device') + 1], 'udid')
+        self.assertEqual(self.release.state['local_iphone']['version'], '1.0.321')
+        self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
+
+    def test_interrupted_install_or_launch_is_never_repeated_automatically(self):
+        for phase in ('install', 'launch'):
+            with self.subTest(phase=phase):
+                path = self.directory / 'deployment.json'
+                controller.write_json(path, {'version': '1.0.321', 'build': '321', 'sourceRevision': 'merged-sha',
+                                            'phase': phase, 'installed': phase == 'launch', 'launched': False})
+                self.release.state['local_iphone'] = {'receipt': str(path), 'status': 'attempting'}
+                with patch.object(controller, 'run', side_effect=AssertionError('device operation repeated')):
+                    with self.assertRaisesRegex(RuntimeError, 'will not be repeated'):
+                        controller.install_release_iphone(self.release)
+                self.assertEqual(self.release.state['local_iphone']['status'], 'blocked')
+
+    def test_crash_after_successful_launch_recovers_without_another_install_or_launch(self):
+        with patch.object(controller, 'run', side_effect=self.deploy):
+            controller.install_release_iphone(self.release)
+        self.release.state['local_iphone']['status'] = 'attempting'
+        with patch.object(controller, 'run', side_effect=AssertionError('device operation repeated')):
+            controller.install_release_iphone(self.release)
+        self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
+
+    def test_unavailable_phone_can_resume_after_connection(self):
+        with patch.object(controller, 'run', side_effect=RuntimeError('No available paired iPhone')):
+            with self.assertRaisesRegex(RuntimeError, 'No available'):
+                controller.install_release_iphone(self.release, 'udid')
+        self.assertEqual(self.release.state['local_iphone']['status'], 'blocked')
+        with patch.object(controller, 'run', side_effect=self.deploy):
+            controller.install_release_iphone(self.release)
+        self.assertEqual(self.release.state['local_iphone']['attempt'], 2)
+        self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
+        self.assertEqual(self.calls[0][-2:], ['--device', 'udid'])
+
+    def test_lost_verified_receipt_never_triggers_another_install(self):
+        with patch.object(controller, 'run', side_effect=self.deploy):
+            controller.install_release_iphone(self.release)
+        Path(self.release.state['local_iphone']['receipt']).unlink()
+        with patch.object(controller, 'run', side_effect=AssertionError('device operation repeated')):
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, 'receipt is missing'):
+                    controller.install_release_iphone(self.release)
+
+    def test_wrong_version_or_source_cannot_count_as_installed(self):
+        for field in ('version', 'build', 'sourceRevision'):
+            with self.subTest(field=field):
+                self.release.state.pop('local_iphone', None)
+                def deploy(command, **kwargs):
+                    self.deploy(command, **kwargs)
+                    path = Path(command[command.index('--output') + 1]) / 'deployment.json'
+                    receipt = json.loads(path.read_text()); receipt[field] = 'wrong'
+                    controller.write_json(path, receipt)
+                output = self.directory / 'iphone-1'
+                if output.exists():
+                    shutil.rmtree(output)
+                with patch.object(controller, 'run', side_effect=deploy):
+                    with self.assertRaisesRegex(RuntimeError, 'differs from'):
+                        controller.install_release_iphone(self.release)
+
+    def test_device_details_are_excluded_from_public_checkpoint(self):
+        self.release.state['local_iphone'] = {'device': 'private phone', 'status': 'installed'}
+        hub = object.__new__(controller.GitHub); hub.repository = 'example/app'
+        with patch.object(controller, 'run'):
+            hub.checkpoint(self.directory / 'release.json', self.release.state)
+        public = json.loads((self.directory / controller.STATE_ASSET).read_text())
+        self.assertNotIn('local_iphone', public)
 
 
 class VersionTests(unittest.TestCase):
