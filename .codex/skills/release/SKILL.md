@@ -1,6 +1,6 @@
 ---
 name: release
-description: Merge release changes into main, publish affected NeoAnki2 apps to the Stores and Homebrew with one shared version, upgrade the local Mac, and clean up disposable release artifacts; preview, resume, or inspect a release. Use for release, ship, publish, or Homebrew/app-store release requests. Physical iPhone installation uses deploy-iphone instead.
+description: Merge release changes into main, publish affected NeoAnki2 apps to the Stores and Homebrew with one shared version, update the local Mac and paired iPhone, and clean up disposable release artifacts; preview, resume, or inspect a release. Use for release, ship, publish, or Homebrew/app-store release requests. Standalone physical iPhone installation uses deploy-iphone.
 ---
 
 # Release NeoAnki2
@@ -42,6 +42,7 @@ before using the controller for publication.
 After source integration, the command handles change detection, version
 reservation, relevant headless checks, parallel builds, signing, Store
 upload/submission, Homebrew publication, and receipts.
+After publication finishes, it also runs the local iPhone deployment automatically.
 Do not reconstruct these phases or invoke the retired per-platform/fast/ship
 entry points. Do not run a release merely because the user asks to develop or
 edit the release process.
@@ -77,18 +78,34 @@ edit the release process.
   settings. Perform this step rather than handing the user a command. An iOS-only
   release with no newer Mac version needs no local upgrade. Do not install
   TestFlight or manipulate Store containers; no other GUI interaction is allowed.
+- Every release also includes updating the user's paired iPhone. The controller
+  invokes `./Scripts/deploy-iphone.sh` with pinned source and the latest released
+  iOS version/build, verifies installation and a single launch, and saves local
+  receipts and `IPHONE_DEPLOY_*` telemetry. A Mac-only release keeps the latest
+  iOS version. Do not run a second standalone deployment after this succeeds.
+  Use `./Scripts/release.sh --resume VERSION --device NAME_OR_IDENTIFIER` if the
+  user must choose among multiple available phones. An unavailable phone or
+  signing/install/launch failure blocks local completion; resolve the stated
+  cause and resume without repeating Store uploads. An interrupted install or
+  launch requires inspecting its receipt before recovery; never repeat it
+  automatically. Do not claim release completion or clean up its recovery inputs
+  until both applicable local installations are verified. This installation is
+  part of release delivery, not a physical acceptance test.
 
 ## Cleanup
 
 Finish a release by reclaiming its disposable outputs, including older completed
 releases. Acquire the release lock and confirm `release.json` has `complete: true`
 and every selected channel is `published`, `submitted`, or `available`. Complete
-the current release's local Mac upgrade first. Pending Apple review does not
+the current release's applicable local Mac upgrade and iPhone installation first.
+The local `release.json` must show `local_iphone.status: installed` with its
+verified deployment receipt. `complete: true` records publication completion
+only and is insufficient for cleanup on its own. Pending Apple review does not
 require retaining build directories; pending processing, failed/abandoned
 releases, and uncertain uploads must retain their recovery inputs.
 
-- Keep receipts/checkpoints, local-upgrade verification, original validation and
-  delivery logs, checksums, signing/notarization evidence, and production debug
+- Keep receipts/checkpoints, local-upgrade and iPhone deployment verification,
+  original validation and delivery logs, checksums, signing/notarization evidence, and production debug
   symbols. Preserve matching dSYMs/symbol maps before deleting archives or build
   trees; retain exact shipped executables when no matching symbols exist. A
   verified compressed symbols archive is sufficient. Leave hash-referenced logs
@@ -107,6 +124,6 @@ releases, and uncertain uploads must retain their recovery inputs.
 
 Read [the release guide](../../../docs/RELEASING.md) for setup, version examples,
 checkpoint behavior, and recovery. Return selected versions/source, each channel's
-actual state, the local installed version, cleanup result, and the receipt path.
-Name concrete blockers without inventing
+actual state, the local Mac and iPhone installed versions, cleanup result, and
+the receipt paths. Name concrete blockers without inventing
 acceptance passes or requesting confirmation already granted by the release request.

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Deployment invariants without a device, credentials, or external mutations."""
 import copy
+import contextlib
 import datetime as dt
 import importlib.util
+import json
 from pathlib import Path
+import plistlib
+from types import SimpleNamespace
 import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -34,6 +39,92 @@ def profile():
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_release_delivery_persists_intent_before_each_device_mutation(self):
+        for failure in (None, 'install', 'launch', 'widget-version'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder); output = root / 'output'; output.mkdir()
+                signing = root / 'signing'; signing.mkdir()
+                for name in ('Apple-Distribution.cert.pem', 'Apple-Distribution.key.pem', 'AppleWWDRCAG3.cer',
+                             'iOS-AdHoc.mobileprovision', 'Widget-AdHoc.mobileprovision'):
+                    (signing / name).touch()
+                for name in ('Platforms/iOS/NeoAnki2.entitlements', 'Platforms/iOSWidget/NeoAnkiWidget.entitlements'):
+                    path = root / name; path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(plistlib.dumps({}))
+                flow = deploy.Workflow(output, root); mutations = []
+                args = SimpleNamespace(signing_dir=signing, device=None, version='1.0.400', build='401', prepare_only=False)
+                def run(command, **kwargs):
+                    if command[:3] == ['openssl', 'x509', '-in']:
+                        return b'certificate'
+                    if command[:3] == ['security', 'cms', '-D']:
+                        p = profile()
+                        if command[-1].endswith('Widget-AdHoc.mobileprovision'):
+                            p['Entitlements']['application-identifier'] = 'TEAM.' + deploy.WIDGET_ID
+                        return plistlib.dumps(p)
+                    if command[0] == 'xcodebuild':
+                        app = output / 'DerivedData/Build/Products/Release-iphoneos/NeoAnki2.app'
+                        widget = app / 'PlugIns/NeoAnki2Widget.appex'; widget.mkdir(parents=True)
+                        for path, bundle in ((app, deploy.APP_ID), (widget, deploy.WIDGET_ID)):
+                            version = '1.0.0' if failure == 'widget-version' and path == widget else '1.0.400'
+                            (path / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': bundle,
+                                'CFBundleShortVersionString': version, 'CFBundleVersion': '401'}))
+                        (app / 'NeoAnki2').write_bytes(b'executable')
+                    if command[:2] == ['git', 'rev-parse']:
+                        return b'merged-sha\n'
+                    return b''
+                def device_command(name, command, *unused):
+                    if name == 'devices':
+                        return {'result': {'devices': [device()]}}
+                    receipt = json.loads((output / 'deployment.json').read_text())
+                    self.assertEqual(receipt['phase'], name)
+                    self.assertEqual(receipt['installed'], name == 'launch')
+                    self.assertFalse(receipt['launched'])
+                    mutations.append(name)
+                    if name == failure:
+                        raise deploy.DeploymentError('injected ' + name + ' failure')
+                    result = {'deviceIdentifier': 'device-1'}
+                    if name == 'install':
+                        result['installedApplications'] = [{'bundleID': deploy.APP_ID}]
+                    else:
+                        result['process'] = {'processIdentifier': 42, 'executable': '/NeoAnki2.app/NeoAnki2'}
+                    return {'info': {'outcome': 'success'}, 'result': result}
+                def codesign(command, **kwargs):
+                    kind = 'widget' if command[-1].endswith('.appex') else 'app'
+                    return subprocess.CompletedProcess(command, 0, (output / (kind + '-entitlements.plist')).read_bytes(), b'')
+                with patch.object(flow, 'run', side_effect=run), patch.object(flow, 'device_command', side_effect=device_command), \
+                     patch.object(flow, 'signing_keychain', return_value=contextlib.nullcontext(Path('temporary-keychain'))), \
+                     patch.object(deploy.subprocess, 'run', side_effect=codesign):
+                    if failure:
+                        with self.assertRaises(deploy.DeploymentError):
+                            flow.execute(args)
+                    else:
+                        flow.execute(args)
+                self.assertEqual(mutations, [] if failure == 'widget-version' else ['install'] if failure == 'install' else ['install', 'launch'])
+                if not failure:
+                    receipt = json.loads((output / 'deployment.json').read_text())
+                    self.assertTrue(receipt['installed'] and receipt['launched'])
+                    self.assertEqual(receipt['sourceRevision'], 'merged-sha')
+                    self.assertEqual((receipt['version'], receipt['build']), ('1.0.400', '401'))
+
+    def test_release_build_uses_pinned_source_and_version_for_app_and_widget(self):
+        flow = deploy.Workflow(Path('/output'), Path('/pinned-source'))
+        command = flow.build_command(SimpleNamespace(version='1.0.400', build='401'), Path('/output/DerivedData'))
+        self.assertEqual(command[command.index('-project') + 1], '/pinned-source/Xcode/NeoAnkiiOS.xcodeproj')
+        self.assertIn('MARKETING_VERSION=1.0.400', command)
+        self.assertIn('CURRENT_PROJECT_VERSION=401', command)
+        self.assertIn('CODE_SIGNING_ALLOWED=NO', command)
+
+    def test_standalone_build_keeps_project_versions(self):
+        command = deploy.Workflow(Path('unused')).build_command(SimpleNamespace(version=None, build=None), Path('derived'))
+        self.assertFalse(any(c.startswith(('MARKETING_VERSION=', 'CURRENT_PROJECT_VERSION=')) for c in command))
+
+    def test_incomplete_or_invalid_release_version_stops_before_device_access(self):
+        for args in (['--version', '1.0.400'], ['--build', '401'],
+                     ['--version', 'bad', '--build', '401'], ['--version', '1.0.400', '--build', '0']):
+            with self.subTest(args=args), patch.object(deploy.Workflow, 'execute', side_effect=AssertionError('device accessed')):
+                with self.assertRaises(SystemExit) as caught:
+                    deploy.main(args)
+                self.assertEqual(caught.exception.code, 2)
+
     def test_single_wired_phone_with_closed_tunnel_is_available(self):
         self.assertEqual(deploy.select_device([device()])["identifier"], "device-1")
 

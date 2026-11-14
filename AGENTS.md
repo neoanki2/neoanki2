@@ -60,9 +60,20 @@ endpoint registry, tests, and generated `docs/api/` artifacts together.
   than giving the user an upgrade command. Skip it for an iOS-only release when
   there is no newer Mac version. Report local installation separately from Store
   submission and public availability.
+- Every release also installs the latest released iOS version on the user's
+  paired iPhone and launches it once through `./Scripts/deploy-iphone.sh`.
+  The controller uses its pinned source and the iOS channel's version/build;
+  Mac-only releases retain the latest iOS version rather than inventing a new
+  one. Use `--device NAME_OR_IDENTIFIER` if multiple iPhones are available.
+  An unavailable phone or signing/install/launch failure leaves local delivery
+  blocked; report it and resume the saved release after resolving the cause.
+  Preserve successful publication and device receipts; never automatically
+  repeat an interrupted install/launch. Release completion requires both the
+  applicable Mac upgrade and the verified iPhone installation.
 - Finish successful releases by cleaning their disposable build outputs and
-  pinned worktrees after the local upgrade. Keep receipts, original logs, and
-  production debug symbols; preserve pending/failed release recovery inputs.
+  pinned worktrees after both local installations are verified. Keep receipts,
+  original logs, and production debug symbols; preserve pending/failed release
+  recovery inputs.
 - Read `docs/RELEASING.md` for the workflow and recovery rules. Retired release
   entry points must not be used to allocate independent versions or bypass state.
 

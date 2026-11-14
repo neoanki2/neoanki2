@@ -16,6 +16,14 @@ validates device registration and app/widget profiles, signs, installs as an
 update, verifies the installation receipt, and launches exactly once. It does
 not commit, publish, uninstall, reset the library, or enable sync.
 
+During a release, the unified controller invokes this command automatically
+with `--source-dir`, `--version`, `--build`, and `--output` to install pinned
+release source with the iOS channel's exact version/build. Both version flags
+are required together and are verified in the app and widget before installation.
+Do not repeat a successful controller-managed deployment. Resume a blocked
+release through `./Scripts/release.sh --resume VERSION` so publication and local
+delivery receipts remain coordinated.
+
 Signing material lives in `~/Library/Application Support/NeoAnki2 Signing/`.
 The existing `NeoAnki2-signing` Keychain has a separate password and its saved
 password failed during the October 3, 2026 deployment. **Do not try to unlock

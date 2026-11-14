@@ -1,6 +1,6 @@
 ---
 title: Releasing NeoAnki2
-description: Publish affected apps to iOS, the Mac App Store, and Homebrew with one shared version.
+description: Publish affected apps with one shared version and update the local Mac and paired iPhone.
 audience: developer
 parent: Developer Guide
 permalink: /RELEASING/
@@ -16,7 +16,9 @@ checkout, then run the release command on the configured signing Mac:
 ```
 
 It uses that merged main revision, detects affected apps, verifies relevant code,
-then builds and publishes the selected distributions. It does not run broad UI
+then builds and publishes the selected distributions and installs the latest iOS
+version on the paired iPhone. The release agent also completes the local Mac
+upgrade when applicable. It does not run broad UI
 journeys, physical acceptance, screenshot capture, or browser review ceremonies.
 This replaces the separate Homebrew/iOS/Mac Store release processes. The old
 `release-fast.sh`, `release-ios.sh`, `release-macos-app-store.sh`,
@@ -106,6 +108,28 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
    library and settings are preserved. An iOS-only release with no newer Mac
    version skips this step. Local installation and Store availability are
    reported separately; Apple's review can still be pending.
+9. Once all selected channels are published/submitted, the controller runs
+   `./Scripts/deploy-iphone.sh` using its pinned source and the iOS channel's
+   exact marketing version and build number. It signs with the saved Ad Hoc
+   profiles, installs in place on the paired iPhone, and launches once. Both the
+   app and widget versions are checked before installation. This preserves app
+   data and does not require TestFlight or waiting for Store approval. Mac-only
+   releases install the latest existing iOS version; they do not advance its
+   version number. Every release requires this verified iPhone installation as
+   well as the applicable local Mac upgrade before the agent reports completion.
+
+Connect and unlock the paired iPhone with Developer Mode enabled before a release.
+If several phones are available, select the intended target:
+
+```bash
+./Scripts/release.sh --device NAME_OR_IDENTIFIER
+```
+
+Missing devices, signing problems, and failed installs/launches block local
+completion and return a nonzero exit status. Publication receipts remain intact.
+`IPHONE_DEPLOY_*` telemetry is printed and retained in the release's
+`iphone-N.log`; deployment and device receipts live in `iphone-N/`. Device details
+stay in local receipts and are excluded from the public release checkpoint.
 
 “Together” means one coordinated command and one source/version assignment.
 Homebrew can become available immediately; Apple controls processing, review,
@@ -129,6 +153,16 @@ The normal command resumes a pending release when current app inputs still match
 It waits up to ten minutes for Apple processing/cancellation; `--wait-seconds 0`
 returns immediately with the resume command. Apple review itself is not waited
 on. Another version is never allocated just because processing is slow.
+
+An unfinished iPhone update remains pending locally even after publication's
+`complete: true` checkpoint. Connect the phone or resolve the reported signing
+blocker, then run `./Scripts/release.sh --resume VERSION` (with `--device` when
+needed). The normal release command also detects this pending local delivery.
+Resuming local delivery skips completed publication and reuses a verified
+successful deployment without another install or launch. If an install/launch
+was interrupted or failed after its durable intent was recorded, the controller
+stops for receipt inspection instead of automatically repeating the device
+operation. `--status` includes this Mac's saved iPhone delivery state.
 
 If code needs fixing after a failed local gate, stop that reserved release before
 starting a new source/version:
@@ -160,21 +194,24 @@ this controller requires a deliberate, evidence-backed baseline migration.
 
 The release agent cleans disposable outputs after the controller records
 `complete: true`, every selected channel is published or submitted, and the
-local Mac upgrade is verified. Apple review may still be pending. Older
-successfully completed releases can be cleaned in the same pass. Hold the
+local Mac upgrade and iPhone installation are verified. The local checkpoint must
+show `local_iphone.status: installed` and retain the matching deployment receipt;
+publication's `complete: true` flag alone is insufficient. Apple review may still
+be pending. Older successfully completed releases can be cleaned in the same pass. Hold the
 release lock and preserve recovery inputs for pending, failed, abandoned, or
 uncertain uploads.
 
-Keep release/platform checkpoints, local-upgrade receipts, original validation
-and delivery logs, checksums, signing/notarization evidence, and production debug
-symbols. Preserve dSYMs and symbol maps in a verified compressed archive first;
+Keep release/platform checkpoints, local-upgrade and iPhone deployment/device
+receipts, original validation and delivery logs, checksums, signing/notarization
+evidence, and production debug symbols. Preserve dSYMs and symbol maps in a verified compressed archive first;
 keep exact shipped executables when matching symbols are unavailable. Original
 hash-referenced logs remain unchanged for resume validation.
 
 Remove release-owned derived data, build caches, archives, exported binaries,
-temporary tap clones, and clean pinned Git worktrees. Verify worktree revisions
-and inspect ignored files before removing generated outputs. A local DMG can
-be removed once authenticated `gh` confirms its published asset digest matches
+temporary tap clones, and clean pinned Git worktrees. Remove the deployment's
+disposable app bundle and `DerivedData` only after its installation is verified.
+Verify worktree revisions and inspect ignored files before removing generated
+outputs. A local DMG can be removed once authenticated `gh` confirms its published asset digest matches
 the release receipt. Keep the installed app, library/settings, saved credentials,
 remote assets, unrelated worktrees, and shared development caches intact.
 Record removed paths and reclaimed space in `cleanup.json` beside the retained
@@ -196,6 +233,9 @@ keys and API credentials outside the repository.
 
 - iOS/Mac Store: `app-store-connect.json`, its referenced API key,
   `Apple-Distribution.cert.pem`, and `Apple-Distribution.key.pem`.
+- Local iPhone delivery: also `AppleWWDRCAG3.cer`,
+  `iOS-AdHoc.mobileprovision`, and `Widget-AdHoc.mobileprovision`, with the
+  paired iPhone registered in both profiles.
 - Mac Store: also `Mac-Installer-Distribution.cert.pem` and
   `Mac-Installer-Distribution.key.pem`.
 - Homebrew: `Developer-ID-Application.cert.pem`, its key,
@@ -219,6 +259,7 @@ Release tooling can be verified without contacting Apple/GitHub or publishing:
 
 ```bash
 python3 Scripts/test-release.py
+python3 Scripts/test-deploy-iphone.py
 python3 Scripts/test-release-ios.py
 python3 Scripts/test-release-macos-app-store.py
 ```

@@ -118,8 +118,9 @@ def validate_receipt(data, device_id, kind):
 
 
 class Workflow:
-    def __init__(self, output):
+    def __init__(self, output, source=ROOT):
         self.output = output
+        self.source = source
         self.phase = "preflight"
         self.started = time.monotonic()
         self.passwords = []
@@ -134,12 +135,12 @@ class Workflow:
         try:
             if log:
                 with log.open("wb") as stream:
-                    r = subprocess.run(args, cwd=ROOT, stdin=subprocess.DEVNULL,
+                    r = subprocess.run(args, cwd=self.source, stdin=subprocess.DEVNULL,
                                        stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
                 if r.returncode:
                     raise DeploymentError(f"{self.phase} failed; see {log}.")
                 return b""
-            r = subprocess.run(args, cwd=ROOT, stdin=subprocess.DEVNULL,
+            r = subprocess.run(args, cwd=self.source, stdin=subprocess.DEVNULL,
                                capture_output=True, timeout=timeout)
         except subprocess.TimeoutExpired:
             raise DeploymentError(f"{self.phase}: {args[0]} timed out.") from None
@@ -160,6 +161,14 @@ class Workflow:
     def mark(self, phase):
         self.phase = phase
         print(f"IPHONE_DEPLOY_PHASE={phase}", flush=True)
+
+    def build_command(self, args, derived):
+        command = ["xcodebuild", "build", "-quiet", "-project", str(self.source / "Xcode/NeoAnkiiOS.xcodeproj"),
+                   "-scheme", "NeoAnkiiOS", "-configuration", "Release", "-destination", "generic/platform=iOS",
+                   "-derivedDataPath", str(derived), "CODE_SIGNING_ALLOWED=NO", "SWIFT_ENABLE_EXPLICIT_MODULES=NO"]
+        if args.version:
+            command += ["MARKETING_VERSION=" + args.version, "CURRENT_PROJECT_VERSION=" + args.build]
+        return command
 
     @contextlib.contextmanager
     def signing_keychain(self, signing):
@@ -234,14 +243,12 @@ class Workflow:
         entitlements = {}
         for kind, file, bundle in (("app", "Platforms/iOS/NeoAnki2.entitlements", APP_ID),
                                    ("widget", "Platforms/iOSWidget/NeoAnkiWidget.entitlements", WIDGET_ID)):
-            source = plistlib.loads((ROOT / file).read_bytes())
+            source = plistlib.loads((self.source / file).read_bytes())
             entitlements[kind] = make_entitlements(source, profiles[kind], team, bundle)
             (self.output / (kind + "-entitlements.plist")).write_bytes(plistlib.dumps(entitlements[kind]))
         self.mark("build")
-        derived = ROOT / ".build/xcode-products/iPhoneDeploy"
-        self.run(["xcodebuild", "build", "-quiet", "-project", str(ROOT / "Xcode/NeoAnkiiOS.xcodeproj"),
-                  "-scheme", "NeoAnkiiOS", "-configuration", "Release", "-destination", "generic/platform=iOS",
-                  "-derivedDataPath", str(derived), "CODE_SIGNING_ALLOWED=NO", "SWIFT_ENABLE_EXPLICIT_MODULES=NO"],
+        derived = self.output / "DerivedData"
+        self.run(self.build_command(args, derived),
                  timeout=900, log=self.output / "build.log")
         app = self.output / "NeoAnki2.app"
         shutil.copytree(derived / "Build/Products/Release-iphoneos/NeoAnki2.app", app)
@@ -255,6 +262,8 @@ class Workflow:
                 info = plistlib.loads((path / "Info.plist").read_bytes())
                 if info.get("CFBundleIdentifier") != bundle:
                     raise DeploymentError(f"Built product does not match {bundle}.")
+                if args.version and (info.get("CFBundleShortVersionString"), info.get("CFBundleVersion")) != (args.version, args.build):
+                    raise DeploymentError(f"Built version does not match {args.version} ({args.build}) for {bundle}.")
                 shutil.copy2(signing / profile_file, path / "embedded.mobileprovision")
                 self.run(["codesign", "--force", "--keychain", str(keychain), "--sign", identity,
                           "--entitlements", str(self.output / (kind + "-entitlements.plist")),
@@ -267,9 +276,10 @@ class Workflow:
                 if raw.returncode or start < 0 or end < 0 or plistlib.loads(xml[start:end + 8]) != entitlements[kind]:
                     raise DeploymentError(f"Signed entitlements do not match {bundle}.")
         info = plistlib.loads((app / "Info.plist").read_bytes())
-        receipt = {"device": name, "deviceIdentifier": device_id, "bundleIdentifier": APP_ID,
+        receipt = {"device": name, "deviceIdentifier": device_id, "deviceUDID": udid, "bundleIdentifier": APP_ID,
                    "configuration": "Release", "version": info["CFBundleShortVersionString"],
                    "build": info["CFBundleVersion"], "team": team, "cloudKitEnvironment": "Production",
+                   "sourceRevision": self.run(["git", "rev-parse", "HEAD"]).decode().strip(),
                    "executableSHA256": hashlib.sha256((app / "NeoAnki2").read_bytes()).hexdigest(),
                    "installed": False, "launched": False, "temporarySigningKeychainRemoved": True}
         receipt_path = self.output / "deployment.json"
@@ -277,15 +287,21 @@ class Workflow:
             receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
         save()
         if not args.prepare_only:
+            # Persist intent before device mutations, so release recovery never
+            # automatically repeats an install or launch with an uncertain result.
+            receipt["phase"] = "install"
+            save()
             self.mark("install")
             data = self.device_command("install", ["device", "install", "app", "--device", device_id, str(app)], 60)
             validate_receipt(data, device_id, "Install")
             receipt["installed"] = True
+            receipt["phase"] = "launch"
             save()
             self.mark("launch")
             data = self.device_command("launch", ["device", "process", "launch", "--device", device_id, APP_ID])
             launched = validate_receipt(data, device_id, "Launch")
             receipt.update(launched=True, processIdentifier=launched["process"]["processIdentifier"])
+            receipt["phase"] = "complete"
             save()
         self.mark("complete")
         print(f"IPHONE_DEPLOY_STATUS={'prepared' if args.prepare_only else 'installed_and_launched'}")
@@ -293,13 +309,21 @@ class Workflow:
         print(f"IPHONE_DEPLOY_ELAPSED_SECONDS={time.monotonic() - self.started:.1f}")
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", help="paired iPhone name, CoreDevice identifier, or UDID")
     parser.add_argument("--prepare-only", action="store_true", help="build/sign without install or launch")
+    parser.add_argument("--source-dir", type=Path, default=ROOT, help="source checkout (release uses its pinned worktree)")
+    parser.add_argument("--output", type=Path, help="new directory for deployment artifacts and receipts")
+    parser.add_argument("--version", help="release marketing version; requires --build")
+    parser.add_argument("--build", help="release build number; requires --version")
     parser.add_argument("--signing-dir", type=Path,
                         default=Path.home() / "Library/Application Support/NeoAnki2 Signing")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if bool(args.version) != bool(args.build):
+        parser.error("--version and --build must be supplied together")
+    if args.version and (not re.fullmatch(r"\d+\.\d+\.\d+", args.version) or not re.fullmatch(r"[1-9]\d*", args.build)):
+        parser.error("expected a three-part marketing version and a positive build number")
     base = ROOT / ".build/iphone-deploy"
     base.mkdir(parents=True, exist_ok=True)
     with (base / "workflow.lock").open("w") as lock:
@@ -308,9 +332,9 @@ def main():
         except BlockingIOError:
             print("IPHONE_DEPLOY_ERROR=Another deployment is already running.", file=sys.stderr)
             return 1
-        output = base / (dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8])
-        output.mkdir()
-        flow = Workflow(output)
+        output = args.output.expanduser().resolve() if args.output else base / (dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8])
+        output.mkdir(parents=True)
+        flow = Workflow(output, args.source_dir.expanduser().resolve())
         # Raise through context managers so interruption cleans up signing secrets.
         signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
         try:
