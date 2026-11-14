@@ -278,6 +278,10 @@ actor SQLiteDatabase {
         guard start.isFinite, end.isFinite, instant.isFinite else { throw DatabaseError.queryFailed("Invalid study clock.") }
         // The representative is selected inside the requested scope. Family
         // exposure and due learned relatives are checked across the library.
+        // Keep each correlated lookup family-first. An ordinary JOIN lets
+        // SQLite start with idx_cards_phase and scan every new card for every
+        // outer card (quadratic startup, queue loading, and grade refreshes).
+        // CROSS JOIN fixes loop order; the item index bounds the inner lookup.
         let candidateScope: String
         switch scope {
         case .all: candidateScope = "1 = 1"
@@ -293,14 +297,14 @@ actor SQLiteDatabase {
               AND (
                 EXISTS (
                     SELECT 1 FROM study_item_relations AS relative
-                    JOIN cards AS learned ON learned.item_id = relative.item_id
+                    CROSS JOIN cards AS learned INDEXED BY idx_cards_item_id ON learned.item_id = relative.item_id
                     WHERE relative.family_key = relation.family_key
                       AND \(usableStudyCardSQL("learned"))
                       AND learned.is_suspended = 0 AND learned.phase != 'new' AND learned.due_at <= \(instant)
                 )
                 OR EXISTS (
                     SELECT 1 FROM study_item_relations AS relative
-                    JOIN cards AS reviewed ON reviewed.item_id = relative.item_id
+                    CROSS JOIN cards AS reviewed INDEXED BY idx_cards_item_id ON reviewed.item_id = relative.item_id
                     JOIN review_logs AS logs ON logs.card_id = reviewed.id
                     WHERE relative.family_key = relation.family_key
                       AND logs.reviewed_at >= \(start) AND logs.reviewed_at < \(end)
@@ -309,7 +313,7 @@ actor SQLiteDatabase {
                 )
                 OR EXISTS (
                     SELECT 1 FROM study_item_relations AS relative
-                    JOIN cards AS candidate ON candidate.item_id = relative.item_id
+                    CROSS JOIN cards AS candidate INDEXED BY idx_cards_item_id ON candidate.item_id = relative.item_id
                     WHERE relative.family_key = relation.family_key
                       AND \(usableStudyCardSQL("candidate"))
                       AND candidate.is_suspended = 0 AND candidate.phase = 'new' AND candidate.due_at <= \(instant)

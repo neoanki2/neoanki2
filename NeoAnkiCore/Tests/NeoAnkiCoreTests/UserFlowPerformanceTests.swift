@@ -11,6 +11,35 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     PerformanceScale.require(flow: flow)
 }
 
+@Test func perfStudyEligibilityOperationsAtScale() async throws {
+    guard let scale = requirePerformanceScale() else { return }
+    let (store, directory) = try await PerformanceFixtures.makeStore(label: "family-eligibility-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let now = Date.now
+    _ = try await PerformanceFixtures.seedBasicItems(count: scale.itemCount, in: store, now: now)
+    _ = try await PerformanceHarness.measure(flow: "family-home-snapshot") {
+        let home = try await store.coldLibraryHomeSnapshot(asOf: now)
+        #expect(home.allDecksSummary.dueNow == scale.itemCount)
+        return [:]
+    }
+    _ = try await PerformanceHarness.measure(flow: "family-session-load") {
+        let count = try await store.dueCount(asOf: now)
+        let head = try await store.fetchDueCards(asOf: now, limit: 1)
+        let queue = try await store.fetchDueCards(asOf: now)
+        #expect(count == scale.itemCount)
+        #expect(head.count == 1)
+        #expect(queue.count == scale.itemCount)
+        return [:]
+    }
+    let card = try #require(try await store.fetchDueCards(asOf: now, limit: 1).first)
+    _ = try await PerformanceHarness.measure(flow: "family-grade-and-refresh") {
+        _ = try await store.submitReview(cardID: card.id, rating: .good, now: now)
+        let summary = try await store.scopeSummary(asOf: now)
+        #expect(summary.dueNow == scale.itemCount - 1)
+        return [:]
+    }
+}
+
 @Test func perfBootstrapFreshLibrary() async throws {
     guard let scale = requirePerformanceScale() else { return }
 
