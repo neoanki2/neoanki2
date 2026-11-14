@@ -168,6 +168,43 @@ private func textItem(id: UUID, type: ItemType, text: String, deckID: UUID?) -> 
 }
 
 struct SyncStateMachineTests {
+    @Test func typeDeletionDoesNotBlockIncomingReviewsAndSurvivesRestart() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cloud = TestCloud()
+        let mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud, seed: 301)
+        var phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud, seed: 302)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let base = try #require(try await mac.repository.loadItemTypes().itemTypes.first)
+        let unused = try ItemTypeBuilder.makeItemType(name: "Unused type to retire", fields: [
+            FieldDef(name: "Unused prompt", type: .text, isRequired: true),
+            FieldDef(name: "Unused answer", type: .text, isRequired: true),
+        ])
+        _ = try await mac.repository.createItemType(unused)
+        let item = textItem(id: UUID(), type: base, text: "Incoming reviewed card", deckID: nil)
+        _ = try await mac.repository.createItem(item, asOf: now)
+        await mac.service.synchronize()
+        await phone.service.synchronize()
+        #expect(try await phone.repository.loadItemTypes().itemTypes.contains { $0.id == unused.id })
+        let card = try #require(try await mac.repository.cards().first { $0.itemID == item.id })
+        _ = try await mac.repository.deleteItemType(id: unused.id)
+        let review = try await mac.repository.submitReview(
+            cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 500
+        )
+        await mac.service.synchronize()
+        await phone.service.synchronize()
+        #expect(await phone.service.issues().isEmpty)
+        #expect(try await phone.repository.reviewLog(id: review.reviewLogID).id == review.reviewLogID)
+        #expect(try await phone.repository.card(id: card.id) == mac.repository.card(id: card.id))
+        #expect(try await phone.repository.loadItemTypes().itemTypes.allSatisfy { $0.id != unused.id })
+        #expect(try await phone.repository.scopeSummary(scope: .allDecks, asOf: now).dueNow == 0)
+        try await phone.restart(cloud: cloud, seed: 303)
+        await phone.service.synchronize()
+        #expect(await phone.service.issues().isEmpty)
+        #expect(try await phone.metadata.load().stagedInbound.isEmpty)
+        #expect(try await phone.repository.card(id: card.id) == mac.repository.card(id: card.id))
+    }
+
     @Test func staleServerCardsWithNewerReviewsConvergeToSixDueAcrossRestart() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

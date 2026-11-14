@@ -220,6 +220,11 @@ rewrite the library.
 
 ## Troubleshoot iCloud
 
+If one device is behind, inspect its sync status even if the other device says
+**Current**. Each device has its own incoming queue. Failed incoming changes
+are retained for retry; keep the library and sync settings intact while updating
+the affected app so it can apply those saved changes.
+
 If Status is **Account unavailable**:
 
 1. Confirm the device is signed in to iCloud and is not using a managed account
