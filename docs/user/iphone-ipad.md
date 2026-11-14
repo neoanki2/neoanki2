@@ -95,6 +95,13 @@ appears immediately below it, followed by supplemental answer details. This
 preserves the reading order of continuations such as poetry. VoiceOver focus
 moves to the newly revealed answer without changing that semantic order.
 
+Independent cards use the same ±15% interval variation and related-card spacing
+as Mac. Only one new relative is introduced per study day, including examples
+added for the same expression in separate Learn in Context batches. Poetry and
+prose keep their schedules: only eligible parts enter a session, in source order.
+Skip and failed recalls return on later passes. See
+[Study queue order](../studying/#study-queue-order).
+
 ## Author and organize
 
 **Create → Learn in Context** needs only a deck and a word or phrase. Choose

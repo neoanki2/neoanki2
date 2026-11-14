@@ -177,7 +177,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     #expect(model.isAnswerRevealed)
 
     await model.grade(.good)
-    model.skipCurrentCard()
+    await model.skipCurrentCard()
     #expect(model.index == 0)
     #expect(model.cardsReviewed == 0)
     #expect(try await store.reviewLogCount(for: expected[0].id) == 0)
@@ -482,7 +482,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
 
     await model.startSession()
     let originalOrder = model.queue.map(\.id)
-    model.skipCurrentCard()
+    await model.skipCurrentCard()
 
     #expect(model.queue.map(\.id) == [originalOrder[1], originalOrder[2], originalOrder[0]])
     #expect(model.currentCard?.id == originalOrder[1])
@@ -506,7 +506,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     await model.startSession()
     let cardID = try #require(model.currentCard?.id)
     model.revealAnswer()
-    model.skipCurrentCard()
+    await model.skipCurrentCard()
 
     #expect(model.currentCard?.id == cardID)
     #expect(model.remainingCardCount == 1)
@@ -535,7 +535,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     await model.grade(.again)
     #expect(model.currentCard?.id == skippedCardID)
 
-    model.skipCurrentCard()
+    await model.skipCurrentCard()
 
     #expect(model.currentCard?.id == firstCardID)
     #expect(model.queue.last?.id == skippedCardID)
@@ -943,6 +943,7 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
     )
     itemType.fields[frontIndex].type = .cloze
     _ = try await store.updateItemType(itemType)
+    let learnedAt = Date.now.addingTimeInterval(-100 * 86_400)
     _ = try await store.createItem(
         Item(
             itemTypeID: itemType.id,
@@ -959,8 +960,12 @@ private func waitForProgressiveStudyHead(_ model: StudyModel) async throws {
                 ),
                 FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Contex")),
             ]
-        )
+        ),
+        now: learnedAt
     )
+    for card in try await store.cards() {
+        _ = try await store.submitReview(cardID: card.id, rating: .good, now: learnedAt)
+    }
 
     await model.startSession()
     #expect(model.queue.count == 2)

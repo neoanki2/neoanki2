@@ -176,6 +176,12 @@ answer text. Audio Submission cards use the same footer position, but replace
 **Reveal & Compare** with **Save & Complete** because they are completed without
 answer reveal or grading.
 
+Related-card spacing uses the same session order for keyboard, touch, and
+VoiceOver review. Poetry and prose parts already eligible for a session follow
+source order, including when a New part precedes a learned part. Skip defers a
+part to a later pass; failed recalls return in an ordered repair pass. The app
+keeps the displayed card fixed while preparing the rest of the session.
+
 ## VoiceOver and focus
 
 Rows combine their important text into one useful VoiceOver label: deck rows

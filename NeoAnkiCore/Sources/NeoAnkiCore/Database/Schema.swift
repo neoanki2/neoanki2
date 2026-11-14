@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 32
+    static let version = 33
 
     static let learningTimeStatements: [String] = [
         """
@@ -28,6 +28,48 @@ enum Schema {
         "CREATE INDEX IF NOT EXISTS idx_learning_time_start ON learning_time_segments(started_at);",
         "CREATE INDEX IF NOT EXISTS idx_learning_time_range ON learning_time_segments(ended_at, started_at);",
     ]
+
+    /// Local projection only; content triggers invalidate it even for sync and
+    /// bulk writes. Grades do not invalidate content identities.
+    static let studyRelationStatements: [String] = [
+        """
+        CREATE TABLE IF NOT EXISTS study_item_relations (
+            item_id TEXT PRIMARY KEY NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            family_key TEXT NOT NULL,
+            work_key TEXT,
+            source_ordinal INTEGER
+        );
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS api_study_presentations (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES api_study_sessions(id) ON DELETE CASCADE,
+            card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE
+        );
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_study_presentations_session ON api_study_presentations(session_id, sequence);",
+        """
+        CREATE TABLE IF NOT EXISTS study_valid_templates (
+            item_type_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            PRIMARY KEY(item_type_id, template_id)
+        );
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_study_family ON study_item_relations(family_key, item_id);",
+        "CREATE INDEX IF NOT EXISTS idx_study_work ON study_item_relations(work_key, source_ordinal);",
+        "CREATE TABLE IF NOT EXISTS study_relation_state (singleton INTEGER PRIMARY KEY, dirty INTEGER NOT NULL);",
+        "INSERT OR IGNORE INTO study_relation_state VALUES (1, 1);",
+    ] + ["items", "item_types"].flatMap { table in
+        ["INSERT", "UPDATE", "DELETE"].map { operation in
+            """
+            CREATE TRIGGER IF NOT EXISTS study_relation_\(table)_\(operation.lowercased())
+            AFTER \(operation) ON \(table)
+            BEGIN
+                UPDATE study_relation_state SET dirty = 1 WHERE singleton = 1 AND dirty = 0;
+            END;
+            """
+        }
+    }
 
     static let createStatements: [String] = learningTimeStatements + [
         """
@@ -334,7 +376,7 @@ enum Schema {
         ON deck_item_type_policy_entries(deck_id)
         WHERE is_default = 1;
         """,
-    ] + schedulerPersistenceStatements + browseProjectionStatements
+    ] + studyRelationStatements + schedulerPersistenceStatements + browseProjectionStatements
         + apiStateStatements + apiChangeTrackingStatements
 
     /// Versioned scheduler records are deliberately separate from the legacy

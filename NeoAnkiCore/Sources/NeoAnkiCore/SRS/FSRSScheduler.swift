@@ -28,7 +28,8 @@ public struct FSRSScheduler: Scheduler {
         public var weights: [Double]
         public var requestRetention: Double
         public var maximumInterval: Int
-        /// Retained only for decoding old settings. Scheduling never fuzzes.
+        /// Retained only for decoding old settings. This numerical adapter never fuzzes;
+        /// card-specific operational variation is applied by the repository.
         public var enableFuzz: Bool
 
         public init(
@@ -175,8 +176,8 @@ public struct FSRSScheduler: Scheduler {
         return seconds / 86_400
     }
 
-    /// Legacy diagnostic helper; the active interval policy never calls it.
-    @available(*, deprecated, message: "Fuzz is disabled by continuous-due-v1")
+    /// Legacy diagnostic helper; repository interval variation does not call it.
+    @available(*, deprecated, message: "Use card-specific ReviewIntervalVariation outside the numerical model")
     public func fuzz(interval: Int, unit: Double) -> Int {
         max(1, min(params.maximumInterval, interval))
     }

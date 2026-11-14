@@ -395,7 +395,7 @@ struct StudySessionView: View {
 
     private func skipCurrentCard() {
         recorder.cleanup()
-        session.skip()
+        Task { await session.skip() }
     }
 
     private func gradeButton(_ choice: StudyGradeChoice) -> some View {

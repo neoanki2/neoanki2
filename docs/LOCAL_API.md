@@ -530,7 +530,15 @@ and does not fabricate a review log.
 
 A session scope is all decks, unassigned items, or one deck with an explicit
 `includeDescendants` flag. The server owns queue order, daily-new limits,
-study-day rollover, and eligibility. Calling `next` reserves at most one card
+study-day rollover, and eligibility. Independent-card families allow one new
+introduction per study day, with due learned relatives taking precedence.
+Related reviews prefer five intervening cards. Poetry/prose builder cards retain
+existing eligibility and scheduling; included parts use source order inside their
+existing queue slots, including across New/Review phases. Skip and repair use
+later ordered passes. Independent successful recalls apply deterministic ±15%
+operational interval variation, exposed by the per-rating policy and final due
+fields; the raw FSRS interval remains available in previews.
+Calling `next` reserves at most one card
 for that session. A card MUST NOT be reserved simultaneously by the native UI
 and an API session or by two API sessions.
 

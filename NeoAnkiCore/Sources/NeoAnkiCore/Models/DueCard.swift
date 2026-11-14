@@ -7,11 +7,13 @@ public struct DueCard: Sendable, Identifiable, Equatable {
     public var item: Item
     public var itemType: ItemType
     public var template: Template
+    public var studyRelation: StudyCardRelation?
 
-    public init(card: Card, item: Item, itemType: ItemType, template: Template) {
+    public init(card: Card, item: Item, itemType: ItemType, template: Template, studyRelation: StudyCardRelation? = nil) {
         self.card = card
         self.item = item
         self.itemType = itemType
         self.template = template
+        self.studyRelation = studyRelation
     }
 }

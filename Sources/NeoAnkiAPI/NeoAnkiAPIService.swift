@@ -2761,7 +2761,7 @@ public actor NeoAnkiAPIService {
         let names: [(ReviewRating, String)] = [
             (.again, "again"), (.hard, "hard"), (.good, "good"), (.easy, "easy"),
         ]
-        let firstPreview = previews[.again]
+        let firstPreview = previews[.good]
         let memoryBefore = firstPreview?.memoryBefore ?? card.memory
         let elapsedSeconds = max(
             0,

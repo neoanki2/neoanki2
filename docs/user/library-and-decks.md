@@ -120,6 +120,13 @@ subdeck can add a stricter limit of its own; cards there must fit both limits.
 Turn the limit off to remove that deck's cap, or set it to **0** to pause new
 cards throughout its subtree while continuing scheduled learning and reviews.
 
+The available-new and due totals also account for related-card spacing. New
+siblings of one item, or context examples of the same language and expression,
+share one introduction per study day. A due learned relative takes precedence.
+Deferred relatives do not consume the deck's allowance or change maturity;
+their next opportunity is shown at study-day rollover. Poetry and prose builder
+cards retain their existing eligibility.
+
 Daily limits are local study preferences. They are not included in portable or
 authored deck files. See [Scheduling](../scheduling/) for first-grade accounting,
 undo behavior, and the configurable study-day rollover.

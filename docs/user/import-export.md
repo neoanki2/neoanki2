@@ -20,6 +20,10 @@ Anki template markup are not supported.
 
 Automatic repair of synced schedules uses reviews already saved in your library.
 It does not import review history from portable or authored deck files.
+Imported independent cards use the normal introduction rules: generated siblings
+share one new introduction per study day, so the saved card count can exceed
+today's eligible-new count. Imported context metadata preserves grouping by
+language and expression across creation batches.
 
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
@@ -54,7 +58,11 @@ Unicode representation differences do not count; accents and actual words do.
 For example, a 12-line poem creates 12 cards with a distinct title, or 11 cards
 when its title already gives the opening line. Review shows the actual cues,
 answers, and whether an opening card is included. Generated cards
-retain the poem's line order in both Browse and their initial Study queue.
+retain the poem's line order in Browse and among eligible cards in every Study
+session. Due times, suspension, and daily new-card limits still decide which
+parts enter the session; reviewing a poem never pulls in future-due lines.
+Poem and prose builder cards keep their existing scheduling and are exempt from
+the interval variation and related-card spacing used for independent cards.
 
 Editing a generated poem previews opening cards to add, change, or retire.
 Adding an opening card preserves existing learned cards and their study history.

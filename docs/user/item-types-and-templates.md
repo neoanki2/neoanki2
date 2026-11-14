@@ -253,6 +253,12 @@ the global model; once its own history passes the optimizer's evidence and
 safety gates, it can use personalized parameters without exposing controls or
 changing existing due dates merely because the cohort was created.
 
+Generated siblings still keep independent memory states and review histories,
+but ordinary items introduce at most one new sibling per study day. All generated
+cards remain saved even when only one is eligible today. Learned relatives are
+spaced within the session when alternatives exist. Recognized poem and prose
+builder cards retain their scheduling and use source order among eligible parts.
+
 ## Use item types included with decks
 
 Custom item types belong to decks. Open a deck's settings and choose **Manage

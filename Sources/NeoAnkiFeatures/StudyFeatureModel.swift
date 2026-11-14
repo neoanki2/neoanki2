@@ -103,7 +103,7 @@ public final class StudyFeatureModel: Identifiable {
             guard isPreparingQueue else { return }
             let all = try await library.dueCards(scope: scope, asOf: .now, limit: nil)
             guard generation == currentGeneration else { return }
-            queue = all
+            queue = first + all.filter { $0.id != first.first?.id }
             isPreparingQueue = false
         } catch {
             guard generation == currentGeneration else { return }
@@ -167,7 +167,7 @@ public final class StudyFeatureModel: Identifiable {
                 savedSubmissions: completion.savedSubmissions + 1
             )
             index += 1
-            advance()
+            await advance()
             await onMutation?()
             return true
         } catch {
@@ -192,7 +192,7 @@ public final class StudyFeatureModel: Identifiable {
             reviewedItems.insert(card.item.id)
             completion = .init(reviews: completion.reviews + 1, uniqueCards: reviewedCards.count, uniqueItems: reviewedItems.count, savedSubmissions: completion.savedSubmissions)
             index += 1
-            advance()
+            await advance()
             await onMutation?()
         } catch { self.error = errorMapper.map(error) }
     }
@@ -220,13 +220,13 @@ public final class StudyFeatureModel: Identifiable {
         } catch { self.error = errorMapper.map(error) }
     }
 
-    public func skip() { learningTime.interaction();
+    public func skip() async { learningTime.interaction();
         guard queue.indices.contains(index), !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
         pendingUndo = nil
         materializePendingRepeats()
         let skippedCard = queue.remove(at: index)
         queue.append(skippedCard)
-        advance()
+        await advance()
     }
 
     public func reloadCurrentItem() async {
@@ -234,10 +234,12 @@ public final class StudyFeatureModel: Identifiable {
         for position in queue.indices where queue[position].item.id == itemID {
             queue[position].item = loaded.item
             queue[position].itemType = loaded.itemType
+            StudyQueueOrdering.refreshRelation(in: &queue[position])
             if let template = loaded.itemType.templates.first(where: { $0.id == queue[position].template.id }) {
                 queue[position].template = template
             }
         }
+        StudyQueueOrdering.orderWorks(in: &queue, from: index + 1)
         prepareInteraction()
     }
 
@@ -245,12 +247,26 @@ public final class StudyFeatureModel: Identifiable {
     public func pauseReviewTiming() { reviewTiming.pause(); learningTime.setActive(false) }
     public func resumeReviewTiming() { reviewTiming.resume(); learningTime.setActive(true) }
 
-    private func advance() {
+    private func advance() async {
         isAnswerRevealed = false
         if index >= queue.count {
             materializePendingRepeats()
         }
-        separateRelatedContexts()
+        while queue.indices.contains(index) {
+            separateRelatedContexts()
+            guard queue[index].card.memory.phase == .new, queue[index].studyRelation?.work == nil else { break }
+            isPreparingQueue = true
+            do {
+                let eligible = try await library.isNewStudyCardEligible(cardID: queue[index].id, scope: scope, asOf: .now)
+                isPreparingQueue = false
+                if eligible { break }
+                queue.remove(at: index)
+            } catch {
+                isPreparingQueue = false
+                self.error = errorMapper.map(error)
+                return
+            }
+        }
         if currentCard != nil { reviewTiming.reset() }
         prepareInteraction()
     }
@@ -261,12 +277,14 @@ public final class StudyFeatureModel: Identifiable {
 
     private func materializePendingRepeats() {
         guard !repairQueue.isEmpty else { return }
+        let passStart = queue.count
         for entry in repairQueue {
             if var source = queue.last(where: { $0.id == entry.card.id }) {
                 source.card = entry.card
                 queue.append(source)
             }
         }
+        StudyQueueOrdering.orderWorks(in: &queue, from: passStart)
         repairQueue = []
     }
 

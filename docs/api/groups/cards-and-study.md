@@ -2,7 +2,7 @@
 title: Cards and study
 description: Generated NeoAnki local API operations for cards and study.
 audience: api
-contract_digest: sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092
+contract_digest: sha256:7bd306e708940318713d663caec75fe2ab8590ac1a07ca6cf90c72220f981f38
 parent: Local API reference
 permalink: /api/cards-and-study/
 ---
@@ -139,7 +139,7 @@ curl --request POST \
 ```
 ## `GET /v1/cards/{id}/review-preview`
 
-Review preview through the loopback-only NeoAnki API.
+Review preview through the loopback-only NeoAnki API. Successful independent-card recalls include deterministic ±15% operational interval variation. rawIntervalDays retains the FSRS estimate; finalDueAt and intervalPolicyVersion describe the committed policy. Again retains immediate repair. Recognized poetry/prose builder cards retain their existing intervals.
 
 - **Operation ID:** `reviewPreview`
 - **Authorization:** Bearer token with `library.read`
@@ -161,7 +161,7 @@ curl --request GET \
 ```
 ## `GET /v1/cards/{id}/scheduling-explanation`
 
-Scheduling explanation through the loopback-only NeoAnki API.
+Scheduling explanation through the loopback-only NeoAnki API. Successful independent-card recalls include deterministic ±15% operational interval variation. rawIntervalDays retains the FSRS estimate; finalDueAt and intervalPolicyVersion describe the committed policy. Again retains immediate repair. Recognized poetry/prose builder cards retain their existing intervals.
 
 - **Operation ID:** `schedulingExplanation`
 - **Authorization:** Bearer token with `library.read`
@@ -301,7 +301,7 @@ curl --request GET \
 ```
 ## `POST /v1/study-sessions/{id}/next`
 
-Next study card through the loopback-only NeoAnki API. Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal.
+Next study card through the loopback-only NeoAnki API. Reserves an eligible card using family-aware daily introductions and related-review spacing. Poetry/prose builder cards retain eligibility and scheduling; included parts appear in source order across New/Review phases. Skipped and repair cards return on later passes. Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal.
 
 - **Operation ID:** `nextStudyCard`
 - **Authorization:** Bearer token with `study.review`
@@ -348,6 +348,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092`.
+Contract digest: `sha256:7bd306e708940318713d663caec75fe2ab8590ac1a07ca6cf90c72220f981f38`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

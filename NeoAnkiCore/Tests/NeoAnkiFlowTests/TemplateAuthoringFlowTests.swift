@@ -54,7 +54,8 @@ import Testing
         )
 
         let due = try await ctx.startStudySession()
-        let operations = Set(due.map(\.card.skill.operation))
+        #expect(due.count == 1)
+        let operations = Set(try await ctx.store.cards().map(\.skill.operation))
         #expect(operations.contains(.recognize))
         #expect(operations.contains(.recall))
         #expect(operations.contains(.locate))

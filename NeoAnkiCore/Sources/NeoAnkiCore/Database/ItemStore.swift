@@ -793,6 +793,21 @@ public actor ItemStore {
         return try await hydrateDueCards(cards)
     }
 
+    public func isNewStudyCardEligible(cardID: UUID, scope: DeckScope, asOf now: Date = .now) async throws -> Bool {
+        let resolved: CardScope
+        switch scope {
+        case .allDecks: resolved = .all
+        case .unassigned: resolved = .unassigned
+        case let .deck(id, includeDescendants):
+            if includeDescendants {
+                let tree = try await deckTreeSummaries()
+                resolved = .decks(DeckTree.descendantIDs(of: id, in: tree))
+            } else { resolved = .decks([id]) }
+        }
+        let day = try await studyDayKey(asOf: now)
+        return try await database.isNewStudyCardEligible(cardID: cardID, scope: resolved, asOf: now, studyDay: day)
+    }
+
     /// Returns all due cards regardless of deck assignment.
     public func fetchDueCards(asOf now: Date = .now, limit: Int? = nil) async throws -> [DueCard] {
         try await fetchDueCards(scope: .allDecks, asOf: now, limit: limit)
@@ -1711,6 +1726,7 @@ public actor ItemStore {
             let persisted = try await database.fetchItems(
                 ids: Set(cardChunk.map(\.itemID))
             )
+            let relations = try await database.studyRelations(itemIDs: Set(cardChunk.map(\.itemID)))
             let itemsByID = Dictionary(
                 uniqueKeysWithValues: persisted.map { ($0.item.id, $0.item) }
             )
@@ -1730,7 +1746,8 @@ public actor ItemStore {
                         card: card,
                         item: item,
                         itemType: itemType,
-                        template: template
+                        template: template,
+                        studyRelation: relations[card.itemID]
                     )
                 )
             }

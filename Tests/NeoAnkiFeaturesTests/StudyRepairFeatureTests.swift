@@ -55,7 +55,7 @@ private func repairFeatureFixture() async throws -> (
 
     await model.start()
     let originalOrder = model.queue.map(\.id)
-    model.skip()
+    await model.skip()
 
     #expect(model.queue.map(\.id) == [originalOrder[1], originalOrder[2], originalOrder[0]])
     #expect(model.currentCard?.id == originalOrder[1])

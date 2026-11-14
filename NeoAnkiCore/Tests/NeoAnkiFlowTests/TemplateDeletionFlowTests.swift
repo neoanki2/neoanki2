@@ -19,10 +19,12 @@ import Testing
         _ = try await ctx.store.updateItemType(itemType, now: ctx.clock.now())
 
         let initialDue = try await ctx.startStudySession()
-        #expect(initialDue.count == 2)
-        let forward = try #require(initialDue.first { $0.card.templateID == forwardID })
+        #expect(initialDue.count == 1)
+        let generated = try await ctx.store.cards()
+        #expect(generated.count == 2)
+        let forward = try #require(generated.first { $0.templateID == forwardID })
         let submission = try await ctx.store.submitReviewWithReceipt(
-            cardID: forward.card.id,
+            cardID: forward.id,
             rating: .good,
             now: ctx.clock.now()
         )
@@ -36,7 +38,7 @@ import Testing
 
         try await ctx.store.revertReview(reviewLogID: submission.reviewLogID, now: ctx.clock.now())
         let restoredDue = try await ctx.startStudySession()
-        #expect(restoredDue.map(\.card.id) == [forward.card.id])
+        #expect(restoredDue.map(\.card.id) == [forward.id])
         #expect(restoredDue.first?.card.templateID == forwardID)
     }
 }

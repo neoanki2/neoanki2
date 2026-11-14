@@ -74,6 +74,14 @@ Initial dictionary, voice, and system-model installation is separate from offlin
 authoring. Accepted items and media follow existing sync and export settings.
 Unfinished drafts remain device-local and are restored when you reopen the flow.
 
+All accepted examples and enabled Card setups are saved, but only one new
+related card is introduced per study day. Language and expression identify
+related context examples across separate batches and decks; adding the same
+expression again does not start another daily allowance. A learned relative
+that is due takes precedence. These eligibility rules do not combine grades or
+change another card's memory. The library rebuilds this grouping for existing,
+imported, and synced content automatically; undoing a grade restores eligibility.
+
 ## Create image occlusion items
 
 Choose the **Image Occlusion** starter in Item Types, then create an item of

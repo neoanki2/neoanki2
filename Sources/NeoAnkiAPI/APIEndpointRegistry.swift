@@ -82,7 +82,11 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
         switch self {
         case .createItem, .replaceItem, .validateItem:
             "Image occlusion values use type imageOcclusion with a still-image media reference, occlusionMode, masks, and nextGroup. Image descriptions (altText) are optional. Each stable mask group generates a separate recall card."
-        case .cardContent, .nextStudyCard:
+        case .nextStudyCard:
+            "Reserves an eligible card using family-aware daily introductions and related-review spacing. Poetry/prose builder cards retain eligibility and scheduling; included parts appear in source order across New/Review phases. Skipped and repair cards return on later passes. Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal."
+        case .reviewPreview, .schedulingExplanation:
+            "Successful independent-card recalls include deterministic ±15% operational interval variation. rawIntervalDays retains the FSRS estimate; finalDueAt and intervalPolicyVersion describe the committed policy. Again retains immediate repair. Recognized poetry/prose builder cards retain their existing intervals."
+        case .cardContent:
             "Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal."
         case .bulkItems:
             "Optional order atomically reconciles one generated deck against complete expected item snapshots. Both dry runs and commits reject stale snapshots; only New-card introduction times are reordered."

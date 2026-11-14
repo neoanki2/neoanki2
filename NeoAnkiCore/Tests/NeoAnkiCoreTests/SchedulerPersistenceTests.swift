@@ -335,7 +335,7 @@ private func seedEligibleOptimizationHistory(
     #expect(audit.operationalIntervalSeconds > 0)
     #expect(audit.modelVersion == SchedulerPersistenceConstants.memoryModelVersion)
     #expect(audit.timingPolicyVersion == FSRSScheduler.elapsedPolicyIdentifier)
-    #expect(audit.intervalPolicyVersion == FSRSScheduler.intervalPolicyIdentifier)
+    #expect(audit.intervalPolicyVersion == ReviewIntervalVariation.policyIdentifier)
     #expect(audit.finalDueAt == receipt.memory.due)
 
     let persisted = try await store.card(id: card.id)
@@ -414,7 +414,10 @@ private func seedEligibleOptimizationHistory(
     ))
 
     let thirdAt = secondAt.addingTimeInterval(86_400)
-    let expected = scheduler.schedule(continuousMemory, rating: .good, now: thirdAt)
+    let expected = ReviewIntervalVariation.apply(
+        to: scheduler.schedule(continuousMemory, rating: .good, now: thirdAt),
+        cardID: card.id, now: thirdAt, maximumIntervalDays: 36_500
+    )
     let actual = try await store.submitReview(
         cardID: card.id,
         rating: .good,

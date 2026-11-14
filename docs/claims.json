@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewedAt": "2026-11-13",
+  "lastReviewedAt": "2026-11-14",
   "media": {
     "article": "user/content-and-media.md",
     "source": "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift",
@@ -70,7 +70,9 @@
     "reviewMinimumIntervalDays": 0,
     "learningPolicy": "repair-rounds",
     "defaultRequestRetention": 0.9,
-    "defaultMaximumIntervalDays": 36500
+    "defaultMaximumIntervalDays": 36500,
+    "independentIntervalVariationPercent": 15,
+    "preferredInterveningCards": 5
   },
   "appData": {
     "article": "user/getting-started.md",
@@ -168,6 +170,15 @@
         "`vocabulary.write`",
         "These operations are fully offline",
         "The API accepts declared bytes"
+      ]
+    },
+    {
+      "article": "user/studying.md",
+      "contains": [
+        "**±15% interval variation**",
+        "**one new related card per study day**",
+        "**five intervening cards**",
+        "**Poetry and prose builder cards keep their existing scheduling.**"
       ]
     }
   ]
