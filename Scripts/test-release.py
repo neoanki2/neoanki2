@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Headless release-contract tests. No Apple, GitHub, signing or installed app writes."""
 import copy
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import shutil
@@ -247,9 +249,18 @@ class LocalIPhoneTests(unittest.TestCase):
         receipt = {'version': command[command.index('--version') + 1],
                    'build': command[command.index('--build') + 1], 'sourceRevision': 'merged-sha',
                    'device': 'My phone', 'deviceIdentifier': 'phone-id', 'deviceUDID': 'udid',
-                   'installed': True, 'launched': True, 'phase': 'complete'}
+                   'installed': True, 'installedVersionVerified': True, 'launched': False, 'phase': 'complete'}
         controller.write_json(output / 'deployment.json', receipt)
         Path(kwargs['log']).write_text('IPHONE_DEPLOY_ELAPSED_SECONDS=12\n')
+
+    def test_delivery_streams_readiness_and_preserves_the_original_log(self):
+        log = self.directory / 'delivery.log'
+        output = io.StringIO()
+        signal = 'IPHONE_DEPLOY_STATUS=waiting_for_device'
+        with contextlib.redirect_stdout(output):
+            controller.run([sys.executable, '-c', 'print(' + repr(signal) + ')'], log=log, live=True)
+        self.assertEqual(output.getvalue(), signal + '\n')
+        self.assertEqual(log.read_text(), signal + '\n')
 
     def test_mac_only_installs_latest_ios_version_from_pinned_source_and_retains_receipt(self):
         with patch.object(controller, 'run', side_effect=self.deploy):
@@ -263,19 +274,25 @@ class LocalIPhoneTests(unittest.TestCase):
         self.assertEqual(self.release.state['local_iphone']['version'], '1.0.321')
         self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
 
-    def test_interrupted_install_or_launch_is_never_repeated_automatically(self):
-        for phase in ('install', 'launch'):
-            with self.subTest(phase=phase):
-                path = self.directory / 'deployment.json'
-                controller.write_json(path, {'version': '1.0.321', 'build': '321', 'sourceRevision': 'merged-sha',
-                                            'phase': phase, 'installed': phase == 'launch', 'launched': False})
-                self.release.state['local_iphone'] = {'receipt': str(path), 'status': 'attempting'}
-                with patch.object(controller, 'run', side_effect=AssertionError('device operation repeated')):
-                    with self.assertRaisesRegex(RuntimeError, 'will not be repeated'):
-                        controller.install_release_iphone(self.release)
-                self.assertEqual(self.release.state['local_iphone']['status'], 'blocked')
+    def test_prepared_update_resumes_the_same_artifact_without_rebuilding(self):
+        path = self.directory / 'iphone-1' / 'deployment.json'
+        receipt = {'version': '1.0.321', 'build': '321', 'sourceRevision': 'merged-sha',
+                   'phase': 'prepared', 'installed': False}
+        controller.write_json(path, receipt)
+        self.release.state['local_iphone'] = {'receipt': str(path), 'status': 'blocked', 'attempt': 1, 'error': 'offline'}
+        def deliver(command, **kwargs):
+            self.assertIn('--resume', command); self.assertNotIn('--output', command)
+            self.assertEqual(command[command.index('--resume') + 1], str(path.parent))
+            self.assertTrue(kwargs['live'])
+            receipt.update(installed=True, installedVersionVerified=True, launched=False, device='My phone')
+            controller.write_json(path, receipt)
+        with patch.object(controller, 'run', side_effect=deliver):
+            controller.install_release_iphone(self.release)
+        self.assertEqual(self.release.state['local_iphone']['attempt'], 1)
+        self.assertEqual(self.release.state['local_iphone']['status'], 'installed')
+        self.assertNotIn('error', self.release.state['local_iphone'])
 
-    def test_crash_after_successful_launch_recovers_without_another_install_or_launch(self):
+    def test_crash_after_verified_install_recovers_without_another_device_mutation(self):
         with patch.object(controller, 'run', side_effect=self.deploy):
             controller.install_release_iphone(self.release)
         self.release.state['local_iphone']['status'] = 'attempting'

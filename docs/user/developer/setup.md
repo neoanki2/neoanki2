@@ -67,10 +67,14 @@ To deploy current local changes directly to a paired physical iPhone:
 
 The command uses saved signing material in
 `~/Library/Application Support/NeoAnki2 Signing/`, builds Release, signs the app
-and widget in a disposable Keychain, installs as an update, and launches once.
+and widget in a disposable Keychain, installs as an update, and verifies the
+device-reported version. It does not launch the app as an installation gate.
 It leaves existing Keychains and app data intact and does not publish a release.
 Use `--device NAME_OR_IDENTIFIER` when multiple iPhones are available, or
-`--prepare-only` to build and sign without installing. Logs and receipts are
+`--prepare-only` to build and sign without a connected phone. It waits for a
+connection only after preparation; an available wired/wireless phone is detected
+automatically. `--resume OUTPUT_DIRECTORY` delivers a retained signed package
+without rebuilding, and `--wait-seconds 0` checks for a connection once. Logs and receipts are
 written to `.build/iphone-deploy/`.
 
 ## Local data

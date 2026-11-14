@@ -26,11 +26,19 @@ SIGNING = Path.home() / "Library/Application Support/NeoAnki2 Signing"
 TAP = "neoanki2/homebrew-tap"
 
 
-def run(args, cwd=None, log=None, env=None, check=True):
+def run(args, cwd=None, log=None, env=None, check=True, live=False):
     cwd = ROOT if cwd is None else cwd
     if log:
         with Path(log).open("wb") as stream:
-            result = subprocess.run(args, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT)
+            if live:
+                with subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as process:
+                    for line in process.stdout:
+                        stream.write(line)
+                        stream.flush()
+                        print(line.decode(errors="replace"), end="", flush=True)
+                    result = subprocess.CompletedProcess(args, process.wait())
+            else:
+                result = subprocess.run(args, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT)
         if check and result.returncode:
             raise RuntimeError(f"{args[0]} failed; see {log}")
         return result
@@ -465,50 +473,51 @@ def install_release_iphone(release, device=None):
         receipt = json.loads(path.read_text())
         if any(receipt.get(k) != v for k, v in identity.items()):
             raise RuntimeError("iPhone deployment receipt differs from the released source/version")
-        if receipt.get("installed") is True and receipt.get("launched") is True:
+        if receipt.get("installed") is True and (receipt.get("installedVersionVerified") is True or receipt.get("launched") is True):
             if device and device not in (receipt.get("device"), receipt.get("deviceIdentifier"), receipt.get("deviceUDID")):
                 raise RuntimeError("iPhone receipt belongs to another device; inspect the saved deployment")
-            local.update(status="installed", installed_and_launched=True, **identity, receipt=str(path))
+            local.update(status="installed", installation_verified=True,
+                         installed_and_launched=receipt.get("launched", False), **identity, receipt=str(path))
+            local.pop("error", None)
             release.save()
-            print("IPHONE_DEPLOY_STATUS=installed_and_launched", flush=True)
+            print("IPHONE_DEPLOY_STATUS=installed", flush=True)
             print("IPHONE_DEPLOY_DEVICE=" + receipt["device"], flush=True)
             print("IPHONE_DEPLOY_RECEIPT=" + str(path), flush=True)
             return True
-        if receipt.get("phase") in ("install", "launch"):
-            raise RuntimeError("iPhone install/launch was interrupted or failed; inspect " + str(path) +
-                               " before recovery. The device operation will not be repeated automatically.")
         return False
 
     try:
+        resume = None
         if local.get("receipt"):
             path = Path(local["receipt"])
             if path.exists() and verified(path):
                 return
-            if local.get("installed_and_launched") or local.get("status") == "installed":
+            if local.get("installation_verified") or local.get("installed_and_launched") or local.get("status") == "installed":
                 raise RuntimeError("Verified iPhone receipt is missing; refusing an automatic reinstall")
+            if path.exists():
+                resume = path.parent
         release.verify_source()
         # For Mac-only releases the planner established identical iOS inputs;
         # keep the last released iOS version/build while using pinned source.
-        attempt = int(local.get("attempt", 0)) + 1
-        output = release.directory / f"iphone-{attempt}"
+        attempt = int(local.get("attempt", 0)) + (0 if resume else 1)
+        output = resume or release.directory / f"iphone-{attempt}"
         path = output / "deployment.json"
         local.update(status="attempting", attempt=attempt, receipt=str(path), **identity)
         local.pop("error", None)
         release.save()
         command = [str(ROOT / "Scripts/deploy-iphone.sh"), "--source-dir", str(release.source),
-                   "--output", str(output), "--version", ios["version"], "--build", ios["build"],
+                   "--resume" if resume else "--output", str(output), "--version", ios["version"], "--build", ios["build"],
                    "--signing-dir", str(release.signing)]
         if device:
             command += ["--device", device]
-        log = release.directory / f"iphone-{attempt}.log"
-        try:
-            run(command, log=log)
-        finally:
-            if log.exists():
-                # Preserve the deployment command's status, timing and blockers.
-                print(log.read_text(), end="", flush=True)
+        invocation = int(local.get("invocation", 0)) + 1
+        local["invocation"] = invocation
+        release.save()
+        log = release.directory / f"iphone-{attempt}-delivery-{invocation}.log"
+        # Show the ready-to-connect signal immediately, after build/signing.
+        run(command, log=log, live=True)
         if not path.exists() or not verified(path):
-            raise RuntimeError("iPhone deployment did not verify installation and launch; see " + str(log))
+            raise RuntimeError("iPhone deployment did not verify the installed version; see " + str(log))
     except Exception as error:
         local.update(status="blocked", error=str(error))
         release.save()
