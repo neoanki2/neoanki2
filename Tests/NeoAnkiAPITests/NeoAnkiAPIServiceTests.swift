@@ -1976,7 +1976,10 @@ private func pairWithAuthority(
     #expect(previewRows.allSatisfy {
         $0["timingPolicyVersion"] as? String == "neo-continuous-elapsed-v2"
     })
-    #expect(previewRows.allSatisfy { $0["intervalPolicyVersion"] as? String == "continuous-due-v1" })
+    #expect(previewRows.allSatisfy {
+        $0["intervalPolicyVersion"] as? String == ($0["rating"] as? String == "again"
+            ? "continuous-due-v1" : ReviewIntervalVariation.policyIdentifier)
+    })
 
     let explanation = await api.handle(
         request(.get, "/v1/cards/\(cardID)/scheduling-explanation", headers: auth)
@@ -4593,8 +4596,10 @@ private extension Array where Element == String {
     #expect(cards.status == 200)
     #expect(String(decoding: cards.body, as: UTF8.self).contains("occlusionGroup"))
     let due = try await store.fetchDueCards()
-    #expect(Set(due.compactMap { $0.card.occlusionGroup }) == [1, 2])
-    let originalCardIDs = Set(due.map { $0.card.id })
+    #expect(due.count == 1)
+    let generated = try await store.cards()
+    #expect(Set(generated.compactMap(\.occlusionGroup)) == [1, 2])
+    let originalCardIDs = Set(generated.map(\.id))
     content.mode = .hideOneRevealOne
     content.masks[0].rect.x = 0.2
     var replacement = input

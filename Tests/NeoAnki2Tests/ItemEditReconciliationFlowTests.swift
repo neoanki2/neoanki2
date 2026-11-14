@@ -27,9 +27,10 @@ import Testing
     ))
     let itemID = try #require(model.items.first?.id)
     let initialDue = try await store.fetchDueCards()
-    let groupOne = try #require(initialDue.first { $0.card.clozeGroup == 1 })
+    #expect(initialDue.count == 1)
+    let groupOne = try #require(try await store.cards().first { $0.clozeGroup == 1 })
     let submission = try await store.submitReviewWithReceipt(
-        cardID: groupOne.card.id,
+        cardID: groupOne.id,
         rating: .good
     )
 
@@ -45,12 +46,13 @@ import Testing
         ]
     ))
     #expect(model.items.first?.cardCount == 2)
-    #expect(model.dueCount == 1)
+    #expect(model.dueCount == 0)
     let afterEdit = try await store.fetchDueCards()
-    #expect(afterEdit.map(\.card.clozeGroup) == [3])
+    #expect(afterEdit.isEmpty)
+    #expect(Set(try await store.cards().compactMap(\.clozeGroup)) == [1, 3])
 
     try await store.revertReview(reviewLogID: submission.reviewLogID)
     let restored = try await store.fetchDueCards()
-    #expect(Set(restored.compactMap(\.card.clozeGroup)) == [1, 3])
-    #expect(restored.first { $0.card.clozeGroup == 1 }?.card.id == groupOne.card.id)
+    #expect(restored.compactMap(\.card.clozeGroup) == [1])
+    #expect(restored.first { $0.card.clozeGroup == 1 }?.card.id == groupOne.id)
 }

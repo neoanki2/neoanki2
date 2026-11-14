@@ -2,7 +2,7 @@
 title: Authentication and clients
 description: Generated NeoAnki local API operations for authentication and clients.
 audience: api
-contract_digest: sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092
+contract_digest: sha256:7bd306e708940318713d663caec75fe2ab8590ac1a07ca6cf90c72220f981f38
 parent: Local API reference
 permalink: /api/authentication/
 ---
@@ -72,6 +72,6 @@ curl --request POST \
   --data '<request-json>'
 ```
 
-Contract digest: `sha256:91586b0c20bf2ed5802e15b782ff0e9d66e19e8d05b4fd1e30bdc61d2676a092`.
+Contract digest: `sha256:7bd306e708940318713d663caec75fe2ab8590ac1a07ca6cf90c72220f981f38`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

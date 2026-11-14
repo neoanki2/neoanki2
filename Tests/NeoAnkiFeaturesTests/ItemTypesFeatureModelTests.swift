@@ -477,9 +477,9 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
         ]
     )
     _ = try await repository.createItem(item)
-    let cards = try await repository.dueCards(scope: .allDecks, asOf: .now)
-    let basicCardID = try #require(cards.first { $0.template.id == basic.id }?.id)
-    let audioCardID = try #require(cards.first { $0.template.id == audio.id }?.id)
+    let cards = try await store.cards()
+    let basicCardID = try #require(cards.first { $0.templateID == basic.id }?.id)
+    let audioCardID = try #require(cards.first { $0.templateID == audio.id }?.id)
     let responseDraftURL = root.appendingPathComponent("response.m4a")
     try Data([0x00, 0x00, 0x00, 0x18] + Array("ftypM4A ".utf8)).write(to: responseDraftURL)
     _ = try await repository.completeAudioSubmission(StudyResponseDraft(

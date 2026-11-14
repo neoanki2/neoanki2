@@ -39,6 +39,19 @@ Each **Learn in Context** example is independently scheduled and uses the
 destination deck’s daily allowance. Grading one example does not grade the other
 examples of that expression.
 
+Independent cards receive **±15% interval variation** after successful recall,
+so cards learned together gradually acquire different due dates. Existing due
+dates are preserved until another grade. Again keeps immediate repair.
+
+Related examples use **one new related card per study day**, across creation
+batches and decks. A due learned relative takes precedence; a review today
+postpones new relatives until rollover. Ordinary cards generated from one item
+share the same rule. Deferred new cards do not use the deck's daily allowance.
+
+Poetry and prose builder cards are exempt from these new spacing rules. Their
+scheduling and eligibility stay unchanged; eligible parts appear in source order
+inside each session. See [Study queue order](../studying/#study-queue-order).
+
 The separate [maturity status](../library-and-decks/#read-the-scope-home) uses
 spaced successful recalls and estimated stability to show when a card is in
 maintenance. It never changes FSRS intervals or the due queue.

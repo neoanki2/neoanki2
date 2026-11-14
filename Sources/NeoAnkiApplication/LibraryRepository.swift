@@ -118,6 +118,8 @@ public protocol LibraryItemTypeStudioSaving: Sendable {
 public protocol LibraryStudying: Sendable {
     func dueCount(scope: DeckScope, asOf: Date) async throws -> Int
     func dueCards(scope: DeckScope, asOf: Date, limit: Int?) async throws -> [DueCard]
+    /// Revalidates a queued introduction against current family exposure and limits.
+    func isNewStudyCardEligible(cardID: UUID, scope: DeckScope, asOf: Date) async throws -> Bool
     func submitReview(
         cardID: UUID,
         rating: ReviewRating,
@@ -543,6 +545,10 @@ public extension LibraryItemTypeManaging {
 }
 
 public extension LibraryStudying {
+    func isNewStudyCardEligible(cardID: UUID, scope: DeckScope, asOf: Date) async throws -> Bool {
+        try await dueCards(scope: scope, asOf: asOf, limit: nil).contains { $0.id == cardID }
+    }
+
     func dueCards(
         scope: DeckScope,
         asOf: Date,
@@ -797,6 +803,10 @@ public actor SQLiteLibraryRepository:
     ) async throws -> [DueCard] {
         try await store.fetchDueCards(scope: scope, asOf: asOf, limit: limit)
     }
+    public func isNewStudyCardEligible(cardID: UUID, scope: DeckScope, asOf: Date) async throws -> Bool {
+        try await store.isNewStudyCardEligible(cardID: cardID, scope: scope, asOf: asOf)
+    }
+
     public func submitReview(
         cardID: UUID,
         rating: ReviewRating,

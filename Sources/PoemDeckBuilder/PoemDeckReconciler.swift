@@ -1,18 +1,6 @@
 import Foundation
 import NeoAnkiCore
 
-public struct PoemDeckItemRecord: Sendable, Equatable {
-    public let item: Item
-    public let itemType: ItemType
-    public let createdAt: Date?
-
-    public init(item: Item, itemType: ItemType, createdAt: Date? = nil) {
-        self.item = item
-        self.itemType = itemType
-        self.createdAt = createdAt
-    }
-}
-
 public struct PoemSequenceMismatch: Sendable, Equatable, Identifiable {
     public let itemID: UUID
     public let expectedPrompt: String
@@ -59,170 +47,18 @@ public struct PoemDeckReconciliationPreview: Sendable, Equatable {
     public var hasChanges: Bool { changesItemType || !operations.isEmpty }
 }
 
-public enum PoemDeckReconciliationError: LocalizedError, Sendable, Equatable {
-    case emptyDeck
-    case mixedItemTypes
-    case unsupportedItemType
-    case missingField(String)
-    case nonTextField(String)
-    case missingTemplate
-    case invalidOpeningCard
-    case ambiguousStart
-    case brokenChain
-    case ambiguousChain
-    case lineCountChanged(existing: Int, proposed: Int)
-
-    public var errorDescription: String? {
-        switch self {
-        case .emptyDeck:
-            "This deck has no poem-line items to edit."
-        case .mixedItemTypes:
-            "Every card in a poem deck must use the same Poem Line item type."
-        case .unsupportedItemType:
-            "This deck is not a generated Poem Line deck."
-        case let .missingField(name):
-            "The Poem Line item type is missing its \(name) field."
-        case let .nonTextField(name):
-            "The \(name) field must contain plain text."
-        case .missingTemplate:
-            "The Poem Line item type must have one card template."
-        case .invalidOpeningCard:
-            "The poem has duplicate or inconsistent opening-line cards."
-        case .ambiguousStart:
-            "NeoAnki could not identify one unambiguous first transition."
-        case .brokenChain:
-            "The stored prompts do not form one complete poem sequence."
-        case .ambiguousChain:
-            "The stored poem order is ambiguous. Open a generated deck with reliable creation order or rebuild it from its source."
-        case let .lineCountChanged(existing, proposed):
-            "This edit has \(proposed) lines; the existing poem has \(existing). Adding or removing lines is not supported yet."
-        }
-    }
-}
-
 public enum PoemDeckReconciler {
     public static let stanzaBreakFieldName = "Stanza Break"
 
     public static func snapshot(records: [PoemDeckItemRecord]) throws -> PoemDeckSnapshot {
-        guard !records.isEmpty else { throw PoemDeckReconciliationError.emptyDeck }
-        let typeIDs = Set(records.map { $0.itemType.id })
-        guard typeIDs.count == 1,
-              records.allSatisfy({ $0.item.itemTypeID == records[0].itemType.id })
-        else { throw PoemDeckReconciliationError.mixedItemTypes }
-
-        let itemType = records[0].itemType
-        guard itemType.name.caseInsensitiveCompare("Poem Line") == .orderedSame else {
-            throw PoemDeckReconciliationError.unsupportedItemType
-        }
-        guard itemType.templates.count == 1 else {
-            throw PoemDeckReconciliationError.missingTemplate
-        }
+        let sequence = try PoemSequenceResolver.resolve(records: records)
+        let sourceLines = sequence.sourceLines
+        let ordered = sequence.orderedRecords
+        let itemType = ordered[0].itemType
         let front = try requiredTextField(named: "Front", in: itemType)
-        let back = try requiredTextField(named: "Back", in: itemType)
-        let attribution = try requiredTextField(named: "Attribution", in: itemType)
-        let marker = field(named: stanzaBreakFieldName, in: itemType)
-        let captions = try Set(records.map {
-            try text($0.item.value(for: attribution.id), fieldName: attribution.name)
-        })
-        guard captions.count == 1, captions.first?.isEmpty == false else {
-            throw PoemDeckReconciliationError.brokenChain
-        }
-
-        struct Candidate {
-            let record: PoemDeckItemRecord
-            let prompt: [String]
-            let answer: String
-            let startsStanza: Bool
-        }
-
-        let openings = records.filter { $0.item.tags.contains(PoemCardPlanner.openingTag) }
-        guard openings.count <= 1 else { throw PoemDeckReconciliationError.invalidOpeningCard }
-        let transitions = records.filter { !$0.item.tags.contains(PoemCardPlanner.openingTag) }
-        guard !transitions.isEmpty else { throw PoemDeckReconciliationError.emptyDeck }
-        let candidates = try transitions.map { record -> Candidate in
-            let prompt = try text(record.item.value(for: front.id), fieldName: front.name)
-                .split(separator: "\n", omittingEmptySubsequences: true)
-                .map { normalize(String($0)) }
-            let rawAnswer = try text(record.item.value(for: back.id), fieldName: back.name)
-            let answer = normalizeAnswer(rawAnswer)
-            guard !answer.isEmpty, !answer.contains("\n") else {
-                throw PoemDeckReconciliationError.brokenChain
-            }
-            let markerText = try marker.map {
-                try text(record.item.value(for: $0.id), fieldName: $0.name, permitsMissing: true)
-            } ?? ""
-            return Candidate(
-                record: record,
-                prompt: prompt,
-                answer: answer,
-                startsStanza: !markerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || rawAnswer.hasPrefix("\n")
-            )
-        }
-
-        let ordered: [Candidate]
-        let dates = candidates.compactMap { $0.record.createdAt }
-        if dates.count == candidates.count, Set(dates).count == candidates.count {
-            ordered = candidates.sorted { $0.record.createdAt! < $1.record.createdAt! }
-        } else {
-            let starts = candidates.filter { $0.prompt.count == 1 }
-            guard starts.count == 1, let start = starts.first else {
-                throw PoemDeckReconciliationError.ambiguousStart
-            }
-            var chain = [start]
-            var used: Set<UUID> = [start.record.item.id]
-            var sourceLines = [try requiredLast(start.prompt), start.answer]
-            while chain.count < candidates.count {
-                let possible = candidates.filter {
-                    !used.contains($0.record.item.id) && $0.prompt.last == sourceLines.last
-                }
-                let selected: Candidate
-                if possible.count == 1, let only = possible.first {
-                    selected = only
-                } else if possible.count > 1 {
-                    let exact = possible.filter {
-                        Array($0.prompt.suffix(min(2, $0.prompt.count)))
-                            == Array(sourceLines.suffix(min(2, $0.prompt.count)))
-                    }
-                    guard exact.count == 1, let only = exact.first else {
-                        throw PoemDeckReconciliationError.ambiguousChain
-                    }
-                    selected = only
-                } else {
-                    throw PoemDeckReconciliationError.brokenChain
-                }
-                chain.append(selected)
-                used.insert(selected.record.item.id)
-                sourceLines.append(selected.answer)
-            }
-            ordered = chain
-        }
-
-        guard ordered[0].prompt.count == 1 else {
-            throw PoemDeckReconciliationError.ambiguousStart
-        }
-        for index in 1 ..< ordered.count {
-            guard ordered[index].prompt.last == ordered[index - 1].answer else {
-                throw PoemDeckReconciliationError.brokenChain
-            }
-        }
-        let sourceLines = [try requiredLast(ordered[0].prompt)] + ordered.map(\.answer)
-        if let opening = openings.first {
-            let answer = try text(opening.item.value(for: back.id), fieldName: back.name)
-            let prompt = try text(opening.item.value(for: front.id), fieldName: front.name)
-            let markerText = try marker.map {
-                try text(opening.item.value(for: $0.id), fieldName: $0.name, permitsMissing: true)
-            } ?? ""
-            guard normalize(answer) == sourceLines[0], !answer.contains("\n"),
-                  prompt == PoemCardPlanner.openingPrompt,
-                  markerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw PoemDeckReconciliationError.invalidOpeningCard
-            }
-        }
-
         var sourceParts: [String] = []
         for index in sourceLines.indices {
-            if index > 0, ordered[index - 1].startsStanza {
+            if index > 0, sequence.startsStanza[index - 1] {
                 sourceParts.append("")
             }
             sourceParts.append(sourceLines[index])
@@ -231,13 +67,13 @@ public enum PoemDeckReconciler {
         let expectedPrompts = PoemPromptPlanner.prompts(for: PoemDeckGenerator.parse(sourceText))
         let mismatches = try ordered.enumerated().compactMap { index, candidate -> PoemSequenceMismatch? in
             let expected = expectedPrompts[index]
-            let actual = try text(candidate.record.item.value(for: front.id), fieldName: front.name)
+            let actual = try text(candidate.item.value(for: front.id), fieldName: front.name)
             guard normalizeMultiline(actual) != normalizeMultiline(expected) else { return nil }
-            return .init(itemID: candidate.record.item.id, expectedPrompt: expected, actualPrompt: actual)
+            return .init(itemID: candidate.item.id, expectedPrompt: expected, actualPrompt: actual)
         }
         return PoemDeckSnapshot(
-            openingRecord: openings.first,
-            orderedRecords: ordered.map(\.record),
+            openingRecord: sequence.openingRecord,
+            orderedRecords: ordered,
             sourceText: sourceText,
             mismatches: mismatches
         )

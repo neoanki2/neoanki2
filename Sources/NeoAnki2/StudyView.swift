@@ -879,7 +879,7 @@ struct StudyView: View {
 
     private func skipCurrentCard() {
         recording.reset()
-        model.skipCurrentCard()
+        Task { await model.skipCurrentCard() }
     }
 
     private func primaryActionTitle(for interaction: Interaction) -> String {

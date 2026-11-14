@@ -319,11 +319,16 @@ extension ItemStore {
             memoryBefore.lastReview.map { now.timeIntervalSince($0) } ?? 0
         )
         let predicted = fsrs.retrievability(of: memoryBefore, asOf: now)
-        let next = LearningScheduler(parameters: context.parameters).schedule(
+        var next = LearningScheduler(parameters: context.parameters).schedule(
             memoryBefore,
             rating: rating,
             now: now
         )
+        let orderedWork = try await database.isOrderedWork(card: card)
+        let varies = rating != .again && !orderedWork
+        if varies {
+            next = ReviewIntervalVariation.apply(to: next, cardID: card.id, now: now, maximumIntervalDays: context.preset.maximumIntervalDays)
+        }
         let rawIntervalDays = fsrs.rawIntervalDays(forStability: next.stability)
         let operationalSeconds = max(0, Int(ceil(next.due.timeIntervalSince(now))))
         let constraintReason: String?
@@ -358,7 +363,7 @@ extension ItemStore {
             operationalIntervalSeconds: operationalSeconds,
             modelVersion: context.parameterSet.modelVersion,
             timingPolicyVersion: FSRSScheduler.elapsedPolicyIdentifier,
-            intervalPolicyVersion: FSRSScheduler.intervalPolicyIdentifier,
+            intervalPolicyVersion: varies ? ReviewIntervalVariation.policyIdentifier : FSRSScheduler.intervalPolicyIdentifier,
             finalDueAt: next.due,
             constraintReason: constraintReason
         )
@@ -412,8 +417,12 @@ extension ItemStore {
         let scheduler = LearningScheduler(parameters: context.parameters)
         let fsrs = FSRSScheduler(parameters: context.parameters)
         let retrievability = fsrs.retrievability(of: memory, asOf: now)
+        let varies = !(try await database.isOrderedWork(card: card))
         return Dictionary(uniqueKeysWithValues: ReviewRating.allCases.map {
-            let next = scheduler.schedule(memory, rating: $0, now: now)
+            var next = scheduler.schedule(memory, rating: $0, now: now)
+            if varies && $0 != .again {
+                next = ReviewIntervalVariation.apply(to: next, cardID: card.id, now: now, maximumIntervalDays: context.preset.maximumIntervalDays)
+            }
             let raw = fsrs.rawIntervalDays(forStability: next.stability)
             let constraint: String? = if $0 == .again {
                 switch memory.phase {
@@ -439,7 +448,7 @@ extension ItemStore {
                 parameterSetID: context.parameterSet.id,
                 modelVersion: context.parameterSet.modelVersion,
                 timingPolicyVersion: FSRSScheduler.elapsedPolicyIdentifier,
-                intervalPolicyVersion: FSRSScheduler.intervalPolicyIdentifier,
+                intervalPolicyVersion: varies && $0 != .again ? ReviewIntervalVariation.policyIdentifier : FSRSScheduler.intervalPolicyIdentifier,
                 finalDueAt: next.due,
                 constraintReason: constraint
             ))
@@ -468,6 +477,12 @@ extension ItemStore {
         var memory = MemoryState.new(due: logs[0].reviewedAt)
         for log in logs {
             memory = scheduler.schedule(memory, rating: log.rating, now: log.reviewedAt)
+        }
+        // A parameter replay re-estimates memory, not a previously committed
+        // operational variation. Preserve that recorded due instant exactly.
+        if let audit = logs.last?.schedulingAudit,
+           audit.intervalPolicyVersion == ReviewIntervalVariation.policyIdentifier {
+            memory.due = audit.finalDueAt
         }
         return memory
     }

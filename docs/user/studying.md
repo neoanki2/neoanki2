@@ -104,22 +104,30 @@ opened on an empty queue shows **Nothing Due Right Now**.
 
 ## Study queue order
 
-The session can separate examples of the same expression with other eligible
-cards in the same review stage. Learned cards remain ahead of new cards, learning
-and repair positions stay fixed, and grades and due dates are unchanged. Each
-example still needs its own recall and rating.
+Independent cards use learned-before-new ordering, with learning and repair
+positions preserved. Related review cards prefer **five intervening cards** when
+alternatives exist; a small deck can still finish every due review.
 
-NeoAnki2 builds the selected scope's eligible queue in two partitions:
+Ordinary siblings share an item. **Learn in Context** examples share their
+language and expression, including examples added in separate batches or decks.
+At most **one new related card per study day** is introduced. A learned relative
+that is due takes precedence, and reviewing a relative today defers new relatives
+until the next study day. These deferrals are applied before daily deck limits;
+undoing a review restores the corresponding eligibility.
 
-1. **Learned cards first:** Review, Learning, and Relearning cards that are due
-   now, ordered from earliest due time to latest.
-2. **New cards second:** eligible New cards, also ordered by due time, after
-   daily new-card limits are applied.
+**Poetry and prose builder cards keep their existing scheduling.** Only eligible
+cards enter the session: no future-due, suspended, or daily-limit-excluded parts
+are added. Included parts appear in source order even when their due times or
+New/Review phases differ. If only parts 2, 5, and 8 are eligible, they appear as
+2 → 5 → 8. Each work keeps its existing queue slots, so unrelated cards can still
+appear between its parts. Opening cards lead their poem when eligible.
 
-Stable card identifiers break ties, so the same snapshot produces the same
-order. A New card with an older timestamp does not jump ahead of a learned card
-that needs reinforcement. This rule is the same for All Decks, an individual
-deck, Unassigned, the app session, and a local API study session.
+Source order applies separately to the initial pass and repair passes. Skip
+defers a part to a later pass. The interval variation and related-card spacing
+rules for independent cards do not apply to poetry or prose builder cards.
+
+The same eligibility and ordering policies apply on Mac, iPhone/iPad, and local
+API study sessions. Stable identifiers break otherwise equal priorities.
 
 Rearranging a deck changes which ancestor scopes include its subtree. A new
 session uses the current hierarchy; a session already in progress keeps the
@@ -270,7 +278,11 @@ review timestamps, so multiple reviews on the same calendar day still use
 their real fractional-day gaps instead of being rounded down to zero days.
 Longer review intervals depend on
 the card’s history, elapsed time, scheduler parameters, desired retention, and
-configured maximum interval. Interval fuzz is disabled.
+configured maximum interval. Successful recall on independent cards applies
+**±15% interval variation** to prevent cards learned together from remaining
+synchronized. The numerical FSRS memory estimate stays unchanged. Variation is
+reproducible for each card and review; saved due dates stay unchanged until a
+new grade. Poetry and prose builder cards retain their precise FSRS intervals.
 
 ## Fix a card during a session
 

@@ -118,7 +118,8 @@ import Testing
     let due = try await store.fetchDueCards()
 
     #expect(saved.cardCount == 2)
-    #expect(due.map(\.card.clozeGroup).sorted { ($0 ?? 0) < ($1 ?? 0) } == [4, 9])
+    #expect(due.count == 1)
+    #expect(try await store.cards().map(\.clozeGroup).sorted { ($0 ?? 0) < ($1 ?? 0) } == [4, 9])
     #expect(due.allSatisfy { $0.template.id == BuiltInItemTypes.clozeTemplateID })
 }
 

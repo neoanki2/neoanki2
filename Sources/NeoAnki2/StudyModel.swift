@@ -67,6 +67,7 @@ final class StudyModel {
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
+    private var sessionScope: DeckScope = .allDecks
     private var repairQueue: [PendingRepeat] = []
     let learningTime: LearningTimeTracker
     private var reviewTiming = ReviewTimingTracker()
@@ -150,6 +151,7 @@ final class StudyModel {
         reviewedItemIDs = []
         repairQueue = []
         scopeLabel = scope.label
+        sessionScope = scope.filter
         pendingGradeUndo = nil
         didFailToLoad = false
 
@@ -381,7 +383,7 @@ final class StudyModel {
             pendingGradeUndo = nil
             index += 1
             isAnswerRevealed = false
-            advanceSession()
+            await advanceSession()
             return true
         } catch {
             errorMessage = userFacingError(from: error)
@@ -430,9 +432,9 @@ final class StudyModel {
             index += 1
             reviewedCount += 1
             isAnswerRevealed = false
-            advanceSession()
+            await advanceSession()
         } catch DatabaseError.cardNotFound(_) {
-            discardMissingCurrentCard(card.id)
+            await discardMissingCurrentCard(card.id)
         } catch {
             errorMessage = userFacingError(from: error)
         }
@@ -514,6 +516,7 @@ final class StudyModel {
             guard card.item.id == item.id else { return }
             card.item = item
             card.itemType = itemType
+            StudyQueueOrdering.refreshRelation(in: &card)
             // Editing an item cannot change its templates, but reading the
             // template back keeps each card rendering from one revision.
             if let template = itemType.templates.first(where: { $0.id == card.template.id }) {
@@ -524,9 +527,10 @@ final class StudyModel {
         for index in queue.indices {
             refresh(&queue[index])
         }
+        StudyQueueOrdering.orderWorks(in: &queue, from: index + 1)
     }
 
-    func skipCurrentCard() {
+    func skipCurrentCard() async {
         guard !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
         errorMessage = nil
         pendingGradeUndo = nil
@@ -536,7 +540,7 @@ final class StudyModel {
         let skippedCard = queue.remove(at: index)
         queue.append(skippedCard)
         isAnswerRevealed = false
-        advanceSession()
+        await advanceSession()
     }
 
     private func prepareCurrentInteraction() {
@@ -573,16 +577,31 @@ final class StudyModel {
         UserFacingError.message(from: error)
     }
 
-    private func discardMissingCurrentCard(_ cardID: UUID) {
+    private func discardMissingCurrentCard(_ cardID: UUID) async {
         guard queue.indices.contains(index), queue[index].id == cardID else { return }
         queue.remove(at: index)
         isAnswerRevealed = false
         repairQueue.removeAll { $0.card.id == cardID }
-        advanceSession()
+        await advanceSession()
     }
 
-    private func advanceSession() {
+    private func advanceSession() async {
         guard !isPreparingQueue else { return }
+        while queue.indices.contains(index) {
+            StudyQueueOrdering.separateRelated(in: &queue, at: index)
+            guard queue[index].card.memory.phase == .new, queue[index].studyRelation?.work == nil else { break }
+            isPreparingQueue = true
+            do {
+                let eligible = try await library.isNewStudyCardEligible(cardID: queue[index].id, scope: sessionScope, asOf: .now)
+                isPreparingQueue = false
+                if eligible { break }
+                queue.remove(at: index)
+            } catch {
+                isPreparingQueue = false
+                errorMessage = userFacingError(from: error)
+                return
+            }
+        }
         guard index >= queue.count else {
             isFinished = false
             reviewTiming.reset()
@@ -608,6 +627,7 @@ final class StudyModel {
     private func materializePendingRepeats() {
         guard !repairQueue.isEmpty else { return }
 
+        let passStart = queue.count
         var sourceIndexByCardID: [UUID: Int] = [:]
         sourceIndexByCardID.reserveCapacity(repairQueue.count)
         for (sourceIndex, card) in queue.enumerated() {
@@ -622,6 +642,7 @@ final class StudyModel {
             repeatedCard.card = repeatEntry.card
             queue.append(repeatedCard)
         }
+        StudyQueueOrdering.orderWorks(in: &queue, from: passStart)
         repairQueue = []
     }
 

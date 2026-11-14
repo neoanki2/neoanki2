@@ -30,6 +30,15 @@ public enum StudyDay {
         )
     }
 
+    public static func start(
+        for date: Date, rolloverMinutes: Int, calendar: Calendar = .autoupdatingCurrent
+    ) -> Date {
+        let parts = key(for: date, rolloverMinutes: rolloverMinutes, calendar: calendar).split(separator: "-").compactMap { Int($0) }
+        let rollover = normalized(rolloverMinutes)
+        guard parts.count == 3, let day = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else { return date }
+        return calendar.date(bySettingHour: rollover / 60, minute: rollover % 60, second: 0, of: day) ?? day
+    }
+
     public static func nextRollover(
         after date: Date,
         rolloverMinutes: Int,

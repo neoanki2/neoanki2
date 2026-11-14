@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiCore
 
 public struct PlannedPoemCard: Sendable, Equatable {
     public let prompt: String
@@ -8,8 +9,8 @@ public struct PlannedPoemCard: Sendable, Equatable {
 
 /// The same opening policy is used by the builder, editor, and repair tool.
 public enum PoemCardPlanner {
-    public static let openingTag = "neoanki:poem-opening"
-    public static let openingPrompt = "Recall the first line."
+    public static let openingTag = PoemSequenceResolver.openingTag
+    public static let openingPrompt = PoemSequenceResolver.openingPrompt
 
     public static func needsOpeningCard(title: String, firstLine: String) -> Bool {
         let title = comparisonText(title)
