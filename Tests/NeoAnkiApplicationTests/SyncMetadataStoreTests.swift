@@ -176,6 +176,70 @@ struct SyncMetadataStoreTests {
         #expect(!FileManager.default.fileExists(atPath: saved.path))
     }
 
+    @Test(arguments: [false, true])
+    func queuedAssetsSurviveContainerRelocation(legacyAbsoluteURLs: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let oldContainer = root.appendingPathComponent("old-container")
+        let directory = oldContainer.appendingPathComponent("sync")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = oldContainer.appendingPathComponent("transient.png")
+        let bytes = Data("queued image".utf8)
+        try bytes.write(to: source)
+        let descriptor = SyncAssetDescriptor(hash: "hash", byteSize: Int64(bytes.count), signature: "hash",
+            fileExtension: "png", contentType: "image")
+        let store = SyncMetadataStore(directory: directory)
+        try await store.save(SyncMetadata(outboundCursor: 42, didCompleteInitialMerge: true))
+        try await store.receive([envelope(id: "incoming", file: source, asset: descriptor)])
+        var metadata = try await store.load()
+        metadata.pendingOutbound = try await store.stageOutbound([envelope(id: "outgoing", file: source, asset: descriptor)])
+        try await store.save(metadata)
+        if legacyAbsoluteURLs {
+            // Reproduce the on-device format from before this migration. The
+            // update moves the data, but these absolute paths stay unchanged.
+            try PropertyListEncoder().encode(metadata)
+                .write(to: directory.appendingPathComponent("cloud-sync-metadata.plist"))
+        } else {
+            let stored = try PropertyListDecoder().decode(SyncMetadata.self,
+                from: Data(contentsOf: directory.appendingPathComponent("cloud-sync-metadata.plist")))
+            #expect(stored.stagedInbound.first?.stagedFileURL?.scheme == nil)
+            #expect(stored.pendingOutbound?.first?.stagedFileURL?.scheme == nil)
+        }
+        try FileManager.default.removeItem(at: source)
+        let newContainer = root.appendingPathComponent("new-container")
+        try FileManager.default.moveItem(at: oldContainer, to: newContainer)
+        let restarted = SyncMetadataStore(directory: newContainer.appendingPathComponent("sync"))
+        let recovered = try await restarted.load()
+        #expect(recovered.outboundCursor == 42)
+        #expect(recovered.didCompleteInitialMerge == true)
+        let inbox = try #require(recovered.stagedInbound.first)
+        let outbox = try #require(recovered.pendingOutbound?.first)
+        for record in [inbox, outbox] {
+            let file = try #require(record.stagedFileURL)
+            #expect(file.path.hasPrefix(newContainer.path + "/"))
+            #expect(try Data(contentsOf: file) == bytes)
+        }
+        // A metadata write migrates legacy paths and remains usable on the
+        // next update too, rather than repairing one installation only.
+        try await restarted.save(recovered)
+        let nextContainer = root.appendingPathComponent("next-container")
+        try FileManager.default.moveItem(at: newContainer, to: nextContainer)
+        let next = SyncMetadataStore(directory: nextContainer.appendingPathComponent("sync"))
+        var pending = try await next.load()
+        let incoming = try #require(pending.stagedInbound.first)
+        let outgoing = try #require(pending.pendingOutbound?.first)
+        #expect(try Data(contentsOf: #require(incoming.stagedFileURL)) == bytes)
+        #expect(try Data(contentsOf: #require(outgoing.stagedFileURL)) == bytes)
+        pending = try await next.completeIncoming([incoming], metadata: pending)
+        #expect(pending.stagedInbound.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: try #require(incoming.stagedFileURL).path))
+        #expect(try Data(contentsOf: #require(outgoing.stagedFileURL)) == bytes)
+        pending.pendingOutbound = []
+        try await next.save(pending)
+        await next.removeStagedAssets(in: [outgoing])
+        #expect(!FileManager.default.fileExists(atPath: try #require(outgoing.stagedFileURL).path))
+    }
+
     @Test func corruptedMetadataDoesNotSilentlyResetTheCursor() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
