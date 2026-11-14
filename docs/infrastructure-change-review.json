@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "diffSHA256": "752d33d097a2fb536e0fc5d514300ac53ddd06400b8937e1c1e957b41508c151",
+  "diffSHA256": "4e6a3be76bc35acfe22a1a1a0e946937098a8db4b4a9202aec3cc2d49202e121",
   "files": [
-    "Sources/NeoAnki2/StudyView.swift"
+    "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift"
   ],
-  "reason": "This restores the existing studyAnswer accessibility identifier after the adaptive-composition rewrite so UI automation and screenshot checks can observe the revealed state again. It does not change visible labels, layout, or documented study behavior."
+  "reason": "This corrects internal transaction ownership for received item-type deletions. The existing atomic deletion, attachment cleanup, studying, and Learn in Context behavior is unchanged; no controls or layouts change. The sync troubleshooting guide is updated to explain per-device recovery queues."
 }

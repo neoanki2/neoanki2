@@ -5604,14 +5604,18 @@ actor SQLiteDatabase {
     }
 
     func deleteItemType(id: UUID) throws {
-        try inTransaction {
-            for var settings in try fetchDeckTypeSettings() where settings.itemTypeIDs.contains(id) {
-                settings.itemTypeIDs.removeAll { $0 == id }
-                if settings.defaultItemTypeID == id { settings.defaultItemTypeID = nil }
-                try saveDeckTypeSettings(settings)
-            }
-            try execute("DELETE FROM item_types WHERE id = ?;", bindings: [.text(id.uuidString)])
+        try inTransaction { try deleteItemTypeWithoutTransaction(id: id) }
+    }
+
+    /// Sync already owns an atomic batch transaction. Use the same cleanup
+    /// within that transaction so one type tombstone cannot block the inbox.
+    private func deleteItemTypeWithoutTransaction(id: UUID) throws {
+        for var settings in try fetchDeckTypeSettings() where settings.itemTypeIDs.contains(id) {
+            settings.itemTypeIDs.removeAll { $0 == id }
+            if settings.defaultItemTypeID == id { settings.defaultItemTypeID = nil }
+            try saveDeckTypeSettings(settings)
         }
+        try execute("DELETE FROM item_types WHERE id = ?;", bindings: [.text(id.uuidString)])
     }
 
     func fetchCards(for itemID: UUID) throws -> [Card] {
@@ -7754,7 +7758,7 @@ actor SQLiteDatabase {
         case .item:
             if let uuid = UUID(uuidString: id) { try deleteItem(id: uuid) }
         case .itemType:
-            if let uuid = UUID(uuidString: id), try countItems(itemTypeID: uuid) == 0 { try deleteItemType(id: uuid) }
+            if let uuid = UUID(uuidString: id), try countItems(itemTypeID: uuid) == 0 { try deleteItemTypeWithoutTransaction(id: uuid) }
         case .card:
             if let uuid = UUID(uuidString: id) { try deleteCard(id: uuid) }
         case .reviewRevert:
