@@ -81,6 +81,8 @@ expression again does not start another daily allowance. A learned relative
 that is due takes precedence. These eligibility rules do not combine grades or
 change another card's memory. The library rebuilds this grouping for existing,
 imported, and synced content automatically; undoing a grade restores eligibility.
+Choosing a deck limits which new example can be introduced, but reviewing a
+related example in another deck still defers its new relatives for that day.
 
 ## Create image occlusion items
 

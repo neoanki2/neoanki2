@@ -37,6 +37,9 @@ Due counts, including the app icon badge, count generated cards rather than
 items. An item with multiple Card setups can therefore contribute more than
 one due card. After saving a definition, library refreshes update those counts
 to reflect the cards that are currently eligible for study.
+New cards generated from the same item share one introduction per study day;
+learned cards retain their individual due dates. See [Study queue
+order](../studying/#study-queue-order) for related-card deferrals.
 
 Saved item-type definitions use the same [iCloud sync](../sync-reminders-widgets/)
 path as items and reviews. Committed edits start an upload after a short debounce;

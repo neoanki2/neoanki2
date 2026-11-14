@@ -3,6 +3,31 @@ import SQLite3
 import Testing
 @testable import NeoAnkiCore
 
+@Test(arguments: [false, true])
+func familyEligibilityUsesFamilyAndItemIndexes(limited: Bool) async throws {
+    let url = studyQueryPlanDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let database = try SQLiteDatabase(path: url)
+    try await database.migrate()
+    let deck = Deck(name: "Scoped", newCardsPerDay: limited ? 20 : nil)
+    try await database.insertDeck(deck)
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    for scope: CardScope in [.all, .unassigned, .decks([deck.id])] {
+        let countPlan = try await database.dueEligibilityQueryPlan(
+            scope: scope, asOf: now, studyDay: "2027-01-15")
+        let queuePlan = try await database.studyQueueQueryPlan(
+            scope: scope, asOf: now, studyDay: "2027-01-15", isNew: true)
+        for plan in [countPlan, queuePlan] {
+            for alias in ["learned", "reviewed", "candidate"] {
+                #expect(plan.contains { $0.contains("SEARCH \(alias) USING INDEX idx_cards_item_id (item_id=?)") })
+            }
+            let familyLookups = plan.filter { $0.contains("SEARCH relative ") }
+            #expect(familyLookups.count >= 3)
+            #expect(familyLookups.allSatisfy { $0.contains("idx_study_family (family_key=?)") })
+        }
+    }
+}
+
 @Test func unlimitedAllDecksEligibilityUsesDirectDueIndexPlan() async throws {
     let url = studyQueryPlanDatabaseURL()
     let database = try SQLiteDatabase(path: url)
