@@ -98,6 +98,10 @@ Browse schedules, and due counts as soon as they commit, rather than waiting
 for the ordinary count timer. A 10-second recovery poll catches missed change
 notifications while the app is running.
 
+Pending changes, including downloaded images, remain recoverable after an app
+update. The updated app resumes its saved queue when it next runs, preserving
+existing reviews and card schedules.
+
 Updates can arrive within a few seconds while both apps are active, but there
 is no fixed delivery-time guarantee. iOS controls background execution and can
 delay or coalesce silent notifications; opening the app performs a catch-up

@@ -85,7 +85,11 @@ existing identity canonical while recording cloud identities as aliases, dedupli
 item types by canonical schema digest, deterministically remaps cross-library identifier
 collisions, and uploads the preserved result. Validated remote domain batches commit in
 one SQLite transaction; staged assets and the verified pre-merge backup remain available
-for recovery if a transfer fails.
+for recovery if a transfer fails. Queued media files are stored relative to the
+sync metadata directory, because iOS may relocate the data container during an
+app update. Loading metadata also resolves legacy absolute queue paths against
+the current container; recovery never advances the cursor or discards records
+to work around a missing file.
 
 See [ADR 0001]({{ '/adr/0001-shared-application-and-ui-layers/' | relative_url }}),
 [ADR 0002]({{ '/adr/0002-cloudkit-offline-first-sync/' | relative_url }}), and

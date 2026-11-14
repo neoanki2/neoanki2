@@ -761,3 +761,58 @@ func synchronizedFirstReviewsConsumeDailyAllowance(legacyPayload: Bool) async th
     #expect(type.fields[0].isRequired)
     #expect(!ItemEditorState.canSave(ItemEditorState.empty(for: type), itemType: type))
 }
+
+private actor RelocatedQueueTransport: CloudSyncTransport {
+    func start() async throws {}
+    func stop() async {}
+    func fetchPendingChanges() async throws -> [SyncRecordEnvelope] { [] }
+    func enqueue(_ records: [SyncRecordEnvelope]) async throws {
+        for record in records {
+            if let file = record.stagedFileURL { _ = try Data(contentsOf: file) }
+        }
+    }
+}
+
+@Test func sqliteSyncAdapterRecoversReviewsBesideMediaAfterAnAppUpdate() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let type = try #require(try await source.repository.loadItemTypes().itemTypes.first)
+    let item = Item(itemTypeID: type.id, fields: type.fields.map {
+        FieldValue(fieldID: $0.id, value: $0.type == .richText ? .rich([Span("Review with queued media")]) : .text("Review with queued media"))
+    })
+    _ = try await source.repository.createItem(item, asOf: now)
+    let card = try #require(try await source.repository.cards().first { $0.itemID == item.id })
+    let review = try await source.repository.submitReview(cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 500)
+    let png = try #require(Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="))
+    _ = try await source.repository.reserveMedia(data: png, kind: .image, altText: "Queued image",
+        reservationID: UUID(), asOf: now)
+    let records = try await SQLiteLibrarySyncAdapter(repository: source.repository).encode(
+        changes: source.repository.changes(after: 0, limit: 1_000), deviceID: "source")
+    #expect(records.contains { $0.resourceKind == "review" })
+    #expect(records.contains { $0.asset != nil })
+    let oldContainer = destination.directory.appendingPathComponent("old-container")
+    let oldSync = oldContainer.appendingPathComponent("sync")
+    let staged = try await SyncMetadataStore(directory: oldSync).stageAssets(in: records)
+    let legacy = SyncMetadata(outboundCursor: try await destination.repository.currentChangeCursor(),
+        stagedInbound: staged, didCreateInitialBackup: true, didCompleteInitialMerge: true)
+    try PropertyListEncoder().encode(legacy).write(to: oldSync.appendingPathComponent("cloud-sync-metadata.plist"))
+    let newContainer = destination.directory.appendingPathComponent("new-container")
+    try FileManager.default.moveItem(at: oldContainer, to: newContainer)
+    let metadata = SyncMetadataStore(directory: newContainer.appendingPathComponent("sync"))
+    let service = OfflineFirstSyncService(repository: destination.repository,
+        adapter: SQLiteLibrarySyncAdapter(repository: destination.repository), transport: RelocatedQueueTransport(),
+        metadataStore: metadata, backupURL: { destination.directory.appendingPathComponent("backup.sqlite") })
+    await service.synchronize()
+    #expect(await service.issues().isEmpty)
+    #expect(try await metadata.load().stagedInbound.isEmpty)
+    #expect(try await destination.repository.reviewLog(id: review.reviewLogID).id == review.reviewLogID)
+    #expect(try await destination.repository.card(id: card.id) == source.repository.card(id: card.id))
+    #expect(try await destination.repository.scopeSummary(scope: .allDecks, asOf: now).dueNow == 0)
+    for record in records where record.asset != nil {
+        #expect(try await destination.repository.mediaAsset(hash: record.id) != nil)
+    }
+}

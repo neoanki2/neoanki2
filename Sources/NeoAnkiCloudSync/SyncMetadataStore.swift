@@ -63,7 +63,10 @@ public actor SyncMetadataStore {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return SyncMetadata()
         }
-        return try decoder.decode(SyncMetadata.self, from: Data(contentsOf: fileURL))
+        var metadata = try decoder.decode(SyncMetadata.self, from: Data(contentsOf: fileURL))
+        metadata.stagedInbound = metadata.stagedInbound.map(resolveAssetLocation)
+        metadata.pendingOutbound = metadata.pendingOutbound?.map(resolveAssetLocation)
+        return metadata
     }
 
     public func save(_ metadata: SyncMetadata) throws {
@@ -196,8 +199,57 @@ public actor SyncMetadataStore {
     private func persist(_ metadata: SyncMetadata) throws {
         let directory = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let data = try encoder.encode(metadata)
+        var stored = metadata
+        // iOS can relocate the entire data container during an app update. Queue
+        // owned filenames, never the installation-specific absolute sandbox URL.
+        stored.stagedInbound = stored.stagedInbound.map(relativeAssetLocation)
+        stored.pendingOutbound = stored.pendingOutbound?.map(relativeAssetLocation)
+        let data = try encoder.encode(stored)
         try data.write(to: fileURL, options: .atomic)
+    }
+
+    /// Recognizes only opaque files created by this store, including absolute
+    /// paths from older installations. Remote asset names never select a path.
+    private func ownedAssetLocation(_ url: URL) -> (directory: URL, filename: String)? {
+        let filename = url.lastPathComponent
+        guard UUID(uuidString: filename) != nil else { return nil }
+        let parent = url.deletingLastPathComponent().lastPathComponent
+        let directory: URL
+        switch parent {
+        case "inbound-assets": directory = stagedAssetDirectory
+        case "outbound-assets": directory = outboundAssetDirectory
+        default: return nil
+        }
+        if url.scheme == nil {
+            guard url.relativeString == "\(parent)/\(filename)" else { return nil }
+        } else {
+            // Legacy absolute locations must have our metadata-directory layout.
+            // Do not reinterpret arbitrary external files as queue-owned assets.
+            guard url.isFileURL,
+                  url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
+                    == fileURL.deletingLastPathComponent().lastPathComponent else { return nil }
+        }
+        return (directory, filename)
+    }
+
+    private func replacingAssetLocation(_ record: SyncRecordEnvelope, with url: URL) -> SyncRecordEnvelope {
+        SyncRecordEnvelope(
+            id: record.id, resourceKind: record.resourceKind, revision: record.revision,
+            deviceID: record.deviceID, order: record.order, isTombstone: record.isTombstone,
+            payload: record.payload, asset: record.asset, stagedFileURL: url
+        )
+    }
+
+    private func resolveAssetLocation(_ record: SyncRecordEnvelope) -> SyncRecordEnvelope {
+        guard let url = record.stagedFileURL, let location = ownedAssetLocation(url) else { return record }
+        return replacingAssetLocation(record, with: location.directory.appendingPathComponent(location.filename))
+    }
+
+    private func relativeAssetLocation(_ record: SyncRecordEnvelope) -> SyncRecordEnvelope {
+        guard let url = record.stagedFileURL, let location = ownedAssetLocation(url),
+              let relative = URL(string: "\(location.directory.lastPathComponent)/\(location.filename)")
+        else { return record }
+        return replacingAssetLocation(record, with: relative)
     }
 
     private func mergedArchive(_ current: SyncMetadata, _ incoming: SyncMetadata) -> [SyncConflictCopy]? {
