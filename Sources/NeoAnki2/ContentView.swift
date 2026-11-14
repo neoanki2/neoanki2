@@ -33,6 +33,13 @@ struct ContentView: View {
     @Bindable var schedulingModel: SchedulingModel
     @Bindable var vocabularyLibraryModel: VocabularyLibraryModel
     @State private var appSession = AppSession()
+    private var showsLearnInContext: Bool {
+        get { if case .learnInContext = appSession.presentation { return true }; return false }
+        nonmutating set {
+            if newValue { appSession.show(.learnInContext(deckID: decksModel.selectedDeckID)) }
+            else if case .learnInContext = appSession.presentation { appSession.dismissPresentation() }
+        }
+    }
     /// Persisted per user, not per browse session: whether you want to see
     /// answers is a standing preference, not something to rediscover.
     @AppStorage(AppPreferences.browseShowsAnswerColumn) private var browseShowsAnswerColumn = false
@@ -314,6 +321,12 @@ struct ContentView: View {
                 await reloadScope()
             }
         }
+        .sheet(isPresented: Binding(get: { showsLearnInContext }, set: { showsLearnInContext = $0 })) {
+            LearnInContextView(library: library, rootURL: vocabularyLibraryModel.rootURL, deckID: decksModel.selectedDeckID) {
+                await decksModel.load(asOf: .now)
+                await reloadScope()
+            }
+        }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
             SchedulingSettingsView(model: schedulingModel) {
                 // A new rollover redraws the day's budget, which is a count
@@ -467,6 +480,7 @@ struct ContentView: View {
             openVocabularyPackImport: openVocabularyPackImport,
             openVocabularyPacks: { isShowingVocabularyPacks = true },
             openAddFromVocabulary: { isAddingFromVocabulary = true },
+            openLearnInContext: { showsLearnInContext = true },
             openDeckBuilder: { isShowingDeckBuilder = true },
             openTemplates: { openTemplates() },
             openBrowse: { openBrowse() },
@@ -684,6 +698,7 @@ struct ContentView: View {
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
                 onAddItem: { openAddItem() },
                 onAddFromVocabulary: canUseVocabularyUI ? { isAddingFromVocabulary = true } : nil,
+                onLearnInContext: canUseVocabularyUI ? { showsLearnInContext = true } : nil,
                 onDeleteAllUnassigned: {
                     Task {
                         _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)

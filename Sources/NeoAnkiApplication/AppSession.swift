@@ -43,6 +43,7 @@ public enum AppPresentation: Sendable, Hashable, Identifiable {
     case poemBuilder
     case vocabularyPacks
     case wordCapture(deckID: UUID?)
+    case learnInContext(deckID: UUID?)
     case scheduling
     case syncIssues
     case reminderEditor
@@ -56,6 +57,7 @@ public enum AppPresentation: Sendable, Hashable, Identifiable {
         case .poemBuilder: "poem-builder"
         case .vocabularyPacks: "vocabulary-packs"
         case let .wordCapture(deckID): "word-capture-\(deckID?.uuidString ?? "last")"
+        case let .learnInContext(deckID): "learn-in-context-\(deckID?.uuidString ?? "last")"
         case .scheduling: "scheduling"
         case .syncIssues: "sync-issues"
         case .reminderEditor: "reminder-editor"

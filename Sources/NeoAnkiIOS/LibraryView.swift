@@ -306,7 +306,7 @@ struct AddItemView: View {
                             )
                         }.id(selectedType.id)
                         Section("Content") {
-                            ForEach(selectedType.fields) { field in
+                            ForEach(ContextExamplePreset.authoringFields(in: selectedType)) { field in
                                 MobileItemFieldRow(field: field) {
                                     fieldEditor(field)
                                     if let issue = validationIssue(field) {
@@ -316,6 +316,9 @@ struct AddItemView: View {
                                 .padding(.vertical, 3)
                             }
                         }
+                        ContextAuthoringEntry(library: model.library, deckID: selectedDeckID, fields: ContextExamplePreset.authoringFields(in: selectedType),
+                            text: { id in richValues[id].map { $0.map(\.text).joined() } ?? values[id] ?? "" },
+                            onSaved: { await model.authoringDidCommit() })
                     }
                 }
             }
@@ -745,7 +748,7 @@ private struct ItemDetailView: View {
         Group {
             if let loaded {
                 List {
-                    ForEach(loaded.itemType.fields) { field in
+                    ForEach(ContextExamplePreset.authoringFields(in: loaded.itemType)) { field in
                         Section(field.name) {
                             MobileContentValueView(
                                 value: loaded.item.value(for: field.id) ?? .empty,
@@ -936,7 +939,7 @@ struct ItemEditMobileView: View {
                     }
                 }
                 Section("Content") {
-                    ForEach(itemType.fields) { field in
+                    ForEach(ContextExamplePreset.authoringFields(in: itemType)) { field in
                         MobileItemFieldRow(field: field) {
                             editor(field)
                             if let issue = fieldIssue(field) {
@@ -945,6 +948,14 @@ struct ItemEditMobileView: View {
                         }
                     }
                 }
+                ContextAuthoringEntry(library: model.library, deckID: item.deckID, fields: ContextExamplePreset.authoringFields(in: itemType),
+                    text: { id in
+                        switch item.value(for: id) {
+                        case let .text(value, _), let .cloze(value, _): value
+                        case let .rich(spans): spans.map(\.text).joined()
+                        default: ""
+                        }
+                    }, onSaved: { await model.authoringDidCommit() })
             }
             .disabled(isPreparingMedia)
             .environment(\.attachmentProcessing, isPreparingMedia || processingAttachments > 0)
@@ -1158,7 +1169,10 @@ struct ItemEditMobileView: View {
     private func save() async {
         guard !isPreparingMedia, processingAttachments == 0 else { return }
         do {
-            try await model.updateItem(item); onSaved((item, itemType)); closeEditor()
+            try await model.updateItem(item)
+            if let saved = try await model.library.item(id: item.id) { onSaved(saved) }
+            else { onSaved((item, itemType)) }
+            closeEditor()
         } catch { errorMessage = MobileAppModel.message(for: error) }
     }
 }

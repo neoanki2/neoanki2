@@ -16,6 +16,7 @@ struct ScopeHomeView: View {
     let onBrowseItemsNeedingAttention: () -> Void
     let onAddItem: () -> Void
     var onAddFromVocabulary: (() -> Void)?
+    var onLearnInContext: (() -> Void)? = nil
     let onDeleteAllUnassigned: () -> Void
 
     @State private var showDeleteAllUnassignedConfirm = false
@@ -57,6 +58,12 @@ struct ScopeHomeView: View {
         .background(DesignSystem.detailBackground)
         .navigationTitle(scope.label)
         .toolbar {
+            if let onLearnInContext {
+                ToolbarItem(placement: .automatic) {
+                    Button("Learn in Context", systemImage: "text.bubble") { onLearnInContext() }
+                        .accessibilityIdentifier("learn-in-context")
+                }
+            }
             ToolbarItem(placement: .automatic) {
                 // Shortcuts live on the menu commands, which is where macOS
                 // displays them; declaring them here too gives one key two owners.

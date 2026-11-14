@@ -32,6 +32,11 @@ iPhone/iPad, or **File → Add Word…** on Mac. Choose a destination and instal
 dictionary once; the app remembers each dictionary–deck setup on that device.
 See [Add a word quickly](../authoring-items/#add-a-word-quickly).
 
+For examples in several contexts, choose **Learn in Context**. Pick a deck and
+enter a word or phrase; the app prepares sentences, meanings, highlighting, and
+speech automatically. See [Learn in Context](../authoring-items/#learn-a-word-or-phrase-in-context).
+
+
 After the library opens, the Mac Dock icon shows the library-wide number of
 cards due for study. It clears when no cards are due; choosing a deck does not
 narrow the badge. See [App icon due count](../sync-reminders-widgets/#app-icon-due-count)

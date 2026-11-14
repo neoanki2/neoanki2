@@ -197,10 +197,15 @@ Image, GIF, and image occlusion descriptions are optional. You can save an
 attachment without a description. When provided, the description supplies the
 VoiceOver label and may also represent the media in item-list text.
 
-Audio and Video descriptions are optional, but adding one gives the player a
-meaningful accessibility label and displays context alongside playback. A
-description belongs to the item field's media reference; editing it does not
-rename the source file.
+Audio and Video descriptions are optional. They remain in the media reference
+and do not rename the source file. Players do not repeat them as visible captions.
+During review, their descriptions stay out of accessibility labels until answer
+reveal, so a transcript cannot disclose a listening answer. Image descriptions
+retain their normal accessibility behavior.
+
+**Play Audio** plays the current card’s recording and restarts it after it ends.
+Moving to another card stops the previous recording. Previewing another example
+also stops the previous preview.
 
 ## Understand media storage
 

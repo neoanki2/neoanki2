@@ -250,8 +250,13 @@ public final class StudyFeatureModel: Identifiable {
         if index >= queue.count {
             materializePendingRepeats()
         }
+        separateRelatedContexts()
         if currentCard != nil { reviewTiming.reset() }
         prepareInteraction()
+    }
+
+    private func separateRelatedContexts() {
+        ContextReviewOrdering.separateRelatedContexts(in: &queue, at: index)
     }
 
     private func materializePendingRepeats() {

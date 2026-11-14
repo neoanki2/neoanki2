@@ -104,6 +104,11 @@ opened on an empty queue shows **Nothing Due Right Now**.
 
 ## Study queue order
 
+The session can separate examples of the same expression with other eligible
+cards in the same review stage. Learned cards remain ahead of new cards, learning
+and repair positions stay fixed, and grades and due dates are unchanged. Each
+example still needs its own recall and rating.
+
 NeoAnki2 builds the selected scope's eligible queue in two partitions:
 
 1. **Learned cards first:** Review, Learning, and Relearning cards that are due

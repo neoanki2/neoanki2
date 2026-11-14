@@ -2644,6 +2644,42 @@ actor SQLiteDatabase {
         }
     }
 
+    func deleteUnchangedUnreviewedItems(
+        _ expectedItems: [Item],
+        now: Date
+    ) throws -> [ItemBulkOperationResult] {
+        try inTransaction {
+            // BEGIN IMMEDIATE also protects against another SQLite connection:
+            // an edit or review cannot slip between these checks and the deletes.
+            for expected in expectedItems {
+                guard try fetchItem(id: expected.id)?.item == expected else {
+                    throw DatabaseError.invalidItem("An added item changed. Manage it in the library instead of undoing this batch.")
+                }
+                let cards = try fetchCards(for: expected.id)
+                let hasReview = try !query(
+                    """
+                    SELECT 1 FROM review_logs
+                    WHERE card_id IN (SELECT id FROM cards WHERE item_id = ?)
+                    LIMIT 1;
+                    """,
+                    bindings: [.text(expected.id.uuidString)]
+                ).isEmpty
+                guard !hasReview, cards.allSatisfy({
+                    $0.memory.phase == .new && $0.memory.reps == 0
+                        && $0.memory.lastReview == nil && !$0.isSuspended
+                }) else {
+                    throw DatabaseError.invalidItem("An added card has been studied or changed. Manage it in the library instead of undoing this batch.")
+                }
+            }
+            return try expectedItems.map { expected in
+                guard try deleteItemWithMediaWithoutTransaction(id: expected.id, deletedAt: now) else {
+                    throw DatabaseError.itemNotFound(expected.id)
+                }
+                return ItemBulkOperationResult(operationID: expected.id.uuidString, action: "delete", itemID: expected.id, cardIDs: [])
+            }
+        }
+    }
+
     func deleteItemWithMedia(id: UUID, deletedAt: Date) throws -> Bool {
         try inTransaction {
             try deleteItemWithMediaWithoutTransaction(id: id, deletedAt: deletedAt)

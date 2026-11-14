@@ -1,6 +1,7 @@
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
 
 private enum ItemEditingError: Error {
     case missingItem
@@ -404,7 +405,8 @@ final class ItemsModel {
                 tags: stored.item.tags,
                 deckID: stored.item.deckID
             )
-            let saved = try await library.updateItem(item)
+            let updated = ContextDerivedContent.invalidatingSpeech(in: item, original: stored.item, type: stored.itemType)
+            let saved = try await library.updateItem(updated)
             if let index = items.firstIndex(where: { $0.id == saved.id }) {
                 items[index] = saved
             }

@@ -20,6 +20,7 @@ public struct MobileRootView: View {
     @Bindable var model: MobileAppModel
     @State private var fixtureError: String?
     @State private var showsWordCapture = false
+    @State private var showsLearnInContext = false
     @State private var wordCaptureDeckID: UUID?
     @State private var fixturesReady = false
     @State private var retriedFailureFixture = false
@@ -59,6 +60,10 @@ public struct MobileRootView: View {
         }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .environment(\.vocabularyPackRootURL, vocabularyRootURL)
+        .environment(\.openLearnInContext, { deckID in
+            wordCaptureDeckID = deckID
+            showsLearnInContext = true
+        })
         .environment(\.openWordCapture, { deckID in
             wordCaptureDeckID = deckID
             showsWordCapture = true
@@ -72,6 +77,11 @@ public struct MobileRootView: View {
         .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
             Button("OK") { fixtureError = nil }
         } message: { Text(fixtureError ?? "") }
+        .sheet(isPresented: $showsLearnInContext) {
+            LearnInContextView(library: model.library, rootURL: vocabularyRootURL, deckID: wordCaptureDeckID) {
+                await model.authoringDidCommit()
+            }.dynamicTypeSize(dynamicTypeSize)
+        }
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
         .task(id: model.syncEnabled) { vocabularyLibrary.sync.setEnabled(model.syncEnabled) }
@@ -215,6 +225,7 @@ private extension AppSection {
 
 private struct CreateHubView: View {
     @Environment(\.openWordCapture) private var openWordCapture
+    @Environment(\.openLearnInContext) private var openLearnInContext
     @Bindable var model: MobileAppModel
     @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
     @Binding var path: NavigationPath
@@ -225,6 +236,8 @@ private struct CreateHubView: View {
         NavigationStack(path: $path) {
             List {
                 Section("Add") {
+                    Button("Learn in Context", systemImage: "text.bubble") { openLearnInContext(nil) }
+                        .accessibilityIdentifier("create-learn-in-context")
                     Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
                         .accessibilityIdentifier("create-add-word")
                     Button { isAddingItem = true } label: { Label("New Item", systemImage: "rectangle.stack.badge.plus") }

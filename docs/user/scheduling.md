@@ -34,6 +34,11 @@ review, and respects explicit scheduling resets.
 Words saved through **Add Word** follow these same rules: the selected item
 type generates the cards, and the destination deck's daily limits determine
 when new cards are available. Dictionary setup does not change scheduling.
+
+Each **Learn in Context** example is independently scheduled and uses the
+destination deck’s daily allowance. Grading one example does not grade the other
+examples of that expression.
+
 The separate [maturity status](../library-and-decks/#read-the-scope-home) uses
 spaced successful recalls and estimated stability to show when a card is in
 maintenance. It never changes FSRS intervals or the due queue.

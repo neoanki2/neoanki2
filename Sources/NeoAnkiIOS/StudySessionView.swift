@@ -640,7 +640,8 @@ struct MobileContentValueView: View {
             MobileResolvedMediaView(
                 reference: reference,
                 store: mediaStore,
-                behavior: mediaBehavior
+                behavior: mediaBehavior,
+                isAnswerRevealed: isAnswerRevealed
             )
         case .empty:
             Text("No content")
@@ -694,10 +695,27 @@ private struct MobileResolvedMediaView: View {
     let reference: MediaRef
     let store: MediaStore?
     let behavior: MediaBehavior
-    @State private var url: URL?
+    let isAnswerRevealed: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var image: UIImage?
     @State private var player: AVPlayer?
     @State private var failed = false
+    @State private var loopObserver: NSObjectProtocol?
+
+    private var description: String {
+        ReviewMediaAccessibility.description(for: reference, isAnswerRevealed: isAnswerRevealed)
+    }
+    private var accessibilityDescription: String {
+        if failed { return "Media unavailable" }
+        if image == nil && player == nil { return "Loading media" }
+        guard reference.kind == .audio, behavior == .playOnTap else { return description }
+        return description == "Audio" ? "Play audio" : "Play audio, \(description)"
+    }
+    private struct LoadConfiguration: Equatable {
+        let reference: MediaRef
+        let behavior: MediaBehavior
+        let reduceMotion: Bool
+    }
 
     var body: some View {
         Group {
@@ -705,47 +723,60 @@ private struct MobileResolvedMediaView: View {
                 if reference.kind == .gif {
                     MobileAnimatedImage(image: image).scaledToFit().frame(maxHeight: 420)
                 } else {
-                    // Still photos must accept SwiftUI's proposed size. A UIImageView's
-                    // intrinsic pixel size can otherwise cover the attachment controls.
                     Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: 420)
+                        .resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 420)
                 }
             } else if let player {
-                VideoPlayer(player: player).frame(minHeight: reference.kind == .audio ? 64 : 220)
+                if reference.kind == .audio, behavior == .playOnTap {
+                    Button {
+                        player.seek(to: .zero); player.play()
+                    } label: {
+                        Label("Play Audio", systemImage: "play.fill").frame(minHeight: 44)
+                    }.buttonStyle(.bordered).accessibilityLabel("Play audio")
+                } else {
+                    VideoPlayer(player: player).frame(minHeight: reference.kind == .audio ? 64 : 220)
+                }
             } else if failed {
-                Label(reference.altText ?? "Media unavailable", systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
+                Label("Media unavailable", systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
             } else {
-                ProgressView().accessibilityLabel("Loading \(reference.altText ?? "media")")
+                ProgressView().accessibilityLabel("Loading media")
             }
         }
-        .accessibilityLabel(reference.altText ?? "Media")
+        .accessibilityLabel(accessibilityDescription)
         .trackingLearningTimePlayback(player)
-        .task(id: reference.assetHash) { await load() }
-        .onDisappear { player?.pause() }
+        .task(id: LoadConfiguration(reference: reference, behavior: behavior, reduceMotion: reduceMotion)) { await load() }
+        .onDisappear { reset() }
+    }
+
+    private func reset() {
+        if let loopObserver { NotificationCenter.default.removeObserver(loopObserver) }
+        loopObserver = nil
+        player?.pause(); player?.replaceCurrentItem(with: nil); player = nil
+        image = nil; failed = false
     }
 
     private func load() async {
+        reset()
         guard let store else { failed = true; return }
         do {
             let resolved = try await store.resolve(reference)
-            url = resolved
+            try Task.checkCancellation()
             switch reference.kind {
             case .image, .gif:
-                image = UIImage(data: try Data(contentsOf: resolved, options: [.mappedIfSafe]))
-                failed = image == nil
+                let loaded = UIImage(data: try Data(contentsOf: resolved, options: [.mappedIfSafe]))
+                try Task.checkCancellation()
+                image = loaded; failed = loaded == nil
             case .audio, .video:
-                let player = AVPlayer(url: resolved)
-                self.player = player
-                if behavior == .autoplay || behavior == .loop { player.play() }
+                let next = AVPlayer(url: resolved)
+                player = next
+                if !reduceMotion, behavior == .autoplay || behavior == .loop { next.play() }
                 if behavior == .loop {
-                    NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
-                        player.seek(to: .zero); player.play()
-                    }
+                    loopObserver = NotificationCenter.default.addObserver(
+                        forName: .AVPlayerItemDidPlayToEndTime, object: next.currentItem, queue: .main
+                    ) { _ in next.seek(to: .zero); next.play() }
                 }
             }
-        } catch { failed = true }
+        } catch { if !Task.isCancelled { failed = true } }
     }
 }
 

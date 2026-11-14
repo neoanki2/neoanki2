@@ -8,6 +8,7 @@ struct LibraryCommandHandlers {
     var openVocabularyPackImport: (() -> Void)?
     var openVocabularyPacks: (() -> Void)?
     var openAddFromVocabulary: (() -> Void)?
+    var openLearnInContext: (() -> Void)?
     var openDeckBuilder: (() -> Void)?
     var openTemplates: (() -> Void)?
     var openBrowse: (() -> Void)?
@@ -59,6 +60,9 @@ struct LibraryCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(!(handlers?.canAddFromVocabulary ?? false))
+
+            Button("Learn in Context…") { handlers?.openLearnInContext?() }
+                .disabled(!(handlers?.canAddFromVocabulary ?? false))
         }
 
         CommandGroup(after: .importExport) {

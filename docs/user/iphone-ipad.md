@@ -97,6 +97,11 @@ moves to the newly revealed answer without changing that semantic order.
 
 ## Author and organize
 
+**Create → Learn in Context** needs only a deck and a word or phrase. Choose
+**Find Examples**, preview the sentences and audio, then **Add Cards**. The app
+handles language, meanings, and phrase highlighting without extra setup.
+
+
 Use **Create → New Item** or the add action in a scope. Choose the deck and item
 type, then fill its typed fields. The primary picker shows this deck's types;
 **Use another type…** opens common types and explicit linked reuse. Changing

@@ -2,6 +2,7 @@ import AVKit
 import AppKit
 import NeoAnkiCore
 import NeoAnkiSharedUI
+import Observation
 import SwiftUI
 
 enum MediaPlaybackPolicy {
@@ -36,21 +37,52 @@ enum MediaPlaybackPolicy {
     }
 }
 
+/// Owns a single mounted media surface. Replacing a card must replace its player too.
+@MainActor @Observable final class ReviewMediaPlayer {
+    private(set) var player: AVPlayer?
+    private var loopObserver: NSObjectProtocol?
+
+    func configure(url: URL, kind: MediaKind, behavior: MediaBehavior, reduceMotion: Bool) {
+        reset()
+        let next = AVPlayer(url: url)
+        if MediaPlaybackPolicy.shouldLoop(kind: kind, behavior: behavior) {
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime, object: next.currentItem, queue: .main
+            ) { _ in next.seek(to: .zero); next.play() }
+        }
+        player = next
+        if MediaPlaybackPolicy.shouldAutoplay(kind: kind, behavior: behavior, reduceMotion: reduceMotion) { next.play() }
+    }
+
+    func replay() { player?.seek(to: .zero); player?.play() }
+
+    func reset() {
+        if let loopObserver { NotificationCenter.default.removeObserver(loopObserver) }
+        loopObserver = nil
+        player?.pause(); player?.replaceCurrentItem(with: nil); player = nil
+    }
+}
+
+private struct ReviewMediaConfiguration: Equatable {
+    let url: URL
+    let behavior: MediaBehavior
+    let reduceMotion: Bool
+}
+
 struct AudioPlayerView: View {
     let url: URL
     let behavior: MediaBehavior
     let altText: String?
     let reduceMotion: Bool
 
-    @State private var player: AVPlayer?
-    @State private var loopObserver: NSObjectProtocol?
+    @State private var playback = ReviewMediaPlayer()
 
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.xs) {
-            if let player {
+            if let player = playback.player {
                 if behavior == .playOnTap {
                     Button {
-                        player.play()
+                        playback.replay()
                     } label: {
                         Label("Play Audio", systemImage: "play.fill")
                             .frame(maxWidth: .infinity, minHeight: 32)
@@ -67,51 +99,17 @@ struct AudioPlayerView: View {
                     .frame(height: 44)
                     .accessibilityLabel("Loading audio")
             }
-
-            if let altText, !altText.isEmpty {
-                Text(altText)
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.secondary)
-            }
         }
-        .trackingLearningTimePlayback(player)
-        .onAppear {
-            configurePlayer()
+        .trackingLearningTimePlayback(playback.player)
+        .task(id: ReviewMediaConfiguration(url: url, behavior: behavior, reduceMotion: reduceMotion)) {
+            playback.configure(url: url, kind: .audio, behavior: behavior, reduceMotion: reduceMotion)
         }
-        .onDisappear {
-            player?.pause()
-            if let loopObserver {
-                NotificationCenter.default.removeObserver(loopObserver)
-                self.loopObserver = nil
-            }
-        }
+        .onDisappear { playback.reset() }
     }
 
     private var playButtonAccessibilityLabel: String {
-        guard let altText, !altText.isEmpty else { return "Play audio" }
+        guard let altText, !altText.isEmpty, altText != "Audio" else { return "Play audio" }
         return "Play audio, \(altText)"
-    }
-
-    private func configurePlayer() {
-        let avPlayer = AVPlayer(url: url)
-        if MediaPlaybackPolicy.shouldLoop(kind: .audio, behavior: behavior) {
-            loopObserver = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: avPlayer.currentItem,
-                queue: .main
-            ) { _ in
-                avPlayer.seek(to: .zero)
-                avPlayer.play()
-            }
-        }
-        player = avPlayer
-        if MediaPlaybackPolicy.shouldAutoplay(
-            kind: .audio,
-            behavior: behavior,
-            reduceMotion: reduceMotion
-        ) {
-            avPlayer.play()
-        }
     }
 }
 
@@ -260,58 +258,23 @@ struct VideoPlayerView: View {
     let behavior: MediaBehavior
     let altText: String?
     let reduceMotion: Bool
-
-    @State private var player: AVPlayer?
-    @State private var loopObserver: NSObjectProtocol?
+    @State private var playback = ReviewMediaPlayer()
 
     var body: some View {
-        VStack(spacing: DesignSystem.Spacing.xs) {
-            if let player {
+        Group {
+            if let player = playback.player {
                 VideoPlayer(player: player)
                     .frame(maxWidth: DesignSystem.readingColumnMaxWidth, maxHeight: 240)
             } else {
-                ProgressView()
-                    .frame(height: 120)
-            }
-
-            if let altText, !altText.isEmpty {
-                Text(altText)
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.secondary)
+                ProgressView().frame(height: 120)
             }
         }
-        .trackingLearningTimePlayback(player)
-        .onAppear { configurePlayer() }
-        .onDisappear {
-            player?.pause()
-            if let loopObserver {
-                NotificationCenter.default.removeObserver(loopObserver)
-                self.loopObserver = nil
-            }
+        .trackingLearningTimePlayback(playback.player)
+        .task(id: ReviewMediaConfiguration(url: url, behavior: behavior, reduceMotion: reduceMotion)) {
+            playback.configure(url: url, kind: .video, behavior: behavior, reduceMotion: reduceMotion)
         }
+        .onDisappear { playback.reset() }
         .accessibilityLabel(altText ?? "Video")
-    }
-
-    private func configurePlayer() {
-        let avPlayer = AVPlayer(url: url)
-        if MediaPlaybackPolicy.shouldLoop(kind: .video, behavior: behavior) {
-            loopObserver = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: avPlayer.currentItem,
-                queue: .main
-            ) { _ in
-                avPlayer.seek(to: .zero)
-                avPlayer.play()
-            }
-        }
-        player = avPlayer
-        if MediaPlaybackPolicy.shouldAutoplay(
-            kind: .video,
-            behavior: behavior,
-            reduceMotion: reduceMotion
-        ) {
-            avPlayer.play()
-        }
     }
 }
 
@@ -346,19 +309,21 @@ struct ResolvedMediaView: View {
                     .accessibilityLabel("Loading media")
             }
         }
-        .task(id: ResolutionTaskID(refID: ref.id, shouldResolve: decision.shouldResolveMedia)) {
+        .task(id: ResolutionTaskID(reference: ref, shouldResolve: decision.shouldResolveMedia)) {
             guard decision.shouldResolveMedia else {
                 resolvedURL = nil
                 resolutionError = nil
                 return
             }
-            guard let store else { return }
             resolvedURL = nil
             resolutionError = nil
+            guard let store else { return }
             do {
-                resolvedURL = try await store.resolve(ref)
+                let url = try await store.resolve(ref)
+                try Task.checkCancellation()
+                resolvedURL = url
             } catch {
-                resolutionError = UserFacingError.message(from: error)
+                if !Task.isCancelled { resolutionError = UserFacingError.message(from: error) }
             }
         }
     }
@@ -370,7 +335,7 @@ struct ResolvedMediaView: View {
             AudioPlayerView(
                 url: url,
                 behavior: presentation.media,
-                altText: ref.altText,
+                altText: ReviewMediaAccessibility.description(for: ref, isAnswerRevealed: isAnswerRevealed),
                 reduceMotion: reduceMotion
             )
         case .image, .gif:
@@ -386,14 +351,14 @@ struct ResolvedMediaView: View {
             VideoPlayerView(
                 url: url,
                 behavior: presentation.media,
-                altText: ref.altText,
+                altText: ReviewMediaAccessibility.description(for: ref, isAnswerRevealed: isAnswerRevealed),
                 reduceMotion: reduceMotion
             )
         }
     }
 
     private struct ResolutionTaskID: Equatable {
-        let refID: UUID
+        let reference: MediaRef
         let shouldResolve: Bool
     }
 }

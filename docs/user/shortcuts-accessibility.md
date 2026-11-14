@@ -54,6 +54,11 @@ The app adds these commands to the standard macOS menu bar.
 ### File
 
 - **New Item** — **Command-N** — adds an item to the selected scope.
+- **Learn in Context…** opens the deck and expression inputs. Return finds
+  examples from the expression field; **Command-Return** adds the prepared cards.
+  Returning to a saved preview does not reopen the keyboard, and ready, error,
+  and saved states provide accessibility announcements.
+
 - **Add Word…** — **Command-Shift-N** — opens quick offline vocabulary capture.
   Dictionary–deck setups are remembered. Arrow keys navigate matches, Return
   selects one, and **Command-Return** adds a valid word without closing the sheet.

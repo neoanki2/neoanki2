@@ -238,8 +238,8 @@
       "id": "content-media",
       "name": "Image, GIF, audio, and video fields",
       "article": "user/content-and-media.md",
-      "sources": ["Sources/NeoAnkiApplication/AttachmentImagePreparer.swift", "Sources/NeoAnkiSharedUI/ImageAttachmentTransfer.swift", "Sources/NeoAnkiIOS/MobileImageAttachmentUITestFixture.swift", "Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaAsset.swift"],
-      "tests": ["Tests/NeoAnkiApplicationTests/AttachmentImagePreparerTests.swift", "Tests/NeoAnki2Tests/ImageAttachmentTransferTests.swift", "UITests/NeoAnki2UITests/AuthoringUITests.swift", "Tests/NeoAnki2Tests/MediaImageLoaderTests.swift", "Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift"],
+      "sources": ["Sources/NeoAnkiApplication/AttachmentImagePreparer.swift", "Sources/NeoAnkiSharedUI/ImageAttachmentTransfer.swift", "Sources/NeoAnkiIOS/MobileImageAttachmentUITestFixture.swift", "Sources/NeoAnki2/MediaFieldEditor.swift", "Sources/NeoAnki2/MediaViews.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaStore.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaValidation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Media/MediaAsset.swift", "Sources/NeoAnkiSharedUI/ReviewMediaAccessibility.swift"],
+      "tests": ["Tests/NeoAnkiApplicationTests/AttachmentImagePreparerTests.swift", "Tests/NeoAnki2Tests/ImageAttachmentTransferTests.swift", "UITests/NeoAnki2UITests/AuthoringUITests.swift", "Tests/NeoAnki2Tests/MediaImageLoaderTests.swift", "Tests/NeoAnki2Tests/ItemsModelMediaFlowTests.swift", "Tests/NeoAnki2Tests/ContextReviewMediaRegressionTests.swift"],
       "screenshot": "assets/screenshots/item-media.png"
     },
     {
@@ -254,8 +254,8 @@
       "id": "study-queue-ordering",
       "name": "Prioritize due learned cards before new material",
       "article": "user/studying.md",
-      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnkiFeatures/StudyFeatureModel.swift"],
-      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudyRepairFeatureTests.swift"]
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiFeatures/ContextReviewOrdering.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudyRepairFeatureTests.swift", "Tests/NeoAnkiFeaturesTests/ContextReviewOrderingRegressionTests.swift"]
     },
     {
       "id": "study-reveal",
@@ -428,6 +428,13 @@
       "article": "api/index.md",
       "sources": ["Sources/NeoAnkiAPI/APIEndpointRegistry.swift", "Sources/NeoAnkiAPI/APIOpenAPI.swift", "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift"],
       "tests": ["Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
+    },
+    {
+      "id": "learn-in-context",
+      "name": "Learn words and phrases through local contextual examples",
+      "article": "user/authoring-items.md",
+      "sources": ["Sources/NeoAnkiApplication/ContextAuthoring.swift", "Sources/NeoAnkiFeatures/LearnInContextModel.swift", "Sources/NeoAnkiFeatures/ContextExamplePreset.swift", "Sources/NeoAnkiFeatures/ContextOccurrences.swift", "Sources/NeoAnkiFeatures/AppleContextProviders.swift", "Sources/NeoAnkiFeatures/ContextSourceLibrary.swift", "Sources/NeoAnkiFeatures/ContextMediaPreparation.swift", "Sources/NeoAnkiSharedUI/LearnInContextView.swift", "Sources/NeoAnkiSharedUI/ContextAuthoringEntry.swift", "Sources/NeoAnkiApplication/LibraryRepository.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/BulkItems.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/LearnInContextTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/ContextCaptureRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextProviderRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ContextMediaPersistenceRegressionTests.swift", "Tests/NeoAnkiApplicationTests/ConditionalItemDeletionTests.swift"]
     },
     {
       "id": "offline-vocabulary",
