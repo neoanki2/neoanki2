@@ -114,6 +114,8 @@ At most **one new related card per study day** is introduced. A learned relative
 that is due takes precedence, and reviewing a relative today defers new relatives
 until the next study day. These deferrals are applied before daily deck limits;
 undoing a review restores the corresponding eligibility.
+Home due counts and the study queue use these same eligibility rules, including
+after grading or undoing a review.
 
 **Poetry and prose builder cards keep their existing scheduling.** Only eligible
 cards enter the session: no future-due, suspended, or daily-limit-excluded parts
