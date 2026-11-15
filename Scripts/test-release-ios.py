@@ -3,6 +3,7 @@
 import datetime as dt
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import plistlib
@@ -18,6 +19,35 @@ SPEC.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_apple_validation_error_includes_nested_cause_and_redacts_token(self):
+        payload = {"errors": [{"code": "STATE_ERROR.ENTITY_STATE_INVALID", "detail": "Check associated errors.",
+            "meta": {"associatedErrors": {"/reviewSubmissions": [
+                {"code": "ENTITY_ERROR.REVIEW_ACTIVE", "detail": "Earlier review is still active. synthetic-token"}
+            ]}}}]}
+        error = release.urllib.error.HTTPError('https://api.appstoreconnect.apple.com/v1/reviewSubmissions',
+            409, 'Conflict', {}, io.BytesIO(json.dumps(payload).encode()))
+        api = object.__new__(release.AppleAPI)
+        with patch.object(api, 'token', return_value='synthetic-token'), \
+             patch.object(release.urllib.request, 'urlopen', side_effect=error):
+            with self.assertRaises(release.ReleaseError) as caught:
+                api.request('reviewSubmissions', 'POST', {'data': {}})
+        self.assertIn('Earlier review is still active.', str(caught.exception))
+        self.assertIn('ENTITY_ERROR.REVIEW_ACTIVE', str(caught.exception))
+        self.assertNotIn('synthetic-token', str(caught.exception))
+
+    def test_codesign_failure_preserves_chain_diagnostic(self):
+        result = subprocess.CompletedProcess([], 1, b'', b'fixture.app: errSecInternalComponent: MissingIntermediate')
+        with patch.object(release.subprocess, 'run', return_value=result):
+            with self.assertRaisesRegex(release.ReleaseError, 'MissingIntermediate'):
+                release.run(['codesign', '--sign', 'public-identity', 'fixture.app'])
+
+    def test_authentication_command_failure_still_hides_output_and_arguments(self):
+        result = subprocess.CompletedProcess([], 1, b'', b'synthetic-secret')
+        with patch.object(release.subprocess, 'run', return_value=result):
+            with self.assertRaises(release.ReleaseError) as error:
+                release.run(['xcrun', 'altool', '--apiKey', 'synthetic-secret'])
+        self.assertNotIn('synthetic-secret', str(error.exception))
+
     def test_actual_ipa_requires_app_group_and_widget_privacy_manifests(self):
         app = plistlib.loads((release.ROOT / "Platforms/iOS/PrivacyInfo.xcprivacy").read_bytes())
         widget = plistlib.loads((release.ROOT / "Platforms/iOSWidget/PrivacyInfo.xcprivacy").read_bytes())

@@ -242,15 +242,31 @@ Saved inputs remain in `~/Library/Application Support/NeoAnki2 Signing/`.
 keys and API credentials outside the repository.
 
 - iOS/Mac Store: `app-store-connect.json`, its referenced API key,
-  `Apple-Distribution.cert.pem`, and `Apple-Distribution.key.pem`.
-- Local iPhone delivery: also `AppleWWDRCAG3.cer`,
-  `iOS-AdHoc.mobileprovision`, and `Widget-AdHoc.mobileprovision`, with the
+  `Apple-Distribution.cert.pem`, `Apple-Distribution.key.pem`, and
+  `AppleWWDRCAG3.cer`.
+- Local iPhone delivery: also `iOS-AdHoc.mobileprovision` and
+  `Widget-AdHoc.mobileprovision`, with the
   paired iPhone registered in both profiles.
 - Mac Store: also `Mac-Installer-Distribution.cert.pem` and
   `Mac-Installer-Distribution.key.pem`.
 - Homebrew: `Developer-ID-Application.cert.pem`, its key,
   `DeveloperIDG2CA.cer`, and `Mac-DeveloperID.provisionprofile`, plus accepted Apple
   notarization through the saved App Store Connect API identity.
+
+Signing preflight verifies the local certificate chain before reserving a
+release version or building an iPhone update. Each actual signing operation
+opens a fresh disposable Keychain, imports its identity and intermediate,
+registers that Keychain in the user's search list, and verifies certificate
+discovery again. `codesign --keychain` selects the private key, but certificate
+chain discovery also uses the search list. A separate public-certificate
+Keychain does not need to survive the build.
+
+Cleanup removes only that disposable Keychain and its search-list aliases,
+preserving concurrent entries and the user's existing Keychains. It does not
+change trust settings or private-key lock policies. A missing or invalid chain
+fails before signing with the certificate diagnostic; signing failures retain
+the `codesign` error. Apple API errors include nested validation causes while
+authentication command output and bearer tokens remain hidden.
 
 The existing platform adapters still validate profiles, app/widget privacy
 manifests, universal Mac architectures, signatures, production CloudKit, package

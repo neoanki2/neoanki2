@@ -5,6 +5,7 @@ import contextlib
 import datetime as dt
 import fcntl
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import plistlib
@@ -17,6 +18,11 @@ import sys
 import tempfile
 import time
 import uuid
+
+_KEYCHAIN_SPEC = importlib.util.spec_from_file_location(
+    __name__ + "_keychain_support", Path(__file__).with_name("signing_keychain_support.py"))
+keychain_support = importlib.util.module_from_spec(_KEYCHAIN_SPEC)
+_KEYCHAIN_SPEC.loader.exec_module(keychain_support)
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_ID = "com.neoanki2.ios"
@@ -204,12 +210,12 @@ class Workflow:
         return command
 
     @contextlib.contextmanager
-    def signing_keychain(self, signing):
-        self.mark("sign")
+    def signing_keychain(self, signing, *, phase="sign"):
+        self.mark(phase)
         password = secrets.token_hex(32)
         self.passwords.append(password)
         with tempfile.TemporaryDirectory(prefix="neoanki-iphone-signing-") as directory:
-            folder = Path(directory)
+            folder = Path(directory).resolve()
             keychain = folder / "signing.keychain-db"
             passfile = folder / "password"
             passfile.write_text(password)
@@ -229,6 +235,8 @@ class Workflow:
                 self.run(["security", "import", str(signing / "AppleWWDRCAG3.cer"), "-k", str(keychain)])
                 self.run(["security", "set-key-partition-list", "-S", "apple-tool:,apple:",
                           "-s", "-k", password, str(keychain)])
+                keychain_support.register(self.run, keychain)
+                keychain_support.verify_chain(self.run, signing / "Apple-Distribution.cert.pem")
                 yield keychain
             finally:
                 # Preserve any concurrent search-list changes; remove only our entry.
@@ -239,10 +247,7 @@ class Workflow:
                     except DeploymentError as error:
                         cleanup_errors.append(str(error))
                 try:
-                    current = re.findall(r'"([^"]+)"', self.run(["security", "list-keychains", "-d", "user"]).decode())
-                    remaining = [p for p in current if p != str(keychain)]
-                    if remaining != current:
-                        self.run(["security", "list-keychains", "-d", "user", "-s", *remaining])
+                    keychain_support.unregister(self.run, keychain)
                 except DeploymentError as error:
                     cleanup_errors.append(str(error))
                 if cleanup_errors:
@@ -266,6 +271,10 @@ class Workflow:
             teams.append(validate_profile(profiles[kind], bundle, None, certificate))
         if teams[0] != teams[1]:
             raise DeploymentError("App and widget profiles have different teams.")
+        # Fail before the expensive build; signing later opens a fresh context
+        # so certificate discovery never depends on a build-long workaround.
+        with self.signing_keychain(signing, phase="preflight"):
+            pass
         team = teams[0]
         entitlements = {}
         for kind, file, bundle in (("app", "Platforms/iOS/NeoAnki2.entitlements", APP_ID),

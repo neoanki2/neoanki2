@@ -127,12 +127,32 @@ class SigningTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'fixture'):
                 with signing.signing_keychain(types.SimpleNamespace(directory=Path('/fixture'))):
                     self.assertEqual(search_list, ['login', keychain])
+                    self.assertIn(['security', 'verify-cert', '-c',
+                        '/fixture/Developer-ID-Application.cert.pem', '-p', 'codeSign', '-L'], calls)
                     search_list.append('concurrent')
                     raise RuntimeError('fixture')
         self.assertIn(['security', 'delete-keychain', keychain], calls)
         self.assertIn(['security', 'list-keychains', '-d', 'user', '-s', 'login', 'concurrent'], calls)
         self.assertEqual(search_list, ['login', 'concurrent'])
         self.assertFalse(any('NeoAnki2-signing.keychain-db' in arg for args in calls for arg in args))
+
+    def test_search_list_aliases_do_not_duplicate_or_survive_cleanup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            real = root / 'real'; real.mkdir()
+            alias = root / 'alias'; alias.symlink_to(real)
+            keychain = real / 'signing.keychain-db'; keychain.touch()
+            search = ['login', str(alias / keychain.name), 'concurrent']
+            writes = []
+            def run(args):
+                if '-s' in args:
+                    writes.append(args)
+                    search[:] = args[args.index('-s') + 1:]
+                return '\n'.join('"' + p + '"' for p in search).encode()
+            signing.keychain_support.register(run, keychain)
+            self.assertFalse(writes)
+            signing.keychain_support.unregister(run, keychain)
+            self.assertEqual(search, ['login', 'concurrent'])
 
     def test_identity_preflight_requires_the_expected_valid_identity(self):
         material = types.SimpleNamespace(identity='A' * 40)

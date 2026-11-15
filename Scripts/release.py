@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+import tempfile
 import time
 from types import SimpleNamespace
 
@@ -202,12 +203,23 @@ def preflight(channels, signing):
     if "homebrew" in channels:
         environment = dict(os.environ, NEOANKI_SIGNING_DIR=str(signing.resolve()))
         run(["python3", str(ROOT / "Scripts/sign-macos-app.py"), "--check"], env=environment)
-    required = ["Apple-Distribution.cert.pem", "Apple-Distribution.key.pem"]
+    required = ["Apple-Distribution.cert.pem", "Apple-Distribution.key.pem", "AppleWWDRCAG3.cer"]
     if "mac" in channels:
         required += ["Mac-Installer-Distribution.cert.pem", "Mac-Installer-Distribution.key.pem"]
     for name in required:
         if not (signing / name).is_file():
             raise ValueError("Missing saved signing input: " + name)
+    if {"ios", "mac"} & set(channels):
+        adapter = module(ROOT / "Scripts/deploy-iphone.py", "release_distribution_preflight")
+        with tempfile.TemporaryDirectory(prefix="neoanki-release-signing-preflight-") as directory:
+            signer = adapter.Workflow(Path(directory))
+            with signer.signing_keychain(signing, phase="preflight"):
+                if "mac" in channels:
+                    # Mac App Store installer certificates have a distinct EKU
+                    # from security's generic pkgSign policy. Verify the CA
+                    # chain here; productbuild/pkgutil still enforce purpose.
+                    adapter.keychain_support.verify_chain(signer.run,
+                        signing / "Mac-Installer-Distribution.cert.pem", policy="basic")
 
 
 class Release:

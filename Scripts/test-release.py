@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import types
 import unittest
 from unittest.mock import patch
 
@@ -227,6 +228,44 @@ class PlanningTests(unittest.TestCase):
              patch.object(controller,'make_api',side_effect=AssertionError('Apple accessed')),\
              patch.object(controller,'Release',side_effect=AssertionError('artifacts built')):
             with self.assertRaisesRegex(ValueError,'merge blocked'):controller.main([])
+
+
+class SigningPreflightTests(unittest.TestCase):
+    def test_distribution_and_installer_chains_are_checked_without_building(self):
+        adapter = controller.module(Path(__file__).with_name('deploy-iphone.py'), 'preflight_fixture_adapter')
+        with tempfile.TemporaryDirectory() as directory:
+            signing = Path(directory)
+            for name in ['Apple-Distribution.cert.pem', 'Apple-Distribution.key.pem', 'AppleWWDRCAG3.cer',
+                         'Mac-Installer-Distribution.cert.pem', 'Mac-Installer-Distribution.key.pem']:
+                (signing/name).touch()
+            for channels in [['ios'], ['ios','mac']]:
+                calls = []
+                class Signer:
+                    def __init__(self, output): pass
+                    @contextlib.contextmanager
+                    def signing_keychain(self, material, *, phase):
+                        self_check = (material, phase)
+                        calls.append(('enter', self_check))
+                        try: yield Path('/fixture/temporary-keychain')
+                        finally: calls.append(('exit', self_check))
+                    def run(self, args): calls.append(args); return b''
+                fake = types.SimpleNamespace(Workflow=Signer, keychain_support=adapter.keychain_support)
+                with patch.object(controller, 'module', return_value=fake):
+                    controller.preflight(channels, signing)
+                self.assertEqual(calls[0], ('enter', (signing,'preflight')))
+                self.assertEqual(calls[-1], ('exit', (signing,'preflight')))
+                checks = [c for c in calls if isinstance(c,list)]
+                self.assertEqual(checks, [['security','verify-cert','-c',
+                    str(signing/'Mac-Installer-Distribution.cert.pem'),'-p','basic','-L']] if 'mac' in channels else [])
+
+    def test_missing_intermediate_stops_preflight_before_loading_signer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            signing = Path(directory)
+            for name in ['Apple-Distribution.cert.pem','Apple-Distribution.key.pem']:
+                (signing/name).touch()
+            with patch.object(controller,'module',side_effect=AssertionError('signer loaded')):
+                with self.assertRaisesRegex(ValueError,'AppleWWDRCAG3.cer'):
+                    controller.preflight(['ios'],signing)
 
 
 class LocalIPhoneTests(unittest.TestCase):
