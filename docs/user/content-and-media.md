@@ -43,6 +43,8 @@ spans.
 On Mac, text fields support normal typing, selection, clipboard commands, and
 **Command-Z** / **Shift-Command-Z** for undo and redo. These commands edit the
 focused text even while a study session or image-mask editor is open.
+Pasting into a rich-text field inserts the clipboard's plain-text content;
+apply formatting with the editor toolbar afterward.
 
 Poem, prose, and vocabulary-definition editors use plain text, with native
 **Edit > Find**, spelling controls, wrapping, and scrolling. Return adds a new

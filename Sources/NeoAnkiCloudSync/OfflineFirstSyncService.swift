@@ -3,6 +3,21 @@ import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
 
+/// The scheduler is replaceable inside tests so debounce/recovery contracts can
+/// advance virtual time without turning a busy CI runner into a latency failure.
+struct SyncTiming: Sendable {
+    enum Reason: Sendable, Equatable {
+        case localChange(cursor: Int64)
+        case recoveryPoll
+    }
+
+    let now: @Sendable () -> Date
+    let sleep: @Sendable (Duration, Reason) async throws -> Void
+    var didFinishSynchronization: @Sendable () -> Void = {}
+
+    static let continuous = SyncTiming(now: { .now }, sleep: { duration, _ in try await Task.sleep(for: duration) })
+}
+
 /// Coordinates a local-authoritative repository and an independent CloudKit
 /// transport. Transport failure changes status but never prevents local work.
 public actor OfflineFirstSyncService: SyncService {
@@ -13,6 +28,7 @@ public actor OfflineFirstSyncService: SyncService {
     private let learningTime: LearningTimeSyncService?
     private let backupURL: @Sendable () -> URL
     private let recoveryPollInterval: Duration
+    private let timing: SyncTiming
     private var currentStatus: SyncStatus = .offline
     private var currentIssues: [SyncIssue] = []
     private var isSynchronizing = false
@@ -42,6 +58,27 @@ public actor OfflineFirstSyncService: SyncService {
         self.learningTime = learningTime
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
+        self.timing = .continuous
+    }
+
+    /// Internal scheduling seam; production callers retain the public initializer.
+    init(
+        repository: any LibraryChangePersisting,
+        adapter: any LibrarySyncAdapter,
+        transport: any CloudSyncTransport,
+        metadataStore: SyncMetadataStore,
+        recoveryPollInterval: Duration = .seconds(10),
+        timing: SyncTiming,
+        backupURL: @escaping @Sendable () -> URL
+    ) {
+        self.repository = repository
+        self.adapter = adapter
+        self.transport = transport
+        self.metadataStore = metadataStore
+        self.learningTime = nil
+        self.backupURL = backupURL
+        self.recoveryPollInterval = recoveryPollInterval
+        self.timing = timing
     }
 
     public func start() async {
@@ -60,9 +97,10 @@ public actor OfflineFirstSyncService: SyncService {
         guard generation == lifecycle else { return }
         if automaticSyncTask == nil {
             let interval = recoveryPollInterval
+            let scheduler = timing
             automaticSyncTask = Task { [weak self] in
                 while !Task.isCancelled {
-                    do { try await Task.sleep(for: interval) }
+                    do { try await scheduler.sleep(interval, .recoveryPoll) }
                     catch { return }
                     await self?.synchronize()
                 }
@@ -71,19 +109,20 @@ public actor OfflineFirstSyncService: SyncService {
     }
 
     public func synchronize() async {
-        guard nextAllowedSync.map({ $0 <= .now }) ?? true else { return }
+        guard nextAllowedSync.map({ $0 <= timing.now() }) ?? true else { return }
         guard !isSynchronizing else { synchronizationRequested = true; return }
         isSynchronizing = true
         defer {
             isSynchronizing = false
             finishWaiters()
+            timing.didFinishSynchronization()
         }
         let generation = lifecycle
         repeat {
             synchronizationRequested = false
             await synchronizeOnce()
         } while synchronizationRequested && generation == lifecycle && !Task.isCancelled
-            && (nextAllowedSync.map({ $0 <= .now }) ?? true)
+            && (nextAllowedSync.map({ $0 <= timing.now() }) ?? true)
     }
 
     /// Background pushes need to await an already-running cycle, including its
@@ -182,13 +221,13 @@ public actor OfflineFirstSyncService: SyncService {
             nextAllowedSync = nil
             currentStatus = !currentIssues.isEmpty ? .needsAttention(issueCount: currentIssues.count)
                 : !metadata.stagedInbound.isEmpty || !(metadata.pendingOutbound ?? []).isEmpty ? .syncing
-                : .current(lastSync: .now)
+                : .current(lastSync: timing.now())
         } catch is CancellationError {
             currentStatus = .offline
         } catch {
             if generation == lifecycle {
                 if let delay = (error as? CKError)?.retryAfterSeconds, delay > 0 {
-                    nextAllowedSync = Date.now.addingTimeInterval(delay)
+                    nextAllowedSync = timing.now().addingTimeInterval(delay)
                 }
                 if (error as? CKError)?.code == .internalError {
                     // CloudKit can invalidate a long-lived client connection.
@@ -208,9 +247,10 @@ public actor OfflineFirstSyncService: SyncService {
     private func scheduleLocalSync(after cursor: Int64) {
         localSyncTask?.cancel()
         let generation = lifecycle
+        let scheduler = timing
         localSyncTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: .milliseconds(600))
+                try await scheduler.sleep(.milliseconds(600), .localChange(cursor: cursor))
                 try await self?.synchronizeLocalChanges(after: cursor, generation: generation)
             } catch {}
         }
@@ -311,7 +351,7 @@ public actor OfflineFirstSyncService: SyncService {
     public func dismissIssue(id: UUID) async {
         currentIssues.removeAll { $0.id == id }
         await persistIssues()
-        currentStatus = currentIssues.isEmpty ? .current(lastSync: .now) : .needsAttention(issueCount: currentIssues.count)
+        currentStatus = currentIssues.isEmpty ? .current(lastSync: timing.now()) : .needsAttention(issueCount: currentIssues.count)
     }
 
     public func restoreConflictCopy(forIssueID id: UUID) async throws {

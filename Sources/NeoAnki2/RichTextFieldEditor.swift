@@ -7,6 +7,17 @@ private final class TextViewHolder {
     var lastSelectedRange = NSRange(location: NSNotFound, length: 0)
 }
 
+/// Avoid AppKit's synchronous HTML-to-attributed-string paste path. Some
+/// clipboard providers answer that request through an XPC service that can
+/// stall the main thread; rich formatting can still be applied with the editor
+/// toolbar after inserting the plain-text flavor.
+private final class SafePasteTextView: NSTextView {
+    override func paste(_ sender: Any?) {
+        guard let text = NSPasteboard.general.string(forType: .string) else { return }
+        insertText(text, replacementRange: selectedRange())
+    }
+}
+
 private final class UndoAttributedString: @unchecked Sendable {
     let value: NSAttributedString
 
@@ -319,9 +330,11 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else {
+        guard let defaultTextView = scrollView.documentView as? NSTextView else {
             return scrollView
         }
+        let textView = SafePasteTextView(frame: defaultTextView.frame, textContainer: defaultTextView.textContainer)
+        scrollView.documentView = textView
 
         textView.isRichText = true
         textView.isEditable = isEnabled

@@ -73,19 +73,6 @@ struct AddItemView: View {
             }
 
             if let itemType {
-                if let library = model.library as? any LibraryRepository {
-                    ContextAuthoringEntry(library: library, deckID: selectedDeckID, fields: ContextExamplePreset.authoringFields(in: itemType)) { id in
-                        fieldSpans[id].map { SpanFormatting.plainText(from: $0) } ?? fieldText[id] ?? ""
-                    }
-                }
-                if !isEditing {
-                    DictionaryFieldLookupSection(fields: itemType.fields) { id in
-                        Binding(
-                            get: { SpanFormatting.plainText(from: fieldSpans[id] ?? []) },
-                            set: { fieldSpans[id] = $0.isEmpty ? [] : [Span($0)] }
-                        )
-                    }.id(itemType.id)
-                }
                 Section {
                     ForEach(ContextExamplePreset.authoringFields(in: itemType)) { field in
                         fieldEditor(for: field)

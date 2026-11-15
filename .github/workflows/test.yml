@@ -46,10 +46,13 @@ jobs:
     name: Swift unit + flow + architecture tests
     runs-on: macos-26
     timeout-minutes: 25
+    env:
+      NEOANKI_SYNC_CONTRACT_ARTIFACTS: ${{ github.workspace }}/.build/sync-contract-artifacts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Ensure the architecture scanner is available
         run: |
           if ! command -v rg >/dev/null 2>&1; then
@@ -66,6 +69,7 @@ jobs:
             Scripts/watch-release-workflow.sh \
             Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh || failures=1
+          python3 Scripts/test-sync-test-sensitivity.py || failures=1
           python3 Scripts/test-release.py || failures=1
           python3 Scripts/test-deploy-iphone.py || failures=1
           python3 Scripts/test-release-ios.py || failures=1
@@ -80,6 +84,33 @@ jobs:
           swift test --parallel || failures=1
           bash Scripts/validate-xcode-build-paths.sh || failures=1
           exit "$failures"
+      - name: Qualify changes to the sync test harness against known defects
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
+          else
+            sync_harness_changes="$(git diff --name-only "$BASE_SHA" HEAD -- \
+              'Tests/NeoAnkiFeaturesTests/SyncConvergenceContractTests.swift' \
+              'Tests/NeoAnkiFeaturesTests/SyncContract*.swift' \
+              'Scripts/check-sync-test-sensitivity.py' \
+              'Scripts/test-sync-test-sensitivity.py')"
+            if [[ -n "$sync_harness_changes" ]]; then
+              python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
+            fi
+          fi
+      - name: Preserve sync scenarios and qualification evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: sync-reliability-failures
+          path: |
+            .build/sync-contract-artifacts/
+            .build/sync-sensitivity/
+          if-no-files-found: ignore
+          retention-days: 14
 
   shared-platforms:
     name: Shared targets (macOS + iOS Simulator)

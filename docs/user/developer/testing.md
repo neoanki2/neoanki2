@@ -104,6 +104,96 @@ Do not add all UI journeys, screenshot capture, or physical acceptance to an
 unrelated release. Failed checks retain their evidence and require a diagnosed
 application, test, or workflow correction before another validation run.
 
+### Autonomous visible-convergence contracts
+
+The earlier state-machine fuzz tests remain useful for eventual consistency.
+They manually settle all replicas after each generated action, however, so they
+cannot establish that an idle receiving app updates promptly on its own.
+
+Three independent test-design proposals were compared:
+
+| Proposal | Main emphasis | Decision |
+| --- | --- | --- |
+| Replayable lifecycle state machine | Independent user-operation ledger, long offline histories, shrinking failing scenarios | Use its independent expectations and replayable operations in the selected contracts |
+| Disk-owned lifecycle chaos | Server-owned image bytes, expiring download leases, process replacement and whole-container moves | Use its storage and lifecycle model in the selected contracts |
+| Autonomous visible convergence | Automatic local-change sending, push/poll recovery, and displayed due counts under controlled time | Selected as the organizing approach because eventual convergence alone did not prevent the observed failures |
+
+`SyncConvergenceContractTests` uses real temporary SQLite repositories, the
+production sync adapter and metadata store, the sync service, and
+`LibraryFeatureModel`. The synthetic cloud owns its own image bytes; a client
+cannot read another client's file as a substitute for uploading or downloading
+it. Relocation moves the synthetic app container and removes its old location,
+without repairing saved URLs in the fixture.
+
+The measured path starts the services once, then relies on ordinary user
+commits, push delivery, and scheduled recovery. Calling manual sync or refreshing
+the feature model to make a measured scenario pass is prohibited. Tests wait for
+observable timer registration and transport events. An injected clock advances
+the production 600-millisecond local-change debounce and 10-second recovery
+poll; a wall-clock watchdog only detects a stuck test. These are application
+scheduling contracts with an immediate simulated network, not a promise that
+Apple delivers a real notification within 600 milliseconds.
+
+Expected review records and card schedules are captured from successful local
+user operations before transport runs. Checking only that two replicas agree
+would also accept both replicas losing the same review. Scheduling comparisons
+exclude device-local repeated-lapse warning acknowledgements.
+
+Run the focused contracts, expand the campaign, or replay an emitted scenario:
+
+```bash
+./Scripts/test-sync.sh --contracts
+./Scripts/test-sync.sh --contracts --stress
+NEOANKI_SYNC_CONTRACT_SEED=99 ./Scripts/test-sync.sh --contracts
+./Scripts/test-sync.sh --replay /absolute/path/to/scenario.json
+```
+
+Use `NEOANKI_SYNC_CONTRACT_SEEDS` and `NEOANKI_SYNC_CONTRACT_STEPS` to size a
+campaign. `NEOANKI_SYNC_CONTRACT_SEED_BASE` selects the first seed in a rotating
+campaign; a single explicit `NEOANKI_SYNC_CONTRACT_SEED` takes precedence.
+`NEOANKI_SYNC_CONTRACT_ARTIFACTS` selects the directory for replay and failure
+evidence; the shell runner defaults it to `.build/sync-contract-artifacts`.
+The default campaign uses four fixed seeds and twelve steps, with one to three
+reviews committed per step before convergence. Supported bounds are 1–64 seeds
+and 1–200 steps. Keep the JSON scenario and code revision together when reporting
+a failure. Replay reproduces the planned actions and fault choices; it uses
+fresh persistence IDs and anchors relative card schedules to the current date.
+It does not freeze arbitrary Swift executor interleavings or automatically
+shrink a failing scenario.
+
+The normal root-package CI lane runs these contracts. A nightly headless job
+runs 64 generated scenarios with 40 operations each, split across four
+independent shards to keep wall time bounded. Each shard rotates its initial
+seed from the workflow run ID. Its artifact contains the campaign log and
+replayable scenario evidence. This campaign uses no Apple account, installed
+app, physical phone, or production library.
+
+#### Verify that the tests reject broken implementations
+
+When the contract harness changes, CI also qualifies it against deliberate
+mutations in an isolated checkout:
+
+```bash
+python3 Scripts/check-sync-test-sensitivity.py --list
+python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
+```
+
+The original implementation must pass first. Each mutation must then produce
+its intended test failure; a compilation failure or infrastructure error does
+not count as detecting a bug. The campaign preserves its report, source diffs,
+and original logs. It never changes the working checkout or retries an unchanged
+failure to get a green result. Qualifying the harness costs more than the normal
+contract run, so it runs when the harness changes rather than on every unrelated
+pull request.
+
+These checks establish correctness and bounded scheduling in the modeled
+conditions. They do not prove arbitrary operating-system crash safety, CloudKit
+server behavior, signing, connectivity, or iOS background execution guarantees.
+The visible-summary path exercises the shared receiving feature model; native
+shell wiring retains its separate tests. Dictionary-pack transfers and the
+learning-time zone also retain their separate suites. Those limits remain
+separate from the card-library contracts.
+
 ## CI reliability and optional UI investigations
 
 Automatic CI runs all root-package Swift tests and all NeoAnkiCore tests,

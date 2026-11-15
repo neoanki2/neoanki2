@@ -104,6 +104,9 @@ class PlanningTests(unittest.TestCase):
         real=AppInputs.load(Path(__file__).resolve().parent.parent)
         self.assertTrue(real.includes('Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift','ios'))
         self.assertTrue(real.includes('Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift','mac'))
+        # Sync contracts must be selected for publication checks as well as CI.
+        sync_tests=real.tests(['Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift'],['ios','mac'])
+        self.assertIn('NeoAnkiFeaturesTests',sync_tests[''])
         self.assertFalse(real.includes('Sources/NeoAnkiAPI/NeoAnkiAPIService.swift','ios'))
         self.assertFalse(real.includes('Sources/NeoAnkiIOS/MobileRootView.swift','mac'))
     def test_noop_command_does_not_contact_apple_build_commit_or_publish(self):

@@ -46,8 +46,8 @@ new item and delete the old one after checking the result.
 ## Learn a word or phrase in context
 
 Choose **Learn in Context** in Create on iPhone/iPad, or from the Mac toolbar or
-File menu. Add and Edit Item also offer **Learn in Context** for a text field.
-The original item remains open while you create separate examples.
+File menu. This is a separate authoring flow; the standard Add Item form stays
+focused on the selected item type's fields.
 
 1. Choose a deck and enter a word or phrase.
 2. Choose **Find Examples**. The app detects the language and finds local dictionary
@@ -177,24 +177,12 @@ for other authoring tasks.
 
 ## Fill fields from a dictionary
 
-On Mac, iPhone, and iPad, the ordinary Add Item editor offers an optional
-**Dictionary** section when the selected item type has at least two Text or
-Rich Text fields. Import a local `.neovocab` pack first using the vocabulary
-pack tools (on iOS, **Create → Vocabulary Packs**).
-
-1. Expand **Dictionary** and choose an installed pack.
-2. Choose distinct **Look up field** and **Fill field** values for this item.
-3. Type a word in the lookup field. After a short typing pause, a single exact
-   match fills the destination automatically. Choose **Use Entry** for an
-   ambiguous or partial match.
-4. Review or edit the result, then save normally into the chosen deck.
-
-Dictionary text includes supplied spellings, forms, textual annotations such
-as stress marks or IPA, and definitions. You can keep the complete entry or
-trim it to just the content you need. The app preserves your edits: clear an
-edited destination before using another dictionary entry. If no entry matches,
-fill the fields yourself. Lookup uses local files and does not create a deck
-or choose a card setup for you.
+Dictionary-assisted capture is available through **Add Word**. Set up an
+installed dictionary and a deck's item type there, then map dictionary content
+to its fields. The app remembers that setup for the dictionary–deck pair.
+Standard **Add Item** uses the selected type's fields directly and has no
+dictionary lookup section. See [Add a word quickly](#add-a-word-quickly) and
+[item types](../item-types-and-templates/#choose-an-answer-method).
 
 ## Open item detail
 

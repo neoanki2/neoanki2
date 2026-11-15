@@ -25,11 +25,10 @@ hidden study surfaces do not count.
 After two minutes without an interaction, the timer pauses. Those first two
 minutes count; later idle time does not. Interacting with study resumes it.
 Audio/video playback and recording keep the timer active, but animated images
-do not. Use **Pause Timer** for a deliberate break and **Resume Timer** to return.
-A manual pause stays paused until you resume it.
+do not. Timing is automatic; there are no timer controls during study.
 
-Time is saved every 15 seconds and when a card or session ends, the timer pauses,
-or the app moves to the background. An unexpected shutdown can lose time since
+Time is saved every 15 seconds and when a card or session ends, the timer pauses
+automatically, or the app moves to the background. An unexpected shutdown can lose time since
 the latest saved checkpoint. A save error appears beside the timer and remains
 visible on completion and totals screens after you leave study. Unsaved segments
 are retained in memory and retried while the app remains open; **Retry Saving**

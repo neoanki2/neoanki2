@@ -290,21 +290,6 @@ struct AddItemView: View {
                     }
 
                     if let selectedType {
-                        DictionaryFieldLookupSection(fields: selectedType.fields) { id in
-                            Binding(
-                                get: {
-                                    if selectedType.fields.first(where: { $0.id == id })?.type == .richText {
-                                        return (richValues[id] ?? []).map(\.text).joined()
-                                    }
-                                    return values[id] ?? ""
-                                },
-                                set: { value in
-                                    if selectedType.fields.first(where: { $0.id == id })?.type == .richText {
-                                        richValues[id] = value.isEmpty ? [] : [Span(value)]
-                                    } else { values[id] = value }
-                                }
-                            )
-                        }.id(selectedType.id)
                         Section("Content") {
                             ForEach(ContextExamplePreset.authoringFields(in: selectedType)) { field in
                                 MobileItemFieldRow(field: field) {
@@ -316,9 +301,6 @@ struct AddItemView: View {
                                 .padding(.vertical, 3)
                             }
                         }
-                        ContextAuthoringEntry(library: model.library, deckID: selectedDeckID, fields: ContextExamplePreset.authoringFields(in: selectedType),
-                            text: { id in richValues[id].map { $0.map(\.text).joined() } ?? values[id] ?? "" },
-                            onSaved: { await model.authoringDidCommit() })
                     }
                 }
             }

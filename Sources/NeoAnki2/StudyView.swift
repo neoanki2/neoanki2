@@ -318,7 +318,6 @@ struct StudyView: View {
 
     private var studyHeader: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
-            LearningTimePauseButton(tracker: model.learningTime)
             Text(model.headerLabel)
                 .font(DesignSystem.Typography.uiCaption)
                 .foregroundStyle(.secondary)

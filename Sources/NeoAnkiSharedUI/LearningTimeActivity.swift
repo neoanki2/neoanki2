@@ -59,26 +59,6 @@ public extension View {
     }
 }
 
-public struct LearningTimePauseButton: View {
-    @Bindable var tracker: LearningTimeTracker
-    public init(tracker: LearningTimeTracker) { self.tracker = tracker }
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Button(tracker.isPaused ? "Resume Timer" : "Pause Timer",
-                   systemImage: tracker.isPaused ? "play" : "pause") {
-                if tracker.isManuallyPaused { tracker.togglePause() }
-                else if tracker.isIdle { tracker.interaction() }
-                else { tracker.togglePause() }
-            }
-            .buttonStyle(.borderless)
-            .accessibilityIdentifier("learningTimePause")
-            if let error = tracker.persistenceError { Text(error).font(.caption).foregroundStyle(.secondary) }
-            else if tracker.isIdle { Text("Paused · no activity").font(.caption).foregroundStyle(.secondary) }
-        }
-    }
-}
-
-
 public struct LearningTimeSaveStatusView: View {
     @State private var status = LearningTimeSaveStatus.shared
     public init() {}

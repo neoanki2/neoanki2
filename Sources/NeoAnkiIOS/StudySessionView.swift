@@ -89,7 +89,6 @@ struct StudySessionView: View {
                 }
                 if !session.isComplete {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        LearningTimePauseButton(tracker: session.learningTime)
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
                         Menu("More", systemImage: "ellipsis.circle") {
                             Button("Skip", systemImage: "forward") { skipCurrentCard() }

@@ -219,6 +219,7 @@ let package = Package(
             dependencies: [
                 "NeoAnkiFeatures",
                 "NeoAnkiApplication",
+                "NeoAnkiCloudSync",
                 "NeoAnkiVocabularyKit",
                 .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
                 .product(name: "NeoAnkiTestSupport", package: "NeoAnkiCore"),

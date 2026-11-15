@@ -25,7 +25,8 @@ tools 6.0. These deployment targets are shared by release and source builds;
 platform installation and distribution still follow the separate paths below.
 Shared native text-editing and vocabulary modules do not raise those minimums.
 The Prose Deck builder is included in the same app targets; it adds no platform
-requirement.
+requirement. The feature test target also links the offline-first sync module to
+exercise cross-device convergence directly; this does not change app targets.
 
 To capture vocabulary after opening a library, choose **Add Word** on Home on
 iPhone/iPad, or **File → Add Word…** on Mac. Choose a destination and installed
@@ -175,10 +176,10 @@ files by hand can break references.
 Removing the source checkout or rebuilding `.build/NeoAnki2.app` does not
 remove the library. Deleting the Application Support directory does.
 
-The Add Item editor can use a locally installed vocabulary pack to fill text
-fields from a dictionary. This works in the same Mac, iPhone, and iPad builds
-and keeps the macOS 14 and iOS 17 requirements above. See
-[Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+Dictionary-assisted capture is available through **Add Word**, which uses
+locally installed vocabulary packs and remembers field mappings by
+dictionary–deck pair. Standard **Add Item** keeps the selected type's fields
+ready for direct entry. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
 With private iCloud sync enabled, imported dictionary packs upload
 automatically. On another device, open **Vocabulary Packs** and choose when to
