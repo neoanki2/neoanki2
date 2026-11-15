@@ -494,12 +494,12 @@ private struct DueNowCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(summary.hasDueCards ? "\(summary.dueNow) \(summary.dueNow == 1 ? "card" : "cards") ready" : "You're all caught up")
+            Text(summary.hasDueCards ? "\(summary.dueNow) \(summary.dueNow == 1 ? "card" : "cards") due" : "You're caught up")
                 .font(.title2.weight(.semibold))
             if summary.hasDueCards {
                 Text("A little practice goes a long way.").foregroundStyle(.secondary)
                 Button(action: action) {
-                    Label("Start Studying", systemImage: "play.fill")
+                    Label("Study", systemImage: "play.fill")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()

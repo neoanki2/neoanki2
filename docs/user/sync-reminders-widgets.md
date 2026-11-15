@@ -228,6 +228,11 @@ Review the summary before dismissing. Invalid remote batches are staged outside
 domain tables and applied transactionally, so a rejected batch does not partly
 rewrite the library.
 
+**Current** describes this device's last completed sync attempt; it does not
+confirm that every other device has caught up. Compare the same deck scope on
+both devices at approximately the same time, because scheduled cards can become
+due even when no new reviews are submitted.
+
 ## Troubleshoot iCloud
 
 If one device is behind, inspect its sync status even if the other device says

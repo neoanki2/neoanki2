@@ -1,0 +1,83 @@
+name: Sync stress
+
+on:
+  schedule:
+    - cron: '19 5 * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Seed base (empty rotates from the workflow run ID)'
+        type: string
+        default: ''
+      seeds:
+        description: 'Generated scenarios per shard (four shards)'
+        type: string
+        default: '16'
+      steps:
+        description: 'Generated operations per scenario'
+        type: string
+        default: '40'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-stress-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  autonomous-convergence:
+    name: Generated sync lifecycle and latency contracts
+    runs-on: macos-26
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      NEOANKI_SYNC_CONTRACT_SEEDS: ${{ inputs.seeds || '16' }}
+      NEOANKI_SYNC_CONTRACT_STEPS: ${{ inputs.steps || '40' }}
+      CAMPAIGN_SEED_BASE: ${{ inputs.seed || github.run_id }}
+      CAMPAIGN_SHARD: ${{ matrix.shard }}
+      NEOANKI_SYNC_CONTRACT_ARTIFACTS: ${{ github.workspace }}/.build/sync-contract-artifacts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Prepare the rotating seeded campaign
+        run: |
+          mkdir -p .build
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          base = int(os.environ["CAMPAIGN_SEED_BASE"])
+          shard = int(os.environ["CAMPAIGN_SHARD"])
+          if not 0 <= base < 1 << 64:
+              raise ValueError("Seed base must be an unsigned 64-bit integer")
+          seed = (base + shard * 4096) % (1 << 64)
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write(f"NEOANKI_SYNC_CONTRACT_SEED_BASE={seed}\n")
+          Path(".build/sync-contract-campaign.json").write_text(json.dumps({
+              "source": os.environ["GITHUB_SHA"], "shard": shard, "seedBase": seed,
+              "seeds": os.environ["NEOANKI_SYNC_CONTRACT_SEEDS"],
+              "steps": os.environ["NEOANKI_SYNC_CONTRACT_STEPS"],
+          }, indent=2) + "\n")
+          PYTHON
+      - name: Execute generated contracts
+        run: ./Scripts/test-sync.sh --contracts --stress 2>&1 | tee .build/sync-contract-stress.log
+      - name: Preserve replayable scenarios and campaign log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: sync-contract-stress-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: |
+            .build/sync-contract-artifacts/
+            .build/sync-contract-stress.log
+            .build/sync-contract-campaign.json
+          if-no-files-found: warn
+          retention-days: 14
