@@ -6,7 +6,17 @@ import Testing
 
 private actor RecordingBadgePublisher: AppIconBadgePublishing {
     var badges: [AppIconBadge] = []
-    func publish(_ badge: AppIconBadge) { badges.append(badge) }
+    private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
+    func publish(_ badge: AppIconBadge) {
+        badges.append(badge)
+        let ready = waiters.filter { $0.0 == badge.count }
+        waiters.removeAll { $0.0 == badge.count }
+        for (_, waiter) in ready { waiter.resume() }
+    }
+    func waitForCount(_ count: Int) async {
+        guard badges.last?.count != count else { return }
+        await withCheckedContinuation { waiters.append((count, $0)) }
+    }
 }
 
 private actor SuspendedBadgePublisher: AppIconBadgePublishing {
@@ -91,10 +101,12 @@ private actor BadgeOnlyNotificationScheduler: NotificationSchedulingService {
     study.revealAnswer()
     await study.grade(.good)
     #expect(study.error == nil)
+    await publisher.waitForCount(0)
     #expect(await publisher.badges.last?.count == 0)
     #expect(await publisher.badges.last?.label == nil)
     await study.undoLastGrade()
     #expect(study.error == nil)
+    await publisher.waitForCount(1)
     #expect(await publisher.badges.last?.label == "1")
     await model.endStudy()
 
