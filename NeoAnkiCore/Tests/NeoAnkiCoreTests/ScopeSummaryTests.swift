@@ -29,6 +29,42 @@ private func item(front: String, back: String, deckID: UUID? = nil) -> Item {
 private let epoch = Date(timeIntervalSince1970: 1_700_000_000)
 private let laterEpoch = Date(timeIntervalSince1970: 1_700_086_400)
 
+@Test func studyAvailabilityMatchesHomeAcrossScopesReviewsUndoAndDailyLimits() async throws {
+    let url = tempDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    var parent = Deck(name: "Limited parent", newCardsPerDay: 1)
+    let child = Deck(name: "Child", parentID: parent.id)
+    let outside = Deck(name: "Outside")
+    for deck in [parent, child, outside] { _ = try await store.createDeck(deck) }
+    for (index, destination) in [parent.id, child.id, child.id, outside.id, nil].enumerated() {
+        _ = try await store.createItem(item(front: "Question \(index)", back: "Answer", deckID: destination), now: epoch)
+    }
+    _ = try await store.createItem(item(front: "Tomorrow", back: "Answer", deckID: outside.id), now: laterEpoch)
+    let scopes: [DeckScope] = [.allDecks, .unassigned, .deck(parent.id),
+        .deck(parent.id, includeDescendants: false), .deck(child.id), .deck(outside.id)]
+    func checkParity() async throws {
+        for now in [epoch, laterEpoch] {
+            for scope in scopes {
+                let availability = try await store.studyAvailability(scope: scope, asOf: now)
+                let home = try await store.scopeSummary(scope: scope, asOf: now)
+                #expect(availability.dueNow == home.dueNow)
+                #expect(availability.nextStudyAt == home.nextStudyAt)
+            }
+        }
+    }
+    try await checkParity()
+    let card = try #require(try await store.fetchDueCards(scope: .deck(parent.id), asOf: epoch).first)
+    let review = try await store.submitReviewWithReceipt(cardID: card.id, rating: .good, now: epoch)
+    try await checkParity()
+    try await store.revertReview(reviewLogID: review.reviewLogID, now: epoch)
+    try await checkParity()
+    parent.newCardsPerDay = 0
+    _ = try await store.updateDeck(parent)
+    try await checkParity()
+}
+
 @Test func scopeSummaryRollsUpDescendantDecks() async throws {
     let store = try await makeStore()
     let parent = Deck(name: "Poetry")

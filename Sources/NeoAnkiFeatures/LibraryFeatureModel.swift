@@ -62,8 +62,16 @@ public final class LibraryFeatureModel {
     @ObservationIgnored private var deferredSyncTask: Task<Void, Never>?
     @ObservationIgnored private var syncChangesTask: Task<Void, Never>?
     @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
+    @ObservationIgnored private var studyUpdatesTask: Task<Void, Never>?
+    @ObservationIgnored private var studyUpdatesRequested = false
+    @ObservationIgnored private var studyMutationRevision: UInt64 = 0
+    @ObservationIgnored private var devicePublicationTask: Task<Void, Never>?
+    @ObservationIgnored private var devicePublicationRevision: UInt64 = 0
 
-    deinit { deferredSyncTask?.cancel(); syncChangesTask?.cancel(); bootstrapTask?.cancel() }
+    deinit {
+        deferredSyncTask?.cancel(); syncChangesTask?.cancel(); bootstrapTask?.cancel()
+        studyUpdatesTask?.cancel(); devicePublicationTask?.cancel()
+    }
 
     private func observeSyncChanges() async {
         syncChangesTask?.cancel()
@@ -149,18 +157,35 @@ public final class LibraryFeatureModel {
     public func reload(asOf now: Date = .now) async throws {
         isRefreshing = true
         defer { isRefreshing = false }
-        async let home = library.coldHomeSnapshot(scope: .allDecks, asOf: now)
-        async let loadedItems = library.items(scope: selectedScope, sort: sortOrder, search: "")
-        async let catalog = library.loadItemTypeCatalog()
-        let (snapshot, itemRows, typeCatalog) = try await (home, loadedItems, catalog)
-        allDecksSummary = snapshot.allDecksSummary
-        unassignedSummary = snapshot.unassignedSummary
-        decks = snapshot.deckSummaries
-        items = itemRows
-        itemTypes = typeCatalog.allItemTypes
-        includedItemTypeGroups = typeCatalog.includedWithDecks
-        selectedItemIDs.formIntersection(Set(itemRows.map(\.id)))
-        await publishDeviceState(asOf: now)
+        var snapshotTime = now
+        while true {
+            let revisionBeforeWaiting = studyMutationRevision
+            await finishStudyUpdates()
+            if revisionBeforeWaiting != studyMutationRevision {
+                snapshotTime = max(snapshotTime, .now)
+            }
+            let revision = studyMutationRevision
+            let asOf = snapshotTime
+            async let home = library.coldHomeSnapshot(scope: .allDecks, asOf: asOf)
+            async let loadedItems = library.items(scope: selectedScope, sort: sortOrder, search: "")
+            async let catalog = library.loadItemTypeCatalog()
+            let (snapshot, itemRows, typeCatalog) = try await (home, loadedItems, catalog)
+            // A refresh that began before a grade must not overwrite its newer
+            // counts after the study workflow has already advanced.
+            guard revision == studyMutationRevision else {
+                snapshotTime = max(snapshotTime, .now)
+                continue
+            }
+            allDecksSummary = snapshot.allDecksSummary
+            unassignedSummary = snapshot.unassignedSummary
+            decks = snapshot.deckSummaries
+            items = itemRows
+            itemTypes = typeCatalog.allItemTypes
+            includedItemTypeGroups = typeCatalog.includedWithDecks
+            selectedItemIDs.formIntersection(Set(itemRows.map(\.id)))
+            await publishDeviceState(asOf: snapshotTime)
+            return
+        }
     }
 
     public func refresh(asOf now: Date = .now) async {
@@ -505,12 +530,31 @@ public final class LibraryFeatureModel {
         scheduleDebouncedSync()
     }
 
-    private func studyDidMutate(asOf now: Date = .now) async {
-        if let summary = try? await library.scopeSummary(scope: .allDecks, asOf: now) {
-            allDecksSummary = summary
-        }
-        await publishDeviceState(asOf: now)
+    private func studyDidMutate() async {
+        // The review is durable and the next card is validated before this
+        // callback. OS publication and library-wide summaries are not part of
+        // saving a review; a suspended publisher must never hold study controls.
+        studyMutationRevision &+= 1
+        studyUpdatesRequested = true
         scheduleDebouncedSync()
+        guard studyUpdatesTask == nil else { return }
+        studyUpdatesTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            defer { studyUpdatesTask = nil }
+            repeat {
+                studyUpdatesRequested = false
+                let revision = studyMutationRevision
+                let now = Date.now
+                let availability = try? await studyAvailability(scope: .allDecks, asOf: now)
+                guard !Task.isCancelled else { return }
+                guard revision == studyMutationRevision else { continue }
+                if let availability { await publishDeviceState(asOf: now, availability: availability) }
+            } while studyUpdatesRequested && !Task.isCancelled
+        }
+    }
+
+    private func finishStudyUpdates() async {
+        while let task = studyUpdatesTask { await task.value }
     }
 
     private func scheduleDebouncedSync() {
@@ -525,26 +569,55 @@ public final class LibraryFeatureModel {
         }
     }
 
-    private func publishDeviceState(asOf now: Date) async {
-        try? await badgePublisher?.publish(AppIconBadge(dueCount: allDecksSummary.dueNow))
-        try? await recalculateReminder(asOf: now)
-        let deckSnapshots = await withTaskGroup(of: DueWidgetDeckSummary?.self) { group in
-            for deck in decks.prefix(12) {
-                group.addTask { [library] in
-                    guard let summary = try? await library.scopeSummary(scope: .deck(deck.id), asOf: now) else { return nil }
-                    return DueWidgetDeckSummary(id: deck.id, name: deck.name, dueCount: summary.dueNow, nextDueAt: summary.nextStudyAt)
-                }
-            }
-            var values: [DueWidgetDeckSummary] = []
-            for await value in group { if let value { values.append(value) } }
-            return values.sorted { lhs, rhs in
-                if lhs.dueCount != rhs.dueCount { return lhs.dueCount > rhs.dueCount }
-                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-            }
+    private func studyAvailability(scope: DeckScope, asOf now: Date) async throws -> StudyAvailability {
+        if let reader = library as? any LibraryStudyAvailabilityReading {
+            return try await reader.studyAvailability(scope: scope, asOf: now)
         }
-        try? await widgetPublisher?.publish(DueWidgetSnapshot(
-            totalDueCount: allDecksSummary.dueNow,
-            nextDueAt: allDecksSummary.nextStudyAt,
+        let summary = try await library.scopeSummary(scope: scope, asOf: now)
+        return StudyAvailability(dueNow: summary.dueNow, nextStudyAt: summary.nextStudyAt)
+    }
+
+    private func publishDeviceState(asOf now: Date, availability: StudyAvailability? = nil) async {
+        // Serialize publication so an older, suspended OS request cannot
+        // finish after a newer grade/undo and restore stale device counts.
+        let previous = devicePublicationTask
+        let mutationRevision = studyMutationRevision
+        let availability = availability ?? StudyAvailability(dueNow: allDecksSummary.dueNow,
+            nextStudyAt: allDecksSummary.nextStudyAt)
+        devicePublicationRevision &+= 1
+        let revision = devicePublicationRevision
+        let task = Task(priority: .utility) { [weak self] in
+            await previous?.value
+            guard !Task.isCancelled, let self else { return }
+            guard mutationRevision == studyMutationRevision else { return }
+            await performDeviceStatePublication(asOf: now, availability: availability)
+        }
+        devicePublicationTask = task
+        await task.value
+        if revision == devicePublicationRevision { devicePublicationTask = nil }
+    }
+
+    private func performDeviceStatePublication(asOf now: Date, availability: StudyAvailability) async {
+        let widgetDecks = Array(decks.prefix(12))
+        try? await badgePublisher?.publish(AppIconBadge(dueCount: availability.dueNow))
+        try? await recalculateReminder(asOf: now)
+        guard let widgetPublisher else { return }
+        var deckSnapshots: [DueWidgetDeckSummary] = []
+        // Keep these lightweight reads sequential rather than queuing a burst
+        // of device-service queries ahead of the next review write.
+        for deck in widgetDecks {
+            guard !Task.isCancelled else { return }
+            guard let summary = try? await studyAvailability(scope: .deck(deck.id), asOf: now) else { continue }
+            deckSnapshots.append(DueWidgetDeckSummary(id: deck.id, name: deck.name,
+                dueCount: summary.dueNow, nextDueAt: summary.nextStudyAt))
+        }
+        deckSnapshots.sort { lhs, rhs in
+            if lhs.dueCount != rhs.dueCount { return lhs.dueCount > rhs.dueCount }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+        try? await widgetPublisher.publish(DueWidgetSnapshot(
+            totalDueCount: availability.dueNow,
+            nextDueAt: availability.nextStudyAt,
             decks: deckSnapshots,
             updatedAt: now
         ))

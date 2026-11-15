@@ -114,7 +114,7 @@
       "name": "Complete native mobile study sessions",
       "article": "user/iphone-ipad.md",
       "sources": ["Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiIOS/MobileStudyCompositionView.swift", "Sources/NeoAnkiIOS/StudySessionView.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift"]
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift", "Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift"]
     },
     {
       "id": "mobile-saved-responses",
@@ -135,14 +135,14 @@
       "name": "Show library-wide due counts on Mac and mobile app icons",
       "article": "user/sync-reminders-widgets.md",
       "sources": ["Sources/NeoAnkiApplication/AppIconBadge.swift", "Sources/NeoAnki2/AppDelegate.swift", "Sources/NeoAnki2/MacAppIconBadgeAuthorization.swift", "Sources/NeoAnki2/DecksModel.swift", "Platforms/iOS/IOSPlatformServices.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
-      "tests": ["Tests/NeoAnki2Tests/DockBadgeTests.swift", "Tests/NeoAnkiApplicationTests/AppIconBadgeTests.swift", "Tests/NeoAnkiFeaturesTests/AppIconBadgeFeatureTests.swift"]
+      "tests": ["Tests/NeoAnki2Tests/DockBadgeTests.swift", "Tests/NeoAnkiApplicationTests/AppIconBadgeTests.swift", "Tests/NeoAnkiFeaturesTests/AppIconBadgeFeatureTests.swift", "Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift"]
     },
     {
       "id": "mobile-reminders-widgets",
       "name": "Configure daily reminders and due-count widgets",
       "article": "user/sync-reminders-widgets.md",
-      "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOSWidget/NeoAnkiWidget.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
+      "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOSWidget/NeoAnkiWidget.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiApplication/LibraryStudyAvailability.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+StudyAvailability.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Models/StudyAvailability.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift", "Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ScopeSummaryTests.swift"]
     },
     {
       "id": "deck-scopes",
