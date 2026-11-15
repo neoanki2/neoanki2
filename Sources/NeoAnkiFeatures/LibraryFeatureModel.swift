@@ -545,11 +545,10 @@ public final class LibraryFeatureModel {
                 studyUpdatesRequested = false
                 let revision = studyMutationRevision
                 let now = Date.now
-                let summary = try? await library.scopeSummary(scope: .allDecks, asOf: now)
+                let availability = try? await studyAvailability(scope: .allDecks, asOf: now)
                 guard !Task.isCancelled else { return }
                 guard revision == studyMutationRevision else { continue }
-                if let summary { allDecksSummary = summary }
-                await publishDeviceState(asOf: now)
+                if let availability { await publishDeviceState(asOf: now, availability: availability) }
             } while studyUpdatesRequested && !Task.isCancelled
         }
     }
@@ -570,34 +569,45 @@ public final class LibraryFeatureModel {
         }
     }
 
-    private func publishDeviceState(asOf now: Date) async {
+    private func studyAvailability(scope: DeckScope, asOf now: Date) async throws -> StudyAvailability {
+        if let reader = library as? any LibraryStudyAvailabilityReading {
+            return try await reader.studyAvailability(scope: scope, asOf: now)
+        }
+        let summary = try await library.scopeSummary(scope: scope, asOf: now)
+        return StudyAvailability(dueNow: summary.dueNow, nextStudyAt: summary.nextStudyAt)
+    }
+
+    private func publishDeviceState(asOf now: Date, availability: StudyAvailability? = nil) async {
         // Serialize publication so an older, suspended OS request cannot
         // finish after a newer grade/undo and restore stale device counts.
         let previous = devicePublicationTask
+        let mutationRevision = studyMutationRevision
+        let availability = availability ?? StudyAvailability(dueNow: allDecksSummary.dueNow,
+            nextStudyAt: allDecksSummary.nextStudyAt)
         devicePublicationRevision &+= 1
         let revision = devicePublicationRevision
         let task = Task(priority: .utility) { [weak self] in
             await previous?.value
             guard !Task.isCancelled, let self else { return }
-            await performDeviceStatePublication(asOf: now)
+            guard mutationRevision == studyMutationRevision else { return }
+            await performDeviceStatePublication(asOf: now, availability: availability)
         }
         devicePublicationTask = task
         await task.value
         if revision == devicePublicationRevision { devicePublicationTask = nil }
     }
 
-    private func performDeviceStatePublication(asOf now: Date) async {
-        let summary = allDecksSummary
+    private func performDeviceStatePublication(asOf now: Date, availability: StudyAvailability) async {
         let widgetDecks = Array(decks.prefix(12))
-        try? await badgePublisher?.publish(AppIconBadge(dueCount: summary.dueNow))
+        try? await badgePublisher?.publish(AppIconBadge(dueCount: availability.dueNow))
         try? await recalculateReminder(asOf: now)
         guard let widgetPublisher else { return }
         var deckSnapshots: [DueWidgetDeckSummary] = []
-        // SQLite already serializes reads. Fan-out here makes reentrant store
-        // calls rebuild the same invalidated maturity/history cache together.
+        // Keep these lightweight reads sequential rather than queuing a burst
+        // of device-service queries ahead of the next review write.
         for deck in widgetDecks {
             guard !Task.isCancelled else { return }
-            guard let summary = try? await library.scopeSummary(scope: .deck(deck.id), asOf: now) else { continue }
+            guard let summary = try? await studyAvailability(scope: .deck(deck.id), asOf: now) else { continue }
             deckSnapshots.append(DueWidgetDeckSummary(id: deck.id, name: deck.name,
                 dueCount: summary.dueNow, nextDueAt: summary.nextStudyAt))
         }
@@ -606,8 +616,8 @@ public final class LibraryFeatureModel {
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
         try? await widgetPublisher.publish(DueWidgetSnapshot(
-            totalDueCount: summary.dueNow,
-            nextDueAt: summary.nextStudyAt,
+            totalDueCount: availability.dueNow,
+            nextDueAt: availability.nextStudyAt,
             decks: deckSnapshots,
             updatedAt: now
         ))

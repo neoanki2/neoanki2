@@ -79,9 +79,10 @@ A session moves through a small set of states:
 7. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
-The saving indicator covers the local review and next-card preparation. Home
-counts, badges, reminders, widgets, and iCloud updates continue separately after
-the review is saved, so they do not hold the next card's controls.
+The saving indicator covers the local review and next-card preparation. Badges,
+reminders, widgets, and iCloud updates continue separately after the review is
+saved, so they do not hold the next card's controls. Leaving study refreshes the
+full Home summary and maturity progress.
 
 After a session adds usable review evidence, an eligible profile continues
 tuning its scheduling model silently. This maintenance does not reorder the

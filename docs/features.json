@@ -141,8 +141,8 @@
       "id": "mobile-reminders-widgets",
       "name": "Configure daily reminders and due-count widgets",
       "article": "user/sync-reminders-widgets.md",
-      "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOSWidget/NeoAnkiWidget.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift", "Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift"]
+      "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOSWidget/NeoAnkiWidget.swift", "Sources/NeoAnkiApplication/AppSession.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiApplication/LibraryStudyAvailability.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+StudyAvailability.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Models/StudyAvailability.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift", "Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ScopeSummaryTests.swift"]
     },
     {
       "id": "deck-scopes",

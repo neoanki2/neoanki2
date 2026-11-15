@@ -21,10 +21,11 @@ iCloud sync is available in provisioned Mac, iPhone, and iPad builds. Daily
 reminders and the Due Cards widget are iPhone/iPad services. The library remains
 usable offline and each device keeps its own service preferences.
 
-Grading and review undo save locally before updating Home counts, app-icon
-badges, reminders, and widgets in the background. A slow device service does
-not keep **Saving review…** visible or prevent the next grade. Leaving study
-refreshes Home and device counts with the latest saved results.
+Grading and review undo save locally before updating app-icon badges, reminders,
+and widgets in the background. These services read due counts and the next study
+time without rebuilding maturity progress from the review history. A slow device
+service does not keep **Saving review…** visible or prevent the next grade.
+Leaving study refreshes the full Home summary with the latest saved results.
 
 Cards accepted through **Learn in Context**, including their saved speech, use
 ordinary item and media sync. Unfinished capture drafts and original source

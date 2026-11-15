@@ -84,9 +84,10 @@ opens the whole poem so line order and its generated cards stay in sync.
 **End** leaves immediately;
 completion reports reviews and saved submissions separately.
 
-After a grade is saved locally, the next card is ready while Home counts,
-badges, reminders, and widgets refresh in the background. These updates also
-follow review undo without delaying the study controls.
+After a grade is saved locally, the next card is ready while badges, reminders,
+and widgets refresh in the background. These updates also follow review undo
+without delaying the study controls. Leaving study refreshes the full Home
+summary, including maturity progress.
 
 The mobile study view supports native images, image occlusion, audio, video,
 rich text, cloze selection, microphone permission and recording, Dynamic Type,

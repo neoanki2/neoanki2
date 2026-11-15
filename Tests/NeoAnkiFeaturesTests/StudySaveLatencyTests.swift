@@ -81,6 +81,8 @@ func reviewSavingFinishesBeforeDevicePublication(duringRefresh: Bool) async thro
     await grade.value
     await refresh?.value
     await model.endStudy()
+    #expect(model.allDecksSummary.dueNow == 2)
+    #expect(model.allDecksSummary.cardCount == 3)
     #expect(await badge.counts.last == 2)
     #expect(await widget.snapshots.last?.totalDueCount == 2)
     #expect(await widget.snapshots.last?.decks.first?.dueCount == 2)
@@ -114,10 +116,13 @@ func reviewSavingFinishesBeforeDevicePublication(duringRefresh: Bool) async thro
     await model.bootstrap()
     await model.beginStudy(scope: .allDecks, title: "All Decks")
     let study = try #require(model.activeStudy)
-    let start = ContinuousClock.now
-    await study.grade(.good)
-    print("MOBILE_REVIEW_SAVE_SECONDS=\(start.duration(to: .now))")
-    #expect(study.completion.reviews == 1)
+    for sample in 0..<5 {
+        let start = ContinuousClock.now
+        await study.grade(.good)
+        print("MOBILE_REVIEW_SAVE_SECONDS sample=\(sample) duration=\(start.duration(to: .now))")
+        await Task.yield()
+    }
+    #expect(study.completion.reviews == 5)
     #expect(!study.isGrading)
     #expect(study.error == nil)
     await model.endStudy()
