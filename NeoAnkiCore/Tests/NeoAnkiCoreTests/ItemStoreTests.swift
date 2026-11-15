@@ -409,7 +409,7 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     try await store.revertReview(reviewLogID: submission.reviewLogID, now: now)
 
     #expect(try await store.reviewLogCount(for: card.id) == 0)
-    #expect(try reviewLogRowCount(at: databaseURL, cardID: card.id) == 1)
+    #expect(try await store.rawReviewLogCount(for: card.id) == 1)
 }
 
 @Test func immediateRepairStatePersistsAcrossReopenAndUndoRestoresExactState() async throws {
@@ -664,40 +664,6 @@ private func seedEligibleOptimizationHistory(
         }
     }
     return latest
-}
-
-private func reviewLogRowCount(at url: URL, cardID: UUID) throws -> Int {
-    var db: OpaquePointer?
-    guard sqlite3_open_v2(url.path(percentEncoded: false), &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
-          let db else {
-        throw DatabaseError.openFailed("Could not inspect test database.")
-    }
-    defer { sqlite3_close(db) }
-    var statement: OpaquePointer?
-    guard sqlite3_prepare_v2(
-        db,
-        "SELECT COUNT(*) FROM review_logs WHERE card_id = ?;",
-        -1,
-        &statement,
-        nil
-    ) == SQLITE_OK,
-          let statement else {
-        throw DatabaseError.queryFailed("Could not inspect test database.")
-    }
-    defer { sqlite3_finalize(statement) }
-    guard sqlite3_bind_text(
-        statement,
-        1,
-        cardID.uuidString,
-        -1,
-        unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    ) == SQLITE_OK else {
-        throw DatabaseError.queryFailed("Could not bind test card ID.")
-    }
-    guard sqlite3_step(statement) == SQLITE_ROW else {
-        throw DatabaseError.queryFailed("Could not inspect test database.")
-    }
-    return Int(sqlite3_column_int64(statement, 0))
 }
 
 private func createLegacyNoteDatabase(at url: URL) throws {
