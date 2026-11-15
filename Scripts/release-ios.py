@@ -506,7 +506,9 @@ def apple_error_entries(payload):
                 key = (entry["code"], entry["detail"])
                 if key not in seen:
                     seen.add(key); result.append(entry)
-                visit(value.get("meta", {}).get("associatedErrors"), depth + 1)
+                meta = value.get("meta")
+                if isinstance(meta, dict):
+                    visit(meta.get("associatedErrors"), depth + 1)
             else:
                 for entry in value.values(): visit(entry, depth + 1)
     visit(payload)

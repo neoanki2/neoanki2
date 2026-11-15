@@ -130,7 +130,7 @@ class AppInputs:
             return True
         if platform == "mac" and path in (
             "Scripts/install-app.sh", "Scripts/build-release-artifact.sh",
-            "Scripts/archive-macos-release.sh", "Scripts/sign-macos-app.py",
+            "Scripts/archive-macos-release.sh", "Scripts/sign-macos-app.py", "Scripts/signing_keychain_support.py",
         ):
             return True
         return any(path == self.targets[t]["input_path"] or path.startswith(self.targets[t]["input_path"] + "/")

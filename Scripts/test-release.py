@@ -58,6 +58,9 @@ class PlanningTests(unittest.TestCase):
     def test_mac_and_api_changes_always_include_both_mac_distributions(self):
         self.write('Sources/MacOnly/API.swift','after')
         self.assertEqual(self.release_plan()['channels'],['mac','homebrew'])
+    def test_shared_signing_helper_is_a_mac_packaging_input(self):
+        self.write('Scripts/signing_keychain_support.py','changed chain discovery')
+        self.assertEqual(self.release_plan()['channels'],['mac','homebrew'])
     def test_cloudkit_direct_ios_dependency_selects_every_distribution(self):
         self.write('Sources/CloudSync/Sync.swift','after')
         self.assertEqual(self.release_plan()['channels'],['ios','mac','homebrew'])
