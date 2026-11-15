@@ -70,6 +70,7 @@ jobs:
           python3 Scripts/test-deploy-iphone.py || failures=1
           python3 Scripts/test-release-ios.py || failures=1
           python3 Scripts/test-release-macos-app-store.py || failures=1
+          python3 Scripts/test-macos-signing.py || failures=1
           python3 Scripts/test-macos-testflight.py || failures=1
           python3 Scripts/test-review-macos-app.py || failures=1
           bash Scripts/test-release-workflow-reconciliation.sh || failures=1

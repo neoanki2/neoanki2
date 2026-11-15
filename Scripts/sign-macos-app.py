@@ -8,6 +8,7 @@ import argparse
 import contextlib
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
+_KEYCHAIN_SPEC = importlib.util.spec_from_file_location(
+    __name__ + "_keychain_support", Path(__file__).with_name("signing_keychain_support.py"))
+keychain_support = importlib.util.module_from_spec(_KEYCHAIN_SPEC)
+_KEYCHAIN_SPEC.loader.exec_module(keychain_support)
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SIGNING = Path.home() / "Library/Application Support/NeoAnki2 Signing"
@@ -144,7 +150,7 @@ class Material:
 @contextlib.contextmanager
 def signing_keychain(material):
     with tempfile.TemporaryDirectory(prefix="neoanki-mac-signing-") as directory:
-        folder = Path(directory)
+        folder = Path(directory).resolve()
         keychain = folder / "signing.keychain-db"
         password = secrets.token_hex(32)
         passfile = folder / "password"
@@ -164,11 +170,8 @@ def signing_keychain(material):
             run(["security", "import", str(p12), "-k", str(keychain), "-P", password, "-T", "/usr/bin/codesign"])
             run(["security", "import", str(material.directory / "DeveloperIDG2CA.cer"), "-k", str(keychain)])
             run(["security", "set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, str(keychain)])
-            # --keychain narrows identity lookup, but codesign still uses the
-            # user's search list to discover the signing certificate chain.
-            current = re.findall(r'"([^"]+)"', run(["security", "list-keychains", "-d", "user"]).decode())
-            if str(keychain) not in current:
-                run(["security", "list-keychains", "-d", "user", "-s", *current, str(keychain)])
+            keychain_support.register(run, keychain)
+            keychain_support.verify_chain(run, material.directory / "Developer-ID-Application.cert.pem")
             yield keychain, folder
         finally:
             # Preserve concurrent search-list changes, removing only our entry.
@@ -176,10 +179,7 @@ def signing_keychain(material):
                 try:
                     run(["security", "delete-keychain", str(keychain)])
                 finally:
-                    current = re.findall(r'"([^"]+)"', run(["security", "list-keychains", "-d", "user"]).decode())
-                    remaining = [p for p in current if p != str(keychain)]
-                    if remaining != current:
-                        run(["security", "list-keychains", "-d", "user", "-s", *remaining])
+                    keychain_support.unregister(run, keychain)
             print("MAC_SIGNING_CLEANUP=complete", flush=True)
 
 

@@ -58,6 +58,12 @@ def run(argv, timeout=60, log=None, env=None):
                                 capture_output=True, timeout=timeout, env=env)
         if result.returncode:
             # Avoid printing command lines or Apple authentication output.
+            if argv[0] == "codesign":
+                # This tool receives public identities and paths, not API
+                # credentials. Preserve its actionable chain/entitlement error.
+                detail = result.stderr.decode(errors="replace").strip()
+                suffix = f": {detail[-1000:]}" if detail else ""
+                raise ReleaseError(f"codesign exited with {result.returncode}{suffix}")
             raise ReleaseError(f"{argv[0]} exited with {result.returncode}")
         return result.stdout
     except subprocess.TimeoutExpired:
@@ -485,6 +491,30 @@ def raw_es256(der):
     return b"".join(numbers)
 
 
+def apple_error_entries(payload):
+    """Include Apple's nested validation causes, without dumping response data."""
+    result, seen = [], set()
+    def visit(value, depth=0):
+        if depth > 6 or len(result) >= 32:
+            return
+        if isinstance(value, list):
+            for entry in value: visit(entry, depth + 1)
+        elif isinstance(value, dict):
+            if "code" in value or "detail" in value:
+                entry = {"code": str(value.get("code", "UNKNOWN")),
+                         "detail": str(value.get("detail", ""))}
+                key = (entry["code"], entry["detail"])
+                if key not in seen:
+                    seen.add(key); result.append(entry)
+                meta = value.get("meta")
+                if isinstance(meta, dict):
+                    visit(meta.get("associatedErrors"), depth + 1)
+            else:
+                for entry in value.values(): visit(entry, depth + 1)
+    visit(payload)
+    return result
+
+
 class AppleAPI:
     def __init__(self, config):
         for key in ("key_id", "issuer_id", "private_key_path"):
@@ -514,8 +544,9 @@ class AppleAPI:
         if parsed.scheme != "https" or parsed.netloc != "api.appstoreconnect.apple.com":
             raise ReleaseError("Refusing an unexpected App Store Connect API host")
         data = None if body is None else json.dumps(body).encode()
+        token = self.token()
         request = urllib.request.Request(url, data=data, method=method,
-                                        headers={"Authorization": "Bearer " + self.token(),
+                                        headers={"Authorization": "Bearer " + token,
                                                  "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
@@ -523,13 +554,14 @@ class AppleAPI:
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as error:
             try:
-                errors = json.loads(error.read()).get("errors", [])
+                errors = apple_error_entries(json.loads(error.read()).get("errors", []))
                 codes = [e.get("code", "UNKNOWN") for e in errors]
                 details = "; ".join(e.get("detail", "") for e in errors)[:1000]
             except (ValueError, KeyError):
                 codes, details = [], ""
-            raise ReleaseError(f"Apple API {method} {parsed.path}: HTTP {error.code}, {', '.join(codes)}"
-                               + (": " + details if details else "")) from None
+            message = (f"Apple API {method} {parsed.path}: HTTP {error.code}, {', '.join(codes)}"
+                       + (": " + details if details else ""))
+            raise ReleaseError(message.replace(token, "<redacted>")) from None
 
     def list(self, resource, **filters):
         query = urllib.parse.urlencode({"limit": 200, **filters})

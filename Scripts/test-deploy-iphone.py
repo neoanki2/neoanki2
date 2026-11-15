@@ -301,6 +301,52 @@ class DeploymentTests(unittest.TestCase):
     def test_signing_failure_removes_only_temporary_keychain(self):
         self.check_signing_cleanup()
 
+    def test_distribution_chain_is_discoverable_before_signing(self):
+        self.check_chain_preflight()
+
+    def test_distribution_chain_failure_stops_before_signing_and_cleans_up(self):
+        self.check_chain_preflight(fail=True)
+
+    def check_chain_preflight(self, fail=False):
+        flow = deploy.Workflow(Path("unused"))
+        calls, search, temporary = [], ["/existing/login"], []
+        verified = False
+        def run(args, **kwargs):
+            nonlocal verified
+            calls.append(args)
+            if args[:2] == ["openssl", "pkcs12"]:
+                Path(args[args.index("-out") + 1]).touch()
+            if args[:2] == ["security", "create-keychain"]:
+                temporary.append(Path(args[-1])); temporary[0].touch()
+            if args[:2] == ["security", "delete-keychain"]:
+                temporary[0].unlink()
+            if args[:2] == ["security", "list-keychains"]:
+                if "-s" in args: search[:] = args[args.index("-s") + 1:]
+                else: return "\n".join('"' + p + '"' for p in search).encode()
+            if args[:2] == ["security", "verify-cert"]:
+                self.assertIn(str(temporary[0]), search)
+                self.assertEqual(args, ["security", "verify-cert", "-c",
+                    "fixture-signing/Apple-Distribution.cert.pem", "-p", "codeSign", "-L"])
+                search.append("/existing/concurrent")
+                if fail: raise deploy.DeploymentError("MissingIntermediate")
+                verified = True
+            return b""
+        entered = False
+        with patch.object(flow, "run", side_effect=run):
+            if fail:
+                with self.assertRaisesRegex(deploy.DeploymentError, "MissingIntermediate"):
+                    with flow.signing_keychain(Path("fixture-signing")):
+                        entered = True
+            else:
+                with flow.signing_keychain(Path("fixture-signing")):
+                    self.assertTrue(verified)
+                    self.assertIn(str(temporary[0]), search)
+                    entered = True
+        self.assertEqual(entered, not fail)
+        self.assertEqual(search, ["/existing/login", "/existing/concurrent"])
+        self.assertFalse(temporary[0].exists())
+        self.assertFalse(any("add-trusted-cert" in args for args in calls))
+
     def test_keychain_delete_failure_still_removes_search_entry(self):
         self.check_signing_cleanup(deletion_fails=True)
 
