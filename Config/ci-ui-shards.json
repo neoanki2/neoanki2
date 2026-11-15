@@ -159,8 +159,8 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testAllFieldAuthoringMediaRemovalAndPickerCancellation",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testGenericDictionaryLookupInNewItemSavesToChosenDeck",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTypingUkrainianStressLookupRepeatedlySavesWithoutCrashing",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testSimpleNewItemOmitsDictionaryLookupAndSavesToChosenDeck",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testSimpleNewItemOmitsDictionaryLookupForCustomType",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testPhotoCanBeSelectedBeforeNameAndDescription",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testCloudVocabularyCatalogDownloadsAndRemovesOnlyLocalCopy"
       ]
