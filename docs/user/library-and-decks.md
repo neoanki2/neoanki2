@@ -50,9 +50,9 @@ With iCloud sync, due counts use the latest saved review outcomes. Opening a
 library also repairs schedules left behind by older synced card snapshots;
 this preserves the review history and does not require reviewing cards again.
 
-Background count updates keep **Start Studying** available when cards are ready.
-The action is disabled while a study session is starting, preventing duplicate
-starts without making you wait for badge or count refreshes.
+Background count updates keep the **Study** action in sync with the current due
+count. The scope home says **You’re caught up** when no cards are due; it also
+updates while badges and other summaries refresh.
 
 Choose **Add Word** from a deck to capture vocabulary directly into that deck.
 From **All Decks**, capture restores the last destination and dictionary pair,

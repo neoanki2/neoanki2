@@ -60,17 +60,12 @@ offline edits remain queued until a connection is available.
 - [Repair or delete an item type](#repair-or-delete-an-item-type)
 </nav>
 
-For dictionary-assisted authoring, include at least two Text or Rich Text
-fields. The Add Item editor lets you choose which field supplies the lookup
-word and which receives the dictionary text. This does not add or change a
-Card setup; the selected item type continues to determine the generated cards.
-See [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
-
-The focused **Add Word** flow uses an existing item type too. Its **Card Setup**
+The focused **Add Word** flow can use an existing item type. Its **Card Setup**
 maps dictionary content to that type's fields and saves the mapping for the
 dictionary–deck pair. Editing one word does not change that mapping. If a field
 is deleted or its type changes, repair the pair's setup before adding again;
-the app does not silently redirect content to another field.
+the app does not silently redirect content to another field. Standard
+**Add Item** uses the selected type's fields without dictionary lookup.
 
 ## Start with a complete item type
 

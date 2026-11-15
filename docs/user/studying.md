@@ -9,9 +9,8 @@ parent: User Guide
 # Studying
 
 Active study is timed automatically, including skipped cards and unfinished
-attempts. **Pause Timer** and **Resume Timer** control deliberate breaks; two
-minutes without interaction pauses automatically. Editing, saving, hidden
-windows, and background time are excluded. Completion shows session duration,
+attempts. The timer pauses after two minutes without interaction. Editing,
+saving, hidden windows, and background time are excluded. Completion shows session duration,
 and deck homes link to per-deck and subdeck reports. Save failures remain visible
 after a session ends. See [Learning time](../learning-time/) for counting rules.
 
@@ -47,7 +46,7 @@ may also hide supporting content until reveal or blur compatible image and GIF
 content; **Show Answer** applies those reveal rules together without changing
 the card's place in the session.
 
-NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The Study button shows the number due and is disabled when that count is zero; future cards are not included.
+NeoAnki2 builds a study session from cards that are due now in the scope selected in the sidebar. Select **All Decks**, **Unassigned**, or a deck, then choose **Study**. A deck scope includes its descendant decks. The home screen shows the number of cards due, or **You’re caught up** when none are due; future cards are not included.
 
 [![A card prompt before reveal]({{ site.baseurl }}/assets/screenshots/study-prompt.png)]({{ site.baseurl }}/assets/screenshots/study-prompt.png)
 

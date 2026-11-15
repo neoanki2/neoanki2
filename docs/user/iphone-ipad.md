@@ -10,10 +10,9 @@ permalink: /user/iphone-ipad/
 # iPhone and iPad
 
 Home and each deck show Today and All time learning totals. **View Learning
-Time** opens period filters and an expandable deck breakdown. During study,
-**Pause Timer** takes a deliberate break and **Resume Timer** returns to timing;
-completion shows the session duration. The timer also pauses after two minutes
-without interaction and while the app is inactive. See
+Time** opens period filters and an expandable deck breakdown. Study time is
+tracked automatically; the timer pauses after two minutes without interaction
+and while the app is inactive. Completion shows the session duration. See
 [Learning time](../learning-time/) for recording, playback, and sync rules.
 
 NeoAnki2 has a native app for iOS and iPadOS 17 or newer. It shares the same
@@ -156,12 +155,11 @@ prepared item. Each pair remembers its item type, field mappings, and preferred
 content variants on this device. Add stays above the keyboard, and the flow
 stays open for the next word. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
-When adding an item with at least two Text or Rich Text fields, expand
-**Dictionary** to choose an installed vocabulary pack, a **Look up field**,
-and a distinct **Fill field**. A single exact match can fill the destination;
-**Use Entry** selects another result. Your edited destination is preserved.
-Install packs through **Create → Vocabulary Packs**; lookup stays offline.
-See [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
+The standard **New Item** form contains the selected type's fields. For
+dictionary-assisted capture, use **Add Word**, which remembers field mappings
+for each dictionary–deck pair and works with installed vocabulary packs.
+Install packs through **Create → Vocabulary Packs**. See
+[Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
 ## Import, export, and build decks
 
