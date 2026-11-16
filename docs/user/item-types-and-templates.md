@@ -16,7 +16,10 @@ Studio retains its preview, authorization, and history-preservation safeguards.
 Learning-time history belongs to the studied item, rather than a generated card
 or Card setup definition. Regenerating cards for a surviving item preserves its
 time. Editing item types or Card setups is excluded from active study timing.
-See [Learning time](../learning-time/).
+Statistics can filter recorded reviews by item type, Card setup, skill, and
+answer method. New measurements capture those classifications at review time;
+older unsupported values are labeled Unknown. See [Statistics](../statistics/)
+and [Learning time](../learning-time/).
 
 An **item type** defines the fields that store one piece of knowledge. Its
 **Card setups** decide which fields appear on a study card, which of five

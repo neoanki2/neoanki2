@@ -14,11 +14,12 @@ browser. A multi-item move succeeds for the entire selection or asks you to
 refresh a changed selection. Typed answers keep your submitted text beside the
 expected answer after checking; explanations remain under **Explanation**.
 
-Home and each deck show Today and All time learning totals. **View Learning
-Time** opens period filters and an expandable deck breakdown. Study time is
-tracked automatically; the timer pauses after two minutes without interaction
-and while the app is inactive. Completion shows the session duration. See
-[Learning time](../learning-time/) for recording, playback, and sync rules.
+The **Statistics** tab on iPhone and sidebar destination on iPad open the same
+reports as Mac: Overview, Activity, Memory, and Workload. Deck actions scope that
+screen; **View Session Statistics** opens a completed session's details. Home
+keeps due counts and study actions rather than repeating statistical totals.
+Tracking remains automatic. See [Statistics](../statistics/) and
+[Learning time](../learning-time/) for definitions and recording rules.
 
 NeoAnki2 has a native app for iOS and iPadOS 17 or newer. It shares the same
 library model, FSRS scheduler, item types, Card setups, and portable formats as
@@ -46,18 +47,19 @@ widgets, and TestFlight.
 
 ## Navigate on iPhone and iPad
 
-On iPhone, four labeled tabs stay available at the bottom:
+On iPhone, five labeled tabs stay available at the bottom:
 
 - **Home** shows All Decks, Unassigned, individual deck scopes, current due
-  counts, maturity progress, and the primary Study action.
+  counts and the primary Study action.
 - **Library** browses, searches, selects, moves, edits, and deletes items.
   Item details show the maturity of each generated card.
 - **Create** adds items and decks, manages item types and Card setups, transfers
   files, opens deck builders, and manages offline vocabulary packs.
+- **Statistics** explores activity, memory, sessions, and read-only workload scenarios.
 - **Settings** contains iCloud sync, reminders, browsing privacy, grading, and
   scheduling controls.
 
-On iPad and other regular-width layouts, the same four destinations appear in
+On iPad and other regular-width layouts, the same five destinations appear in
 a persistent sidebar with the selected destination in the detail area. Rotate
 the device freely: compact layouts use tabs and regular layouts use the split
 view. System Back controls return through nested screens.

@@ -14,12 +14,11 @@ elsewhere, refresh and select again; the whole move is rejected. Renaming a deck
 preserves progress. If review evidence is damaged, maturity is labeled
 unavailable while items and study remain accessible.
 
-Each deck home shows learning time for Today and All time. In the detailed
-report, a parent's total includes descendants; expand it to distinguish **This
-deck only** from subdeck totals. Time follows each item's current assignment,
-so moving an item or subdeck updates historical rollups. Deleted items retain
-time under **Deleted Content** in the library report. See
-[Learning time](../learning-time/) for period and rollover rules.
+Choose a deck's **Statistics** action to open its activity, learning-time,
+progress, and workload reports. The shared Statistics screen includes subdeck
+controls; current due counts stay on the deck home. Historical time follows the
+item's current deck. See [Statistics](../statistics/) and
+[Learning time](../learning-time/) for counting and attribution rules.
 
 The sidebar controls which items and due cards appear in the detail area.
 Decks organize items without changing their item type or generated cards.
@@ -212,15 +211,10 @@ to study right now?
 - When nothing is due, the count is replaced by when the next card comes back —
   for example, "The next card is due in 3 hours." There is no disabled Study
   button left sitting there without explanation.
-- **Cards** breaks the scope down into **New**, **Learning**, and **Review**.
-  Relearning cards count as learning, because relearning is a repair round.
-- **Maturity** shows whether the scope is Not started, Learning, or Maintaining,
-  plus how many active cards are maintaining. A deck includes its subdecks and
-  reaches Maintaining only when every active card qualifies.
-- The progress chart shows the percentage of active cards that are Maintaining;
-  the adjacent state counts keep New and Learning cards visible too.
-- When a daily limit defers new cards, a note separates today's available new
-  cards from the deferred backlog and reports when more become available.
+- **Statistics** opens the scoped reports. Card counts and Maintaining progress
+  appear under Memory, and review/time history appears under Activity.
+- When a daily limit defers new cards, the next-study message reports when more
+  become available. Workload scenarios explain the effect of introduction limits.
 - If cards in the scope have lapsed at least eight times, a note says how many
   and offers **Review Affected Items**. This opens Browse filtered to the items
   that generated those cards. Select one or more rows and choose
@@ -229,7 +223,9 @@ to study right now?
   content, or choose **Show All Items** to remove the filter.
 - **Browse *n* Items** opens browse mode.
 
-The scope home never shows an item's answer.
+The scope home never shows an item's answer. Card counts, maturity breakdowns,
+and historical progress are available in **Statistics → Memory**, alongside
+activity and learning-time reports.
 
 Maturity describes demonstrated long-term recall, not the scheduler phase shown
 under Cards or in Browse. A card qualifies after two Good or Easy recalls that

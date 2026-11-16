@@ -14,6 +14,13 @@ the local API, or iCloud. A device-update warning after saving means the library
 change is already stored; refresh to retry badge, reminder, or widget
 publication rather than creating or importing the same content again.
 
+Statistics also has an independent private iCloud zone for content-free review,
+undo, lifecycle, and session evidence. Idempotent event identities prevent
+repeated delivery from duplicating activity, and unrelated record arrival order
+does not turn an explicit undo into a review. Statistics reports remain separate
+from the operational app-icon due count, reminder schedule, and widget values.
+See [Statistics](../statistics/) for legacy coverage and deletion rules.
+
 Updated apps also synchronize active learning-time segments through a separate
 private iCloud zone. Offline study joins combined totals after syncing, and
 repeated delivery never duplicates time. Older apps keep ordinary library sync

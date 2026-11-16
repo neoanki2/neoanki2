@@ -13,10 +13,10 @@ you open Browse. Large libraries can therefore show the home screen without
 first loading every saved item. If progress evidence cannot be read, a recovery
 message identifies unavailable maturity while keeping the library accessible.
 
-Deck homes also show Today and All time learning totals. Choose **View Learning
-Time** for a deck breakdown and reporting periods. Tracking begins with new
-native study sessions; older review durations are not imported. See
-[Learning time](../learning-time/).
+Choose **Statistics** in the Mac/iPad sidebar or iPhone tab bar for activity,
+learning time, progress, streaks, and workload charts. A deck's Statistics action
+selects that scope. Reports use one shared screen across all Apple platforms;
+home keeps due counts and study actions. See [Statistics](../statistics/).
 
 NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and
 iPad. Homebrew is the recommended Mac installation because it verifies the

@@ -19,6 +19,12 @@ attempt keeps its learning time; undoing a grade or resetting scheduling does
 not erase it. Reporting days use the same configured study-day rollover. See
 [Learning time](../learning-time/).
 
+**Statistics → Workload** separates current due dates from simulated future
+reviews. Scenarios compare configured settings with a chosen new-card pace or
+desired retention, honor today's consumed introductions and parent limits, and
+never reschedule actual cards. Recall and maturity reports live under Memory;
+see [Statistics](../statistics/) for assumptions and coverage.
+
 NeoAnki2 uses FSRS-6 (Free Spaced Repetition Scheduler) to decide when each card
 is due. You do not set an interval while studying. Instead, reveal the answer
 and describe your recall:

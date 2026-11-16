@@ -184,6 +184,14 @@
         "**five intervening cards**",
         "**Poetry and prose builder cards keep their existing scheduling.**"
       ]
+    },
+    {
+      "article": "user/statistics.md",
+      "contains": [
+        "Mac, iPhone, and iPad use the same screen and calculations",
+        "Explicit undo removes the review contribution",
+        "Scenarios never change actual cards, due dates, or settings"
+      ]
     }
   ]
 }
