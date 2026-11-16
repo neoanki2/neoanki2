@@ -79,6 +79,13 @@ public enum PoemDeckGenerator {
         workspaceProvider: any DeckBuildWorkspaceProviding = SystemDeckBuildWorkspaceProvider(),
         limits: AuthoredDeckLimits = .default
     ) throws -> GeneratedDeckBundle {
+        try prepare(input: input, limits: limits).materialize(using: workspaceProvider)
+    }
+
+    public static func prepare(
+        input: PoemDeckInput,
+        limits: AuthoredDeckLimits = .default
+    ) throws -> GeneratedDeckCreation {
         let author = input.author.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !author.isEmpty else { throw PoemDeckBuilderError.missingAuthor }
 
@@ -92,22 +99,17 @@ public enum PoemDeckGenerator {
         let lines = poem.lines
         guard lines.count >= 2 else { throw PoemDeckBuilderError.tooFewLines }
 
-        let workspace = try workspaceProvider.makeWorkspace()
+        let attribution = "\(title) · \(author)"
+        let items = PoemCardPlanner.cards(for: poem, title: title).map { card in
+            AuthoredDeckDraft.TextItem(fields: ["front": card.prompt, "back": card.answer, "attribution": attribution],
+                tags: ["author:\(author)"] + (card.isOpening ? [PoemCardPlanner.openingTag] : []))
+        }
         do {
-            try writeBundle(
-                at: workspace.bundleURL,
-                author: author,
-                title: title,
-                poem: poem
-            )
-            let diagnostics = AuthoredDeck.validate(at: workspace.bundleURL, limits: limits)
-            guard diagnostics.isEmpty else {
-                throw PoemDeckBuilderError.invalidGeneratedDeck(diagnostics)
-            }
-            return workspace.placed(under: destinationDeckID)
-        } catch {
-            workspace.cleanup()
-            throw error
+            let prepared = try AuthoredDeck.prepare(.init(key: "poem", title: title,
+                definition: poemTypeRecord, items: items), limits: limits)
+            return GeneratedDeckCreation(prepared: prepared, parentDeckID: destinationDeckID)
+        } catch let AuthoredDeckError.invalid(diagnostics) {
+            throw PoemDeckBuilderError.invalidGeneratedDeck(diagnostics)
         }
     }
 
@@ -142,192 +144,41 @@ public enum PoemDeckGenerator {
         parse(text).lines.map(\.text)
     }
 
-    private static func writeBundle(
-        at bundleURL: URL,
-        author: String,
-        title: String,
-        poem: ParsedPoem
-    ) throws {
-        let itemsDirectory = bundleURL.appendingPathComponent("items", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: itemsDirectory,
-            withIntermediateDirectories: false,
-            attributes: [.posixPermissions: 0o700]
-        )
-
-        var manifestData = Data()
-        try append(
-            ManifestRecord(kind: "neoanki", version: 5, root: "poem", parts: ["items/poem.jsonl"]),
-            to: &manifestData
-        )
-        try append(poemTypeRecord, to: &manifestData)
-        try append(
-            DeckRecord(
-                kind: "deck",
-                id: "poem",
-                name: title,
-                parent: nil,
-                itemTypes: ["poem-line"],
-                defaultType: "poem-line"
-            ),
-            to: &manifestData
-        )
-        try manifestData.write(
-            to: bundleURL.appendingPathComponent(AuthoredDeck.manifestName),
-            options: .atomic
-        )
-
-        var itemData = Data()
-        let attribution = "\(title) · \(author)"
-        for card in PoemCardPlanner.cards(for: poem, title: title) {
-            let fields = [
-                "front": TextValue(text: card.prompt),
-                // A leading blank line carries stanza separation as whitespace
-                // within the answer rather than as visible instructional text.
-                "back": TextValue(text: card.answer),
-                "attribution": TextValue(text: attribution),
-            ]
-            let item = ItemRecord(
-                kind: "item",
-                deck: "poem",
-                type: "poem-line",
-                fields: fields,
-                tags: ["author:\(author)"] + (card.isOpening ? [PoemCardPlanner.openingTag] : [])
-            )
-            try append(item, to: &itemData)
-        }
-        try itemData.write(
-            to: itemsDirectory.appendingPathComponent("poem.jsonl"),
-            options: .atomic
-        )
-    }
-
-    private static func append<Value: Encodable>(_ value: Value, to data: inout Data) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
-        data.append(try encoder.encode(value))
-        data.append(0x0A)
-    }
-
-    private static let poemTypeRecord = TypeRecord(
-        kind: "type",
+    private static let poemTypeRecord = AuthoredDeckDraft.Definition(
         id: "poem-line",
         name: "Poem Line",
         fields: [
-            FieldRecord(id: "front", name: "Front", type: "text", required: true),
-            FieldRecord(id: "back", name: "Back", type: "text", required: true),
-            FieldRecord(id: "attribution", name: "Attribution", type: "text", required: true),
+            AuthoredDeckDraft.Field(id: "front", name: "Front", type: .text, required: true),
+            AuthoredDeckDraft.Field(id: "back", name: "Back", type: .text, required: true),
+            AuthoredDeckDraft.Field(id: "attribution", name: "Attribution", type: .text, required: true),
         ],
         templates: [
-            TemplateRecord(
+            AuthoredDeckDraft.CardTemplate(
                 name: "Card",
-                layout: "focus",
+                layout: .focus,
                 components: [
-                    ComponentRecord(
-                        region: "label",
-                        purpose: "supporting",
+                    AuthoredDeckDraft.Component(
+                        region: .label,
+                        purpose: .supporting,
                         field: "attribution",
-                        reveal: "always"
+                        reveal: .always
                     ),
-                    ComponentRecord(
-                        region: "primary",
-                        purpose: "question",
+                    AuthoredDeckDraft.Component(
+                        region: .primary,
+                        purpose: .question,
                         field: "front",
-                        reveal: "always"
+                        reveal: .always
                     ),
-                    ComponentRecord(
-                        region: "secondary",
-                        purpose: "expectedAnswer",
+                    AuthoredDeckDraft.Component(
+                        region: .secondary,
+                        purpose: .expectedAnswer,
                         field: "back",
-                        reveal: "hiddenUntilAnswer"
+                        reveal: .hiddenUntilAnswer
                     ),
                 ],
-                prompt: [
-                    SlotRecord(field: "attribution"),
-                    SlotRecord(field: "front"),
-                ],
-                answer: [
-                    SlotRecord(field: "back", reveal: "hiddenUntilAnswer"),
-                ],
-                interaction: "reveal",
-                skill: SkillRecord(input: "text", output: "text", operation: "recall")
+                interaction: .reveal,
+                skill: Skill(input: .text, output: .text, operation: .recall)
             ),
         ]
     )
-}
-
-private struct ManifestRecord: Encodable {
-    let kind: String
-    let version: Int
-    let root: String
-    let parts: [String]
-}
-
-private struct DeckRecord: Encodable {
-    let kind: String
-    let id: String
-    let name: String
-    let parent: String?
-    let itemTypes: [String]?
-    let defaultType: String?
-}
-
-private struct TypeRecord: Encodable {
-    let kind: String
-    let id: String
-    let name: String
-    let fields: [FieldRecord]
-    let templates: [TemplateRecord]
-}
-
-private struct FieldRecord: Encodable {
-    let id: String
-    let name: String
-    let type: String
-    let required: Bool
-}
-
-private struct TemplateRecord: Encodable {
-    let name: String
-    let layout: String
-    let components: [ComponentRecord]
-    let prompt: [SlotRecord]
-    let answer: [SlotRecord]
-    let interaction: String
-    let skill: SkillRecord
-}
-
-private struct SlotRecord: Encodable {
-    let field: String
-    let reveal: String?
-
-    init(field: String, reveal: String? = nil) {
-        self.field = field
-        self.reveal = reveal
-    }
-}
-
-private struct ComponentRecord: Encodable {
-    let region: String
-    let purpose: String
-    let field: String
-    let reveal: String
-}
-
-private struct SkillRecord: Encodable {
-    let input: String
-    let output: String
-    let operation: String
-}
-
-private struct ItemRecord: Encodable {
-    let kind: String
-    let deck: String
-    let type: String
-    let fields: [String: TextValue]
-    let tags: [String]
-}
-
-private struct TextValue: Encodable {
-    let text: String
 }

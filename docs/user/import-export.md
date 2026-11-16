@@ -86,6 +86,11 @@ The builder first writes a temporary `.neoanki` bundle, validates the complete
 bundle with the same rules as an imported authored deck, imports it atomically,
 and removes the temporary files. It does not write directly to the library.
 
+Creation saves the new deck and its selected parent together. If the parent was
+removed before the save, creation stops without leaving a top-level deck. The
+entered text remains available to try again. A refresh warning after a completed
+save means the deck exists; refresh the library rather than creating it again.
+
 ## Build a prose deck
 
 Choose **File → Build Deck… → Prose Deck** on Mac, or **Create → Prose

@@ -48,6 +48,14 @@ public enum ProseDeckGenerator {
         workspaceProvider: any DeckBuildWorkspaceProviding = SystemDeckBuildWorkspaceProvider(),
         limits: AuthoredDeckLimits = .default
     ) throws -> GeneratedDeckBundle {
+        try prepare(input: input, reviewedUnits: reviewedUnits, limits: limits).materialize(using: workspaceProvider)
+    }
+
+    public static func prepare(
+        input: ProseDeckInput,
+        reviewedUnits: [ProseUnit]? = nil,
+        limits: AuthoredDeckLimits = .default
+    ) throws -> GeneratedDeckCreation {
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { throw ProseDeckBuilderError.missingTitle }
         guard let destinationDeckID = input.destinationDeckID else {
@@ -57,22 +65,20 @@ public enum ProseDeckGenerator {
         guard !units.isEmpty else { throw ProseDeckBuilderError.emptyText }
         guard valid(units) else { throw ProseDeckBuilderError.invalidUnits }
 
-        let workspace = try workspaceProvider.makeWorkspace()
+        let author = input.author.trimmingCharacters(in: .whitespacesAndNewlines)
+        let attribution = author.isEmpty ? title : "\(title) · \(author)"
+        let prompts = ProsePromptPlanner.prompts(for: units)
+        let items = units.enumerated().map { index, unit in
+            AuthoredDeckDraft.TextItem(fields: ["front": prompts[index], "back": unit.text,
+                "attribution": attribution, "order": String(index), "separator": unit.separator],
+                tags: author.isEmpty ? [] : ["author:\(author)"])
+        }
         do {
-            try writeBundle(
-                at: workspace.bundleURL,
-                author: input.author.trimmingCharacters(in: .whitespacesAndNewlines),
-                title: title,
-                units: units
-            )
-            let diagnostics = AuthoredDeck.validate(at: workspace.bundleURL, limits: limits)
-            guard diagnostics.isEmpty else {
-                throw ProseDeckBuilderError.invalidGeneratedDeck(diagnostics)
-            }
-            return workspace.placed(under: destinationDeckID)
-        } catch {
-            workspace.cleanup()
-            throw error
+            let prepared = try AuthoredDeck.prepare(.init(key: "prose", title: title,
+                definition: proseTypeRecord, items: items), limits: limits)
+            return GeneratedDeckCreation(prepared: prepared, parentDeckID: destinationDeckID)
+        } catch let AuthoredDeckError.invalid(diagnostics) {
+            throw ProseDeckBuilderError.invalidGeneratedDeck(diagnostics)
         }
     }
 
@@ -86,182 +92,33 @@ public enum ProseDeckGenerator {
         }
     }
 
-    private static func writeBundle(
-        at bundleURL: URL,
-        author: String,
-        title: String,
-        units: [ProseUnit]
-    ) throws {
-        let itemsDirectory = bundleURL.appendingPathComponent("items", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: itemsDirectory,
-            withIntermediateDirectories: false,
-            attributes: [.posixPermissions: 0o700]
-        )
-
-        var manifestData = Data()
-        try append(
-            ProseManifestRecord(kind: "neoanki", version: 5, root: "prose", parts: ["items/prose.jsonl"]),
-            to: &manifestData
-        )
-        try append(proseTypeRecord, to: &manifestData)
-        try append(
-            ProseDeckRecord(
-                kind: "deck",
-                id: "prose",
-                name: title,
-                parent: nil,
-                itemTypes: ["prose-unit"],
-                defaultType: "prose-unit"
-            ),
-            to: &manifestData
-        )
-        try manifestData.write(
-            to: bundleURL.appendingPathComponent(AuthoredDeck.manifestName),
-            options: .atomic
-        )
-
-        let attribution = author.isEmpty ? title : "\(title) · \(author)"
-        let prompts = ProsePromptPlanner.prompts(for: units)
-        var itemData = Data()
-        for (index, unit) in units.enumerated() {
-            let fields = [
-                "front": ProseTextValue(text: prompts[index]),
-                "back": ProseTextValue(text: unit.text),
-                "attribution": ProseTextValue(text: attribution),
-                "order": ProseTextValue(text: String(index)),
-                "separator": ProseTextValue(text: unit.separator),
-            ]
-            try append(
-                ProseItemRecord(
-                    kind: "item",
-                    deck: "prose",
-                    type: "prose-unit",
-                    fields: fields,
-                    tags: author.isEmpty ? [] : ["author:\(author)"]
-                ),
-                to: &itemData
-            )
-        }
-        try itemData.write(
-            to: itemsDirectory.appendingPathComponent("prose.jsonl"),
-            options: .atomic
-        )
-    }
-
-    private static func append<Value: Encodable>(_ value: Value, to data: inout Data) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
-        data.append(try encoder.encode(value))
-        data.append(0x0A)
-    }
-
-    private static let proseTypeRecord = ProseTypeRecord(
-        kind: "type",
+    private static let proseTypeRecord = AuthoredDeckDraft.Definition(
         id: "prose-unit",
         name: "Prose Unit",
         fields: [
-            .init(id: "front", name: "Front", type: "text", required: true),
-            .init(id: "back", name: "Back", type: "text", required: true),
-            .init(id: "attribution", name: "Attribution", type: "text", required: true),
-            .init(id: "order", name: "Order", type: "text", required: true),
-            .init(id: "separator", name: "Separator", type: "text", required: false),
+            .init(id: "front", name: "Front", type: .text, required: true),
+            .init(id: "back", name: "Back", type: .text, required: true),
+            .init(id: "attribution", name: "Attribution", type: .text, required: true),
+            .init(id: "order", name: "Order", type: .text, required: true),
+            .init(id: "separator", name: "Separator", type: .text, required: false),
         ],
         templates: [
             .init(
                 name: "Card",
-                layout: "focus",
+                layout: .focus,
                 components: [
-                    .init(region: "label", purpose: "supporting", field: "attribution", reveal: "always"),
-                    .init(region: "primary", purpose: "question", field: "front", reveal: "always"),
+                    .init(region: .label, purpose: .supporting, field: "attribution", reveal: .always),
+                    .init(region: .primary, purpose: .question, field: "front", reveal: .always),
                     .init(
-                        region: "secondary",
-                        purpose: "expectedAnswer",
+                        region: .secondary,
+                        purpose: .expectedAnswer,
                         field: "back",
-                        reveal: "hiddenUntilAnswer"
+                        reveal: .hiddenUntilAnswer
                     ),
                 ],
-                prompt: [.init(field: "attribution"), .init(field: "front")],
-                answer: [.init(field: "back", reveal: "hiddenUntilAnswer")],
-                interaction: "reveal",
-                skill: .init(input: "text", output: "text", operation: "recall")
+                interaction: .reveal,
+                skill: .init(input: .text, output: .text, operation: .recall)
             ),
         ]
     )
-}
-
-private struct ProseManifestRecord: Encodable {
-    let kind: String
-    let version: Int
-    let root: String
-    let parts: [String]
-}
-
-private struct ProseDeckRecord: Encodable {
-    let kind: String
-    let id: String
-    let name: String
-    let parent: String?
-    let itemTypes: [String]
-    let defaultType: String
-}
-
-private struct ProseTypeRecord: Encodable {
-    let kind: String
-    let id: String
-    let name: String
-    let fields: [ProseFieldRecord]
-    let templates: [ProseTemplateRecord]
-}
-
-private struct ProseFieldRecord: Encodable {
-    let id: String
-    let name: String
-    let type: String
-    let required: Bool
-}
-
-private struct ProseTemplateRecord: Encodable {
-    let name: String
-    let layout: String
-    let components: [ProseComponentRecord]
-    let prompt: [ProseSlotRecord]
-    let answer: [ProseSlotRecord]
-    let interaction: String
-    let skill: ProseSkillRecord
-}
-
-private struct ProseSlotRecord: Encodable {
-    let field: String
-    let reveal: String?
-
-    init(field: String, reveal: String? = nil) {
-        self.field = field
-        self.reveal = reveal
-    }
-}
-
-private struct ProseComponentRecord: Encodable {
-    let region: String
-    let purpose: String
-    let field: String
-    let reveal: String
-}
-
-private struct ProseSkillRecord: Encodable {
-    let input: String
-    let output: String
-    let operation: String
-}
-
-private struct ProseTextValue: Encodable {
-    let text: String
-}
-
-private struct ProseItemRecord: Encodable {
-    let kind: String
-    let deck: String
-    let type: String
-    let fields: [String: ProseTextValue]
-    let tags: [String]
 }

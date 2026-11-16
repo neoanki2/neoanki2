@@ -63,6 +63,11 @@ NeoAnki2 builds a study session from cards that are due now in the scope selecte
 - [Motion and accessibility](#motion-and-accessibility)
 </nav>
 
+For large libraries of independent cards, loading the first new card now reads
+in due order without sorting all new material first. Family, daily-limit, and
+ordered-work rules still apply. The first card can be readable while the rest
+of the session is preparing; grading waits until that preparation completes.
+
 ## Session states
 
 Mac, iPhone, and iPad use the same session behavior. Loading failures do not

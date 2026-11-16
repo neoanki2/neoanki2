@@ -119,6 +119,7 @@ let package = Package(
         ),
         .target(
             name: "NeoAnkiDeckBuilderCore",
+            dependencies: [.product(name: "NeoAnkiCore", package: "NeoAnkiCore")],
             path: "Sources/NeoAnkiDeckBuilderCore"
         ),
         .target(

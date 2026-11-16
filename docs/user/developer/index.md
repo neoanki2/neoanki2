@@ -37,6 +37,9 @@ documentation, and releases.
 
 ## Understand decisions and history
 
+- [Typed native creation and bounded study heads ADR]({{ '/adr/0004-typed-native-creation-and-study-heads/' | relative_url }})
+- [Typed creation implementation and performance evidence]({{ '/audits/typed-native-creation-implementation-2026-11-16/' | relative_url }})
+
 - [Fresh simplification and performance investigation]({{ '/audits/comprehensive-codebase-review-2026-11-16/' | relative_url }})
 
 - [Product model]({{ '/PRODUCT/' | relative_url }})

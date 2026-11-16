@@ -151,3 +151,51 @@ public enum NativeLibraryCommands {
         }
     }
 }
+
+/// Separate capability keeps existing transfer adapters source compatible.
+public protocol LibraryGeneratedDeckCreating: Sendable {
+    func createGeneratedDeck(from source: URL, parentDeckID: UUID) async throws -> PortableDeckImportResult
+    func createGeneratedDeck(_ prepared: PreparedAuthoredDeck, parentDeckID: UUID) async throws -> PortableDeckImportResult
+}
+
+extension SQLiteLibraryRepository: LibraryGeneratedDeckCreating {
+    public func createGeneratedDeck(from source: URL, parentDeckID: UUID) async throws -> PortableDeckImportResult {
+        try await AuthoredDeck.importDeck(from: source, into: store, parentDeckID: parentDeckID)
+    }
+
+    public func createGeneratedDeck(_ prepared: PreparedAuthoredDeck, parentDeckID: UUID) async throws -> PortableDeckImportResult {
+        try await AuthoredDeck.importPrepared(prepared, into: store, parentDeckID: parentDeckID)
+    }
+}
+
+public extension NativeLibraryCommands {
+    @MainActor
+    static func createGeneratedDeck(on repository: any Sendable, source: URL,
+        parentDeckID: UUID) async throws -> PortableDeckImportResult {
+        guard let native = repository as? any LibraryGeneratedDeckCreating else {
+            throw DatabaseError.invalidItem("This library cannot create a generated deck atomically.")
+        }
+        let context = NativeCommandContext(operation: "create-generated-bundle",
+            input: Data((source.standardizedFileURL.path + ":" + parentDeckID.uuidString).utf8))
+        let outcome = try await perform(on: repository, context: context) {
+            try await native.createGeneratedDeck(from: source, parentDeckID: parentDeckID)
+        }
+        if let value = outcome.value { return value }
+        guard let data = outcome.receipt?.resultData else { throw DatabaseError.decodingFailed }
+        return try JSONDecoder().decode(PortableDeckImportResult.self, from: data)
+    }
+
+    @MainActor
+    static func createGeneratedDeck(on repository: any Sendable, prepared: PreparedAuthoredDeck,
+        parentDeckID: UUID, context: NativeCommandContext) async throws -> (result: PortableDeckImportResult, warnings: [String]) {
+        guard let native = repository as? any LibraryGeneratedDeckCreating else {
+            throw DatabaseError.invalidItem("This library cannot create a generated deck atomically.")
+        }
+        let outcome = try await perform(on: repository, context: context) {
+            try await native.createGeneratedDeck(prepared, parentDeckID: parentDeckID)
+        }
+        if let value = outcome.value { return (value, outcome.warnings) }
+        guard let data = outcome.receipt?.resultData else { throw DatabaseError.decodingFailed }
+        return (try JSONDecoder().decode(PortableDeckImportResult.self, from: data), outcome.warnings)
+    }
+}

@@ -456,6 +456,15 @@ public final class LibraryFeatureModel {
         return result
     }
 
+    public func createGeneratedDeck(_ prepared: PreparedAuthoredDeck, parentDeckID: UUID,
+                                    context: NativeCommandContext) async throws -> PortableDeckImportResult {
+        let outcome = try await NativeLibraryCommands.createGeneratedDeck(on: library,
+            prepared: prepared, parentDeckID: parentDeckID, context: context)
+        try await didMutate()
+        if !outcome.warnings.isEmpty { recoveryMessage = outcome.warnings.joined(separator: " ") }
+        return outcome.result
+    }
+
     public func importAuthoredBundle(from url: URL) async throws -> PortableDeckImportResult {
         let result = try await NativeLibraryCommands.importDeck(on: library, source: url, authored: true)
         try await didMutate()

@@ -33,6 +33,22 @@ private struct AtomicCommandFixture {
 }
 
 @Suite struct AtomicLibraryCommandsTests {
+    @Test func importRechecksReusedTypeInsideCommit() async throws {
+        let f = try await AtomicCommandFixture()
+        defer { f.cleanup() }
+        let database = try SQLiteDatabase(path: f.url)
+        let original = try #require(await database.fetchItemType(id: BuiltInItemTypes.basicID))
+        var edited = original
+        edited.name = "Edited concurrently"
+        try await database.updateItemType(edited)
+        let child = Deck(name: "Must not be created")
+        let plan = PortableDeckImportPlan(itemTypes: [], libraryItemTypeIDs: [], decks: [child],
+            items: [], mappings: [], includedItemTypes: [], itemTypePolicies: [], expectedItemTypes: [original])
+        await #expect(throws: (any Error).self) { try await database.importPortableDeck(plan, now: .now) }
+        #expect(try await database.fetchDeck(id: child.id) == nil)
+        #expect(try await database.fetchItemType(id: original.id) == edited)
+    }
+
     @Test func secondMoveFailureRollsBackSelectionAndJournal() async throws {
         let f = try await AtomicCommandFixture()
         defer { f.cleanup() }

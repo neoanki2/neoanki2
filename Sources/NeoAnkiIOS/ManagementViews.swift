@@ -312,29 +312,16 @@ struct PoemBuilderMobileHost: View {
             rootDecks: model.decks.filter { $0.parentID == nil }.map {
                 DeckBuilderDeckOption(id: $0.id, name: $0.name)
             },
-            onGenerated: { generated in
-                guard !isImporting else { generated.cleanup(); return }
+            onPrepared: { creation in
+                guard !isImporting else { return }
                 isImporting = true
                 Task {
-                    defer { generated.cleanup(); isImporting = false }
+                    defer { isImporting = false }
                     do {
-                        let result = try await model.importAuthoredBundle(from: generated.bundleURL)
-                        guard let parentID = generated.destinationDeckID,
-                              let poemID = result.deckIDs.first,
-                              let poem = model.decks.first(where: { $0.id == poemID })
-                        else {
-                            throw PoemDeckReconciliationError.brokenChain
-                        }
-                        try await model.updateDeck(
-                            id: poemID,
-                            name: poem.name,
-                            parentID: parentID,
-                            newCardsPerDay: poem.newCardsPerDay
-                        )
+                        _ = try await model.createGeneratedDeck(creation.prepared,
+                            parentDeckID: creation.parentDeckID, context: creation.command)
                         dismiss()
-                    } catch {
-                        errorMessage = MobileAppModel.message(for: error)
-                    }
+                    } catch { errorMessage = MobileAppModel.message(for: error) }
                 }
             },
             onCancel: { dismiss() }
@@ -366,29 +353,16 @@ struct ProseBuilderMobileHost: View {
             rootDecks: model.decks.filter { $0.parentID == nil }.map {
                 DeckBuilderDeckOption(id: $0.id, name: $0.name)
             },
-            onGenerated: { generated in
-                guard !isImporting else { generated.cleanup(); return }
+            onPrepared: { creation in
+                guard !isImporting else { return }
                 isImporting = true
                 Task {
-                    defer { generated.cleanup(); isImporting = false }
+                    defer { isImporting = false }
                     do {
-                        let result = try await model.importAuthoredBundle(from: generated.bundleURL)
-                        guard let parentID = generated.destinationDeckID,
-                              let proseID = result.deckIDs.first,
-                              let prose = model.decks.first(where: { $0.id == proseID })
-                        else {
-                            throw ProseDeckEditError.mixedContent
-                        }
-                        try await model.updateDeck(
-                            id: proseID,
-                            name: prose.name,
-                            parentID: parentID,
-                            newCardsPerDay: prose.newCardsPerDay
-                        )
+                        _ = try await model.createGeneratedDeck(creation.prepared,
+                            parentDeckID: creation.parentDeckID, context: creation.command)
                         dismiss()
-                    } catch {
-                        errorMessage = MobileAppModel.message(for: error)
-                    }
+                    } catch { errorMessage = MobileAppModel.message(for: error) }
                 }
             },
             onCancel: { dismiss() }

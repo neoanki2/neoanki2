@@ -325,3 +325,57 @@ private struct StudyEligibilityRandom {
         int(in: 0...1) == 1
     }
 }
+
+@Test func unlimitedNewHeadAndEmptyWorkGateUseOrderedIndexes() async throws {
+    let url = studyQueryPlanDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    for index in 0..<100 { _ = try await store.createItem(studyQueryPlanItem("New \(index)"), now: now) }
+    let database = try SQLiteDatabase(path: url)
+    try await database.migrate()
+    for scope: CardScope in [.all] {
+        let plan = try await database.studyQueueQueryPlan(scope: scope, asOf: now,
+            studyDay: "2027-01-15", isNew: true)
+        #expect(plan.contains { $0.contains("idx_cards_active_new_due") })
+        #expect(!plan.contains { $0.contains("TEMP B-TREE") })
+    }
+    let gate = try await database.studyWorkGateQueryPlan()
+    #expect(gate.contains { $0.contains("idx_study_work") })
+    #expect(!gate.contains { $0.contains("SCAN cards") || $0.contains("SEARCH cards") })
+    let work = try await database.studyQueueHeadWorkDiagnostic(scope: .all,
+        asOf: now, studyDay: "2027-01-15")
+    #expect(work.rows == 1)
+    #expect(work.sorts == 0)
+    #expect(work.instructions < 1_000)
+    let complete = try await store.fetchDueCards(asOf: now)
+    let head = try await store.fetchDueCards(asOf: now, limit: 1)
+    #expect(head.map(\.card.id) == Array(complete.map(\.card.id).prefix(1)))
+}
+
+@Test func studyWorkGateAndHeadKeepOneReadSnapshot() async throws {
+    let url = studyQueryPlanDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    for index in 0..<2 { _ = try await store.createItem(studyQueryPlanItem("New \(index)"), now: now) }
+    let original = try await store.fetchDueCards(asOf: now)
+    let first = try #require(original.first).card
+    // A real second-connection commit during a read requires WAL; rollback
+    // journaling intentionally prevents that interleaving with a read lock.
+    try studyExecuteSQL("PRAGMA journal_mode = WAL;", at: url)
+    let database = try SQLiteDatabase(path: url)
+    let held = try await database.studyQueueHeadSnapshotDiagnostic(asOf: now, studyDay: "2027-01-15") {
+        try studyExecuteSQL("""
+            UPDATE study_item_relations SET work_key='concurrent-work', source_ordinal=0
+            WHERE item_id='\(first.itemID.uuidString)';
+            UPDATE cards SET is_suspended=1 WHERE id='\(first.id.uuidString)';
+            """, at: url)
+    }
+    #expect(held.map(\.id) == [first.id])
+    let fresh = try await database.fetchDueCards(asOf: now, studyDay: "2027-01-15", limit: 1)
+    #expect(fresh.first?.id != first.id)
+    #expect(fresh.count == 1)
+}
