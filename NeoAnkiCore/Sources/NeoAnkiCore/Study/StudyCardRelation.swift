@@ -80,23 +80,44 @@ public enum StudyQueueOrdering {
     /// A stable move (rather than a swap) preserves the priority of candidates
     /// which were not selected. Builder work slots and repair phases stay fixed.
     public static func separateRelated(in queue: inout [DueCard], at index: Int) {
-        guard queue.indices.contains(index), index > 0,
-              queue[index].studyRelation?.work == nil,
-              queue[index].card.memory.phase == .review || queue[index].card.memory.phase == .new else { return }
+        guard let selected = relatedCardIndex(in: queue, at: index, family: family(of:)),
+              selected != index else { return }
         let phase = queue[index].card.memory.phase
-        let recent = queue[..<index].suffix(preferredInterveningCards).map { family(of: $0) }
-        let slots = (index..<queue.count).filter {
-            queue[$0].studyRelation?.work == nil && queue[$0].card.memory.phase == phase
-        }
-        // nil means absent from the recent window, which is always preferred.
-        func score(_ slot: Int) -> Int { recent.lastIndex(of: family(of: queue[slot])) ?? -1 }
-        guard let selected = slots.min(by: { score($0) < score($1) }), selected != index,
-              let offset = slots.firstIndex(of: selected) else { return }
         let card = queue[selected]
-        for position in stride(from: offset, through: 1, by: -1) {
-            queue[slots[position]] = queue[slots[position - 1]]
+        var destination = selected
+        for source in stride(from: selected - 1, through: index, by: -1)
+        where queue[source].studyRelation?.work == nil && queue[source].card.memory.phase == phase {
+            queue[destination] = queue[source]
+            destination = source
         }
         queue[index] = card
+    }
+
+    /// The resolver seam lets tests count actual family inspections without
+    /// timing assumptions. Keys live only for this read, so edits stay visible.
+    static func relatedCardIndex(
+        in queue: [DueCard], at index: Int, family: (DueCard) -> String
+    ) -> Int? {
+        guard queue.indices.contains(index), index > 0,
+              queue[index].studyRelation?.work == nil,
+              queue[index].card.memory.phase == .review || queue[index].card.memory.phase == .new else { return nil }
+        let phase = queue[index].card.memory.phase
+        let recent = queue[..<index].suffix(preferredInterveningCards).map(family)
+        var selected = index
+        var bestScore = recent.lastIndex(of: family(queue[index])) ?? -1
+        // An unseen family is optimal. Ordinary independent cards therefore
+        // advance in constant work rather than scanning the remaining session.
+        guard bestScore >= 0 else { return selected }
+        for candidate in (index + 1)..<queue.count
+        where queue[candidate].studyRelation?.work == nil && queue[candidate].card.memory.phase == phase {
+            let score = recent.lastIndex(of: family(queue[candidate])) ?? -1
+            if score < bestScore {
+                selected = candidate
+                bestScore = score
+                if score == -1 { break }
+            }
+        }
+        return selected
     }
 
     public static func refreshRelation(in card: inout DueCard) {
