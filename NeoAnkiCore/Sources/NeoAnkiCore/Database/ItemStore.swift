@@ -869,9 +869,7 @@ public actor ItemStore {
         let orphans = try await database.fetchOrphanedMediaAssets()
         var collected = 0
         for asset in orphans {
-            try await mediaStore.removeOrphan(asset)
-            try await database.deleteMediaAssetIfOrphaned(hash: asset.hash)
-            collected += 1
+            if try await mediaStore.collectOrphan(asset) { collected += 1 }
         }
         return collected
     }

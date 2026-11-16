@@ -211,6 +211,11 @@ also stops the previous preview.
 
 ## Understand media storage
 
+Cleanup verifies saved item and recording references before removing an unused
+asset. This includes image occlusion fields and repairs stale ownership counts
+left by older sync clients. A shared image remains available until its last
+reference is removed.
+
 When an attachment is accepted, NeoAnki2 stores its prepared bytes in:
 
 ```text

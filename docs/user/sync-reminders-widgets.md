@@ -134,6 +134,10 @@ later refresh; opening the app remains the way to request a current summary.
 
 ## What syncs
 
+Incoming media is stored before its accompanying items are committed. If an
+image arrives in a later sync batch, it is associated with the items already
+referencing it and retained during cleanup.
+
 Card schedules are checked against their saved review history when sync commits
 and when a library opens. A delayed card snapshot cannot replace a newer grade;
 previously affected libraries repair their due counts automatically. Review

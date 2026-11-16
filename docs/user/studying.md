@@ -305,6 +305,10 @@ new grade. Poetry and prose builder cards retain their precise FSRS intervals.
 
 ## Fix a card during a session
 
+If a card reports that a media file cannot be read, follow
+[media troubleshooting](../troubleshooting/#item-and-media-errors).
+The same saved attachment is used in item detail and during study.
+
 Reviewing is when card problems surface: a typo, a missing detail, a definition
 that needs more context. Choose **More ▸ Edit Card** in the session header, choose
 **Study ▸ Edit Card…**, or press Command-E to open the current card's item in

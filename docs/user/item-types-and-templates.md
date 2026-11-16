@@ -231,6 +231,10 @@ you do.
 
 ## Handle changes safely
 
+Image occlusion fields retain their underlying image through sync and media
+cleanup. Multiple items can share that file; removing one reference leaves
+the others available.
+
 Save validates the complete candidate and summarizes consequences before
 changing the library:
 

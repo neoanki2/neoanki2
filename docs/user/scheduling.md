@@ -113,6 +113,10 @@ time zone, and deferred new cards become available at the next rollover.
 
 ## Reset a deck's progress
 
+A progress reset keeps item attachments. For an unreadable image, use
+[media troubleshooting](../troubleshooting/#item-and-media-errors); resetting
+progress does not restore missing media files.
+
 Control-click a deck, choose **Deck Settings…**, then choose **Reset All Progress…**
 to return every card in that deck and its subdecks to New. NeoAnki2
 shows a destructive confirmation before committing the reset. Items, deck

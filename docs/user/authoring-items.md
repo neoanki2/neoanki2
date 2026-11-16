@@ -133,6 +133,9 @@ media](../content-and-media/) for number, cloze, and media procedures.
 
 ## Cancel or discard
 
+Discarding a draft attachment keeps the same image if a saved item uses it,
+including an item received through sync.
+
 While adding a new item, **Cancel** immediately closes the form and discards
 the unsaved item.
 
