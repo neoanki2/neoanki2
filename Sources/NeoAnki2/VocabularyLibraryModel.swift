@@ -1,6 +1,5 @@
 import Foundation
 import NeoAnkiVocabularyKit
-import VocabularyDeckBuilder
 
 struct VocabularyLibraryNotice: Identifiable, Equatable {
     let id = UUID()
@@ -26,7 +25,7 @@ private enum VocabularyLibraryError: LocalizedError {
 @MainActor
 @Observable
 final class VocabularyLibraryModel {
-    private(set) var installedPacks: [VocabularyPackOption] = []
+    var installedPacks: [InstalledVocabularyPack] { sync.localPacks }
     private(set) var isLoading = false
     private(set) var isImporting = false
     var notice: VocabularyLibraryNotice?
@@ -44,17 +43,6 @@ final class VocabularyLibraryModel {
         isLoading = true
         defer { isLoading = false }
         await sync.reloadLocal()
-        let rootURL = rootURL
-        do {
-            installedPacks = try await Task.detached(priority: .utility) {
-                try Self.scan(rootURL: rootURL)
-            }.value
-        } catch {
-            notice = .init(
-                title: "Could Not Load Vocabulary Packs",
-                message: error.localizedDescription
-            )
-        }
     }
 
     @discardableResult
@@ -80,12 +68,8 @@ final class VocabularyLibraryModel {
             }
         }
 
-        let rootURL = rootURL
         do {
             let imported = try await sync.installLocal(from: sourceURL)
-            installedPacks = try await Task.detached(priority: .utility) {
-                try Self.scan(rootURL: rootURL)
-            }.value
             notice = .init(
                 title: "Vocabulary Pack Imported",
                 message: "\(imported.title) is available for offline vocabulary lookup."
@@ -98,55 +82,5 @@ final class VocabularyLibraryModel {
             )
             return false
         }
-    }
-
-    private nonisolated static func scan(rootURL: URL) throws -> [VocabularyPackOption] {
-        guard FileManager.default.fileExists(atPath: rootURL.path) else { return [] }
-        let urls = try FileManager.default.contentsOfDirectory(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
-        return try urls
-            .filter { $0.pathExtension.lowercased() == "neovocab" }
-            .map { option(manifest: try readManifest(at: $0), packageURL: $0) }
-            .sorted {
-                $0.title.localizedStandardCompare($1.title) == .orderedAscending
-            }
-    }
-
-    private nonisolated static func readManifest(at packageURL: URL) throws
-        -> VocabularyPackManifest
-    {
-        let manifestURL = packageURL.appendingPathComponent("manifest.json")
-        let values = try manifestURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-        guard values.isRegularFile == true,
-              let size = values.fileSize,
-              size <= VocabularyPackLimits.default.maximumManifestBytes else {
-            throw VocabularyPackError.invalidPackage("manifest.json is missing or too large.")
-        }
-        let manifest = try JSONDecoder().decode(
-            VocabularyPackManifest.self,
-            from: Data(contentsOf: manifestURL, options: [.mappedIfSafe])
-        )
-        guard manifest.format == "neoanki-vocabulary-pack",
-              manifest.formatVersion == VocabularyPackManifest.currentFormatVersion else {
-            throw VocabularyPackError.invalidPackage("manifest format is not supported.")
-        }
-        return manifest
-    }
-
-    private nonisolated static func option(
-        manifest: VocabularyPackManifest,
-        packageURL: URL
-    ) -> VocabularyPackOption {
-        let languages = manifest.languages.joined(separator: ", ")
-        let noun = manifest.entryCount == 1 ? "entry" : "entries"
-        return VocabularyPackOption(
-            id: manifest.id,
-            title: manifest.title,
-            summary: "\(languages) · \(manifest.entryCount.formatted()) \(noun)",
-            packageURL: packageURL
-        )
     }
 }

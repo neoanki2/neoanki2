@@ -61,9 +61,10 @@ description. Fix every diagnostic, rerun validation, and import only after the
 command succeeds. Validation does not modify the bundle or your NeoAnki2
 library.
 
-NeoAnki2 also reuses this authored-bundle validation and atomic import boundary
-when an installed offline vocabulary pack generates items for an existing
-deck. That app workflow does not change the CLI command or its diagnostics.
+Poem and prose builders share these semantic checks while creating content
+directly in the app. The CLI continues to validate existing authored bundles
+independently of the app's native builder workflow; its command and diagnostics
+are unchanged.
 
 ## Repair local poem decks
 

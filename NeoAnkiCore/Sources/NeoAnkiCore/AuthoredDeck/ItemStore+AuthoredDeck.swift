@@ -5,11 +5,21 @@ extension ItemStore {
         _ package: AuthoredDeckPackage,
         limits: PortableDeckLimits,
         now: Date,
-        destinationDeckID: UUID?
+        destinationDeckID: UUID?,
+        parentDeckID: UUID? = nil
     ) async throws -> PortableDeckImportResult {
         if let destinationDeckID,
            try await database.fetchDeck(id: destinationDeckID) == nil {
             throw DatabaseError.deckNotFound(destinationDeckID)
+        }
+        // Prepared input is reusable; its source identifiers must never become
+        // identities shared by two intentional creations. Receipts reconcile
+        // retries before this allocation reaches persistence.
+        let deckIDs = Dictionary(uniqueKeysWithValues: package.decks.map { ($0.id, UUID()) })
+        guard let rootDeckID = deckIDs[package.rootDeckID] else { throw DatabaseError.decodingFailed }
+        let newDecks = package.decks.map { source in
+            Deck(id: deckIDs[source.id]!, name: source.name,
+                 parentID: source.parentID.flatMap { deckIDs[$0] }, newCardsPerDay: source.newCardsPerDay)
         }
         let existingTypes = try await database.fetchAllItemTypes()
         let existingDigests = try Dictionary(
@@ -36,9 +46,10 @@ extension ItemStore {
                 resolvedByDigest[digest] = existing
                 reusedTypeIDs.insert(existing.id)
             } else {
-                typeMap[source.id] = source
-                resolvedByDigest[digest] = source
-                createdTypes.append(source)
+                let created = source.duplicated(name: source.name)
+                typeMap[source.id] = created
+                resolvedByDigest[digest] = created
+                createdTypes.append(created)
             }
         }
 
@@ -92,7 +103,7 @@ extension ItemStore {
                     itemTypeID: destinationType.id,
                     fields: mappedFields,
                     tags: record.item.tags,
-                    deckID: destinationDeckID ?? record.item.deckID
+                    deckID: destinationDeckID ?? record.item.deckID.flatMap { deckIDs[$0] }
                 ),
                 createdAt: orderedAt,
                 updatedAt: now
@@ -137,7 +148,7 @@ extension ItemStore {
                     updatedAt: record.updatedAt
                 )
             }
-            let includedItemTypeRootID = destinationDeckID ?? package.rootDeckID
+            let includedItemTypeRootID = destinationDeckID ?? rootDeckID
             let existingIncludedItemTypes = try await database.fetchIncludedItemTypeOwners()
                 .filter { $0.rootDeckID == includedItemTypeRootID }
             var seenIncludedTypeIDs = Set(existingIncludedItemTypes.map(\.itemTypeID))
@@ -174,14 +185,14 @@ extension ItemStore {
                 guard let deckID = sourceEntries.first?.deckID else { return [] }
                 return orderedIDs.enumerated().map { ordinal, itemTypeID in
                     DeckItemTypePolicyEntry(
-                        deckID: deckID,
+                        deckID: deckIDs[deckID]!,
                         itemTypeID: itemTypeID,
                         ordinal: ordinal,
                         isDefault: defaultIDs.contains(itemTypeID)
                     )
                 }
             }
-            let result = PortableDeckImportResult(deckIDs: [destinationDeckID ?? package.rootDeckID], itemCount: importedItems.count,
+            let result = PortableDeckImportResult(deckIDs: [destinationDeckID ?? rootDeckID], itemCount: importedItems.count,
                 createdItemTypeCount: createdTypes.count, reusedItemTypeCount: reusedTypeIDs.count)
             try await database.importPortableDeck(
                 .init(
@@ -190,7 +201,7 @@ extension ItemStore {
                     libraryItemTypeIDs: package.usesIncludedItemTypes
                         ? []
                         : Set(typeMap.values.map(\.id)),
-                    decks: destinationDeckID == nil ? package.decks : [],
+                    decks: destinationDeckID == nil ? newDecks : [],
                     items: importedItems,
                     mappings: [],
                     includedItemTypes: includedItemTypes,
@@ -199,7 +210,9 @@ extension ItemStore {
                     // owned by that deck and can still be reused by later batches.
                     itemTypePolicies: destinationDeckID == nil
                         ? resolvedPolicies
-                        : []
+                        : [],
+                    rootPlacement: parentDeckID.map { .init(rootID: rootDeckID, parentID: $0) },
+                    expectedItemTypes: existingTypes.filter { reusedTypeIDs.contains($0.id) }
                 ),
                 now: now,
                 initialDueDates: Dictionary(

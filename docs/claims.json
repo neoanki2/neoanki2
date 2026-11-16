@@ -93,6 +93,10 @@
   },
   "articleAssertions": [
     {
+      "article": "user/import-export.md",
+      "contains": ["Creation saves the new deck and its selected parent together."]
+    },
+    {
       "article": "user/content-and-media.md",
       "contains": [
         "**Audio:** M4A, MP3, WAV, AAC, and CAF",

@@ -246,8 +246,11 @@
       "id": "study-start",
       "name": "Start a scoped due-card session",
       "article": "user/studying.md",
-      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Tests/NeoAnki2Tests/StudyStartPerformanceTests.swift", "Tests/NeoAnki2Tests/DockBadgeTests.swift"],
+      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift",
+        "Sources/NeoAnkiFeatures/StudyFeatureModel.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Tests/NeoAnki2Tests/StudyStartPerformanceTests.swift", "Tests/NeoAnki2Tests/DockBadgeTests.swift",
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyEligibilityQueryPlanTests.swift"],
       "screenshot": "assets/screenshots/study-prompt.png"
     },
     {
@@ -375,8 +378,10 @@
       "id": "authored-deck",
       "name": "Import authored deck bundles",
       "article": "user/import-export.md",
-      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift"],
-      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeckDraft.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift",
+        "Tests/NeoAnki2Tests/GeneratedDeckCreationTests.swift"]
     },
     {
       "id": "deck-builders",
@@ -440,8 +445,8 @@
       "id": "offline-vocabulary",
       "name": "Install and use offline vocabulary packs",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnki2/VocabularyLibraryModel.swift", "Sources/NeoAnkiIOS/MobileVocabularyLibraryModel.swift", "Sources/VocabularyDeckBuilder/VocabularyDeckBuilderView.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "UITests/NeoAnki2UITests/VocabularyUITests.swift", "Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift", "Tests/VocabularyDeckBuilderTests/VocabularyDeckBuilderTests.swift"]
+      "sources": ["Sources/NeoAnki2/VocabularyPacksView.swift", "Sources/NeoAnki2/VocabularyLibraryModel.swift", "Sources/NeoAnkiIOS/MobileVocabularyLibraryModel.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "UITests/NeoAnki2UITests/VocabularyUITests.swift", "Tests/NeoAnki2Tests/VocabularyLibraryModelTests.swift"]
     },
     {
       "id": "vocabulary-pack-sync",

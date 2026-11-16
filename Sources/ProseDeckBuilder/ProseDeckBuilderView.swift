@@ -24,6 +24,9 @@ public enum ProseDeckBuilderFeature {
                 onGenerated: onGenerated,
                 onCancel: onCancel
             )
+        }.withPreparedView { context, onPrepared, onCancel in
+            ProseDeckBuilderView(rootDecks: context.rootDecks, limits: limits,
+                onPrepared: onPrepared, onCancel: onCancel)
         }
     }
 }
@@ -38,6 +41,8 @@ public struct ProseDeckBuilderView: View {
     @State private var textSession = PlainTextEditorSession()
     @State private var dismissal = DraftDismissal()
     @State private var isPreviewing = false
+    @State private var pendingCreation: GeneratedDeckCreation?
+    @State private var generationTask: Task<Void, Never>?
     @State private var isGenerating = false
     @State private var errorMessage: String?
 
@@ -45,6 +50,7 @@ public struct ProseDeckBuilderView: View {
     private let workspaceProvider: any DeckBuildWorkspaceProviding
     private let limits: AuthoredDeckLimits
     private let onGenerated: @MainActor (GeneratedDeckBundle) -> Void
+    private var onPrepared: (@MainActor (GeneratedDeckCreation) -> Void)?
     private let onCancel: @MainActor () -> Void
 
     public init(
@@ -59,6 +65,13 @@ public struct ProseDeckBuilderView: View {
         self.limits = limits
         self.onGenerated = onGenerated
         self.onCancel = onCancel
+    }
+
+    public init(rootDecks: [DeckBuilderDeckOption], limits: AuthoredDeckLimits = .default,
+                onPrepared: @escaping @MainActor (GeneratedDeckCreation) -> Void,
+                onCancel: @escaping @MainActor () -> Void) {
+        self.init(rootDecks: rootDecks, limits: limits, onGenerated: { _ in }, onCancel: onCancel)
+        self.onPrepared = onPrepared
     }
 
     public var body: some View {
@@ -158,6 +171,7 @@ public struct ProseDeckBuilderView: View {
         #else
         .navigationTitle(isPreviewing ? "Review Prose Cards" : "Prose Deck")
         #endif
+        .onDisappear { generationTask?.cancel() }
         .protectDraft(isDirty: hasDraft, isBusy: isGenerating, dismissal: dismissal)
         .onChange(of: input) { _, _ in errorMessage = nil }
     }
@@ -199,17 +213,25 @@ public struct ProseDeckBuilderView: View {
         guard !isGenerating else { return }
         isGenerating = true
         errorMessage = nil
-        defer { isGenerating = false }
-        do {
-            let generated = try ProseDeckGenerator.generate(
-                input: input,
-                reviewedUnits: units,
-                workspaceProvider: workspaceProvider,
-                limits: limits
-            )
-            onGenerated(generated)
-        } catch {
-            errorMessage = error.localizedDescription
+        let input = input
+        let limits = limits
+        let units = units
+        generationTask = Task {
+            defer { isGenerating = false }
+            do {
+                let creation = try await GeneratedDeckCreation.preparing {
+                    try ProseDeckGenerator.prepare(input: input, reviewedUnits: units, limits: limits)
+                }
+                guard input == self.input && units == self.units else { return }
+                let stable: GeneratedDeckCreation
+                if let pendingCreation, pendingCreation.prepared.contentHash == creation.prepared.contentHash,
+                   pendingCreation.parentDeckID == creation.parentDeckID { stable = pendingCreation }
+                else { pendingCreation = creation; stable = creation }
+                if let onPrepared { onPrepared(stable) }
+                else { onGenerated(try creation.materialize(using: workspaceProvider)) }
+            } catch is CancellationError {
+                // Dismissal cancels detached validation and discards its result.
+            } catch { errorMessage = error.localizedDescription }
         }
     }
 }

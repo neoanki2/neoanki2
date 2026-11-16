@@ -139,6 +139,10 @@ struct PortableDeckPackage: Sendable {
 }
 
 struct PortableDeckImportPlan: Sendable {
+    struct RootPlacement: Sendable {
+        let rootID: UUID
+        let parentID: UUID
+    }
     var attachmentDeckID: UUID? = nil
     let itemTypes: [ItemType]
     let libraryItemTypeIDs: Set<UUID>
@@ -148,6 +152,8 @@ struct PortableDeckImportPlan: Sendable {
     let includedItemTypes: [IncludedItemTypeOwner]
     let itemTypePolicies: [DeckItemTypePolicyEntry]
     var deckTypeSettings: [DeckItemTypeSettings] = []
+    var rootPlacement: RootPlacement? = nil
+    var expectedItemTypes: [ItemType] = []
 }
 
 struct PortableDeckLibrarySnapshot: Sendable {

@@ -6,6 +6,7 @@ struct DeckBuilderSheet: View {
     let registry: DeckBuilderRegistry
     let context: DeckBuilderHostContext
     let isImporting: Bool
+    let onPrepared: (@MainActor (GeneratedDeckCreation) -> Void)?
     let onGenerated: @MainActor (GeneratedDeckBundle) -> Void
     let onCancel: @MainActor () -> Void
 
@@ -17,25 +18,31 @@ struct DeckBuilderSheet: View {
         context: DeckBuilderHostContext,
         isImporting: Bool,
         onGenerated: @escaping @MainActor (GeneratedDeckBundle) -> Void,
-        onCancel: @escaping @MainActor () -> Void
+        onCancel: @escaping @MainActor () -> Void,
+        onPrepared: (@MainActor (GeneratedDeckCreation) -> Void)? = nil
     ) {
         self.registry = registry
         self.context = context
         self.isImporting = isImporting
+        self.onPrepared = onPrepared
         self.onGenerated = onGenerated
         self.onCancel = onCancel
         _selectedBuilderID = State(initialValue: nil)
+    }
+
+    private func creationView(_ feature: AnyDeckBuilderFeature) -> AnyView {
+        if let onPrepared {
+            return feature.makeCreationView(context: context, onPrepared: onPrepared,
+                onGenerated: onGenerated, onCancel: onCancel)
+        }
+        return feature.makeView(context: context, onGenerated: onGenerated, onCancel: onCancel)
     }
 
     var body: some View {
         NavigationStack {
             if let selectedBuilderID,
                let feature = registry.feature(id: selectedBuilderID) {
-                feature.makeView(
-                    context: context,
-                    onGenerated: onGenerated,
-                    onCancel: onCancel
-                )
+                creationView(feature)
                     .onDraftNavigationGuardChange { draftGuard = $0 }
                     .disabled(isImporting)
                     .toolbar {

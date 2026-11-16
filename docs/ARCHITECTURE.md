@@ -48,7 +48,7 @@ and the local HTTP server are assembled.
 | `NeoAnkiMobile` | Adaptive SwiftUI screens and iOS media/playback adapters | App identity, entitlements, CloudKit credentials |
 | `NeoAnkiSharedUI` | Adaptive reading layout, semantic tokens, common status/empty/error content | File panels, Mac tables, menu commands, database access |
 | `NeoAnkiCloudSync` | CKSyncEngine transport, separate engine metadata, merge/conflict policy | Domain-table ownership, blocking startup, UI |
-| `NeoAnkiDeckBuilderCore` | Generator descriptors, workspaces, generated bundles | SwiftUI type erasure |
+| `NeoAnkiDeckBuilderCore` | Generator descriptors, prepared creation/command identity, compatibility workspaces and bundles | SwiftUI type erasure |
 | `NeoAnkiDeckBuilderKit` | `AnyView` feature registry | Generator or persistence rules |
 | `NeoAnki2` | macOS composition, AppKit adapters, commands, and local API | Mobile-only services and new reusable business rules |
 
@@ -66,6 +66,22 @@ The Xcode-managed `NeoAnkiiOS` target contains only lifecycle composition,
 capabilities, and device services. The `NeoAnki2Widget` extension reads a
 privacy-limited App Group snapshot; it never opens the domain database and never
 receives prompts or answers.
+
+### Typed native deck creation
+
+Poem/prose builders produce `AuthoredDeckDraft`, then Core returns an opaque
+`PreparedAuthoredDeck` through the same semantic compiler as external authored
+files. A shared line writer counts encoded source limits without temporary files
+or JSON reparsing. Existing bundle APIs use that writer only for explicit legacy
+materialization. Native creation commits parent placement, imported identities,
+type ownership, cards and a durable result receipt together. Repeated operations
+recover the receipt; a new intentional creation allocates new identities.
+
+Ordinary unlimited study heads walk the active-new ordered index for All Decks;
+scoped reads retain SQLite's scoped index choice. An indexed global-negative
+work check avoids joining all cards when no work relations exist. A positive
+check retains the original scoped/due work path. Gate and selection share a read
+snapshot; daily limits, families and full-work ordering remain authoritative.
 
 ### Offline-first synchronization
 

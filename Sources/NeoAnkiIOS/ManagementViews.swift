@@ -6,7 +6,6 @@ import NeoAnkiFeatures
 import PoemDeckBuilder
 import ProseDeckBuilder
 import NeoAnkiSharedUI
-import VocabularyDeckBuilder
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -261,36 +260,6 @@ private struct PortableDeckDocument: FileDocument {
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
 }
 
-struct SchedulingMobileView: View {
-    @Bindable var model: MobileAppModel
-    @State private var rollover = 240
-    @State private var message: String?
-    var body: some View {
-        Form {
-            Section("Study Day") {
-                DatePicker("New day begins", selection: Binding(
-                    get: { Calendar.current.date(from: DateComponents(hour: rollover / 60, minute: rollover % 60)) ?? .now },
-                    set: { let parts = Calendar.current.dateComponents([.hour, .minute], from: $0); rollover = (parts.hour ?? 4) * 60 + (parts.minute ?? 0) }
-                ), displayedComponents: .hourAndMinute)
-                Button("Save") {
-                    Task {
-                        do {
-                            try await model.library.setStudyDayRolloverMinutes(rollover)
-                            message = "Study day updated"
-                            await model.refresh()
-                        } catch { message = MobileAppModel.message(for: error) }
-                    }
-                }
-                if let message { Text(message).foregroundStyle(.secondary) }
-            }
-        }
-        .navigationTitle("Study Day")
-        .task {
-            rollover = (try? await model.library.studyDayRolloverMinutes()) ?? 240
-        }
-    }
-}
-
 struct SyncIssuesMobileView: View {
     @Bindable var model: MobileAppModel
     @State private var errorMessage: String?
@@ -332,99 +301,7 @@ struct SyncIssuesMobileView: View {
     }
 }
 
-struct BuilderToolsView: View {
-    @Bindable var model: MobileAppModel
-    @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
-    var body: some View {
-        List {
-            NavigationLink {
-                PoemBuilderMobileHost(model: model)
-            } label: {
-                Label("Poem Deck", systemImage: "text.quote")
-            }
-            NavigationLink {
-                ProseBuilderMobileHost(model: model)
-            } label: {
-                Label("Prose Deck", systemImage: "text.book.closed")
-            }
-            NavigationLink {
-                VocabularyBuilderMobileHost(model: model, vocabularyLibrary: vocabularyLibrary)
-            } label: {
-                Label("Vocabulary Deck", systemImage: "character.book.closed")
-            }
-        }
-        .navigationTitle("Deck Builders")
-
-    }
-}
-
-private struct VocabularyBuilderMobileHost: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var model: MobileAppModel
-    @Bindable var vocabularyLibrary: MobileVocabularyLibraryModel
-    @State private var errorMessage: String?
-    @State private var isImporting = false
-
-    var body: some View {
-        Group {
-            if !vocabularyLibrary.builderOptions.isEmpty {
-                VocabularyDeckBuilderView(
-                    installedPacks: vocabularyLibrary.builderOptions,
-                    rootDecks: model.decks.filter { $0.parentID == nil }.map {
-                        DeckBuilderDeckOption(id: $0.id, name: $0.name)
-                    },
-                    onGenerated: { generated in
-                        guard !isImporting else { generated.cleanup(); return }
-                        isImporting = true
-                        Task {
-                            defer { generated.cleanup(); isImporting = false }
-                            do {
-                                _ = try await model.importAuthoredBundle(from: generated.bundleURL)
-                                dismiss()
-                            } catch { errorMessage = MobileAppModel.message(for: error) }
-                        }
-                    },
-                    onCancel: { dismiss() }
-                )
-            } else {
-                VocabularyDeckBuilderView(
-                    rootDecks: model.decks.filter { $0.parentID == nil }.map {
-                        DeckBuilderDeckOption(id: $0.id, name: $0.name)
-                    },
-                    onGenerated: { generated in
-                        guard !isImporting else { generated.cleanup(); return }
-                        isImporting = true
-                        Task {
-                            defer { generated.cleanup(); isImporting = false }
-                            do {
-                                _ = try await model.importAuthoredBundle(from: generated.bundleURL)
-                                dismiss()
-                            } catch {
-                                errorMessage = MobileAppModel.message(for: error)
-                            }
-                        }
-                    },
-                    onCancel: { dismiss() }
-                )
-            }
-        }
-        .disabled(isImporting)
-        .navigationBarBackButtonHidden(isImporting)
-        .interactiveDismissDisabled(isImporting)
-        .overlay {
-            if isImporting {
-                ProgressView("Importing deck…").padding(24)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-            }
-        }
-        .task { await vocabularyLibrary.load() }
-        .alert("Could Not Add Vocabulary", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: { Text(errorMessage ?? "Please try again.") }
-    }
-}
-
-private struct PoemBuilderMobileHost: View {
+struct PoemBuilderMobileHost: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     @State private var errorMessage: String?
@@ -435,29 +312,16 @@ private struct PoemBuilderMobileHost: View {
             rootDecks: model.decks.filter { $0.parentID == nil }.map {
                 DeckBuilderDeckOption(id: $0.id, name: $0.name)
             },
-            onGenerated: { generated in
-                guard !isImporting else { generated.cleanup(); return }
+            onPrepared: { creation in
+                guard !isImporting else { return }
                 isImporting = true
                 Task {
-                    defer { generated.cleanup(); isImporting = false }
+                    defer { isImporting = false }
                     do {
-                        let result = try await model.importAuthoredBundle(from: generated.bundleURL)
-                        guard let parentID = generated.destinationDeckID,
-                              let poemID = result.deckIDs.first,
-                              let poem = model.decks.first(where: { $0.id == poemID })
-                        else {
-                            throw PoemDeckReconciliationError.brokenChain
-                        }
-                        try await model.updateDeck(
-                            id: poemID,
-                            name: poem.name,
-                            parentID: parentID,
-                            newCardsPerDay: poem.newCardsPerDay
-                        )
+                        _ = try await model.createGeneratedDeck(creation.prepared,
+                            parentDeckID: creation.parentDeckID, context: creation.command)
                         dismiss()
-                    } catch {
-                        errorMessage = MobileAppModel.message(for: error)
-                    }
+                    } catch { errorMessage = MobileAppModel.message(for: error) }
                 }
             },
             onCancel: { dismiss() }
@@ -478,7 +342,7 @@ private struct PoemBuilderMobileHost: View {
     }
 }
 
-private struct ProseBuilderMobileHost: View {
+struct ProseBuilderMobileHost: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     @State private var errorMessage: String?
@@ -489,29 +353,16 @@ private struct ProseBuilderMobileHost: View {
             rootDecks: model.decks.filter { $0.parentID == nil }.map {
                 DeckBuilderDeckOption(id: $0.id, name: $0.name)
             },
-            onGenerated: { generated in
-                guard !isImporting else { generated.cleanup(); return }
+            onPrepared: { creation in
+                guard !isImporting else { return }
                 isImporting = true
                 Task {
-                    defer { generated.cleanup(); isImporting = false }
+                    defer { isImporting = false }
                     do {
-                        let result = try await model.importAuthoredBundle(from: generated.bundleURL)
-                        guard let parentID = generated.destinationDeckID,
-                              let proseID = result.deckIDs.first,
-                              let prose = model.decks.first(where: { $0.id == proseID })
-                        else {
-                            throw ProseDeckEditError.mixedContent
-                        }
-                        try await model.updateDeck(
-                            id: proseID,
-                            name: prose.name,
-                            parentID: parentID,
-                            newCardsPerDay: prose.newCardsPerDay
-                        )
+                        _ = try await model.createGeneratedDeck(creation.prepared,
+                            parentDeckID: creation.parentDeckID, context: creation.command)
                         dismiss()
-                    } catch {
-                        errorMessage = MobileAppModel.message(for: error)
-                    }
+                    } catch { errorMessage = MobileAppModel.message(for: error) }
                 }
             },
             onCancel: { dismiss() }

@@ -11,9 +11,6 @@ NeoAnki2 keeps user documentation beside the behavior it describes. Explanatory
 articles are intentionally hand-written; a manifest and tests keep their
 coverage verifiable.
 
-The latest published assessment is the
-[August 2026 documentation audit]({{ site.baseurl }}/audits/documentation-2026-08-15/).
-
 ## When product behavior changes
 
 1. Update the relevant article under `docs/user/`.

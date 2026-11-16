@@ -290,6 +290,11 @@ types used only by unassigned items appear under **Needs Organization**, where y
 can attach them to a deck or make them available everywhere. No items, generated
 card identities, scheduling, or review history are changed by this organization.
 
+Generated poem and prose decks attach their item types to the new deck. When an
+equivalent definition is reused, its existing availability choices and the
+learning history of existing cards are retained. Creation does not edit that
+shared definition to fit the new content.
+
 Removing an attachment changes future authoring choices. Existing items stay
 editable. Moving an item preserves its type without automatically adding that
 type to the destination picker. Deck deletion retains definitions used elsewhere;

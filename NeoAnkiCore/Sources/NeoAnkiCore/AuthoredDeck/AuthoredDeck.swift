@@ -85,6 +85,16 @@ public enum AuthoredDeck {
         limits: AuthoredDeckLimits = .default,
         now: Date = .now
     ) async throws -> PortableDeckImportResult {
+        try await importDeck(from: bundleURL, into: store, parentDeckID: nil, limits: limits, now: now)
+    }
+
+    public static func importDeck(
+        from bundleURL: URL,
+        into store: ItemStore,
+        parentDeckID: UUID?,
+        limits: AuthoredDeckLimits = .default,
+        now: Date = .now
+    ) async throws -> PortableDeckImportResult {
         let loaded = try await Task.detached(priority: .userInitiated) {
             try AuthoredDeckLoader(bundleURL: bundleURL, limits: limits).load()
         }.value
@@ -110,7 +120,7 @@ public enum AuthoredDeck {
             staged.package,
             limits: limits.portable,
             now: now,
-            destinationDeckID: nil
+            destinationDeckID: nil, parentDeckID: parentDeckID
         )
     }
 
@@ -2012,4 +2022,130 @@ private func isContained(_ child: URL, in root: URL) -> Bool {
     let rootComponents = root.standardizedFileURL.pathComponents
     return childComponents.count > rootComponents.count
         && childComponents.prefix(rootComponents.count).elementsEqual(rootComponents)
+}
+
+/// Compiler-validated, immutable native input. Construction is confined to the
+/// shared compiler; callers cannot create an unchecked persistence package.
+public struct PreparedAuthoredDeck: Sendable {
+    fileprivate let package: AuthoredDeckPackage
+    fileprivate let draft: AuthoredDeckDraft
+    fileprivate let limits: AuthoredDeckLimits
+    public let contentHash: String
+    public var itemCount: Int { package.items.count }
+}
+
+public extension AuthoredDeck {
+    static func prepare(_ draft: AuthoredDeckDraft, limits: AuthoredDeckLimits = .default) throws -> PreparedAuthoredDeck {
+        let manifestLocation = SourceLocation(file: manifestName, line: 1)
+        do {
+            _ = try identifier(["id": draft.key], "id")
+            _ = try identifier(["id": draft.definition.id], "id")
+            _ = try nonemptyString(["name": draft.title], "name")
+            _ = try nonemptyString(["name": draft.definition.name], "name")
+            guard limits.maximumParts >= 1 else { throw DecodeFailure("AD031", "The manifest lists too many item parts.") }
+            var sizes: [String: Int] = [:]
+            var total = 0
+            var digest = SHA256()
+            try draft.writeRecords { file, number, data in
+                guard data.count - 1 <= limits.maximumLineBytes else {
+                    throw AuthoredDeckDiagnostic(file: file, line: number, code: "AD013", message: "Record exceeds the configured line limit.")
+                }
+                sizes[file, default: 0] += data.count
+                total += data.count
+                guard sizes[file, default: 0] <= limits.maximumSourceBytes else {
+                    throw DecodeFailure("AD011", "Source exceeds the configured byte limit.")
+                }
+                guard total <= limits.maximumTotalSourceBytes else {
+                    throw DecodeFailure("AD018", "Authored deck source exceeds the configured total byte limit.")
+                }
+                digest.update(data: data)
+            }
+            let fields = try draft.definition.fields.map { field -> FieldRecord in
+                _ = try identifier(["id": field.id], "id")
+                _ = try nonemptyString(["name": field.name], "name")
+                return FieldRecord(key: field.id, name: field.name, kind: field.type, required: field.required)
+            }
+            func slot(_ field: String, _ reveal: RevealMode = .always) throws -> SlotRecord {
+                _ = try identifier(["field": field], "field")
+                return SlotRecord(source: .field(field), reveal: reveal, media: .default)
+            }
+            let templates = try draft.definition.templates.map { template -> TemplateRecord in
+                _ = try nonemptyString(["name": template.name], "name")
+                return TemplateRecord(name: template.name, layout: template.layout,
+                    components: try template.components.map {
+                        ComponentRecord(region: $0.region, purpose: $0.purpose, slot: try slot($0.field, $0.reveal))
+                    }, prompt: try template.prompt.map { try slot($0.field, $0.reveal ?? .always) },
+                    answer: try template.answer.map { try slot($0.field, $0.reveal ?? .always) },
+                    interaction: template.interaction, skill: template.skill, condition: nil)
+            }
+            let compiler = AuthoredDeckCompiler(root: URL(fileURLWithPath: "/"),
+                manifest: ManifestRecord(version: 5, root: draft.key, parts: [draft.partName], location: manifestLocation),
+                types: [TypeRecord(key: draft.definition.id, name: draft.definition.name, fields: fields,
+                                   templates: templates, location: .init(file: manifestName, line: 2))],
+                decks: [DeckRecord(key: draft.key, name: draft.title, parent: nil,
+                                   itemTypes: [draft.definition.id], defaultType: draft.definition.id,
+                                   location: .init(file: manifestName, line: 3))],
+                items: draft.items.enumerated().map { index, item in
+                    ItemRecord(type: draft.definition.id, deck: draft.key,
+                               fields: item.fields.mapValues { ["text": $0] }, tags: item.tags,
+                               location: .init(file: draft.partName, line: index + 1))
+                }, limits: limits)
+            let loaded = compiler.compile()
+            guard loaded.diagnostics.isEmpty, let package = loaded.package else {
+                throw AuthoredDeckError.invalid(loaded.diagnostics)
+            }
+            return PreparedAuthoredDeck(package: package, draft: draft, limits: limits,
+                contentHash: digest.finalize().map { String(format: "%02x", $0) }.joined())
+        } catch let error as AuthoredDeckError { throw error }
+        catch let error as AuthoredDeckDiagnostic { throw AuthoredDeckError.invalid([error]) }
+        catch let error as DecodeFailure { throw AuthoredDeckError.invalid([error.diagnostic(at: manifestLocation)]) }
+    }
+
+    /// Explicit legacy export only. The normal native creation path never
+    /// materializes a source bundle and never parses serialized JSON.
+    static func write(_ prepared: PreparedAuthoredDeck, to bundleURL: URL) throws {
+        // Refuse an existing items directory (including symlinks), as the old
+        // generators did. Never follow a provider's preexisting item path.
+        try FileManager.default.createDirectory(at: bundleURL.appendingPathComponent("items"), withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+        var files: [String: (url: URL, handle: FileHandle)] = [:]
+        defer {
+            for file in files.values {
+                try? file.handle.close()
+                try? FileManager.default.removeItem(at: file.url)
+            }
+        }
+        try prepared.draft.writeRecords { name, _, data in
+            if files[name] == nil {
+                let directory = bundleURL.appendingPathComponent(name).deletingLastPathComponent()
+                let temporary = directory.appendingPathComponent(".native-\(UUID().uuidString)")
+                guard FileManager.default.createFile(atPath: temporary.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                files[name] = (temporary, try FileHandle(forWritingTo: temporary))
+            }
+            try files[name]?.handle.write(contentsOf: data)
+        }
+        // Atomic replacement avoids truncating a preexisting manifest symlink.
+        // Publish the manifest only after all item parts have been written.
+        let names = files.keys.sorted { left, right in
+            if left == manifestName { return false }
+            if right == manifestName { return true }
+            return left < right
+        }
+        for name in names {
+            guard let file = files[name] else { continue }
+            try file.handle.close()
+            let destination = bundleURL.appendingPathComponent(name)
+            guard Darwin.rename(file.url.path, destination.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        }
+    }
+
+    static func importPrepared(_ prepared: PreparedAuthoredDeck, into store: ItemStore,
+                               parentDeckID: UUID?, now: Date = .now) async throws -> PortableDeckImportResult {
+        try await store.importAuthoredDeck(prepared.package, limits: prepared.limits.portable,
+                                          now: now, destinationDeckID: nil, parentDeckID: parentDeckID)
+    }
 }

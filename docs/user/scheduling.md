@@ -83,8 +83,10 @@ all of its subdecks that study day. A subdeck can add a stricter limit of its
 own; cards in that subdeck must fit both allowances. Unassigned cards remain
 unlimited. The scope home keeps **New** as the full backlog while explaining
 how many due new cards are available today and how many are deferred.
-A generated Prose Deck is a child deck without its own default cap, so its
-continuation cards share the chosen parent's daily allowance.
+Generated poem and prose decks are children of the selected root without their
+own default cap. Their new cards share the parent's allowance as soon as the
+save completes. Creating a deck does not consume that allowance; first grading
+a new card does.
 When a saved limit has been edited, **Cancel** asks before discarding it. Limit
 controls are unavailable while a save or progress reset is running.
 Other scope-home notices, including the affected-items link for repeatedly

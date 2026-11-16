@@ -37,16 +37,16 @@ documentation, and releases.
 
 ## Understand decisions and history
 
+- [Typed native creation and bounded study heads ADR]({{ '/adr/0004-typed-native-creation-and-study-heads/' | relative_url }})
+- [Typed creation implementation and performance evidence]({{ '/audits/typed-native-creation-implementation-2026-11-16/' | relative_url }})
+
+- [Fresh simplification and performance investigation]({{ '/audits/comprehensive-codebase-review-2026-11-16/' | relative_url }})
+
 - [Product model]({{ '/PRODUCT/' | relative_url }})
 - [Design system]({{ '/DESIGN/' | relative_url }})
 - [Shared application and UI layers ADR]({{ '/adr/0001-shared-application-and-ui-layers/' | relative_url }})
 - [CloudKit offline-first sync ADR]({{ '/adr/0002-cloudkit-offline-first-sync/' | relative_url }})
 - [Application library boundary ADR]({{ '/adr/0003-application-library-boundary/' | relative_url }})
-- [Current documentation audit]({{ '/audits/documentation-2026-08-15/' | relative_url }})
-- [macOS editing and interaction audit]({{ '/audits/macos-editing-2026-10-23/' | relative_url }})
-- [Migaku competitor research and replacement requirements]({{ '/audits/migaku-competitor-2026-11-11/' | relative_url }})
-- [Local Apple AI research and potential features]({{ '/audits/apple-local-ai-2026-11-13/' | relative_url }})
-- [Codebase simplification and performance review]({{ '/audits/codebase-review-2026-11-16/' | relative_url }})
 - [Persistent spoken-response proposal]({{ '/proposals/persistent-spoken-responses/' | relative_url }})
 - [Legacy documentation-maintenance guide]({{ '/user/maintaining-documentation/' | relative_url }})
 
@@ -54,4 +54,3 @@ The repository-level `CONTRIBUTING.md`, `README.md`, and `AGENTS.md` are short
 entry points. This guide is the maintained source of contributor instructions.
 
 - [Native command/read coordination and maturity ADR]({{ '/adr/0002-native-library-commands-and-maturity/' | relative_url }})
-- [Native library implementation evidence]({{ '/audits/native-library-implementation-2026-11-16/' | relative_url }})

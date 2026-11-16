@@ -6,7 +6,6 @@ import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import SwiftUI
 import UniformTypeIdentifiers
-import VocabularyDeckBuilder
 
 private struct ImportNotice: Identifiable {
     let id = UUID()
@@ -57,6 +56,7 @@ struct ContentView: View {
     @State private var importModel: ImportModel?
     @State private var isChoosingImportFile = false
     @State private var importNotice: ImportNotice?
+    @State private var isCreatingGeneratedDeck = false
     @State private var portableDeckTransfer: PortableDeckTransferModel
     private let library: any LibraryRepository
     private let deckBuilderRegistry: DeckBuilderRegistry
@@ -146,7 +146,7 @@ struct ContentView: View {
         Binding(get: { isShowingVocabularyPacks }, set: { isShowingVocabularyPacks = $0 })
     }
 
-    private var vocabularyBuilderPresentation: Binding<Bool> {
+    private var wordCapturePresentation: Binding<Bool> {
         Binding(get: { isAddingFromVocabulary }, set: { isAddingFromVocabulary = $0 })
     }
 
@@ -300,9 +300,10 @@ struct ContentView: View {
             DeckBuilderSheet(
                 registry: deckBuilderRegistry,
                 context: deckBuilderContext,
-                isImporting: portableDeckTransfer.isBusy,
+                isImporting: portableDeckTransfer.isBusy || isCreatingGeneratedDeck,
                 onGenerated: importGeneratedDeck,
-                onCancel: { isShowingDeckBuilder = false }
+                onCancel: { isShowingDeckBuilder = false },
+                onPrepared: createPreparedDeck
             )
         }
         .sheet(isPresented: vocabularyPacksPresentation) {
@@ -312,7 +313,7 @@ struct ContentView: View {
                 onDone: { isShowingVocabularyPacks = false }
             )
         }
-        .sheet(isPresented: vocabularyBuilderPresentation, onDismiss: {
+        .sheet(isPresented: wordCapturePresentation, onDismiss: {
             Task { await vocabularyLibraryModel.load() }
         }) {
             WordCaptureView(library: library, rootURL: vocabularyLibraryModel.rootURL,
@@ -696,15 +697,7 @@ struct ContentView: View {
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
-                onAddItem: { openAddItem() },
-                onAddFromVocabulary: canUseVocabularyUI ? { isAddingFromVocabulary = true } : nil,
-                onLearnInContext: canUseVocabularyUI ? { showsLearnInContext = true } : nil,
-                onDeleteAllUnassigned: {
-                    Task {
-                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await refreshLibrary(forceRefresh: true)
-                    }
-                }
+                onAddItem: { openAddItem() }
             )
         }
     }
@@ -907,27 +900,43 @@ struct ContentView: View {
         }
     }
 
-    private func importGeneratedDeck(_ generated: GeneratedDeckBundle) {
+    private func createPreparedDeck(_ creation: GeneratedDeckCreation) {
+        guard !isCreatingGeneratedDeck else { return }
+        isCreatingGeneratedDeck = true
         Task {
-            defer { generated.cleanup() }
-            guard let imported = await portableDeckTransfer.importDeck(from: generated.bundleURL) else {
-                return
+            defer { isCreatingGeneratedDeck = false }
+            do {
+                let outcome = try await NativeLibraryCommands.createGeneratedDeck(on: library,
+                    prepared: creation.prepared, parentDeckID: creation.parentDeckID, context: creation.command)
+                await refreshAfterPortableDeckImport(outcome.result)
+                portableDeckTransfer.notice = PortableDeckTransferNotice(title: "Deck Imported",
+                    message: outcome.warnings.first ?? "\(outcome.result.itemCount) items imported.")
+                isShowingDeckBuilder = false
+            } catch {
+                portableDeckTransfer.notice = PortableDeckTransferNotice(title: "Could Not Create Deck", message: error.localizedDescription)
             }
-            if let destinationDeckID = generated.destinationDeckID,
-               let importedRootID = imported.deckIDs.first {
-                do {
-                    var importedRoot = try await library.deck(id: importedRootID)
-                    importedRoot.parentID = destinationDeckID
-                    _ = try await library.updateDeck(importedRoot)
-                } catch {
-                    portableDeckTransfer.notice = PortableDeckTransferNotice(
-                        title: "Deck Imported at Top Level",
-                        message: "The deck was imported, but its selected parent deck was unavailable."
-                    )
+        }
+    }
+
+    private func importGeneratedDeck(_ generated: GeneratedDeckBundle) {
+        guard !isCreatingGeneratedDeck else { generated.cleanup(); return }
+        isCreatingGeneratedDeck = true
+        Task {
+            defer { generated.cleanup(); isCreatingGeneratedDeck = false }
+            do {
+                let result: PortableDeckImportResult
+                if let parent = generated.destinationDeckID {
+                    result = try await NativeLibraryCommands.createGeneratedDeck(on: library,
+                        source: generated.bundleURL, parentDeckID: parent)
+                } else {
+                    result = try await NativeLibraryCommands.importDeck(on: library,
+                        source: generated.bundleURL, authored: true)
                 }
+                await refreshAfterPortableDeckImport(result)
+                isShowingDeckBuilder = false
+            } catch {
+                portableDeckTransfer.notice = PortableDeckTransferNotice(title: "Could Not Create Deck", message: error.localizedDescription)
             }
-            await refreshAfterPortableDeckImport(imported)
-            isShowingDeckBuilder = false
         }
     }
 

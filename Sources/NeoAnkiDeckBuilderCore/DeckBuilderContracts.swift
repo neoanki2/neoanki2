@@ -1,4 +1,5 @@
 import Foundation
+import NeoAnkiCore
 
 public struct DeckBuilderDescriptor: Identifiable, Sendable, Equatable {
     public let id: String
@@ -87,5 +88,34 @@ public struct SystemDeckBuildWorkspaceProvider: DeckBuildWorkspaceProviding {
         return GeneratedDeckBundle(bundleURL: bundleURL) {
             try? FileManager.default.removeItem(at: rootURL)
         }
+    }
+}
+
+/// A validated native creation and its stable operation identity. Retain this
+/// value while recovering an uncertain result; generating again is a new action.
+public struct GeneratedDeckCreation: Sendable {
+    public let prepared: PreparedAuthoredDeck
+    public let parentDeckID: UUID
+    public let command: NativeCommandContext
+    public init(prepared: PreparedAuthoredDeck, parentDeckID: UUID) {
+        self.prepared = prepared; self.parentDeckID = parentDeckID
+        command = NativeCommandContext(operation: "create-generated-deck",
+            input: Data((prepared.contentHash + ":" + parentDeckID.uuidString).utf8),
+            expectedCount: prepared.itemCount)
+    }
+    public func materialize(using provider: any DeckBuildWorkspaceProviding) throws -> GeneratedDeckBundle {
+        let workspace = try provider.makeWorkspace()
+        do {
+            try AuthoredDeck.write(prepared, to: workspace.bundleURL)
+            return workspace.placed(under: parentDeckID)
+        } catch { workspace.cleanup(); throw error }
+    }
+    public static func preparing(_ operation: @escaping @Sendable () throws -> Self) async throws -> Self {
+        let worker = Task.detached(priority: .userInitiated, operation: operation)
+        return try await withTaskCancellationHandler {
+            let result = try await worker.value
+            try Task.checkCancellation()
+            return result
+        } onCancel: { worker.cancel() }
     }
 }

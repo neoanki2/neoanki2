@@ -211,7 +211,7 @@
       "tests": [
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testBuildersPreviewImportAndValidation",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testProsePreviewImportAndEditing",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testVocabularySearchPreviewImportAndPackPersistence",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testVocabularyPackPersistenceWithoutLegacyBuilder",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testSyncConflictRecoveryAndImportFailure",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLibraryRecoveryPresentationAndRetry"
       ]

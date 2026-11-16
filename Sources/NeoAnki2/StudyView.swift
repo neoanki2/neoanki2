@@ -644,7 +644,9 @@ struct StudyView: View {
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("primaryStudyAction")
 
-                    if card.template.interaction != .reveal, card.template.interaction != .cloze {
+                    if card.template.interaction != .reveal,
+                       card.template.interaction != .cloze,
+                       card.template.interaction != .imageOcclusion {
                         revealAndSelfGradeButton
                     }
                 }

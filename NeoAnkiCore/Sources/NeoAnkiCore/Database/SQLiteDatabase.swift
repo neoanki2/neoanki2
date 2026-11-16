@@ -2411,6 +2411,18 @@ actor SQLiteDatabase {
     ) throws {
         let orderedDecks = try DeckImportOrdering.parentFirst(plan.decks)
         try inTransaction(recordNativeCommand: true, affectedCount: plan.items.count, nativeResult: try result.map { try JSONEncoder().encode($0) }) {
+            try Task.checkCancellation()
+            if let placement = plan.rootPlacement {
+                guard orderedDecks.contains(where: { $0.id == placement.rootID && $0.parentID == nil }),
+                      try fetchDeck(id: placement.parentID) != nil else {
+                    throw DatabaseError.deckNotFound(placement.parentID)
+                }
+            }
+            for expected in plan.expectedItemTypes {
+                guard try fetchValidatedItemType(id: expected.id) == expected else {
+                    throw DatabaseError.invalidItemType("The item type changed during import. Try again.")
+                }
+            }
             for itemType in plan.itemTypes {
                 try insertItemType(itemType)
             }
@@ -2425,7 +2437,10 @@ actor SQLiteDatabase {
                     localTypeID: mapping.localTypeID
                 )
             }
-            for deck in orderedDecks {
+            for var deck in orderedDecks {
+                if let placement = plan.rootPlacement, deck.id == placement.rootID {
+                    deck.parentID = placement.parentID
+                }
                 try insertDeck(deck)
             }
             for owner in plan.includedItemTypes {
@@ -2514,6 +2529,7 @@ actor SQLiteDatabase {
                 sqlite3_finalize(browseStatement)
             }
             for entry in plan.items {
+                try Task.checkCancellation()
                 guard let itemType = itemTypesByID[entry.item.itemTypeID] else {
                     throw DatabaseError.itemTypeNotFound(entry.item.itemTypeID)
                 }
@@ -5053,11 +5069,17 @@ actor SQLiteDatabase {
         scope: CardScope,
         asOf now: Date,
         studyDay: String?,
-        limit: Int?
+        limit: Int?,
+        afterWorkGate: (() throws -> Void)? = nil
     ) throws -> [Card] {
         try refreshStudyRelationsIfNeeded()
         let filter = scopeClause(scope, column: "cards.deck_id")
-        let hasWork = try !query("""
+        // Proving there are no works must not scan every ordinary due card.
+        // When works do exist retain the selective scoped/due plan: forcing a
+        // relation-first join can be worse for large future/suspended works.
+        let anyWork = try !query(Self.anyStudyWorkSQL).isEmpty
+        try afterWorkGate?()
+        let hasWork = try anyWork && !query("""
             SELECT 1 FROM study_item_relations AS relation
             JOIN cards ON cards.item_id = relation.item_id
             WHERE relation.work_key IS NOT NULL AND cards.is_suspended = 0
@@ -5076,6 +5098,50 @@ actor SQLiteDatabase {
         return limit.map { Array(cards.prefix(max(0, $0))) } ?? cards
     }
 
+    private static let anyStudyWorkSQL = """
+        SELECT 1 FROM study_item_relations INDEXED BY idx_study_work
+        WHERE work_key IS NOT NULL LIMIT 1;
+        """
+
+    func studyWorkGateQueryPlan() throws -> [String] {
+        try inReadTransaction {
+            try query("EXPLAIN QUERY PLAN " + Self.anyStudyWorkSQL)
+                .compactMap { $0["detail"] as? String }
+        }
+    }
+
+    /// Counts actual production-statement work, independent of host timing.
+    /// Used only by bounded-query regression tests and profiling tools.
+    func studyQueueHeadWorkDiagnostic(scope: CardScope, asOf now: Date,
+        studyDay: String) throws -> (instructions: Int32, sorts: Int32, rows: Int) {
+        try inReadTransaction {
+            let sql = try studyQueueStatement(scope: scope, asOf: now,
+                studyDay: studyDay, isNew: true, limit: 1)
+            let statement = try prepareStatement(sql.sql)
+            defer { sqlite3_finalize(statement) }
+            try bind(sql.bindings, to: statement)
+            var rows = 0
+            while true {
+                let result = sqlite3_step(statement)
+                if result == SQLITE_DONE { break }
+                guard result == SQLITE_ROW else {
+                    throw DatabaseError.queryFailed("Could not profile study-head statement.")
+                }
+                rows += 1
+            }
+            return (sqlite3_stmt_status(statement, SQLITE_STMTSTATUS_VM_STEP, 0),
+                    sqlite3_stmt_status(statement, SQLITE_STMTSTATUS_SORT, 0), rows)
+        }
+    }
+
+    func studyQueueHeadSnapshotDiagnostic(asOf now: Date, studyDay: String,
+        afterWorkGate: @escaping @Sendable () throws -> Void) throws -> [Card] {
+        try inReadTransaction {
+            try fetchStudyQueueCards(scope: .all, asOf: now, studyDay: studyDay,
+                limit: 1, afterWorkGate: afterWorkGate)
+        }
+    }
+
     private func studyQueueStatement(
         scope: CardScope,
         asOf now: Date,
@@ -5085,6 +5151,31 @@ actor SQLiteDatabase {
     ) throws -> (sql: String, bindings: [Binding]) {
         if isNew {
             let studyDay = studyDay ?? ""
+            if case .none = try newCardLimitShape(scope: scope, studyDay: studyDay) {
+                let filter = scopeClause(scope, column: "cards.deck_id")
+                let family = try newFamilyEligibilitySQL(scope: scope, asOf: now)
+                // A global ordered walk can regress a sparse deck selection.
+                // Let SQLite retain its scoped index choice in those cases.
+                let index: String
+                if case .all = scope { index = " INDEXED BY idx_cards_active_new_due" }
+                else { index = "" }
+                // The general CTE can choose phase + a full temporary sort
+                // before LIMIT. Walk the existing ordered partial index and
+                // apply the same family/usability predicates before slicing.
+                return ("""
+                    SELECT cards.id, cards.item_id, cards.template_id, cards.skill,
+                           cards.memory, cards.is_suspended, cards.deck_id,
+                           cards.cloze_group, cards.occlusion_group,
+                           cards.memory_model_version, cards.memory_parameter_set_id,
+                           cards.scheduling_history_origin
+                    FROM cards\(index)
+                    WHERE cards.is_suspended = 0 AND cards.phase = 'new'
+                      AND \(usableStudyCardSQL()) AND cards.due_at <= ?
+                      AND \(filter.sql) AND (\(family))
+                    ORDER BY cards.due_at ASC, cards.id ASC
+                    """ + studyQueueLimitSQL(limit),
+                    [.double(now.timeIntervalSince1970)] + filter.bindings)
+            }
             let eligible = try eligibleDueCardsCTE(
                 scope: scope,
                 asOf: now,

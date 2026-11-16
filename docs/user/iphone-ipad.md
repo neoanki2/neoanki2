@@ -157,13 +157,14 @@ Deck settings support rename, nesting, daily new-card limits, progress reset,
 and deletion policies. After **Delete and Unassign Items** succeeds, NeoAnki2
 closes Deck Settings and the removed deck's detail screen, returning to the
 previous deck list; its former items remain available under **Unassigned**.
-Study Day settings expose only the local rollover time. Retention, maximum
+**Settings → Study → New day begins** sets the local rollover time and saves
+automatically. Retention, maximum
 interval, content-cohort learning, probation, and fallback are fixed automatic
 behavior with no controls or status surface. Maintenance runs locally after
 eligible sessions, sync, startup, or idle time; it never runs inline while a
 grade is saved.
 
-Use **Add Word** on Home, inside a deck, or in Create for quick vocabulary
+Use **Create → Add Word**, or **Add Word** inside a deck, for quick vocabulary
 capture. Look up a word, set up the dictionary–deck pair once, and add the
 prepared item. Each pair remembers its item type, field mappings, and preferred
 content variants on this device. Add stays above the keyboard, and the flow
@@ -183,8 +184,8 @@ a portable `.neodeck` bundle for the selected deck and presents the system save
 sheet. The same [format and conflict rules](../import-export/) apply on Mac and
 iOS.
 
-**Deck Builders** contains guided poem, prose, and installed-vocabulary
-builders. Created poems and prose passages are placed in their selected parent
+**Create → Poem Deck** and **Create → Prose Deck** open the guided builders
+directly. Created poems and prose passages are placed in their selected parent
 decks. Editing a generated unit from item details opens the whole source
 editor for that passage.
 **Vocabulary Packs** imports and removes local `.neovocab` directories. Packs
