@@ -8,6 +8,10 @@ parent: User Guide
 
 # Import and export
 
+Imported and synced items can share an image asset. Cleanup retains that asset
+while any saved item references it. Include both the database and media folder
+in a [complete library backup](../troubleshooting/#where-the-library-is-stored).
+
 When importing JSON or CSV into a deck, placement, generated cards, media
 references, and item-type attachment are saved together. An attachment or
 destination error leaves no partial imported batch. Nested portable and authored

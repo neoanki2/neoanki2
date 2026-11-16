@@ -247,6 +247,10 @@ the surviving card identities.
 
 ## Browse and search items
 
+If item detail reports that an image cannot be read, see
+[media troubleshooting](../troubleshooting/#item-and-media-errors).
+The library stores image files alongside the database, so back them up together.
+
 Open browse mode from the scope home link, from **Library ▸ Browse Items**, or
 with ⌥⌘B. Press Escape or choose **Done** to return to the scope home.
 
