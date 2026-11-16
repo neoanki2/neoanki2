@@ -25,18 +25,20 @@ mkdir -p "$(dirname "$OUTPUT")"
 run_suite() {
   echo "==> NeoAnkiCore user-flow performance tests (scale=$SCALE, budget=${SUITE_BUDGET_SECONDS}s total)"
   cd "$ROOT/NeoAnkiCore"
-  swift test --filter 'UserFlowPerformance'
+  swift test --no-parallel --filter 'UserFlowPerformance'
 
   echo "==> NeoAnki2 ViewModel performance tests (scale=$SCALE)"
   cd "$ROOT"
-  swift test --filter 'UserFlowPerformance'
+  swift test --no-parallel --filter 'UserFlowPerformance'
 }
 
 if command -v timeout >/dev/null 2>&1; then
-  timeout "${SUITE_BUDGET_SECONDS}" bash -c "$(declare -f run_suite); run_suite"
+  # The timeout child needs both the package paths and its own failure policy.
+  export ROOT SCALE SUITE_BUDGET_SECONDS
+  timeout "${SUITE_BUDGET_SECONDS}" bash -euo pipefail -c "$(declare -f run_suite); run_suite"
 else
   run_suite
 fi
 
+"$ROOT/Scripts/summarize-performance.sh" "$OUTPUT" core app
 echo "Performance baseline written to $OUTPUT"
-"$ROOT/Scripts/summarize-performance.sh" "$OUTPUT"

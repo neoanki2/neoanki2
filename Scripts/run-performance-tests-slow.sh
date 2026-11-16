@@ -25,11 +25,11 @@ mkdir -p "$(dirname "$OUTPUT")"
 
 echo "==> NeoAnkiCore user-flow performance tests (scale=$SCALE, no time cap)"
 cd "$ROOT/NeoAnkiCore"
-swift test --filter 'UserFlowPerformance'
+swift test --no-parallel --filter 'UserFlowPerformance'
 
 echo "==> NeoAnki2 ViewModel performance tests (scale=$SCALE)"
 cd "$ROOT"
-swift test --filter 'UserFlowPerformance'
+swift test --no-parallel --filter 'UserFlowPerformance'
 
+"$ROOT/Scripts/summarize-performance.sh" "$OUTPUT" core app
 echo "Performance baseline written to $OUTPUT"
-"$ROOT/Scripts/summarize-performance.sh" "$OUTPUT"

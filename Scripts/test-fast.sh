@@ -12,6 +12,7 @@ cd "$ROOT"
 swift test --parallel
 
 python3 "$ROOT/Scripts/test-sync-test-sensitivity.py"
+python3 "$ROOT/Scripts/test-performance-runner.py"
 
 echo "==> Generated API reference"
 swift run neoanki-api-reference check
