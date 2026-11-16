@@ -8,6 +8,19 @@ parent: User Guide
 
 # Troubleshooting
 
+## A save or import is present but a warning remains
+
+A message beginning **Saved** means the library write completed. Refresh to
+retry the failed display or device update; repeating the import can create
+another deliberate batch. If the save status could not be confirmed, refresh and
+inspect the library before repeating the operation.
+
+A maturity-unavailable message means review evidence could not be read. Your
+stored content is preserved, and browsing and study remain available. Keep a
+backup before attempting any repair. A rejected selection move means at least
+one selected item disappeared or changed its deck; refresh and select the items
+again.
+
 ## Learning time is missing or still saving
 
 Learning time starts with new study sessions and excludes browsing, editing,

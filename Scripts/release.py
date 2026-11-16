@@ -117,9 +117,9 @@ class GitHub:
         return baseline, history
 
     def fetch_main(self):
-        run(["git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential",
-             "fetch", "https://github.com/" + self.repository + ".git", "refs/heads/main"])
-        return run(["git", "rev-parse", "FETCH_HEAD"])
+        # GitHub access always uses the authenticated CLI. Source integration
+        # prepares local main before publication; no network Git fetch is needed.
+        return self.api("git/ref/heads/main")["object"]["sha"]
 
     def main_source(self):
         # Source integration happens before this command, through the release
@@ -138,8 +138,10 @@ class GitHub:
             raise ValueError("This candidate was not prepared from main after merge; preserve its history "
                              "and prepare a new release from main instead of resuming publication")
         remote = self.fetch_main()
-        if run(["git", "merge-base", "--is-ancestor", state["revision"], remote], check=False).returncode:
-            raise ValueError("Release source is not contained in remote main; publication blocked")
+        if remote != state["revision"]:
+            comparison = self.api("compare/" + state["revision"] + "..." + remote)
+            if comparison.get("status") not in ("ahead", "identical"):
+                raise ValueError("Release source is not contained in remote main; publication blocked")
 
     def reserve(self, state):
         self.verify_release_source(state)

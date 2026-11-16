@@ -8,6 +8,13 @@ parent: User Guide
 
 # Import and export
 
+When importing JSON or CSV into a deck, placement, generated cards, media
+references, and item-type attachment are saved together. An attachment or
+destination error leaves no partial imported batch. Nested portable and authored
+decks preserve their hierarchy regardless of internal identifier ordering. A
+saved import followed by a refresh warning should be refreshed rather than
+imported again.
+
 NeoAnki2 has four native ways to bring in content:
 
 - A bundled deck builder turns guided input into an authored deck.

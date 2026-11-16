@@ -78,7 +78,8 @@ changes, although their bundle IDs, signatures, sandboxing, and binaries differ.
 
 1. Requires the requested changes to be merged first. Commit local release input,
    push and merge its PRs using authenticated `gh`, then update a clean `main`
-   checkout. A queued auto-merge is insufficient. The command checks that its
+   checkout. Remote main and source ancestry are verified through authenticated
+   `gh` API calls. A queued auto-merge is insufficient. The command checks that its
    checkout is clean, on `main`, and exactly matches remote `main`; a blocked
    merge stops the release before version reservation, signing or publication.
 2. Records that `main` SHA, then atomically reserves the version tag and a draft

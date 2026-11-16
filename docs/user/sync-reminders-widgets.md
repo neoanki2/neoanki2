@@ -9,6 +9,11 @@ permalink: /user/sync-reminders-widgets/
 
 # iCloud, Reminders, and Widgets
 
+Saved library changes refresh native counts whether they come from this device,
+the local API, or iCloud. A device-update warning after saving means the library
+change is already stored; refresh to retry badge, reminder, or widget
+publication rather than creating or importing the same content again.
+
 Updated apps also synchronize active learning-time segments through a separate
 private iCloud zone. Offline study joins combined totals after syncing, and
 repeated delivery never duplicates time. Older apps keep ordinary library sync

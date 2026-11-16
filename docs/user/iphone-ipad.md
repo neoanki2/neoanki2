@@ -9,6 +9,11 @@ permalink: /user/iphone-ipad/
 
 # iPhone and iPad
 
+Home loads deck totals and authoring choices before you open a scoped item
+browser. A multi-item move succeeds for the entire selection or asks you to
+refresh a changed selection. Typed answers keep your submitted text beside the
+expected answer after checking; explanations remain under **Explanation**.
+
 Home and each deck show Today and All time learning totals. **View Learning
 Time** opens period filters and an expandable deck breakdown. Study time is
 tracked automatically; the timer pauses after two minutes without interaction

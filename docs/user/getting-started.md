@@ -8,6 +8,11 @@ parent: User Guide
 
 # Getting started
 
+Home opens with deck totals and authoring choices; the item browser loads when
+you open Browse. Large libraries can therefore show the home screen without
+first loading every saved item. If progress evidence cannot be read, a recovery
+message identifies unavailable maturity while keeping the library accessible.
+
 Deck homes also show Today and All time learning totals. Choose **View Learning
 Time** for a deck breakdown and reporting periods. Tracking begins with new
 native study sessions; older review durations are not imported. See

@@ -213,14 +213,24 @@ class PlanningTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'not prepared from main'):hub.verify_release_source(state)
             with self.assertRaisesRegex(ValueError,'not prepared from main'):hub.reserve(state)
 
+    def test_main_ref_is_read_only_through_authenticated_gh(self):
+        hub=object.__new__(controller.GitHub);hub.repository='owner/repository'
+        with patch.object(controller,'run',return_value=json.dumps({'object':{'sha':self.rev}})) as invoke:
+            self.assertEqual(hub.fetch_main(),self.rev)
+        invoke.assert_called_once_with(['gh','api','repos/owner/repository/git/ref/heads/main','--method','GET'])
+
     def test_main_prepared_revision_must_still_belong_to_remote_main(self):
         hub=object.__new__(controller.GitHub)
         state={'branch':'main','source_origin':'main','revision':self.rev}
-        with patch.object(controller,'ROOT',self.root),patch.object(hub,'fetch_main',return_value=self.rev):
+        with patch.object(hub,'fetch_main',return_value=self.rev),patch.object(hub,'api',side_effect=AssertionError('comparison unnecessary')):
             hub.verify_release_source(state)
-            self.git('switch','-qc','release/unmerged');self.write('README.md','feature')
-            self.git('add','.');self.git('commit','-qm','unmerged change');state['revision']=self.git('rev-parse','HEAD')
-            with self.assertRaisesRegex(ValueError,'not contained in remote main'):hub.verify_release_source(state)
+        # Resume may observe a newer remote commit absent from the local clone.
+        with patch.object(hub,'fetch_main',return_value='unfetched-remote-main'),patch.object(hub,'api',return_value={'status':'ahead'}) as api,patch.object(controller,'run',side_effect=AssertionError('network Git must not be used')):
+            hub.verify_release_source(state)
+            api.assert_called_once_with('compare/'+self.rev+'...unfetched-remote-main')
+        for status in ('behind','diverged','unknown'):
+            with self.subTest(status=status),patch.object(hub,'fetch_main',return_value='other-main'),patch.object(hub,'api',return_value={'status':status}):
+                with self.assertRaisesRegex(ValueError,'not contained in remote main'):hub.verify_release_source(state)
 
     def test_main_blocker_prevents_apple_access_and_all_release_phases(self):
         owner=self

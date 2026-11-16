@@ -25,7 +25,7 @@ Correctness tests cover injected second-move failure with complete rollback and 
 
 Projection tests assert scoped decoding, no card/history replay on deck rename, affected-card grade/revert invalidation, journal-gap rebuild, external scheduler-origin changes, reset/suspension behavior, and preservation of unrelated scoped reads when another card's history is damaged. Existing API, synchronization, media, migration, and study suites remain release checks.
 
-Verification completed: `swift build`, the complete `./Scripts/test-fast.sh` workflow, the 86-operation API reference check, documentation validation for 53 features, and unsigned iOS app/widget builds passed. The focused typed-answer XCTest passed on its first attempt (one test, no failures or skips), and its disposable Simulator was deleted. Original logs are included in the implementation evidence archive.
+Verification completed: `swift build`, the complete `./Scripts/test-fast.sh` workflow, the 86-operation API reference check, documentation validation for 53 features, and unsigned iOS app/widget builds passed. The focused typed-answer XCTest passed on its first attempt (one test, no failures or skips), and its disposable Simulator was deleted. The release controller also passed 63 focused contract tests after replacing network Git fetches with authenticated `gh` main/ancestry verification. Original logs, including the documentation gate failure that required affected guide updates, are included in the implementation evidence archive.
 
 ## Migration and release criteria
 
