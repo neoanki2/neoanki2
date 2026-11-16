@@ -1,106 +1,56 @@
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
+import Observation
 
-struct PendingGradeUndo: Equatable, Sendable {
-    let reviewLogID: UUID
-    let previousIndex: Int
-    let previousReviewedCount: Int
-    let reviewedCardID: UUID
-    let reviewedItemID: UUID
-    let insertedReviewedCardID: Bool
-    let insertedReviewedItemID: Bool
-    let rating: ReviewRating
-    let requeuedCardID: UUID?
-}
+typealias PendingGradeUndo = StudyGradeUndo
+typealias StudyStartTiming = StudySessionStartTiming
 
-private struct PendingRepeat: Sendable {
-    var card: Card
-}
-
-struct StudyStartTiming: Sendable, Equatable {
-    var dueCountSeconds = 0.0
-    var itemTypeCheckSeconds = 0.0
-    var headFetchSeconds = 0.0
-    var headPublicationSeconds = 0.0
-    var remainingFetchSeconds = 0.0
-    var remainingPublicationSeconds = 0.0
-    var firstReadySeconds = 0.0
-    var totalSeconds = 0.0
-}
-
-@MainActor
-@Observable
+/// Mac presentation names over the single native session engine. No queue or
+/// review state is mirrored here; Swift Observation follows the nested model.
+@MainActor @Observable
 final class StudyModel {
-    private(set) var queue: [DueCard] = [] { didSet { updateLearningTime() } }
-    private(set) var index = 0 { didSet { updateLearningTime() } }
-    private(set) var isAnswerRevealed = false
-    private(set) var isLoading = false { didSet { updateLearningTime() } }
-    /// The first card is readable while the rest of the exact session queue is
-    /// being validated. Persistence and queue mutations remain disabled until
-    /// this becomes false.
-    private(set) var isPreparingQueue = false
-    private(set) var isGrading = false { didSet { updateLearningTime() } }
-    private(set) var isCompletingSubmission = false { didSet { updateLearningTime() } }
-    private(set) var errorMessage: String?
-    private(set) var isFinished = false { didSet { updateLearningTime() } }
-    /// Set only when the queue could not be read at all. Without it a failed
-    /// load is indistinguishable from an empty one, and a session that never
-    /// opened reports itself complete.
-    private(set) var didFailToLoad = false { didSet { updateLearningTime() } }
-    private(set) var scopeLabel = ""
-    private(set) var pendingGradeUndo: PendingGradeUndo?
-    private(set) var typedAnswer = ""
-    private(set) var answerEvaluation: AnswerEvaluation?
-    private(set) var choiceOptions: [String] = []
-    private(set) var selectedChoice: String?
-    private(set) var arrangedItems: [String] = []
-    private(set) var selectedArrangementIndex: Int?
-    private(set) var interactionMessage: String?
-    private(set) var reviewedCount = 0
-    private(set) var completedSubmissionCount = 0
-    private(set) var reviewedCardIDs: Set<UUID> = []
-    private(set) var reviewedItemIDs: Set<UUID> = []
-    private(set) var lastStartTiming = StudyStartTiming()
-
+    let session: StudyFeatureModel
     let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
-    /// Repeats only need the newly persisted scheduling state while waiting for
-    /// the current pass to finish. Item/type/template content stays canonical
-    /// in `queue`, avoiding a second hydrated copy of every failed card.
-    private var sessionScope: DeckScope = .allDecks
-    private var repairQueue: [PendingRepeat] = []
-    let learningTime: LearningTimeTracker
-    private var reviewTiming = ReviewTimingTracker()
-    private var expectedQueueCount = 0
-    private var startGeneration: UInt64 = 0
-    private let remainingQueueLoadGate: (@Sendable () async -> Void)?
 
     init(
         library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses,
         remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
     ) {
         self.library = library
-        self.learningTime = LearningTimeTracker(library: library as? any LibraryLearningTime)
-        self.remainingQueueLoadGate = remainingQueueLoadGate
+        session = StudyFeatureModel(library: library, scope: .allDecks, title: "All Decks",
+                                    errorMapper: MacStudyErrorMapper())
+        session.remainingQueueLoadGate = remainingQueueLoadGate
     }
 
-    var currentCard: DueCard? {
-        guard !isFinished, queue.indices.contains(index) else { return nil }
-        return queue[index]
-    }
-
-    var remainingCardCount: Int {
-        guard !isFinished else { return 0 }
-        if isPreparingQueue {
-            return expectedQueueCount
-        }
-        guard queue.indices.contains(index) else { return 0 }
-
-        // A failed card waits once in the next repair round while untouched
-        // cards remain once in the current queue. Counting both pending groups
-        // keeps Again stable without rescanning a potentially large session.
-        return queue.count - index + repairQueue.count
-    }
+    var queue: [DueCard] { session.queue }
+    var currentCard: DueCard? { session.currentCard }
+    var index: Int { session.index }
+    var isAnswerRevealed: Bool { session.isAnswerRevealed }
+    var isLoading: Bool { session.isLoading }
+    var isPreparingQueue: Bool { session.isPreparingQueue }
+    var isGrading: Bool { session.isGrading }
+    var isCompletingSubmission: Bool { session.isCompletingSubmission }
+    var isFinished: Bool { session.isFinished }
+    var didFailToLoad: Bool { session.didFailToLoad }
+    var pendingGradeUndo: PendingGradeUndo? { session.pendingGradeUndo }
+    var typedAnswer: String { session.typedAnswer }
+    var answerEvaluation: AnswerEvaluation? { session.answerEvaluation }
+    var choiceOptions: [String] { session.choiceOptions }
+    var selectedChoice: String? { session.selectedChoice }
+    var arrangedItems: [String] { session.arrangedItems }
+    var selectedArrangementIndex: Int? { session.selectedArrangementIndex }
+    var interactionMessage: String? { session.interactionMessage }
+    var reviewedCount: Int { session.reviewedCount }
+    var completedSubmissionCount: Int { session.completedSubmissionCount }
+    var reviewedCardIDs: Set<UUID> { session.reviewedCardIDs }
+    var reviewedItemIDs: Set<UUID> { session.reviewedItemIDs }
+    var lastStartTiming: StudyStartTiming { session.lastStartTiming }
+    var learningTime: LearningTimeTracker { session.learningTime }
+    var errorMessage: String? { session.error?.message }
+    var scopeLabel: String { session.title }
+    var remainingCardCount: Int { session.remainingCount }
 
     var remainingLabel: String {
         let count = remainingCardCount
@@ -128,559 +78,36 @@ final class StudyModel {
     }
 
     var canUndoLastGrade: Bool {
-        pendingGradeUndo != nil
+        session.canUndo
     }
 
     func startSession(scope: StudyScope = .allDecks) async {
-        let start = ContinuousClock.now
-        let sessionNow = Date.now
-        var timing = StudyStartTiming()
-        startGeneration &+= 1
-        let generation = startGeneration
-        lastStartTiming = timing
-        isLoading = true
-        isPreparingQueue = false
-        expectedQueueCount = 0
-        errorMessage = nil
-        isFinished = false
-        isAnswerRevealed = false
-        index = 0
-        reviewedCount = 0
-        completedSubmissionCount = 0
-        reviewedCardIDs = []
-        reviewedItemIDs = []
-        repairQueue = []
-        scopeLabel = scope.label
-        sessionScope = scope.filter
-        pendingGradeUndo = nil
-        didFailToLoad = false
-
-        do {
-            let countStart = ContinuousClock.now
-            let dueCount = try await library.dueCount(
-                scope: scope.filter,
-                asOf: sessionNow
-            )
-            timing.dueCountSeconds = countStart.elapsedSeconds
-            guard startIsCurrent(generation) else { return }
-
-            if dueCount == 0 {
-                let publicationStart = ContinuousClock.now
-                queue = []
-                isFinished = true
-                prepareCurrentInteraction()
-                isLoading = false
-                timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
-                timing.firstReadySeconds = start.elapsedSeconds
-                timing.totalSeconds = timing.firstReadySeconds
-                lastStartTiming = timing
-                return
-            }
-
-            let itemTypeStart = ContinuousClock.now
-            let itemTypes = try await library.loadItemTypes()
-            timing.itemTypeCheckSeconds = itemTypeStart.elapsedSeconds
-            guard startIsCurrent(generation) else { return }
-
-            let headStart = ContinuousClock.now
-            let head = try await library.dueCards(
-                scope: scope.filter,
-                asOf: sessionNow,
-                limit: 1
-            )
-            timing.headFetchSeconds = headStart.elapsedSeconds
-            guard startIsCurrent(generation) else { return }
-
-            // A corrupt definition can make the database's raw due count differ
-            // from the renderable queue. Keep the original all-or-failure load
-            // behavior for those libraries instead of publishing an inexact
-            // progress total.
-            guard itemTypes.corruptions.isEmpty, let firstCard = head.first else {
-                try await loadCompleteQueue(
-                    scope: scope,
-                    asOf: sessionNow,
-                    generation: generation,
-                    start: start,
-                    timing: &timing
-                )
-                return
-            }
-
-            let headPublicationStart = ContinuousClock.now
-            queue = [firstCard]
-            expectedQueueCount = dueCount
-            isFinished = false
-            isPreparingQueue = true
-            prepareCurrentInteraction()
-            reviewTiming.reset()
-            isLoading = false
-            timing.headPublicationSeconds = headPublicationStart.elapsedSeconds
-            timing.firstReadySeconds = start.elapsedSeconds
-            lastStartTiming = timing
-
-            if let remainingQueueLoadGate {
-                await remainingQueueLoadGate()
-                guard startIsCurrent(generation) else { return }
-            }
-
-            let remainingFetchStart = ContinuousClock.now
-            let completeQueue = try await library.dueCards(
-                scope: scope.filter,
-                asOf: sessionNow
-            )
-            timing.remainingFetchSeconds = remainingFetchStart.elapsedSeconds
-            guard startIsCurrent(generation) else { return }
-
-            let remainingPublicationStart = ContinuousClock.now
-            // Keep the already-rendered copy: it may hold local interaction
-            // state or an edit reload. The complete read supplies every
-            // remaining card in its original database order.
-            queue.reserveCapacity(completeQueue.count)
-            for card in completeQueue where card.id != firstCard.id {
-                queue.append(card)
-            }
-            expectedQueueCount = 0
-            isPreparingQueue = false
-            isLoading = false
-            isFinished = false
-            timing.remainingPublicationSeconds = remainingPublicationStart.elapsedSeconds
-            timing.totalSeconds = start.elapsedSeconds
-            lastStartTiming = timing
-        } catch {
-            guard startIsCurrent(generation) else { return }
-            errorMessage = userFacingError(from: error)
-            queue = []
-            expectedQueueCount = 0
-            isPreparingQueue = false
-            isFinished = true
-            didFailToLoad = true
-            isLoading = false
-            timing.totalSeconds = start.elapsedSeconds
-            if timing.firstReadySeconds == 0 {
-                timing.firstReadySeconds = timing.totalSeconds
-            }
-            lastStartTiming = timing
-        }
+        await session.start(scope: scope.filter, title: scope.label)
     }
-
-    func revealAnswer() { learningTime.interaction();
-        guard currentCard != nil else { return }
-        isAnswerRevealed = true
-    }
-
-    func updateTypedAnswer(_ answer: String) { learningTime.interaction();
-        guard !isAnswerRevealed else { return }
-        typedAnswer = answer
-        answerEvaluation = nil
-        interactionMessage = nil
-    }
-
-    func submitTypedAnswer() {
-        guard let card = currentCard, card.template.interaction == .type else { return }
-        let evaluation = StudySupport.evaluate(typedAnswer, for: card)
-        if evaluation == .unavailable {
-            recoverFromMissingAnswer()
-            return
-        }
-        guard !typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            interactionMessage = "Enter an answer, or reveal it to self-grade."
-            return
-        }
-        answerEvaluation = evaluation
-        isAnswerRevealed = true
-    }
-
-    func selectChoice(_ option: String) { learningTime.interaction();
-        guard choiceOptions.contains(option), !isAnswerRevealed else { return }
-        selectedChoice = option
-        interactionMessage = nil
-    }
-
-    func submitChoice() {
-        guard let card = currentCard, card.template.interaction == .choose else { return }
-        guard !choiceOptions.isEmpty else {
-            recoverFromMissingAnswer()
-            return
-        }
-        guard let selectedChoice else {
-            interactionMessage = "Choose an option, or reveal the answer to self-grade."
-            return
-        }
-        answerEvaluation = StudySupport.evaluate(selectedChoice, for: card)
-        isAnswerRevealed = true
-    }
-
-    func selectArrangementItem(at index: Int) { learningTime.interaction();
-        guard arrangedItems.indices.contains(index), !isAnswerRevealed else { return }
-        selectedArrangementIndex = index
-        interactionMessage = nil
-    }
-
-    func moveSelectedArrangementItem(by offset: Int) { learningTime.interaction();
-        guard let selectedArrangementIndex else {
-            interactionMessage = "Select an item before moving it."
-            return
-        }
-        let destination = selectedArrangementIndex + offset
-        guard arrangedItems.indices.contains(destination), !isAnswerRevealed else { return }
-        arrangedItems.swapAt(selectedArrangementIndex, destination)
-        self.selectedArrangementIndex = destination
-        answerEvaluation = nil
-    }
-
-    func submitArrangement() {
-        guard let card = currentCard, card.template.interaction == .arrange else { return }
-        guard !arrangedItems.isEmpty else {
-            recoverFromMissingAnswer()
-            return
-        }
-        answerEvaluation = StudySupport.isCorrectArrangement(arrangedItems, for: card)
-        isAnswerRevealed = true
-    }
-
-    func completeRecording() {
-        guard let card = currentCard, card.template.interaction == .record else { return }
-        interactionMessage = if StudySupport.hasReferenceAudio(for: card) {
-            "Replay your recording, then play the reference audio below."
-        } else {
-            "No reference audio is available for this card. Replay your recording and compare it with the written answer."
-        }
-        isAnswerRevealed = true
-    }
-
-    func performPrimaryAction() { learningTime.interaction();
-        guard let interaction = currentCard?.template.interaction else { return }
-        switch interaction {
-        case .reveal, .cloze, .imageOcclusion:
-            revealAnswer()
-        case .type:
-            submitTypedAnswer()
-        case .choose:
-            submitChoice()
-        case .record:
-            completeRecording()
-        case .arrange:
-            submitArrangement()
-        case .audioSubmission:
-            break
-        }
-    }
-
+    func revealAnswer() { session.revealAnswer() }
+    func updateTypedAnswer(_ answer: String) { session.updateTypedAnswer(answer) }
+    func submitTypedAnswer() { session.submitTypedAnswer() }
+    func selectChoice(_ option: String) { session.selectChoice(option) }
+    func submitChoice() { session.submitChoice() }
+    func selectArrangementItem(at index: Int) { session.selectArrangementItem(at: index) }
+    func moveSelectedArrangementItem(by offset: Int) { session.moveSelectedArrangementItem(by: offset) }
+    func submitArrangement() { session.submitArrangement() }
+    func completeRecording() { session.completeRecording() }
+    func performPrimaryAction() { session.performPrimaryAction() }
+    func dismissGradeUndo() { session.dismissGradeUndo() }
+    func pauseReviewTiming() { session.pauseReviewTiming() }
+    func resumeReviewTiming() { session.resumeReviewTiming() }
+    func grade(_ rating: ReviewRating) async { await session.grade(rating) }
+    func undoLastGrade() async { await session.undoLastGrade() }
+    func reloadCurrentItem() async { await session.reloadCurrentItem() }
+    func skipCurrentCard() async { await session.skip() }
     func completeAudioSubmission(_ draft: StudyResponseDraft) async -> Bool {
-        guard !isCompletingSubmission, !isPreparingQueue,
-              let card = currentCard,
-              card.id == draft.cardID,
-              card.template.interaction == .audioSubmission
-        else { return false }
-        isCompletingSubmission = true
-        defer { isCompletingSubmission = false }
-        errorMessage = nil
-        do {
-            _ = try await library.completeAudioSubmission(draft, submittedAt: .now)
-            reviewedCardIDs.insert(card.id)
-            reviewedItemIDs.insert(card.item.id)
-            completedSubmissionCount += 1
-            pendingGradeUndo = nil
-            index += 1
-            isAnswerRevealed = false
-            await advanceSession()
-            return true
-        } catch {
-            errorMessage = userFacingError(from: error)
-            return false
-        }
-    }
-
-    func grade(_ rating: ReviewRating) async { learningTime.interaction();
-        guard !isGrading, !isPreparingQueue else { return }
-        errorMessage = nil
-        guard let card = currentCard else { return }
-
-        isGrading = true
-        defer { isGrading = false }
-
-        let previousIndex = index
-        let now = Date.now
-
-        do {
-            let submission = try await library.submitReview(
-                cardID: card.id,
-                rating: rating,
-                asOf: now,
-                durationMilliseconds: reviewTiming.elapsedMilliseconds()
-            )
-            var repeatedCard = card
-            repeatedCard.card.memory = submission.memory
-            let shouldRequeue = submission.memory.phase == .learning
-                || submission.memory.phase == .relearning
-            if shouldRequeue {
-                repairQueue.append(PendingRepeat(card: repeatedCard.card))
-            }
-            let insertedReviewedCardID = reviewedCardIDs.insert(card.id).inserted
-            let insertedReviewedItemID = reviewedItemIDs.insert(card.item.id).inserted
-            pendingGradeUndo = PendingGradeUndo(
-                reviewLogID: submission.reviewLogID,
-                previousIndex: previousIndex,
-                previousReviewedCount: reviewedCount,
-                reviewedCardID: card.id,
-                reviewedItemID: card.item.id,
-                insertedReviewedCardID: insertedReviewedCardID,
-                insertedReviewedItemID: insertedReviewedItemID,
-                rating: rating,
-                requeuedCardID: shouldRequeue ? card.id : nil
-            )
-            index += 1
-            reviewedCount += 1
-            isAnswerRevealed = false
-            await advanceSession()
-        } catch DatabaseError.cardNotFound(_) {
-            await discardMissingCurrentCard(card.id)
-        } catch {
-            errorMessage = userFacingError(from: error)
-        }
-    }
-
-    func undoLastGrade() async { learningTime.interaction();
-        guard !isGrading else { return }
-        guard let undo = pendingGradeUndo else { return }
-
-        isGrading = true
-        defer { isGrading = false }
-
-        do {
-            try await library.revertReview(id: undo.reviewLogID, asOf: .now)
-            if let requeuedCardID = undo.requeuedCardID {
-                repairQueue.removeAll { $0.card.id == requeuedCardID }
-                if let queuedRepeat = queue.indices.last(where: {
-                    $0 > undo.previousIndex && queue[$0].id == requeuedCardID
-                }) {
-                    queue.remove(at: queuedRepeat)
-                }
-            }
-            index = undo.previousIndex
-            reviewedCount = undo.previousReviewedCount
-            if undo.insertedReviewedCardID {
-                reviewedCardIDs.remove(undo.reviewedCardID)
-            }
-            if undo.insertedReviewedItemID {
-                reviewedItemIDs.remove(undo.reviewedItemID)
-            }
-            isFinished = false
-            isAnswerRevealed = true
-            prepareCurrentInteraction()
-            reviewTiming.reset()
-            isAnswerRevealed = true
-            pendingGradeUndo = nil
-        } catch {
-            errorMessage = userFacingError(from: error)
-        }
-    }
-
-    func dismissGradeUndo() {
-        pendingGradeUndo = nil
-    }
-
-    private func updateLearningTime() {
-        learningTime.setBusy(isLoading || isGrading || isCompletingSubmission)
-        let card = currentCard
-        learningTime.setCard(itemID: card?.item.id, cardID: card?.id)
-    }
-
-    func pauseReviewTiming() { reviewTiming.pause(); learningTime.setActive(false) }
-    func resumeReviewTiming() { reviewTiming.resume(); learningTime.setActive(true) }
-
-    /// Re-reads the item behind the current card after it was edited mid-session,
-    /// so the rest of the session shows the correction rather than the copy the
-    /// queue was built from. Every queued card drawn from that item is refreshed,
-    /// because one item can own several cards in the same session.
-    func reloadCurrentItem() async {
-        guard !isPreparingQueue else { return }
-        guard let itemID = currentCard?.item.id else { return }
-
-        do {
-            guard let reloaded = try await library.item(id: itemID) else { return }
-            refreshQueuedCards(for: reloaded.item, itemType: reloaded.itemType)
-            // An answer already on screen keeps its feedback: re-deriving the
-            // interaction here would clear the message the learner is reading,
-            // and the choices or ordering they answered no longer matter.
-            if !isAnswerRevealed {
-                prepareCurrentInteraction()
-            }
-        } catch {
-            errorMessage = userFacingError(from: error)
-        }
-    }
-
-    private func refreshQueuedCards(for item: Item, itemType: ItemType) {
-        func refresh(_ card: inout DueCard) {
-            guard card.item.id == item.id else { return }
-            card.item = item
-            card.itemType = itemType
-            StudyQueueOrdering.refreshRelation(in: &card)
-            // Editing an item cannot change its templates, but reading the
-            // template back keeps each card rendering from one revision.
-            if let template = itemType.templates.first(where: { $0.id == card.template.id }) {
-                card.template = template
-            }
-        }
-
-        for index in queue.indices {
-            refresh(&queue[index])
-        }
-        StudyQueueOrdering.orderWorks(in: &queue, from: index + 1)
-    }
-
-    func skipCurrentCard() async {
-        guard !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
-        errorMessage = nil
-        pendingGradeUndo = nil
-        guard queue.indices.contains(index) else { return }
-
-        materializePendingRepeats()
-        let skippedCard = queue.remove(at: index)
-        queue.append(skippedCard)
-        isAnswerRevealed = false
-        await advanceSession()
-    }
-
-    private func prepareCurrentInteraction() {
-        typedAnswer = ""
-        answerEvaluation = nil
-        selectedChoice = nil
-        selectedArrangementIndex = nil
-        interactionMessage = nil
-        guard let card = currentCard else {
-            choiceOptions = []
-            arrangedItems = []
-            return
-        }
-        choiceOptions = card.template.interaction == .choose
-            ? StudySupport.choiceOptions(for: card)
-            : []
-        arrangedItems = card.template.interaction == .arrange
-            ? StudySupport.arrangement(for: card)?.initial ?? []
-            : []
-        if card.template.interaction == .choose, choiceOptions.isEmpty {
-            interactionMessage = "This card has no usable answer options. Reveal it to self-grade."
-        } else if card.template.interaction == .arrange, arrangedItems.isEmpty {
-            interactionMessage = "This card has nothing to arrange. Reveal it to self-grade."
-        }
-    }
-
-    private func recoverFromMissingAnswer() {
-        answerEvaluation = .unavailable
-        interactionMessage = "No checkable answer is available. Review the card and self-grade."
-        isAnswerRevealed = true
-    }
-
-    private func userFacingError(from error: Error) -> String {
-        UserFacingError.message(from: error)
-    }
-
-    private func discardMissingCurrentCard(_ cardID: UUID) async {
-        guard queue.indices.contains(index), queue[index].id == cardID else { return }
-        queue.remove(at: index)
-        isAnswerRevealed = false
-        repairQueue.removeAll { $0.card.id == cardID }
-        await advanceSession()
-    }
-
-    private func advanceSession() async {
-        guard !isPreparingQueue else { return }
-        while queue.indices.contains(index) {
-            StudyQueueOrdering.separateRelated(in: &queue, at: index)
-            guard queue[index].card.memory.phase == .new, queue[index].studyRelation?.work == nil else { break }
-            isPreparingQueue = true
-            do {
-                let eligible = try await library.isNewStudyCardEligible(cardID: queue[index].id, scope: sessionScope, asOf: .now)
-                isPreparingQueue = false
-                if eligible { break }
-                queue.remove(at: index)
-            } catch {
-                isPreparingQueue = false
-                errorMessage = userFacingError(from: error)
-                return
-            }
-        }
-        guard index >= queue.count else {
-            isFinished = false
-            reviewTiming.reset()
-            prepareCurrentInteraction()
-            return
-        }
-
-        if !repairQueue.isEmpty {
-            materializePendingRepeats()
-            isFinished = false
-            reviewTiming.reset()
-            prepareCurrentInteraction()
-            return
-        }
-
-        isFinished = true
-        prepareCurrentInteraction()
-    }
-
-    /// Makes the deferred repair round concrete before another action changes
-    /// queue order. This lets Skip move a card behind every card already waiting
-    /// without creating a duplicate skipped entry.
-    private func materializePendingRepeats() {
-        guard !repairQueue.isEmpty else { return }
-
-        let passStart = queue.count
-        var sourceIndexByCardID: [UUID: Int] = [:]
-        sourceIndexByCardID.reserveCapacity(repairQueue.count)
-        for (sourceIndex, card) in queue.enumerated() {
-            sourceIndexByCardID[card.id] = sourceIndex
-        }
-        queue.reserveCapacity(queue.count + repairQueue.count)
-        for repeatEntry in repairQueue {
-            guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
-                continue
-            }
-            var repeatedCard = queue[sourceIndex]
-            repeatedCard.card = repeatEntry.card
-            queue.append(repeatedCard)
-        }
-        StudyQueueOrdering.orderWorks(in: &queue, from: passStart)
-        repairQueue = []
-    }
-
-    private func loadCompleteQueue(
-        scope: StudyScope,
-        asOf now: Date,
-        generation: UInt64,
-        start: ContinuousClock.Instant,
-        timing: inout StudyStartTiming
-    ) async throws {
-        let fetchStart = ContinuousClock.now
-        let completeQueue = try await library.dueCards(
-            scope: scope.filter,
-            asOf: now
-        )
-        timing.remainingFetchSeconds = fetchStart.elapsedSeconds
-        guard startIsCurrent(generation) else { return }
-
-        let publicationStart = ContinuousClock.now
-        queue = completeQueue
-        isFinished = queue.isEmpty
-        prepareCurrentInteraction()
-        isLoading = false
-        timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
-        timing.firstReadySeconds = start.elapsedSeconds
-        timing.totalSeconds = timing.firstReadySeconds
-        lastStartTiming = timing
-    }
-
-    private func startIsCurrent(_ generation: UInt64) -> Bool {
-        generation == startGeneration && !Task.isCancelled
+        await session.completeAudioSubmission(draft)
     }
 }
 
-private extension ContinuousClock.Instant {
-    var elapsedSeconds: Double {
-        let duration = duration(to: .now)
-        return Double(duration.components.seconds)
-            + Double(duration.components.attoseconds) / 1e18
+private struct MacStudyErrorMapper: UserFacingErrorMapping {
+    func map(_ error: any Error) -> NeoAnkiApplication.UserFacingError {
+        .init(title: "Could Not Complete Study Action", message: UserFacingError.message(from: error))
     }
 }

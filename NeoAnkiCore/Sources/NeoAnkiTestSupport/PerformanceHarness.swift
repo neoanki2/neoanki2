@@ -161,7 +161,6 @@ public enum PerformanceHarness {
         _ body: () async throws -> [String: String] = { [:] }
     ) async throws -> PerformanceMeasurement {
         let scale = scale
-        resetPeakRSS()
         let start = ContinuousClock.now
         let resultMetadata = try await body()
         let duration = start.duration(to: .now)
@@ -208,11 +207,7 @@ public enum PerformanceHarness {
         PerformanceReportWriter.shared.append(payload, to: url)
     }
 
-    private static func resetPeakRSS() {
-        var usage = rusage()
-        _ = getrusage(RUSAGE_SELF, &usage)
-    }
-
+    /// Process-lifetime high-water mark; getrusage cannot reset it per flow.
     private static func peakRSSBytes() -> Int64 {
         var usage = rusage()
         _ = getrusage(RUSAGE_SELF, &usage)

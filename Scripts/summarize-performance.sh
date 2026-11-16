@@ -10,8 +10,9 @@ if [[ ! -f "$INPUT" ]]; then
   exit 1
 fi
 
-python3 - "$INPUT" <<'PY'
+python3 - "$INPUT" "${@:2}" <<'PY'
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -23,7 +24,16 @@ for line in path.read_text().splitlines():
         continue
     rows.append(json.loads(line))
 
-rows.sort(key=lambda row: row.get("durationSeconds", 0), reverse=True)
+if not rows:
+    raise SystemExit("Performance baseline has no measurements.")
+missing = set(sys.argv[2:]) - {row.get("layer") for row in rows}
+if missing:
+    raise SystemExit("Performance baseline is missing layers: " + ", ".join(sorted(missing)))
+for row in rows:
+    duration = row.get("durationSeconds")
+    if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
+        raise SystemExit("Performance baseline has an invalid duration.")
+rows.sort(key=lambda row: row["durationSeconds"], reverse=True)
 
 print(f"Performance summary ({len(rows)} flows) — slowest first\n")
 print(f"{'Rank':<5} {'Duration':>10}  {'Layer':<5}  Flow")

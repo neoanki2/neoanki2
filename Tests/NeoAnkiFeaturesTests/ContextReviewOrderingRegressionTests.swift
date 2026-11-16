@@ -9,7 +9,7 @@ import Testing
         let group = UUID()
         var queue = try [example(group: group), example(group: group, phase: .review), example(phase: .learning), example(group: UUID(), phase: .review), example(phase: .relearning)]
         let original = queue
-        ContextReviewOrdering.separateRelatedContexts(in: &queue, at: 1)
+        StudyQueueOrdering.separateRelated(in: &queue, at: 1)
         #expect(queue.map(\.id) == [original[0].id, original[3].id, original[2].id, original[1].id, original[4].id])
         #expect(Dictionary(uniqueKeysWithValues: queue.map { ($0.id, $0.card.memory) }) == Dictionary(uniqueKeysWithValues: original.map { ($0.id, $0.card.memory) }))
     }
@@ -18,7 +18,7 @@ import Testing
         let group = UUID()
         var queue = try [example(group: group), example(group: group, phase: .learning), example(group: UUID())]
         let original = queue
-        ContextReviewOrdering.separateRelatedContexts(in: &queue, at: 1)
+        StudyQueueOrdering.separateRelated(in: &queue, at: 1)
         #expect(queue == original)
     }
 
@@ -26,7 +26,7 @@ import Testing
         let group = UUID()
         var queue = try [example(group: group, phase: .review), example(group: group, phase: .review), example(group: UUID(), phase: .new)]
         let original = queue
-        ContextReviewOrdering.separateRelatedContexts(in: &queue, at: 1)
+        StudyQueueOrdering.separateRelated(in: &queue, at: 1)
         #expect(queue == original)
     }
 
@@ -34,7 +34,7 @@ import Testing
         let group = UUID()
         var queue = try [example(group: group), example(group: group), example(phase: .learning), example(group: UUID(), phase: .review)]
         let original = queue
-        ContextReviewOrdering.separateRelatedContexts(in: &queue, at: 1)
+        StudyQueueOrdering.separateRelated(in: &queue, at: 1)
         #expect(queue == original)
     }
 
@@ -44,7 +44,7 @@ import Testing
             var queue = try [example(group: group, phase: phase), example(group: group, phase: phase),
                              example(phase: .learning), example(group: UUID(), phase: phase), example(phase: .relearning)]
             let original = queue
-            ContextReviewOrdering.separateRelatedContexts(in: &queue, at: 1)
+            StudyQueueOrdering.separateRelated(in: &queue, at: 1)
             #expect(queue[1].id == original[3].id)
             #expect(queue[3].id == original[1].id)
             #expect(queue.map { $0.card.memory.phase } == original.map { $0.card.memory.phase })
@@ -56,11 +56,11 @@ import Testing
         let group = UUID()
         var queue = try [example(group: group), example(group: group)] + (0..<5).map { _ in try example(group: UUID()) }
         let related = queue[1].id
-        for index in 1..<queue.count { ContextReviewOrdering.separateRelatedContexts(in: &queue, at: index) }
+        for index in 1..<queue.count { StudyQueueOrdering.separateRelated(in: &queue, at: index) }
         #expect(queue.last?.id == related)
         var small = try [example(group: group), example(group: group)]
         let before = small
-        ContextReviewOrdering.separateRelatedContexts(in: &small, at: 1)
+        StudyQueueOrdering.separateRelated(in: &small, at: 1)
         #expect(small == before)
     }
 

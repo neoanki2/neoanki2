@@ -41,6 +41,31 @@ dedicated scripts under `Scripts/`. The [unified release process](../../RELEASIN
 selects relevant headless checks; UI journeys are additional targeted evidence,
 not a ceremony required for every release.
 
+### Study sessions and performance
+
+Session behavior is tested in `NeoAnkiFeaturesTests/StudySessionContractTests`;
+Mac tests cover presentation and observation through its forwarding adapter.
+Core ordering tests compare stable selection against the previous policy and
+count family inspections, so ordinary-queue scaling is checked without timing
+thresholds in CI.
+
+`Scripts/run-performance-tests.sh` runs both packages serially at small scale,
+propagates failures through its optional timeout, and requires measurements from
+both layers. Use the slow runner for large/stress suites. For an isolated,
+optimized queue benchmark, run from `NeoAnkiCore`:
+
+```bash
+NEOANKI_RUN_PERFORMANCE_TESTS=1 NEOANKI_PERF_SCALE=large \
+NEOANKI_PERF_ALLOW_SLOW=1 NEOANKI_PERF_JSON=/tmp/neoanki-queue.ndjson \
+swift test -c release -Xswiftc -enable-testing --no-parallel --filter perfIndependentQueueOrdering
+```
+
+The benchmark excludes fixture construction, measures the first 100 positions,
+and emits one warm-up followed by five repetitions. Use `small`, `medium`, and
+`large` for 100, 1,000, and 25,000 cards. Compare medians and ranges with the same
+hardware/configuration and no competing builds. `peakRSSBytes` is the process's
+lifetime high-water mark, not memory attributable to an individual flow.
+
 ### Chrome companion
 
 The extension needs no build step. Its JavaScript and packaged-browser checks run
