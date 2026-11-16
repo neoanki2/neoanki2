@@ -107,6 +107,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
     }
 
     public func applyRemote(_ records: [SyncRecordEnvelope], origin: LibraryChangeOrigin) async throws {
+        guard !records.isEmpty else { return }
         _ = origin
         let aliases = try await repository.syncItemTypeAliases()
         let records = try normalizeRemote(
@@ -149,8 +150,12 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 }
             }
         }
-        try await repository.applySynchronizedBatch(mutations)
         for (payload, envelope) in media { try await apply(payload, envelope: envelope) }
+        // Materialize incoming files before synchronized items reference them.
+        // The repository reconciles reference counts in the same transaction
+        // as the item batch, so subsequent orphan collection cannot delete
+        // a newly synchronized but locally uncounted asset.
+        try await repository.applySynchronizedBatch(mutations)
         for record in records {
             echoedResources[key(kind: record.resourceKind, id: record.id)] = record
         }

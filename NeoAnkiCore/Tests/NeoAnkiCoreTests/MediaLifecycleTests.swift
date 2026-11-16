@@ -404,3 +404,40 @@ private func insert(into database: OpaquePointer, sql: String, bindings: [TestBi
 }
 
 private let SQLITE_TRANSIENT_TEST = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+@Test(arguments: [false, true])
+func cleanupRepairsLegacyZeroCountsBeforeDeletingLiveMedia(cancelDraft: Bool) async throws {
+    let context = try await makeMediaStore()
+    let root = await context.media.rootDirectory
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ref = try await context.media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
+    _ = try await context.store.createItem(item(type: context.type, mediaFields: [(context.firstImage, ref)]))
+    // Reproduce an older sync client's stale bookkeeping, with a live item
+    // reference and a draft reservation for the same content-addressed bytes.
+    let draft = try await context.media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
+    var handle: OpaquePointer?
+    #expect(sqlite3_open(root.appendingPathComponent("test.sqlite").path, &handle) == SQLITE_OK)
+    let database = try #require(handle)
+    defer { sqlite3_close(database) }
+    #expect(sqlite3_exec(database, "UPDATE media_assets SET ref_count = 0;", nil, nil, nil) == SQLITE_OK)
+    if cancelDraft {
+        try await context.media.discardDraftReference(draft)
+    } else {
+        #expect(try await context.store.collectMediaGarbage(asOf: .now.addingTimeInterval(48 * 60 * 60)) == 0)
+    }
+    #expect(try await context.store.mediaAsset(hash: ref.assetHash)?.refCount == 1)
+    _ = try await context.media.resolve(ref)
+}
+
+@Test func staleGarbageCandidateCannotDeleteAnAdoptedAsset() async throws {
+    let context = try await makeMediaStore()
+    let root = await context.media.rootDirectory
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ref = try await context.media.ingest(data: pngBytes, kind: .image, fileExtension: "png")
+    let candidate = try #require(try await context.store.mediaAsset(hash: ref.assetHash))
+    #expect(candidate.refCount == 0)
+    _ = try await context.store.createItem(item(type: context.type, mediaFields: [(context.firstImage, ref)]))
+    #expect(try await context.media.collectOrphan(candidate) == false)
+    _ = try await context.media.resolve(ref)
+    #expect(try await context.store.mediaAsset(hash: ref.assetHash)?.refCount == 1)
+}

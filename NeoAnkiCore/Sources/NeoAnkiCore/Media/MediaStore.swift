@@ -373,6 +373,20 @@ public actor MediaStore {
         try removeAssetFile(asset)
     }
 
+    /// Recheck a candidate under the database write lock. Actor suspension
+    /// between listing orphans and deleting their files must not lose an asset
+    /// that another operation has adopted in the meantime.
+    func collectOrphan(_ asset: MediaAsset) async throws -> Bool {
+        guard asset.refCount == 0, let metadataDatabase else { return false }
+        let url = try assetURL(hash: asset.hash, fileExtension: asset.fileExtension, kind: asset.kind)
+        if FileManager.default.fileExists(atPath: url.path) { _ = try containedExistingURL(url) }
+        return try await metadataDatabase.collectMediaAssetIfOrphaned(hash: asset.hash) {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
     public func discardDraftReference(_ ref: MediaRef) async throws {
         guard let id = ref.reservationID, let metadataDatabase else { return }
         if let asset = try await metadataDatabase.cancelMediaReservation(id: id, deleteNewAsset: true) {

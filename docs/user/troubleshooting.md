@@ -242,6 +242,11 @@ reimporting again will add more copies.
 
 ## Item and media errors
 
+Synced images remain owned by every item that references them, including image
+occlusion fields. Media cleanup verifies stored item and recording references
+before removing unused files and repairs stale counts left by older clients.
+
+
 - **Required field:** enter a nonblank value. Images and GIFs also require an
   image description for VoiceOver.
 - **Invalid item type:** check that field names are unique and Card setups have

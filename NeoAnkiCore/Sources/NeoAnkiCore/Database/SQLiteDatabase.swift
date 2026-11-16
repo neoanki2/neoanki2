@@ -6038,6 +6038,7 @@ actor SQLiteDatabase {
 
     func cancelMediaReservation(id: UUID, deleteNewAsset: Bool) throws -> MediaAsset? {
         try inTransaction {
+            try reconcileMediaReferenceCounts()
             let rows = try query(
                 "SELECT hash FROM media_reservations WHERE id = ? LIMIT 1;",
                 bindings: [.text(id.uuidString)]
@@ -6059,6 +6060,7 @@ actor SQLiteDatabase {
 
     func rollbackMediaReservations(scopeID: UUID) throws -> [MediaAsset] {
         try inTransaction {
+            try reconcileMediaReferenceCounts()
             let rows = try query(
                 """
                 SELECT hash, MAX(created_asset) AS created_asset
@@ -6102,6 +6104,13 @@ actor SQLiteDatabase {
     }
 
     func fetchOrphanedMediaAssets() throws -> [MediaAsset] {
+        try inTransaction {
+            try reconcileMediaReferenceCounts()
+            return try fetchUnreferencedMediaAssets()
+        }
+    }
+
+    private func fetchUnreferencedMediaAssets() throws -> [MediaAsset] {
         let rows = try query(
             """
             SELECT hash, kind, byte_size, file_extension, created_at, ref_count
@@ -6115,6 +6124,21 @@ actor SQLiteDatabase {
             """
         )
         return try rows.map { try decodeMediaAsset(from: $0) }
+    }
+
+    /// Hold the ownership check and file removal in one SQLite write transaction.
+    /// A sync commit or new reservation cannot adopt a candidate between them.
+    func collectMediaAssetIfOrphaned(
+        hash: String,
+        removeFile: @Sendable () throws -> Void
+    ) throws -> Bool {
+        try inTransaction {
+            guard let asset = try fetchMediaAsset(hash: hash), asset.refCount == 0,
+                  try mediaReservationCount(hash: hash) == 0 else { return false }
+            try removeFile()
+            try deleteMediaAssetIfOrphaned(hash: hash)
+            return true
+        }
     }
 
     func deleteMediaAssetIfOrphaned(hash: String) throws {
@@ -6329,6 +6353,30 @@ actor SQLiteDatabase {
             counts[ref.assetHash, default: 0] += 1
         }
         return counts
+    }
+
+    /// Rebuild ownership from persisted references rather than trusting cached
+    /// counts. This also repairs libraries written by older sync clients before
+    /// their stale zero counts can cause destructive orphan collection.
+    private func reconcileMediaReferenceCounts() throws {
+        try execute(
+            """
+            WITH counts AS (
+                SELECT hash, SUM(count) AS count FROM (
+                    SELECT reference.value AS hash, COUNT(*) AS count
+                    FROM items, json_tree(CAST(items.fields AS TEXT)) AS reference
+                    WHERE reference.key = 'assetHash'
+                    GROUP BY reference.value
+                    UNION ALL
+                    SELECT media_hash AS hash, COUNT(*) AS count
+                    FROM study_responses GROUP BY media_hash
+                ) GROUP BY hash
+            )
+            UPDATE media_assets
+            SET ref_count = COALESCE((SELECT count FROM counts WHERE counts.hash = media_assets.hash), 0)
+            WHERE ref_count != COALESCE((SELECT count FROM counts WHERE counts.hash = media_assets.hash), 0);
+            """
+        )
     }
 
     private func mediaReservationIDs(in item: Item) -> Set<UUID> {
@@ -7710,6 +7758,7 @@ actor SQLiteDatabase {
                     try applySynchronizedTombstone(kind: kind, id: id)
                 }
             }
+            try reconcileMediaReferenceCounts()
             var schedulingCardIDs = Set<UUID>()
             for mutation in mutations {
                 switch mutation {

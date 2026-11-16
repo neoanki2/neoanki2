@@ -816,3 +816,49 @@ private actor RelocatedQueueTransport: CloudSyncTransport {
         #expect(try await destination.repository.mediaAsset(hash: record.id) != nil)
     }
 }
+
+@Test(arguments: [false, true])
+func synchronizedImagesSurviveExpiryAndUnrelatedDeletion(mediaArrivesLater: Bool) async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let type = try ItemTypeStudioDraft.newImageOcclusion().candidateItemType()
+    _ = try await source.repository.createItemType(type)
+    let image = try await source.repository.reserveMedia(
+        data: Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        kind: .image, altText: "Shared diagram", asOf: .now
+    ).reference
+    var content = ImageOcclusionContent(image: image)
+    content.addMask(rect: .init(x: 0.1, y: 0.1, width: 0.3, height: 0.3))
+    let items = (0..<2).map { _ in Item(itemTypeID: type.id, fields: [
+        .init(fieldID: type.fields[0].id, value: .imageOcclusion(content))
+    ]) }
+    _ = try await source.repository.createItem(items[0], asOf: .now)
+    // A persisted reference has no draft reservation; the first commit consumed it.
+    let second = try JSONDecoder().decode(Item.self, from: JSONEncoder().encode(items[1]))
+    _ = try await source.repository.createItem(second, asOf: .now)
+    let records = try await SQLiteLibrarySyncAdapter(repository: source.repository).initialMerge(remote: [], deviceID: "source")
+    let adapter = SQLiteLibrarySyncAdapter(repository: destination.repository)
+    if mediaArrivesLater {
+        try await adapter.applyRemote(records.filter { $0.resourceKind != "media" }, origin: .cloud)
+        try await adapter.applyRemote(records.filter { $0.resourceKind == "media" }, origin: .cloud)
+    } else {
+        try await adapter.applyRemote(records, origin: .cloud)
+    }
+    let store = try ItemStore(databaseURL: destination.directory.appendingPathComponent("library.sqlite"))
+    let media = try #require(await store.media)
+    #expect(try await store.mediaAsset(hash: image.assetHash)?.refCount == 2)
+    #expect(try await store.collectMediaGarbage(asOf: .now.addingTimeInterval(48 * 60 * 60)) == 0)
+    _ = try await media.resolve(image)
+    #expect(try await store.deleteItem(id: items[0].id))
+    #expect(try await store.mediaAsset(hash: image.assetHash)?.refCount == 1)
+    _ = try await media.resolve(image)
+    // Replaying the same records must not inflate counts or create sync churn.
+    try await adapter.applyRemote(records, origin: .cloud)
+    #expect(try await store.mediaAsset(hash: image.assetHash)?.refCount == 2)
+    let cursor = try await destination.repository.currentChangeCursor()
+    _ = try await store.collectMediaGarbage()
+    #expect(try await destination.repository.currentChangeCursor() == cursor)
+}
