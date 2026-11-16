@@ -42,6 +42,10 @@ struct StatisticsTimeChart: View {
                         RuleMark(x: .value("Selected date", selected)).foregroundStyle(.secondary)
                     }
                 }
+                .chartForegroundStyleScale(
+                    domain: Array(Set(points.map(\.series))).sorted(),
+                    range: Array(Set(points.map(\.series))).sorted().map { seriesColor($0) }
+                )
                 .chartXSelection(value: $selected)
                 .frame(height: 220)
                 if let selected {
@@ -76,6 +80,16 @@ struct StatisticsTimeChart: View {
                 }.font(.caption)
             }
         }.accessibilityElement(children: .contain)
+    }
+}
+
+private func seriesColor(_ series: String) -> Color {
+    switch series {
+    case "New": .gray
+    case "Learning": .orange
+    case "Review": .blue
+    case "Relearning": .red
+    default: .blue
     }
 }
 
@@ -209,7 +223,17 @@ struct StatisticsForecastChart: View {
             HStack {
                 Text("Simulated reviews · median and 10th–90th percentile").font(.headline)
                 Spacer()
-                Button("Export") { export(StatisticsExport.forecast(forecast)) }.font(.caption)
+                Button("Export") {
+                    var csv = StatisticsExport.forecast(forecast)
+                    if let baseline {
+                        csv +=
+                            "\n"
+                            + StatisticsExport.forecast(baseline, prefix: "Current settings: ").split(
+                                separator: "\n"
+                            ).dropFirst().joined(separator: "\n")
+                    }
+                    export(csv)
+                }.font(.caption)
             }
             Chart {
                 ForEach(forecast.points) { point in

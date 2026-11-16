@@ -440,3 +440,17 @@ private func statsReview(
         StatisticsEngine.snapshot(source: source, query: .init(), now: Date.now.addingTimeInterval(2))
             .reviewCount == 0)
 }
+
+@Test func statisticsSeriesAndExportsStayOrderedAcrossEventArrivalOrders() {
+    var source = emptyStatsSource()
+    let now = statsDate()
+    source.events = [
+        statsReview(now, UUID(), .good, .new), statsReview(now, UUID(), .again, .learning),
+        statsReview(now, UUID(), .hard, .review), statsReview(now, UUID(), .easy, .relearning),
+    ]
+    let a = StatisticsEngine.snapshot(source: source, query: .init(), now: now, calendar: statsCalendar())
+    source.events.reverse()
+    let b = StatisticsEngine.snapshot(source: source, query: .init(), now: now, calendar: statsCalendar())
+    #expect(a.csv == b.csv)
+    #expect(a.daily.map(\.series) == b.daily.map(\.series))
+}

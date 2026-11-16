@@ -211,14 +211,19 @@ public actor OfflineFirstSyncService: SyncService {
             try await flushOutbound(metadata: &metadata, generation: generation)
 
             try checkLifecycle(generation)
+            var activityFailure: UserFacingError?
             if let statistics {
-                do { try await statistics.synchronize() }
-                catch { throw UserFacingError(title: "Statistics Could Not Sync", message: error.localizedDescription) }
+                do {try await statistics.synchronize()}
+                catch is CancellationError {throw CancellationError()}
+                catch {activityFailure=UserFacingError(title:"Statistics Could Not Sync",message:error.localizedDescription)}
             }
+            try checkLifecycle(generation)
             if let learningTime {
-                do { try await learningTime.synchronize() }
-                catch { throw UserFacingError(title: "Learning Time Could Not Sync", message: error.localizedDescription) }
+                do {try await learningTime.synchronize()}
+                catch is CancellationError {throw CancellationError()}
+                catch {if activityFailure == nil {activityFailure=UserFacingError(title:"Learning Time Could Not Sync",message:error.localizedDescription)}}
             }
+            if let activityFailure {throw activityFailure}
             try checkLifecycle(generation)
             metadata = try await metadataStore.load()
             currentIssues = metadata.issues

@@ -449,15 +449,15 @@ public enum StatisticsExport {
         (header ? "date,series,value,samples" : "")
             + bins.map { "\n,\(escape(title+": "+$0.label)),\($0.value),\($0.count)" }.joined()
     }
-    public static func forecast(_ forecast: StatisticsForecast) -> String {
+    public static func forecast(_ forecast: StatisticsForecast, prefix: String = "") -> String {
         let rows = forecast.points.flatMap { point in
             [
                 ("Median reviews", point.median), ("10th percentile", point.lower),
                 ("90th percentile", point.upper), ("Backlog", point.backlog),
                 ("Estimated remembered", point.remembered),
-            ].map { StatisticsPoint(date: point.date, series: $0.0, value: $0.1) }
+            ].map { StatisticsPoint(date: point.date, series: prefix + $0.0, value: $0.1) }
                 + (point.minutes.map {
-                    [StatisticsPoint(date: point.date, series: "Estimated minutes", value: $0)]
+                    [StatisticsPoint(date: point.date, series: prefix + "Estimated minutes", value: $0)]
                 } ?? [])
         }
         return points(rows)

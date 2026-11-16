@@ -20,6 +20,8 @@ public final class StatisticsFeatureModel {
     private var refreshRevision: String?
     private var sourceRevision = -1
     private var previousQuery: StatisticsQuery?
+    private var projectingQuery: StatisticsQuery?
+    private var refreshPending = false
     private var generation = 0
     private var forecastTask: Task<(StatisticsForecast, StatisticsForecast?), Error>?
     private var forecastGeneration = 0
@@ -33,6 +35,23 @@ public final class StatisticsFeatureModel {
     }
     public func refresh(now: Date = .now, calendar: Calendar = .autoupdatingCurrent, force: Bool = true) async
     {
+        // Rapid filter edits coalesce behind one projection. Stale results
+        // are discarded without running several large histories in parallel.
+        if let projectingQuery {
+            if query != projectingQuery {
+                generation += 1
+                refreshPending = true
+            }
+            return
+        }
+        projectingQuery = query
+        defer {
+            projectingQuery = nil
+            if refreshPending {
+                refreshPending = false
+                Task { await refresh() }
+            }
+        }
         generation += 1
         let token = generation
         let requested = query

@@ -92,3 +92,37 @@ private func statisticsSyncFixture() async throws -> (SQLiteLibraryRepository, U
     #expect(CKSyncEngineTransport.statisticsZoneName != CKSyncEngineTransport.zoneName)
     #expect(CKSyncEngineTransport.statisticsZoneName != CKSyncEngineTransport.learningTimeZoneName)
 }
+
+@Test func statisticsFailureDoesNotPreventIndependentLearningTimeSync() async throws {
+    let (library, folder) = try await statisticsSyncFixture()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let now = Date.now
+    let card = UUID()
+    let review = ReviewLog(
+        cardID: card, reviewedAt: now, rating: .good, elapsedDays: 2, scheduledDays: 2, phaseBefore: .review,
+        durationMs: 1000)
+    try await library.recordStatisticsEvents([
+        .init(
+            id: "review:" + review.id.uuidString, kind: "review", occurredAt: now, cardID: card, log: review)
+    ])
+    let segment = LearningTimeSegment(
+        sessionID: UUID(), deviceID: UUID(), sourceLibraryID: try await library.libraryID(), itemID: UUID(),
+        cardID: card, startedAt: now.addingTimeInterval(-10), endedAt: now, durationMilliseconds: 10000)
+    try await library.recordLearningTime([segment])
+    let statisticsTransport = StatisticsTransport()
+    let timeTransport = StatisticsTransport()
+    let mainTransport = StatisticsTransport()
+    await statisticsTransport.setFailing(true)
+    let service = OfflineFirstSyncService(
+        repository: library, adapter: SQLiteLibrarySyncAdapter(repository: library), transport: mainTransport,
+        metadataStore: SyncMetadataStore(directory: folder.appendingPathComponent("main-sync")),
+        learningTime: LearningTimeSyncService(
+            repository: library, transport: timeTransport,
+            metadataStore: SyncMetadataStore(directory: folder.appendingPathComponent("time-sync"))),
+        statistics: StatisticsSyncService(
+            repository: library, transport: statisticsTransport,
+            metadataStore: SyncMetadataStore(directory: folder.appendingPathComponent("stats-sync"))),
+        backupURL: { folder.appendingPathComponent("backup.sqlite") })
+    await service.synchronize()
+    #expect(await timeTransport.sentRecords().contains { $0.id == segment.id.uuidString })
+}

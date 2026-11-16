@@ -482,7 +482,9 @@ public enum StatisticsEngine {
         let attention = effort.values.sorted { a, b in
             let al = cardLookup[a.log.cardID]?.card.memory.lapses ?? 0
             let bl = cardLookup[b.log.cardID]?.card.memory.lapses ?? 0
-            return al == bl ? a.log.durationMs > b.log.durationMs : al > bl
+            if al != bl { return al > bl }
+            if a.log.durationMs != b.log.durationMs { return a.log.durationMs > b.log.durationMs }
+            return a.log.id.uuidString < b.log.id.uuidString
         }.prefix(10)
         return StatisticsSnapshot(
             todayIntroductions: source.introductions.filter {
@@ -497,14 +499,19 @@ public enum StatisticsEngine {
             recallPassed: passed, recallTotal: eligible.count, recallLower: bounds.0, recallUpper: bounds.1,
             durationMedian: quantile(durations, 0.5), durationP90: quantile(durations, 0.9),
             excludedDurations: selected.count - durations.count,
-            estimatedRemembered: remembered, daily: daily.sorted { $0.date < $1.date }, heatmap: heatmap,
+            estimatedRemembered: remembered,
+            daily: daily.sorted { $0.date == $1.date ? $0.series < $1.series : $0.date < $1.date },
+            heatmap: heatmap,
             timeHeatmap: heatmap.map { point in
                 let lookup = calendar.date(
                     bySettingHour: source.rollover / 60, minute: source.rollover % 60, second: 0,
                     of: point.date)!
                 return StatisticsPoint(
                     date: point.date, series: "Active minutes", value: heatMinutes[lookup, default: 0])
-            }, recall: recalls, progress: history.points, cohorts: cohorts, hours: hours,
+            }, recall: recalls, progress: history.points,
+            cohorts: cohorts.sorted {
+                $0.date == $1.date ? (Int($0.series) ?? 0) < (Int($1.series) ?? 0) : $0.date < $1.date
+            }, hours: hours.sorted { $0.date < $1.date },
             phases: phases, grades: grades,
             stability: histogram(
                 studied.map { $0.card.memory.stability }, edges: ageEdges, labels: ageLabels,
@@ -541,14 +548,14 @@ public enum StatisticsEngine {
             },
             skillComparisons: Dictionary(grouping: selected, by: \.skill).map {
                 .init($0.key, Double($0.value.count))
-            }.sorted { $0.value > $1.value },
+            }.sorted { $0.value == $1.value ? $0.label < $1.label : $0.value > $1.value },
             methodComparisons: Dictionary(grouping: selected, by: \.interaction).map {
                 .init($0.key, Double($0.value.count))
-            }.sorted { $0.value > $1.value },
+            }.sorted { $0.value == $1.value ? $0.label < $1.label : $0.value > $1.value },
             milestoneDurations: histogram(milestoneDays, edges: ageEdges, labels: ageLabels),
             comparisons: Dictionary(grouping: selected, by: \.deckName).map {
                 .init($0.key, Double($0.value.count))
-            }.sorted { $0.value > $1.value },
+            }.sorted { $0.value == $1.value ? $0.label < $1.label : $0.value > $1.value },
             due: due, sessions: sessions, cards: scopedCards,
             coverage: .init(
                 historyStartedAt: all.first?.log.reviewedAt, progressStartedAt: source.trackingStartedAt,
