@@ -333,6 +333,21 @@ See [`AUTHORED_DECK_FORMAT.md`]({{ '/AUTHORED_DECK_FORMAT/' | relative_url }}) a
 
 ### Study resolution
 
+`StudyFeatureModel` is the single native study-session coordinator. Both app
+shells use its progressive loading, interaction validation, grading, deferred
+repair rounds, skip/undo, and completion state. The Mac `StudyModel` only adapts
+presentation names and error copy; it does not mirror or mutate session state.
+Startup reads use one captured instant. A load failure remains distinct from an
+empty or completed session, and restarting clears counters, interaction state,
+and pending undo. Review persistence stays behind the application capabilities;
+HTTP sessions retain their separate transactional reservation lifecycle.
+
+Related-card spacing inspects the recent five cards and stops as soon as it
+finds an optimal family. An already-independent current card needs no scan of
+the remaining queue. Stable movement preserves repair phases and ordered-work
+slots, and family identity is read from current content rather than a stale
+cross-call cache.
+
 `SideContent.resolvedSlots` yields `ResolvedSlot(value:presentation:)` so renderers honor
 `RevealMode` and meaningful `MediaBehavior` values (default controls, autoplay,
 play-on-tap, and looping). Reduce Motion suppresses automatic audio, video, and

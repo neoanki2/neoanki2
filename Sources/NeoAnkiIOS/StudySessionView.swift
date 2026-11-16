@@ -50,7 +50,17 @@ struct StudySessionView: View {
     private var sessionContent: some View {
         NavigationStack {
             Group {
-                if session.isComplete {
+                if session.didFailToLoad {
+                    ContentUnavailableView {
+                        Label("Could Not Start Session", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(session.error?.message ?? "Your library could not be loaded. Try again.")
+                    } actions: {
+                        Button("Try Again") { Task { await session.start() } }
+                    }
+                } else if session.isLoading {
+                    ProgressView("Preparing study session…")
+                } else if session.isComplete {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
@@ -74,7 +84,7 @@ struct StudySessionView: View {
                     studyCard(card)
                 }
             }
-            .navigationTitle(session.isComplete ? session.title : "\(session.remainingCount) left")
+            .navigationTitle(session.isComplete || session.didFailToLoad ? session.title : "\(session.remainingCount) left")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -87,7 +97,7 @@ struct StudySessionView: View {
                     .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
                     .accessibilityIdentifier("endStudySession")
                 }
-                if !session.isComplete {
+                if !session.isComplete && !session.didFailToLoad && !session.isLoading {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
                         Menu("More", systemImage: "ellipsis.circle") {
