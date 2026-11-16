@@ -615,6 +615,7 @@ final class ItemsModel {
         do {
             let snapshot = try await reads.load(scope: scope, demand: [.summary], asOf: .now)
             if let summary = snapshot.summary { scopeSummary = summary }
+            maturityUnavailable = snapshot.maturityIssue != nil
             errorMessage = snapshot.maturityIssue
         } catch { errorMessage = "Saved. Refresh could not finish: \(error.localizedDescription)" }
     }
