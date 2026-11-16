@@ -389,3 +389,54 @@ private func statsReview(
     #expect(result.reviewCount == 1_000_000)
     #expect(result.distinctCards == 100_000)
 }
+
+@Test func statisticsLegacyBackfillIsPagedAndPreservesOptionalMemory() async throws {
+    let (store, folder, _, card) = try await statsFixture()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    for offset in 0..<3 {
+        _ = try await store.submitReviewWithReceipt(
+            cardID: card, rating: .good, now: Date.now.addingTimeInterval(Double(offset)))
+    }
+    try await store.database.execute("DELETE FROM statistics_events;")
+    let firstPage = try await store.database.backfillStatisticsPage()
+    #expect(firstPage)
+    #expect(try await store.database.backfillStatisticsPage() == false)
+    let source = try await store.statisticsSource()
+    let reviews = source.events.filter { $0.kind == "review" }
+    #expect(reviews.count == 3)
+    #expect(reviews.allSatisfy { $0.log?.sequence == nil })
+    #expect(reviews.allSatisfy { $0.memoryAfter != nil })
+    try await store.recordStatisticsEvents(reviews)
+    #expect(try await store.statisticsSource().events.filter { $0.kind == "review" }.count == 3)
+}
+
+@Test func statisticsFactCopiesKeepIndependentValueSemantics() throws {
+    let original = statsReview(statsDate())
+    var copy = original
+    copy.kind = "state"
+    #expect(original.kind == "review")
+    #expect(copy.kind == "state")
+    let encoded = try JSONEncoder().encode(original)
+    #expect(try JSONDecoder().decode(StatisticsEvent.self, from: encoded) == original)
+}
+
+@Test func statisticsOlderClientRevertStaysUndoneAfterLaterDeletion() async throws {
+    let (store, folder, item, card) = try await statsFixture()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let review = try await store.submitReviewWithReceipt(cardID: card, rating: .good, now: .now)
+    try await store.database.execute(
+        "INSERT INTO review_reverts(id,review_log_id,reverted_at) VALUES (?,?,?);",
+        bindings: [
+            .text(UUID().uuidString), .text(review.reviewLogID.uuidString),
+            .double(Date.now.timeIntervalSince1970),
+        ])
+    var source = try await store.statisticsSource()
+    #expect(
+        StatisticsEngine.snapshot(source: source, query: .init(), now: Date.now.addingTimeInterval(1))
+            .reviewCount == 0)
+    _ = try await store.deleteItem(id: item.id)
+    source = try await store.statisticsSource()
+    #expect(
+        StatisticsEngine.snapshot(source: source, query: .init(), now: Date.now.addingTimeInterval(2))
+            .reviewCount == 0)
+}

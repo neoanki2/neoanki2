@@ -85,7 +85,7 @@ public enum StatisticsEngine {
                 value.itemID = mapped(event.itemID, "item", sourceID)
                 value.deckID = mapped(event.deckID, "deck", sourceID)
                 value.itemTypeID = mapped(event.itemTypeID, "itemType", sourceID)
-                if event.kind == "undo" || event.kind == "legacyExcluded" {
+                if ["undo", "legacyExcluded", "reverted", "preservedDeletion"].contains(event.kind) {
                     value.templateID = mapped(event.templateID, "review", sourceID)
                 }
                 if let log = event.log {
@@ -108,9 +108,13 @@ public enum StatisticsEngine {
             normalizedEvents.filter { $0.kind == "context" }.map {
                 ($0.id.replacingOccurrences(of: "context:", with: ""), $0)
             }, uniquingKeysWith: { a, _ in a })
+        let preserved = Set(
+            normalizedEvents.filter { $0.kind == "preservedDeletion" }.compactMap(\.templateID))
         let excluded = Set(
-            normalizedEvents.filter { $0.kind == "undo" || $0.kind == "legacyExcluded" }.compactMap(
-                \.templateID))
+            normalizedEvents.filter {
+                $0.kind == "undo" || $0.kind == "legacyExcluded"
+                    || ($0.kind == "reverted" && !($0.templateID.map(preserved.contains) ?? false))
+            }.compactMap(\.templateID))
         let rawReviews = normalizedEvents.filter { $0.kind == "review" }
         let uniqueReviews =
             identityAliases.isEmpty

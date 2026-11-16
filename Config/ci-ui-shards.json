@@ -44,7 +44,8 @@
       "tests": [
         "NeoAnki2MobileUITests/MobileNavigationUITests/testTopLevelProductNavigation",
         "NeoAnki2MobileUITests/MobileNavigationUITests/testLearnInContextOnlyRequiresDeckAndPhraseAndExplainsUnavailableGeneration",
-        "NeoAnki2MobileUITests/MobileDeckUITests/testDeckCreateRenameAndDeleteJourney"
+        "NeoAnki2MobileUITests/MobileDeckUITests/testDeckCreateRenameAndDeleteJourney",
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsNavigationAndHomeConsolidation"
       ]
     },
     {
@@ -77,7 +78,8 @@
       "device": "iPhone 17e",
       "workers": 1,
       "tests": [
-        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility"
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility",
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize"
       ]
     },
     {
@@ -113,7 +115,8 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testTabletCardSetupControlsHaveNoHorizontalOverflow",
-        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility"
+        "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility",
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize"
       ]
     },
     {
@@ -248,30 +251,6 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testOversizedImageCanBePastedSavedAndReplaced"
-      ]
-    },
-    {
-      "id": "phone-statistics",
-      "device": "iPhone 17 Pro Max",
-      "workers": 1,
-      "tests": [
-        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsNavigationAndHomeConsolidation"
-      ]
-    },
-    {
-      "id": "compact-statistics",
-      "device": "iPhone 17e",
-      "workers": 1,
-      "tests": [
-        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize"
-      ]
-    },
-    {
-      "id": "tablet-statistics",
-      "device": "iPad Pro 13-inch (M5)",
-      "workers": 1,
-      "tests": [
-        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize"
       ]
     }
   ]

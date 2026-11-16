@@ -28,6 +28,16 @@ extension Schema {
             END;
             """,
             """
+            CREATE TRIGGER IF NOT EXISTS statistics_review_revert AFTER INSERT ON review_reverts BEGIN
+              INSERT OR IGNORE INTO statistics_events(id,kind,occurred_at,card_id,payload)
+              SELECT 'reverted:'||NEW.review_log_id,'reverted',NEW.reverted_at,r.card_id,
+                CAST(json_object('id','reverted:'||NEW.review_log_id,'kind','reverted',
+                  'occurredAt',NEW.reverted_at-978307200,'cardID',r.card_id,
+                  'templateID',NEW.review_log_id,'suspended',json('false')) AS BLOB)
+              FROM review_logs r WHERE r.id=NEW.review_log_id;
+            END;
+            """,
+            """
             CREATE TRIGGER IF NOT EXISTS statistics_card_delete BEFORE DELETE ON cards BEGIN
               INSERT INTO statistics_changes(kind,occurred_at,card_id,item_id,deck_id,template_id,memory,suspended)
               VALUES ('deleted',\(now),OLD.id,OLD.item_id,OLD.deck_id,OLD.template_id,OLD.memory,OLD.is_suspended);
@@ -53,7 +63,7 @@ extension SQLiteDatabase {
                 guard event.occurredAt.timeIntervalSince1970.isFinite,
                     [
                         "review", "undo", "context", "created", "state", "reset", "deleted", "baseline",
-                        "legacyExcluded", "alias", "submission",
+                        "legacyExcluded", "alias", "submission", "reverted", "preservedDeletion",
                     ].contains(event.kind),
                     event.log.map({ $0.cardID == event.cardID && "review:" + $0.id.uuidString == event.id })
                         ?? true,
@@ -126,46 +136,71 @@ extension SQLiteDatabase {
         ])
     }
 
-    func prepareStatisticsEvidence() throws {
-        try inStatisticsTransaction {
-            if try query("SELECT value FROM statistics_metadata WHERE key = 'backfilled';").isEmpty {
-                let captured = Set(
-                    try query("SELECT id FROM statistics_events WHERE kind='review';").compactMap {
-                        $0["id"] as? String
-                    })
-                var cursor: Int64 = 0
-                while true {
-                    let rows = try query(
-                        "SELECT sequence, log, memory_before FROM review_logs WHERE sequence > ? ORDER BY sequence LIMIT 1000;",
-                        bindings: [.int(cursor)])
-                    guard !rows.isEmpty else { break }
-                    for row in rows {
-                        cursor = row["sequence"] as? Int64 ?? cursor
-                        guard let data = payload(row, "log") else { continue }
-                        let log = try JSONDecoder().decode(ReviewLog.self, from: data)
-                        let before = try payload(row, "memory_before").map {
-                            try JSONDecoder().decode(MemoryState.self, from: $0)
-                        }
-                        try recordStatisticsReview(log, before: before)
-                    }
-                }
-                for row in try query(
-                    "SELECT review_logs.log FROM review_reverts JOIN review_logs ON review_logs.id = review_reverts.review_log_id;"
-                ) {
-                    guard let data = payload(row, "log") else { continue }
-                    let log = try JSONDecoder().decode(ReviewLog.self, from: data)
-                    if captured.contains("review:" + log.id.uuidString) { continue }
-                    try saveStatisticsEvents([
-                        StatisticsEvent(
-                            id: "legacy:" + log.id.uuidString, kind: "legacyExcluded",
-                            occurredAt: log.reviewedAt, cardID: log.cardID, templateID: log.id)
-                    ])
-                }
+    /// A resumable page yields the database actor between batches. Migration
+    /// preserves optional legacy evidence without loading content per review.
+    func backfillStatisticsPage() throws -> Bool {
+        if !(try query("SELECT value FROM statistics_metadata WHERE key='backfilled';")).isEmpty {
+            return false
+        }
+        return try inStatisticsTransaction {
+            if (try query("SELECT value FROM statistics_metadata WHERE key='backfill_cursor';")).isEmpty {
+                try execute(
+                    """
+                    INSERT OR IGNORE INTO statistics_events(id,kind,occurred_at,card_id,payload)
+                    SELECT 'legacy:'||r.id,'legacyExcluded',r.reviewed_at,r.card_id,
+                      CAST(json_object('id','legacy:'||r.id,'kind','legacyExcluded',
+                        'occurredAt',r.reviewed_at-978307200,'cardID',r.card_id,
+                        'templateID',r.id,'suspended',json('false')) AS BLOB)
+                    FROM review_logs r JOIN review_reverts v ON v.review_log_id=r.id
+                    WHERE NOT EXISTS(SELECT 1 FROM statistics_events e WHERE e.id='review:'||r.id);
+                    """)
+                try execute("INSERT INTO statistics_metadata VALUES ('backfill_cursor',0);")
+            }
+            let cursor =
+                (try query("SELECT value FROM statistics_metadata WHERE key='backfill_cursor';").first?[
+                    "value"] as? Double) ?? 0
+            let rows = try query(
+                "SELECT sequence FROM review_logs WHERE sequence > ? ORDER BY sequence LIMIT 1000;",
+                bindings: [.int(Int64(cursor))])
+            guard let last = rows.last?["sequence"] as? Int64 else {
                 try execute(
                     "INSERT INTO statistics_changes(kind,occurred_at,card_id,item_id,deck_id,template_id,memory,suspended) SELECT 'baseline',(SELECT value FROM statistics_metadata WHERE key='started'),id,item_id,deck_id,template_id,memory,is_suspended FROM cards;"
                 )
                 try execute("INSERT INTO statistics_metadata VALUES ('backfilled',1);")
+                return false
             }
+            let libraryID = try getOrCreateLibraryID().uuidString
+            try execute(
+                """
+                INSERT OR IGNORE INTO statistics_events(id,kind,occurred_at,card_id,payload)
+                SELECT 'review:'||r.id,'review',r.reviewed_at,r.card_id,
+                  CAST(json_object('id','review:'||r.id,'kind','review',
+                    'occurredAt',r.reviewed_at-978307200,'cardID',r.card_id,
+                    'itemID',c.item_id,'deckID',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.deckIDAtReview'),c.deck_id),
+                    'itemTypeID',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.itemTypeIDAtReview'),i.item_type_id),
+                    'templateID',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.templateIDAtReview'),c.template_id),
+                    'log',json_remove(CAST(r.log AS TEXT),'$.sequence'),
+                    'memoryBefore',json(CAST(r.memory_before AS TEXT)),
+                    'memoryAfter',json(CAST(r.memory_after AS TEXT)),
+                    'skill',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.input'),json_extract(CAST(c.skill AS TEXT),'$.input'))||' → '||
+                        COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.output'),json_extract(CAST(c.skill AS TEXT),'$.output'))||' · '||
+                        COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.operation'),json_extract(CAST(c.skill AS TEXT),'$.operation')),
+                    'interaction',(SELECT json_extract(value,'$.interaction') FROM json_each(CAST(t.definition AS TEXT),'$.templates') WHERE json_extract(value,'$.id')=c.template_id LIMIT 1),
+                    'sourceLibraryID',?,'suspended',json('false')) AS BLOB)
+                FROM review_logs r LEFT JOIN cards c ON c.id=r.card_id
+                LEFT JOIN items i ON i.id=c.item_id LEFT JOIN item_types t ON t.id=i.item_type_id
+                WHERE r.sequence > ? AND r.sequence <= ?;
+                """, bindings: [.text(libraryID), .int(Int64(cursor)), .int(last)])
+            try execute(
+                "UPDATE statistics_metadata SET value=? WHERE key='backfill_cursor';",
+                bindings: [.double(Double(last))])
+            return true
+        }
+    }
+
+    func prepareStatisticsEvidence() throws {
+        while try backfillStatisticsPage() {}
+        try inStatisticsTransaction {
             for row in try query("SELECT * FROM statistics_changes ORDER BY sequence;") {
                 guard let eventID = row["event_id"] as? String, let kind = row["kind"] as? String,
                     let date = row["occurred_at"] as? Double, let text = row["card_id"] as? String,
@@ -303,6 +338,10 @@ extension SQLiteDatabase {
 extension ItemStore {
     public func statisticsRevision() async throws -> String { try await database.statisticsRevision() }
     public func statisticsSource() async throws -> StatisticsSource {
+        while try await database.backfillStatisticsPage() {
+            try Task.checkCancellation()
+            await Task.yield()
+        }
         var source = try await database.statisticsSource()
         let stale = source.cards.filter {
             $0.card.memory.reps > 0 && $0.parameters.weights != $0.forecastParameters?.weights
@@ -328,7 +367,13 @@ extension ItemStore {
     }
     public func statisticsEvents(after cursor: Int64, limit: Int = 500) async throws
         -> [StatisticsStoredEvent]
-    { try await database.statisticsEvents(after: cursor, limit: limit) }
+    {
+        while try await database.backfillStatisticsPage() {
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+        return try await database.statisticsEvents(after: cursor, limit: limit)
+    }
     public func recordStatisticsEvents(_ events: [StatisticsEvent]) async throws {
         try await database.saveStatisticsEvents(events)
     }

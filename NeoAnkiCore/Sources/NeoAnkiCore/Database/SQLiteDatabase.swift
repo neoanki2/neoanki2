@@ -665,7 +665,7 @@ actor SQLiteDatabase {
 
             if current < 34 {
                 for sql in Schema.statisticsStatements { try execute(sql) }
-                if try tableExists("cards"), try columnExists("memory",in:"cards"), try columnExists("scheduling_history_origin",in:"cards"),try tableExists("api_transaction_context") {
+                if try tableExists("cards"), try columnExists("memory",in:"cards"), try columnExists("scheduling_history_origin",in:"cards"),try tableExists("api_transaction_context"),try tableExists("review_reverts") {
                     for sql in Schema.statisticsTriggerStatements {try execute(sql)}
                 }
             }
@@ -2928,6 +2928,9 @@ actor SQLiteDatabase {
             bindings: bindings
         ).compactMap { $0["id"] as? String }
         for logID in activeLogIDs {
+            if let id=UUID(uuidString:logID),let log=try fetchReviewLog(id:id) {
+                try saveStatisticsEvents([StatisticsEvent(id:"preserve:"+logID,kind:"preservedDeletion",occurredAt:revertedAt,cardID:log.cardID,templateID:log.id,sourceLibraryID:try getOrCreateLibraryID())])
+            }
             try execute(
                 """
                 INSERT INTO review_reverts (id, review_log_id, reverted_at)

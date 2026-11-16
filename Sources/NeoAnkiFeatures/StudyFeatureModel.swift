@@ -56,7 +56,7 @@ public final class StudyFeatureModel: Identifiable {
     public private(set) var queue: [DueCard] = [] { didSet { updateLearningTime() } }
     public private(set) var index = 0 { didSet { updateLearningTime() } }
     public private(set) var isAnswerRevealed = false {
-        didSet { if isAnswerRevealed && !oldValue { answerActiveStart = learningTime.sessionMilliseconds } }
+        didSet { if isAnswerRevealed && !oldValue { learningTime.interaction(); answerActiveStart = learningTime.sessionMilliseconds } }
     }
     private var attemptActiveStart: Int64 = 0
     private var answerActiveStart: Int64?

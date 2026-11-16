@@ -79,26 +79,120 @@ public struct StatisticsQuery: Sendable, Equatable {
 /// Immutable evidence has no foreign keys to live content. Deleting a card must
 /// not erase the work already done. Context is a separate event, never a rewrite.
 public struct StatisticsEvent: Codable, Sendable, Equatable, Identifiable {
-    public var id: String
-    public var kind: String
-    public var occurredAt: Date
-    public var cardID: UUID
-    public var sourceLibraryID: UUID?
-    public var itemID: UUID?
-    public var deckID: UUID?
-    public var itemTypeID: UUID?
-    public var templateID: UUID?
-    public var skill: String?
-    public var interaction: String?
-    public var log: ReviewLog?
-    public var memoryBefore: MemoryState?
-    public var memoryAfter: MemoryState?
-    public var suspended: Bool
-    public var sessionID: UUID?
-    public var deviceID: UUID?
-    public var promptMilliseconds: Int64?
-    public var answerMilliseconds: Int64?
-    public var checkedCorrect: Bool?
+    private struct Payload: Codable, Sendable, Equatable {
+        var id: String
+        var kind: String
+        var occurredAt: Date
+        var cardID: UUID
+        var sourceLibraryID: UUID?
+        var itemID: UUID?
+        var deckID: UUID?
+        var itemTypeID: UUID?
+        var templateID: UUID?
+        var skill: String?
+        var interaction: String?
+        var log: ReviewLog?
+        var memoryBefore: MemoryState?
+        var memoryAfter: MemoryState?
+        var suspended: Bool
+        var sessionID: UUID?
+        var deviceID: UUID?
+        var promptMilliseconds: Int64?
+        var answerMilliseconds: Int64?
+        var checkedCorrect: Bool?
+    }
+    // A history can contain millions of facts. Copy-on-write keeps sorting,
+    // filtering and snapshots from repeatedly copying the entire audit payload.
+    // Mutations always detach before writing, preserving value semantics across tasks.
+    private final class Storage: @unchecked Sendable {
+        var payload: Payload
+        init(_ payload: Payload) { self.payload = payload }
+    }
+    private var storage: Storage
+    private mutating func update<T>(_ key: WritableKeyPath<Payload, T>, _ value: T) {
+        if !isKnownUniquelyReferenced(&storage) { storage = Storage(storage.payload) }
+        storage.payload[keyPath: key] = value
+    }
+    public var id: String {
+        get { storage.payload.id }
+        set { update(\.id, newValue) }
+    }
+    public var kind: String {
+        get { storage.payload.kind }
+        set { update(\.kind, newValue) }
+    }
+    public var occurredAt: Date {
+        get { storage.payload.occurredAt }
+        set { update(\.occurredAt, newValue) }
+    }
+    public var cardID: UUID {
+        get { storage.payload.cardID }
+        set { update(\.cardID, newValue) }
+    }
+    public var sourceLibraryID: UUID? {
+        get { storage.payload.sourceLibraryID }
+        set { update(\.sourceLibraryID, newValue) }
+    }
+    public var itemID: UUID? {
+        get { storage.payload.itemID }
+        set { update(\.itemID, newValue) }
+    }
+    public var deckID: UUID? {
+        get { storage.payload.deckID }
+        set { update(\.deckID, newValue) }
+    }
+    public var itemTypeID: UUID? {
+        get { storage.payload.itemTypeID }
+        set { update(\.itemTypeID, newValue) }
+    }
+    public var templateID: UUID? {
+        get { storage.payload.templateID }
+        set { update(\.templateID, newValue) }
+    }
+    public var skill: String? {
+        get { storage.payload.skill }
+        set { update(\.skill, newValue) }
+    }
+    public var interaction: String? {
+        get { storage.payload.interaction }
+        set { update(\.interaction, newValue) }
+    }
+    public var log: ReviewLog? {
+        get { storage.payload.log }
+        set { update(\.log, newValue) }
+    }
+    public var memoryBefore: MemoryState? {
+        get { storage.payload.memoryBefore }
+        set { update(\.memoryBefore, newValue) }
+    }
+    public var memoryAfter: MemoryState? {
+        get { storage.payload.memoryAfter }
+        set { update(\.memoryAfter, newValue) }
+    }
+    public var suspended: Bool {
+        get { storage.payload.suspended }
+        set { update(\.suspended, newValue) }
+    }
+    public var sessionID: UUID? {
+        get { storage.payload.sessionID }
+        set { update(\.sessionID, newValue) }
+    }
+    public var deviceID: UUID? {
+        get { storage.payload.deviceID }
+        set { update(\.deviceID, newValue) }
+    }
+    public var promptMilliseconds: Int64? {
+        get { storage.payload.promptMilliseconds }
+        set { update(\.promptMilliseconds, newValue) }
+    }
+    public var answerMilliseconds: Int64? {
+        get { storage.payload.answerMilliseconds }
+        set { update(\.answerMilliseconds, newValue) }
+    }
+    public var checkedCorrect: Bool? {
+        get { storage.payload.checkedCorrect }
+        set { update(\.checkedCorrect, newValue) }
+    }
     public init(
         id: String, kind: String, occurredAt: Date, cardID: UUID, itemID: UUID? = nil, deckID: UUID? = nil,
         itemTypeID: UUID? = nil, templateID: UUID? = nil, skill: String? = nil, interaction: String? = nil,
@@ -106,27 +200,18 @@ public struct StatisticsEvent: Codable, Sendable, Equatable, Identifiable {
         suspended: Bool = false, sourceLibraryID: UUID? = nil, sessionID: UUID? = nil, deviceID: UUID? = nil,
         promptMilliseconds: Int64? = nil, answerMilliseconds: Int64? = nil, checkedCorrect: Bool? = nil
     ) {
-        self.id = id
-        self.kind = kind
-        self.occurredAt = occurredAt
-        self.cardID = cardID
-        self.itemID = itemID
-        self.deckID = deckID
-        self.itemTypeID = itemTypeID
-        self.templateID = templateID
-        self.skill = skill
-        self.interaction = interaction
-        self.log = log
-        self.memoryBefore = memoryBefore
-        self.memoryAfter = memoryAfter
-        self.suspended = suspended
-        self.sourceLibraryID = sourceLibraryID
-        self.sessionID = sessionID
-        self.deviceID = deviceID
-        self.promptMilliseconds = promptMilliseconds
-        self.answerMilliseconds = answerMilliseconds
-        self.checkedCorrect = checkedCorrect
+        storage = Storage(
+            Payload(
+                id: id, kind: kind, occurredAt: occurredAt, cardID: cardID, sourceLibraryID: sourceLibraryID,
+                itemID: itemID, deckID: deckID, itemTypeID: itemTypeID, templateID: templateID, skill: skill,
+                interaction: interaction, log: log, memoryBefore: memoryBefore, memoryAfter: memoryAfter,
+                suspended: suspended, sessionID: sessionID, deviceID: deviceID,
+                promptMilliseconds: promptMilliseconds, answerMilliseconds: answerMilliseconds,
+                checkedCorrect: checkedCorrect))
     }
+    public init(from decoder: Decoder) throws { storage = Storage(try Payload(from: decoder)) }
+    public func encode(to encoder: Encoder) throws { try storage.payload.encode(to: encoder) }
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.storage.payload == rhs.storage.payload }
 }
 public struct StatisticsStoredEvent: Sendable {
     public let sequence: Int64
@@ -199,7 +284,7 @@ public struct StatisticsBin: Sendable, Identifiable {
         self.cardIDs = cardIDs
     }
 }
-public struct StatisticsReview: Sendable, Identifiable {
+public final class StatisticsReview: Sendable, Identifiable {
     public var id: UUID { log.id }
     public let log: ReviewLog
     public let itemID: UUID?
@@ -212,6 +297,23 @@ public struct StatisticsReview: Sendable, Identifiable {
     public let promptMilliseconds: Int64?
     public let answerMilliseconds: Int64?
     public let checkedCorrect: Bool?
+    public init(
+        log: ReviewLog, itemID: UUID?, deckName: String, skill: String, interaction: String, sessionID: UUID?,
+        before: MemoryState?, after: MemoryState?, promptMilliseconds: Int64?, answerMilliseconds: Int64?,
+        checkedCorrect: Bool?
+    ) {
+        self.log = log
+        self.itemID = itemID
+        self.deckName = deckName
+        self.skill = skill
+        self.interaction = interaction
+        self.sessionID = sessionID
+        self.before = before
+        self.after = after
+        self.promptMilliseconds = promptMilliseconds
+        self.answerMilliseconds = answerMilliseconds
+        self.checkedCorrect = checkedCorrect
+    }
 }
 public struct StatisticsSession: Sendable, Identifiable {
     public let id: UUID
