@@ -52,6 +52,7 @@ struct ContentView: View {
     /// card editor, and every study command has to stand down while it is open:
     /// the grade keys are unmodified, so they would otherwise land in a field.
     @State private var isEditingStudyCard = false
+    @State private var statisticsSessionID: UUID?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var importModel: ImportModel?
     @State private var isChoosingImportFile = false
@@ -241,7 +242,7 @@ struct ContentView: View {
             setAddItemFocus(adding)
         }
         .onChange(of: decksModel.selectedScope) { _, _ in
-            if case .learningTime = appSession.route { appSession.route = .learningTime(decksModel.studyScope.filter) }
+            if case .statistics = appSession.route { appSession.route = .statistics(decksModel.studyScope.filter) }
             selectedItemID = nil
             if isShowingSavedResponses { isShowingSavedResponses = false }
             Task { await reloadScope() }
@@ -404,6 +405,10 @@ struct ContentView: View {
                 DeckSidebarView(
                     decksModel: decksModel,
                     selection: $decksModel.selectedScope,
+                    isShowingStatistics: Binding(
+                        get: { if case .statistics = appSession.route { return true }; return false },
+                        set: { statisticsSessionID = nil; appSession.route = $0 ? .statistics(.allDecks) : .scopeHome }
+                    ),
                     isShowingSavedResponses: Binding(
                         get: { isShowingSavedResponses },
                         set: { showing in
@@ -618,8 +623,8 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if case let .learningTime(scope) = appSession.route {
-            LearningTimeView(library: library, scope: scope)
+        if case let .statistics(scope) = appSession.route {
+            StatisticsView(library: library, scope: scope, sessionID: statisticsSessionID)
                 .id(scope)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -645,7 +650,14 @@ struct ContentView: View {
                 scope: studyScope,
                 mediaStore: itemsModel.mediaStore,
                 endSessionTrigger: $endSessionTrigger,
-                isEditingCard: $isEditingStudyCard
+                isEditingCard: $isEditingStudyCard,
+                onSessionStatistics: {
+                    let sessionID = studyModel.learningTime.sessionID
+                    let scope = studyScope.filter
+                    endStudy()
+                    statisticsSessionID = sessionID
+                    appSession.route = .statistics(scope)
+                }
             ) {
                 endStudy()
             }
@@ -691,9 +703,8 @@ struct ContentView: View {
         } else {
             ScopeHomeView(
                 itemsModel: itemsModel,
-                learningTimeLibrary: library,
                 scope: decksModel.studyScope,
-                onLearningTime: { appSession.route = .learningTime(decksModel.studyScope.filter) },
+                onStatistics: { statisticsSessionID = nil; appSession.route = .statistics(decksModel.studyScope.filter) },
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },

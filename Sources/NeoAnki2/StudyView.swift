@@ -18,6 +18,7 @@ struct StudyView: View {
     /// Owned by the host so the Study menu can open the editor, and so the
     /// unmodified grade shortcuts stay disabled while it is open.
     @Binding var isEditingCard: Bool
+    var onSessionStatistics: () -> Void = {}
     let onEndSession: () -> Void
 
     @FocusState private var typedAnswerFocused: Bool
@@ -255,10 +256,10 @@ struct StudyView: View {
         ContentUnavailableView {
             Label("Session Complete", systemImage: "checkmark.circle")
         } description: {
-            Text(model.queue.isEmpty ? "No more due cards in this session." : model.completionSummary)
-            Text("Learning time: " + LearningTimeFormat.duration(model.learningTime.sessionMilliseconds))
+            Text("No more due cards in this session.")
             LearningTimeSaveStatusView()
         } actions: {
+            Button("View Session Statistics", systemImage: "chart.bar.xaxis", action: onSessionStatistics)
             if model.canUndoLastGrade {
                 Button("Undo Last Grade") {
                     Task { await model.undoLastGrade() }

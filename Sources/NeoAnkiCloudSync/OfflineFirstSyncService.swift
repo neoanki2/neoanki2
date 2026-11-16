@@ -25,6 +25,7 @@ public actor OfflineFirstSyncService: SyncService {
     private let adapter: any LibrarySyncAdapter
     private let transport: any CloudSyncTransport
     private let metadataStore: SyncMetadataStore
+    private let statistics: StatisticsSyncService?
     private let learningTime: LearningTimeSyncService?
     private let backupURL: @Sendable () -> URL
     private let recoveryPollInterval: Duration
@@ -48,6 +49,7 @@ public actor OfflineFirstSyncService: SyncService {
         transport: any CloudSyncTransport,
         metadataStore: SyncMetadataStore,
         learningTime: LearningTimeSyncService? = nil,
+        statistics: StatisticsSyncService? = nil,
         recoveryPollInterval: Duration = .seconds(10),
         backupURL: @escaping @Sendable () -> URL
     ) {
@@ -56,6 +58,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.transport = transport
         self.metadataStore = metadataStore
         self.learningTime = learningTime
+        self.statistics = statistics
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
         self.timing = .continuous
@@ -76,6 +79,7 @@ public actor OfflineFirstSyncService: SyncService {
         self.transport = transport
         self.metadataStore = metadataStore
         self.learningTime = nil
+        self.statistics = nil
         self.backupURL = backupURL
         self.recoveryPollInterval = recoveryPollInterval
         self.timing = timing
@@ -207,6 +211,10 @@ public actor OfflineFirstSyncService: SyncService {
             try await flushOutbound(metadata: &metadata, generation: generation)
 
             try checkLifecycle(generation)
+            if let statistics {
+                do { try await statistics.synchronize() }
+                catch { throw UserFacingError(title: "Statistics Could Not Sync", message: error.localizedDescription) }
+            }
             if let learningTime {
                 do { try await learningTime.synchronize() }
                 catch { throw UserFacingError(title: "Learning Time Could Not Sync", message: error.localizedDescription) }
@@ -335,6 +343,7 @@ public actor OfflineFirstSyncService: SyncService {
         finishWaiters()
         await transport.stop()
         await learningTime?.stop()
+        await statistics?.stop()
         transportStarted = false
         currentStatus = .offline
     }

@@ -462,7 +462,7 @@ extension ItemStore {
         try await detailedReviewPreviews(card: card, now: now).mapValues(\.memoryAfter)
     }
 
-    private func replayMemory(
+    func replayMemory(
         card: Card,
         logs: [ReviewLog],
         parameters: FSRSScheduler.Parameters

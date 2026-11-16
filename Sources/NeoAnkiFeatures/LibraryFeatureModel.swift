@@ -41,6 +41,12 @@ public final class LibraryFeatureModel {
     public private(set) var mediaStore: MediaStore?
     public private(set) var isStartingStudy = false
     public var activeStudy: StudyFeatureModel?
+    public var statisticsScope: DeckScope = .allDecks
+    public var statisticsSessionID: UUID?
+    public var statisticsNavigationID = UUID()
+    public func showStatistics(scope: DeckScope = .allDecks, sessionID: UUID? = nil) {
+        statisticsScope = scope; statisticsSessionID = sessionID; statisticsNavigationID = UUID(); section = .statistics
+    }
     public var section: AppSection = .home
     public var route: AppRoute = .scopeHome
     public var presentation: AppPresentation?

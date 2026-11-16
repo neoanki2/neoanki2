@@ -7,13 +7,14 @@ public enum AppSection: String, Codable, CaseIterable, Sendable, Hashable, Ident
     case home
     case library
     case create
+    case statistics
     case settings
 
     public var id: Self { self }
 }
 
 public enum AppRoute: Sendable, Hashable {
-    case learningTime(DeckScope)
+    case statistics(DeckScope)
     case scopeHome
     case scope(DeckScope)
     case browse

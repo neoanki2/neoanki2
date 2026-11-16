@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 33
+    static let version = 34
 
     static let learningTimeStatements: [String] = [
         """
@@ -71,7 +71,7 @@ enum Schema {
         }
     }
 
-    static let createStatements: [String] = learningTimeStatements + [
+    static let createStatements: [String] = statisticsStatements + learningTimeStatements + [
         """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL

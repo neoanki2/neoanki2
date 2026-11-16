@@ -24,6 +24,7 @@ goal or explanation you need.
 - [Add, edit, or delete items](authoring-items/)
 - [Add text, cloze, and media](content-and-media/)
 - [Study and grade cards](studying/)
+- [Explore statistics](statistics/)
 - [Track learning time](learning-time/)
 - [Import or export](import-export/)
 - [Set up iCloud sync, reminders, and widgets](sync-reminders-widgets/)

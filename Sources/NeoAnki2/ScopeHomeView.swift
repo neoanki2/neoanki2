@@ -1,4 +1,3 @@
-import Charts
 import NeoAnkiCore
 import NeoAnkiApplication
 import NeoAnkiSharedUI
@@ -8,14 +7,12 @@ import SwiftUI
 /// start. Enumerating items is a separate, deliberate mode.
 struct ScopeHomeView: View {
     @Bindable var itemsModel: ItemsModel
-    let learningTimeLibrary: any LibraryRepository
     let scope: StudyScope
-    var onLearningTime: () -> Void = {}
+    var onStatistics: () -> Void = {}
     let onStudy: () -> Void
     let onBrowse: () -> Void
     let onBrowseItemsNeedingAttention: () -> Void
     let onAddItem: () -> Void
-    @ScaledMetric(relativeTo: .body) private var chartDiameter: CGFloat = 144
 
     private var summary: ScopeSummary { itemsModel.scopeSummary }
 
@@ -42,7 +39,7 @@ struct ScopeHomeView: View {
                 } else if summary.itemCount == 0 {
                     VStack(spacing: DesignSystem.Spacing.lg) {
                         emptyState
-                        learningTimeSection.padding()
+                        statisticsLink.padding()
                     }
                 } else {
                     home
@@ -72,9 +69,9 @@ struct ScopeHomeView: View {
         }
     }
 
-    private var learningTimeSection: some View {
-        LearningTimeHomeSection(library: learningTimeLibrary, scope: scope.filter, onDetails: onLearningTime)
-            .id(scope.filter)
+    private var statisticsLink: some View {
+        Button("Statistics", systemImage: "chart.bar.xaxis", action: onStatistics)
+            .buttonStyle(.borderless).accessibilityIdentifier("viewStatistics")
     }
 
     // MARK: - Home
@@ -87,11 +84,7 @@ struct ScopeHomeView: View {
                 // position carries hierarchy that type size is not allowed to.
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
-                learningTimeSection
-                if itemsModel.maturityUnavailable {
-                    Text("Card maturity is unavailable. Your items and study controls are ready.")
-                        .foregroundStyle(.secondary)
-                } else { cardStateSection }
+                statisticsLink
                 if summary.leechCount > 0 {
                     leechCallout
                 }
@@ -152,127 +145,6 @@ struct ScopeHomeView: View {
             return "More new cards become available \(relative)."
         }
         return "The next card is due \(relative)."
-    }
-
-    private var cardStateSection: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
-            Text("Card progress")
-                .font(DesignSystem.Typography.uiCaption)
-                .foregroundStyle(.secondary)
-
-            if activeCardCount > 0 {
-                // This section lives in a vertical ScrollView, where the width
-                // offered to ViewThatFits can be effectively unbounded. It may
-                // then choose the horizontal arrangement even when the actual
-                // window is narrow, letting a scaled chart overlap the heading.
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                    cardProgressChart
-                    cardStateLegend
-                }
-            } else {
-                Text("No active cards")
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("scopeHomeCardProgressEmpty")
-            }
-
-            if summary.hiddenNewCount > 0 {
-                let noun = summary.hiddenNewCount == 1 ? "card" : "cards"
-                Text(
-                    "\(summary.availableNewCount) new available today; "
-                        + "\(summary.hiddenNewCount) \(noun) deferred by daily limits."
-                )
-                .font(DesignSystem.Typography.uiCaption)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("scopeHomeDailyNewLimit")
-            }
-        }
-    }
-
-    /// A part-to-whole chart for active cards. Exact counts stay alongside it,
-    /// so small slices and color differences never carry the meaning alone.
-    private var cardProgressChart: some View {
-        Chart(chartStates, id: \.label) { state in
-            SectorMark(
-                angle: .value("Cards", state.count),
-                innerRadius: .ratio(0.67),
-                angularInset: chartStates.count > 1 ? 1.5 : 0
-            )
-            .foregroundStyle(state.color)
-        }
-        .chartLegend(.hidden)
-        .frame(width: chartDiameter, height: chartDiameter)
-        .overlay {
-            VStack(spacing: 0) {
-                Text("\(maturePercent)%")
-                    .font(DesignSystem.Typography.uiSection)
-                    .monospacedDigit()
-                Text("mature")
-                    .font(DesignSystem.Typography.uiCaption)
-                    .foregroundStyle(.secondary)
-            }
-            .allowsHitTesting(false)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(maturePercent) percent mature")
-        .accessibilityIdentifier("scopeHomeCardProgressChart")
-    }
-
-    private var cardStateLegend: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-            ForEach(cardStates, id: \.label) { state in
-                HStack(spacing: DesignSystem.Spacing.xs) {
-                    Circle()
-                        .fill(state.color)
-                        .frame(width: 10, height: 10)
-                        .accessibilityHidden(true)
-                    Text(state.label)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: DesignSystem.Spacing.md)
-                    Text("\(state.count)")
-                        .fontWeight(.semibold)
-                        .monospacedDigit()
-                }
-                .font(DesignSystem.Typography.uiBody)
-            }
-        }
-        .frame(minWidth: 150, maxWidth: 220)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(cardStateAccessibilityLabel)
-        .accessibilityIdentifier("scopeHomeCardStates")
-    }
-
-    private var activeCardCount: Int { cardStates.reduce(0) { $0 + $1.count } }
-
-    private var chartStates: [CardStateValue] { cardStates.filter { $0.count > 0 } }
-
-    private var maturePercent: Int {
-        guard activeCardCount > 0 else { return 0 }
-        return Int((Double(summary.maturity.maintainingCardCount) * 100 / Double(activeCardCount)).rounded())
-    }
-
-    private struct CardStateValue {
-        let label: String
-        let count: Int
-        let color: Color
-    }
-
-    private var cardStates: [CardStateValue] {
-        let maturity = summary.maturity
-        let learningCount = max(
-            0,
-            maturity.activeCardCount - maturity.notStartedCardCount - maturity.maintainingCardCount
-        )
-        return [
-            CardStateValue(label: "New", count: maturity.notStartedCardCount, color: .secondary),
-            CardStateValue(label: "Learning", count: learningCount, color: .orange),
-            CardStateValue(label: "Mature", count: maturity.maintainingCardCount, color: .green),
-        ]
-    }
-
-    private var cardStateAccessibilityLabel: String {
-        let parts = cardStates.map { "\($0.count) \($0.label.lowercased())" }
-        return "Cards: " + parts.joined(separator: ", ")
     }
 
     private var leechCallout: some View {

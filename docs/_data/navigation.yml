@@ -34,6 +34,8 @@ primary:
         url: /user/content-and-media/
       - title: Studying
         url: /user/studying/
+      - title: Statistics
+        url: /user/statistics/
       - title: Learning time
         url: /user/learning-time/
       - title: Import and export

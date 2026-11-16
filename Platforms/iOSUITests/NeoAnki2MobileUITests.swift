@@ -581,7 +581,7 @@ final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
 
     func testTopLevelProductNavigation() throws {
         let app = launchApp()
-        for title in ["Home", "Library", "Create", "Settings"] {
+        for title in ["Home", "Library", "Create", "Statistics", "Settings"] {
             open(title, in: app)
             let navigationTitle = title
             XCTAssertTrue(app.navigationBars[navigationTitle].waitUntilExists(timeout: 3))
@@ -2186,5 +2186,29 @@ final class MobileImageOcclusionUITests: NeoAnki2MobileUITestCase {
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["0 saved cards"].waitUntilExists(timeout: 10))
         XCTAssertFalse(app.buttons["occlusion-fixture-study"].exists)
+    }
+}
+
+@MainActor
+final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
+    func testStatisticsNavigationAndHomeConsolidation() throws {
+        let app=launchApp()
+        XCTAssertFalse(app.buttons["viewLearningTime"].exists)
+        XCTAssertFalse(app.staticTexts["Card progress"].exists)
+        open("Statistics",in:app)
+        XCTAssertTrue(app.navigationBars["Statistics"].waitUntilExists(timeout:5))
+        XCTAssertTrue(app.scrollViews["statisticsScreen"].exists)
+        XCTAssertTrue(app.descendants(matching:.any)["statisticsTotals"].waitUntilExists(timeout:10))
+        XCTAssertTrue(app.buttons["Export CSV"].exists)
+        open("Home",in:app)
+        XCTAssertFalse(app.buttons["viewLearningTime"].exists)
+    }
+    func testStatisticsAtAccessibilityTextSize() throws {
+        let app=launchApp(additionalArguments:["-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"])
+        open("Statistics",in:app)
+        let screen=app.scrollViews["statisticsScreen"]
+        XCTAssertTrue(screen.waitUntilExists(timeout:5))
+        XCTAssertLessThanOrEqual(screen.frame.maxX,app.frame.maxX+1)
+        XCTAssertTrue(app.descendants(matching:.any)["statisticsScope"].exists)
     }
 }

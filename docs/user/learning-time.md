@@ -7,11 +7,12 @@ parent: User guide
 
 # Learning time
 
-Each deck home shows **Today** and **All time** learning-time totals. Choose
-**View Learning Time** for Today, Last 7 Days, Last 30 Days, or All Time and an
-expandable deck breakdown. Session completion also shows the session's duration.
-Tracking starts with your first study session after installing this feature;
-past review durations are not imported.
+Open **Statistics → Activity** for learning-time reports, period selection,
+session history, and deck comparisons. The same Statistics screen is shared by
+Mac, iPhone, and iPad. Deck actions open it with the deck selected; session
+completion offers **View Session Statistics**. Tracking starts with your first
+study session after installing learning-time tracking; past review durations
+are not imported. See [Statistics](../statistics/) for charts and definitions.
 
 ## What counts
 

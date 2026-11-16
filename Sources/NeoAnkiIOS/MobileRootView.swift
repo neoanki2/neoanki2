@@ -151,6 +151,7 @@ private struct MobileTabView: View {
     @State private var libraryPath = NavigationPath()
     @State private var createPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
+    @State private var statisticsPath = NavigationPath()
 
     private var usesSidebar: Bool {
         UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
@@ -209,6 +210,11 @@ private struct MobileTabView: View {
         case .home: HomeView(model: model, path: $homePath)
         case .library: LibraryView(model: model, navigationPath: $libraryPath)
         case .create: CreateHubView(model: model, vocabularyLibrary: vocabularyLibrary, path: $createPath)
+        case .statistics:
+            NavigationStack(path: $statisticsPath) {
+                StatisticsView(library: model.library, scope: model.statisticsScope, sessionID: model.statisticsSessionID)
+                    .id(model.statisticsNavigationID)
+            }
         case .settings: SettingsView(model: model, vocabularyLibrary: vocabularyLibrary, path: $settingsPath)
         }
     }
@@ -224,10 +230,10 @@ struct MobileTabBarVisibility: ViewModifier {
 
 private extension AppSection {
     var title: String {
-        switch self { case .home: "Home"; case .library: "Library"; case .create: "Create"; case .settings: "Settings" }
+        switch self { case .home: "Home"; case .library: "Library"; case .create: "Create"; case .statistics: "Statistics"; case .settings: "Settings" }
     }
     var symbol: String {
-        switch self { case .home: "house"; case .library: "rectangle.stack"; case .create: "plus.square"; case .settings: "gearshape" }
+        switch self { case .home: "house"; case .library: "rectangle.stack"; case .create: "plus.square"; case .statistics: "chart.bar.xaxis"; case .settings: "gearshape" }
     }
 }
 
@@ -412,7 +418,6 @@ private struct SettingsView: View {
 private struct HomeView: View {
     @Bindable var model: MobileAppModel
     @Binding var path: NavigationPath
-    @State private var showsLearningTime = false
     @State private var isAddingItem = false
 
     var body: some View {
@@ -434,7 +439,7 @@ private struct HomeView: View {
                 }
 
                 Section {
-                    LearningTimeHomeSection(library: model.library, scope: .allDecks) { showsLearningTime = true }
+                    Button("Statistics", systemImage: "chart.bar.xaxis") { model.showStatistics() }
                 }
 
                 Section {
@@ -474,9 +479,6 @@ private struct HomeView: View {
                 }
             }
             .navigationTitle("Home")
-            .navigationDestination(isPresented: $showsLearningTime) {
-                LearningTimeView(library: model.library, scope: .allDecks)
-            }
             .modifier(MobileTabBarVisibility())
             .navigationDestination(for: MobileScope.self) { scope in
                 ScopeDetailView(model: model, scope: scope)
@@ -560,7 +562,6 @@ private struct ScopeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
     let scope: MobileScope
-    @State private var showsLearningTime = false
     @State private var summary: ScopeSummary?
     @State private var errorMessage: String?
     @State private var showsDeckSettings = false
@@ -580,7 +581,7 @@ private struct ScopeDetailView: View {
                 }
 
                 Section {
-                    LearningTimeHomeSection(library: model.library, scope: scope.filter) { showsLearningTime = true }
+                    Button("Statistics", systemImage: "chart.bar.xaxis") { model.showStatistics(scope: scope.filter) }
                 }
                 Section {
                     NavigationLink("Browse Items") { LibraryView(model: model, scope: scope.filter, embedsNavigation: false) }
@@ -599,9 +600,6 @@ private struct ScopeDetailView: View {
                         }
                     }
                 }
-                Section {
-                    NavigationLink("Progress") { progress(summary) }
-                }
             } else if let errorMessage {
                 ContentUnavailableView("Could Not Load Deck", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
             } else {
@@ -612,9 +610,6 @@ private struct ScopeDetailView: View {
             AddItemView(model: model, deckID: { if case let .deck(id) = scope { return id }; return nil }())
         }
         .navigationTitle(model.scopeTitle(scope))
-        .navigationDestination(isPresented: $showsLearningTime) {
-            LearningTimeView(library: model.library, scope: scope.filter)
-        }
         .toolbar {
             if case let .deck(id) = scope {
                 Button("Deck Settings", systemImage: "ellipsis.circle") { showsDeckSettings = true }
@@ -626,23 +621,6 @@ private struct ScopeDetailView: View {
         .task { await load() }
         .onChange(of: model.allDecksSummary) { _, _ in Task { await load() } }
         .onChange(of: model.activeStudy?.id) { _, id in if id == nil { Task { await load() } } }
-    }
-
-    private func progress(_ summary: ScopeSummary) -> some View {
-        List {
-                Section("Progress") {
-                    LabeledContent("Items", value: summary.itemCount.formatted())
-                    LabeledContent("Cards", value: summary.cardCount.formatted())
-                    LabeledContent("New", value: summary.newCount.formatted())
-                    LabeledContent("Learning", value: summary.inLearningCount.formatted())
-                    LabeledContent("Review", value: summary.reviewCount.formatted())
-                    LabeledContent("Maturity", value: model.recoveryMessage == nil ? summary.maturity.displayName : "Unavailable")
-                    if model.recoveryMessage == nil, summary.maturity.activeCardCount > 0 {
-                        LabeledContent("Progress", value: summary.maturity.progressText)
-                    }
-                }
-        }
-        .navigationTitle("Progress")
     }
 
     private func load() async {
