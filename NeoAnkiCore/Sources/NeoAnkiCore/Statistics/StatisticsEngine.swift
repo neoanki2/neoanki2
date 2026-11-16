@@ -53,7 +53,12 @@ public enum StatisticsEngine {
                 }
             }
         }
-        func matchesScope(item: UUID?, deck: UUID?, forceCurrent: Bool = false) -> Bool {
+        func matchesScope(item: UUID?, deck: UUID?, forceCurrent: Bool = false, historicalKnown: Bool = true)
+            -> Bool
+        {
+            if query.studyTimeAttribution && !forceCurrent && !historicalKnown {
+                return query.scope == .allDecks
+            }
             let current = item.flatMap { source.itemDecks[$0] }
             let assigned = query.studyTimeAttribution && !forceCurrent ? deck : current
             switch query.scope {
@@ -137,15 +142,24 @@ public enum StatisticsEngine {
             let extra = context[log.id.uuidString] ?? event
             let skill = extra.skill ?? event.skill
             let interaction = extra.interaction ?? event.interaction
-            guard matchesScope(item: event.itemID, deck: event.deckID),
+            let historicalKnown =
+                event.log?.schedulingAudit != nil || event.deckID != nil || event.sessionID != nil
+            guard matchesScope(item: event.itemID, deck: event.deckID, historicalKnown: historicalKnown),
                 matches(event.itemTypeID, event.templateID, skill, interaction),
                 query.sessionID == nil || extra.sessionID == query.sessionID
             else { continue }
             let deck =
                 query.studyTimeAttribution ? event.deckID : event.itemID.flatMap { source.itemDecks[$0] }
-            let name =
-                event.itemID.map(source.liveItems.contains) == false
-                ? "Deleted Content" : deck.flatMap { deckNames[$0] } ?? "Unassigned"
+            let name: String
+            if query.studyTimeAttribution && !historicalKnown {
+                name = "Unknown historical deck"
+            } else if event.itemID.map(source.liveItems.contains) == false {
+                name = "Deleted Content"
+            } else if let deck {
+                name = deckNames[deck] ?? "Deleted Deck"
+            } else {
+                name = "Unassigned"
+            }
             all.append(
                 StatisticsReview(
                     log: log, itemID: event.itemID, deckName: name, skill: skill ?? "Unknown",

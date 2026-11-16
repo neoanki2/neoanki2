@@ -454,3 +454,19 @@ private func statsReview(
     #expect(a.csv == b.csv)
     #expect(a.daily.map(\.series) == b.daily.map(\.series))
 }
+
+@Test func statisticsDoesNotInventHistoricalUnassignedContext() {
+    var source = emptyStatsSource()
+    let event = statsReview(statsDate())
+    source.events = [event]
+    source.liveItems = [event.itemID!]
+    var query = StatisticsQuery()
+    query.studyTimeAttribution = true
+    let all = StatisticsEngine.snapshot(
+        source: source, query: query, now: statsDate(), calendar: statsCalendar())
+    #expect(all.reviews.first?.deckName == "Unknown historical deck")
+    query.scope = .unassigned
+    #expect(
+        StatisticsEngine.snapshot(source: source, query: query, now: statsDate(), calendar: statsCalendar())
+            .reviewCount == 0)
+}

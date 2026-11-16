@@ -122,7 +122,8 @@ extension SQLiteDatabase {
         try saveStatisticsEvents([
             StatisticsEvent(
                 id: "review:" + log.id.uuidString, kind: "review", occurredAt: log.reviewedAt,
-                cardID: log.cardID, itemID: card?.itemID, deckID: audit?.deckIDAtReview ?? card?.deckID,
+                cardID: log.cardID, itemID: card?.itemID,
+                deckID: audit == nil ? card?.deckID : audit?.deckIDAtReview,
                 itemTypeID: audit?.itemTypeIDAtReview ?? type?.id,
                 templateID: audit?.templateIDAtReview ?? card?.templateID,
                 skill: skill.map {
@@ -176,16 +177,16 @@ extension SQLiteDatabase {
                 SELECT 'review:'||r.id,'review',r.reviewed_at,r.card_id,
                   CAST(json_object('id','review:'||r.id,'kind','review',
                     'occurredAt',r.reviewed_at-978307200,'cardID',r.card_id,
-                    'itemID',c.item_id,'deckID',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.deckIDAtReview'),c.deck_id),
+                    'itemID',c.item_id,'deckID',json_extract(CAST(r.scheduling_audit AS TEXT),'$.deckIDAtReview'),
                     'itemTypeID',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.itemTypeIDAtReview'),i.item_type_id),
                     'templateID',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.templateIDAtReview'),c.template_id),
                     'log',json_remove(CAST(r.log AS TEXT),'$.sequence'),
                     'memoryBefore',json(CAST(r.memory_before AS TEXT)),
                     'memoryAfter',json(CAST(r.memory_after AS TEXT)),
-                    'skill',COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.input'),json_extract(CAST(c.skill AS TEXT),'$.input'))||' → '||
-                        COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.output'),json_extract(CAST(c.skill AS TEXT),'$.output'))||' · '||
-                        COALESCE(json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.operation'),json_extract(CAST(c.skill AS TEXT),'$.operation')),
-                    'interaction',(SELECT json_extract(value,'$.interaction') FROM json_each(CAST(t.definition AS TEXT),'$.templates') WHERE json_extract(value,'$.id')=c.template_id LIMIT 1),
+                    'skill',json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.input')||' → '||
+                        json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.output')||' · '||
+                        json_extract(CAST(r.scheduling_audit AS TEXT),'$.skillAtReview.operation'),
+                    'interaction',NULL,
                     'sourceLibraryID',?,'suspended',json('false')) AS BLOB)
                 FROM review_logs r LEFT JOIN cards c ON c.id=r.card_id
                 LEFT JOIN items i ON i.id=c.item_id LEFT JOIN item_types t ON t.id=i.item_type_id
