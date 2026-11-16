@@ -19,7 +19,8 @@ extension FastFunctionalJourneyTests {
         if let notice = firstExisting(of: [app.buttons["action-button-1"], app.buttons["OK"]], timeout: 1), notice.isHittable { notice.click() }
 
         selectScope("deckRow-Ukrainian", in: app)
-        app.buttons.identified("addFromVocabularyToolbar").click()
+        app.menuBarItems["File"].click()
+        app.menuItems.identified("Add Word…").click()
         let query = app.textFields.identified("word-capture-query")
         XCTAssertTrue(query.waitUntilExists(timeout: 5))
         enterText("слово", into: query, app: app)
@@ -43,7 +44,8 @@ extension FastFunctionalJourneyTests {
         }
         app.buttons.identified("word-capture-done").click()
         XCTAssertTrue(query.waitUntilGone(timeout: 5))
-        app.buttons.identified("addFromVocabularyToolbar").click()
+        app.menuBarItems["File"].click()
+        app.menuItems.identified("Add Word…").click()
         XCTAssertTrue(waitUntil(timeout: 5) { (app.buttons.identified("word-capture-setup").value as? String) == "Basic" })
         app.buttons.identified("word-capture-done").click()
         showSidebar(in: app)

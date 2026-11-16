@@ -275,12 +275,11 @@ extension FastFunctionalJourneyTests {
             waitForItem(named: "Browse Move", in: seeded)
         }
 
-        runJourneyActivity("LibraryUITests.testDeleteAllUnassignedFromToolbar") {
+        runJourneyActivity("LibraryUITests.testDeleteAllUnassignedInSelectedScope") {
             returnToLibrary(in: seeded)
             selectScope("scopeRow-Unassigned", in: seeded)
-            let deleteAll = seeded.buttons.identified("deleteAllUnassignedToolbar")
-            XCTAssertTrue(deleteAll.waitUntilExists(timeout: 3))
-            deleteAll.click()
+            seeded.descendants(matching: .any).identified("scopeRow-Unassigned").rightClick()
+            selectMenuItem("Delete All", in: seeded)
             seeded.buttons.identified("confirmDeleteAllUnassigned").click()
             XCTAssertTrue(
                 seeded.descendants(matching: .any).identified("scopeRow-Unassigned")
@@ -390,7 +389,7 @@ extension FastFunctionalJourneyTests {
         XCTAssertFalse(app.buttons.identified("deleteItem").exists)
     }
 
-    func checkLibraryUITestsDeleteAllUnassignedFromToolbar() throws {
+    func checkLibraryUITestsDeleteAllUnassignedInSelectedScope() throws {
         let app = launchApp()
         addBasicItem(front: "Loose Item", back: "A", in: app)
         createDeck(named: "Keep Deck", in: app)
@@ -409,9 +408,9 @@ extension FastFunctionalJourneyTests {
         waitForItem(named: "Loose Item", in: app)
         returnToLibrary(in: app)
 
-        let deleteAll = app.buttons.identified("deleteAllUnassignedToolbar")
-        XCTAssertTrue(deleteAll.waitUntilExists(timeout: 5))
-        deleteAll.click()
+        showSidebar(in: app)
+        app.descendants(matching: .any).identified("scopeRow-Unassigned").rightClick()
+        selectMenuItem("Delete All", in: app)
         XCTAssertTrue(app.buttons.identified("confirmDeleteAllUnassigned").waitUntilExists(timeout: 5))
         app.buttons.identified("confirmDeleteAllUnassigned").click()
 

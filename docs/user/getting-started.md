@@ -33,7 +33,7 @@ The Prose Deck builder is included in the same app targets; it adds no platform
 requirement. The feature test target also links the offline-first sync module to
 exercise cross-device convergence directly; this does not change app targets.
 
-To capture vocabulary after opening a library, choose **Add Word** on Home on
+To capture vocabulary after opening a library, choose **Create → Add Word** on
 iPhone/iPad, or **File → Add Word…** on Mac. Choose a destination and installed
 dictionary once; the app remembers each dictionary–deck setup on that device.
 See [Add a word quickly](../authoring-items/#add-a-word-quickly).

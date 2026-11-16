@@ -11,7 +11,7 @@ audience: developer
 
 ## Context
 
-The [codebase investigation](../audits/codebase-review-2026-11-16.md) found two independent costs: Mac and mobile adapters composed their own mutation/refresh sequences, and every cold maturity query hydrated all cards and active reviews. A successful import could be followed by failed placement or cleanup; a selected move could commit only some rows. An unrelated deck rename invalidated the full maturity snapshot.
+The previous implementation had two independent costs: Mac and mobile adapters composed their own mutation/refresh sequences, and every cold maturity query hydrated all cards and active reviews. A successful import could be followed by failed placement or cleanup; a selected move could commit only some rows. An unrelated deck rename invalidated the full maturity snapshot.
 
 ## Decision
 
@@ -38,8 +38,8 @@ One observable view model for both shells would absorb Mac table comparators, fi
 
 A persistent maturity table could avoid more cold work, but would add schema evolution, repair, and synchronization responsibilities. Scoped reads plus a disposable projection achieve the measured gates without that migration. Full invalidation on every write was simpler but made unrelated edits scale with the entire library. Incremental contributions introduce cache bookkeeping, covered by rename/grade/revert, reset, journal-gap, external-origin, and malformed-history tests.
 
-The remaining full study-relation rebuild after content edits, bootstrap recovery scans, and portable transfer throughput are separate candidates from the investigation. This change does not redesign those subsystems.
+The remaining full study-relation rebuild after content edits, bootstrap recovery scans, and portable transfer throughput are separate concerns outside this decision. This change does not redesign those subsystems.
 
 ## Verification and release
 
-See the [implementation evidence](../audits/native-library-implementation-2026-11-16.md). Use the normal headless checks, relevant iOS builds and focused Simulator XCTest, then merge to `main` before invoking the [unified release controller](../RELEASING.md). Release completion includes applicable Homebrew installation, verified iPhone installation, and release-owned artifact cleanup.
+Use the normal headless checks, relevant iOS builds and focused Simulator XCTest, then merge to `main` before invoking the [unified release controller](../RELEASING.md). Release completion includes applicable Homebrew installation, verified iPhone installation, and release-owned artifact cleanup.

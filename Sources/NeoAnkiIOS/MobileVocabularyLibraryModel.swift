@@ -4,7 +4,6 @@ import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiVocabularyKit
 import Observation
-import VocabularyDeckBuilder
 
 @MainActor
 @Observable
@@ -17,19 +16,6 @@ final class MobileVocabularyLibraryModel {
 
     init(rootURL: URL, cloudTransport: (any VocabularyPackCloudTransport)? = nil) {
         sync = VocabularyPackSyncModel(rootURL: rootURL, transport: cloudTransport)
-    }
-
-    var builderOptions: [VocabularyPackOption] {
-        installedPacks.map { pack in
-            let languages = pack.languages.joined(separator: ", ")
-            let noun = pack.entryCount == 1 ? "entry" : "entries"
-            return VocabularyPackOption(
-                id: pack.id,
-                title: pack.title,
-                summary: "\(languages) · \(pack.entryCount.formatted()) \(noun)",
-                packageURL: pack.packageURL
-            )
-        }
     }
 
     func seedVisualFixtureIfRequested(library: (any LibraryRepository)? = nil) async throws {

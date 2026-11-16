@@ -88,7 +88,7 @@ and removes the temporary files. It does not write directly to the library.
 
 ## Build a prose deck
 
-Choose **File → Build Deck… → Prose Deck** on Mac, or **Deck Builders → Prose
+Choose **File → Build Deck… → Prose Deck** on Mac, or **Create → Prose
 Deck** on iPhone or iPad. Choose a root deck, enter a title and optional author,
 and paste the passage. Blank lines mark paragraphs. Choose **Review Cards** to
 see the cues, answers, paragraph count, and card count before importing. Use
@@ -122,24 +122,21 @@ receive the catalog and can choose **Download** to install a pack for offline
 use. **Remove from Device** keeps uploaded copies and saved cards. See
 [Dictionary packs]({{ '/user/sync-reminders-widgets/' | relative_url }}#dictionary-packs).
 
-Choose **File → Add Word…** on Mac, or **Add Word** on iPhone/iPad Home,
-in Create, or inside a deck. Select an installed dictionary and a destination,
+Choose **File → Add Word…** on Mac, or **Create → Add Word** on iPhone/iPad
+or **Add Word** inside a deck. Select an installed dictionary and a destination,
 then set up that pair once using an existing item type and field mappings.
 Look up a word, choose any relevant ambiguous content, and add the prepared
 item. The sheet stays open for another word. Each dictionary–deck pair keeps
 its own setup on this device. See [Quick vocabulary capture](../authoring-items/#add-a-word-quickly).
 
-The full vocabulary deck builder remains available through the deck-builder
-catalog for selecting card paradigms and generating a deck.
+For sentence-based vocabulary cards, choose **Learn in Context**.
 
 Import and lookup work offline. Import reads and copies the selected local
 package; lookup reads only the installed SQLite index and local media.
 
-An installed pack can also fill fields in the ordinary Add Item editor.
-Expand **Dictionary**, choose two distinct Text or Rich Text fields, and type
-a lookup word. Review the filled definition before saving. This creates an
-ordinary item in your selected deck, using its chosen item type and Card
-setups. On iPhone and iPad, install the pack through
+Use **Add Word** for dictionary-assisted field filling, with remembered mappings
+for each dictionary–deck pair. The ordinary New Item form contains the selected
+item type's fields. On iPhone and iPad, install packs through
 **Create → Vocabulary Packs**. See
 [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
 

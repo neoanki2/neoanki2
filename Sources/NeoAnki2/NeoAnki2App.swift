@@ -4,7 +4,6 @@ import NeoAnkiDeckBuilderKit
 import NeoAnkiCloudSync
 import PoemDeckBuilder
 import ProseDeckBuilder
-import VocabularyDeckBuilder
 import NeoAnkiTextEditing
 import SwiftUI
 
@@ -495,12 +494,11 @@ struct NeoAnki2App: App {
 #endif
 }
 
-private extension DeckBuilderRegistry {
+extension DeckBuilderRegistry {
     static var production: DeckBuilderRegistry {
         DeckBuilderRegistry([
             PoemDeckBuilderFeature.makeFeature(),
             ProseDeckBuilderFeature.makeFeature(),
-            VocabularyDeckBuilderFeature.makeFeature(),
         ])
     }
 }

@@ -60,7 +60,8 @@ Background count updates keep the **Study** action in sync with the current due
 count. The scope home says **You’re caught up** when no cards are due; it also
 updates while badges and other summaries refresh.
 
-Choose **Add Word** from a deck to capture vocabulary directly into that deck.
+On iPhone and iPad, choose **Add Word** inside a deck to capture vocabulary
+directly into it. On Mac, select the deck and choose **File → Add Word…**.
 From **All Decks**, capture restores the last destination and dictionary pair,
 or asks you to choose a destination on first use. Renaming a deck preserves its
 saved dictionary setup because the pairing uses the deck's stable identity.

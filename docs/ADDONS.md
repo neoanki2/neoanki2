@@ -53,15 +53,16 @@ card for each line after the first. Each prompt contains the preceding one or
 two nonblank lines, extending backward when the same context occurs more than
 once. Blank lines in that context preserve stanza separation.
 
-`VocabularyDeckBuilder` supplies a domain-neutral generated-item editor rather
-than a registered deck builder. NeoAnki imports `.neovocab` packages into
-managed offline storage in a separate flow. With an existing deck selected, the
-editor searches an installed index, lets the user review forms, pronunciations,
-senses, and examples, then emits form/pronunciation, form/meaning,
-meaning/form, and example-cloze items through the validated `.neoanki` boundary.
-Core flattens that generated item batch into the selected deck atomically, so
-one lookup does not create one deck. Language and pronunciation schemes remain
-pack data; the editor contains no language-specific rules.
+`ProseDeckBuilder` creates ordered recall cards from a passage and keeps source
+editing and generated cards together. These two builders are the bundled catalog.
+On iPhone and iPad they open directly from Create.
+
+The former vocabulary builder and generator have been removed. Their separate
+paradigm editor duplicated vocabulary authoring and required unnecessary setup.
+**Add Word** now fills a chosen deck's item type from an installed dictionary;
+**Learn in Context** creates sentence-based cards. Offline `.neovocab` package
+storage, lookup, and sync remain independent of deck builders. Existing generated
+vocabulary items remain ordinary library data and can still be studied and edited.
 
 ### External builders
 

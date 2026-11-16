@@ -71,7 +71,7 @@ The app adds these commands to the standard macOS menu bar.
 - **Import Vocabulary Pack…** validates and installs a local `.neovocab`
   directory.
 - **Export Deck…** exports the selected real deck as `.neodeck`.
-- **Build Deck…** opens the catalog containing Poem Deck, Prose Deck, and Vocabulary Deck.
+- **Build Deck…** opens the catalog containing Poem Deck and Prose Deck.
 
 There is no **New Window** or **New Tab**; NeoAnki2 has one library. Create decks
 with the controls in the sidebar.

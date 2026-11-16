@@ -6,7 +6,6 @@ import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import SwiftUI
 import UniformTypeIdentifiers
-import VocabularyDeckBuilder
 
 private struct ImportNotice: Identifiable {
     let id = UUID()
@@ -146,7 +145,7 @@ struct ContentView: View {
         Binding(get: { isShowingVocabularyPacks }, set: { isShowingVocabularyPacks = $0 })
     }
 
-    private var vocabularyBuilderPresentation: Binding<Bool> {
+    private var wordCapturePresentation: Binding<Bool> {
         Binding(get: { isAddingFromVocabulary }, set: { isAddingFromVocabulary = $0 })
     }
 
@@ -312,7 +311,7 @@ struct ContentView: View {
                 onDone: { isShowingVocabularyPacks = false }
             )
         }
-        .sheet(isPresented: vocabularyBuilderPresentation, onDismiss: {
+        .sheet(isPresented: wordCapturePresentation, onDismiss: {
             Task { await vocabularyLibraryModel.load() }
         }) {
             WordCaptureView(library: library, rootURL: vocabularyLibraryModel.rootURL,
@@ -696,15 +695,7 @@ struct ContentView: View {
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
-                onAddItem: { openAddItem() },
-                onAddFromVocabulary: canUseVocabularyUI ? { isAddingFromVocabulary = true } : nil,
-                onLearnInContext: canUseVocabularyUI ? { showsLearnInContext = true } : nil,
-                onDeleteAllUnassigned: {
-                    Task {
-                        _ = await itemsModel.deleteAllUnassigned(scope: decksModel.studyScope)
-                        await refreshLibrary(forceRefresh: true)
-                    }
-                }
+                onAddItem: { openAddItem() }
             )
         }
     }

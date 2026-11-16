@@ -19,7 +19,6 @@ let package = Package(
         .library(name: "NeoAnkiDeckBuilderCore", targets: ["NeoAnkiDeckBuilderCore"]),
         .library(name: "NeoAnkiVocabularyKit", targets: ["NeoAnkiVocabularyKit"]),
         .library(name: "NeoAnkiVocabularyCLI", targets: ["NeoAnkiVocabularyCLI"]),
-        .library(name: "VocabularyDeckBuilder", targets: ["VocabularyDeckBuilder"]),
         .executable(name: "neoanki-vocab", targets: ["neoanki-vocab"]),
         .executable(
             name: "neoanki-api-reference",
@@ -63,7 +62,6 @@ let package = Package(
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
                 "ProseDeckBuilder",
-                "VocabularyDeckBuilder",
             ],
             path: "Sources/NeoAnkiIOS"
         ),
@@ -81,7 +79,6 @@ let package = Package(
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
                 "ProseDeckBuilder",
-                "VocabularyDeckBuilder",
             ],
             path: "Sources/NeoAnki2"
         ),
@@ -204,16 +201,6 @@ let package = Package(
             ],
             path: "Sources/ProseDeckBuilder"
         ),
-        .target(
-            name: "VocabularyDeckBuilder",
-            dependencies: [
-                "NeoAnkiTextEditing",
-                "NeoAnkiVocabularyKit",
-                "NeoAnkiDeckBuilderKit",
-                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
-            ],
-            path: "Sources/VocabularyDeckBuilder"
-        ),
         .testTarget(
             name: "NeoAnkiFeaturesTests",
             dependencies: [
@@ -251,7 +238,6 @@ let package = Package(
                 "NeoAnkiVocabularyKit",
                 "PoemDeckBuilder",
                 "ProseDeckBuilder",
-                "VocabularyDeckBuilder",
                 "NeoAnkiTemplateMigration",
             ],
             path: "Tests/NeoAnki2Tests",
@@ -294,16 +280,6 @@ let package = Package(
             name: "NeoAnkiVocabularyCLITests",
             dependencies: ["NeoAnkiVocabularyCLI", "NeoAnkiVocabularyKit"],
             path: "Tests/NeoAnkiVocabularyCLITests"
-        ),
-        .testTarget(
-            name: "VocabularyDeckBuilderTests",
-            dependencies: [
-                "VocabularyDeckBuilder",
-                "NeoAnkiVocabularyKit",
-                "NeoAnkiDeckBuilderKit",
-                .product(name: "NeoAnkiCore", package: "NeoAnkiCore"),
-            ],
-            path: "Tests/VocabularyDeckBuilderTests"
         ),
     ]
 )

@@ -254,9 +254,12 @@ private struct CreateHubView: View {
                 Section("Design") {
                     NavigationLink { ItemTypesMobileView(model: model) } label: { Label("Item Types & Card Setups", systemImage: "square.stack.3d.up") }
                 }
-                Section("Transfer & Build") {
+                Section("Deck Builders") {
+                    NavigationLink { PoemBuilderMobileHost(model: model) } label: { Label("Poem Deck", systemImage: "text.quote") }
+                    NavigationLink { ProseBuilderMobileHost(model: model) } label: { Label("Prose Deck", systemImage: "text.book.closed") }
+                }
+                Section("Transfer") {
                     NavigationLink { TransferToolsView(model: model) } label: { Label("Import or Export", systemImage: "arrow.up.arrow.down.square") }
-                    NavigationLink { BuilderToolsView(model: model, vocabularyLibrary: vocabularyLibrary) } label: { Label("Deck Builders", systemImage: "hammer") }
                     NavigationLink { VocabularyToolsView(model: vocabularyLibrary) } label: { Label("Vocabulary Packs", systemImage: "books.vertical") }
                 }
             }
@@ -275,6 +278,8 @@ private struct SettingsView: View {
     @AppStorage(StudyPreferences.usesPassFailGrades) private var usesPassFailGrades = false
     @State private var showsSyncConsent = false
     @State private var errorMessage: String?
+    @State private var rolloverMinutes: Int?
+    @State private var isSavingRollover = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -314,7 +319,9 @@ private struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Toggle("Conceal answers while browsing", isOn: $model.concealsAnswers)
-                    NavigationLink("Study Day") { SchedulingMobileView(model: model) }
+                    DatePicker("New day begins", selection: rolloverTime, displayedComponents: .hourAndMinute)
+                        .disabled(rolloverMinutes == nil || isSavingRollover)
+                        .accessibilityIdentifier("study-day-rollover")
                 }
                 Section("About") {
                     LabeledContent("Data", value: "Stored on this device")
@@ -328,6 +335,10 @@ private struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .modifier(MobileTabBarVisibility())
+            .task {
+                do { rolloverMinutes = try await model.library.studyDayRolloverMinutes() }
+                catch { errorMessage = MobileAppModel.message(for: error) }
+            }
             .alert("Enable iCloud Sync?", isPresented: $showsSyncConsent) {
                 Button("Create Backup & Enable") { Task { await model.setSyncEnabled(true) } }
                 Button("Not Now", role: .cancel) {}
@@ -348,6 +359,30 @@ private struct SettingsView: View {
         case .accountUnavailable: "Account unavailable"
         case .needsAttention: "Needs attention"
         }
+    }
+
+    private var rolloverTime: Binding<Date> {
+        Binding(
+            get: {
+                let minutes = rolloverMinutes ?? 240
+                return Calendar.current.date(from: DateComponents(hour: minutes / 60, minute: minutes % 60)) ?? .now
+            },
+            set: { value in
+                guard rolloverMinutes != nil, !isSavingRollover else { return }
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: value)
+                let minutes = (parts.hour ?? 4) * 60 + (parts.minute ?? 0)
+                guard minutes != rolloverMinutes else { return }
+                isSavingRollover = true
+                Task {
+                    defer { isSavingRollover = false }
+                    do {
+                        try await model.library.setStudyDayRolloverMinutes(minutes)
+                        rolloverMinutes = minutes
+                        await model.refresh()
+                    } catch { errorMessage = MobileAppModel.message(for: error) }
+                }
+            }
+        )
     }
 
     private var reminderEnabled: Binding<Bool> { Binding(
@@ -375,20 +410,16 @@ private struct SettingsView: View {
 }
 
 private struct HomeView: View {
-    @Environment(\.openWordCapture) private var openWordCapture
     @Bindable var model: MobileAppModel
     @Binding var path: NavigationPath
     @State private var showsLearningTime = false
-    @State private var isAddingDeck = false
     @State private var isAddingItem = false
-    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack(path: $path) {
             List {
                 Section {
                     DueNowCard(
-                        title: "Ready to study",
                         summary: model.allDecksSummary,
                         // Background count refreshes do not prevent study.
                         // Only starting a session must disable this action.
@@ -404,10 +435,6 @@ private struct HomeView: View {
 
                 Section {
                     LearningTimeHomeSection(library: model.library, scope: .allDecks) { showsLearningTime = true }
-                }
-                Section {
-                    Button("Add Word", systemImage: "character.book.closed") { openWordCapture(nil) }
-                        .accessibilityIdentifier("home-add-word")
                 }
 
                 Section {
@@ -454,23 +481,8 @@ private struct HomeView: View {
             .navigationDestination(for: MobileScope.self) { scope in
                 ScopeDetailView(model: model, scope: scope)
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("New Deck", systemImage: "folder.badge.plus") {
-                        isAddingDeck = true
-                    }
-                }
-            }
             .refreshable { await model.refresh() }
-            .sheet(isPresented: $isAddingDeck) {
-                NewDeckView(model: model)
-            }
             .sheet(isPresented: $isAddingItem) { AddItemView(model: model) }
-            .alert("Could Not Start Study", isPresented: errorBinding) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "Please try again.")
-            }
             .onChange(of: model.route) { _, route in
                 if case let .scope(scope) = route { path = NavigationPath([MobileScope(scope)]) }
             }
@@ -478,13 +490,6 @@ private struct HomeView: View {
                 if case let .scope(scope) = model.route { path = NavigationPath([MobileScope(scope)]) }
             }
         }
-    }
-
-    private var errorBinding: Binding<Bool> {
-        Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )
     }
 
     private func startStudy(_ scope: MobileScope) {
@@ -495,7 +500,6 @@ private struct HomeView: View {
 }
 
 private struct DueNowCard: View {
-    let title: String
     let summary: ScopeSummary
     let isWorking: Bool
     let action: () -> Void
@@ -567,7 +571,6 @@ private struct ScopeDetailView: View {
             if let summary {
                 Section {
                     DueNowCard(
-                        title: model.scopeTitle(scope),
                         summary: summary,
                         isWorking: model.isStartingStudy,
                         action: startStudy
@@ -581,9 +584,10 @@ private struct ScopeDetailView: View {
                 }
                 Section {
                     NavigationLink("Browse Items") { LibraryView(model: model, scope: scope.filter, embedsNavigation: false) }
-                    Button("Add Word", systemImage: "character.book.closed") {
-                        if case let .deck(id) = scope { openWordCapture(id) } else { openWordCapture(nil) }
-                    }.accessibilityIdentifier("deck-add-word")
+                    if case let .deck(id) = scope {
+                        Button("Add Word", systemImage: "character.book.closed") { openWordCapture(id) }
+                            .accessibilityIdentifier("deck-add-word")
+                    }
                     Button("Add Item", systemImage: "plus") { showsAddItem = true }
                 }
                 if case let .deck(id) = scope, model.decks.contains(where: { $0.parentID == id }) {

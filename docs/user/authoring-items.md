@@ -51,7 +51,7 @@ new item and delete the old one after checking the result.
 
 ## Learn a word or phrase in context
 
-Choose **Learn in Context** in Create on iPhone/iPad, or from the Mac toolbar or
+Choose **Learn in Context** in Create on iPhone/iPad, or from the Mac
 File menu. This is a separate authoring flow; the standard Add Item form stays
 focused on the selected item type's fields.
 
@@ -150,9 +150,9 @@ Saving closes the form and refreshes the current library scope.
 
 ## Add a word quickly
 
-Choose **Add Word** on iPhone or iPad Home, inside a deck, or in Create.
-On Mac, use **File → Add Word…** (**Command-Shift-N**) or **Add Word** in
-the scope toolbar. Opening inside a deck selects that destination; otherwise,
+Choose **Create → Add Word** on iPhone or iPad, or **Add Word** inside a deck.
+On Mac, use **File → Add Word…** (**Command-Shift-N**).
+Opening with a deck selected uses that destination; otherwise,
 the last dictionary–deck pair is restored.
 
 1. Choose a deck and an installed dictionary, then type or paste a word or phrase.
@@ -181,8 +181,8 @@ the capture sheet if needed, or use **Enter Manually** when no suitable entry is
 available. On Mac, arrow keys navigate matches, Return chooses a highlighted
 match, **Command-Return** adds a valid word, and Escape requests closing the sheet.
 
-The general New Item editor and full vocabulary deck builder remain available
-for other authoring tasks.
+Use **New Item** for general authoring or **Learn in Context** for sentence-based
+cards.
 
 ## Fill fields from a dictionary
 

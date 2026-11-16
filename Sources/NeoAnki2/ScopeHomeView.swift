@@ -15,11 +15,6 @@ struct ScopeHomeView: View {
     let onBrowse: () -> Void
     let onBrowseItemsNeedingAttention: () -> Void
     let onAddItem: () -> Void
-    var onAddFromVocabulary: (() -> Void)?
-    var onLearnInContext: (() -> Void)? = nil
-    let onDeleteAllUnassigned: () -> Void
-
-    @State private var showDeleteAllUnassignedConfirm = false
     @ScaledMetric(relativeTo: .body) private var chartDiameter: CGFloat = 144
 
     private var summary: ScopeSummary { itemsModel.scopeSummary }
@@ -58,12 +53,6 @@ struct ScopeHomeView: View {
         .background(DesignSystem.detailBackground)
         .navigationTitle(scope.label)
         .toolbar {
-            if let onLearnInContext {
-                ToolbarItem(placement: .automatic) {
-                    Button("Learn in Context", systemImage: "text.bubble") { onLearnInContext() }
-                        .accessibilityIdentifier("learn-in-context")
-                }
-            }
             ToolbarItem(placement: .automatic) {
                 // Shortcuts live on the menu commands, which is where macOS
                 // displays them; declaring them here too gives one key two owners.
@@ -80,39 +69,6 @@ struct ScopeHomeView: View {
                 }
                 .accessibilityIdentifier("addItemToolbar")
             }
-            if let onAddFromVocabulary {
-                ToolbarItem(placement: .automatic) {
-                    Button("Add Word", systemImage: "character.book.closed") {
-                        onAddFromVocabulary()
-                    }
-                    .help("Find an entry in an installed offline vocabulary pack")
-                    .accessibilityIdentifier("addFromVocabularyToolbar")
-                }
-            }
-            if case .unassigned = scope.filter, summary.itemCount > 0 {
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("Delete All", systemImage: "trash", role: .destructive) {
-                        showDeleteAllUnassignedConfirm = true
-                    }
-                    .accessibilityIdentifier("deleteAllUnassignedToolbar")
-                }
-            }
-        }
-        .confirmationDialog(
-            "Delete all unassigned items?",
-            isPresented: $showDeleteAllUnassignedConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete All", role: .destructive) {
-                onDeleteAllUnassigned()
-            }
-            .accessibilityIdentifier("confirmDeleteAllUnassigned")
-            Button("Cancel", role: .cancel) {}
-                .accessibilityIdentifier("cancelDeleteAllUnassigned")
-        } message: {
-            Text(
-                "This permanently deletes all \(summary.itemCount) unassigned items and their study cards."
-            )
         }
     }
 

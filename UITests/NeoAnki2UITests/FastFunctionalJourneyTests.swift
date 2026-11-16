@@ -34,7 +34,7 @@ final class FastFunctionalJourneyTests: NeoAnkiUITestCase {
         try runLegacyCheck("LibraryUITests.testAddItemValidationDisablesSave") { try checkLibraryUITestsAddItemValidationDisablesSave() }
         try runLegacyCheck("LibraryUITests.testOpenItemDetail") { try checkLibraryUITestsOpenItemDetail() }
         try runLegacyCheck("LibraryUITests.testBackFromItemDetailReturnsToLibrary") { try checkLibraryUITestsBackFromItemDetailReturnsToLibrary() }
-        try runLegacyCheck("LibraryUITests.testDeleteAllUnassignedFromToolbar") { try checkLibraryUITestsDeleteAllUnassignedFromToolbar() }
+        try runLegacyCheck("LibraryUITests.testDeleteAllUnassignedInSelectedScope") { try checkLibraryUITestsDeleteAllUnassignedInSelectedScope() }
         try runLegacyCheck("LibraryUITests.testDeleteAllUnassignedFromSidebarMenu") { try checkLibraryUITestsDeleteAllUnassignedFromSidebarMenu() }
         try runLegacyCheck("LibraryUITests.testEditItemFromDetailUpdatesLibraryAndPreview") { try checkLibraryUITestsEditItemFromDetailUpdatesLibraryAndPreview() }
         try runLegacyCheck("LibraryUITests.testDirtyItemEditCanKeepEditingThenDiscard") { try checkLibraryUITestsDirtyItemEditCanKeepEditingThenDiscard() }
