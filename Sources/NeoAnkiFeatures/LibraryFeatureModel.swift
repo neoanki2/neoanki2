@@ -44,7 +44,9 @@ public final class LibraryFeatureModel {
     public var section: AppSection = .home
     public var route: AppRoute = .scopeHome
     public var presentation: AppPresentation?
-    public var selectedScope: DeckScope = .allDecks
+    public var selectedScope: DeckScope = .allDecks {
+        didSet { if oldValue != selectedScope { browseScope = nil } }
+    }
     public var searchText = ""
     public var sortOrder: ItemSortOrder = .createdAscending
     public var concealsAnswers = true
@@ -57,7 +59,8 @@ public final class LibraryFeatureModel {
     public private(set) var libraryRevision: UInt64 = 0
     private let reads: NativeLibraryReadCoordinator
     private var readGeneration: UInt64 = 0
-    private var browseRequested = false
+    private var browseScope: DeckScope?
+    private var browseGeneration: UInt64 = 0
     private var commandRefreshInProgress = false
     @ObservationIgnored private var libraryChangesTask: Task<Void, Never>?
 
@@ -177,9 +180,11 @@ public final class LibraryFeatureModel {
     }
 
     public func loadBrowse(scope: DeckScope) async throws -> [SavedItemSummary] {
-        browseRequested = true
+        browseScope = scope
+        browseGeneration &+= 1
+        let generation = browseGeneration
         let snapshot = try await reads.load(scope: scope, demand: [.browse], asOf: .now)
-        if scope == selectedScope { items = snapshot.items ?? [] }
+        if generation == browseGeneration, browseScope == scope { items = snapshot.items ?? [] }
         return snapshot.items ?? []
     }
 
@@ -187,7 +192,8 @@ public final class LibraryFeatureModel {
         demand: Set<NativeLibraryReadDemand> = [.home, .browse, .catalog]) async throws {
         readGeneration &+= 1
         let generation = readGeneration
-        let scope = selectedScope
+        let selection = selectedScope
+        let scope = demand.contains(.browse) ? (browseScope ?? selectedScope) : selectedScope
         let sort = sortOrder
         isRefreshing = true
         defer { if generation == readGeneration { isRefreshing = false } }
@@ -197,7 +203,7 @@ public final class LibraryFeatureModel {
             await finishStudyUpdates()
             if revision != studyMutationRevision { snapshotTime = max(snapshotTime, .now); continue }
             let data = try await reads.load(scope: scope, sort: sort, demand: demand, asOf: snapshotTime)
-            guard generation == readGeneration, scope == selectedScope, sort == sortOrder else { return }
+            guard generation == readGeneration, selection == selectedScope, sort == sortOrder else { return }
             guard revision == studyMutationRevision else { snapshotTime = max(snapshotTime, .now); continue }
             if let snapshot = data.home {
                 allDecksSummary = snapshot.allDecksSummary
@@ -205,8 +211,8 @@ public final class LibraryFeatureModel {
                 decks = snapshot.deckSummaries
                 itemTypes = snapshot.itemTypes.itemTypes
             }
-            if let rows = data.items {
-                browseRequested = true
+            if let rows = data.items, browseScope == nil || browseScope == scope {
+                browseScope = scope
                 items = rows
                 selectedItemIDs.formIntersection(Set(rows.map(\.id)))
             }
@@ -221,11 +227,11 @@ public final class LibraryFeatureModel {
     }
 
     public func refresh(asOf now: Date = .now) async {
-        do { try await reload(asOf: now, demand: browseRequested ? [.home, .browse, .catalog] : [.home, .catalog]) }
+        do { try await reload(asOf: now, demand: browseScope != nil ? [.home, .browse, .catalog] : [.home, .catalog]) }
         catch { loadState = .failed(errorMapper.map(error)) }
     }
 
-    /// A shared authoring workflow committed through the repository. Publish counts and schedule sync.
+    /// Publish a committed authoring change; outbound sync observes its journal.
     public func authoringDidCommit() async {
         await refresh()
     }
@@ -549,7 +555,7 @@ public final class LibraryFeatureModel {
         commandRefreshInProgress = true
         defer { commandRefreshInProgress = false }
         libraryRevision &+= 1
-        do { try await reload(demand: browseRequested ? [.home, .browse, .catalog] : [.home, .catalog]) }
+        do { try await reload(demand: browseScope != nil ? [.home, .browse, .catalog] : [.home, .catalog]) }
         catch { recoveryMessage = "Saved. Refresh could not finish: \(error.localizedDescription)" }
     }
 

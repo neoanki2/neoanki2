@@ -53,6 +53,18 @@ private actor FailingNativeBadgePublisher: AppIconBadgePublishing {
         let rows = try await model.loadBrowse(scope: .allDecks)
         #expect(rows.count == 1)
         #expect(throws: (any Error).self) { try NativeLibraryCommands.selection([UUID()], rows: rows) }
+        let deck = try await repository.createDeck(Deck(name: "Scoped"))
+        try await model.createItem(itemType: type, deckID: deck.id, values: [
+            BuiltInItemTypes.frontFieldID: .text("Scoped question"), BuiltInItemTypes.backFieldID: .text("Answer"),
+        ])
+        _ = try await model.loadBrowse(scope: .deck(deck.id))
+        await model.refresh()
+        #expect(model.items.count == 1)
+        #expect(model.items.first?.deckID == deck.id)
+        model.selectedScope = .unassigned
+        try await model.reload()
+        #expect(model.items.count == 1)
+        #expect(model.items.first?.deckID == nil)
         let snapshot = try await NativeLibraryReadCoordinator(library: repository)
             .load(scope: .unassigned, demand: [.summary], asOf: Date(timeIntervalSince1970: 1_800_000_000))
         #expect(snapshot.items == nil)
