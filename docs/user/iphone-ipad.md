@@ -70,6 +70,11 @@ Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:
 Reveal, Type Answer, Choose, Arrange, Record, Audio Submission, and Cloze.
 
+The first card becomes readable while the rest of the queue is validated. You
+can reveal its answer during preparation; grading and skipping become available
+after validation finishes. A failed load shows **Could Not Start Session** with
+**Try Again**, rather than reporting an empty or completed session.
+
 Reveal or check the response, then grade it when the interaction uses FSRS. The
 default choices are Again, Hard, Good, and Easy. In **Settings → Study**, enable
 **Use Fail / Pass grades** to show only Fail and Pass; they schedule as Again
@@ -82,6 +87,10 @@ the remaining queued cards generated from it. For a generated poem line, Edit
 opens the whole poem so line order and its generated cards stay in sync.
 **End** leaves immediately;
 completion reports reviews and saved submissions separately.
+
+Undo updates the review total and the unique card/item counts together, while
+preserving earlier reviews of the same card. Starting a new session clears the
+previous session's counts, answer input, and undo action.
 
 After a grade is saved locally, the next card is ready while badges, reminders,
 and widgets refresh in the background. These updates also follow review undo

@@ -65,6 +65,10 @@ NeoAnki2 builds a study session from cards that are due now in the scope selecte
 
 ## Session states
 
+Mac, iPhone, and iPad use the same session behavior. Loading failures do not
+count as completed sessions or erase saved reviews. On iPhone and iPad, **Try
+Again** reloads a failed session; **End** returns to the library.
+
 A session moves through a small set of states:
 
 1. **Loading** fetches the due queue for the selected scope.
@@ -111,6 +115,8 @@ opened on an empty queue shows **Nothing Due Right Now**.
 Independent cards use learned-before-new ordering, with learning and repair
 positions preserved. Related review cards prefer **five intervening cards** when
 alternatives exist; a small deck can still finish every due review.
+Large queues use the same spacing rules without searching every remaining card
+when the next card is already unrelated to the recent cards.
 
 Ordinary siblings share an item. **Learn in Context** examples share their
 language and expression, including examples added in separate batches or decks.
@@ -144,6 +150,8 @@ into Learning, it returns after the rest of the current queue rather than
 interrupting the next card. **Skip** also moves the current card to the end, but
 does not save a review or remove the card from the remaining count. Editing an
 item refreshes its queued cards; deleting a card removes it from the session.
+Editing an unrevealed card also refreshes its choices or arrangement. Feedback
+for an answer already revealed stays visible while its content is updated.
 
 Changing an Item Type's Card setups can likewise retire cards that no longer
 generate. A newly opened session uses the reconciled card set, while surviving
