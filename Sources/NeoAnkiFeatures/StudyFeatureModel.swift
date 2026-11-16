@@ -55,7 +55,11 @@ public final class StudyFeatureModel: Identifiable {
     private let clock: @Sendable () -> Date
     public private(set) var queue: [DueCard] = [] { didSet { updateLearningTime() } }
     public private(set) var index = 0 { didSet { updateLearningTime() } }
-    public private(set) var isAnswerRevealed = false
+    public private(set) var isAnswerRevealed = false {
+        didSet { if isAnswerRevealed && !oldValue { learningTime.interaction(); answerActiveStart = learningTime.sessionMilliseconds } }
+    }
+    private var attemptActiveStart: Int64 = 0
+    private var answerActiveStart: Int64?
     public private(set) var isLoading = false { didSet { updateLearningTime() } }
     /// The first card is readable while the rest of the exact session queue is
     /// being validated. Persistence and queue mutations remain disabled until
@@ -106,7 +110,7 @@ public final class StudyFeatureModel: Identifiable {
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
-    private var sessionScope: DeckScope = .allDecks
+    public private(set) var sessionScope: DeckScope = .allDecks
     private var repairQueue: [PendingRepeat] = []
     public let learningTime: LearningTimeTracker
     private var reviewTiming = ReviewTimingTracker()
@@ -249,7 +253,7 @@ public final class StudyFeatureModel: Identifiable {
             isFinished = false
             isPreparingQueue = true
             prepareCurrentInteraction()
-            reviewTiming.reset()
+            resetAttemptTiming()
             isLoading = false
             timing.headPublicationSeconds = headPublicationStart.elapsedSeconds
             timing.firstReadySeconds = start.elapsedSeconds
@@ -419,7 +423,10 @@ public final class StudyFeatureModel: Identifiable {
         defer { isCompletingSubmission = false }
         error = nil
         do {
-            _ = try await library.completeAudioSubmission(draft, submittedAt: clock())
+            let context=StatisticsReviewContext(sessionID:learningTime.sessionID,deviceID:learningTime.deviceID,promptMilliseconds:max(0,learningTime.sessionMilliseconds-attemptActiveStart),answerMilliseconds:0)
+            _ = try await StatisticsCapture.$context.withValue(context) {
+                try await library.completeAudioSubmission(draft, submittedAt: clock())
+            }
             reviewedCardIDs.insert(card.id)
             reviewedItemIDs.insert(card.item.id)
             completedSubmissionCount += 1
@@ -435,6 +442,12 @@ public final class StudyFeatureModel: Identifiable {
         }
     }
 
+    private func resetAttemptTiming() {
+        reviewTiming.reset()
+        attemptActiveStart = learningTime.sessionMilliseconds
+        answerActiveStart = nil
+    }
+
     public func grade(_ rating: ReviewRating) async {
         learningTime.interaction()
         guard !isGrading, !isCompletingSubmission, !isLoading, !isPreparingQueue else { return }
@@ -448,12 +461,18 @@ public final class StudyFeatureModel: Identifiable {
         let now = clock()
 
         do {
-            let submission = try await library.submitReview(
+            let activeEnd = learningTime.sessionMilliseconds
+            let answerStart = answerActiveStart ?? activeEnd
+            let context = StatisticsReviewContext(sessionID: learningTime.sessionID, deviceID: learningTime.deviceID,
+                promptMilliseconds: max(0, answerStart - attemptActiveStart), answerMilliseconds: max(0, activeEnd - answerStart), checkedCorrect: answerEvaluation == .unavailable || answerEvaluation == nil ? nil : answerEvaluation == .correct)
+            let submission = try await StatisticsCapture.$context.withValue(context) {
+                try await library.submitReview(
                 cardID: card.id,
                 rating: rating,
                 asOf: now,
                 durationMilliseconds: reviewTiming.elapsedMilliseconds()
             )
+            }
             var repeatedCard = card
             repeatedCard.card.memory = submission.memory
             let shouldRequeue = submission.memory.phase == .learning
@@ -515,7 +534,7 @@ public final class StudyFeatureModel: Identifiable {
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
-            reviewTiming.reset()
+            resetAttemptTiming()
             isAnswerRevealed = true
             pendingGradeUndo = nil
             await onMutation?()
@@ -648,7 +667,7 @@ public final class StudyFeatureModel: Identifiable {
         }
         guard index >= queue.count else {
             isFinished = false
-            reviewTiming.reset()
+            resetAttemptTiming()
             prepareCurrentInteraction()
             return
         }
@@ -656,7 +675,7 @@ public final class StudyFeatureModel: Identifiable {
         if !repairQueue.isEmpty {
             materializePendingRepeats()
             isFinished = false
-            reviewTiming.reset()
+            resetAttemptTiming()
             prepareCurrentInteraction()
             return
         }
@@ -709,7 +728,7 @@ public final class StudyFeatureModel: Identifiable {
         queue = completeQueue
         isFinished = queue.isEmpty
         prepareCurrentInteraction()
-        if !queue.isEmpty { reviewTiming.reset() }
+        if !queue.isEmpty { resetAttemptTiming() }
         isLoading = false
         timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
         timing.firstReadySeconds = start.elapsedSeconds

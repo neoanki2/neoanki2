@@ -63,8 +63,8 @@ public final class LearningTimeTracker {
 
     private let library: (any LibraryLearningTime)?
     private let clock: LearningTimeClock
-    private let deviceID: UUID
-    private let sessionID = UUID()
+    public let deviceID: UUID
+    public let sessionID = UUID()
     private var libraryID: UUID?
     private var itemID: UUID?
     private var cardID: UUID?

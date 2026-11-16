@@ -60,7 +60,6 @@
         "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+LearningTime.swift",
         "Sources/NeoAnkiApplication/LearningTime.swift",
         "Sources/NeoAnkiCloudSync/LearningTimeSyncService.swift",
-        "Sources/NeoAnkiFeatures/LearningTimeFeatureModel.swift",
         "Sources/NeoAnkiSharedUI/LearningTimeActivity.swift",
         "Sources/NeoAnkiSharedUI/LearningTimeView.swift",
         "Sources/NeoAnki2/StudyWindowActivity.swift"
@@ -68,8 +67,7 @@
       "tests": [
         "NeoAnkiCore/Tests/NeoAnkiCoreTests/LearningTimeTests.swift",
         "Tests/NeoAnkiApplicationTests/LearningTimeTrackerTests.swift",
-        "Tests/NeoAnkiApplicationTests/LearningTimeSyncTests.swift",
-        "Tests/NeoAnkiFeaturesTests/LearningTimeFeatureTests.swift"
+        "Tests/NeoAnkiApplicationTests/LearningTimeSyncTests.swift"
       ]
     },
     {
@@ -461,6 +459,28 @@
       "article": "user/cli.md",
       "sources": ["NeoAnkiCore/Sources/NeoAnkiDeckCLI/main.swift"],
       "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"]
+    },
+    {
+      "id": "statistics",
+      "name": "Unified activity, memory, and workload statistics",
+      "article": "user/statistics.md",
+      "sources": [
+        "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/Statistics.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsPersistence.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsEngine.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsForecast.swift",
+        "Sources/NeoAnkiSharedUI/StatisticsView.swift",
+        "Sources/NeoAnkiSharedUI/StatisticsCharts.swift",
+        "Sources/NeoAnkiApplication/LibraryStatistics.swift",
+        "Sources/NeoAnkiFeatures/StatisticsFeatureModel.swift",
+        "Sources/NeoAnkiCloudSync/StatisticsSyncService.swift"
+      ],
+      "tests": [
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/StatisticsTests.swift",
+        "Tests/NeoAnkiApplicationTests/StatisticsSyncTests.swift",
+        "Tests/NeoAnkiFeaturesTests/StatisticsFeatureTests.swift",
+        "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"
+      ]
     }
   ]
 }

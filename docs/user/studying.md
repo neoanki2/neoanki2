@@ -10,8 +10,9 @@ parent: User Guide
 
 Active study is timed automatically, including skipped cards and unfinished
 attempts. The timer pauses after two minutes without interaction. Editing,
-saving, hidden windows, and background time are excluded. Completion shows session duration,
-and deck homes link to per-deck and subdeck reports. Save failures remain visible
+saving, hidden windows, and background time are excluded. **View Session Statistics**
+opens duration, review counts, cards/items, and response totals in the unified
+Statistics screen. Completion itself shows status and actions. Save failures remain visible
 after a session ends. See [Learning time](../learning-time/) for counting rules.
 
 Grades and review undo outcomes remain effective across iCloud sync even when
@@ -84,8 +85,8 @@ A session moves through a small set of states:
    grading it or changing its schedule.
 6. **Repair** repeats every failed card after the cards already waiting.
    Consecutive failures remain unresolved and repeat in the same session.
-7. **Session Complete** reports reviews and unique cards, then offers **Undo
-   Last Grade** or **Done**.
+7. **Session Complete** offers **View Session Statistics**, **Undo Last Grade**
+   when available, and **Done**. Statistical totals live in Statistics.
 
 After checking a typed answer, choice, or arrangement, **Your answer** stays
 visible with the labeled **Answer** section. For a single plain-text answer,
@@ -95,7 +96,7 @@ changed words are bold and underlined. Answer-only notes open under
 The saving indicator covers the local review and next-card preparation. Badges,
 reminders, widgets, and iCloud updates continue separately after the review is
 saved, so they do not hold the next card's controls. Leaving study refreshes the
-full Home summary and maturity progress.
+Home due counts; progress history is available in Statistics.
 
 After a session adds usable review evidence, an eligible profile continues
 tuning its scheduling model silently. This maintenance does not reorder the
@@ -357,6 +358,10 @@ The **Study** menu mirrors the main actions:
 Interaction-specific shortcuts are described above. Shortcuts are enabled only when their corresponding action is valid, which prevents grading before reveal or comparing a Record card before recording.
 
 ## Undo and ending a session
+
+Use **View Session Statistics** after completion to inspect active time, linked
+reviews, distinct cards/items, and saved responses. These reports use the same
+shared Activity view on Mac, iPhone, and iPad.
 
 After a grade is saved, a compact notice in the session header identifies the rating. Choose **Undo** or press Command-Z to revert that latest review and return to the same card with its answer revealed. You can dismiss the notice; completing another grade replaces the previous undo opportunity. **Undo Last Grade** also appears on the completion screen when the final grade can still be reverted.
 

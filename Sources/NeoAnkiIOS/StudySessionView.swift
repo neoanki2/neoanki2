@@ -66,14 +66,10 @@ struct StudySessionView: View {
                         VStack(alignment: .leading, spacing: 20) {
                             Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
                             Text("Session Complete").font(.title.weight(.semibold))
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Learning time: " + LearningTimeFormat.duration(session.learningTime.sessionMilliseconds))
-                                LearningTimeSaveStatusView()
-                                Text("\(session.completion.reviews) \(session.completion.reviews == 1 ? "review" : "reviews")")
-                                Text("\(session.completion.uniqueCards) \(session.completion.uniqueCards == 1 ? "card" : "cards") · \(session.completion.uniqueItems) \(session.completion.uniqueItems == 1 ? "item" : "items")")
-                                if session.completion.savedSubmissions > 0 {
-                                    Text("\(session.completion.savedSubmissions) saved \(session.completion.savedSubmissions == 1 ? "response" : "responses")")
-                                }
+                            LearningTimeSaveStatusView()
+                            Button("View Session Statistics", systemImage: "chart.bar.xaxis") {
+                                model.showStatistics(scope: session.sessionScope, sessionID: session.learningTime.sessionID)
+                                dismiss()
                             }
                         }.frame(maxWidth: 600, alignment: .leading).frame(maxWidth: .infinity).padding(24)
                     }

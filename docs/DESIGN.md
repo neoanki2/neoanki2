@@ -394,3 +394,13 @@ and Learn in Context use the File menu with the selected deck as their context.
 Delete All Unassigned belongs in the Unassigned sidebar menu, alongside library
 management, rather than next to the study actions. Keep its impact confirmation.
 These cuts remove duplicate entry points without changing stored items or schedules.
+
+## Unified Statistics
+
+Statistics is one shared Operate surface on Mac, iPhone, and iPad. Overview,
+Activity, Memory, and Workload share a model, definitions, Swift Charts, filters,
+selection, tables, and CSV exports. Width changes layout, never capabilities.
+Home and deck surfaces show operational due information and a Statistics link;
+learning-time and progress reports live only in Statistics. Completion screens
+link to session statistics rather than repeating totals. Use native typography,
+semantic colors, exact accessible values, and explicit coverage/estimate labels.

@@ -13,11 +13,12 @@ and the software keyboard dismisses. Explanations appear only when opened.
 Library recovery messages identify unavailable maturity or an incomplete device
 update without replacing usable item fields and study controls.
 
-Learning Time uses native period pickers, disclosure controls, and labeled deck
-durations. The study timer runs automatically and has no pause or resume button.
+Statistics uses shared native filters, Swift Charts selection, exact-value
+data tables, and CSV export on Mac, iPhone, and iPad. Its layout adapts to width
+and Dynamic Type. Learning-time durations are reported under Activity. The study timer runs automatically and has no pause or resume button.
 Save errors and retry actions remain available on completion and totals screens.
 These are implemented semantics, not a claim of live assistive-technology verification.
-See [Learning time](../learning-time/).
+See [Statistics](../statistics/) and [Learning time](../learning-time/).
 
 NeoAnki2 uses standard macOS menus, controls, focus behavior, and semantic
 system colors. Menu items are disabled when their action is unsafe—for example,

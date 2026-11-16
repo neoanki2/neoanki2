@@ -28,6 +28,14 @@ leave an unexpected top-level deck, and the entered text remains in the builder.
 If the message instead says the save status could not be confirmed, keep the
 form open and refresh or inspect the library before starting another creation.
 
+## Statistics show missing or older data
+
+Check the scope, period, session, and advanced filters. Statistics retains the
+last successful report when a refresh fails; choose **Retry** after resolving the
+reported issue. Coverage notes identify unavailable legacy classifications,
+ambiguous old reverts, and measurements that started with updated apps. An
+estimated probability or scenario is different from an observed review count.
+
 ## Learning time is missing or still saving
 
 Learning time starts with new study sessions and excludes browsing, editing,

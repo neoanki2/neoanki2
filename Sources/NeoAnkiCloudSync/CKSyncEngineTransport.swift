@@ -95,6 +95,8 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     public static let containerIdentifier = "iCloud.com.neoanki2.app"
     public static let zoneName = "NeoAnkiLibrary"
     public static let librarySubscriptionID = "neoanki-library-changes-v1"
+    public static let statisticsZoneName = "NeoAnkiStatisticsV1"
+    public static let statisticsSubscriptionID = "neoanki-statistics-changes-v1"
     public static let learningTimeZoneName = "NeoAnkiLearningTimeV1"
     public static let learningTimeSubscriptionID = "neoanki-learning-time-changes-v1"
 
@@ -109,7 +111,7 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     public static func isLibraryNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
         guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
               notification.notificationType == .recordZone,
-              [librarySubscriptionID, learningTimeSubscriptionID].contains(notification.subscriptionID ?? "") else { return false }
+              [librarySubscriptionID, learningTimeSubscriptionID, statisticsSubscriptionID].contains(notification.subscriptionID ?? "") else { return false }
         return notification.containerIdentifier == nil || notification.containerIdentifier == containerIdentifier
     }
     private static let containerIdentifiersEntitlement =
@@ -161,7 +163,7 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         self.metadataStore = metadataStore
         self.initialState = initialState
         zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
-        subscriptionID = zoneName == Self.learningTimeZoneName ? Self.learningTimeSubscriptionID : Self.librarySubscriptionID
+        subscriptionID = zoneName == Self.statisticsZoneName ? Self.statisticsSubscriptionID : zoneName == Self.learningTimeZoneName ? Self.learningTimeSubscriptionID : Self.librarySubscriptionID
     }
 
     public static func make(metadataStore: SyncMetadataStore, zoneName: String = zoneName) async throws -> CKSyncEngineTransport {

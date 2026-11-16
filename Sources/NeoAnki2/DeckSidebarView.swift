@@ -16,11 +16,13 @@ enum DeckDragPayload {
 private enum LibrarySidebarDestination: Hashable {
     case scope(SidebarSelection)
     case recordings
+    case statistics
 }
 
 struct DeckSidebarView: View {
     @Bindable var decksModel: DecksModel
     @Binding var selection: SidebarSelection
+    @Binding var isShowingStatistics: Bool
     @Binding var isShowingSavedResponses: Bool
     var onDeleteAllUnassigned: () -> Void = {}
     var onDeckSettingsSaved: () async -> Void = {}
@@ -57,6 +59,8 @@ struct DeckSidebarView: View {
                                 tag: .allDecks
                             )
 
+                            sidebarRow(title: "Statistics", subtitle: nil, systemImage: "chart.bar.xaxis", destination: .statistics)
+                                .accessibilityIdentifier("statisticsSidebar")
                             sidebarRow(
                                 title: "Recordings",
                                 subtitle: nil,
@@ -222,15 +226,20 @@ struct DeckSidebarView: View {
     private var sidebarSelection: Binding<LibrarySidebarDestination> {
         Binding(
             get: {
-                isShowingSavedResponses ? .recordings : .scope(selection)
+                isShowingStatistics ? .statistics : isShowingSavedResponses ? .recordings : .scope(selection)
             },
             set: { destination in
                 switch destination {
+                case .statistics:
+                    isShowingSavedResponses = false
+                    isShowingStatistics = true
                 case .recordings:
+                    isShowingStatistics = false
                     isShowingSavedResponses = true
                 case let .scope(scope):
                     // Close Recordings even if this is the scope that was
                     // already active before the user opened it.
+                    isShowingStatistics = false
                     isShowingSavedResponses = false
                     selection = scope
                 }

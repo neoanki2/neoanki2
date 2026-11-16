@@ -130,6 +130,7 @@ actor SQLiteDatabase {
 
     private nonisolated(unsafe) var handle: OpaquePointer?
     private let databaseURL: URL
+    var statisticsCache = StatisticsDatabaseCache()
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private var learningTimeObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
@@ -381,6 +382,7 @@ actor SQLiteDatabase {
                     bindings: [.int(Int64(Schema.version))]
                 )
                 _ = try getOrCreateLibraryID()
+                for sql in Schema.statisticsTriggerStatements { try execute(sql) }
             }
             changeTrackingReady = true
             studyRelationsReady = true
@@ -659,6 +661,13 @@ actor SQLiteDatabase {
 
             if current < 32 {
                 for sql in Schema.learningTimeStatements { try execute(sql) }
+            }
+
+            if current < 34 {
+                for sql in Schema.statisticsStatements { try execute(sql) }
+                if try tableExists("cards"), try columnExists("memory",in:"cards"), try columnExists("scheduling_history_origin",in:"cards"),try tableExists("api_transaction_context"),try tableExists("review_reverts") {
+                    for sql in Schema.statisticsTriggerStatements {try execute(sql)}
+                }
             }
 
             try execute(
@@ -2919,6 +2928,9 @@ actor SQLiteDatabase {
             bindings: bindings
         ).compactMap { $0["id"] as? String }
         for logID in activeLogIDs {
+            if let id=UUID(uuidString:logID),let log=try fetchReviewLog(id:id) {
+                try saveStatisticsEvents([StatisticsEvent(id:"preserve:"+logID,kind:"preservedDeletion",occurredAt:revertedAt,cardID:log.cardID,templateID:log.id,sourceLibraryID:try getOrCreateLibraryID())])
+            }
             try execute(
                 """
                 INSERT INTO review_reverts (id, review_log_id, reverted_at)
@@ -4085,6 +4097,7 @@ actor SQLiteDatabase {
                 .int(nextSequence),
             ]
         )
+        try recordStatisticsReview(sequencedLog, before: memoryBefore)
     }
 
     func insertSynchronizedReviewIfMissing(_ log: ReviewLog) throws {
@@ -5448,6 +5461,7 @@ actor SQLiteDatabase {
                     .double(revertedAt.timeIntervalSince1970),
                 ]
             )
+            try saveStatisticsEvents([StatisticsEvent(id: "undo:" + reviewLogID.uuidString, kind: "undo", occurredAt: revertedAt, cardID: cardID, templateID: reviewLogID, sourceLibraryID: try getOrCreateLibraryID())])
             try updateCardMemory(cardID, memory: memory)
         }
     }
@@ -5877,6 +5891,8 @@ actor SQLiteDatabase {
                     .double(submittedAt.timeIntervalSince1970),
                 ]
             )
+            let context=StatisticsCapture.context
+            try saveStatisticsEvents([StatisticsEvent(id:"submission:"+id.uuidString,kind:"submission",occurredAt:submittedAt,cardID:cardID,itemID:item.id,deckID:item.deckID,itemTypeID:item.itemTypeID,templateID:card.templateID,interaction:"audioSubmission",sourceLibraryID:try getOrCreateLibraryID(),sessionID:context?.sessionID,deviceID:context?.deviceID,promptMilliseconds:context?.promptMilliseconds,answerMilliseconds:Int64(durationMilliseconds))])
             try consumeMediaReservations(ids: [reservationID])
             try execute(
                 "UPDATE cards SET is_suspended = 1 WHERE id = ?;",
@@ -7972,7 +7988,7 @@ actor SQLiteDatabase {
         }
     }
 
-    private func inTransaction<Result>(recordNativeCommand: Bool = false, affectedCount: Int? = nil, nativeResult: Data? = nil, _ body: () throws -> Result) throws -> Result {
+    func inTransaction<Result>(recordNativeCommand: Bool = false, affectedCount: Int? = nil, nativeResult: Data? = nil, _ body: () throws -> Result) throws -> Result {
         // Nested database helpers belong to their caller's atomic transaction.
         if let handle, sqlite3_get_autocommit(handle) == 0 { return try body() }
         try execute("BEGIN IMMEDIATE TRANSACTION;")
