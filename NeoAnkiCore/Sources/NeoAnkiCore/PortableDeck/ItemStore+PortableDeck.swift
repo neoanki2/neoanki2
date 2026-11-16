@@ -411,6 +411,8 @@ extension ItemStore {
                 itemTypePolicies = []
             }
 
+            let result = PortableDeckImportResult(deckIDs: [importedRootDeckID], itemCount: package.items.count,
+                createdItemTypeCount: createdTypes.count, reusedItemTypeCount: reusedCount)
             try await database.importPortableDeck(
                 .init(
                     itemTypes: createdTypes,
@@ -433,15 +435,12 @@ extension ItemStore {
                         return .init(deckID: deckID, inherits: value.inherits, itemTypeIDs: value.itemTypeIDs.compactMap { typeMap[$0]?.id }, defaultItemTypeID: value.defaultItemTypeID.flatMap { typeMap[$0]?.id })
                     }
                 ),
-                now: now
+                now: now, result: result
             )
-            try await mediaStore?.releaseReservations(scopeID: reservationScope)
-            return .init(
-                deckIDs: [importedRootDeckID],
-                itemCount: package.items.count,
-                createdItemTypeCount: createdTypes.count,
-                reusedItemTypeCount: reusedCount
-            )
+            // The import has committed; cleanup cannot turn it into a failed
+            // operation and invite a duplicate import on retry.
+            try? await mediaStore?.releaseReservations(scopeID: reservationScope)
+            return result
         } catch {
             try? await mediaStore?.rollbackReservations(scopeID: reservationScope)
             throw error

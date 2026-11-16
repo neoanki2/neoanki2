@@ -132,7 +132,10 @@ struct ScopeHomeView: View {
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
                 learningTimeSection
-                cardStateSection
+                if itemsModel.maturityUnavailable {
+                    Text("Card maturity is unavailable. Your items and study controls are ready.")
+                        .foregroundStyle(.secondary)
+                } else { cardStateSection }
                 if summary.leechCount > 0 {
                     leechCallout
                 }

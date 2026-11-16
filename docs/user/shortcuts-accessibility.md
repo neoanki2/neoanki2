@@ -8,6 +8,11 @@ parent: User Guide
 
 # Shortcuts and accessibility
 
+After checking a typed answer, the submitted and expected answers stay visible
+and the software keyboard dismisses. Explanations appear only when opened.
+Library recovery messages identify unavailable maturity or an incomplete device
+update without replacing usable item fields and study controls.
+
 Learning Time uses native period pickers, disclosure controls, and labeled deck
 durations. The study timer runs automatically and has no pause or resume button.
 Save errors and retry actions remain available on completion and totals screens.

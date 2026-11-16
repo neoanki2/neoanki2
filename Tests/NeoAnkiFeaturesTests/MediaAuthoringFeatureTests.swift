@@ -33,7 +33,7 @@ import Testing
     #expect(try Data(contentsOf: storedURL).count <= MediaValidation.maxBytes(for: .image))
     #expect(ItemDraftValidation.canSave(.init(text: [name.id: "Oak"], media: [photo.id: media]), itemType: type))
     try await model.createItem(itemType: type, deckID: deck.id, values: [photo.id: .media(media), name.id: .text("Oak")])
-    let summary = try #require(model.items.first)
+    let summary = try #require(try await model.loadBrowse(scope: .allDecks).first)
     var item = try #require(try await model.item(id: summary.id)?.item)
     #expect(item.deckID == deck.id)
     #expect(item.value(for: photo.id) == .media(media))

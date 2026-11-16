@@ -46,8 +46,12 @@ documentation, and releases.
 - [macOS editing and interaction audit]({{ '/audits/macos-editing-2026-10-23/' | relative_url }})
 - [Migaku competitor research and replacement requirements]({{ '/audits/migaku-competitor-2026-11-11/' | relative_url }})
 - [Local Apple AI research and potential features]({{ '/audits/apple-local-ai-2026-11-13/' | relative_url }})
+- [Codebase simplification and performance review]({{ '/audits/codebase-review-2026-11-16/' | relative_url }})
 - [Persistent spoken-response proposal]({{ '/proposals/persistent-spoken-responses/' | relative_url }})
 - [Legacy documentation-maintenance guide]({{ '/user/maintaining-documentation/' | relative_url }})
 
 The repository-level `CONTRIBUTING.md`, `README.md`, and `AGENTS.md` are short
 entry points. This guide is the maintained source of contributor instructions.
+
+- [Native command/read coordination and maturity ADR]({{ '/adr/0002-native-library-commands-and-maturity/' | relative_url }})
+- [Native library implementation evidence]({{ '/audits/native-library-implementation-2026-11-16/' | relative_url }})

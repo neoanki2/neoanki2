@@ -1,8 +1,25 @@
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiSharedUI
 import Testing
 @testable import NeoAnkiMobile
+
+@Test func answerReviewFixtureHasOneCheckableAnswerAndSeparateNotes() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let library = try SQLiteLibraryRepository(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    try await library.bootstrap()
+    try await MobileRedesignUITestSeeder.seedAnswerReview(library: library)
+    let cards = try await library.dueCards(scope: .allDecks, asOf: .now)
+    #expect(cards.count == 1)
+    let card = try #require(cards.first)
+    #expect(StudyResponseEvaluator.acceptedAnswers(for: card) == ["They canceled the meeting."])
+    let review = StudyAnswerReviewProjection(components: SideContent.resolvedComponents(for: card.template, from: card.item))
+    #expect(review.explanation.count == 2)
+    #expect(review.prompt.count == 3)
+}
 
 @Test func mobileRedesignFixturesSeedEveryInteractionAndAllLaterJourneys() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

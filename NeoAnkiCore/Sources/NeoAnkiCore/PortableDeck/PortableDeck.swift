@@ -59,7 +59,7 @@ public enum PortableDeckError: Error, Sendable, Equatable, LocalizedError {
     }
 }
 
-public struct PortableDeckImportResult: Sendable, Equatable {
+public struct PortableDeckImportResult: Codable, Sendable, Equatable {
     public let deckIDs: [UUID]
     public let itemCount: Int
     public let createdItemTypeCount: Int

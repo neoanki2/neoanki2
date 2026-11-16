@@ -133,6 +133,8 @@ actor SQLiteDatabase {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private var learningTimeObservers: [UUID: AsyncStream<Void>.Continuation] = [:]
+    var maturityProjection = MaturityProjection()
+    var maturityStatistics = MaturityReadStatistics()
     private var localRevision: UInt64 = 0
     private var changeTrackingReady = false
     private var changeObservers: [UUID: AsyncStream<Int64>.Continuation] = [:]
@@ -1662,7 +1664,7 @@ actor SQLiteDatabase {
         updated: ItemType,
         now: Date
     ) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true) {
             try updateItemType(updated)
             if let previous {
                 try syncCards(from: previous, to: updated, now: now)
@@ -1710,7 +1712,7 @@ actor SQLiteDatabase {
         authorization: ItemTypeUpdateAuthorization,
         now: Date
     ) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true) {
             guard let current = try fetchItemType(id: updated.id) else {
                 throw DatabaseError.itemTypeNotFound(updated.id)
             }
@@ -1864,20 +1866,22 @@ actor SQLiteDatabase {
     }
 
     func insertDeck(_ deck: Deck) throws {
-        let sortPosition = try nextDeckSortPosition(parentID: deck.parentID)
-        try execute(
-            """
-            INSERT INTO decks (id, name, parent_id, new_cards_per_day, sort_position)
-            VALUES (?, ?, ?, ?, ?);
-            """,
-            bindings: [
-                .text(deck.id.uuidString),
-                .text(deck.name),
-                deck.parentID.map { .text($0.uuidString) } ?? .null,
-                deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
-                .int(sortPosition),
-            ]
-        )
+        try inTransaction(recordNativeCommand: true) {
+            let sortPosition = try nextDeckSortPosition(parentID: deck.parentID)
+            try execute(
+                """
+                INSERT INTO decks (id, name, parent_id, new_cards_per_day, sort_position)
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                bindings: [
+                    .text(deck.id.uuidString),
+                    .text(deck.name),
+                    deck.parentID.map { .text($0.uuidString) } ?? .null,
+                    deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
+                    .int(sortPosition),
+                ]
+            )
+        }
     }
 
     private func nextDeckSortPosition(parentID: UUID?) throws -> Int64 {
@@ -1949,7 +1953,7 @@ actor SQLiteDatabase {
     }
 
     func moveDeck(id: UUID, to destination: DeckMoveDestination) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true) {
             guard let movingDeck = try fetchDeck(id: id) else {
                 throw DatabaseError.deckNotFound(id)
             }
@@ -2041,26 +2045,28 @@ actor SQLiteDatabase {
     }
 
     func updateDeck(_ deck: Deck) throws {
-        let existingParentID = try fetchDeck(id: deck.id)?.parentID
-        let parentChanged = existingParentID != deck.parentID
-        let sortPosition = parentChanged
-            ? try nextDeckSortPosition(parentID: deck.parentID)
-            : nil
-        try execute(
-            """
-            UPDATE decks
-            SET name = ?, parent_id = ?, new_cards_per_day = ?,
-                sort_position = COALESCE(?, sort_position)
-            WHERE id = ?;
-            """,
-            bindings: [
-                .text(deck.name),
-                deck.parentID.map { .text($0.uuidString) } ?? .null,
-                deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
-                sortPosition.map(Binding.int) ?? .null,
-                .text(deck.id.uuidString),
-            ]
-        )
+        try inTransaction(recordNativeCommand: true) {
+            let existingParentID = try fetchDeck(id: deck.id)?.parentID
+            let parentChanged = existingParentID != deck.parentID
+            let sortPosition = parentChanged
+                ? try nextDeckSortPosition(parentID: deck.parentID)
+                : nil
+            try execute(
+                """
+                UPDATE decks
+                SET name = ?, parent_id = ?, new_cards_per_day = ?,
+                    sort_position = COALESCE(?, sort_position)
+                WHERE id = ?;
+                """,
+                bindings: [
+                    .text(deck.name),
+                    deck.parentID.map { .text($0.uuidString) } ?? .null,
+                    deck.newCardsPerDay.map { .int(Int64($0)) } ?? .null,
+                    sortPosition.map(Binding.int) ?? .null,
+                    .text(deck.id.uuidString),
+                ]
+            )
+        }
     }
 
     func deleteDeck(id: UUID) throws {
@@ -2321,7 +2327,7 @@ actor SQLiteDatabase {
         updatedAt: Date,
         mediaDescriptors: [String: MediaAssetDescriptor] = [:]
     ) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true, affectedCount: 1) {
             try insertItemWithCardsWithoutTransaction(
                 item,
                 cards: cards,
@@ -2358,9 +2364,21 @@ actor SQLiteDatabase {
     func insertItemsWithCards(
         _ entries: [(item: Item, cards: [Card])],
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        destinationDeckID: UUID? = nil,
+        expectedItemType: ItemType? = nil
     ) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true, affectedCount: entries.count) {
+            if let destinationDeckID {
+                guard try fetchDeck(id: destinationDeckID) != nil else {
+                    throw DatabaseError.deckNotFound(destinationDeckID)
+                }
+            }
+            if let expectedItemType {
+                guard try fetchValidatedItemType(id: expectedItemType.id) == expectedItemType else {
+                    throw DatabaseError.invalidItemType("The item type changed during import. Review the source and try again.")
+                }
+            }
             for entry in entries {
                 try applyMediaReferenceDeltas(
                     from: [:],
@@ -2376,6 +2394,9 @@ actor SQLiteDatabase {
                 try upsertBrowseProjection(entry.item, itemType: itemType, createdAt: createdAt)
                 try consumeMediaReservations(ids: mediaReservationIDs(in: entry.item))
             }
+            if let destinationDeckID, let expectedItemType {
+                try attachTypeInTransaction(expectedItemType.id, to: destinationDeckID)
+            }
         }
     }
 
@@ -2385,9 +2406,11 @@ actor SQLiteDatabase {
     func importPortableDeck(
         _ plan: PortableDeckImportPlan,
         now: Date,
-        initialDueDates: [UUID: Date] = [:]
+        initialDueDates: [UUID: Date] = [:],
+        result: PortableDeckImportResult? = nil
     ) throws {
-        try inTransaction {
+        let orderedDecks = try DeckImportOrdering.parentFirst(plan.decks)
+        try inTransaction(recordNativeCommand: true, affectedCount: plan.items.count, nativeResult: try result.map { try JSONEncoder().encode($0) }) {
             for itemType in plan.itemTypes {
                 try insertItemType(itemType)
             }
@@ -2402,7 +2425,7 @@ actor SQLiteDatabase {
                     localTypeID: mapping.localTypeID
                 )
             }
-            for deck in plan.decks {
+            for deck in orderedDecks {
                 try insertDeck(deck)
             }
             for owner in plan.includedItemTypes {
@@ -2581,7 +2604,7 @@ actor SQLiteDatabase {
         updatedAt: Date,
         mediaDescriptors: [String: MediaAssetDescriptor]
     ) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true, affectedCount: 1) {
             try updateItemWithMediaWithoutTransaction(
                 item,
                 desiredCards: desiredCards,
@@ -2751,7 +2774,7 @@ actor SQLiteDatabase {
         if dryRun {
             try inReadTransaction(apply)
         } else {
-            try inTransaction(apply)
+            try inTransaction(recordNativeCommand: true, affectedCount: mutations.count, apply)
         }
     }
 
@@ -2843,7 +2866,7 @@ actor SQLiteDatabase {
     }
 
     func deleteItemWithMedia(id: UUID, deletedAt: Date) throws -> Bool {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true, affectedCount: 1) {
             try deleteItemWithMediaWithoutTransaction(id: id, deletedAt: deletedAt)
         }
     }
@@ -3045,13 +3068,6 @@ actor SQLiteDatabase {
             """
         )
         return try rows.map { try decodeCard(from: $0) }
-    }
-
-    /// One consistent read of the inputs used by the derived maturity projection.
-    func fetchMaturityInputs() throws -> (cards: [Card], reviews: [ReviewLog]) {
-        try inReadTransaction {
-            (try fetchAllCards(), try fetchActiveReviewLogs())
-        }
     }
 
     func supportsVersionedCardReplay() throws -> Bool {
@@ -6829,7 +6845,7 @@ actor SQLiteDatabase {
         }
     }
 
-    private func decodeCard(from row: [String: Any?]) throws -> Card {
+    func decodeCard(from row: [String: Any?]) throws -> Card {
         guard
             let idText = row["id"] as? String,
             let id = UUID(uuidString: idText),
@@ -7074,8 +7090,32 @@ actor SQLiteDatabase {
         }
     }
 
+    func moveItems(_ selection: [ItemMoveSelection], to deckID: UUID?) throws -> Int {
+        guard Set(selection.map(\.itemID)).count == selection.count else {
+            throw DatabaseError.invalidItem("An item may be selected only once.")
+        }
+        return try inTransaction(recordNativeCommand: true, affectedCount: selection.count) {
+            if let deckID, try fetchDeck(id: deckID) == nil {
+                throw DatabaseError.deckNotFound(deckID)
+            }
+            for selected in selection {
+                guard let current = try fetchItem(id: selected.itemID) else {
+                    throw DatabaseError.itemNotFound(selected.itemID)
+                }
+                guard current.item.deckID == selected.expectedDeckID else {
+                    throw DatabaseError.invalidItem("A selected item moved elsewhere. Refresh the selection and try again.")
+                }
+            }
+            for selected in selection {
+                try updateItemDeck(itemID: selected.itemID, deckID: deckID)
+                try updateCardsDeck(itemID: selected.itemID, deckID: deckID)
+            }
+            return selection.count
+        }
+    }
+
     func deleteAllUnassignedItems(deletedAt: Date) throws -> Int {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true) {
             let items = try fetchUnassignedItems()
             var deleted = 0
             for entry in items {
@@ -7088,7 +7128,7 @@ actor SQLiteDatabase {
     }
 
     func deleteDeckRecursively(descendantIDs: Set<UUID>) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true) {
             for deckID in descendantIDs {
                 let items = try fetchItems(deckID: deckID)
                 for entry in items {
@@ -7109,7 +7149,7 @@ actor SQLiteDatabase {
         policy: DeckDeletionPolicy,
         deletedAt: Date
     ) throws {
-        try inTransaction {
+        try inTransaction(recordNativeCommand: true) {
             guard try fetchDeck(id: rootID) != nil else {
                 throw DatabaseError.deckNotFound(rootID)
             }
@@ -7169,7 +7209,7 @@ actor SQLiteDatabase {
             WHERE cards.deck_id IN (\(placeholders))
             """
 
-        return try inTransaction {
+        return try inTransaction(recordNativeCommand: true) {
             let rows = try query(
                 """
                 SELECT cards.id
@@ -7792,9 +7832,15 @@ actor SQLiteDatabase {
         }
     }
 
-    private func inTransaction<Result>(_ body: () throws -> Result) throws -> Result {
+    private func inTransaction<Result>(recordNativeCommand: Bool = false, affectedCount: Int? = nil, nativeResult: Data? = nil, _ body: () throws -> Result) throws -> Result {
+        // Nested database helpers belong to their caller's atomic transaction.
+        if let handle, sqlite3_get_autocommit(handle) == 0 { return try body() }
         try execute("BEGIN IMMEDIATE TRANSACTION;")
         do {
+            let native = recordNativeCommand ? NativeCommandContext.current : nil
+            if let native, let receipt = try nativeCommandReceipt(native) {
+                throw NativeCommandAlreadyCommitted(receipt: receipt)
+            }
             if changeTrackingReady {
                 try execute(
                     """
@@ -7809,6 +7855,7 @@ actor SQLiteDatabase {
                 )
             }
             let result = try body()
+            if let native { try self.recordNativeCommand(native, count: affectedCount ?? (result as? Int), resultData: nativeResult) }
             if changeTrackingReady {
                 try execute("DELETE FROM api_transaction_context WHERE singleton = 1;")
             }
@@ -7823,7 +7870,7 @@ actor SQLiteDatabase {
     /// Keeps multi-statement query planning and consumption on one SQLite
     /// snapshot without making read-only transaction control look like a data
     /// revision to cache clients.
-    private func inReadTransaction<Result>(_ body: () throws -> Result) throws -> Result {
+    func inReadTransaction<Result>(_ body: () throws -> Result) throws -> Result {
         try refreshStudyRelationsIfNeeded()
         try executeTransactionControl("BEGIN DEFERRED TRANSACTION;")
         do {
@@ -7845,7 +7892,7 @@ actor SQLiteDatabase {
         }
     }
 
-    private func execute(_ sql: String, bindings: [Binding] = []) throws {
+    func execute(_ sql: String, bindings: [Binding] = []) throws {
         guard let handle else {
             throw DatabaseError.executeFailed("Database is closed.")
         }
@@ -7898,34 +7945,27 @@ actor SQLiteDatabase {
         publishCommittedChanges()
     }
 
-    private func query(_ sql: String, bindings: [Binding] = []) throws -> [[String: Any?]] {
-        guard let handle else {
-            throw DatabaseError.queryFailed("Database is closed.")
-        }
-
-        var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK,
-              let statement
-        else {
-            throw DatabaseError.queryFailed(errorMessage(from: handle))
-        }
-        defer { sqlite3_finalize(statement) }
-
-        try bind(bindings, to: statement)
-
+    func query(_ sql: String, bindings: [Binding] = []) throws -> [[String: Any?]] {
         var rows: [[String: Any?]] = []
-        while true {
-            let code = sqlite3_step(statement)
-            if code == SQLITE_DONE { break }
-            guard code == SQLITE_ROW else {
-                throw DatabaseError.queryFailed(errorMessage(from: handle))
-            }
-            rows.append(readRow(from: statement))
-        }
+        try forEachRow(sql, bindings: bindings) { rows.append($0) }
         return rows
     }
 
-    private enum Binding {
+    /// Bounds temporary decoding allocations to one row for streaming consumers.
+    func forEachRow(_ sql: String, bindings: [Binding] = [], _ body: ([String: Any?]) throws -> Void) throws {
+        guard let handle else { throw DatabaseError.queryFailed("Database is closed.") }
+        let statement = try prepareStatement(sql)
+        defer { sqlite3_finalize(statement) }
+        try bind(bindings, to: statement)
+        while true {
+            let code = sqlite3_step(statement)
+            if code == SQLITE_DONE { break }
+            guard code == SQLITE_ROW else { throw DatabaseError.queryFailed(errorMessage(from: handle)) }
+            try autoreleasepool { try body(readRow(from: statement)) }
+        }
+    }
+
+    enum Binding {
         case text(String)
         case blob(Data)
         case double(Double)
@@ -8009,7 +8049,7 @@ actor SQLiteDatabase {
     /// affinity, so SQLite keeps whatever storage class a writer bound. A row
     /// repaired by an external tool that bound the same JSON as text is still
     /// readable, and reading it beats failing every query that selects the row.
-    private func payload(_ row: [String: Any?], _ column: String) -> Data? {
+    func payload(_ row: [String: Any?], _ column: String) -> Data? {
         switch row[column] ?? nil {
         case let data as Data:
             return data

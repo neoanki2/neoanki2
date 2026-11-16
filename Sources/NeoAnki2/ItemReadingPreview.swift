@@ -76,6 +76,7 @@ struct ItemDetailView: View {
     @State private var item: Item?
     @State private var itemType: ItemType?
     @State private var cardMaturityDetails: [CardMaturityDetail] = []
+    @State private var maturityIssue: String?
     @State private var selectedDeckID: UUID?
     @State private var isLoading = true
     @State private var isDeleting = false
@@ -128,6 +129,7 @@ struct ItemDetailView: View {
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity)
 
+                        if let maturityIssue { Text(maturityIssue).foregroundStyle(.secondary) }
                         if !cardMaturityDetails.isEmpty {
                             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                                 Text("Card maturity")
@@ -276,7 +278,10 @@ struct ItemDetailView: View {
             if let loaded = try await model.library.item(id: summary.id) {
                 item = loaded.item
                 itemType = loaded.itemType
-                cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: summary.id)
+                do {
+                    cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: summary.id)
+                    maturityIssue = nil
+                } catch { maturityIssue = "Maturity is unavailable. " + error.localizedDescription }
                 selectedDeckID = loaded.item.deckID
             } else {
                 cardMaturityDetails = []

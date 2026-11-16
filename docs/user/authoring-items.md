@@ -8,6 +8,12 @@ parent: User Guide
 
 # Authoring items
 
+After a successful save, a refresh or device-update warning does not mean the
+item must be saved again. Refresh the library first. Selection moves preserve
+content edits made after selection, and reject the entire move if any selected
+item changed its deck assignment. Item detail can show a maturity warning while
+keeping its fields available.
+
 Deleting an item also preserves its recorded learning time under **Deleted
 Content** in All Decks. Moving an item transfers its previous time to the current
 deck, and regenerating its cards preserves that history. Time spent authoring or

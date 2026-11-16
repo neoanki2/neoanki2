@@ -1,6 +1,7 @@
 import Foundation
 import NeoAnkiCore
 import Testing
+import SQLite3
 
 @testable import NeoAnki2
 
@@ -334,7 +335,7 @@ private func addItem(
     #expect(model.scopeSummary.itemCount == 2)
 }
 
-@Test @MainActor func browseBulkMoveReportsPartialSuccess() async throws {
+@Test @MainActor func browseBulkMoveRejectsASelectionContainingMissingItems() async throws {
     let (model, _, _) = try await makeModels()
     await model.load()
     _ = await addItem(model, front: "France", back: "Paris")
@@ -342,8 +343,9 @@ private func addItem(
 
     let moved = await model.moveItems(ids: [existing, UUID()], to: nil)
 
-    #expect(moved == 1)
-    #expect(model.errorMessage == nil)
+    #expect(moved == 0)
+    #expect(model.errorMessage != nil)
+    #expect(model.items.map(\.id) == [existing])
 }
 
 @Test @MainActor func browseBulkDeleteRemovesSelectionAndRefreshesSummary() async throws {
@@ -548,4 +550,34 @@ private func addItem(
     #expect(scheduled.lapseSortKey == 9)
     #expect(unscheduled.lapseSortKey == 0)
     #expect(scheduled.schedule?.isLeech == true)
+}
+
+@Test @MainActor func saveKeepsMaturityUnavailableWhenExistingReviewEvidenceIsDamaged() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("save-maturity-warning-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("library.sqlite")
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    _ = try await store.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Original")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+    ]))
+    let cardID = try #require(try await store.cards().first?.id)
+    _ = try await store.submitReview(cardID: cardID, rating: .good)
+    var db: OpaquePointer?
+    #expect(sqlite3_open(url.path, &db) == SQLITE_OK)
+    defer { sqlite3_close(db) }
+    #expect(sqlite3_exec(db, "UPDATE review_logs SET log = '{}';", nil, nil, nil) == SQLITE_OK)
+    let model = ItemsModel(store: store, mediaStore: await store.media)
+    // Configure authoring without loading a browser: only the command's own
+    // post-commit summary can publish this recovery state.
+    await model.configureAddItem(for: nil)
+    model.addItemTypeID = BuiltInItemTypes.basicID
+    #expect(await model.addItem(fieldSpans: [
+        BuiltInItemTypes.frontFieldID: [Span("New question")],
+        BuiltInItemTypes.backFieldID: [Span("Answer")],
+    ]))
+    #expect(model.scopeSummary.cardCount == 2)
+    #expect(model.maturityUnavailable)
+    #expect(model.errorMessage != nil)
 }

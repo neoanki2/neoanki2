@@ -82,6 +82,11 @@ A session moves through a small set of states:
 7. **Session Complete** reports reviews and unique cards, then offers **Undo
    Last Grade** or **Done**.
 
+After checking a typed answer, choice, or arrangement, **Your answer** stays
+visible with the labeled **Answer** section. For a single plain-text answer,
+changed words are bold and underlined. Answer-only notes open under
+**Explanation**. You still choose your own grade.
+
 The saving indicator covers the local review and next-card preparation. Badges,
 reminders, widgets, and iCloud updates continue separately after the review is
 saved, so they do not hold the next card's controls. Leaving study refreshes the

@@ -8,6 +8,11 @@ parent: User Guide
 
 # Item Types and Card Setups
 
+A JSON or CSV import into a deck attaches its existing item type in the same
+save as the imported items and cards. If the type changes during import or the
+destination disappears, the import fails without a partial batch. Item Type
+Studio retains its preview, authorization, and history-preservation safeguards.
+
 Learning-time history belongs to the studied item, rather than a generated card
 or Card setup definition. Regenerating cards for a surviving item preserves its
 time. Editing item types or Card setups is excluded from active study timing.

@@ -270,32 +270,28 @@ final class ImportModel {
 
         do {
             let data = try await fileInspector.readPayload(at: selectedURL)
-            let imported: [SavedItemSummary]
+            let nativeFormat: NativeImportFormat
+            let itemTypeID: UUID?
             switch format {
-            case .json:
-                imported = try await library.importJSONItems(
-                    from: data,
-                    itemTypeID: nil,
-                    context: ImportContext(baseDirectory: mediaDirectory ?? selectedURL.deletingLastPathComponent()),
-                    asOf: .now
-                )
+            case .json: nativeFormat = .json; itemTypeID = nil
             case .csv:
-                guard let itemType = itemsModel.itemTypes.first(where: { $0.id == selectedItemTypeID }) else {
+                guard let type = itemsModel.itemTypes.first(where: { $0.id == selectedItemTypeID }) else {
                     errorMessage = "Choose an item type for this CSV file."
                     return false
                 }
-                imported = try await library.importCSVItems(
-                    from: data,
-                    itemTypeID: itemType.id,
-                    itemTypeName: itemType.name,
-                    context: ImportContext(baseDirectory: selectedURL.deletingLastPathComponent()),
-                    asOf: .now
-                )
+                nativeFormat = .csv(itemTypeName: type.name); itemTypeID = type.id
             }
-
-            if let destinationDeckID {
-                for id in Set(imported.map(\.itemTypeID)) { try await itemsModel.library.attachItemType(id: id, to: destinationDeckID) }
-                for item in imported { _ = try await itemsModel.library.moveItem(id: item.id, to: destinationDeckID) }
+            let outcome = try await NativeLibraryCommands.perform(on: library,
+                context: NativeCommandContext(operation: "import-\(format.rawValue)", input: data)) {
+                    try await NativeLibraryCommands.importItems(on: library, data: data, format: nativeFormat,
+                        itemTypeID: itemTypeID, deckID: destinationDeckID,
+                        context: ImportContext(baseDirectory: mediaDirectory ?? selectedURL.deletingLastPathComponent()), asOf: .now)
+                }
+            guard let imported = outcome.value else {
+                importedCount = outcome.affectedCount
+                await itemsModel.load(scope: scope)
+                errorMessage = outcome.warnings.first
+                return true
             }
             importedCount = imported.count
             await itemsModel.applyImportedItems(imported, scope: scope)

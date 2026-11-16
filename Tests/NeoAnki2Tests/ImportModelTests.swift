@@ -321,3 +321,18 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(model.selectedURL == nil)
     #expect(model.errorMessage?.contains("larger than 5 MB") == true)
 }
+
+@Test @MainActor func importModelPlacesRowsAndRefreshesTheDestinationBrowser() async throws {
+    let (model, itemsModel, directory) = try await makeImportModel()
+    let deck = try await itemsModel.store.createDeck(Deck(name: "Destination"))
+    let scope = StudyScope.deck(deck.id, name: deck.name)
+    await itemsModel.load(scope: scope)
+    model.destinationDeckID = deck.id
+    let file = directory.appendingPathComponent("destination.json")
+    try Data(#"{"itemType":"Basic","rows":[{"Front":"Placed","Back":"Answer"}]}"#.utf8).write(to: file)
+    #expect(await model.selectFile(file))
+    #expect(await model.importSelected(scope: scope))
+    #expect(itemsModel.items.map(\.deckID) == [deck.id])
+    #expect(itemsModel.items.map(\.title) == ["Placed"])
+    #expect(itemsModel.scopeSummary.itemCount == 1)
+}

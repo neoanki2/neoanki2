@@ -8,6 +8,12 @@ parent: User Guide
 
 # Library and decks
 
+Moving a selection validates every selected item and its original deck
+assignment before changing any assignments. If an item disappeared or moved
+elsewhere, refresh and select again; the whole move is rejected. Renaming a deck
+preserves progress. If review evidence is damaged, maturity is labeled
+unavailable while items and study remain accessible.
+
 Each deck home shows learning time for Today and All time. In the detailed
 report, a parent's total includes descendants; expand it to distinguish **This
 deck only** from subdeck totals. Time follows each item's current assignment,

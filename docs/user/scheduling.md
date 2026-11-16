@@ -8,6 +8,11 @@ parent: User Guide
 
 # Scheduling
 
+Deck due counts and daily new-card limits remain separate from maturity. A
+maturity-unavailable warning does not reset schedules or prevent study. Renaming
+a deck does not recalculate review evidence; grading, undo, suspension, and
+progress reset update the affected maturity values.
+
 Learning-time totals measure active study independently of FSRS review-duration
 samples, maturity, daily new-card limits, and due dates. A skipped or unfinished
 attempt keeps its learning time; undoing a grade or resetting scheduling does

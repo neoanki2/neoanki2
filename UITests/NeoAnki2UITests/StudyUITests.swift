@@ -460,10 +460,9 @@ extension FastFunctionalJourneyTests {
         enterText("London", into: app.textFields.identified("typedAnswer"), app: app)
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyAnswer"].waitUntilExists(timeout: 3))
-        let feedback = app.staticTexts.matching(
-            NSPredicate(format: "value CONTAINS[c] %@", "Compare your response")
-        ).firstMatch
-        XCTAssertTrue(feedback.waitUntilExists(timeout: 3))
+        XCTAssertTrue(app.staticTexts["London"].waitUntilExists(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Paris"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].exists)
     }
 
     func checkStudyUITestsChoiceRequiresSelectionThenChecksCorrectChoice() throws {
