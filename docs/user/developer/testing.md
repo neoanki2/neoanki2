@@ -57,7 +57,7 @@ optimized queue benchmark, run from `NeoAnkiCore`:
 ```bash
 NEOANKI_RUN_PERFORMANCE_TESTS=1 NEOANKI_PERF_SCALE=large \
 NEOANKI_PERF_ALLOW_SLOW=1 NEOANKI_PERF_JSON=/tmp/neoanki-queue.ndjson \
-swift test -c release --no-parallel --filter perfIndependentQueueOrdering
+swift test -c release -Xswiftc -enable-testing --no-parallel --filter perfIndependentQueueOrdering
 ```
 
 The benchmark excludes fixture construction, measures the first 100 positions,
