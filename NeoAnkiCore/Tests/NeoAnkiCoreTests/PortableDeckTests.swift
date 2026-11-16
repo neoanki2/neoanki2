@@ -22,6 +22,36 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     return store
 }
 
+@Test func portableNestedDeckImportDoesNotDependOnParentUUIDOrder() async throws {
+    let directory = try portableTestDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let source = try await portableStore(in: directory, name: "source")
+    let root = try await source.createDeck(Deck(
+        id: UUID(uuidString: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")!, name: "Root"
+    ))
+    let child = try await source.createDeck(Deck(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        name: "Child", parentID: root.id
+    ))
+    let grandchild = try await source.createDeck(Deck(name: "Grandchild", parentID: child.id))
+    _ = try await source.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Nested question")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Nested answer")),
+    ], deckID: grandchild.id))
+    let package = directory.appendingPathComponent("nested.neodeck")
+    try await PortableDeck.export(deckID: root.id, from: source, to: package)
+    let target = try await portableStore(in: directory, name: "target")
+    let result = try await PortableDeck.importDeck(from: package, into: target)
+    #expect(result.itemCount == 1)
+    let decks = try await target.listDecks()
+    let importedRoot = try #require(decks.first { $0.name == "Root" })
+    let importedChild = try #require(decks.first { $0.name == "Child" })
+    let importedGrandchild = try #require(decks.first { $0.name == "Grandchild" })
+    #expect(importedChild.parentID == importedRoot.id)
+    #expect(importedGrandchild.parentID == importedChild.id)
+    #expect(try await target.listItems().first?.deckID == importedGrandchild.id)
+}
+
 @Test func portableRichTextNormalizesConflictingLegacyStylesOnReadAndWrite() throws {
     let decoded = try PortableJSON.decodeContent(
         #"{"type":"rich","spans":[{"text":"Legacy","styles":["highlight","code","superscript","subscript"]}]}"#,

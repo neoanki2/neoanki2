@@ -334,7 +334,7 @@ private func addItem(
     #expect(model.scopeSummary.itemCount == 2)
 }
 
-@Test @MainActor func browseBulkMoveReportsPartialSuccess() async throws {
+@Test @MainActor func browseBulkMoveRejectsASelectionContainingMissingItems() async throws {
     let (model, _, _) = try await makeModels()
     await model.load()
     _ = await addItem(model, front: "France", back: "Paris")
@@ -342,8 +342,9 @@ private func addItem(
 
     let moved = await model.moveItems(ids: [existing, UUID()], to: nil)
 
-    #expect(moved == 1)
-    #expect(model.errorMessage == nil)
+    #expect(moved == 0)
+    #expect(model.errorMessage != nil)
+    #expect(model.items.map(\.id) == [existing])
 }
 
 @Test @MainActor func browseBulkDeleteRemovesSelectionAndRefreshesSummary() async throws {

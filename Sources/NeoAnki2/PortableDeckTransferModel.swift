@@ -61,13 +61,10 @@ final class PortableDeckTransferModel {
         scopedAccess: any SecurityScopedResourceAccessing = SystemSecurityScopedResourceAccess()
     ) {
         importOperation = { source, resolution in
-            try await library.importPortableDeck(
-                from: source,
-                conflictResolution: resolution
-            )
+            try await NativeLibraryCommands.importDeck(on: library, source: source, authored: false, conflict: resolution)
         }
         authoredImportOperation = { source in
-            try await library.importAuthoredDeck(from: source)
+            try await NativeLibraryCommands.importDeck(on: library, source: source, authored: true)
         }
         exportOperation = { deckID, destination in
             try await PortableDeckExportFile.write(to: destination) { staged in

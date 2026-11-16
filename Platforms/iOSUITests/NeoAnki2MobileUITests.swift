@@ -230,7 +230,7 @@ class NeoAnki2MobileUITestCase: XCTestCase {
             let isCapture = captureAdd.exists && captureAdd.isHittable
             guard issue.auditType == .contrast, let element = issue.element,
                   element.elementType == .staticText,
-                  (isCapture || ["Front", "Back", "Legacy Notes", "Preview", "Practice type: what do you remember?", "Paris", "Correct"].contains(element.label)),
+                  (isCapture || ["Front", "Back", "Legacy Notes", "Preview", "Practice type: what do you remember?", "Paris", "Matches"].contains(element.label)),
                   let scroll = app.scrollViews.allElementsBoundByIndex.first(where: { scroll in
                       scroll.staticTexts.matching(NSPredicate(format: "label == %@", element.label))
                           .allElementsBoundByIndex.contains { $0.frame == element.frame }
@@ -1284,6 +1284,33 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
         let tree = XCTAttachment(string: app.debugDescription); tree.name = name + "-tree"; tree.lifetime = .keepAlways; add(tree)
     }
+    func testTypedAnswerComparisonKeepsSubmittedAnswer() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign", "NEOANKI_TEST_ANSWER_REVIEW": "1"])
+        scrollToAndTap(app.staticTexts["Answer Review"], in: app)
+        app.buttons["Study"].tap()
+        let input = app.textFields["Typed answer"]
+        XCTAssertTrue(input.waitUntilExists(timeout: 10))
+        let explanation = app.staticTexts["Use the because both speakers know which meeting is meant."]
+        XCTAssertFalse(app.staticTexts["They canceled the meeting."].exists)
+        XCTAssertFalse(explanation.exists)
+        input.tap(); input.typeText("They canceled meeting.")
+        app.buttons["Check Answer"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitUntilExists(timeout: 5))
+        let visible = NSPredicate(format: "isHittable == true")
+        let response = app.otherElements["studySubmittedAnswer"].staticTexts["They canceled meeting."]
+        let answer = app.otherElements["studyExpectedAnswer"].staticTexts["They canceled the meeting."]
+        let responseVisible = XCTNSPredicateExpectation(predicate: visible, object: response)
+        let answerVisible = XCTNSPredicateExpectation(predicate: visible, object: answer)
+        let keyboardDismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        wait(for: [responseVisible, answerVisible, keyboardDismissed], timeout: 5)
+        XCTAssertFalse(explanation.exists)
+        XCTAssertFalse(app.staticTexts["Repair needed."].exists)
+        capture("typed-answer-comparison", app)
+        scrollToAndTap(app.buttons["Explanation"], in: app)
+        XCTAssertTrue(explanation.waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Repair needed."].exists)
+        XCTAssertTrue(app.buttons["Good"].isHittable)
+    }
     func testStudyModesLayoutsAndFullContentConcealment() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
         let fixtures = app.staticTexts["Study Fixtures"]
@@ -2079,8 +2106,8 @@ final class MobileRedesignParityUITests: NeoAnki2MobileUITestCase {
                            "Grade labels must remain whole at the largest text size")
         }
         try auditVisibleContent(in: app, for: studyAuditTypes)
-        scrollTo(app.staticTexts["Correct"], in: app)
-        XCTAssertTrue(app.staticTexts["Paris"].isHittable)
+        scrollTo(app.descendants(matching: .any)["answerCorrect"], in: app)
+        XCTAssertTrue(app.staticTexts.matching(identifier: "Paris").firstMatch.isHittable)
         try auditVisibleContent(in: app, for: studyAuditTypes)
         capture("44-largest-study-grading", app)
         XCUIDevice.shared.orientation = .landscapeRight

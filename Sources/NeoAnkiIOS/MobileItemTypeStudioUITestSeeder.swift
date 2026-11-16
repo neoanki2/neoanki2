@@ -164,7 +164,40 @@ enum MobileRedesignUITestSeeder {
         let process = ProcessInfo.processInfo
         guard process.arguments.contains("-NeoAnkiUITestingReset"),
               process.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" else { return }
+        if process.environment["NEOANKI_TEST_ANSWER_REVIEW"] == "1" {
+            try await seedAnswerReview(library: library)
+            return
+        }
         try await seed(library: library)
+    }
+
+    /// A single real card keeps answer-review checks independent of media,
+    /// recordings, and repeated-grading setup in the full visual inventory.
+    static func seedAnswerReview(library: any LibraryRepository) async throws {
+        guard try await library.items(scope: .allDecks, sort: .createdAscending, search: "").isEmpty else { return }
+        let deck = try await library.createDeck(Deck(name: "Answer Review"))
+        let prompt = FieldDef(name: "Prompt", type: .text, isRequired: true)
+        let answer = FieldDef(name: "Answer", type: .text, isRequired: true)
+        let type = ItemType(name: "Answer Review", fields: [prompt, answer], templates: [
+            Template(name: "Edit", layout: .focus, components: [
+                TemplateComponent(region: .label, purpose: .supporting, source: .literal("Fix the sentence.")),
+                TemplateComponent(region: .primary, purpose: .question, source: .field(prompt.id)),
+                TemplateComponent(region: .supporting, purpose: .supporting,
+                    source: .literal("Both speakers know which meeting was canceled.")),
+                TemplateComponent(region: .secondary, purpose: .expectedAnswer, source: .field(answer.id),
+                    presentation: Presentation(reveal: .hiddenUntilAnswer)),
+                TemplateComponent(region: .supporting, purpose: .supporting,
+                    source: .literal("Use the because both speakers know which meeting is meant."),
+                    presentation: Presentation(reveal: .hiddenUntilAnswer)),
+                TemplateComponent(region: .supporting, purpose: .supporting,
+                    source: .literal("Repair needed."), presentation: Presentation(reveal: .hiddenUntilAnswer)),
+            ], interaction: .type, skill: Skill(input: .text, output: .text, operation: .recall))
+        ])
+        _ = try await library.createItemType(type)
+        _ = try await library.createItem(Item(itemTypeID: type.id, fields: [
+            FieldValue(fieldID: prompt.id, value: .text("They canceled meeting.")),
+            FieldValue(fieldID: answer.id, value: .text("They canceled the meeting.")),
+        ], deckID: deck.id))
     }
 
     // Repository-only setup is also exercised headlessly on macOS, so a new

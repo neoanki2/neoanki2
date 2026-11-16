@@ -28,6 +28,7 @@ struct StudySessionView: View {
     @State private var recorder = MobileStudyRecorder()
     @State private var confirmsDeleteDraft = false
     @AccessibilityFocusState private var answerFocused: Bool
+    @FocusState private var typedAnswerFocused: Bool
 
     var body: some View {
         sessionContent
@@ -145,7 +146,9 @@ struct StudySessionView: View {
                     if let card = session.currentCard {
                         MobileStudyCompositionView(template: card.template, item: card.item,
                             mediaStore: session.mediaStore, isAnswerRevealed: session.isAnswerRevealed,
-                            occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup)
+                            occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
+                            response: session.reviewResponse, evaluation: session.answerEvaluation)
+                            .id(card.id)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(24)
                     }
@@ -219,12 +222,14 @@ struct StudySessionView: View {
                 VStack(spacing: 24) {
                     MobileStudyCompositionView(
                         template: card.template, item: card.item, mediaStore: session.mediaStore,
-                        isAnswerRevealed: session.isAnswerRevealed, occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup
+                        isAnswerRevealed: session.isAnswerRevealed, occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
+                        response: session.reviewResponse, evaluation: session.answerEvaluation
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     if !session.isAnswerRevealed {
                         interaction(for: card)
-                    } else if let evaluation = session.answerEvaluation {
+                    } else if let evaluation = session.answerEvaluation,
+                              session.reviewResponse == nil || evaluation == .unavailable {
                         Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
                             .font(.headline).accessibilityAddTraits(.isSummaryElement)
                     }
@@ -248,7 +253,10 @@ struct StudySessionView: View {
             value: session.isAnswerRevealed
         )
         .onChange(of: session.isAnswerRevealed) { _, revealed in
-            if revealed { answerFocused = true }
+            if revealed {
+                typedAnswerFocused = false
+                answerFocused = true
+            }
         }
     }
 
@@ -305,6 +313,7 @@ struct StudySessionView: View {
             EmptyView()
         case .type:
             TextField("Type your answer", text: Binding(get: { session.typedAnswer }, set: { session.updateTypedAnswer($0) }), axis: .vertical)
+                .focused($typedAnswerFocused)
                 .textFieldStyle(.roundedBorder).submitLabel(.done).onSubmit { session.performPrimaryAction() }
                 .frame(maxWidth: 520).accessibilityLabel("Typed answer")
         case .choose:
@@ -393,7 +402,7 @@ struct StudySessionView: View {
     }
 
     private func evaluationLabel(_ value: NeoAnkiCore.AnswerEvaluation) -> String {
-        switch value { case .correct: "Correct"; case .incorrect: "Compare with the answer"; case .unavailable: "Self-grade this answer" }
+        switch value { case .correct: "Matches"; case .incorrect: "Differs"; case .unavailable: "Self-grade" }
     }
 
     private func openEditor() async {

@@ -28,6 +28,7 @@ struct LibraryView: View {
     @State private var isAddingItem = false
     @State private var path = NavigationPath()
     @State private var items: [SavedItemSummary] = []
+    @State private var loadGeneration: UInt64 = 0
     @State private var sort: ItemSortOrder = .createdAscending
     @State private var attentionOnly = false
     @State private var selecting = false
@@ -52,7 +53,7 @@ struct LibraryView: View {
             AddItemView(model: model, deckID: deckID)
         }
         .task { await load() }
-        .onChange(of: model.items) { _, _ in Task { await load() } }
+        .onChange(of: model.libraryRevision) { _, _ in Task { await load() } }
         .onChange(of: model.route, initial: true) { _, route in
             guard embedsNavigation else { return }
             if case let .itemDetail(id) = route {
@@ -195,14 +196,22 @@ struct LibraryView: View {
         }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.vertical, 4)
     }
     private func load() async {
-        do { items = try await model.library.items(scope: scope, sort: .createdAscending, search: "") }
-        catch { errorMessage = MobileAppModel.message(for: error) }
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        let requestedScope = scope
+        do {
+            let rows = try await model.loadBrowse(scope: requestedScope)
+            guard generation == loadGeneration, requestedScope == scope else { return }
+            items = rows
+        } catch {
+            if generation == loadGeneration { errorMessage = MobileAppModel.message(for: error) }
+        }
     }
     private func perform(_ action: () async throws -> Void) async {
         do { try await action(); selection = []; await load() }
         catch { errorMessage = MobileAppModel.message(for: error) }
     }
-    private func move(to deck: UUID?) { Task { await perform { try await model.moveItems(selection, to: deck) } } }
+    private func move(to deck: UUID?) { Task { await perform { try await model.moveItems(selection, to: deck, rows: items) } } }
     private func markOK(_ ids: Set<UUID>) async {
         await perform { _ = try await model.library.acknowledgeRepeatedLapses(itemIDs: ids, asOf: .now); await model.refresh() }
     }
@@ -720,6 +729,7 @@ private struct ItemDetailView: View {
     let itemID: UUID
     @State private var loaded: (item: Item, itemType: ItemType)?
     @State private var cardMaturityDetails: [CardMaturityDetail] = []
+    @State private var maturityIssue: String?
     @State private var errorMessage: String?
     @State private var isEditing = false
     @State private var confirmsDelete = false
@@ -741,6 +751,7 @@ private struct ItemDetailView: View {
                             .multilineTextAlignment(.leading)
                         }
                     }
+                    if let maturityIssue { Section("Card maturity") { Text(maturityIssue) } }
                     if !cardMaturityDetails.isEmpty {
                         Section("Card maturity") {
                             ForEach(cardMaturityDetails) { detail in
@@ -775,7 +786,7 @@ private struct ItemDetailView: View {
         .task {
             do {
                 loaded = try await model.item(id: itemID)
-                cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
+                await loadMaturity()
                 if loaded == nil { errorMessage = "This item no longer exists." }
             } catch {
                 errorMessage = MobileAppModel.message(for: error)
@@ -830,6 +841,15 @@ private struct ItemDetailView: View {
         } message: { Text(deletionError ?? "Please try again.") }
     }
 
+    private func loadMaturity() async {
+        do {
+            cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
+            maturityIssue = nil
+        } catch {
+            maturityIssue = "Maturity is unavailable. " + error.localizedDescription
+        }
+    }
+
     private func reloadAfterSourceEditing() async {
         await model.refresh()
         do {
@@ -837,7 +857,7 @@ private struct ItemDetailView: View {
             // browser rather than leaving a detail for a retired item mounted.
             guard let updated = try await model.item(id: itemID) else { dismiss(); return }
             loaded = updated
-            cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
+            await loadMaturity()
         } catch {
             loaded = nil
             errorMessage = MobileAppModel.message(for: error)

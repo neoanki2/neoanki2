@@ -480,18 +480,41 @@ private func waitForProgressiveStudyHead(_ model: StudyFeatureModel) async throw
 @Test @MainActor func typedAnswersAreEvaluatedAgainstRenderedAnswer() async throws {
     let (correct, _) = try await makeInteractionModel(.type, answer: .text("Paris"))
     correct.updateTypedAnswer("  PARIS! ")
+    #expect(correct.reviewResponse == nil)
     correct.submitTypedAnswer()
     #expect(correct.isAnswerRevealed)
     #expect(correct.answerEvaluation == .correct)
+    #expect(correct.reviewResponse == "  PARIS! ")
 
     let (incorrect, _) = try await makeInteractionModel(.type, answer: .text("Paris"))
     incorrect.updateTypedAnswer("London")
     incorrect.submitTypedAnswer()
     #expect(incorrect.isAnswerRevealed)
     #expect(incorrect.answerEvaluation == .incorrect)
+    #expect(incorrect.reviewResponse == "London")
     incorrect.updateTypedAnswer("")
     #expect(incorrect.typedAnswer == "London")
     #expect(incorrect.answerEvaluation == .incorrect)
+    await incorrect.grade(.good)
+    #expect(incorrect.reviewResponse == nil)
+}
+
+@Test @MainActor func answerReviewDoesNotInventAnUnsubmittedResponse() async throws {
+    let (model, _) = try await makeInteractionModel(.type)
+    model.revealAnswer()
+    #expect(model.reviewResponse == nil)
+}
+
+@Test @MainActor func answerReviewKeepsChoiceAndCharacterArrangement() async throws {
+    let (choice, _) = try await makeInteractionModel(.choose, answer: .text("Paris"))
+    choice.selectChoice("Paris")
+    choice.submitChoice()
+    #expect(choice.reviewResponse == "Paris")
+
+    let (characters, _) = try await makeInteractionModel(.arrange, answer: .text("word"))
+    let submitted = characters.arrangedItems.joined()
+    characters.submitArrangement()
+    #expect(characters.reviewResponse == submitted)
 }
 
 @Test @MainActor func missingAnswerRecoversToSelfGradeAndCompletion() async throws {

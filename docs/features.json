@@ -106,7 +106,7 @@
       "id": "mobile-library-authoring",
       "name": "Browse, author, organize, and transfer on iOS",
       "article": "user/iphone-ipad.md",
-      "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
+      "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiApplication/NativeLibraryCommands.swift", "Sources/NeoAnkiApplication/NativeLibraryReadCoordinator.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/NativeCommandReceipt.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemMoveSelection.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
       "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/MediaAuthoringFeatureTests.swift"]
     },
     {
@@ -156,8 +156,8 @@
       "id": "card-maturity",
       "name": "See when cards and decks are ready for maintenance",
       "article": "user/library-and-decks.md",
-      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Models/CardMaturity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift", "Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemReadingPreview.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/LibraryView.swift"],
-      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/CardMaturityTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Models/CardMaturity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/MaturityProjection.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase+Maturity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift", "Sources/NeoAnki2/ScopeHomeView.swift", "Sources/NeoAnki2/ItemReadingPreview.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/LibraryView.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/CardMaturityTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/MaturityProjectionTests.swift", "Tests/NeoAnkiFeaturesTests/NativeLibraryWorkflowTests.swift", "Tests/NeoAnkiAPITests/NeoAnkiAPIServiceTests.swift"]
     },
     {
       "id": "deck-management",
@@ -269,8 +269,8 @@
       "id": "study-type",
       "name": "Typed-answer interaction",
       "article": "user/studying.md",
-      "sources": ["Sources/NeoAnki2/StudySupport.swift", "Sources/NeoAnki2/StudyView.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift"],
+      "sources": ["Sources/NeoAnki2/StudySupport.swift", "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnkiSharedUI/StudyAnswerReview.swift", "Sources/NeoAnkiIOS/MobileStudyCompositionView.swift"],
+      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyAnswerReviewTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"],
       "screenshot": "assets/screenshots/study-type.png"
     },
     {
@@ -367,8 +367,8 @@
       "id": "portable-deck",
       "name": "Import and export portable decks",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "Sources/NeoAnki2/PortableDeckExportFile.swift", "Sources/NeoAnki2/PortableDeckImportPanel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
-      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckExportFileTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift", "Tests/NeoAnki2Tests/TemplateDefinitionMigratorTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/PortableDeckTests.swift"],
+      "sources": ["Sources/NeoAnki2/PortableDeckTransferModel.swift", "Sources/NeoAnki2/PortableDeckExportFile.swift", "Sources/NeoAnki2/PortableDeckImportPanel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/DeckImportOrdering.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableItemTypeIdentity.swift", "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift"],
+      "tests": ["UITests/NeoAnki2UITests/PortableDeckUITests.swift", "Tests/NeoAnki2Tests/PortableDeckTransferModelTests.swift", "Tests/NeoAnki2Tests/PortableDeckExportFileTests.swift", "Tests/NeoAnki2Tests/PortableDeckImportSelectionTests.swift", "Tests/NeoAnki2Tests/TemplateDefinitionMigratorTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/PortableDeckTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/AtomicLibraryCommandsTests.swift"],
       "screenshot": "assets/screenshots/portable-conflict.png"
     },
     {

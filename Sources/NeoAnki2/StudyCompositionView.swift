@@ -9,6 +9,8 @@ struct StudyCompositionView: View {
     let mediaStore: MediaStore?
     var occlusionGroup: Int? = nil
     let clozeGroup: Int?
+    var response: String? = nil
+    var evaluation: AnswerEvaluation? = nil
 
     private var components: [ResolvedTemplateComponent] {
         SideContent.resolvedComponents(for: template, from: item)
@@ -41,10 +43,13 @@ struct StudyCompositionView: View {
     }
 
     private var wireframe: some View {
-        CardWireframeView(
+        StudyAnswerReview(
             layout: effectiveLayout,
             components: components,
-            isAnswerRevealed: isAnswerRevealed
+            isAnswerRevealed: isAnswerRevealed,
+            response: response,
+            evaluation: evaluation,
+            enabled: [.type, .choose, .arrange].contains(template.interaction)
         ) { component, hole in
             ContentValueView(
                 value: component.value,

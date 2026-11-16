@@ -383,8 +383,10 @@ struct StudyView: View {
                 item: card.item,
                 isAnswerRevealed: model.isAnswerRevealed,
                 mediaStore: mediaStore,
-                occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup
+                occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
+                response: model.reviewResponse, evaluation: model.answerEvaluation
             )
+            .id(card.id)
             .accessibilityIdentifier(model.isAnswerRevealed ? "studyAnswer" : "studyPrompt")
             .frame(maxWidth: .infinity)
             .frame(maxHeight: .infinity)
@@ -416,7 +418,7 @@ struct StudyView: View {
             }
 
             if model.isAnswerRevealed {
-                evaluationFeedback
+                if model.reviewResponse == nil || model.answerEvaluation == .unavailable { evaluationFeedback }
 
                 if card.template.interaction == .record, recording.hasRecording {
                     revealedRecordingPlayback
@@ -517,15 +519,15 @@ struct StudyView: View {
     private var evaluationFeedback: some View {
         switch model.answerEvaluation {
         case .correct:
-            Label("Your response matches.", systemImage: "checkmark.circle.fill")
+            Label("Matches", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .accessibilityIdentifier("answerCorrect")
         case .incorrect:
-            Label("Compare your response with the answer.", systemImage: "arrow.left.arrow.right")
+            Label("Differs", systemImage: "arrow.left.arrow.right")
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("answerIncorrect")
         case .unavailable:
-            Label("Automatic checking wasn’t available.", systemImage: "person.crop.circle.badge.questionmark")
+            Label("Self-grade", systemImage: "person.crop.circle.badge.questionmark")
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("answerCheckUnavailable")
         case nil:

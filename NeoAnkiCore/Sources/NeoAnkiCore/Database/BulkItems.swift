@@ -75,6 +75,18 @@ private struct BulkCardIdentity: Hashable {
 }
 
 public extension ItemStore {
+    /// Native selection deletes have no HTTP batch limit and never split a
+    /// selection into separately committed chunks.
+    func deleteItemsAtomically(_ ids: Set<UUID>, now: Date = .now) async throws -> Int {
+        guard !ids.isEmpty else { return 0 }
+        let operations = ids.sorted { $0.uuidString < $1.uuidString }.map {
+            ItemBulkOperation(operationID: "delete-\($0)", action: .delete($0))
+        }
+        let results = try await executeItemBulk(operations, dryRun: false, now: now, nativeSelection: true)
+        _ = try? await collectMediaGarbage()
+        return results.count
+    }
+
     /// Deletes a freshly added batch only while its content and never-reviewed
     /// cards still match. Preconditions and deletion share one write transaction.
     func deleteUnchangedUnreviewedItems(
@@ -240,7 +252,8 @@ public extension ItemStore {
         _ operations: [ItemBulkOperation],
         dryRun: Bool,
         now: Date = .now,
-        orderedDeck: OrderedDeckItemReconciliation? = nil
+        orderedDeck: OrderedDeckItemReconciliation? = nil,
+        nativeSelection: Bool = false
     ) async throws -> [ItemBulkOperationResult] {
         if let order = orderedDeck {
             guard !order.expectedItemIDs.isEmpty,
@@ -272,7 +285,7 @@ public extension ItemStore {
                 }
             }
         }
-        let maximumOperations = orderedDeck == nil ? 500 : 100_000
+        let maximumOperations = nativeSelection ? Int.max : (orderedDeck == nil ? 500 : 100_000)
         guard !operations.isEmpty, operations.count <= maximumOperations else {
             throw DatabaseError.invalidItem(
                 "A bulk request must contain between 1 and \(maximumOperations) operations."

@@ -23,9 +23,9 @@ public enum ItemDraftError: LocalizedError, Sendable, Equatable {
     }
 }
 
-/// Platform-neutral, observable library workflow shared by Apple shells. It is
-/// the only UI-facing owner of repository mutations, navigation state, browse
-/// state, sync status, reminder recalculation, and widget publication.
+/// Mobile library presentation and device publication. Both native shells use
+/// the shared application commands and read coordinator; navigation and native
+/// table/editor behavior remain in their presentation adapters.
 @MainActor @Observable
 public final class LibraryFeatureModel {
     public private(set) var loadState: FeatureLoadState = .loading
@@ -52,6 +52,15 @@ public final class LibraryFeatureModel {
     public var reminderSettings = ReminderSettings()
     public private(set) var syncEnabled = false
 
+    public private(set) var recoveryMessage: String?
+    public private(set) var lastCommandReceipt: NativeCommandReceipt?
+    public private(set) var libraryRevision: UInt64 = 0
+    private let reads: NativeLibraryReadCoordinator
+    private var readGeneration: UInt64 = 0
+    private var browseRequested = false
+    private var commandRefreshInProgress = false
+    @ObservationIgnored private var libraryChangesTask: Task<Void, Never>?
+
     public let library: any LibraryRepository
     private let syncService: any SyncService
     private let notifier: (any NotificationSchedulingService)?
@@ -59,7 +68,6 @@ public final class LibraryFeatureModel {
     private let badgePublisher: (any AppIconBadgePublishing)?
     private let settingsStore: (any MobileSettingsStoring)?
     private let errorMapper: any UserFacingErrorMapping
-    @ObservationIgnored private var deferredSyncTask: Task<Void, Never>?
     @ObservationIgnored private var syncChangesTask: Task<Void, Never>?
     @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
     @ObservationIgnored private var studyUpdatesTask: Task<Void, Never>?
@@ -69,7 +77,7 @@ public final class LibraryFeatureModel {
     @ObservationIgnored private var devicePublicationRevision: UInt64 = 0
 
     deinit {
-        deferredSyncTask?.cancel(); syncChangesTask?.cancel(); bootstrapTask?.cancel()
+        libraryChangesTask?.cancel(); syncChangesTask?.cancel(); bootstrapTask?.cancel()
         studyUpdatesTask?.cancel(); devicePublicationTask?.cancel()
     }
 
@@ -95,6 +103,7 @@ public final class LibraryFeatureModel {
         errorMapper: any UserFacingErrorMapping = DefaultUserFacingErrorMapper()
     ) {
         self.library = library
+        self.reads = NativeLibraryReadCoordinator(library: library)
         self.syncService = syncService
         self.notifier = notifier
         self.widgetPublisher = widgetPublisher
@@ -141,62 +150,84 @@ public final class LibraryFeatureModel {
             }
             try await library.bootstrap()
             mediaStore = await library.mediaStore()
-            try await reload()
+            try await reload(demand: [.home, .catalog])
             loadState = .ready
+            await observeLibraryChanges()
             if startSync ?? syncEnabled {
                 await observeSyncChanges()
                 await syncService.start()
                 await refreshSyncStatus()
-                try await reload()
+                try await reload(demand: [.home, .catalog])
             }
         } catch {
             loadState = .failed(errorMapper.map(error))
         }
     }
 
-    public func reload(asOf now: Date = .now) async throws {
+    private func observeLibraryChanges() async {
+        libraryChangesTask?.cancel()
+        let stream = await reads.invalidations()
+        libraryChangesTask = Task { [weak self] in
+            for await _ in stream {
+                guard !Task.isCancelled, let self else { return }
+                libraryRevision &+= 1
+                if !commandRefreshInProgress { await refresh() }
+            }
+        }
+    }
+
+    public func loadBrowse(scope: DeckScope) async throws -> [SavedItemSummary] {
+        browseRequested = true
+        let snapshot = try await reads.load(scope: scope, demand: [.browse], asOf: .now)
+        if scope == selectedScope { items = snapshot.items ?? [] }
+        return snapshot.items ?? []
+    }
+
+    public func reload(asOf now: Date = .now,
+        demand: Set<NativeLibraryReadDemand> = [.home, .browse, .catalog]) async throws {
+        readGeneration &+= 1
+        let generation = readGeneration
+        let scope = selectedScope
+        let sort = sortOrder
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer { if generation == readGeneration { isRefreshing = false } }
         var snapshotTime = now
         while true {
-            let revisionBeforeWaiting = studyMutationRevision
-            await finishStudyUpdates()
-            if revisionBeforeWaiting != studyMutationRevision {
-                snapshotTime = max(snapshotTime, .now)
-            }
             let revision = studyMutationRevision
-            let asOf = snapshotTime
-            async let home = library.coldHomeSnapshot(scope: .allDecks, asOf: asOf)
-            async let loadedItems = library.items(scope: selectedScope, sort: sortOrder, search: "")
-            async let catalog = library.loadItemTypeCatalog()
-            let (snapshot, itemRows, typeCatalog) = try await (home, loadedItems, catalog)
-            // A refresh that began before a grade must not overwrite its newer
-            // counts after the study workflow has already advanced.
-            guard revision == studyMutationRevision else {
-                snapshotTime = max(snapshotTime, .now)
-                continue
+            await finishStudyUpdates()
+            if revision != studyMutationRevision { snapshotTime = max(snapshotTime, .now); continue }
+            let data = try await reads.load(scope: scope, sort: sort, demand: demand, asOf: snapshotTime)
+            guard generation == readGeneration, scope == selectedScope, sort == sortOrder else { return }
+            guard revision == studyMutationRevision else { snapshotTime = max(snapshotTime, .now); continue }
+            if let snapshot = data.home {
+                allDecksSummary = snapshot.allDecksSummary
+                unassignedSummary = snapshot.unassignedSummary
+                decks = snapshot.deckSummaries
+                itemTypes = snapshot.itemTypes.itemTypes
             }
-            allDecksSummary = snapshot.allDecksSummary
-            unassignedSummary = snapshot.unassignedSummary
-            decks = snapshot.deckSummaries
-            items = itemRows
-            itemTypes = typeCatalog.allItemTypes
-            includedItemTypeGroups = typeCatalog.includedWithDecks
-            selectedItemIDs.formIntersection(Set(itemRows.map(\.id)))
+            if let rows = data.items {
+                browseRequested = true
+                items = rows
+                selectedItemIDs.formIntersection(Set(rows.map(\.id)))
+            }
+            if let catalog = data.catalog {
+                itemTypes = catalog.allItemTypes
+                includedItemTypeGroups = catalog.includedWithDecks
+            }
+            recoveryMessage = data.maturityIssue.map { "Maturity is unavailable. " + $0 }
             await publishDeviceState(asOf: snapshotTime)
             return
         }
     }
 
     public func refresh(asOf now: Date = .now) async {
-        do { try await reload(asOf: now) }
+        do { try await reload(asOf: now, demand: browseRequested ? [.home, .browse, .catalog] : [.home, .catalog]) }
         catch { loadState = .failed(errorMapper.map(error)) }
     }
 
     /// A shared authoring workflow committed through the repository. Publish counts and schedule sync.
     public func authoringDidCommit() async {
         await refresh()
-        scheduleDebouncedSync()
     }
 
     public func synchronize() async {
@@ -282,7 +313,9 @@ public final class LibraryFeatureModel {
     }
 
     public func scopeSummary(for scope: DeckScope, asOf now: Date = .now) async throws -> ScopeSummary {
-        try await library.scopeSummary(scope: scope, asOf: now)
+        let data = try await reads.load(scope: scope, demand: [.summary], asOf: now)
+        if let issue = data.maturityIssue { recoveryMessage = "Maturity is unavailable. " + issue }
+        return data.summary ?? .empty
     }
 
     public func beginStudy(scope: DeckScope, title: String) async {
@@ -306,11 +339,11 @@ public final class LibraryFeatureModel {
     }
 
     public func createDeck(name: String, parentID: UUID?, newCardsPerDay: Int?) async throws {
-        _ = try await library.createDeck(Deck(
+        _ = try await command("create-deck") { try await library.createDeck(Deck(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             parentID: parentID,
             newCardsPerDay: newCardsPerDay
-        ))
+        )) }
         try await didMutate()
     }
 
@@ -319,7 +352,7 @@ public final class LibraryFeatureModel {
         deck.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         deck.parentID = parentID
         deck.newCardsPerDay = newCardsPerDay
-        _ = try await library.updateDeck(deck)
+        _ = try await command("update-deck", input: try JSONEncoder().encode(deck)) { try await library.updateDeck(deck) }
         try await didMutate()
     }
 
@@ -328,12 +361,12 @@ public final class LibraryFeatureModel {
     }
 
     public func deleteDeck(id: UUID, policy: DeckDeletionPolicy) async throws {
-        try await library.commitDeckDeletion(id: id, policy: policy, asOf: .now)
+        _ = try await command("delete-deck", input: Data(id.uuidString.utf8)) { try await library.commitDeckDeletion(id: id, policy: policy, asOf: .now) }
         try await didMutate()
     }
 
     public func resetDeckProgress(id: UUID) async throws {
-        _ = try await library.resetDeckProgress(id: id, asOf: .now)
+        _ = try await command("reset-deck", input: Data(id.uuidString.utf8)) { try await library.resetDeckProgress(id: id, asOf: .now) }
         try await didMutate()
     }
 
@@ -347,7 +380,7 @@ public final class LibraryFeatureModel {
             fields: itemType.fields.map { FieldValue(fieldID: $0.id, value: values[$0.id] ?? .empty) },
             deckID: deckID
         )
-        _ = try await library.createItem(item, asOf: .now)
+        _ = try await command("create-item", input: try JSONEncoder().encode(item)) { try await library.createItem(item, asOf: .now) }
         try await didMutate()
     }
 
@@ -356,21 +389,21 @@ public final class LibraryFeatureModel {
         if let stored = try await library.item(id: item.id) {
             updated = ContextDerivedContent.invalidatingSpeech(in: item, original: stored.item, type: stored.itemType)
         } else { updated = item }
-        _ = try await library.updateItem(updated, asOf: .now)
+        _ = try await command("update-item", input: try JSONEncoder().encode(updated)) { try await library.updateItem(updated, asOf: .now) }
         try await didMutate()
     }
 
-    public func moveItems(_ ids: Set<UUID>, to deckID: UUID?) async throws {
-        for id in ids { _ = try await library.moveItem(id: id, to: deckID) }
+    public func moveItems(_ ids: Set<UUID>, to deckID: UUID?, rows: [SavedItemSummary]? = nil) async throws {
+        let selection = try NativeLibraryCommands.selection(ids, rows: rows ?? items)
+        _ = try await command("move", input: Data(ids.sorted { $0.uuidString < $1.uuidString }.description.utf8), count: ids.count) {
+            try await NativeLibraryCommands.move(on: library, selection: selection, to: deckID)
+        }
         try await didMutate()
     }
 
     public func deleteItems(_ ids: Set<UUID>) async throws {
-        let operations = ids.sorted { $0.uuidString < $1.uuidString }.map {
-            ItemBulkOperation(operationID: "delete-\($0.uuidString)", action: .delete($0))
-        }
-        if !operations.isEmpty {
-            _ = try await library.performBulkItemOperations(operations, asOf: .now)
+        _ = try await command("delete", input: Data(ids.sorted { $0.uuidString < $1.uuidString }.description.utf8), count: ids.count) {
+            try await NativeLibraryCommands.delete(on: library, ids: ids, asOf: .now)
         }
         selectedItemIDs.subtract(ids)
         try await didMutate()
@@ -394,44 +427,31 @@ public final class LibraryFeatureModel {
     }
 
     public func importJSON(_ data: Data, itemTypeID: UUID?, deckID: UUID?) async throws -> Int {
-        let imported = try await library.importJSONItems(
-            from: data,
-            itemTypeID: itemTypeID,
-            context: ImportContext(),
-            asOf: .now
-        )
-        if let deckID {
-            for id in Set(imported.map(\.itemTypeID)) { try await library.attachItemType(id: id, to: deckID) }
-            for item in imported { _ = try await library.moveItem(id: item.id, to: deckID) }
+        let outcome = try await command("import-json", input: data) {
+            try await NativeLibraryCommands.importItems(on: library, data: data, format: .json,
+                itemTypeID: itemTypeID, deckID: deckID, context: ImportContext(), asOf: .now)
         }
         try await didMutate()
-        return imported.count
+        return outcome.value?.count ?? outcome.affectedCount ?? 0
     }
 
     public func importCSV(_ data: Data, itemTypeID: UUID?, itemTypeName: String, deckID: UUID?) async throws -> Int {
-        let imported = try await library.importCSVItems(
-            from: data,
-            itemTypeID: itemTypeID,
-            itemTypeName: itemTypeName,
-            context: ImportContext(),
-            asOf: .now
-        )
-        if let deckID {
-            for id in Set(imported.map(\.itemTypeID)) { try await library.attachItemType(id: id, to: deckID) }
-            for item in imported { _ = try await library.moveItem(id: item.id, to: deckID) }
+        let outcome = try await command("import-csv", input: data) {
+            try await NativeLibraryCommands.importItems(on: library, data: data, format: .csv(itemTypeName: itemTypeName),
+                itemTypeID: itemTypeID, deckID: deckID, context: ImportContext(), asOf: .now)
         }
         try await didMutate()
-        return imported.count
+        return outcome.value?.count ?? outcome.affectedCount ?? 0
     }
 
     public func importPortableDeck(from url: URL, conflict: PortableDeckTypeConflictResolution) async throws -> PortableDeckImportResult {
-        let result = try await library.importPortableDeck(from: url, conflictResolution: conflict)
+        let result = try await NativeLibraryCommands.importDeck(on: library, source: url, authored: false, conflict: conflict)
         try await didMutate()
         return result
     }
 
     public func importAuthoredBundle(from url: URL) async throws -> PortableDeckImportResult {
-        let result = try await library.importAuthoredDeck(from: url)
+        let result = try await NativeLibraryCommands.importDeck(on: library, source: url, authored: true)
         try await didMutate()
         return result
     }
@@ -526,8 +546,20 @@ public final class LibraryFeatureModel {
     }
 
     private func didMutate() async throws {
-        try await reload()
-        scheduleDebouncedSync()
+        commandRefreshInProgress = true
+        defer { commandRefreshInProgress = false }
+        libraryRevision &+= 1
+        do { try await reload(demand: browseRequested ? [.home, .browse, .catalog] : [.home, .catalog]) }
+        catch { recoveryMessage = "Saved. Refresh could not finish: \(error.localizedDescription)" }
+    }
+
+    private func command<Value: Sendable>(_ name: String, input: Data = Data(), count: Int = 1,
+        _ operation: () async throws -> Value) async throws -> CommandOutcome<Value> {
+        let outcome = try await NativeLibraryCommands.perform(on: library,
+            context: NativeCommandContext(operation: name, input: input, expectedCount: count), operation: operation)
+        lastCommandReceipt = outcome.receipt
+        if let warning = outcome.warnings.first { recoveryMessage = warning }
+        return outcome
     }
 
     private func studyDidMutate() async {
@@ -536,7 +568,6 @@ public final class LibraryFeatureModel {
         // saving a review; a suspended publisher must never hold study controls.
         studyMutationRevision &+= 1
         studyUpdatesRequested = true
-        scheduleDebouncedSync()
         guard studyUpdatesTask == nil else { return }
         studyUpdatesTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
@@ -555,18 +586,6 @@ public final class LibraryFeatureModel {
 
     private func finishStudyUpdates() async {
         while let task = studyUpdatesTask { await task.value }
-    }
-
-    private func scheduleDebouncedSync() {
-        guard syncEnabled else { return }
-        deferredSyncTask?.cancel()
-        deferredSyncTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(600))
-            guard !Task.isCancelled, let self else { return }
-            deferredSyncTask = nil
-            await self.syncService.synchronize()
-            await self.refreshSyncStatus()
-        }
     }
 
     private func studyAvailability(scope: DeckScope, asOf now: Date) async throws -> StudyAvailability {
@@ -599,8 +618,10 @@ public final class LibraryFeatureModel {
 
     private func performDeviceStatePublication(asOf now: Date, availability: StudyAvailability) async {
         let widgetDecks = Array(decks.prefix(12))
-        try? await badgePublisher?.publish(AppIconBadge(dueCount: availability.dueNow))
-        try? await recalculateReminder(asOf: now)
+        do { try await badgePublisher?.publish(AppIconBadge(dueCount: availability.dueNow)) }
+        catch { recoveryMessage = "Saved. Device updates could not finish: " + error.localizedDescription }
+        do { try await recalculateReminder(asOf: now) }
+        catch { recoveryMessage = "Saved. Device updates could not finish: " + error.localizedDescription }
         guard let widgetPublisher else { return }
         var deckSnapshots: [DueWidgetDeckSummary] = []
         // Keep these lightweight reads sequential rather than queuing a burst
@@ -615,11 +636,11 @@ public final class LibraryFeatureModel {
             if lhs.dueCount != rhs.dueCount { return lhs.dueCount > rhs.dueCount }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
-        try? await widgetPublisher.publish(DueWidgetSnapshot(
+        do { try await widgetPublisher.publish(DueWidgetSnapshot(
             totalDueCount: availability.dueNow,
             nextDueAt: availability.nextStudyAt,
             decks: deckSnapshots,
             updatedAt: now
-        ))
+        )) } catch { recoveryMessage = "Saved. Device updates could not finish: " + error.localizedDescription }
     }
 }

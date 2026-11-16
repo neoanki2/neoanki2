@@ -15,11 +15,16 @@ final class ItemsModel {
     }
     private(set) var itemTypes: [ItemType] = []
     private var authoringLoadGeneration = 0
+    private var loadGeneration: UInt64 = 0
+    private let reads: NativeLibraryReadCoordinator
+    @ObservationIgnored private var libraryChangesTask: Task<Void, Never>?
+    private(set) var lastCommandReceipt: NativeCommandReceipt?
     private(set) var normalItemTypes: [ItemType] = []
     private(set) var effectiveItemTypePolicy: DeckItemTypePolicy?
     /// The one scheduling snapshot for the selected scope. Everything the app
     /// says about what is due comes from here, so no two surfaces can disagree.
     private(set) var scopeSummary: ScopeSummary = .empty
+    private(set) var maturityUnavailable = false
     /// True only until the pane first has something to show. Later reloads
     /// revise what is on screen in place; a progress view where the numbers
     /// were is not an improvement on numbers a moment out of date.
@@ -60,7 +65,7 @@ final class ItemsModel {
     /// than computed: a table reads it several times per render pass, and each
     /// read would otherwise rescan every item.
     private(set) var visibleItems: [SavedItemSummary] = []
-    private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
     private var searchGeneration = 0
 
     private func refreshVisibleItems() {
@@ -118,11 +123,24 @@ final class ItemsModel {
     init(
         library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
             & LibraryStudyResponses & LibraryCoordinatedItemEditing,
-        mediaStore: MediaStore?
+        mediaStore: MediaStore?,
+        reads: NativeLibraryReadCoordinator? = nil
     ) {
         self.library = library
         self.mediaStore = mediaStore
+        self.reads = reads ?? NativeLibraryReadCoordinator(library: library)
+        libraryChangesTask = Task { [weak self, reads = self.reads] in
+            let changes = await reads.invalidations()
+            for await _ in changes {
+                guard !Task.isCancelled, let self else { return }
+                browseDataInvalidated = true
+                guard hasLoaded else { continue }
+                await refreshAfterSync()
+            }
+        }
     }
+
+    deinit { libraryChangesTask?.cancel(); searchTask?.cancel() }
 
     var itemType: ItemType? {
         guard let addItemTypeID else { return nil }
@@ -148,48 +166,42 @@ final class ItemsModel {
     /// `asOf` is passed in so the sidebar and the detail pane read the same
     /// instant. Letting each surface call `.now` is what made them disagree.
     func load(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
-        // `beginBrowseLoad` opts the home→Browse transition into the existing
-        // loading state. Ordinary reloads keep populated rows visible.
+        await load(scope: scope, asOf: now, browse: true)
+    }
+
+    func loadHome(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
+        await load(scope: scope, asOf: now, browse: false)
+    }
+
+    private func load(scope: StudyScope, asOf now: Date, browse: Bool) async {
+        loadGeneration &+= 1
+        let generation = loadGeneration
         isLoading = isLoading || !hasLoaded
         errorMessage = itemTypeWarning
         updateCachedScope(scope)
         do {
-            // Everything is read before anything is published, so a reload never
-            // shows this scope's items beside another scope's counts.
-            if !itemTypesLoaded {
-                applyItemTypes(try await library.loadItemTypes())
+            var demand: Set<NativeLibraryReadDemand> = [.summary]
+            if browse { demand.insert(.browse) }
+            if !itemTypesLoaded { demand.insert(.catalog) }
+            let snapshot = try await reads.load(scope: scope.filter, demand: demand, asOf: now)
+            guard generation == loadGeneration, cachedScope.filter == scope.filter else { return }
+            if let catalog = snapshot.catalog {
+                applyItemTypes(ItemTypeLoadResult(itemTypes: catalog.allItemTypes, corruptions: catalog.corruptions))
             }
-            let loadedItems = try await library.items(scope: scope.filter, sort: .createdAscending)
-            let summary = try await library.scopeSummary(scope: scope.filter, asOf: now)
-
-            items = loadedItems.sorted(using: tableSort)
-            scopeSummary = summary
-            hasLoaded = true
-            loadedItemsScope = scope.filter
-            browseDataInvalidated = false
-        } catch {
-            errorMessage = UserFacingError.message(from: error)
-        }
-        isLoading = false
-    }
-
-    /// Loads only the selected scope's home summary. Item types normally arrive
-    /// from the startup snapshot; the fallback keeps direct model callers and
-    /// snapshot failures behaviorally identical.
-    func loadHome(scope: StudyScope = .allDecks, asOf now: Date = .now) async {
-        isLoading = !hasLoaded
-        errorMessage = itemTypeWarning
-        updateCachedScope(scope)
-        do {
-            if !itemTypesLoaded {
-                applyItemTypes(try await library.loadItemTypes())
+            if let rows = snapshot.items {
+                items = rows.sorted(using: tableSort)
+                loadedItemsScope = scope.filter
+                browseDataInvalidated = false
             }
-            scopeSummary = try await library.scopeSummary(scope: scope.filter, asOf: now)
+            if let summary = snapshot.summary { scopeSummary = summary }
+            maturityUnavailable = snapshot.maturityIssue != nil
+            errorMessage = snapshot.maturityIssue.map { "Maturity is unavailable. " + $0 } ?? itemTypeWarning
             hasLoaded = true
         } catch {
+            guard generation == loadGeneration else { return }
             errorMessage = UserFacingError.message(from: error)
         }
-        isLoading = false
+        if generation == loadGeneration { isLoading = false }
     }
 
     func beginBrowseLoad() {
@@ -249,19 +261,22 @@ final class ItemsModel {
         itemTypesLoaded = false
     }
 
-    /// Applies a committed native-import batch without re-reading every browse
-    /// row already held by the model. Native imports are unassigned, so deck
-    /// scopes only need their scheduling snapshot refreshed.
+    /// Applies committed rows by identity. A deck browser resolves descendant
+    /// membership through the shared read coordinator.
     func applyImportedItems(
         _ imported: [SavedItemSummary],
         scope: StudyScope,
         asOf now: Date = .now
     ) async {
+        loadGeneration &+= 1
         errorMessage = nil
         cachedScope = scope
+        let importedIDs = Set(imported.map(\.id))
+        items.removeAll { importedIDs.contains($0.id) }
         switch scope.filter {
         case .allDecks, .unassigned:
-            let sortedImported = imported.sorted(using: tableSort)
+            let visibleImported = scope.filter == .unassigned ? imported.filter { $0.deckID == nil } : imported
+            let sortedImported = visibleImported.sorted(using: tableSort)
             var updated = items
             if let last = updated.last,
                let first = sortedImported.first,
@@ -276,7 +291,7 @@ final class ItemsModel {
             }
             items = updated
         case .deck:
-            break
+            await load(scope: scope, asOf: now)
         }
         do {
             scopeSummary = try await library.scopeSummary(
@@ -355,12 +370,15 @@ final class ItemsModel {
             )
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
-            let saved = try await library.createItem(item)
-            let libraryID = try await library.libraryID()
-            UserDefaults.standard.set(itemType.id.uuidString, forKey: "authoring.type.\(libraryID).\(resolvedDeckID?.uuidString ?? "unassigned")")
+            let outcome = try await command("create-item") { try await library.createItem(item) }
+            guard let saved = outcome.value else { await load(scope: cachedScope); return true }
+            if let libraryID = try? await library.libraryID() {
+                UserDefaults.standard.set(itemType.id.uuidString, forKey: "authoring.type.\(libraryID).\(resolvedDeckID?.uuidString ?? "unassigned")")
+            }
+            items.removeAll { $0.id == saved.id }
             items.append(saved)
             items.sort(using: tableSort)
-            scopeSummary = try await library.scopeSummary(scope: currentScopeFilter())
+            await refreshCommittedSummary(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -406,11 +424,12 @@ final class ItemsModel {
                 deckID: stored.item.deckID
             )
             let updated = ContextDerivedContent.invalidatingSpeech(in: item, original: stored.item, type: stored.itemType)
-            let saved = try await library.updateItem(updated)
+            let outcome = try await command("update-item") { try await library.updateItem(updated) }
+            guard let saved = outcome.value else { await load(scope: cachedScope); return true }
             if let index = items.firstIndex(where: { $0.id == saved.id }) {
                 items[index] = saved
             }
-            scopeSummary = try await library.scopeSummary(scope: currentScopeFilter())
+            await refreshCommittedSummary(scope: currentScopeFilter())
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -503,24 +522,16 @@ final class ItemsModel {
     }
 
     func deleteItem(id: UUID, scope: StudyScope = .allDecks) async -> Bool {
-        errorMessage = nil
-        do {
-            guard try await library.deleteItem(id: id) else { return false }
-            items.removeAll { $0.id == id }
-            scopeSummary = try await library.scopeSummary(scope: scope.filter)
-            return true
-        } catch {
-            errorMessage = UserFacingError.message(from: error)
-            return false
-        }
+        await deleteItems(ids: [id], scope: scope) == 1
     }
 
     func deleteAllUnassigned(scope: StudyScope = .unassigned) async -> Int {
         errorMessage = nil
         do {
-            let deleted = try await library.deleteAllUnassignedItems()
+            let outcome = try await command("delete-unassigned") { try await library.deleteAllUnassignedItems() }
+            let deleted = outcome.value ?? outcome.affectedCount ?? 0
             items.removeAll()
-            scopeSummary = try await library.scopeSummary(scope: scope.filter)
+            await refreshCommittedSummary(scope: scope.filter)
             return deleted
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -528,46 +539,23 @@ final class ItemsModel {
         }
     }
 
-    func moveItem(
-        id: UUID,
-        to deckID: UUID?,
-        scope: StudyScope = .allDecks,
-        asOf now: Date = .now
-    ) async -> Bool {
-        errorMessage = nil
-        do {
-            guard try await library.moveItem(id: id, to: deckID) else { return false }
-            await load(scope: scope, asOf: now)
-            return true
-        } catch {
-            errorMessage = UserFacingError.message(from: error)
-            return false
-        }
+    func moveItem(id: UUID, to deckID: UUID?, scope: StudyScope = .allDecks, asOf now: Date = .now) async -> Bool {
+        await moveItems(ids: [id], to: deckID, scope: scope, asOf: now) == 1
     }
 
-    /// Moves a browse selection. Reports how many moved so a partial result is
-    /// visible rather than silently rounded to success or failure. `asOf` is the
-    /// caller's instant, so the reload agrees with the sidebar's.
+    /// Selection validation and all assignments commit together.
     @discardableResult
-    func moveItems(
-        ids: Set<UUID>,
-        to deckID: UUID?,
-        scope: StudyScope = .allDecks,
-        asOf now: Date = .now
-    ) async -> Int {
+    func moveItems(ids: Set<UUID>, to deckID: UUID?, scope: StudyScope = .allDecks,
+        asOf now: Date = .now) async -> Int {
         errorMessage = nil
-        var moved = 0
         do {
-            for id in orderedSelection(ids) {
-                if try await library.moveItem(id: id, to: deckID) {
-                    moved += 1
-                }
+            let selection = try NativeLibraryCommands.selection(ids, rows: items)
+            let outcome = try await command("move", count: ids.count) {
+                try await NativeLibraryCommands.move(on: library, selection: selection, to: deckID)
             }
-        } catch {
-            errorMessage = UserFacingError.message(from: error)
-        }
-        await load(scope: scope, asOf: now)
-        return moved
+            await load(scope: scope, asOf: now)
+            return outcome.value ?? outcome.affectedCount ?? 0
+        } catch { errorMessage = UserFacingError.message(from: error); return 0 }
     }
 
     /// Acknowledges the selected rows at their cards' current lapse counts,
@@ -592,24 +580,15 @@ final class ItemsModel {
     }
 
     @discardableResult
-    func deleteItems(
-        ids: Set<UUID>,
-        scope: StudyScope = .allDecks,
-        asOf now: Date = .now
-    ) async -> Int {
+    func deleteItems(ids: Set<UUID>, scope: StudyScope = .allDecks, asOf now: Date = .now) async -> Int {
         errorMessage = nil
-        var deleted = 0
         do {
-            for id in orderedSelection(ids) {
-                if try await library.deleteItem(id: id) {
-                    deleted += 1
-                }
+            let outcome = try await command("delete", count: ids.count) {
+                try await NativeLibraryCommands.delete(on: library, ids: ids, asOf: now)
             }
-        } catch {
-            errorMessage = UserFacingError.message(from: error)
-        }
-        await load(scope: scope, asOf: now)
-        return deleted
+            await load(scope: scope, asOf: now)
+            return outcome.value ?? outcome.affectedCount ?? 0
+        } catch { errorMessage = UserFacingError.message(from: error); return 0 }
     }
 
     func studyResponseCount(itemIDs: Set<UUID>) async -> Int {
@@ -621,10 +600,23 @@ final class ItemsModel {
         }
     }
 
-    /// Acts in the order the user sees, so a failure part-way through leaves a
-    /// comprehensible result.
-    private func orderedSelection(_ ids: Set<UUID>) -> [UUID] {
-        items.map(\.id).filter(ids.contains)
+    private func command<Value: Sendable>(_ name: String, count: Int = 1,
+        _ action: () async throws -> Value) async throws -> CommandOutcome<Value> {
+        loadGeneration &+= 1
+        let outcome = try await NativeLibraryCommands.perform(on: library,
+            context: NativeCommandContext(operation: name, input: Data(), expectedCount: count), operation: action)
+        loadGeneration &+= 1
+        lastCommandReceipt = outcome.receipt
+        if let warning = outcome.warnings.first { errorMessage = warning }
+        return outcome
+    }
+
+    private func refreshCommittedSummary(scope: DeckScope) async {
+        do {
+            let snapshot = try await reads.load(scope: scope, demand: [.summary], asOf: .now)
+            if let summary = snapshot.summary { scopeSummary = summary }
+            errorMessage = snapshot.maturityIssue
+        } catch { errorMessage = "Saved. Refresh could not finish: \(error.localizedDescription)" }
     }
 
     private var cachedScope: StudyScope = .allDecks

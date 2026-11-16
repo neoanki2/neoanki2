@@ -266,13 +266,16 @@ struct NeoAnki2App: App {
                 payload = try await prepareLibrary(at: AppDatabase.defaultURL)
             }
 #endif
+            let reads = NativeLibraryReadCoordinator(library: payload.library)
             let newItemsModel = ItemsModel(
                 library: payload.library,
-                mediaStore: payload.mediaStore
+                mediaStore: payload.mediaStore,
+                reads: reads
             )
             let newDecksModel = DecksModel(
                 library: payload.library,
-                onDueCountChange: AppDelegate.updateDockBadge
+                onDueCountChange: AppDelegate.updateDockBadge,
+                reads: reads
             )
             if let snapshot = payload.snapshot {
                 newDecksModel.applyColdHomeSnapshot(snapshot)

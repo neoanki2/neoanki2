@@ -36,6 +36,7 @@ final class StudyModel {
     var didFailToLoad: Bool { session.didFailToLoad }
     var pendingGradeUndo: PendingGradeUndo? { session.pendingGradeUndo }
     var typedAnswer: String { session.typedAnswer }
+    var reviewResponse: String? { session.reviewResponse }
     var answerEvaluation: AnswerEvaluation? { session.answerEvaluation }
     var choiceOptions: [String] { session.choiceOptions }
     var selectedChoice: String? { session.selectedChoice }

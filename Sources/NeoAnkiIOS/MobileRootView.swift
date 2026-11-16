@@ -58,6 +58,14 @@ public struct MobileRootView: View {
             }
             }
         }
+        .safeAreaInset(edge: .top) {
+            if let message = model.recoveryMessage {
+                HStack {
+                    Text(message).font(.footnote)
+                    Button("Refresh") { Task { await model.refresh() } }
+                }.padding().background(.regularMaterial)
+            }
+        }
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
         .environment(\.vocabularyPackRootURL, vocabularyRootURL)
         .environment(\.openLearnInContext, { deckID in
@@ -624,8 +632,8 @@ private struct ScopeDetailView: View {
                     LabeledContent("New", value: summary.newCount.formatted())
                     LabeledContent("Learning", value: summary.inLearningCount.formatted())
                     LabeledContent("Review", value: summary.reviewCount.formatted())
-                    LabeledContent("Maturity", value: summary.maturity.displayName)
-                    if summary.maturity.activeCardCount > 0 {
+                    LabeledContent("Maturity", value: model.recoveryMessage == nil ? summary.maturity.displayName : "Unavailable")
+                    if model.recoveryMessage == nil, summary.maturity.activeCardCount > 0 {
                         LabeledContent("Progress", value: summary.maturity.progressText)
                     }
                 }

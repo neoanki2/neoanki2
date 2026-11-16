@@ -77,6 +77,25 @@ public final class StudyFeatureModel: Identifiable {
     public private(set) var arrangedItems: [String] = []
     public private(set) var selectedArrangementIndex: Int?
     public private(set) var interactionMessage: String?
+
+    /// Retain the learner's actual response when the input controls disappear.
+    public var reviewResponse: String? {
+        guard isAnswerRevealed else { return nil }
+        switch currentCard?.template.interaction {
+        case .type:
+            return typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : typedAnswer
+        case .choose:
+            return selectedChoice
+        case .arrange:
+            guard !arrangedItems.isEmpty else { return nil }
+            let reference = currentCard.flatMap { StudyResponseEvaluator.acceptedAnswers(for: $0).first } ?? ""
+            let separator = reference.split(whereSeparator: \.isNewline).count > 1 ? "\n"
+                : (reference.split(whereSeparator: \.isWhitespace).count > 1 ? " " : "")
+            return arrangedItems.joined(separator: separator)
+        default:
+            return nil
+        }
+    }
     public private(set) var reviewedCount = 0
     public private(set) var completedSubmissionCount = 0
     public private(set) var reviewedCardIDs: Set<UUID> = []

@@ -22,7 +22,9 @@ flowchart LR
     Mac["macOS shell<br/>commands, panels, local API"] --> Features[NeoAnkiFeatures]
     iOS["iPhone/iPad shell<br/>native navigation and pickers"] --> Mobile[NeoAnkiMobile]
     Mobile --> Features
-    Features --> SharedUI[NeoAnkiSharedUI]
+    Mobile --> SharedUI[NeoAnkiSharedUI]
+    Mac --> SharedUI
+    SharedUI --> Features
     Features --> Application[NeoAnkiApplication]
     Application --> Repository[LibraryRepository]
     Repository --> Core[NeoAnkiCore / ItemStore]
@@ -41,7 +43,7 @@ and the local HTTP server are assembled.
 | Target | Owns now | Must not own |
 | --- | --- | --- |
 | `NeoAnkiCore` | Domain values, schema validation, persistence, scheduling, study-response and content-visibility semantics | UI copy, navigation, pickers, CloudKit |
-| `NeoAnkiApplication` | Repository capabilities, `AppSession`, routes, presentations, editor/draft state, service protocols, sync-facing types | SwiftUI/AppKit/UIKit/CloudKit |
+| `NeoAnkiApplication` | Repository capabilities, native command outcomes and read coordination, `AppSession`, routes, editor/draft state, service protocols, sync-facing types | SwiftUI/AppKit/UIKit/CloudKit |
 | `NeoAnkiFeatures` | Observable library, authoring, study, transfer, reminder, widget, and sync workflows shared by app shells | AppKit/UIKit/CloudKit and direct SQLite access |
 | `NeoAnkiMobile` | Adaptive SwiftUI screens and iOS media/playback adapters | App identity, entitlements, CloudKit credentials |
 | `NeoAnkiSharedUI` | Adaptive reading layout, semantic tokens, common status/empty/error content | File panels, Mac tables, menu commands, database access |

@@ -181,6 +181,8 @@ extension ItemStore {
                     )
                 }
             }
+            let result = PortableDeckImportResult(deckIDs: [destinationDeckID ?? package.rootDeckID], itemCount: importedItems.count,
+                createdItemTypeCount: createdTypes.count, reusedItemTypeCount: reusedTypeIDs.count)
             try await database.importPortableDeck(
                 .init(
                     attachmentDeckID: destinationDeckID,
@@ -202,18 +204,13 @@ extension ItemStore {
                 now: now,
                 initialDueDates: Dictionary(
                     uniqueKeysWithValues: importedItems.map { ($0.item.id, $0.createdAt) }
-                )
+                ), result: result
             )
             // The database transaction consumes committed reservations. Any
             // residual scope cleanup is best-effort after commit: reporting
             // failure here would invite a retry that duplicates imported data.
             try? await mediaStore?.releaseReservations(scopeID: reservationScope)
-            return .init(
-                deckIDs: [destinationDeckID ?? package.rootDeckID],
-                itemCount: importedItems.count,
-                createdItemTypeCount: createdTypes.count,
-                reusedItemTypeCount: reusedTypeIDs.count
-            )
+            return result
         } catch {
             try? await mediaStore?.rollbackReservations(scopeID: reservationScope)
             throw error

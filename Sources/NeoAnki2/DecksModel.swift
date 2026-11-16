@@ -42,6 +42,8 @@ final class DecksModel {
     private(set) var errorMessage: String?
 
     private var hasLoaded = false
+    private let reads: NativeLibraryReadCoordinator
+    private var loadGeneration: UInt64 = 0
     var needsInitialLoad: Bool { !hasLoaded }
 
     var selectedScope: SidebarSelection = .allDecks
@@ -51,9 +53,11 @@ final class DecksModel {
 
     init(
         library: any LibraryBrowsing & LibraryDeckManaging,
-        onDueCountChange: (@MainActor (Int) -> Void)? = nil
+        onDueCountChange: (@MainActor (Int) -> Void)? = nil,
+        reads: NativeLibraryReadCoordinator? = nil
     ) {
         self.library = library
+        self.reads = reads ?? NativeLibraryReadCoordinator(library: library)
         self.onDueCountChange = onDueCountChange
     }
 
@@ -160,15 +164,14 @@ final class DecksModel {
     /// half-updated set, and assigns only what changed, so an unchanged library
     /// costs no view updates.
     private func applyCounts(asOf now: Date) async throws {
-        let loadedSummaries = try await library.deckSummaries(asOf: now)
-        let allDecksSummary = try await library.scopeSummary(
-            scope: .allDecks,
-            asOf: now
-        )
-        let unassignedSummary = try await library.scopeSummary(
-            scope: .unassigned,
-            asOf: now
-        )
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        let snapshot = try await reads.load(scope: studyScope.filter, demand: [.home], asOf: now)
+        guard generation == loadGeneration, let home = snapshot.home else { return }
+        let loadedSummaries = home.deckSummaries
+        let allDecksSummary = home.allDecksSummary
+        let unassignedSummary = home.unassignedSummary
+        errorMessage = snapshot.maturityIssue.map { "Maturity is unavailable. " + $0 }
         let allDecksDue = allDecksSummary.dueNow
         let unassignedDue = unassignedSummary.dueNow
         let unassignedItems = unassignedSummary.itemCount
@@ -213,7 +216,8 @@ final class DecksModel {
             }
 
             let deck = Deck(name: trimmed, parentID: parentID)
-            let created = try await library.createDeck(deck)
+            let outcome = try await command("create-deck") { try await library.createDeck(deck) }
+            let created = outcome.value ?? deck
             await load()
             selectedScope = .deck(created.id)
             return created
@@ -234,7 +238,7 @@ final class DecksModel {
         do {
             var deck = try await library.deck(id: id)
             deck.name = trimmed
-            _ = try await library.updateDeck(deck)
+            _ = try await command("update-deck") { try await library.updateDeck(deck) }
             await load()
             return true
         } catch {
@@ -253,7 +257,7 @@ final class DecksModel {
         do {
             var deck = try await library.deck(id: id)
             deck.newCardsPerDay = limit
-            _ = try await library.updateDeck(deck)
+            _ = try await command("update-deck") { try await library.updateDeck(deck) }
             // The tree is unchanged; only the limit and the due counts it gates
             // moved, so there is nothing here worth a reload.
             await refreshCounts()
@@ -268,7 +272,8 @@ final class DecksModel {
         errorMessage = nil
         guard canMoveDeck(id: id, to: destination) else { return false }
         do {
-            guard try await library.moveDeck(id: id, to: destination) else { return false }
+            let outcome = try await command("move-deck") { try await library.moveDeck(id: id, to: destination) }
+            guard outcome.value ?? (outcome.receipt != nil) else { return false }
             await load()
             return true
         } catch {
@@ -364,7 +369,8 @@ final class DecksModel {
     func deleteDeck(id: UUID) async -> Bool {
         errorMessage = nil
         do {
-            guard try await library.deleteDeck(id: id) else { return false }
+            let outcome = try await command("delete-deck") { try await library.deleteDeck(id: id) }
+            guard outcome.value ?? (outcome.receipt != nil) else { return false }
             if case let .deck(selectedID) = selectedScope {
                 let deletedIDs = DeckTree.descendantIDs(of: id, in: summaries)
                 if deletedIDs.contains(selectedID) {
@@ -391,7 +397,8 @@ final class DecksModel {
     func resetProgress(id: UUID, now: Date = .now) async -> Int? {
         errorMessage = nil
         do {
-            let resetCount = try await library.resetDeckProgress(id: id, asOf: now)
+            let outcome = try await command("reset-deck") { try await library.resetDeckProgress(id: id, asOf: now) }
+            let resetCount = outcome.value ?? outcome.affectedCount ?? 0
             await refreshCounts(asOf: now)
             return resetCount
         } catch {
@@ -402,6 +409,12 @@ final class DecksModel {
 
     func deckName(for id: UUID) -> String? {
         summaries.first(where: { $0.id == id })?.name
+    }
+
+    private func command<Value: Sendable>(_ name: String,
+        _ action: () async throws -> Value) async throws -> CommandOutcome<Value> {
+        try await NativeLibraryCommands.perform(on: library,
+            context: NativeCommandContext(operation: name, input: Data()), operation: action)
     }
 
     private func siblingSummaries(containing id: UUID) -> [DeckSummary] {

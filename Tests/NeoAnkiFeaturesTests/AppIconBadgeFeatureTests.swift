@@ -119,7 +119,8 @@ private actor BadgeOnlyNotificationScheduler: NotificationSchedulingService {
     let due = try await library.card(id: cardID).memory.due
     await model.refresh(asOf: due.addingTimeInterval(1))
     #expect(await publisher.badges.last?.label == "1")
-    try await model.deleteItems(Set(model.items.map(\.id)))
+    let rows = try await model.loadBrowse(scope: .allDecks)
+    try await model.deleteItems(Set(rows.map(\.id)))
     #expect(await publisher.badges.last?.count == 0)
 }
 

@@ -10,6 +10,8 @@ struct MobileStudyCompositionView: View {
     let isAnswerRevealed: Bool
     var occlusionGroup: Int? = nil
     let clozeGroup: Int?
+    var response: String? = nil
+    var evaluation: AnswerEvaluation? = nil
 
     private var components: [ResolvedTemplateComponent] {
         SideContent.resolvedComponents(for: template, from: item)
@@ -20,11 +22,14 @@ struct MobileStudyCompositionView: View {
     }
 
     var body: some View {
-        CardWireframeView(
+        StudyAnswerReview(
             layout: effectiveLayout,
             components: components,
             isAnswerRevealed: isAnswerRevealed,
-            mobileReading: true
+            response: response,
+            evaluation: evaluation,
+            mobileReading: true,
+            enabled: [.type, .choose, .arrange].contains(template.interaction)
         ) { component, _ in
             MobileContentValueView(
                 value: component.value,
