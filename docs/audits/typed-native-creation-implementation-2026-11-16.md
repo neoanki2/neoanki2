@@ -35,7 +35,10 @@ The 100,000-card candidate head p95 is 0.489 ms, within the 200 ms acceptance bu
 
 The full Core and root Swift test lanes passed 1,269 tests, including native creation differential imports, schema reuse, atomic second-item failure, deleted parent, lost response/reopened receipt replay, request-hash conflict, cancellation, legacy registry fallback, encoded limits, compatibility-export symlink confinement, query plans, deterministic statement work and a held read snapshot with a concurrent writer. Existing authored/portable/media, scheduling, sync and API suites remained enabled. The unsigned iOS app/widget build passed.
 
-The fast workflow's supporting contracts, architecture and API-reference checks passed. Its documentation stage initially found the regenerated feature index and ADR navigation missing; those documentation inputs were corrected and the documentation gate was rerun. Original logs are retained. Test setup corrections initialized the diagnostic SQLite connection and used WAL for the intentional concurrent-write fixture; assertions were retained. Stale generated XCTest signing bundles were rebuilt without weakening signing or stripping quarantine.
+The fast workflow's supporting contracts, architecture and API-reference checks passed. Its documentation stage initially found the regenerated feature index and ADR navigation missing; those documentation inputs were corrected and the documentation gate was rerun.
+CI additionally required the affected sync, scheduling, item-type, troubleshooting
+and CLI guides and claims registry to be reviewed; those were updated without
+weakening the change-aware gate. Original logs are retained. Test setup corrections initialized the diagnostic SQLite connection and used WAL for the intentional concurrent-write fixture; assertions were retained. Stale generated XCTest signing bundles were rebuilt without weakening signing or stripping quarantine.
 
 The implementation adds no file-format/schema migration. Publication uses the merged-main unified controller and one shared version. Store submission/processing/public availability, local Mac upgrade, verified iPhone update and completed-artifact cleanup are separate recorded outcomes; no publication or device result is implied by these test results.
 

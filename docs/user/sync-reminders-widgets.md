@@ -43,6 +43,11 @@ including badges and the widget. Saved dictionary–deck capture configurations
 remain local to each device and library; configure a pair separately on another
 device even when its items and dictionary packs have synced.
 
+Poem and prose creation saves the selected parent relationship with the deck.
+After the local save, the deck and its items join ordinary library sync; badges,
+reminders, and widgets refresh from committed library data. A dictionary pack's
+download status is separate from the sync status of saved study items.
+
 This guide follows the current `main` source. Before relying on sync in an
 installed build, check that build's release notes and entitlements; an older
 public Mac release or unsigned contributor build can operate locally without a

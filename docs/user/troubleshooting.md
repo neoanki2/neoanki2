@@ -21,6 +21,13 @@ backup before attempting any repair. A rejected selection move means at least
 one selected item disappeared or changed its deck; refresh and select the items
 again.
 
+## A generated deck's selected parent disappeared
+
+Choose an existing root deck and try again. Failed poem/prose placement does not
+leave an unexpected top-level deck, and the entered text remains in the builder.
+If the message instead says the save status could not be confirmed, keep the
+form open and refresh or inspect the library before starting another creation.
+
 ## Learning time is missing or still saving
 
 Learning time starts with new study sessions and excludes browsing, editing,
