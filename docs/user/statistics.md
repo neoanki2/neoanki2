@@ -7,8 +7,8 @@ parent: User guide
 
 # Statistics
 
-Open **Statistics** from the Mac or iPad sidebar, the iPhone tab bar, or a deck's
-Statistics action. Mac, iPhone, and iPad use the same screen and calculations.
+Open **Statistics** from the Mac or iPad sidebar or the iPhone tab bar.
+Mac, iPhone, and iPad use the same screen and calculations.
 Session completion offers **View Session Statistics**, filtered to that session.
 Home and deck screens retain due counts and study actions; reports live here.
 
@@ -31,7 +31,8 @@ did not record that classification.
   and read-only scenarios.
 
 Select a time bucket, calendar day, grade, or memory histogram category to
-inspect details. Chart data tables expose exact values without relying on
+inspect details. Hovering keeps following charts in place: the detail line has
+reserved space before a value is selected. Chart data tables expose exact values without relying on
 color or pointer hover. Chart Export actions save their underlying data as CSV;
 the toolbar exports the report's aggregate data.
 
@@ -66,7 +67,9 @@ Stability describes memory durability; difficulty describes how slowly it grows.
 Time-of-day patterns describe your activity and do not prove a best study time.
 
 The study calendar has one cell for every day in the selected year. Switch between
-review counts and active learning minutes; darker cells mean more activity. Days
+review counts and active learning minutes; stronger color means more activity.
+Month names run across the top and weekdays stay on the leading edge. Daily cells
+stay approximately square; compact screens scroll the chart horizontally. Days
 with no activity remain visible, and an empty year is labeled explicitly.
 
 ## Dates, moves, deletion, and sync
@@ -85,11 +88,13 @@ Updated apps preserve content-free statistical history when you delete content.
 Explicit undo removes the review contribution, while reset preserves completed
 activity. No card text, submitted answers, or recordings are copied into
 statistics evidence. Older deletion and undo records cannot always be
-separated; ambiguous legacy reviews are excluded and labeled.
+separated; ambiguous legacy reviews are excluded.
 
 Statistics evidence syncs through its own private iCloud zone. Older apps keep
-ordinary library sync but do not record every new measurement. Missing evidence
-and tracking-start dates are shown instead of fabricating earlier history.
+ordinary library sync but do not record every new measurement. Earlier history
+is limited to the evidence saved by those app versions. The definitions in this
+guide explain those limits; the Statistics screen has no separate explanatory
+footer.
 
 ## Workload scenarios
 

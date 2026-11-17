@@ -9,9 +9,10 @@ extension FastFunctionalJourneyTests {
         let headline = app.descendants(matching: .any).identified("scopeHomeDueHeadline")
         XCTAssertTrue(headline.waitUntilExists(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["scopeHomeCardStates"].exists)
-        XCTAssertTrue(app.buttons["viewStatistics"].exists)
+        XCTAssertFalse(app.buttons["viewStatistics"].exists)
         XCTAssertTrue(app.buttons.identified("studyButton").isEnabled)
-        XCTAssertTrue(app.buttons.identified("scopeHomeBrowseLink").exists)
+        XCTAssertFalse(app.buttons.identified("scopeHomeBrowseLink").exists)
+        XCTAssertTrue(app.buttons.identified("browseToolbar").exists)
     }
 
     /// The scope home never prints an item's answer, which is the whole reason

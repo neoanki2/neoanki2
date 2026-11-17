@@ -2203,6 +2203,31 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
         open("Home",in:app)
         XCTAssertFalse(app.buttons["viewLearningTime"].exists)
     }
+    func testCalendarPresentationAndStableSelection() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
+        open("Statistics", in: app)
+        let screen = app.scrollViews["statisticsScreen"]
+        XCTAssertTrue(app.descendants(matching: .any)["statisticsTotals"].waitUntilExists(timeout: 15))
+        let metric = app.segmentedControls["statisticsCalendarMetric"]
+        let calendar = app.descendants(matching: .any)["statisticsStudyCalendar"]
+        for label in ["Reviews", "Active minutes"] {
+            scrollTo(metric, in: app, surface: screen)
+            metric.buttons[label].tap()
+            scrollTo(calendar, in: app, surface: screen)
+            XCTAssertLessThanOrEqual(calendar.frame.maxX, app.frame.maxX)
+            XCTAssertGreaterThan(calendar.frame.height, 100)
+            let attachment = XCTAttachment(screenshot: calendar.screenshot())
+            attachment.name = "study-calendar-" + label
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            let before = calendar.frame
+            let plot = app.descendants(matching: .any)["statisticsCalendarPlot"]
+            plot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertEqual(calendar.frame.height, before.height, accuracy: 1,
+                           "Selecting a day must not move following charts")
+        }
+        XCTAssertFalse(app.staticTexts["About these statistics"].exists)
+    }
     func testStatisticsAtAccessibilityTextSize() throws {
         let app=launchApp(additionalArguments:["-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"])
         open("Statistics",in:app)

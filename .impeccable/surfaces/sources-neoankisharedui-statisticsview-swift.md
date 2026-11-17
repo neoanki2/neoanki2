@@ -21,3 +21,9 @@ counts and save/sync errors remain beside their actions.
 
 Verification is headless; disposable Simulator XCTest is permitted, host desktop
 interaction is not. No visual-world replacement or image assets are required.
+
+Calendar refinement: use month labels, leading weekday labels, square daily
+cells, and a continuous intensity scale. Compact layouts scroll with Swift
+Charts while keeping the weekday axis visible. Hover details reserve their
+space. Home has no duplicate Statistics/Browse links, and Statistics has no
+About footer; definitions remain in the user guide.

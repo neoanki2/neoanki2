@@ -14,8 +14,8 @@ first loading every saved item. If progress evidence cannot be read, a recovery
 message identifies unavailable maturity while keeping the library accessible.
 
 Choose **Statistics** in the Mac/iPad sidebar or iPhone tab bar for activity,
-learning time, progress, streaks, and workload charts. A deck's Statistics action
-selects that scope. Reports use one shared screen across all Apple platforms;
+learning time, progress, streaks, and workload charts. Select a deck using the
+scope filter in that screen. Reports use one shared screen across all Apple platforms;
 home keeps due counts and study actions. See [Statistics](../statistics/).
 
 NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and

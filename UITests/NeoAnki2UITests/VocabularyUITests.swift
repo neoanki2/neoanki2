@@ -49,10 +49,11 @@ extension FastFunctionalJourneyTests {
         XCTAssertTrue(waitUntil(timeout: 5) { (app.buttons.identified("word-capture-setup").value as? String) == "Basic" })
         app.buttons.identified("word-capture-done").click()
         showSidebar(in: app)
-        let browse = app.descendants(matching: .any)["scopeHomeBrowseLink"]
-        XCTAssertTrue(waitUntil(timeout: 10) {
-            (browse.label + " " + (browse.value as? String ?? "")).contains("Browse 2 Items")
-        })
+        enterBrowseMode(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["itemBrowserTable"].waitUntilExists(timeout: 10))
+        let itemRows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'itemRow-'"))
+        XCTAssertEqual(itemRows.count, 2, "Both captured vocabulary items must be saved")
+        leaveBrowseMode(in: app)
         let deckRows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'deckRow-'"))
         XCTAssertEqual(deckRows.count, 1, "Word capture must not create child decks")
     }

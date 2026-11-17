@@ -15,7 +15,8 @@ update without replacing usable item fields and study controls.
 
 Statistics uses shared native filters, Swift Charts selection, exact-value
 data tables, and CSV export on Mac, iPhone, and iPad. Its layout adapts to width
-and Dynamic Type. Learning-time durations are reported under Activity. The study timer runs automatically and has no pause or resume button.
+and Dynamic Type. Chart selection reserves its detail space so hovering does
+not shift the charts below it. Learning-time durations are reported under Activity. The study timer runs automatically and has no pause or resume button.
 Save errors and retry actions remain available on completion and totals screens.
 These are implemented semantics, not a claim of live assistive-technology verification.
 See [Statistics](../statistics/) and [Learning time](../learning-time/).

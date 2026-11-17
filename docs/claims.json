@@ -190,6 +190,7 @@
       "contains": [
         "Mac, iPhone, and iPad use the same screen and calculations",
         "one cell for every day in the selected year",
+        "Hovering keeps following charts in place",
         "Explicit undo removes the review contribution",
         "Scenarios never change actual cards, due dates, or settings"
       ]

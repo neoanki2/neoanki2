@@ -75,6 +75,10 @@ is deleted or its type changes, repair the pair's setup before adding again;
 the app does not silently redirect content to another field. Standard
 **Add Item** uses the selected type's fields without dictionary lookup.
 
+To inspect items after changing their type or card setup, use the **Browse**
+toolbar action on Mac or **Library** on iPhone/iPad. Home no longer repeats those
+navigation links. Statistics filters can narrow reviews to a type or card setup.
+
 ## Start with a complete item type
 
 Choose **New Item Type**. A new type already contains required Text fields

@@ -471,6 +471,7 @@
         "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsForecast.swift",
         "Sources/NeoAnkiSharedUI/StatisticsView.swift",
         "Sources/NeoAnkiSharedUI/StatisticsCharts.swift",
+        "Sources/NeoAnkiSharedUI/StatisticsCalendarPlot.swift",
         "Sources/NeoAnkiApplication/LibraryStatistics.swift",
         "Sources/NeoAnkiFeatures/StatisticsFeatureModel.swift",
         "Sources/NeoAnkiCloudSync/StatisticsSyncService.swift"

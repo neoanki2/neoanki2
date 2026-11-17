@@ -58,7 +58,6 @@ public struct StatisticsView: View {
                     case .memory: memory(snapshot)
                     case .workload: workload(snapshot)
                     }
-                    coverage(snapshot)
                 } else if model.isLoading {
                     ProgressView("Preparing statistics…")
                 } else {
@@ -251,7 +250,7 @@ public struct StatisticsView: View {
             Picker("Calendar metric", selection: $heatmapTime) {
                 Text("Reviews").tag(false)
                 Text("Active minutes").tag(true)
-            }.pickerStyle(.segmented)
+            }.pickerStyle(.segmented).accessibilityIdentifier("statisticsCalendarMetric")
             StatisticsHeatmap(points: heatmapTime ? s.timeHeatmap : s.heatmap, onSelect: { selectDay($0) })
             StatisticsTimeChart(
                 title: "Reviews",
@@ -585,36 +584,6 @@ public struct StatisticsView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { selectedReview = nil } }
             }
         }.frame(minWidth: 300, minHeight: 400)
-    }
-    private func coverage(_ s: StatisticsSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-            Text("About these statistics").font(.headline)
-            Text(
-                "Days follow your configured study-day rollover in this device's time zone. Active time excludes browsing, editing and background time. Streaks count days with a completed, non-undone review."
-            )
-            if let began = s.coverage.timeStartedAt {
-                Text("Active time recorded since \(began.formatted(date:.abbreviated,time:.omitted)).")
-            }
-            if let began = s.coverage.progressStartedAt {
-                Text(
-                    "Progress-state tracking began \(began.formatted(date:.abbreviated,time:.omitted)); earlier history is shown only where supported by saved reviews."
-                )
-            }
-            if s.coverage.unknownReviewCount > 0 {
-                Text(
-                    "\(s.coverage.unknownReviewCount) legacy reverted reviews have ambiguous undo/deletion history and are excluded."
-                )
-            }
-            if s.coverage.pendingMilliseconds > 0 {
-                Text(
-                    LearningTimeFormat.duration(s.coverage.pendingMilliseconds)
-                        + " is waiting for synced content.")
-            }
-            Text(
-                "Prompt/answer splits and linked session review counts are available only for reviews recorded by updated apps. Small samples are descriptive; they do not establish causation."
-            )
-        }.font(.caption).foregroundStyle(.secondary)
     }
     private func selectDay(_ date: Date) {
         let start = StudyDay.start(for: date.addingTimeInterval(12 * 3600), rolloverMinutes: model.rollover)

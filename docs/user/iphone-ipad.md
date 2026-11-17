@@ -15,10 +15,11 @@ refresh a changed selection. Typed answers keep your submitted text beside the
 expected answer after checking; explanations remain under **Explanation**.
 
 The **Statistics** tab on iPhone and sidebar destination on iPad open the same
-reports as Mac: Overview, Activity, Memory, and Workload. Deck actions scope that
-screen; **View Session Statistics** opens a completed session's details. Home
+reports as Mac: Overview, Activity, Memory, and Workload. Its scope filter selects
+a deck; **View Session Statistics** opens a completed session's details. Home
 keeps due counts and study actions rather than repeating statistical totals.
-Tracking remains automatic. See [Statistics](../statistics/) and
+Home and deck screens omit duplicate Statistics and Browse links; use the
+Statistics and Library destinations instead. Tracking remains automatic. See [Statistics](../statistics/) and
 [Learning time](../learning-time/) for definitions and recording rules.
 
 NeoAnki2 has a native app for iOS and iPadOS 17 or newer. It shares the same

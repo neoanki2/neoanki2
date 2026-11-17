@@ -79,7 +79,8 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility",
-        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize"
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize",
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testCalendarPresentationAndStableSelection"
       ]
     },
     {
@@ -116,7 +117,8 @@
       "tests": [
         "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testTabletCardSetupControlsHaveNoHorizontalOverflow",
         "NeoAnki2MobileUITests/MobileStudioCanvasAccessibilityUITests/testItemTypeStudioPreviewAccessibility",
-        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize"
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testStatisticsAtAccessibilityTextSize",
+        "NeoAnki2MobileUITests/MobileStatisticsUITests/testCalendarPresentationAndStableSelection"
       ]
     },
     {
