@@ -400,7 +400,13 @@ These cuts remove duplicate entry points without changing stored items or schedu
 Statistics is one shared Operate surface on Mac, iPhone, and iPad. Overview,
 Activity, Memory, and Workload share a model, definitions, Swift Charts, filters,
 selection, tables, and CSV exports. Width changes layout, never capabilities.
-Home and deck surfaces show operational due information and a Statistics link;
-learning-time and progress reports live only in Statistics. Completion screens
+Mac scope home pairs the due headline and Study action with a quiet “Today so
+far” summary of distinct reviewed cards and recorded study time. A neutral
+seven-bar “Coming up” chart shows the next seven study days' current scheduled
+cards, including zero days, excluding today's queue and unintroduced cards.
+It is scheduling evidence, not simulated repeat workload. The group uses the
+600pt reading column with generous top and inter-section spacing; narrow panes
+stack the study and activity groups. Detailed learning-time and progress reports
+live in Statistics. Completion screens
 link to session statistics rather than repeating totals. Use native typography,
 semantic colors, exact accessible values, and explicit coverage/estimate labels.

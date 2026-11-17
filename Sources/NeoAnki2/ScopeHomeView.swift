@@ -1,11 +1,15 @@
+import Charts
 import NeoAnkiCore
 import NeoAnkiApplication
+import NeoAnkiFeatures
 import NeoAnkiSharedUI
 import SwiftUI
 
 /// The default detail pane: what this scope owes you right now, and one way to
 /// start. Enumerating items is a separate, deliberate mode.
 struct ScopeHomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var statistics: StatisticsFeatureModel
     @Bindable var itemsModel: ItemsModel
     let scope: StudyScope
     let onStudy: () -> Void
@@ -14,6 +18,22 @@ struct ScopeHomeView: View {
     let onAddItem: () -> Void
 
     private var summary: ScopeSummary { itemsModel.scopeSummary }
+
+    init(
+        itemsModel: ItemsModel, library: any LibraryRepository, scope: StudyScope,
+        onStudy: @escaping () -> Void, onBrowse: @escaping () -> Void,
+        onBrowseItemsNeedingAttention: @escaping () -> Void, onAddItem: @escaping () -> Void
+    ) {
+        self.itemsModel = itemsModel
+        self.scope = scope
+        self.onStudy = onStudy
+        self.onBrowse = onBrowse
+        self.onBrowseItemsNeedingAttention = onBrowseItemsNeedingAttention
+        self.onAddItem = onAddItem
+        let model = StatisticsFeatureModel(library: library, scope: scope.filter)
+        model.query.period = .today
+        _statistics = State(initialValue: model)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,21 +88,120 @@ struct ScopeHomeView: View {
     // MARK: - Home
 
     private var home: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-                // The rhythm is deliberately uneven: the headline block gets more
-                // air beneath it than the blocks below get between them, so
-                // position carries hierarchy that type size is not allowed to.
-                dueSection
-                    .padding(.bottom, DesignSystem.Spacing.xs)
-                if summary.leechCount > 0 {
-                    leechCallout
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xl * 2) {
+                    if geometry.size.width >= 520 {
+                        HStack(alignment: .center, spacing: DesignSystem.Spacing.xl) {
+                            dueSection
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            todaySection
+                                .padding(.leading, DesignSystem.Spacing.lg)
+                                .overlay(alignment: .leading) { Divider() }
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                            dueSection
+                            todaySection
+                        }
+                    }
+                    upcomingSection
+                    if summary.leechCount > 0 {
+                        leechCallout
+                    }
                 }
+                .frame(maxWidth: DesignSystem.readingColumnMaxWidth, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, DesignSystem.Spacing.xl)
+                .padding(.vertical, DesignSystem.Spacing.xl * 2)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .readingColumnLayout()
         }
         .accessibilityIdentifier("scopeHome")
+        .task { await statistics.observe() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await statistics.refresh(force: false) } }
+        }
+    }
+
+    private var todaySection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+            Text("Today so far")
+                .font(DesignSystem.Typography.uiCaption)
+                .foregroundStyle(.secondary)
+            if let snapshot = statistics.snapshot {
+                let count = snapshot.distinctCards
+                Text("\(count) \(count == 1 ? "card" : "cards") reviewed")
+                    .font(DesignSystem.Typography.uiBody.weight(.medium))
+                    .monospacedDigit()
+                Text("\(LearningTimeFormat.duration(snapshot.activeMilliseconds)) of study")
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(
+                        "\(LearningTimeFormat.accessibleDuration(snapshot.activeMilliseconds)) of study")
+            } else {
+                Text(statistics.error == nil ? "Loading activity…" : "Activity unavailable")
+                    .font(DesignSystem.Typography.uiCaption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("scopeHomeToday")
+    }
+
+    private var upcomingSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Coming up")
+                    .font(DesignSystem.Typography.uiBody.weight(.semibold))
+                Spacer(minLength: DesignSystem.Spacing.xs)
+                Text("Scheduled cards")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let snapshot = statistics.snapshot {
+                let days = ScopeHomeUpcoming.days(
+                    points: snapshot.due, asOf: snapshot.asOf, rollover: statistics.rollover)
+                Chart(days) { day in
+                    BarMark(
+                        x: .value("Day", day.date.formatted(.dateTime.weekday(.abbreviated))),
+                        y: .value("Scheduled cards", day.count),
+                        width: .ratio(0.55)
+                    )
+                    .foregroundStyle(.secondary.opacity(0.55))
+                    .cornerRadius(3)
+                    .annotation(position: .top, spacing: DesignSystem.Spacing.xs) {
+                        Text(day.count, format: .number.notation(.compactName))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    .accessibilityLabel(day.date.formatted(date: .complete, time: .omitted))
+                    .accessibilityValue("\(day.count) scheduled cards")
+                }
+                .chartYAxis(.hidden)
+                .chartXAxis {
+                    AxisMarks { _ in AxisValueLabel() }
+                }
+                .chartYScale(domain: 0...Double(max(1, days.map(\.count).max() ?? 0)) * 1.3)
+                .frame(height: 160)
+                .accessibilityLabel("Scheduled cards over the next seven study days")
+                .accessibilityIdentifier("scopeHomeUpcomingChart")
+                Text("Next 7 days. Counts change as you study.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if statistics.error == nil {
+                ProgressView("Loading scheduled cards…")
+                    .frame(height: 160)
+            }
+            if statistics.error != nil {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                    Text("\(statistics.snapshot == nil ? "Scheduled cards are unavailable." : "Activity and scheduled cards may be out of date.") You can still study.")
+                        .font(DesignSystem.Typography.uiCaption)
+                        .foregroundStyle(.secondary)
+                    Button("Retry") { Task { await statistics.refresh() } }
+                }
+            }
+        }
     }
 
     /// The one question this pane exists to answer, with the one action that
