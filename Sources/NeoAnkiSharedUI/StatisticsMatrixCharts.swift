@@ -29,22 +29,26 @@ struct StatisticsMatrixPlot: View {
     }
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
-            Chart(cells) { cell in
-                RectangleMark(
-                    xStart: .value("Column", Double(cell.column) - 0.44),
-                    xEnd: .value("Column", Double(cell.column) + 0.44),
-                    yStart: .value("Row", Double(cell.row) - 0.44),
-                    yEnd: .value("Row", Double(cell.row) + 0.44)
-                )
-                .foregroundStyle(by: .value(unit, cell.value))
-                .accessibilityLabel(cell.label)
-                .accessibilityValue(
-                    "\(cell.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
-            }
-            .chartForegroundStyleScale(
-                domain: 0...peak,
-                range: Gradient(colors: [Color.accentColor.opacity(0.12), Color.accentColor])
-            )
+            plot
+            legend
+        }
+    }
+    private func mark(_ cell: StatisticsMatrixCell) -> some ChartContent {
+        let description = cell.value.formatted(.number.precision(.fractionLength(0...1))) + " " + unit
+        return RectangleMark(
+            xStart: .value("Column", Double(cell.column) - 0.44),
+            xEnd: .value("Column", Double(cell.column) + 0.44),
+            yStart: .value("Row", Double(cell.row) - 0.44),
+            yEnd: .value("Row", Double(cell.row) + 0.44)
+        )
+        .foregroundStyle(by: .value(unit, cell.value))
+        .accessibilityLabel(Text(cell.label))
+        .accessibilityValue(Text(description))
+    }
+    private var plot: some View {
+        Chart(cells) { cell in mark(cell) }
+            .chartForegroundStyleScale(domain: 0...peak,
+                range: Gradient(colors: [Color.accentColor.opacity(0.12), Color.accentColor]))
             .chartLegend(.hidden)
             .chartXScale(domain: -0.5...(Double(max(1, columns.count)) - 0.5))
             .chartYScale(domain: [Double(max(1, rows.count)) - 0.5, -0.5])
@@ -67,16 +71,15 @@ struct StatisticsMatrixPlot: View {
                 }
             }
             .frame(height: height)
-            HStack(spacing: 6) {
-                Text("0")
-                LinearGradient(
-                    colors: [Color.accentColor.opacity(0.12), Color.accentColor],
-                    startPoint: .leading, endPoint: .trailing
-                )
+    }
+    private var legend: some View {
+        HStack(spacing: 6) {
+            Text("0")
+            LinearGradient(colors: [Color.accentColor.opacity(0.12), Color.accentColor],
+                startPoint: .leading, endPoint: .trailing)
                 .frame(width: 72, height: 8).clipShape(RoundedRectangle(cornerRadius: 2))
-                Text("\(peak.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
-            }.font(.caption2).foregroundStyle(.secondary)
-        }
+            Text(peak.formatted(.number.precision(.fractionLength(0...1))) + " " + unit)
+        }.font(.caption2).foregroundStyle(.secondary)
     }
 }
 
