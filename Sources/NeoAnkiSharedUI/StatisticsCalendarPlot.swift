@@ -17,6 +17,7 @@ struct StatisticsCalendarLayout {
     func column(_ date: Date) -> Int {
         ((calendar.ordinality(of: .day, in: .year, for: date) ?? 1) - 1 + row(yearStart)) / 7
     }
+    var lastActiveWeek: Int? { points.last(where: { $0.value > 0 }).map { column($0.date) } }
     var weekCount: Int { (points.last.map { column($0.date) } ?? 0) + 1 }
     var months: [StatisticsPoint] { points.filter { calendar.component(.day, from: $0.date) == 1 } }
     func weekday(_ row: Int) -> String {
@@ -33,6 +34,9 @@ struct StatisticsCalendarMetrics {
         visibleWeeks = min(weeks, max(1, Int(plotWidth / minimumCell)))
         cellSide = plotWidth / CGFloat(visibleWeeks)
         height = cellSide * 7 + axisHeight
+    }
+    func initialX(lastActiveWeek: Int?) -> Double {
+        Double(max(0, (lastActiveWeek ?? 0) - visibleWeeks + 1)) - 0.5
     }
 }
 
@@ -69,6 +73,7 @@ struct StatisticsCalendarPlot: View {
     @ScaledMetric(relativeTo: .caption2) private var axisWidth = 36.0
     @ScaledMetric(relativeTo: .caption2) private var axisHeight = 24.0
     private var layout: StatisticsCalendarLayout { .init(points: points, calendar: calendar) }
+    private var calendarIdentity: String { "\(points.first?.id ?? ""):\(layout.lastActiveWeek ?? -1)" }
     var body: some View {
         CalendarSizing(
             weeks: layout.weekCount, minimumCell: minimumCell,
@@ -78,11 +83,13 @@ struct StatisticsCalendarPlot: View {
                 let metrics = StatisticsCalendarMetrics(
                     width: geometry.size.width, weeks: layout.weekCount,
                     minimumCell: minimumCell, axisWidth: axisWidth, axisHeight: axisHeight)
-                let plot = chart
+                // A new year, metric or activity range opens on its latest
+                // populated week instead of hiding recent time behind January.
+                let plot = chart.id(calendarIdentity)
                 if metrics.visibleWeeks < layout.weekCount {
                     plot.chartScrollableAxes(.horizontal)
                         .chartXVisibleDomain(length: Double(metrics.visibleWeeks))
-                        .chartScrollPosition(initialX: -0.5)
+                        .chartScrollPosition(initialX: metrics.initialX(lastActiveWeek: layout.lastActiveWeek))
                 } else {
                     plot.chartPlotStyle { content in content.frame(height: metrics.cellSide * 7) }
                 }

@@ -191,3 +191,19 @@ func statisticsMatricesRenderCompleteCells() async throws {
         #expect(components.count == rows * columns)
     }
 }
+
+@Test("Compact calendar initially reveals the most recent recorded activity")
+func statisticsCalendarOpensOnLatestActivity() throws {
+    var points = try calendarFixture(series: "Active minutes", active: false)
+    points[319].value = 41.1 // November 16; earlier months have no timed activity.
+    let layout = StatisticsCalendarLayout(points: points)
+    let metrics = StatisticsCalendarMetrics(width: 330, weeks: layout.weekCount,
+        minimumCell: 10, axisWidth: 36, axisHeight: 24)
+    let week = try #require(layout.lastActiveWeek)
+    let start = metrics.initialX(lastActiveWeek: week)
+    #expect(start > 0)
+    #expect(Double(week) - 0.42 >= start)
+    #expect(Double(week) + 0.42 <= start + Double(metrics.visibleWeeks))
+    #expect(metrics.initialX(lastActiveWeek: nil) == -0.5)
+    #expect(metrics.initialX(lastActiveWeek: 1) == -0.5)
+}

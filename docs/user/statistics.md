@@ -73,7 +73,8 @@ Time-of-day patterns describe your activity and do not prove a best study time.
 The study calendar has one cell for every day in the selected year. Switch between
 review counts and active learning minutes; stronger color means more activity.
 Month names run across the top and weekdays stay on the leading edge. Daily cells
-stay approximately square; compact screens scroll the chart horizontally. Days
+stay approximately square; compact screens scroll horizontally and initially show
+the most recent activity. Days
 with no activity remain visible, and an empty year is labeled explicitly.
 
 ## Dates, moves, deletion, and sync
