@@ -7,6 +7,22 @@ related_targets: ["Sources/NeoAnki2/ItemBrowserView.swift"]
 
 # Surface brief: Scope Home and Item Browser
 
+## Confirmed home refinement (2026-11-17)
+
+The user selected the “Upcoming workload” mockup and requested implementation
+and release. This supersedes the original home chart anti-goal below. Preserve
+the native Quiet Desk world and browse behavior. Mac home uses a centered 600pt
+column with generous top spacing, due headline and Study at upper left, and a
+quiet “Today so far” group at upper right (distinct cards reviewed, recorded
+study time). Stack these groups in narrow panes. Below, a neutral seven-bar
+“Coming up” chart shows current scheduled counts for the next seven study days,
+including zero days, excluding today's backlog and unintroduced cards. Label
+that counts change as you study; this is not simulated repeated-review workload.
+Use the existing scoped Statistics projection and study-day rollover. Keep
+loading/failure feedback independent of the available Study action. Preserve
+caught-up, empty-library, and affected-item recovery states. Detailed historical
+reports remain in Statistics; no streaks, goals, progress rings, or extra links.
+
 Visitor mode: **Operate**. The user is in a task. Scanability, native Mac
 expectations, and earned familiarity outrank expression. Brand lives in precise
 details, not in novelty.

@@ -703,12 +703,14 @@ struct ContentView: View {
         } else {
             ScopeHomeView(
                 itemsModel: itemsModel,
+                library: library,
                 scope: decksModel.studyScope,
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },
                 onAddItem: { openAddItem() }
             )
+            .id(decksModel.studyScope.filter)
         }
     }
 
