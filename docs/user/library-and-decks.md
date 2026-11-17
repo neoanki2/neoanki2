@@ -210,8 +210,9 @@ to study right now?
   the moment you pick a scope.
 - On Mac, **Today so far** shows distinct cards reviewed and recorded study time
   in the selected scope. **Coming up** shows current scheduled card counts for
-  the next seven study days, including days with no scheduled cards. It excludes
-  today's queue and unintroduced cards; counts change as you study. It is not a
+  today and the next six study days, including days with no scheduled cards.
+  **Today** includes overdue cards and reviews scheduled for later in the study
+  day. Unintroduced cards are excluded; counts change as you study. It is not a
   simulation of repeated reviews. Narrow windows stack today's activity below
   the Study action.
 - When nothing is due, the count is replaced by when the next card comes back —

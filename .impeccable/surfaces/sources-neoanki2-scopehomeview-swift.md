@@ -15,8 +15,9 @@ the native Quiet Desk world and browse behavior. Mac home uses a centered 600pt
 column with generous top spacing, due headline and Study at upper left, and a
 quiet “Today so far” group at upper right (distinct cards reviewed, recorded
 study time). Stack these groups in narrow panes. Below, a neutral seven-bar
-“Coming up” chart shows current scheduled counts for the next seven study days,
-including zero days, excluding today's backlog and unintroduced cards. Label
+“Coming up” chart shows current scheduled counts for today and the next six
+study days, including zero days. Today includes overdue and later-today reviews;
+label it explicitly so intraday scheduling stays visible. Exclude unintroduced cards. Label
 that counts change as you study; this is not simulated repeated-review workload.
 Use the existing scoped Statistics projection and study-day rollover. Keep
 loading/failure feedback independent of the available Study action. Preserve

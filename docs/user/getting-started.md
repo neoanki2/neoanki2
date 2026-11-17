@@ -17,7 +17,7 @@ Choose **Statistics** in the Mac/iPad sidebar or iPhone tab bar for activity,
 learning time, progress, streaks, and workload charts. Select a deck using the
 scope filter in that screen. Reports use one shared screen across all Apple platforms;
 Mac home pairs due counts and Study with today's distinct reviewed-card count,
-recorded study time, and the next seven study days' scheduled cards. Detailed
+recorded study time, and scheduled cards for today and the next six study days. Detailed
 reports remain in Statistics. See [Statistics](../statistics/).
 
 NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and
