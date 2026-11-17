@@ -402,8 +402,9 @@ Activity, Memory, and Workload share a model, definitions, Swift Charts, filters
 selection, tables, and CSV exports. Width changes layout, never capabilities.
 Mac scope home pairs the due headline and Study action with a quiet “Today so
 far” summary of distinct reviewed cards and recorded study time. A neutral
-seven-bar “Coming up” chart shows the next seven study days' current scheduled
-cards, including zero days, excluding today's queue and unintroduced cards.
+seven-bar “Coming up” chart shows today and the next six study days' current
+scheduled cards, including zero days. Label the first bucket “Today”; it includes
+overdue and later-today reviews, so intraday scheduling stays visible. Exclude unintroduced cards.
 It is scheduling evidence, not simulated repeat workload. The group uses the
 600pt reading column with generous top and inter-section spacing; narrow panes
 stack the study and activity groups. Detailed learning-time and progress reports

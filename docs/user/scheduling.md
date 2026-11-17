@@ -93,7 +93,8 @@ all of its subdecks that study day. A subdeck can add a stricter limit of its
 own; cards in that subdeck must fit both allowances. Unassigned cards remain
 unlimited. The scope home's due count includes only new cards currently eligible
 under these limits. On Mac, **Coming up** shows current due dates of introduced
-cards for the next seven study days. It excludes unintroduced cards, so changing
+cards for today and the next six study days. **Today** includes overdue cards
+and intraday reviews scheduled for later today. It excludes unintroduced cards, so changing
 an introduction limit need not change those bars. The chart uses the configured
 study-day rollover, rather than calendar midnight, and is not a simulation of
 future grades or repeated attempts.
