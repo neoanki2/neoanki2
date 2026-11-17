@@ -24,6 +24,7 @@ struct StatisticsChartSelection: View {
                 Button(action: onSelect) {
                     Text(text).lineLimit(2, reservesSpace: true)
                 }.buttonStyle(.plain).accessibilityHint("Show matching details")
+                    .accessibilityIdentifier("statisticsSelectedValue")
             } else {
                 Text("Select a value for details")
                     .lineLimit(2, reservesSpace: true).foregroundStyle(.secondary)

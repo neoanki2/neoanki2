@@ -2204,7 +2204,7 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
         XCTAssertFalse(app.buttons["viewLearningTime"].exists)
     }
     func testCalendarPresentationAndStableSelection() throws {
-        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign"])
+        let app = launchApp()
         open("Statistics", in: app)
         let screen = app.scrollViews["statisticsScreen"]
         XCTAssertTrue(app.descendants(matching: .any)["statisticsTotals"].waitUntilExists(timeout: 15))
@@ -2223,6 +2223,8 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
             let before = calendar.frame
             let plot = app.descendants(matching: .any)["statisticsCalendarPlot"]
             plot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(calendar.buttons["statisticsSelectedValue"].waitUntilExists(timeout: 3),
+                          "A real day selection must precede the layout assertion")
             XCTAssertEqual(calendar.frame.height, before.height, accuracy: 1,
                            "Selecting a day must not move following charts")
         }

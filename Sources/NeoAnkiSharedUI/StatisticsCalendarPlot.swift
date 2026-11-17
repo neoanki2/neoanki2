@@ -135,5 +135,11 @@ struct StatisticsCalendarPlot: View {
         .chartPlotStyle { plot in plot.frame(height: metrics.cellSide * 7) }
         .chartXSelection(value: $selectedWeek)
         .chartYSelection(value: $selectedWeekday)
+        .chartGesture { proxy in
+            SpatialTapGesture().onEnded { event in
+                proxy.selectXValue(at: event.location.x)
+                proxy.selectYValue(at: event.location.y)
+            }
+        }
     }
 }
