@@ -67,7 +67,7 @@ struct StatisticsCalendarPlot: View {
     @Binding var selectedWeekday: Double?
     @ScaledMetric(relativeTo: .caption2) private var minimumCell = 10.0
     @ScaledMetric(relativeTo: .caption2) private var axisWidth = 36.0
-    @ScaledMetric(relativeTo: .caption2) private var axisHeight = 36.0
+    @ScaledMetric(relativeTo: .caption2) private var axisHeight = 24.0
     private var layout: StatisticsCalendarLayout { .init(points: points, calendar: calendar) }
     var body: some View {
         CalendarSizing(
@@ -78,20 +78,20 @@ struct StatisticsCalendarPlot: View {
                 let metrics = StatisticsCalendarMetrics(
                     width: geometry.size.width, weeks: layout.weekCount,
                     minimumCell: minimumCell, axisWidth: axisWidth, axisHeight: axisHeight)
-                let plot = chart(metrics: metrics)
+                let plot = chart
                 if metrics.visibleWeeks < layout.weekCount {
                     plot.chartScrollableAxes(.horizontal)
                         .chartXVisibleDomain(length: Double(metrics.visibleWeeks))
                         .chartScrollPosition(initialX: -0.5)
                 } else {
-                    plot
+                    plot.chartPlotStyle { content in content.frame(height: metrics.cellSide * 7) }
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("statisticsCalendarPlot")
     }
-    private func chart(metrics: StatisticsCalendarMetrics) -> some View {
+    private var chart: some View {
         Chart(points) { point in
             let column = Double(layout.column(point.date))
             let row = Double(layout.row(point.date))
@@ -132,7 +132,6 @@ struct StatisticsCalendarPlot: View {
                 }
             }
         }
-        .chartPlotStyle { plot in plot.frame(height: metrics.cellSide * 7) }
         .chartXSelection(value: $selectedWeek)
         .chartYSelection(value: $selectedWeekday)
         .chartGesture { proxy in

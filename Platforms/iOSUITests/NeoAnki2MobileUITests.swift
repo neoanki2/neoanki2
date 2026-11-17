@@ -2216,6 +2216,10 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
             scrollTo(calendar, in: app, surface: screen)
             XCTAssertLessThanOrEqual(calendar.frame.maxX, app.frame.maxX)
             XCTAssertGreaterThan(calendar.frame.height, 100)
+            let attachment = XCTAttachment(screenshot: calendar.screenshot())
+            attachment.name = "study-calendar-" + label
+            attachment.lifetime = .keepAlways
+            add(attachment)
             let plot = app.descendants(matching: .any)["statisticsCalendarPlot"]
             var dates = Calendar(identifier: .gregorian)
             dates.locale = Locale(identifier: "en_US")
@@ -2231,10 +2235,6 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
                 XCTAssertLessThanOrEqual(cell.frame.maxY, plot.frame.maxY + 1,
                                          "The first and last weekday rows must not be clipped")
             }
-            let attachment = XCTAttachment(screenshot: calendar.screenshot())
-            attachment.name = "study-calendar-" + label
-            attachment.lifetime = .keepAlways
-            add(attachment)
             let before = calendar.frame
             plot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             XCTAssertTrue(calendar.buttons["statisticsSelectedValue"].waitUntilExists(timeout: 3),
