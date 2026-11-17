@@ -17,29 +17,36 @@ private func calendarFixture(series: String, active: Bool) throws -> [Statistics
 }
 
 @Test("Calendar full context renders labels, square cells, and continuous intensity")
-@MainActor func statisticsCalendarRendersDailyCells() throws {
+func statisticsCalendarRendersDailyCells() async throws {
     for series in ["Reviews", "Active minutes"] {
         for active in [true, false] {
             for width in [659.0, 1_000.0] {
                 for scheme in [ColorScheme.dark, .light] {
                     let points = try calendarFixture(series: series, active: active)
-                    let renderer = ImageRenderer(
-                        content:
-                            StatisticsHeatmap(points: points)
-                            .frame(width: width).accentColor(.blue)
-                            .padding(24)
-                            .environment(\.colorScheme, scheme)
-                            .background(scheme == .dark ? Color(white: 0.2) : .white))
-                    renderer.scale = 2
-                    let image = try #require(renderer.cgImage)
-                    if let directory = ProcessInfo.processInfo.environment["NEOANKI_CALENDAR_RENDER_DIR"] {
-                        let output = URL(fileURLWithPath: directory, isDirectory: true)
-                        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-                        let png = try #require(
-                            NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
-                        try png.write(
-                            to: output.appendingPathComponent(
-                                "\(series)-\(active)-\(Int(width))-\(scheme).png"))
+                    // Only SwiftUI capture needs the main actor. CPU-heavy pixel
+                    // analysis must leave concurrent UI-model/sync tests free to run.
+                    let image = try await MainActor.run {
+                        let renderer = ImageRenderer(
+                            content:
+                                StatisticsHeatmap(points: points)
+                                .frame(width: width).accentColor(.blue)
+                                .padding(24)
+                                .environment(\.colorScheme, scheme)
+                                .background(scheme == .dark ? Color(white: 0.2) : .white))
+                        renderer.scale = 2
+                        let image = try #require(renderer.cgImage)
+                        if let directory = ProcessInfo.processInfo.environment["NEOANKI_CALENDAR_RENDER_DIR"]
+                        {
+                            let output = URL(fileURLWithPath: directory, isDirectory: true)
+                            try FileManager.default.createDirectory(
+                                at: output, withIntermediateDirectories: true)
+                            let png = try #require(
+                                NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+                            try png.write(
+                                to: output.appendingPathComponent(
+                                    "\(series)-\(active)-\(Int(width))-\(scheme).png"))
+                        }
+                        return image
                     }
                     // Inspect complete rendered cell components, not just the
                     // presence of some blue pixels in an isolated plot.
