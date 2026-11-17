@@ -67,7 +67,7 @@ struct StatisticsCalendarPlot: View {
     @Binding var selectedWeekday: Double?
     @ScaledMetric(relativeTo: .caption2) private var minimumCell = 10.0
     @ScaledMetric(relativeTo: .caption2) private var axisWidth = 36.0
-    @ScaledMetric(relativeTo: .caption2) private var axisHeight = 24.0
+    @ScaledMetric(relativeTo: .caption2) private var axisHeight = 36.0
     private var layout: StatisticsCalendarLayout { .init(points: points, calendar: calendar) }
     var body: some View {
         CalendarSizing(
@@ -117,7 +117,7 @@ struct StatisticsCalendarPlot: View {
                 if let column = value.as(Double.self),
                     let month = layout.months.first(where: { layout.column($0.date) == Int(column) })
                 {
-                    AxisValueLabel(anchor: .leading) {
+                    AxisValueLabel(anchor: .bottomLeading) {
                         Text(month.date, format: .dateTime.month(.abbreviated)).font(.caption2)
                     }
                 }

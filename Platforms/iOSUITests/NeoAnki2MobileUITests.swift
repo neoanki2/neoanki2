@@ -2216,12 +2216,26 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
             scrollTo(calendar, in: app, surface: screen)
             XCTAssertLessThanOrEqual(calendar.frame.maxX, app.frame.maxX)
             XCTAssertGreaterThan(calendar.frame.height, 100)
+            let plot = app.descendants(matching: .any)["statisticsCalendarPlot"]
+            var dates = Calendar(identifier: .gregorian)
+            dates.locale = Locale(identifier: "en_US")
+            let january = dates.date(from: DateComponents(year: dates.component(.year, from: .now), month: 1, day: 1))!
+            let sunday = dates.nextDate(after: january.addingTimeInterval(-1), matching: DateComponents(weekday: 1), matchingPolicy: .nextTime)!
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US")
+            formatter.dateStyle = .full
+            for date in [sunday, dates.date(byAdding: .day, value: 6, to: sunday)!] {
+                let cell = calendar.descendants(matching: .any).matching(NSPredicate(format: "label == %@", formatter.string(from: date))).firstMatch
+                XCTAssertTrue(cell.exists)
+                XCTAssertGreaterThanOrEqual(cell.frame.minY, plot.frame.minY - 1)
+                XCTAssertLessThanOrEqual(cell.frame.maxY, plot.frame.maxY + 1,
+                                         "The first and last weekday rows must not be clipped")
+            }
             let attachment = XCTAttachment(screenshot: calendar.screenshot())
             attachment.name = "study-calendar-" + label
             attachment.lifetime = .keepAlways
             add(attachment)
             let before = calendar.frame
-            let plot = app.descendants(matching: .any)["statisticsCalendarPlot"]
             plot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             XCTAssertTrue(calendar.buttons["statisticsSelectedValue"].waitUntilExists(timeout: 3),
                           "A real day selection must precede the layout assertion")
