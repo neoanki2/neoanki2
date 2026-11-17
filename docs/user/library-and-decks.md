@@ -221,7 +221,8 @@ to study right now?
   **Mark Selected OK** if the content does not need editing; the warning stays
   dismissed until one of those cards lapses again. Open a row to edit unclear
   content, or choose **Show All Items** to remove the filter.
-- **Browse *n* Items** opens browse mode.
+- Use the **Browse** toolbar button or Library menu to open browse mode. Home
+  omits duplicate Browse and Statistics links.
 
 The scope home never shows an item's answer. Card counts, maturity breakdowns,
 and historical progress are available in **Statistics → Memory**, alongside
@@ -248,7 +249,7 @@ If item detail reports that an image cannot be read, see
 [media troubleshooting](../troubleshooting/#item-and-media-errors).
 The library stores image files alongside the database, so back them up together.
 
-Open browse mode from the scope home link, from **Library ▸ Browse Items**, or
+Open browse mode from the **Browse** toolbar button, **Library ▸ Browse Items**, or
 with ⌥⌘B. Press Escape or choose **Done** to return to the scope home.
 
 Browse mode is a sortable table, one row per item:

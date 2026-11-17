@@ -13,6 +13,36 @@ extension EnvironmentValues {
     }
 }
 
+/// Hover/selection details occupy the same space in every state, so later
+/// charts keep their positions as the pointer moves across a chart.
+struct StatisticsChartSelection: View {
+    let text: String?
+    var onSelect: () -> Void = {}
+    var body: some View {
+        Group {
+            if let text {
+                Button(action: onSelect) {
+                    Text(text).lineLimit(2, reservesSpace: true)
+                }.buttonStyle(.plain).accessibilityHint("Show matching details")
+                    .accessibilityIdentifier("statisticsSelectedValue")
+            } else {
+                Text("Select a value for details")
+                    .lineLimit(2, reservesSpace: true).foregroundStyle(.secondary)
+            }
+        }
+        .font(.caption)
+        .frame(maxWidth: .infinity, minHeight: minimumHeight, alignment: .topLeading)
+    }
+    private var minimumHeight: CGFloat {
+        #if os(macOS)
+            28
+        #else
+            44
+        #endif
+    }
+
+}
+
 struct StatisticsTimeChart: View {
     @Environment(\.statisticsExportCSV) private var export
     let title: String
@@ -30,13 +60,17 @@ struct StatisticsTimeChart: View {
             if points.isEmpty {
                 Text("No data in this period").foregroundStyle(.secondary)
             } else {
-                Chart(points) { point in
-                    if lines {
-                        LineMark(x: .value("Date", point.date), y: .value(title, point.value))
-                            .foregroundStyle(by: .value("Series", point.series))
-                    } else {
-                        BarMark(x: .value("Date", point.date), y: .value(title, point.value))
-                            .foregroundStyle(by: .value("Series", point.series))
+                Chart {
+                    ForEach(points) { point in
+                        if lines {
+                            LineMark(x: .value("Date", point.date), y: .value(title, point.value))
+                                .foregroundStyle(by: .value("Series", point.series))
+                            PointMark(x: .value("Date", point.date), y: .value(title, point.value))
+                                .foregroundStyle(by: .value("Series", point.series)).symbolSize(14)
+                        } else {
+                            BarMark(x: .value("Date", point.date), y: .value(title, point.value))
+                                .foregroundStyle(by: .value("Series", point.series))
+                        }
                     }
                     if let selected {
                         RuleMark(x: .value("Selected date", selected)).foregroundStyle(.secondary)
@@ -47,25 +81,21 @@ struct StatisticsTimeChart: View {
                     range: Array(Set(points.map(\.series))).sorted().map { seriesColor($0) }
                 )
                 .chartXSelection(value: $selected)
+                .chartXScale(range: .plotDimension(startPadding: 12, endPadding: 24))
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day, count: axisDayStride)) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day(), anchor: .top)
+                    }
+                }
                 .frame(height: 220)
-                if let selected {
-                    let date = points.min {
-                        abs($0.date.timeIntervalSince(selected)) < abs($1.date.timeIntervalSince(selected))
-                    }?.date
-                    if let date {
-                        Button(
-                            "\(date.formatted(date:.abbreviated,time:.omitted)): "
-                                + points.filter { $0.date == date }.map {
-                                    "\($0.series) \($0.value.formatted(.number.precision(.fractionLength(0...1))))"
-                                }.joined(separator: ", ")
-                        ) {
-                            onSelect?(
-                                DateInterval(
-                                    start: date,
-                                    end: points.first(where: { $0.date == date })?.intervalEnd ?? Calendar
-                                        .current.date(byAdding: .day, value: 1, to: date)!))
-                        }
-                        .buttonStyle(.plain).font(.caption).accessibilityHint("Show matching reviews")
+                StatisticsChartSelection(text: selectedDescription) {
+                    if let date = selectedDate {
+                        onSelect?(
+                            DateInterval(
+                                start: date,
+                                end: points.first(where: { $0.date == date })?.intervalEnd
+                                    ?? Calendar.current.date(byAdding: .day, value: 1, to: date)!))
                     }
                 }
                 DisclosureGroup("Data table") {
@@ -81,6 +111,25 @@ struct StatisticsTimeChart: View {
             }
         }.accessibilityElement(children: .contain)
     }
+    private var axisDayStride: Int {
+        let dates = points.map(\.date)
+        let days = (dates.max() ?? .now).timeIntervalSince(dates.min() ?? .now) / 86400
+        return max(1, Int(ceil(days / 5)))
+    }
+    private var selectedDate: Date? {
+        guard let selected else { return nil }
+        return points.min {
+            abs($0.date.timeIntervalSince(selected)) < abs($1.date.timeIntervalSince(selected))
+        }?.date
+    }
+    private var selectedDescription: String? {
+        guard let date = selectedDate else { return nil }
+        return "\(date.formatted(date: .abbreviated, time: .omitted)): "
+            + points.filter { $0.date == date }.map {
+                "\($0.series) \($0.value.formatted(.number.precision(.fractionLength(0...1))))"
+            }.joined(separator: ", ")
+    }
+
 }
 
 private func seriesColor(_ series: String) -> Color {
@@ -105,22 +154,50 @@ struct StatisticsBarChart: View {
             HStack {
                 Text(title).font(.headline)
                 Spacer()
-                Button("Export") { export(StatisticsExport.bins(bins, title: title)) }.font(.caption)
+                Button("Export") { export(StatisticsExport.bins(bins, title: title)) }.font(
+                    .caption)
             }
-            if bins.isEmpty {
+            if bins.isEmpty || bins.allSatisfy({ $0.value == 0 && (!percent || $0.count == 0) }) {
                 Text("Not enough data yet").foregroundStyle(.secondary)
             } else {
-                Chart(bins) { bin in
-                    BarMark(x: .value("Category", bin.label), y: .value(title, bin.value))
+                if horizontal {
+                    Chart(bins) { bin in
+                        BarMark(
+                            x: .value(title, bin.value), y: .value("Category", bin.label),
+                            height: .fixed(18)
+                        )
                         .foregroundStyle(Color.accentColor)
-                        .accessibilityLabel(bin.label)
-                        .accessibilityValue(
-                            "\(bin.value.formatted())\(percent ? " percent" : ""), \(bin.count) samples")
-                }.chartXSelection(value: $selected).frame(height: 180)
-                if let selected, let bin = bins.first(where: { $0.label == selected }) {
-                    Button(
-                        "\(bin.label): \(bin.value.formatted(.number.precision(.fractionLength(0...1))))\(percent ? "%" : "")\(bin.count > 0 ? " · \(bin.count) samples" : "")"
-                    ) { onSelect?(selected) }.buttonStyle(.plain).font(.caption)
+                        if percent {
+                            PointMark(x: .value(title, bin.value), y: .value("Category", bin.label))
+                                .foregroundStyle(Color.accentColor).symbolSize(12)
+                        }
+                    }
+                    .chartYScale(domain: Array(bins.map(\.label)))
+                    .chartYSelection(value: $selected)
+                    .chartYAxis {
+                        AxisMarks(preset: .aligned, position: .leading, values: bins.map(\.label)) {
+                            value in
+                            AxisValueLabel {
+                                if let label = value.as(String.self) {
+                                    Text(label).font(.caption2).lineLimit(2).frame(
+                                        width: 130, alignment: .trailing)
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: max(180, CGFloat(bins.count) * 26))
+                } else {
+                    Chart(bins) { bin in
+                        BarMark(x: .value("Category", bin.label), y: .value(title, bin.value))
+                            .foregroundStyle(Color.accentColor)
+                        if percent {
+                            PointMark(x: .value("Category", bin.label), y: .value(title, bin.value))
+                                .foregroundStyle(Color.accentColor).symbolSize(12)
+                        }
+                    }.chartXSelection(value: $selected).frame(height: 180)
+                }
+                StatisticsChartSelection(text: selectedDescription) {
+                    if let selected { onSelect?(selected) }
                 }
                 DisclosureGroup("Data table") {
                     ForEach(bins) { bin in
@@ -135,6 +212,17 @@ struct StatisticsBarChart: View {
             }
         }
     }
+    private var horizontal: Bool {
+        bins.count > 6 || bins.contains { $0.label.count > 18 }
+    }
+    private var selectedDescription: String? {
+        guard let selected, let bin = bins.first(where: { $0.label == selected }) else {
+            return nil
+        }
+        return
+            "\(bin.label): \(bin.value.formatted(.number.precision(.fractionLength(0...1))))\(percent ? "%" : "")\(bin.count > 0 ? " · \(bin.count) samples" : "")"
+    }
+
 }
 
 struct StatisticsHeatmap: View {
@@ -143,7 +231,9 @@ struct StatisticsHeatmap: View {
     var onSelect: ((Date) -> Void)?
     @State private var selectedWeek: Double?
     @State private var selectedWeekday: Double?
-    private var unit: String { points.first?.series == "Active minutes" ? "active minutes" : "reviews" }
+    private var unit: String {
+        points.first?.series == "Active minutes" ? "active minutes" : "reviews"
+    }
     private let calendar = Calendar.autoupdatingCurrent
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -152,23 +242,26 @@ struct StatisticsHeatmap: View {
                 Spacer()
                 Button("Export") { export(StatisticsExport.points(points)) }.font(.caption)
             }
-            ScrollView(.horizontal) {
-                calendarChart
+            StatisticsCalendarPlot(
+                points: points, selectedWeek: $selectedWeek, selectedWeekday: $selectedWeekday)
+            HStack(spacing: 6) {
+                Text("Daily \(unit)")
+                Spacer()
+                Text("Less")
+                LinearGradient(
+                    colors: [Color.accentColor.opacity(0.12), Color.accentColor],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: 72, height: 8).clipShape(RoundedRectangle(cornerRadius: 2))
+                Text("More")
+            }.font(.caption2).foregroundStyle(.secondary)
+            StatisticsChartSelection(
+                text: selectedPoint.map {
+                    "\($0.date.formatted(date: .abbreviated, time: .omitted)): \($0.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
+                }
+            ) {
+                if let point = selectedPoint { onSelect?(point.date) }
             }
-            if let selectedWeek, let selectedWeekday,
-                let point = points.first(where: {
-                    week($0.date) == Int(selectedWeek.rounded())
-                        && calendar.component(.weekday, from: $0.date) == Int(selectedWeekday.rounded())
-                })
-            {
-                Button(
-                    "\(point.date.formatted(date:.abbreviated,time:.omitted)): \(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
-                ) { onSelect?(point.date) }.buttonStyle(.plain).font(.caption)
-            }
-            Text("One cell per day; weeks across, weekdays down. Darker cells indicate more \(unit).").font(
-                .caption
-            )
-            .foregroundStyle(.secondary)
             if !points.isEmpty && points.allSatisfy({ $0.value == 0 }) {
                 Text("No \(unit) recorded in \(points[0].date.formatted(.dateTime.year())).")
                     .font(.caption).foregroundStyle(.secondary)
@@ -182,57 +275,24 @@ struct StatisticsHeatmap: View {
                             Text(point.date, format: .dateTime.year().month().day())
                             Spacer()
                             Text(
-                                "\(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
+                                "\(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
+                            )
                         }
                     }.font(.caption)
                 }
             }.font(.caption)
+        }.accessibilityElement(children: .contain)
+            .accessibilityIdentifier("statisticsStudyCalendar")
+    }
+    private var selectedPoint: StatisticsPoint? {
+        guard let selectedWeek, let selectedWeekday else { return nil }
+        return points.first {
+            layout.column($0.date) == Int(selectedWeek.rounded())
+                && layout.row($0.date) == Int(selectedWeekday.rounded())
         }
     }
-    var calendarChart: some View {
-        Chart(points) { point in
-            // Explicit bounds give each day area on continuous week/day scales.
-            // Ratio dimensions have no categorical band to size against here.
-            let column = Double(week(point.date))
-            let row = Double(calendar.component(.weekday, from: point.date))
-            RectangleMark(
-                xStart: .value("Week", column - 0.42),
-                xEnd: .value("Week", column + 0.42),
-                yStart: .value("Weekday", row - 0.42),
-                yEnd: .value("Weekday", row + 0.42)
-            )
-            .foregroundStyle(by: .value(unit.capitalized, point.value))
-            .accessibilityLabel(point.date.formatted(date: .complete, time: .omitted))
-            .accessibilityValue(
-                "\(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
-        }
-        .chartForegroundStyleScale(
-            domain: 0...max(1, points.map(\.value).max() ?? 0),
-            range: [Color.accentColor.opacity(0.12), Color.accentColor]
-        )
-        .chartXScale(domain: -0.5...(Double(lastWeek) + 0.5))
-        .chartYScale(domain: [7.5, 0.5])
-        .chartYAxis {
-            AxisMarks(values: [1.0, 3, 5, 7]) { value in
-                AxisValueLabel {
-                    if let weekday = value.as(Double.self) {
-                        Text(calendar.shortWeekdaySymbols[Int(weekday) - 1])
-                    }
-                }
-            }
-        }
-        .chartXAxis { AxisMarks(values: .stride(by: 4)) }
-        .chartXSelection(value: $selectedWeek)
-        .chartYSelection(value: $selectedWeekday)
-        .frame(minWidth: 680).frame(height: 160)
-    }
-    private var lastWeek: Int { points.last.map { week($0.date) } ?? 0 }
-    private func week(_ date: Date) -> Int {
-        guard let start = points.first?.date else { return 0 }
-        return
-            (calendar.ordinality(of: .day, in: .year, for: date)! - 1
-            + calendar.component(.weekday, from: start) - 1) / 7
-    }
+    private var layout: StatisticsCalendarLayout { .init(points: points, calendar: calendar) }
+
 }
 
 struct StatisticsForecastChart: View {
@@ -249,7 +309,8 @@ struct StatisticsForecastChart: View {
                     if let baseline {
                         csv +=
                             "\n"
-                            + StatisticsExport.forecast(baseline, prefix: "Current settings: ").split(
+                            + StatisticsExport.forecast(baseline, prefix: "Current settings: ")
+                            .split(
                                 separator: "\n"
                             ).dropFirst().joined(separator: "\n")
                     }
@@ -273,8 +334,10 @@ struct StatisticsForecastChart: View {
                         ).foregroundStyle(.secondary).lineStyle(StrokeStyle(dash: [5, 3]))
                     }
                 }
-            }.frame(height: 230)
-            if baseline != nil { Text("Solid: selected scenario · dashed: current settings").font(.caption) }
+            }.chartXScale(range: .plotDimension(startPadding: 12, endPadding: 24)).frame(height: 230)
+            if baseline != nil {
+                Text("Solid: selected scenario · dashed: current settings").font(.caption)
+            }
             Text(forecast.assumptions).font(.caption).foregroundStyle(.secondary)
             DisclosureGroup("Daily forecast table") {
                 ForEach(forecast.points) { point in
@@ -285,7 +348,9 @@ struct StatisticsForecastChart: View {
                                 + (point.minutes.map {
                                     "\($0.formatted(.number.precision(.fractionLength(1)))) min"
                                 } ?? "Time unavailable"))
-                        Text("Backlog \(Int(point.backlog)) · estimated remembered \(Int(point.remembered))")
+                        Text(
+                            "Backlog \(Int(point.backlog)) · estimated remembered \(Int(point.remembered))"
+                        )
                     }.font(.caption).padding(.vertical, 4)
                 }
             }.font(.caption)
@@ -306,16 +371,20 @@ struct StatisticsCohortChart: View {
             if points.isEmpty {
                 Text("Cohorts appear after cards are introduced.").foregroundStyle(.secondary)
             } else {
-                Chart(points) { point in
-                    RectangleMark(
-                        x: .value("Months since introduction", Int(point.series) ?? 0),
-                        y: .value("Introduction month", point.date.formatted(.dateTime.year().month()))
+                let months = Array(Set(points.map(\.date))).sorted()
+                let lastAge = points.compactMap { Int($0.series) }.max() ?? 0
+                let cells = points.map { point in
+                    StatisticsMatrixCell(
+                        column: Int(point.series) ?? 0,
+                        row: months.firstIndex(of: point.date) ?? 0, value: point.value,
+                        label:
+                            "\(point.date.formatted(.dateTime.year().month())), month \(point.series), \(point.count) cards"
                     )
-                    .foregroundStyle(by: .value("Reached Maintaining (%)", point.value))
-                    .accessibilityValue("\(point.value.formatted()) percent of \(point.count) cards")
-                }.chartForegroundStyleScale(
-                    domain: 0...100, range: [Color.accentColor.opacity(0.1), Color.accentColor]
-                ).frame(height: 220)
+                }
+                StatisticsMatrixPlot(
+                    cells: cells, columns: (0...lastAge).map(String.init),
+                    rows: months.map { $0.formatted(.dateTime.year().month(.abbreviated)) },
+                    unit: "%", maximum: 100, height: max(160, CGFloat(months.count) * 24 + 32))
                 Text(
                     "Each row groups cards by their first introduction month. Columns show how many reached their first Maintaining milestone by each month of age; later regressions do not erase this milestone."
                 ).font(.caption).foregroundStyle(.secondary)

@@ -328,7 +328,7 @@ public enum StatisticsEngine {
             daily.append(.init(date: date, series: "Cumulative reviews", value: cumulative))
         }
         var timeCumulative = 0.0
-        for date in grouped.keys.sorted() {
+        for date in grouped.keys.sorted() where grouped[date]?["Active minutes"] != nil {
             timeCumulative += grouped[date]?["Active minutes"] ?? 0
             daily.append(.init(date: date, series: "Cumulative minutes", value: timeCumulative))
         }
@@ -409,12 +409,16 @@ public enum StatisticsEngine {
                     date: Date(timeIntervalSince1970: Double(hour) * 3600), series: "\(hour / 24)",
                     value: Double(group.count), count: hour % 24))
         }
-        func recallBins(_ group: (StatisticsReview) -> String) -> [StatisticsBin] {
-            Dictionary(grouping: eligible, by: group).map { label, rows in
-                .init(
+        func recallBins(order: [String], _ group: (StatisticsReview) -> String?) -> [StatisticsBin] {
+            let known = eligible.compactMap { review in group(review).map { ($0, review) } }
+            return Dictionary(grouping: known, by: { $0.0 }).map { label, pairs in
+                let rows = pairs.map { $0.1 }
+                return StatisticsBin(
                     label, Double(rows.filter { $0.log.rating != .again }.count) / Double(rows.count) * 100,
                     count: rows.count)
-            }.sorted { $0.label < $1.label }
+            }.sorted {
+                (order.firstIndex(of: $0.label) ?? 0) < (order.firstIndex(of: $1.label) ?? 0)
+            }
         }
         let predictedReviews = eligible.filter { $0.log.schedulingAudit?.predictedRetrievability != nil }
         let calibrationGroups = Dictionary(grouping: predictedReviews) { review -> Int in
@@ -522,7 +526,7 @@ public enum StatisticsEngine {
                     of: point.date)!
                 return StatisticsPoint(
                     date: point.date, series: "Active minutes", value: heatMinutes[lookup, default: 0])
-            }, recall: recalls, progress: history.points,
+            }, recall: recalls, progress: history.points.filter { $0.date >= day(range.start) && $0.date <= range.end },
             cohorts: cohorts.sorted {
                 $0.date == $1.date ? (Int($0.series) ?? 0) < (Int($1.series) ?? 0) : $0.date < $1.date
             }, hours: hours.sorted { $0.date < $1.date },
@@ -551,13 +555,14 @@ public enum StatisticsEngine {
             backlog: histogram(
                 overdue, edges: [0, 1, 7, 30, 90], labels: ["<1d", "1–6d", "7–29d", "30–89d", "90d+"]),
             calibration: calibration,
-            latenessRecall: recallBins { review in
+            latenessRecall: recallBins(order: ["Within 1 day", "1–6 days late", "7+ days late"]) { review in
+                guard let due = review.before?.due else { return nil }
                 let late =
-                    review.log.reviewedAt.timeIntervalSince(review.before?.due ?? review.log.reviewedAt)
+                    review.log.reviewedAt.timeIntervalSince(due)
                     / 86400
                 return late <= 1 ? "Within 1 day" : late < 7 ? "1–6 days late" : "7+ days late"
             },
-            intervalRecall: recallBins {
+            intervalRecall: recallBins(order: ["1–6 days", "7–29 days", "30+ days"]) {
                 $0.log.elapsedDays < 7 ? "1–6 days" : $0.log.elapsedDays < 30 ? "7–29 days" : "30+ days"
             },
             skillComparisons: Dictionary(grouping: selected, by: \.skill).map {

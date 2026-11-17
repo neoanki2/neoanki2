@@ -2203,6 +2203,47 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
         open("Home",in:app)
         XCTAssertFalse(app.buttons["viewLearningTime"].exists)
     }
+    func testCalendarPresentationAndStableSelection() throws {
+        let app = launchApp()
+        open("Statistics", in: app)
+        let screen = app.scrollViews["statisticsScreen"]
+        XCTAssertTrue(app.descendants(matching: .any)["statisticsTotals"].waitUntilExists(timeout: 15))
+        let metric = app.segmentedControls["statisticsCalendarMetric"]
+        let calendar = app.descendants(matching: .any)["statisticsStudyCalendar"]
+        for label in ["Reviews", "Active minutes"] {
+            scrollTo(metric, in: app, surface: screen)
+            metric.buttons[label].tap()
+            scrollTo(calendar, in: app, surface: screen)
+            XCTAssertLessThanOrEqual(calendar.frame.maxX, app.frame.maxX)
+            XCTAssertGreaterThan(calendar.frame.height, 100)
+            let attachment = XCTAttachment(screenshot: calendar.screenshot())
+            attachment.name = "study-calendar-" + label
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            let plot = app.descendants(matching: .any)["statisticsCalendarPlot"]
+            var dates = Calendar(identifier: .gregorian)
+            dates.locale = Locale(identifier: "en_US")
+            let january = dates.date(from: DateComponents(year: dates.component(.year, from: .now), month: 1, day: 1))!
+            let sunday = dates.nextDate(after: january.addingTimeInterval(-1), matching: DateComponents(weekday: 1), matchingPolicy: .nextTime)!
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US")
+            formatter.dateStyle = .full
+            for date in [sunday, dates.date(byAdding: .day, value: 6, to: sunday)!] {
+                let cell = calendar.descendants(matching: .any).matching(NSPredicate(format: "label == %@", formatter.string(from: date))).firstMatch
+                XCTAssertTrue(cell.exists)
+                XCTAssertGreaterThanOrEqual(cell.frame.minY, plot.frame.minY - 1)
+                XCTAssertLessThanOrEqual(cell.frame.maxY, plot.frame.maxY + 1,
+                                         "The first and last weekday rows must not be clipped")
+            }
+            let before = calendar.frame
+            plot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(calendar.buttons["statisticsSelectedValue"].waitUntilExists(timeout: 3),
+                          "A real day selection must precede the layout assertion")
+            XCTAssertEqual(calendar.frame.height, before.height, accuracy: 1,
+                           "Selecting a day must not move following charts")
+        }
+        XCTAssertFalse(app.staticTexts["About these statistics"].exists)
+    }
     func testStatisticsAtAccessibilityTextSize() throws {
         let app=launchApp(additionalArguments:["-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"])
         open("Statistics",in:app)

@@ -21,3 +21,15 @@ counts and save/sync errors remain beside their actions.
 
 Verification is headless; disposable Simulator XCTest is permitted, host desktop
 interaction is not. No visual-world replacement or image assets are required.
+
+Calendar refinement: use month labels, leading weekday labels, square daily
+cells, and a continuous intensity scale. Compact layouts scroll with Swift
+Charts while keeping the weekday axis visible and the latest activity in view. Hover details reserve their
+space. Home has no duplicate Statistics/Browse links, and Statistics has no
+About footer; definitions remain in the user guide.
+
+Data audit refinement: weekday/hour, cohort, and memory-density heatmaps use
+explicit native chart cell bounds and continuous color scales. Long categories
+use horizontal bars. Empty activity has an explicit message, singleton lines
+have points, and time axes show dates. Missing prior due dates never count as
+on-time evidence; cumulative time begins only when recorded time exists.

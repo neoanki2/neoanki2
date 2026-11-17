@@ -88,12 +88,10 @@ extension FastFunctionalJourneyTests {
                     .waitUntilExists(timeout: 5)
             )
             XCTAssertFalse(relaunched.descendants(matching: .any)["scopeHomeCardStates"].exists)
-            XCTAssertTrue(relaunched.buttons["viewStatistics"].exists)
+            XCTAssertFalse(relaunched.buttons["viewStatistics"].exists)
             XCTAssertTrue(relaunched.buttons.identified("studyButton").isEnabled)
-            XCTAssertTrue(
-                relaunched.descendants(matching: .any)["scopeHomeBrowseLink"]
-                    .waitUntilExists(timeout: 3)
-            )
+            XCTAssertFalse(relaunched.descendants(matching: .any)["scopeHomeBrowseLink"].exists)
+            XCTAssertTrue(relaunched.buttons["browseToolbar"].exists)
         }
 
         runJourneyActivity("ScopeHomeAndBrowseUITests.testScopeHomeDoesNotRevealAnswers") {

@@ -8,7 +8,6 @@ import SwiftUI
 struct ScopeHomeView: View {
     @Bindable var itemsModel: ItemsModel
     let scope: StudyScope
-    var onStatistics: () -> Void = {}
     let onStudy: () -> Void
     let onBrowse: () -> Void
     let onBrowseItemsNeedingAttention: () -> Void
@@ -37,10 +36,7 @@ struct ScopeHomeView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("scopeHomeLoading")
                 } else if summary.itemCount == 0 {
-                    VStack(spacing: DesignSystem.Spacing.lg) {
-                        emptyState
-                        statisticsLink.padding()
-                    }
+                    emptyState
                 } else {
                     home
                 }
@@ -69,11 +65,6 @@ struct ScopeHomeView: View {
         }
     }
 
-    private var statisticsLink: some View {
-        Button("Statistics", systemImage: "chart.bar.xaxis", action: onStatistics)
-            .buttonStyle(.borderless).accessibilityIdentifier("viewStatistics")
-    }
-
     // MARK: - Home
 
     private var home: some View {
@@ -84,11 +75,9 @@ struct ScopeHomeView: View {
                 // position carries hierarchy that type size is not allowed to.
                 dueSection
                     .padding(.bottom, DesignSystem.Spacing.xs)
-                statisticsLink
                 if summary.leechCount > 0 {
                     leechCallout
                 }
-                browseLink
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .readingColumnLayout()
@@ -197,15 +186,6 @@ struct ScopeHomeView: View {
         .buttonStyle(.bordered)
         .accessibilityHint("Opens Browse filtered to items containing repeatedly forgotten cards")
         .accessibilityIdentifier("scopeHomeReviewAffectedItems")
-    }
-
-    private var browseLink: some View {
-        let noun = summary.itemCount == 1 ? "Item" : "Items"
-        return Button("Browse \(summary.itemCount) \(noun)") {
-            onBrowse()
-        }
-        .buttonStyle(.link)
-        .accessibilityIdentifier("scopeHomeBrowseLink")
     }
 
     // MARK: - Empty

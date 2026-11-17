@@ -704,7 +704,6 @@ struct ContentView: View {
             ScopeHomeView(
                 itemsModel: itemsModel,
                 scope: decksModel.studyScope,
-                onStatistics: { statisticsSessionID = nil; appSession.route = .statistics(decksModel.studyScope.filter) },
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
                 onBrowseItemsNeedingAttention: { openBrowse(filter: .needsAttention) },

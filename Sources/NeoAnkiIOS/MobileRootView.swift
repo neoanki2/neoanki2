@@ -439,10 +439,6 @@ private struct HomeView: View {
                 }
 
                 Section {
-                    Button("Statistics", systemImage: "chart.bar.xaxis") { model.showStatistics() }
-                }
-
-                Section {
                     NavigationLink(value: MobileScope.allDecks) {
                         ScopeRow(
                             title: "All Decks",
@@ -581,10 +577,6 @@ private struct ScopeDetailView: View {
                 }
 
                 Section {
-                    Button("Statistics", systemImage: "chart.bar.xaxis") { model.showStatistics(scope: scope.filter) }
-                }
-                Section {
-                    NavigationLink("Browse Items") { LibraryView(model: model, scope: scope.filter, embedsNavigation: false) }
                     if case let .deck(id) = scope {
                         Button("Add Word", systemImage: "character.book.closed") { openWordCapture(id) }
                             .accessibilityIdentifier("deck-add-word")

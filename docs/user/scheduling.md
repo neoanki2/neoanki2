@@ -76,6 +76,10 @@ as the other cards in its deck. Putting it first changes introduction order
 among New cards; it does not reschedule cards you have already learned or
 rewrite their review history.
 
+Home keeps the due count and Study action. Open **Statistics → Workload** from
+the sidebar or tab bar to inspect upcoming work; select the deck there instead
+of using a duplicate statistics link on Home.
+
 ## Limit new cards per day
 
 To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,
