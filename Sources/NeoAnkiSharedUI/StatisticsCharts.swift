@@ -81,10 +81,11 @@ struct StatisticsTimeChart: View {
                     range: Array(Set(points.map(\.series))).sorted().map { seriesColor($0) }
                 )
                 .chartXSelection(value: $selected)
+                .chartXScale(range: .plotDimension(startPadding: 12, endPadding: 24))
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day, count: axisDayStride)) { _ in
                         AxisGridLine()
-                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day(), anchor: .top)
                     }
                 }
                 .frame(height: 220)
@@ -333,7 +334,7 @@ struct StatisticsForecastChart: View {
                         ).foregroundStyle(.secondary).lineStyle(StrokeStyle(dash: [5, 3]))
                     }
                 }
-            }.frame(height: 230)
+            }.chartXScale(range: .plotDimension(startPadding: 12, endPadding: 24)).frame(height: 230)
             if baseline != nil {
                 Text("Solid: selected scenario · dashed: current settings").font(.caption)
             }

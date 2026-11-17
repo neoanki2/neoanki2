@@ -54,7 +54,7 @@ struct StatisticsMatrixPlot: View {
             .chartYScale(domain: [Double(max(1, rows.count)) - 0.5, -0.5])
             .chartXAxis {
                 AxisMarks(values: columnTicks.map(Double.init)) { value in
-                    AxisValueLabel {
+                    AxisValueLabel(anchor: columnAnchor(value.as(Double.self))) {
                         if let index = value.as(Double.self), columns.indices.contains(Int(index)) {
                             Text(columns[Int(index)]).font(.caption2)
                         }
@@ -71,6 +71,11 @@ struct StatisticsMatrixPlot: View {
                 }
             }
             .frame(height: height)
+    }
+    private func columnAnchor(_ value: Double?) -> UnitPoint {
+        if value == 0 { return .topLeading }
+        if value == Double(columns.count - 1) { return .topTrailing }
+        return .top
     }
     private var legend: some View {
         HStack(spacing: 6) {
