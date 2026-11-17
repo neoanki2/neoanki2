@@ -10,19 +10,23 @@ private func homeCalendar() -> Calendar {
     return calendar
 }
 
-@Test func homeUpcomingShowsAnIntradayLearningReviewBeforeItIsDue() async throws {
+@Test func homeUpcomingShowsAnIntradayReviewBeforeItIsDue() async throws {
     let calendar = homeCalendar()
     let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 17, hour: 12)))
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("home-intraday-\(UUID())")
     defer { try? FileManager.default.removeItem(at: directory) }
-    let store = try ItemStore(databaseURL: directory.appendingPathComponent("library.sqlite"))
+    // Use real FSRS with high retention to produce a deterministic intraday
+    // interval. Again intentionally stays due immediately for repair rounds.
+    let store = try ItemStore(
+        databaseURL: directory.appendingPathComponent("library.sqlite"),
+        scheduler: LearningScheduler(parameters: .init(requestRetention: 0.99)))
     try await store.bootstrap()
     _ = try await store.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
         .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
         .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
     ]))
     let card = try #require(try await store.fetchDueCards().first)
-    let memory = try await store.submitReview(cardID: card.id, rating: .again, now: now)
+    let memory = try await store.submitReview(cardID: card.id, rating: .hard, now: now)
     #expect(memory.due > now)
     #expect(memory.due < StudyDay.nextRollover(after: now, rolloverMinutes: 240, calendar: calendar))
     let source = try await store.statisticsSource()
