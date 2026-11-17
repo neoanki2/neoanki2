@@ -141,8 +141,8 @@ struct StatisticsHeatmap: View {
     @Environment(\.statisticsExportCSV) private var export
     let points: [StatisticsPoint]
     var onSelect: ((Date) -> Void)?
-    @State private var selectedWeek: Int?
-    @State private var selectedWeekday: Int?
+    @State private var selectedWeek: Double?
+    @State private var selectedWeekday: Double?
     private var unit: String { points.first?.series == "Active minutes" ? "active minutes" : "reviews" }
     private let calendar = Calendar.autoupdatingCurrent
     var body: some View {
@@ -153,43 +153,26 @@ struct StatisticsHeatmap: View {
                 Button("Export") { export(StatisticsExport.points(points)) }.font(.caption)
             }
             ScrollView(.horizontal) {
-                Chart(points) { point in
-                    RectangleMark(
-                        x: .value("Week", week(point.date)),
-                        y: .value("Weekday", calendar.component(.weekday, from: point.date)),
-                        width: .ratio(0.84), height: .ratio(0.84)
-                    )
-                    .foregroundStyle(by: .value("Reviews", point.value))
-                    .accessibilityLabel(point.date.formatted(date: .complete, time: .omitted))
-                    .accessibilityValue(
-                        "\(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
-                }
-                .chartForegroundStyleScale(range: [Color.accentColor.opacity(0.12), Color.accentColor])
-                .chartYScale(domain: [7, 1])
-                .chartYAxis {
-                    AxisMarks(values: [1, 3, 5, 7]) { value in
-                        AxisValueLabel {
-                            if let i = value.as(Int.self) { Text(calendar.shortWeekdaySymbols[i - 1]) }
-                        }
-                    }
-                }
-                .chartXAxis { AxisMarks(values: .stride(by: 4)) }
-                .chartXSelection(value: $selectedWeek)
-                .chartYSelection(value: $selectedWeekday)
-                .frame(minWidth: 680).frame(height: 160)
+                calendarChart
             }
             if let selectedWeek, let selectedWeekday,
                 let point = points.first(where: {
-                    week($0.date) == selectedWeek
-                        && calendar.component(.weekday, from: $0.date) == selectedWeekday
+                    week($0.date) == Int(selectedWeek.rounded())
+                        && calendar.component(.weekday, from: $0.date) == Int(selectedWeekday.rounded())
                 })
             {
                 Button(
                     "\(point.date.formatted(date:.abbreviated,time:.omitted)): \(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
                 ) { onSelect?(point.date) }.buttonStyle(.plain).font(.caption)
             }
-            Text("Weeks across, weekdays down. Darker cells indicate more \(unit).").font(.caption)
-                .foregroundStyle(.secondary)
+            Text("One cell per day; weeks across, weekdays down. Darker cells indicate more \(unit).").font(
+                .caption
+            )
+            .foregroundStyle(.secondary)
+            if !points.isEmpty && points.allSatisfy({ $0.value == 0 }) {
+                Text("No \(unit) recorded in \(points[0].date.formatted(.dateTime.year())).")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             DisclosureGroup("Days and exact values") {
                 ForEach(points.filter { $0.value > 0 }.reversed()) { point in
                     Button {
@@ -206,6 +189,44 @@ struct StatisticsHeatmap: View {
             }.font(.caption)
         }
     }
+    var calendarChart: some View {
+        Chart(points) { point in
+            // Explicit bounds give each day area on continuous week/day scales.
+            // Ratio dimensions have no categorical band to size against here.
+            let column = Double(week(point.date))
+            let row = Double(calendar.component(.weekday, from: point.date))
+            RectangleMark(
+                xStart: .value("Week", column - 0.42),
+                xEnd: .value("Week", column + 0.42),
+                yStart: .value("Weekday", row - 0.42),
+                yEnd: .value("Weekday", row + 0.42)
+            )
+            .foregroundStyle(by: .value(unit.capitalized, point.value))
+            .accessibilityLabel(point.date.formatted(date: .complete, time: .omitted))
+            .accessibilityValue(
+                "\(point.value.formatted(.number.precision(.fractionLength(0...1)))) \(unit)")
+        }
+        .chartForegroundStyleScale(
+            domain: 0...max(1, points.map(\.value).max() ?? 0),
+            range: [Color.accentColor.opacity(0.12), Color.accentColor]
+        )
+        .chartXScale(domain: -0.5...(Double(lastWeek) + 0.5))
+        .chartYScale(domain: [7.5, 0.5])
+        .chartYAxis {
+            AxisMarks(values: [1.0, 3, 5, 7]) { value in
+                AxisValueLabel {
+                    if let weekday = value.as(Double.self) {
+                        Text(calendar.shortWeekdaySymbols[Int(weekday) - 1])
+                    }
+                }
+            }
+        }
+        .chartXAxis { AxisMarks(values: .stride(by: 4)) }
+        .chartXSelection(value: $selectedWeek)
+        .chartYSelection(value: $selectedWeekday)
+        .frame(minWidth: 680).frame(height: 160)
+    }
+    private var lastWeek: Int { points.last.map { week($0.date) } ?? 0 }
     private func week(_ date: Date) -> Int {
         guard let start = points.first?.date else { return 0 }
         return
