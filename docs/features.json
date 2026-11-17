@@ -479,6 +479,7 @@
         "NeoAnkiCore/Tests/NeoAnkiCoreTests/StatisticsTests.swift",
         "Tests/NeoAnkiApplicationTests/StatisticsSyncTests.swift",
         "Tests/NeoAnkiFeaturesTests/StatisticsFeatureTests.swift",
+        "Tests/NeoAnki2Tests/StatisticsCalendarRenderingTests.swift",
         "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"
       ]
     }

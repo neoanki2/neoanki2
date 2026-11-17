@@ -65,6 +65,10 @@ studied cards. It estimates cards, not a count of independently proven facts.
 Stability describes memory durability; difficulty describes how slowly it grows.
 Time-of-day patterns describe your activity and do not prove a best study time.
 
+The study calendar has one cell for every day in the selected year. Switch between
+review counts and active learning minutes; darker cells mean more activity. Days
+with no activity remain visible, and an empty year is labeled explicitly.
+
 ## Dates, moves, deletion, and sync
 
 Study days follow your configured rollover and this device's time zone. Active
