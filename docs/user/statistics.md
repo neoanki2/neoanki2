@@ -54,12 +54,16 @@ your recorded judgment, not an independent examination.
 [learning-time rules](../learning-time/). Graded-attempt durations are separate:
 only usable recorded durations contribute to pace summaries. They are never
 added to active time. Prompt/answer splits and linked session review counts
-require reviews recorded by updated apps.
+require reviews recorded by updated apps. Cumulative minutes begin with the first
+recorded time bucket; earlier review-only history does not imply timed activity.
+Lateness comparisons exclude reviews without a recorded prior due date.
 
 **Maintaining** uses NeoAnki's existing progress definition. Cohorts group cards
 by their first introduction month and show when they first reached Maintaining;
 later regressions do not erase that milestone. Historical progress is shown only
-where saved evidence supports it. Current-state charts explicitly describe now.
+where saved evidence supports it, within the selected dates. Current-state charts
+explicitly describe now. Memory histograms exclude suspended cards; the labeled
+stability/difficulty density matrix includes all studied cards.
 
 **Estimated remembered cards** sums FSRS recall probabilities over eligible
 studied cards. It estimates cards, not a count of independently proven facts.

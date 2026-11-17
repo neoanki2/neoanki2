@@ -164,3 +164,30 @@ func statisticsCalendarLayoutCoordinates() throws {
         width: 659, weeks: 53, minimumCell: 10, axisWidth: 36, axisHeight: 24)
     #expect(desktop.visibleWeeks == 53)
 }
+
+@Test("Matrix charts render complete cells instead of fallback dashes")
+func statisticsMatricesRenderCompleteCells() async throws {
+    for (columns, rows) in [(24, 7), (10, 5), (5, 2)] {
+        let cells = (0..<rows).flatMap { row in
+            (0..<columns).map { column in
+                StatisticsMatrixCell(
+                    column: column, row: row,
+                    value: Double((row * columns + column) % 9), label: "Cell")
+            }
+        }
+        let image = try await MainActor.run {
+            let renderer = ImageRenderer(
+                content: StatisticsMatrixPlot(
+                    cells: cells,
+                    columns: (0..<columns).map(String.init), rows: (0..<rows).map(String.init),
+                    unit: "reviews"
+                )
+                .frame(width: 760).accentColor(.blue).padding(24)
+                .environment(\.colorScheme, .dark).background(Color(white: 0.2)))
+            renderer.scale = 2
+            return try #require(renderer.cgImage)
+        }
+        let components = try calendarCellComponents(image)
+        #expect(components.count == rows * columns)
+    }
+}

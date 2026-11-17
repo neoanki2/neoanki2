@@ -277,7 +277,7 @@ public struct StatisticsView: View {
                 title: "Cumulative minutes", points: s.daily.filter { $0.series == "Cumulative minutes" },
                 lines: true)
             StatisticsBarChart(title: "Answer grades", bins: s.grades, onSelect: { selectedGrade = $0 })
-            hourChart(s)
+            StatisticsHourChart(points: s.hours)
             StatisticsTimeChart(
                 title: "New cards introduced", points: s.daily.filter { $0.series == "New introductions" })
             StatisticsBarChart(title: "Reviews by deck", bins: s.comparisons)
@@ -336,7 +336,9 @@ public struct StatisticsView: View {
                 title: "Observed recall by predicted probability (%)", bins: s.calibration, percent: true)
             StatisticsBarChart(title: "Recall by elapsed interval (%)", bins: s.intervalRecall, percent: true)
             StatisticsBarChart(title: "Recall by lateness (%)", bins: s.latenessRecall, percent: true)
-            density(s)
+            Text("Lateness includes only spaced reviews with a recorded prior due date.")
+                .font(.caption).foregroundStyle(.secondary)
+            StatisticsDensityChart(cards: s.cards)
             Text("Cards to inspect").font(.headline)
             ForEach(s.attentionReviews) { review in reviewButton(review) }
             Text(
@@ -457,82 +459,6 @@ public struct StatisticsView: View {
             }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 6)
         }.buttonStyle(.plain)
     }
-    private func hourChart(_ s: StatisticsSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Reviews by weekday and hour").font(.headline)
-                Spacer()
-                Button("Export") {
-                    exportText = StatisticsExport.bins(hourBins(s), title: "Weekday and hour")
-                    exporting = true
-                }.font(.caption)
-            }
-            Chart(s.hours) { point in
-                RectangleMark(x: .value("Hour", point.count), y: .value("Weekday", point.series))
-                    .foregroundStyle(by: .value("Reviews", point.value))
-            }
-            .chartForegroundStyleScale(range: [Color.accentColor.opacity(0.15), Color.accentColor]).frame(
-                height: 190)
-            DisclosureGroup("Data table") {
-                ForEach(hourBins(s)) { bin in
-                    HStack {
-                        Text(bin.label)
-                        Spacer()
-                        Text(bin.value, format: .number)
-                    }.font(.caption)
-                }
-            }
-            Text(
-                "Weekdays use Calendar weekday numbers (1 = Sunday). This describes when you studied, not when you learn best."
-            ).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-    private func hourBins(_ s: StatisticsSnapshot) -> [StatisticsBin] {
-        s.hours.map { point in
-            let index = max(0, min(6, (Int(point.series) ?? 1) - 1))
-            return .init("\(Calendar.current.weekdaySymbols[index]) \(point.count):00", point.value)
-        }
-    }
-    private func density(_ s: StatisticsSnapshot) -> some View {
-        let cards = s.cards.filter { $0.card.memory.reps > 0 && $0.card.memory.stability > 0 }
-        let groups = Dictionary(grouping: cards) { entry in
-            "\(Int(entry.card.memory.difficulty)):\(Int(floor(log10(max(0.01,entry.card.memory.stability)))))"
-        }
-        let bins = groups.keys.sorted()
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Stability versus difficulty · current card density").font(.headline)
-                Spacer()
-                Button("Export") {
-                    exportText = StatisticsExport.bins(
-                        bins.map { .init($0, Double(groups[$0]?.count ?? 0)) },
-                        title: "Difficulty : log10 stability")
-                    exporting = true
-                }.font(.caption)
-            }
-            Chart(bins, id: \.self) { key in
-                let parts = key.split(separator: ":").compactMap { Int($0) }
-                RectangleMark(
-                    x: .value("Difficulty", parts.first ?? 0),
-                    y: .value("Stability magnitude (log10 days)", parts.last ?? 0)
-                )
-                .foregroundStyle(by: .value("Cards", groups[key]?.count ?? 0))
-            }.chartForegroundStyleScale(range: [Color.accentColor.opacity(0.12), Color.accentColor]).frame(
-                height: 220)
-            DisclosureGroup("Data table") {
-                ForEach(bins, id: \.self) { key in
-                    HStack {
-                        Text(key)
-                        Spacer()
-                        Text("\(groups[key]?.count ?? 0) cards")
-                    }.font(.caption)
-                }
-            }
-            Text(
-                "All studied cards are included. Stability is grouped in powers of ten days; darker cells contain more cards."
-            ).font(.caption).foregroundStyle(.secondary)
-        }
-    }
     private func inspect(_ s: StatisticsSnapshot, metric: String, label: String) {
         let bins: [StatisticsBin]
         switch metric {
@@ -558,14 +484,7 @@ public struct StatisticsView: View {
                     LabeledContent("Elapsed days", value: review.log.elapsedDays.formatted())
                     if let state = review.after {
                         Text("Estimated forgetting curve after this review").font(.headline)
-                        Chart(0..<91, id: \.self) { day in
-                            LineMark(
-                                x: .value("Days", day),
-                                y: .value(
-                                    "Recall probability",
-                                    FSRSScheduler().retrievability(
-                                        elapsedDays: Double(day), stability: state.stability) * 100))
-                        }.frame(height: 220)
+                        StatisticsForgettingCurve(memory: state)
                         Text(
                             "Illustrative curve uses population parameters and the recorded stability. It is an estimate, not a recall test."
                         ).font(.caption).foregroundStyle(.secondary)

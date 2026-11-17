@@ -470,3 +470,52 @@ private func statsReview(
         StatisticsEngine.snapshot(source: source, query: query, now: statsDate(), calendar: statsCalendar())
             .reviewCount == 0)
 }
+
+@Test func statisticsCumulativeTimeStartsWithRecordedTimeAndProgressRespectsRange() {
+    var source = emptyStatsSource()
+    let now = statsDate()
+    let early = statsDate(2026, 7, 1)
+    source.events = [statsReview(early)]
+    source.trackingStartedAt = early
+    let item = UUID()
+    source.liveItems = [item]
+    source.segments = [
+        .init(
+            sessionID: UUID(), deviceID: UUID(), sourceLibraryID: UUID(),
+            itemID: item, cardID: UUID(), startedAt: now.addingTimeInterval(-60), endedAt: now,
+            durationMilliseconds: 60_000)
+    ]
+    var query = StatisticsQuery()
+    query.period = .all
+    let all = StatisticsEngine.snapshot(
+        source: source, query: query, now: now, calendar: statsCalendar())
+    let time = all.daily.filter { $0.series == "Cumulative minutes" }
+    #expect(time.count == 1)
+    #expect(time.first?.value == 1)
+    query.period = .today
+    let today = StatisticsEngine.snapshot(
+        source: source, query: query, now: now, calendar: statsCalendar())
+    #expect(today.progress.count == 1)
+    #expect(
+        today.progress.allSatisfy { $0.date >= today.range.start && $0.date <= today.range.end })
+}
+
+@Test func statisticsRecallBinsUseTimeOrderAndOmitUnknownPriorDueDates() {
+    var source = emptyStatsSource()
+    let now = statsDate()
+    var unknown = statsReview(now)
+    unknown.memoryBefore = nil
+    var medium = statsReview(now, UUID(), .again, .review, 10)
+    medium.memoryBefore = .init(due: now.addingTimeInterval(-3 * 86400))
+    var long = statsReview(now, UUID(), .good, .review, 40)
+    long.memoryBefore = .init(due: now.addingTimeInterval(-8 * 86400))
+    source.events = [long, medium, statsReview(now), unknown]
+    let result = StatisticsEngine.snapshot(
+        source: source, query: .init(), now: now, calendar: statsCalendar())
+    #expect(result.intervalRecall.map(\.label) == ["1–6 days", "7–29 days", "30+ days"])
+    #expect(
+        result.latenessRecall.map(\.label) == ["Within 1 day", "1–6 days late", "7+ days late"])
+    #expect(result.recallTotal == 4)
+    #expect(result.latenessRecall.reduce(0) { $0 + $1.count } == 3)
+    #expect(result.latenessRecall[1].value == 0)  // A measured zero is still data.
+}
