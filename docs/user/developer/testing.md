@@ -280,6 +280,14 @@ separate from the card-library contracts.
 
 ## CI reliability and optional UI investigations
 
+Required Mac CI jobs use `macos-26-intel` with Xcode 26.6. Hosted ARM jobs failed before
+runner acquisition during capacity shortages; the Intel image runs the same
+headless contracts, shared builds, and unsigned iOS archive checks. Native Mac
+tests therefore execute on Intel in CI, while the iOS app build and device
+archive still target ARM64. Local Apple Silicon verification remains separate.
+The [official image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md)
+lists the pinned Xcode installation.
+
 Automatic CI runs all root-package Swift tests and all NeoAnkiCore tests,
 architecture and release contracts, documentation checks, shared macOS/iOS
 builds, and the unsigned iOS app/widget archive. Performance benchmarks remain
