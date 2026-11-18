@@ -237,13 +237,19 @@ cards with unchanged cues and answers keep their review history. New or changed
 units receive new cards, and unused cards are retired. The editor keeps
 manually adjusted boundaries in paragraphs whose text did not change.
 
-For other item types, editing preserves the item's type, tags, and deck
-assignment while rebuilding field values from the form. Generated cards are reconciled: cards whose
-generation conditions or cloze groups still exist preserve their identity and
-history, while cards that no longer generate are deleted. Recreating removed
-content later creates a new, never-reviewed card. The item type picker and deck
-picker are therefore absent. After saving, the detail preview and library row
-update.
+For other item types, editing preserves the item's type, tags, and untouched
+field values, including formatting and language metadata. On Mac, use the
+item detail's Deck menu to move the item; on iPhone and iPad, the ordinary
+editor also offers a Deck picker. The item type stays fixed. Generated cards
+are reconciled: cards whose generation conditions or cloze groups still exist
+preserve their identity and history, while cards that no longer generate are
+deleted. Recreating removed content later creates a new, never-reviewed card.
+After saving, the detail preview and library row update.
+
+Save shows progress while storing the change and prevents a second submission.
+A successful save can finish before counts, badges, reminders, or widgets
+refresh. A refresh warning does not mean the stored edit failed; reopen the
+item to inspect the saved content instead of creating another copy.
 
 ## Delete an item
 

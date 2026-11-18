@@ -11,6 +11,9 @@ Open **Statistics** from the Mac or iPad sidebar or the iPhone tab bar.
 Mac, iPhone, and iPad use the same screen and calculations.
 Session completion offers **View Session Statistics**, filtered to that session.
 Home and deck screens retain due counts and study actions; reports live here.
+Editing an item does not add a review to these totals. After correcting a card,
+refresh the report to inspect its current content and memory state; recorded
+review history remains separate from the edit.
 
 ## Explore your history
 

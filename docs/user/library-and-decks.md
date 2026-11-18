@@ -306,6 +306,9 @@ together:
 
 The move happens immediately; there is no separate Save button. Counts and the
 current scoped list refresh after the move. If the destination is outside the
-active scope, choose the destination scope to find the item.
+active scope, choose the destination scope to find the item. A move into a
+subdeck remains visible when the active scope includes that subdeck. Successful
+deletes remove their rows while summary counts refresh; deleting unassigned
+items leaves items assigned to decks intact.
 
 For several items at once, select them in browse mode and use **Move to Deck**.
