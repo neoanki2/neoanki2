@@ -11,20 +11,16 @@ struct AddItemView: View {
     let editingItemType: ItemType?
     var onDismiss: () -> Void = {}
 
-    @State private var fieldSpans: [UUID: [Span]] = [:]
-    @State private var fieldText: [UUID: String] = [:]
-    @State private var fieldMedia: [UUID: MediaRef] = [:]
-    @State private var fieldMediaAltText: [UUID: String] = [:]
+    @State private var snapshot = ItemEditorState.empty(for: nil)
     @State private var occlusionDraftReferences: [MediaRef] = []
-    @State private var fieldOcclusions: [UUID: ImageOcclusionContent] = [:]
-    @State private var fieldClozeBlanks: [UUID: [ClozeSpan]] = [:]
     @State private var actionError: String?
     @State private var showTypeChooser = false
     @State private var deckRequestGeneration = 0
     @State private var pendingDeckID: UUID?
     @State private var showDeckChangeConfirmation = false
     @State private var selectedDeckID: UUID?
-    @State private var isSaving = false
+    @State private var saveOperation = EditorSaveOperation()
+    private var isSaving: Bool { saveOperation.isSaving }
     @State private var processingAttachments = 0
     @State private var didInitialize = false
     @State private var initialSnapshot: ItemEditorSnapshot?
@@ -80,12 +76,14 @@ struct AddItemView: View {
                 }
             }
 
-            if let errorMessage = actionError ?? model.errorMessage {
+            if let errorMessage = actionError ?? saveOperation.error?.message ?? model.errorMessage {
                 Section {
                     ErrorBanner(message: errorMessage)
                 }
             }
         }
+        .disabled(isSaving)
+        .onChange(of: snapshot) { _, _ in saveOperation.beginEditing() }
         .environment(\.attachmentProcessing, processingAttachments > 0)
         .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { processingAttachments = $0 }
         .formStyle(.grouped)
@@ -123,7 +121,7 @@ struct AddItemView: View {
             initialSnapshot = currentSnapshot
         }
         .sheet(isPresented: $showTypeChooser) {
-            ItemTypeChooserView(library: model.library, deckID: selectedDeckID) { type in
+            ItemTypeChooserView(model: model.makeTypeChooser(deckID: selectedDeckID)) { type in
                 await model.configureAddItem(for: selectedDeckID, resolveSelection: false)
                 addItemTypeBinding.wrappedValue = type.id
             }
@@ -133,7 +131,7 @@ struct AddItemView: View {
                 Button("Attach Type and Keep Content") {
                     Task {
                         do {
-                            if let id = itemType?.id, let deck = pendingDeckID { try await model.library.attachItemType(id: id, to: deck) }
+                            if let id = itemType?.id, let deck = pendingDeckID { try await model.attachType(id: id, to: deck) }
                             selectedDeckID = pendingDeckID; model.addItemDeckID = pendingDeckID
                             await model.configureAddItem(for: selectedDeckID, resolveSelection: false)
                         } catch { actionError = error.localizedDescription }
@@ -207,9 +205,9 @@ struct AddItemView: View {
             }
         case .imageOcclusion:
             ImageOcclusionFieldEditor(label: fieldLabel(field), content: Binding(
-                get: { fieldOcclusions[field.id] }, set: { value in
+                get: { snapshot.fieldOcclusions[field.id] }, set: { value in
                     if let value { occlusionDraftReferences.append(value.image) }
-                    fieldOcclusions[field.id] = value
+                    snapshot.fieldOcclusions[field.id] = value
                 }
             ), mediaStore: model.mediaStore)
         case .cloze:
@@ -230,7 +228,7 @@ struct AddItemView: View {
             let generation = deckRequestGeneration
             Task {
                 do {
-                    let choices = try await model.library.authoringItemTypes(for: deckID)
+                    let choices = try await model.authoringChoices(for: deckID)
                     guard generation == deckRequestGeneration, !isSaving else { return }
                     if hasEnteredContent, let id = itemType?.id, !choices.itemTypes.contains(where: { $0.id == id }) {
                         pendingDeckID = deckID; showDeckChangeConfirmation = true
@@ -259,20 +257,20 @@ struct AddItemView: View {
     }
 
     private var hasEnteredContent: Bool {
-        fieldSpans.values.contains {
+        snapshot.fieldSpans.values.contains {
             !SpanFormatting.plainText(from: $0)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .isEmpty
         }
-            || fieldText.values.contains {
+            || snapshot.fieldText.values.contains {
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
-            || !fieldOcclusions.isEmpty
-            || !fieldMedia.isEmpty
-            || fieldMediaAltText.values.contains {
+            || !snapshot.fieldOcclusions.isEmpty
+            || !snapshot.fieldMedia.isEmpty
+            || snapshot.fieldMediaAltText.values.contains {
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             }
-            || fieldClozeBlanks.values.contains { !$0.isEmpty }
+            || snapshot.fieldClozeBlanks.values.contains { !$0.isEmpty }
     }
 
     private var canSave: Bool {
@@ -285,8 +283,8 @@ struct AddItemView: View {
 
     private func spanBinding(for fieldID: UUID) -> Binding<[Span]> {
         Binding(
-            get: { fieldSpans[fieldID, default: []] },
-            set: { fieldSpans[fieldID] = $0 }
+            get: { snapshot.fieldSpans[fieldID, default: []] },
+            set: { snapshot.fieldSpans[fieldID] = $0 }
         )
     }
 
@@ -305,29 +303,29 @@ struct AddItemView: View {
 
     private func textBinding(for fieldID: UUID) -> Binding<String> {
         Binding(
-            get: { fieldText[fieldID, default: ""] },
-            set: { fieldText[fieldID] = $0 }
+            get: { snapshot.fieldText[fieldID, default: ""] },
+            set: { snapshot.fieldText[fieldID] = $0 }
         )
     }
 
     private func mediaBinding(for fieldID: UUID) -> Binding<MediaRef?> {
         Binding(
-            get: { fieldMedia[fieldID] },
-            set: { fieldMedia[fieldID] = $0 }
+            get: { snapshot.fieldMedia[fieldID] },
+            set: { snapshot.fieldMedia[fieldID] = $0 }
         )
     }
 
     private func mediaAltTextBinding(for fieldID: UUID) -> Binding<String> {
         Binding(
-            get: { fieldMediaAltText[fieldID, default: ""] },
-            set: { fieldMediaAltText[fieldID] = $0 }
+            get: { snapshot.fieldMediaAltText[fieldID, default: ""] },
+            set: { snapshot.fieldMediaAltText[fieldID] = $0 }
         )
     }
 
     private func clozeBlanksBinding(for fieldID: UUID) -> Binding<[ClozeSpan]> {
         Binding(
-            get: { fieldClozeBlanks[fieldID, default: []] },
-            set: { fieldClozeBlanks[fieldID] = $0 }
+            get: { snapshot.fieldClozeBlanks[fieldID, default: []] },
+            set: { snapshot.fieldClozeBlanks[fieldID] = $0 }
         )
     }
 
@@ -354,27 +352,14 @@ struct AddItemView: View {
     }
 
     private func apply(_ snapshot: ItemEditorSnapshot) {
-        fieldSpans = snapshot.fieldSpans
-        fieldText = snapshot.fieldText
-        fieldMedia = snapshot.fieldMedia
-        fieldMediaAltText = snapshot.fieldMediaAltText
-        fieldOcclusions = snapshot.fieldOcclusions
-        fieldClozeBlanks = snapshot.fieldClozeBlanks
+        self.snapshot = snapshot
+        saveOperation.beginEditing()
     }
 
-    private var currentSnapshot: ItemEditorSnapshot {
-        ItemEditorSnapshot(
-            fieldSpans: fieldSpans,
-            fieldText: fieldText,
-            fieldMedia: fieldMedia,
-            fieldMediaAltText: fieldMediaAltText,
-            fieldClozeBlanks: fieldClozeBlanks,
-            fieldOcclusions: fieldOcclusions
-        )
-    }
+    private var currentSnapshot: ItemEditorSnapshot { snapshot }
 
     private func closeEditor() {
-        let refs = occlusionDraftReferences + fieldOcclusions.values.map(\.image)
+        let refs = occlusionDraftReferences + snapshot.fieldOcclusions.values.map(\.image)
         Task { for ref in refs { try? await model.mediaStore?.discardDraftReference(ref) } }
         onDismiss()
     }
@@ -401,33 +386,32 @@ struct AddItemView: View {
 
     private func save() async {
         guard !isSaving, processingAttachments == 0 else { return }
-        isSaving = true
-        defer { isSaving = false }
-
-        let didSave: Bool
-        if let editingItem {
-            didSave = await model.updateItem(
-                id: editingItem.id,
-                fieldSpans: fieldSpans,
-                fieldText: fieldText,
-                fieldMedia: fieldMedia,
-                fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks,
-                fieldOcclusions: fieldOcclusions
-            )
-        } else {
-            didSave = await model.addItem(
-                fieldSpans: fieldSpans,
-                fieldText: fieldText,
-                fieldMedia: fieldMedia,
-                fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks,
-                fieldOcclusions: fieldOcclusions,
-                deckID: selectedDeckID
-            )
+        let didSave: Bool? = await saveOperation.perform {
+            let result: Bool
+            if let editingItem {
+                result = await model.updateItem(
+                    id: editingItem.id,
+                    fieldSpans: snapshot.fieldSpans,
+                    fieldText: snapshot.fieldText,
+                    fieldMedia: snapshot.fieldMedia,
+                    fieldMediaAltText: snapshot.fieldMediaAltText,
+                    fieldClozeBlanks: snapshot.fieldClozeBlanks,
+                    fieldOcclusions: snapshot.fieldOcclusions
+                )
+            } else {
+                result = await model.addItem(
+                    fieldSpans: snapshot.fieldSpans,
+                    fieldText: snapshot.fieldText,
+                    fieldMedia: snapshot.fieldMedia,
+                    fieldMediaAltText: snapshot.fieldMediaAltText,
+                    fieldClozeBlanks: snapshot.fieldClozeBlanks,
+                    fieldOcclusions: snapshot.fieldOcclusions,
+                    deckID: selectedDeckID
+                )
+            }
+            guard result else { throw NeoAnkiApplication.UserFacingError(title: "Could Not Save", message: model.errorMessage ?? "Please try again.") }
+            return true
         }
-        if didSave {
-            closeEditor()
-        }
+        if didSave == true { closeEditor() }
     }
 }

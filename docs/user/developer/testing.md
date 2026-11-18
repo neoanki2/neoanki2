@@ -41,6 +41,65 @@ dedicated scripts under `Scripts/`. The [unified release process](../../RELEASIN
 selects relevant headless checks; UI journeys are additional targeted evidence,
 not a ceremony required for every release.
 
+### Card-editing contracts
+
+Run the editing contracts independently of a device or production library:
+
+```bash
+swift test --filter 'ItemEditing|NativeItemEditorHydration|GeneratedDeckEditing|CardEditingRegression'
+(cd NeoAnkiCore && swift test --filter ClozeEditingInvariantTests)
+```
+
+The suites cover every field kind's hydration, required-value validation,
+discard detection, Unicode cloze edits, save/reopen round trips, preservation of
+unmodified fields and scheduling history, invalid saves and SQLite write
+failures, generated-deck snapshot conflicts and atomicity, and mid-study reloads.
+Native Mac tests exercise the actual text adapter and the full bridge-card
+editor in an offscreen `NSHostingView`; they never create a window or open the
+user's library. The offscreen opening test verifies that the real appearance
+callback ran before checking native text values.
+
+These tests do not establish that an installed app's sheet presentation,
+focus behavior, iOS bindings, or media pickers work. Do not equate a passing
+hydration test with reproduction or resolution of an empty-editor report.
+Regression assertions remain enabled when they expose defects; do not replace
+them with assertions of the broken behavior or disable them to make CI green.
+
+`NativeCommandCompletionTests` suspends badges, reminders, and widgets across
+create, edit, move, delete, deck, and import commands. `LatestAsyncWorkTests`
+checks serial execution and bounded pending work. Editor tests check shared
+draft conversion, validation parity, save transitions, and actual glyph ink;
+study tests check retired cards, deferred repairs, deletion, and stale reads.
+Gated reload tests verify that automatic refresh retains explicit browse demand
+and that a commit invalidates an older snapshot before it reaches the screen.
+Tests that need derived summaries await `awaitReadModels()`. Tests of OS
+publication explicitly await `awaitDevicePublication()`; that barrier does not
+belong on a Save completion path.
+
+Qualify that the editor contracts actually reject known defects:
+
+```bash
+python3 Scripts/check-editor-test-sensitivity.py --output .build/editor-sensitivity
+python3 Scripts/run-editor-save-ui.py --output .build/editor-save-ui
+# Also qualify the disabled-fixture defect with real Simulator verification:
+python3 Scripts/check-editor-test-sensitivity.py --with-simulator --output .build/editor-sensitivity-ui
+```
+
+The sensitivity campaign builds an isolated snapshot including dirty and
+untracked source. It never mutates the working checkout. A passing executed
+baseline is required; only the expected behavioral assertion detects a mutant.
+Compilation errors, timeouts, skipped/missing tests, and infrastructure failures
+are inconclusive failures. Headless qualification covers document sizing,
+binding replacement, and putting OS publication back on command completion.
+CI qualifies relevant changed contracts without restoring broad UI journeys.
+
+The focused iOS runner uses one uniquely named disposable Simulator and always
+deletes it. Its save-from-study journey checks dismissal, refreshed content,
+reopening, and persistence after relaunch. Independently validated nonce-scoped
+armed/held receipts must match the persisted fixture item. An inactive fixture
+cannot earn a pass merely because tapping Save worked under normal conditions.
+The fixture is Simulator-only and requires the explicit UI-test reset argument.
+
 ### Study sessions and performance
 
 Session behavior is tested in `NeoAnkiFeaturesTests/StudySessionContractTests`;
@@ -220,6 +279,37 @@ learning-time zone also retain their separate suites. Those limits remain
 separate from the card-library contracts.
 
 ## CI reliability and optional UI investigations
+
+Required Mac CI jobs use `macos-26-intel` with Xcode 26.6. Hosted ARM jobs failed before
+runner acquisition during capacity shortages; the Intel image runs the same
+headless contracts, shared builds, and unsigned iOS archive checks. Native Mac
+tests therefore execute on Intel in CI, while the iOS app build and device
+archive still target ARM64. Local Apple Silicon verification remains separate.
+The [official image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md)
+lists the pinned Xcode installation.
+
+Resource contracts check each checksum read's autorelease lifetime and pairing
+approval cancellation/completion directly. The former process-wide RSS growth
+budget and one-second pairing-response deadline were removed: parallel tests
+and runner load could violate those thresholds without either behavior failing.
+The loopback lifecycle contract observes TCP readiness, complete HTTP framing,
+and EOF directly. It no longer measures the shared URLSession's scheduling or
+default request deadline alongside unrelated parallel tests.
+Sync, vocabulary catalog, dictionary/debounce, progressive study, export, and reload tests use
+observable state, buffered stream events, or explicit operation-entry/release
+gates. Assertions run after the exact relevant work completes, including stale
+work being rejected. Review-duration arithmetic uses explicit monotonic
+instants. These contracts replace readiness sleeps, yield counts, and short
+wall-clock deadlines; domain timers and opt-in performance checks remain
+separate.
+
+The signed FSRS fixture manifest preserves the original August 16, 2026
+verification and its tolerances. Current analytic-gradient tests permit the
+larger of `1e-10` and two Float ULPs at each nonzero oracle derivative's magnitude,
+because forward caches use Float and platform math libraries can differ.
+Inactive derivatives and signs remain exact; loss parity, independent finite
+differences, and optimizer parity retain their separate checks. This fixture
+tolerance is not an error bound for arbitrary review histories.
 
 Automatic CI runs all root-package Swift tests and all NeoAnkiCore tests,
 architecture and release contracts, documentation checks, shared macOS/iOS

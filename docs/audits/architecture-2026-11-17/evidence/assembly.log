@@ -1,0 +1,31 @@
+{
+  "swiftFiles": 488,
+  "productionSwiftFiles": 278,
+  "productionLines": 87116,
+  "swiftDeclarations": 28926,
+  "productionDeclarations": 17002,
+  "references": 291035,
+  "productionKinds": {
+    "struct": 752,
+    "variable": 10826,
+    "initializer": 482,
+    "enum": 326,
+    "case": 939,
+    "function": 3374,
+    "extension": 109,
+    "actor": 34,
+    "deinitializer": 10,
+    "protocol": 56,
+    "class": 72,
+    "typealias": 21,
+    "subscript": 1
+  },
+  "parseErrors": [],
+  "productionFilesOver500": 45,
+  "productionFilesOver1000": 14,
+  "functionsOver50": 169,
+  "functionsOver100": 44,
+  "explicitPublicDeclarations": 2056,
+  "documentedPublicDeclarations": 313
+}
+Viewer bytes: 3658778

@@ -55,6 +55,7 @@
       "workers": 1,
       "tests": [
         "NeoAnki2MobileUITests/MobileCardJourneyUITests/testCreateBrowseAndStudyBasicCardJourney",
+        "NeoAnki2MobileUITests/MobileCardJourneyUITests/testSaveFromStudyEditorDismissesAndPersistsTheCorrection",
         "NeoAnki2MobileUITests/MobileAuthoringSurfaceUITests/testAuthoringTransferVocabularyAndSyncConsentSurfaces"
       ]
     },

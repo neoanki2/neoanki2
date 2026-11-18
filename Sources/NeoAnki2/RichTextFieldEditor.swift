@@ -1,8 +1,9 @@
 import AppKit
 import NeoAnkiCore
+import NeoAnkiTextEditing
 import SwiftUI
 
-private final class TextViewHolder {
+final class TextViewHolder {
     weak var textView: NSTextView?
     var lastSelectedRange = NSRange(location: NSNotFound, length: 0)
 }
@@ -310,7 +311,7 @@ private struct FormatButton: View {
     }
 }
 
-private struct RichTextEditorRepresentable: NSViewRepresentable {
+struct RichTextEditorRepresentable: NSViewRepresentable {
     @Environment(\.isEnabled) private var isEnabled
     let label: String
     @Binding var spans: [Span]
@@ -329,12 +330,13 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let defaultTextView = scrollView.documentView as? NSTextView else {
-            return scrollView
-        }
-        let textView = SafePasteTextView(frame: defaultTextView.frame, textContainer: defaultTextView.textContainer)
-        scrollView.documentView = textView
+        makeNSView(coordinator: context.coordinator)
+    }
+
+    // Keep the native adapter lifecycle callable without hosting a window.
+    func makeNSView(coordinator: Coordinator) -> NSScrollView {
+        let textView = SafePasteTextView(frame: .zero)
+        let scrollView = NativeTextEditorPolicy.makeScrollView(for: textView, inset: NSSize(width: 10, height: 10))
 
         textView.isRichText = true
         textView.isEditable = isEnabled
@@ -343,21 +345,18 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
         textView.drawsBackground = true
         textView.backgroundColor = .textBackgroundColor
         textView.textColor = .textColor
-        textView.textContainerInset = NSSize(width: 10, height: 10)
-        textView.delegate = context.coordinator
+        textView.delegate = coordinator
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
         textView.setAccessibilityLabel(label)
-        context.coordinator.textView = textView
+        coordinator.textView = textView
         textViewHolder.textView = textView
 
-        context.coordinator.setAttributedString(
+        coordinator.setAttributedString(
             SpanFormatting.attributedString(from: spans),
             preservingSelection: false
         )
         if isFocused?.wrappedValue == true {
-            DispatchQueue.main.async {
-                textView.window?.makeFirstResponder(textView)
-            }
+            coordinator.requestFocus(in: textView)
         }
 
         return scrollView
@@ -365,36 +364,41 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
 
     @MainActor
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        updateNSView(scrollView, coordinator: context.coordinator)
+    }
+
+    @MainActor
+    func updateNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         textView.isEditable = isEnabled
-        context.coordinator.textView = textView
-        context.coordinator.isFocused = isFocused
+        coordinator.textView = textView
+        coordinator.updateBindings(spans: $spans, isFocused: isFocused, selectionFormatting: $selectionFormatting)
         textViewHolder.textView = textView
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
         textView.setAccessibilityLabel(label)
 
         if isFocused?.wrappedValue == true, textView.window?.firstResponder !== textView {
-            DispatchQueue.main.async {
-                textView.window?.makeFirstResponder(textView)
-            }
+            coordinator.requestFocus(in: textView)
         }
 
-        guard !context.coordinator.isUpdatingFromView else { return }
+        guard !coordinator.isUpdatingFromView else { return }
 
         let currentSpans = SpanFormatting.spans(from: textView.attributedString())
         if currentSpans != spans {
-            context.coordinator.setAttributedString(
+            coordinator.setAttributedString(
                 SpanFormatting.attributedString(from: spans),
                 preservingSelection: true
             )
         }
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         @Binding var spans: [Span]
         weak var textView: NSTextView?
         var isUpdatingFromView = false
         var isProgrammaticUpdate = false
+        private var bindingGeneration: UInt64 = 0
         let textViewHolder: TextViewHolder
         var isFocused: Binding<Bool>?
         @Binding var selectionFormatting: RichTextEditing.SelectionState
@@ -411,18 +415,39 @@ private struct RichTextEditorRepresentable: NSViewRepresentable {
             _selectionFormatting = selectionFormatting
         }
 
-        func textDidChange(_ notification: Notification) {
-            guard let textView, !isProgrammaticUpdate else { return }
-            Task { @MainActor in
-                sanitizeContentsIfNeeded(in: textView)
-                publishSpans(from: textView)
+        func requestFocus(in textView: NSTextView) {
+            let generation = bindingGeneration
+            DispatchQueue.main.async { [weak self, weak textView] in
+                guard let self, let textView, generation == bindingGeneration,
+                      self.textView === textView, isFocused?.wrappedValue == true else { return }
+                textView.window?.makeFirstResponder(textView)
             }
+        }
+
+        func updateBindings(spans: Binding<[Span]>, isFocused: Binding<Bool>?,
+                            selectionFormatting: Binding<RichTextEditing.SelectionState>) {
+            bindingGeneration &+= 1
+            _spans = spans
+            self.isFocused = isFocused
+            _selectionFormatting = selectionFormatting
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView, !isProgrammaticUpdate,
+                  (notification.object as? NSTextView) === textView else { return }
+            // Native user edits publish before another SwiftUI update can
+            // replace the binding. Programmatic hydration is guarded above.
+            sanitizeContentsIfNeeded(in: textView)
+            publishSpans(from: textView)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView else { return }
             textViewHolder.lastSelectedRange = textView.selectedRange()
-            Task { @MainActor in
+            let generation = bindingGeneration
+            Task { @MainActor [weak self, weak textView] in
+                guard let self, let textView, generation == bindingGeneration,
+                      self.textView === textView else { return }
                 selectionFormatting = RichTextEditing.selectionState(in: textView)
             }
         }

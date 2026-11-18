@@ -335,6 +335,10 @@ On iPhone and iPad, Studio keeps field reordering and Card setup changes in one
 draft. Open a field to move it, return to the setup, and choose **Save** only
 when the complete definition is ready. **Cancel** discards the draft.
 
+After a successful save, the saved definition is available even if refreshing
+the surrounding type list fails. A refresh warning is separate from a failed
+save; inspect the saved definition before trying to create or duplicate it again.
+
 The shared editor offers Layout, Answer method, Availability, and Learning
 route screens. A Media Aside layout requires a Media component; select a
 compatible layout before saving if the setup contains only text. Scroll a

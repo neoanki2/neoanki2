@@ -1,0 +1,421 @@
+classDiagram
+direction LR
+  class t0["DictionaryEntryText"] {
+    <<enum>>
+    render()
+  }
+  class t1["DictionaryAutofillState"] {
+    <<struct>>
+    lastText
+    init()
+    apply()
+    clear()
+  }
+  class t2["DictionaryLookupModel"] {
+    <<class>>
+    results
+    automaticText
+    errorMessage
+    isSearching
+    hasSearched
+    generation
+    packTask
+    delay
+    searchOverride
+    openPack
+    init()
+    init()
+    init()
+    invalidate()
+    lookup()
+    search()
+  }
+  class t3["InstalledVocabularyPack"] {
+    <<struct>>
+    id
+    title
+    languages
+    entryCount
+    packageURL
+    init()
+  }
+  class t4["InstalledVocabularyPackStoreError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t5["InstalledVocabularyPackStore"] {
+    <<actor>>
+    rootURL
+    fileManager
+    init()
+    installedPacks()
+    install()
+    remove()
+    installedPack()
+    installedPack()
+  }
+  class t6["VocabularyCapability"] {
+    <<enum>>
+  }
+  class t7["LocalizedText"] {
+    <<struct>>
+    value
+    language
+    init()
+  }
+  class t8["LexicalTrait"] {
+    <<struct>>
+    name
+    value
+    init()
+  }
+  class t9["LexicalForm"] {
+    <<struct>>
+    id
+    text
+    kind
+    grammaticalFeatures
+    provenance
+    init()
+  }
+  class t10["AudioReference"] {
+    <<struct>>
+    path
+    mimeType
+    init()
+  }
+  class t11["PronunciationRepresentation"] {
+    <<enum>>
+  }
+  class t12["Pronunciation"] {
+    <<struct>>
+    id
+    scheme
+    label
+    representations
+    formIDs
+    senseIDs
+    provenance
+    init()
+    init()
+    encode()
+  }
+  class t13["Pronunciation.CodingKeys"] {
+    <<enum>>
+  }
+  class t14["Provenance"] {
+    <<struct>>
+    sourceID
+    sourceName
+    recordID
+    attribution
+    license
+    sourceURL
+    init()
+  }
+  class t15["UnicodeScalarRange"] {
+    <<struct>>
+    location
+    length
+    init()
+  }
+  class t16["ExampleTarget"] {
+    <<struct>>
+    exactText
+    scalarRange
+    init()
+  }
+  class t17["UsageExample"] {
+    <<struct>>
+    id
+    text
+    target
+    provenance
+    init()
+  }
+  class t18["Definition"] {
+    <<struct>>
+    id
+    text
+    provenance
+    init()
+  }
+  class t19["LexicalSense"] {
+    <<struct>>
+    id
+    definitions
+    examples
+    labels
+    provenance
+    init()
+  }
+  class t20["LexicalEntry"] {
+    <<struct>>
+    id
+    language
+    canonicalForm
+    forms
+    pronunciations
+    senses
+    frequency
+    provenance
+    init()
+  }
+  class t21["VocabularyPackDescriptor"] {
+    <<struct>>
+    id
+    title
+    summary
+    languages
+    capabilities
+    provenance
+    init()
+  }
+  class t22["VocabularyPackManifest"] {
+    <<struct>>
+    currentFormatVersion
+    format
+    formatVersion
+    id
+    title
+    summary
+    languages
+    capabilities
+    provenance
+    entryCount
+    databaseFile
+    databaseSHA256
+    mediaFiles
+    init()
+  }
+  class t23["VocabularyPackMediaFile"] {
+    <<struct>>
+    path
+    byteSize
+    sha256
+    init()
+  }
+  class t24["VocabularyPackLimits"] {
+    <<struct>>
+    maximumPackBytes
+    maximumManifestBytes
+    maximumEntries
+    maximumJSONLineBytes
+    maximumEncodedEntryBytes
+    maximumFormsPerEntry
+    maximumSensesPerEntry
+    maximumExamplesPerSense
+    maximumDefinitionsPerSense
+    maximumPronunciationsPerEntry
+    maximumRepresentationsPerPronunciation
+    maximumTraitsPerForm
+    maximumLabelsPerSense
+    maximumIndexedTextBytes
+    maximumAudioPathBytes
+    maximumMediaBytes
+    maximumMediaFiles
+    maximumMediaTreeEntries
+    maximumMediaPathDepth
+    maximumSearchQueryBytes
+    maximumSearchResultBytes
+    init()
+    _default_
+  }
+  class t25["VocabularySearchMode"] {
+    <<enum>>
+  }
+  class t26["VocabularyPackError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t27["VocabularyPack"] {
+    <<actor>>
+    manifest
+    packageURL
+    database
+    limits
+    init()
+    open()
+    validateMedia()
+    search()
+    entry()
+    mediaURL()
+  }
+  class t28["VocabularySearchKey"] {
+    <<enum>>
+    make()
+  }
+  class t29["FileSafety"] {
+    <<enum>>
+    validatePackageRoot()
+    requireDirectory()
+    requireRegularFile()
+    fileSize()
+    isSafeSingleFilename()
+    isSafeRelativePath()
+    isSHA256Hex()
+    requireNoSymlinkComponents()
+    regularFilesRecursively()
+  }
+  class t30["SHA256File"] {
+    <<enum>>
+    hexDigest()
+  }
+  class t31["CloudVocabularyPack"] {
+    <<struct>>
+    id
+    manifest
+    files
+    byteCount
+    chunkBytes
+    maximumCatalogEntryBytes
+    init()
+    chunkID()
+    validate()
+    manifestData()
+    digest()
+    invalid()
+  }
+  class t32["CloudVocabularyPack.File"] {
+    <<struct>>
+    path
+    byteCount
+    sha256
+    init()
+  }
+  class t33["VocabularyPackCloudTransport"] {
+    <<protocol>>
+    accountIdentifier()
+    catalog()
+    publish()
+    uploadChunk()
+    downloadChunk()
+  }
+  class t34["VocabularyPackCloudTransfer"] {
+    <<actor>>
+    init()
+    describe()
+    upload()
+    download()
+    checkLocalPath()
+  }
+  class t35["VocabularyPackCompiler"] {
+    <<enum>>
+    compile()
+    validate()
+    validate()
+    requireByteLimit()
+    validate()
+    validate()
+    occurrenceCount()
+    copyReferencedMedia()
+    packageByteSize()
+  }
+  class t36["VocabularyPackCompiler.Options"] {
+    <<struct>>
+    limits
+    mediaDirectoryURL
+    init()
+  }
+  class t37["JSONLineReader"] {
+    <<class>>
+    handle
+    maximumLineBytes
+    buffer
+    reachedEOF
+    lineNumber
+    init()
+    next()
+  }
+  class t38["JSONLineReader.Record"] {
+    <<struct>>
+    number
+    data
+  }
+  class t39["VocabularyPackTransferProgress"] {
+    <<struct>>
+    isUploading
+    completedBytes
+    totalBytes
+  }
+  class t40["VocabularyPackSyncModel"] {
+    <<class>>
+    catalog
+    localPacks
+    localKeys
+    localSizes
+    isEnabled
+    isRefreshing
+    transfers
+    errors
+    catalogError
+    isAvailable
+    rootURL
+    store
+    transport
+    transfer
+    accountID
+    generation
+    automaticTask
+    uploadTask
+    downloads
+    refreshInterval
+    init()
+    setEnabled()
+    reloadLocal()
+    refresh()
+    localPacksChanged()
+    installLocal()
+    isDownloaded()
+    download()
+    cancelDownload()
+    isTransferring()
+    removeDownload()
+    startUploads()
+    progress()
+    check()
+    sorted()
+    saveCache()
+  }
+  class t41["VocabularyPackSyncModel.Cache"] {
+    <<struct>>
+    accountID
+    packs
+  }
+  class t42["VocabularySQLiteDatabase"] {
+    <<class>>
+    applicationID
+    schemaVersion
+    handle
+    encoder
+    decoder
+    entriesTableSQL
+    formsTableSQL
+    entriesIndexSQL
+    formsIndexSQL
+    init()
+    close()
+    createSchema()
+    setMaximumDatabaseBytes()
+    begin()
+    commit()
+    rollback()
+    insert()
+    validateForReading()
+    entry()
+    search()
+    decodeEntry()
+    execute()
+    prepare()
+    scalarInt()
+    scalarText()
+    schemaObjects()
+    tableColumns()
+    schemaSQL()
+    indexKeyColumns()
+    normalizeSchemaSQL()
+    bindText()
+    bindBlob()
+    sqliteError()
+    prefixUpperBound()
+  }

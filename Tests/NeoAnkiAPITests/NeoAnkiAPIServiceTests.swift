@@ -539,14 +539,31 @@ private actor VocabularyPackOpenCounter {
 
 private actor BlockingPairingApprover: APIPairingApprover {
     private var continuation: CheckedContinuation<Bool, Never>?
+    private var startedWaiters: [CheckedContinuation<Void, Never>] = []
     private(set) var started = false
+    private(set) var completed = false
+    private(set) var requestedApproval: APIPairingRequest?
+    private(set) var cancelledRequest: APIPairingRequest?
 
     func approve(_ request: APIPairingRequest) async -> Bool {
         started = true
+        let waiters = startedWaiters
+        startedWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        requestedApproval = request
+        defer { completed = true }
+        // The expiry task may win before the approval task enters this actor.
+        if cancelledRequest != nil { return false }
         return await withCheckedContinuation { continuation = $0 }
     }
 
+    func waitUntilStarted() async {
+        guard !started else { return }
+        await withCheckedContinuation { startedWaiters.append($0) }
+    }
+
     func cancel(_ request: APIPairingRequest) {
+        cancelledRequest = request
         continuation?.resume(returning: false)
         continuation = nil
     }
@@ -554,17 +571,6 @@ private actor BlockingPairingApprover: APIPairingApprover {
     func resolve(_ approved: Bool) {
         continuation?.resume(returning: approved)
         continuation = nil
-    }
-}
-
-private struct SlowPairingApprover: APIPairingApprover {
-    func approve(_ request: APIPairingRequest) async -> Bool {
-        do {
-            try await Task.sleep(for: .seconds(10))
-            return true
-        } catch {
-            return false
-        }
     }
 }
 
@@ -708,18 +714,95 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
     )
 
     try await server.start()
-    #expect(await server.isRunning)
-    let actualPort = try #require(await server.listeningPort)
-    let url = try #require(URL(string: "http://127.0.0.1:\(actualPort.rawValue)/health"))
-    var healthRequest = URLRequest(url: url)
-    healthRequest.setValue(authority, forHTTPHeaderField: "Host")
-    let (data, response) = try await URLSession.shared.data(for: healthRequest)
-    #expect((response as? HTTPURLResponse)?.statusCode == 200)
-    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
-    #expect(body == ["status": "ok"])
+    do {
+        #expect(await server.isRunning)
+        let actualPort = try #require(await server.listeningPort)
+        // Observe this socket's readiness and EOF directly. URLSession.shared's
+        // process-wide scheduling/deadline is unrelated to the server contract.
+        let bytes = try await loopbackHTTPResponse(
+            port: actualPort,
+            request: Data("GET /health HTTP/1.1\r\nHost: \(authority)\r\nConnection: close\r\n\r\n".utf8)
+        )
+        let separator = try #require(bytes.range(of: Data("\r\n\r\n".utf8)))
+        let head = String(decoding: bytes[..<separator.lowerBound], as: UTF8.self)
+        let lines = head.components(separatedBy: "\r\n")
+        #expect(lines.first == "HTTP/1.1 200 OK")
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            let colon = try #require(line.firstIndex(of: ":"))
+            let name = line[..<colon].lowercased()
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            #expect(headers[name] == nil, "Duplicate response header: \(name)")
+            headers[name] = value
+        }
+        let length = try #require(headers["content-length"].flatMap(Int.init))
+        let data = Data(bytes[separator.upperBound...])
+        #expect(length == data.count, "EOF must follow exactly the declared response body.")
+        #expect(headers["connection"]?.lowercased() == "close")
+        #expect(headers["transfer-encoding"] == nil)
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
+        #expect(body == ["status": "ok"])
+    } catch {
+        await server.stop()
+        throw error
+    }
 
     await server.stop()
     #expect(await !server.isRunning)
+}
+
+private func loopbackHTTPResponse(port: NWEndpoint.Port, request: Data) async throws -> Data {
+    let connection = NWConnection(host: "127.0.0.1", port: port, using: .tcp)
+    defer { connection.cancel() }
+    return try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    connection.stateUpdateHandler = nil
+                    continuation.resume()
+                case let .failed(error):
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: error)
+                case .cancelled:
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: CancellationError())
+                default: break
+                }
+            }
+            connection.start(queue: DispatchQueue(label: "neoanki-api-http-test"))
+        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.send(content: request, completion: .contentProcessed { error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            })
+        }
+        return try await loopbackReadToEOF(connection)
+    } onCancel: {
+        connection.cancel()
+    }
+}
+
+private func loopbackReadToEOF(_ connection: NWConnection) async throws -> Data {
+    try Task.checkCancellation()
+    return try await withTaskCancellationHandler {
+        var bytes = Data()
+        while true {
+            let (data, complete) = try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<(Data, Bool), Error>) in
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) {
+                    data, _, complete, error in
+                    if let error { continuation.resume(throwing: error) }
+                    else { continuation.resume(returning: (data ?? Data(), complete)) }
+                }
+            }
+            bytes.append(data)
+            if complete { return bytes }
+        }
+    } onCancel: {
+        connection.cancel()
+    }
 }
 
 @Test func openEventStreamClosesAfterClientRevocation() async throws {
@@ -751,6 +834,7 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
 
     let actualPort = try #require(await server.listeningPort)
     let connection = NWConnection(host: "127.0.0.1", port: actualPort, using: .tcp)
+    defer { connection.cancel() }
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
         connection.stateUpdateHandler = { state in
             switch state {
@@ -806,9 +890,18 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
         ]
     ))
     #expect(revoked.status == 204)
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-    while await server.activeConnectionCount != 0, ContinuousClock.now < deadline {
-        try await Task.sleep(for: .milliseconds(25))
+    do {
+        _ = try await loopbackReadToEOF(connection)
+    } catch let error as NWError {
+        // Either orderly EOF or a peer reset proves that revocation closed the
+        // stream. Other network errors remain failures.
+        guard case .posix(.ECONNRESET) = error else {
+            await server.stop()
+            throw error
+        }
+    } catch {
+        await server.stop()
+        throw error
     }
     #expect(await server.activeConnectionCount == 0)
     connection.cancel()
@@ -1291,7 +1384,7 @@ private func pairWithAuthority(
             body: pairingBody
         ))
     }
-    while !(await blocker.started) { await Task.yield() }
+    await blocker.waitUntilStarted()
     let overlapping = await blockedAPI.handle(request(
         .post,
         "/v1/pairings",
@@ -1354,16 +1447,16 @@ private func pairWithAuthority(
 
     let expiringStore = try ItemStore(databaseURL: apiTestDatabaseURL(), starterItemTypes: [])
     try await expiringStore.bootstrap()
+    let expiringApprover = BlockingPairingApprover()
     let expiringAPI = NeoAnkiAPIService(
         store: expiringStore,
         authorization: APIAuthorizationStore(
             persistence: InMemoryAPICredentialPersistence()
         ),
-        pairingApprover: SlowPairingApprover(),
+        pairingApprover: expiringApprover,
         applicationVersion: "test",
-        pairingRequestLifetime: 0.01
+        pairingRequestLifetime: 0
     )
-    let startedAt = ContinuousClock.now
     let expired = await expiringAPI.handle(request(
         .post,
         "/v1/pairings",
@@ -1371,7 +1464,11 @@ private func pairWithAuthority(
     ))
     #expect(expired.status == 403)
     #expect(try jsonObject(expired)["code"] as? String == "pairing_denied")
-    #expect(startedAt.duration(to: .now) < .seconds(1))
+    #expect(await expiringApprover.started)
+    #expect(await expiringApprover.completed)
+    let expiredRequest = APIPairingRequest(displayName: "Expires", origin: nil, requestedScopes: [.libraryRead])
+    #expect(await expiringApprover.requestedApproval == expiredRequest)
+    #expect(await expiringApprover.cancelledRequest == expiredRequest)
 }
 
 @Test func verifierFilePersistsOnlyTokenHashesWithPrivatePermissions() async throws {

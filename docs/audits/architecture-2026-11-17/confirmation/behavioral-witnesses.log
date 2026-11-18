@@ -1,0 +1,52 @@
+PASS W1: changing only the type name changes ordinal refresh (7 versus 1)
+PASS W2: feature envelope format in an ordinary text field controls family identity
+PASS W3: a valid LibraryStudying conformer inherits an empty preview result
+PASS W4: a valid coordinated-editing conformer can reject every operation by default
+PASS W5: generated-deck command accepts Int at compile time and rejects it at runtime
+PASS W6: generic command wrapper can succeed with no receipt capability
+6 behavioral witnesses passed; no application data or services accessed.
+
+Building for debugging...
+[Planning 39 / 125]
+[Planning deferred tasks]
+[35 / 66]
+[36 / 67] NeoAnkiFSRS
+[45 / 110]
+[48 / 110]
+[51 / 110]
+[54 / 110]
+[55 / 110]
+[59 / 110]
+[61 / 110]
+[64 / 110]
+[67 / 110]
+[69 / 110]
+[70 / 110]
+[79 / 110] NeoAnkiFSRS
+[86 / 111] NeoAnkiFSRS
+[86 / 111] NeoAnkiCore
+[90 / 128]
+[96 / 128] NeoAnkiCore
+[97 / 128] NeoAnkiFSRS
+[104 / 128] NeoAnkiCore
+[110 / 128] NeoAnkiCore
+[110 / 128]
+[112 / 129] NeoAnkiCore
+[112 / 129] NeoAnkiApplication
+[117 / 149]
+[118 / 149]
+[119 / 149]
+[128 / 149] NeoAnkiApplication
+[130 / 149] NeoAnkiApplication
+[131 / 149] NeoAnkiApplication
+[132 / 149] NeoAnkiApplication
+[141 / 150] NeoAnkiApplication
+[141 / 150] NeoAnkiCore
+[141 / 150] Witnesses-product
+[143 / 152] Witnesses-product
+[144 / 152] Witnesses-product
+[145 / 152] NeoAnkiApplication
+[146 / 152] NeoAnkiCore
+[148 / 152] NeoAnkiCore
+[150 / 152] Witnesses-product
+Build complete! (24,41 sec)

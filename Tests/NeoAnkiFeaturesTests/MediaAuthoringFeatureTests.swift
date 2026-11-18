@@ -48,6 +48,7 @@ import Testing
     #expect(try await model.item(id: item.id)?.item.value(for: photo.id) == .media(media))
     let cards = try await repository.dueCards(scope: .deck(deck.id), asOf: .now)
     #expect(cards.count == 1)
+    await model.awaitReadModels()
     #expect(model.decks.count == 1)
 }
 

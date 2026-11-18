@@ -202,7 +202,8 @@ The main window is a split view:
   the active task.
 
 Selecting a scope opens its home: what is due, what to study, and a link into
-browse mode. Browse mode is where you search items and open one for editing;
+browse mode. Switching scopes keeps the requested destination while counts
+refresh. Browse mode is where you search items and open one for editing;
 open it with **Command-Option-B** and leave it with **Escape**. The sidebar can
 also be shown or hidden with the standard macOS split-view controls.
 

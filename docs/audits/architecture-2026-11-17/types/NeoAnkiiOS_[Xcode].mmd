@@ -1,0 +1,107 @@
+classDiagram
+direction LR
+  class t0["IOSMobileSettingsStore"] {
+    <<actor>>
+    defaults
+    syncKey
+    reminderKey
+    init()
+    loadSyncEnabled()
+    saveSyncEnabled()
+    loadReminderSettings()
+    saveReminderSettings()
+  }
+  class t1["IOSNotificationScheduler"] {
+    <<actor>>
+    center
+    authorizationStatus()
+    requestAuthorization()
+    replaceDailyReminder()
+    reminderURL()
+  }
+  class t2["IOSAppIconBadgePublisher"] {
+    <<actor>>
+    center
+    hasRequestedAuthorization
+    publicationTask
+    publish()
+    apply()
+  }
+  class t3["AppGroupWidgetPublisher"] {
+    <<actor>>
+    suite
+    publish()
+  }
+  class t4["MobileSyncCoordinator"] {
+    <<actor>>
+    repository
+    paths
+    service
+    fallbackStatus
+    libraryChangeEvents
+    changesMonitor
+    init()
+    start()
+    synchronize()
+    synchronizeAndWait()
+    stop()
+    libraryChanges()
+    status()
+    issues()
+    retryIssue()
+    dismissIssue()
+    restoreConflictCopy()
+  }
+  class t5["MobileSyncRecoveryUITestService"] {
+    <<actor>>
+    repository
+    adapter
+    seeded
+    pending
+    init()
+    start()
+    synchronize()
+    stop()
+    status()
+    issues()
+    retryIssue()
+    dismissIssue()
+    restoreConflictCopy()
+  }
+  class t6["IOSBackgroundRefresh"] {
+    <<class>>
+    shared
+    identifier
+    model
+    register()
+    schedule()
+    handle()
+  }
+  class t7["MobilePaths"] {
+    <<struct>>
+    applicationSupport
+    databaseURL
+    syncMetadataDirectory
+    backupURL
+    vocabularyPacksURL
+    init()
+  }
+  class t8["NeoAnkiIOSApp"] {
+    <<struct>>
+    appDelegate
+    scenePhase
+    model
+    packCloudTransport
+    usesAccessibilityUITestEnvironment
+    usesCardSetupAccessibilityTestHost
+    init()
+    body
+  }
+  class t9["IOSCloudSyncAppDelegate"] {
+    <<class>>
+    model
+    logger
+    application()
+    application()
+    application()
+  }

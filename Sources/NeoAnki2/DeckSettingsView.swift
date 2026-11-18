@@ -44,19 +44,15 @@ struct DeckSettingsView: View {
                     ErrorBanner(message: errorMessage)
                 }
 
-                if let library = decksModel.library as? any LibraryRepository {
+                if let features = decksModel.features {
                     Section("Item Types") {
                         Button("Manage Item Types…") { showsTypes = true }
                     }
                     .sheet(isPresented: $showsTypes) {
                         NavigationStack {
-                            DeckItemTypesView(library: library, deckID: deck.id, refreshToken: typesRevision, onEdit: { type in
-                                if let studioLibrary = library as? any LibraryBrowsing & LibraryItemTypeManaging & LibraryItemTypeEditingSafeguarding & LibraryItemTypeStudioSaving {
-                                    let studio = ItemTypesFeatureModel(library: studioLibrary)
-                                    studio.destinationDeckID = deck.id
-                                    Task { await studio.load(); studio.selectItemType(id: type.id); if !studio.isSelectedItemTypeReadOnly { studio.beginEditingSelectedItemType() }; typeStudio = studio }
-                                }
-                            }, onChanged: onSaved)
+                            DeckItemTypesView(model: features.makeDeckItemTypes(deckID: deck.id, onChanged: onSaved), refreshToken: typesRevision, onEdit: { type in
+                                Task { typeStudio = await features.openItemType(id: type.id, deckID: deck.id) }
+                            })
                             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { showsTypes = false } } }
                         }.frame(minWidth: 520, minHeight: 450)
                         .sheet(isPresented: Binding(get: { typeStudio != nil }, set: { if !$0 { typeStudio = nil } }), onDismiss: { typesRevision += 1 }) {

@@ -65,6 +65,14 @@ struct MacItemTypeStudioView: View {
                 ErrorBanner(message: errorMessage)
                     .accessibilityIdentifier(ItemTypeStudioAccessibilityID.validationSummary)
             }
+            if let warning = model.refreshWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, DesignSystem.Spacing.md)
+                    .padding(.vertical, DesignSystem.Spacing.xs)
+                    .accessibilityIdentifier("itemTypeStudioRefreshWarning")
+            }
             if let repairMessage {
                 HStack(spacing: DesignSystem.Spacing.xs) {
                     Image(systemName: "wrench.and.screwdriver")
@@ -542,15 +550,16 @@ struct MacItemTypeStudioView: View {
         do {
             let saved = try await model.commitSave(preparation)
             errorMessage = nil
-            await onSaved()
             // commitSave rebases edits made while persistence was awaiting the
             // repository. Close only the clean saved draft; retain any newer
             // or different draft so a reentrant edit is never erased.
             if let activeDraft = model.studioDraft,
                activeDraft.id == saved.id,
+               activeDraft.originalSnapshot == saved,
                activeDraft.isDirty == false {
                 model.discardStudioDraft()
             }
+            model.requestOwnerRefresh { await onSaved() }
         } catch {
             errorMessage = error.localizedDescription
         }

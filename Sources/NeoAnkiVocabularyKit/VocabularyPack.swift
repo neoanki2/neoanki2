@@ -529,6 +529,12 @@ enum SHA256File {
         do { handle = try FileHandle(forReadingFrom: url) }
         catch { throw VocabularyPackError.ioFailure(error.localizedDescription) }
         defer { try? handle.close() }
+        return try hexDigest { try handle.read(upToCount: 1_048_576) ?? Data() }
+    }
+
+    // Keep the actual streaming loop independently exercisable: its per-read
+    // autorelease lifetime matters even when other tasks allocate concurrently.
+    static func hexDigest(readChunk: () throws -> Data) throws -> String {
         var hasher = SHA256()
         do {
             while true {
@@ -537,7 +543,7 @@ enum SHA256File {
                 // chunk instead of retaining a dictionary-sized copy until the
                 // surrounding task's autorelease pool is drained on iOS.
                 let count = try autoreleasepool {
-                    let chunk = try handle.read(upToCount: 1_048_576) ?? Data()
+                    let chunk = try readChunk()
                     hasher.update(data: chunk)
                     return chunk.count
                 }

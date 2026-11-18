@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "checks": [
+    {
+      "id": "S1",
+      "status": "confirmed",
+      "statement": "All 891 audited tracked files still match their recorded SHA-256 digests",
+      "details": null
+    },
+    {
+      "id": "S2",
+      "status": "confirmed",
+      "statement": "488 Swift file identities match git; saved scanner output has 28,926 declaration records and no parser errors",
+      "details": "Confirms saved-output counts and input coverage; does not independently prove SwiftSyntax traversal completeness."
+    },
+    {
+      "id": "S3",
+      "status": "confirmed",
+      "statement": "All 37 SwiftPM target dependency lists match fresh SwiftPM output",
+      "details": null
+    },
+    {
+      "id": "S4",
+      "status": "confirmed",
+      "statement": "Application contracts and SQLite repository adapter share a target; Core includes both model and SQLite implementation",
+      "details": null
+    },
+    {
+      "id": "S5",
+      "status": "confirmed",
+      "statement": "LibraryFeatureModel publicly exposes an aggregate LibraryRepository",
+      "details": "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift:73"
+    },
+    {
+      "id": "S6",
+      "status": "confirmed",
+      "statement": "Typed HTTP endpoint metadata and a separate method/path execution switch coexist",
+      "details": null
+    },
+    {
+      "id": "S7",
+      "status": "confirmed",
+      "statement": "Features contains Apple provider imports; iOS filesystem/repository initialization uses try!",
+      "details": null
+    },
+    {
+      "id": "S8",
+      "status": "confirmed",
+      "statement": "Router and statistics snapshot span 538 and 559 source lines respectively",
+      "details": "Span is objective. Number of responsibilities, maintainability and extraction value remain judgments."
+    },
+    {
+      "id": "W7",
+      "status": "confirmed",
+      "statement": "Actual guard rejects plain forbidden import but accepts attributed, selective and extra-space variants",
+      "details": "Fixture uses the unchanged script and real rg. Fixtures are text, not compiler-validated programs; confirms gate matching behavior."
+    },
+    {
+      "id": "W1",
+      "status": "confirmed",
+      "statement": "changing only the type name changes ordinal refresh (7 versus 1)",
+      "details": null
+    },
+    {
+      "id": "W2",
+      "status": "confirmed",
+      "statement": "feature envelope format in an ordinary text field controls family identity",
+      "details": null
+    },
+    {
+      "id": "W3",
+      "status": "confirmed",
+      "statement": "a valid LibraryStudying conformer inherits an empty preview result",
+      "details": null
+    },
+    {
+      "id": "W4",
+      "status": "confirmed",
+      "statement": "a valid coordinated-editing conformer can reject every operation by default",
+      "details": null
+    },
+    {
+      "id": "W5",
+      "status": "confirmed",
+      "statement": "generated-deck command accepts Int at compile time and rejects it at runtime",
+      "details": null
+    },
+    {
+      "id": "W6",
+      "status": "confirmed",
+      "statement": "generic command wrapper can succeed with no receipt capability",
+      "details": null
+    }
+  ],
+  "limits": [
+    "These are bounded structural/behavioral confirmations, not theorem-prover verification.",
+    "No claim of a complete compiler-resolved dependency/call graph.",
+    "No universal SOLID compliance/noncompliance or correctness of a proposed redesign is proven.",
+    "Saved build/test logs attest prior successful executions; this run does not repeat an unchanged full test suite."
+  ]
+}

@@ -10,7 +10,6 @@ extension ItemsModel {
         self.init(library: SQLiteLibraryRepository(store: store), mediaStore: mediaStore)
     }
 
-    var store: any LibraryRepository { library as! any LibraryRepository }
 }
 
 @MainActor
@@ -32,23 +31,6 @@ extension StudyModel {
         )
     }
 
-    var store: any LibraryRepository { library as! any LibraryRepository }
-}
-
-@MainActor
-extension ImportModel {
-    convenience init(
-        itemsModel: ItemsModel,
-        scopedAccess: any SecurityScopedResourceAccessing = SystemSecurityScopedResourceAccess(),
-        fileInspector: any ImportFileInspecting = SystemImportFileInspector()
-    ) {
-        self.init(
-            itemsModel: itemsModel,
-            library: itemsModel.library as! any LibraryRepository,
-            scopedAccess: scopedAccess,
-            fileInspector: fileInspector
-        )
-    }
 }
 
 @MainActor

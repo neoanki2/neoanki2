@@ -3,21 +3,7 @@ import NeoAnkiApplication
 import NeoAnkiCore
 import Observation
 
-public struct StudyGradeUndo: Equatable, Sendable {
-    public let reviewLogID: UUID
-    public let previousIndex: Int
-    public let previousReviewedCount: Int
-    public let reviewedCardID: UUID
-    public let reviewedItemID: UUID
-    public let insertedReviewedCardID: Bool
-    public let insertedReviewedItemID: Bool
-    public let rating: ReviewRating
-    public let requeuedCardID: UUID?
-}
-
-private struct PendingRepeat: Sendable {
-    var card: Card
-}
+public typealias StudyGradeUndo = NeoAnkiApplication.StudyGradeUndo
 
 public struct StudySessionStartTiming: Sendable, Equatable {
     public fileprivate(set) var dueCountSeconds = 0.0
@@ -53,8 +39,9 @@ public final class StudyFeatureModel: Identifiable {
     private let errorMapper: any UserFacingErrorMapping
     private let onMutation: (@MainActor @Sendable () async -> Void)?
     private let clock: @Sendable () -> Date
-    public private(set) var queue: [DueCard] = [] { didSet { updateLearningTime() } }
-    public private(set) var index = 0 { didSet { updateLearningTime() } }
+    private var sessionState = StudySessionState() { didSet { updateLearningTime() } }
+    public var queue: [DueCard] { sessionState.queue }
+    public var index: Int { sessionState.index }
     public private(set) var isAnswerRevealed = false {
         didSet { if isAnswerRevealed && !oldValue { learningTime.interaction(); answerActiveStart = learningTime.sessionMilliseconds } }
     }
@@ -73,7 +60,7 @@ public final class StudyFeatureModel: Identifiable {
     /// load is indistinguishable from an empty one, and a session that never
     /// opened reports itself complete.
     public private(set) var didFailToLoad = false { didSet { updateLearningTime() } }
-    public private(set) var pendingGradeUndo: StudyGradeUndo?
+    public var pendingGradeUndo: StudyGradeUndo? { sessionState.pendingGradeUndo }
     public private(set) var typedAnswer = ""
     public private(set) var answerEvaluation: AnswerEvaluation?
     public private(set) var choiceOptions: [String] = []
@@ -100,22 +87,23 @@ public final class StudyFeatureModel: Identifiable {
             return nil
         }
     }
-    public private(set) var reviewedCount = 0
-    public private(set) var completedSubmissionCount = 0
-    public private(set) var reviewedCardIDs: Set<UUID> = []
-    public private(set) var reviewedItemIDs: Set<UUID> = []
+    public var reviewedCount: Int { sessionState.reviewedCount }
+    public var completedSubmissionCount: Int { sessionState.completedSubmissionCount }
+    public var reviewedCardIDs: Set<UUID> { sessionState.reviewedCardIDs }
+    public var reviewedItemIDs: Set<UUID> { sessionState.reviewedItemIDs }
     public private(set) var lastStartTiming = StudySessionStartTiming()
 
     private let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
+    private let itemSnapshotReader: (any LibraryStudyItemSnapshotReading)?
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
     /// in `queue`, avoiding a second hydrated copy of every failed card.
     public private(set) var sessionScope: DeckScope = .allDecks
-    private var repairQueue: [PendingRepeat] = []
     public let learningTime: LearningTimeTracker
     private var reviewTiming = ReviewTimingTracker()
     private var expectedQueueCount = 0
     private var startGeneration: UInt64 = 0
+    private var itemReloadGeneration: UInt64 = 0
     package var remainingQueueLoadGate: (@Sendable () async -> Void)?
 
     public init(
@@ -123,11 +111,13 @@ public final class StudyFeatureModel: Identifiable {
         scope: DeckScope,
         title: String,
         mediaStore: MediaStore? = nil,
+        itemSnapshotReader: (any LibraryStudyItemSnapshotReading)? = nil,
         onMutation: (@MainActor @Sendable () async -> Void)? = nil,
         errorMapper: any UserFacingErrorMapping = DefaultUserFacingErrorMapper(),
         clock: @escaping @Sendable () -> Date = { .now }
     ) {
         self.library = library
+        self.itemSnapshotReader = itemSnapshotReader ?? (library as? any LibraryStudyItemSnapshotReading)
         self.sessionScope = scope
         self.title = title
         self.mediaStore = mediaStore
@@ -145,6 +135,23 @@ public final class StudyFeatureModel: Identifiable {
     public var isComplete: Bool { isFinished && !didFailToLoad && !isLoading && !isPreparingQueue }
     public var remainingCount: Int { remainingCardCount }
     public var canUndo: Bool { pendingGradeUndo != nil && !isGrading && !isCompletingSubmission && !isPreparingQueue }
+
+    /// Native shells share action availability. Platform adapters add only
+    /// local restrictions such as an open editor or microphone permission.
+    public var canShowAnswer: Bool { currentCard != nil && !isAnswerRevealed && !isLoading && !isFinished }
+    public var canGrade: Bool {
+        currentCard != nil && isAnswerRevealed && !isLoading && !isGrading
+            && !isCompletingSubmission && !isPreparingQueue
+    }
+    public var canSkip: Bool {
+        currentCard != nil && !isLoading && !isGrading && !isCompletingSubmission && !isPreparingQueue
+    }
+    public var supportsRevealWithoutChecking: Bool {
+        switch currentCard?.template.interaction {
+        case .type, .choose, .arrange, .record: true
+        default: false
+        }
+    }
 
     public func start() async { await start(scope: sessionScope, title: title) }
     public func skip() async { await skipCurrentCard() }
@@ -165,7 +172,7 @@ public final class StudyFeatureModel: Identifiable {
         // A failed card waits once in the next repair round while untouched
         // cards remain once in the current queue. Counting both pending groups
         // keeps Again stable without rescanning a potentially large session.
-        return queue.count - index + repairQueue.count
+        return sessionState.remainingCount
     }
 
     public func start(scope: DeckScope, title: String) async {
@@ -179,21 +186,14 @@ public final class StudyFeatureModel: Identifiable {
         isLoading = true
         isPreparingQueue = false
         expectedQueueCount = 0
-        queue = []
+        sessionState.reset()
         prepareCurrentInteraction()
         error = nil
         isFinished = false
         isAnswerRevealed = false
-        index = 0
-        reviewedCount = 0
-        completedSubmissionCount = 0
-        reviewedCardIDs = []
-        reviewedItemIDs = []
-        repairQueue = []
         reviewTiming = ReviewTimingTracker()
         self.title = title
         sessionScope = scope
-        pendingGradeUndo = nil
         didFailToLoad = false
 
         do {
@@ -207,7 +207,7 @@ public final class StudyFeatureModel: Identifiable {
 
             if dueCount == 0 {
                 let publicationStart = ContinuousClock.now
-                queue = []
+                sessionState.load([])
                 isFinished = true
                 prepareCurrentInteraction()
                 isLoading = false
@@ -248,7 +248,7 @@ public final class StudyFeatureModel: Identifiable {
             }
 
             let headPublicationStart = ContinuousClock.now
-            queue = [firstCard]
+            sessionState.load([firstCard])
             expectedQueueCount = dueCount
             isFinished = false
             isPreparingQueue = true
@@ -276,10 +276,7 @@ public final class StudyFeatureModel: Identifiable {
             // Keep the already-rendered copy: it may hold local interaction
             // state or an edit reload. The complete read supplies every
             // remaining card in its original database order.
-            queue.reserveCapacity(completeQueue.count)
-            for card in completeQueue where card.id != firstCard.id {
-                queue.append(card)
-            }
+            sessionState.appendRemaining(completeQueue, excluding: firstCard.id)
             expectedQueueCount = 0
             isPreparingQueue = false
             isLoading = false
@@ -290,7 +287,7 @@ public final class StudyFeatureModel: Identifiable {
         } catch {
             guard startIsCurrent(generation) else { return }
             self.error = errorMapper.map(error)
-            queue = []
+            sessionState.load([])
             expectedQueueCount = 0
             isPreparingQueue = false
             isFinished = true
@@ -427,11 +424,7 @@ public final class StudyFeatureModel: Identifiable {
             _ = try await StatisticsCapture.$context.withValue(context) {
                 try await library.completeAudioSubmission(draft, submittedAt: clock())
             }
-            reviewedCardIDs.insert(card.id)
-            reviewedItemIDs.insert(card.item.id)
-            completedSubmissionCount += 1
-            pendingGradeUndo = nil
-            index += 1
+            sessionState.recordSubmission(for: card)
             isAnswerRevealed = false
             await advanceSession()
             await onMutation?()
@@ -457,7 +450,6 @@ public final class StudyFeatureModel: Identifiable {
         isGrading = true
         defer { isGrading = false }
 
-        let previousIndex = index
         let now = clock()
 
         do {
@@ -473,28 +465,7 @@ public final class StudyFeatureModel: Identifiable {
                 durationMilliseconds: reviewTiming.elapsedMilliseconds()
             )
             }
-            var repeatedCard = card
-            repeatedCard.card.memory = submission.memory
-            let shouldRequeue = submission.memory.phase == .learning
-                || submission.memory.phase == .relearning
-            if shouldRequeue {
-                repairQueue.append(PendingRepeat(card: repeatedCard.card))
-            }
-            let insertedReviewedCardID = reviewedCardIDs.insert(card.id).inserted
-            let insertedReviewedItemID = reviewedItemIDs.insert(card.item.id).inserted
-            pendingGradeUndo = StudyGradeUndo(
-                reviewLogID: submission.reviewLogID,
-                previousIndex: previousIndex,
-                previousReviewedCount: reviewedCount,
-                reviewedCardID: card.id,
-                reviewedItemID: card.item.id,
-                insertedReviewedCardID: insertedReviewedCardID,
-                insertedReviewedItemID: insertedReviewedItemID,
-                rating: rating,
-                requeuedCardID: shouldRequeue ? card.id : nil
-            )
-            index += 1
-            reviewedCount += 1
+            sessionState.recordGrade(submission, for: card, rating: rating)
             isAnswerRevealed = false
             await advanceSession()
             await onMutation?()
@@ -515,28 +486,12 @@ public final class StudyFeatureModel: Identifiable {
 
         do {
             try await library.revertReview(id: undo.reviewLogID, asOf: clock())
-            if let requeuedCardID = undo.requeuedCardID {
-                repairQueue.removeAll { $0.card.id == requeuedCardID }
-                if let queuedRepeat = queue.indices.last(where: {
-                    $0 > undo.previousIndex && queue[$0].id == requeuedCardID
-                }) {
-                    queue.remove(at: queuedRepeat)
-                }
-            }
-            index = undo.previousIndex
-            reviewedCount = undo.previousReviewedCount
-            if undo.insertedReviewedCardID {
-                reviewedCardIDs.remove(undo.reviewedCardID)
-            }
-            if undo.insertedReviewedItemID {
-                reviewedItemIDs.remove(undo.reviewedItemID)
-            }
+            sessionState.undoGrade(undo)
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
             resetAttemptTiming()
             isAnswerRevealed = true
-            pendingGradeUndo = nil
             await onMutation?()
         } catch {
             self.error = errorMapper.map(error)
@@ -544,7 +499,7 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func dismissGradeUndo() {
-        pendingGradeUndo = nil
+        sessionState.dismissUndo()
     }
 
     private func updateLearningTime() {
@@ -561,12 +516,40 @@ public final class StudyFeatureModel: Identifiable {
     /// queue was built from. Every queued card drawn from that item is refreshed,
     /// because one item can own several cards in the same session.
     public func reloadCurrentItem() async {
-        guard !isPreparingQueue else { return }
-        guard let itemID = currentCard?.item.id else { return }
+        guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
+              let current = currentCard else { return }
+        let itemID = current.item.id
+        let cardID = current.id
+        let position = index
+        let generation = startGeneration
+        itemReloadGeneration &+= 1
+        let reloadGeneration = itemReloadGeneration
 
         do {
-            guard let reloaded = try await library.item(id: itemID) else { return }
-            refreshQueuedCards(for: reloaded.item, itemType: reloaded.itemType)
+            let snapshot: ItemCardSnapshot?
+            let compatibilityItem: (item: Item, itemType: ItemType)?
+            if let reader = itemSnapshotReader {
+                snapshot = try await reader.studyItemSnapshot(id: itemID)
+                compatibilityItem = nil
+            } else {
+                compatibilityItem = try await library.item(id: itemID)
+                snapshot = nil
+            }
+            guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
+                  startIsCurrent(generation), itemReloadGeneration == reloadGeneration,
+                  currentCard?.id == cardID, index == position else { return }
+            if let compatibilityItem {
+                sessionState.refresh(item: compatibilityItem.item, itemType: compatibilityItem.itemType)
+            } else {
+                sessionState.reconcile(itemID: itemID, snapshot: snapshot)
+            }
+            error = nil
+            if currentCard?.id != cardID {
+                isAnswerRevealed = false
+                resetAttemptTiming()
+                await advanceSession()
+                return
+            }
             // An answer already on screen keeps its feedback: re-deriving the
             // interaction here would clear the message the learner is reading,
             // and the choices or ordering they answered no longer matter.
@@ -574,43 +557,28 @@ public final class StudyFeatureModel: Identifiable {
                 prepareCurrentInteraction()
             }
         } catch {
+            guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
+                  startIsCurrent(generation), itemReloadGeneration == reloadGeneration,
+                  currentCard?.id == cardID, index == position else { return }
             self.error = errorMapper.map(error)
         }
-    }
-
-    private func refreshQueuedCards(for item: Item, itemType: ItemType) {
-        func refresh(_ card: inout DueCard) {
-            guard card.item.id == item.id else { return }
-            card.item = item
-            card.itemType = itemType
-            StudyQueueOrdering.refreshRelation(in: &card)
-            // Editing an item cannot change its templates, but reading the
-            // template back keeps each card rendering from one revision.
-            if let template = itemType.templates.first(where: { $0.id == card.template.id }) {
-                card.template = template
-            }
-        }
-
-        for index in queue.indices {
-            refresh(&queue[index])
-        }
-        StudyQueueOrdering.orderWorks(in: &queue, from: index + 1)
     }
 
     public func skipCurrentCard() async {
         guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
         error = nil
-        pendingGradeUndo = nil
+        sessionState.dismissUndo()
         guard queue.indices.contains(index) else { return }
 
-        materializePendingRepeats()
-        let skippedCard = queue.remove(at: index)
-        queue.append(skippedCard)
+        sessionState.skip()
         isAnswerRevealed = false
         await advanceSession()
     }
 
     private func prepareCurrentInteraction() {
+        // A delayed editor read cannot update a different attempt, including
+        // skipping through a queue and returning to the same card ID/index.
+        itemReloadGeneration &+= 1
         typedAnswer = ""
         answerEvaluation = nil
         selectedChoice = nil
@@ -642,25 +610,31 @@ public final class StudyFeatureModel: Identifiable {
 
     private func discardMissingCurrentCard(_ cardID: UUID) async {
         guard queue.indices.contains(index), queue[index].id == cardID else { return }
-        queue.remove(at: index)
+        sessionState.discardCurrent()
         isAnswerRevealed = false
-        repairQueue.removeAll { $0.card.id == cardID }
         await advanceSession()
     }
 
     private func advanceSession() async {
         guard !isPreparingQueue else { return }
         while queue.indices.contains(index) {
-            StudyQueueOrdering.separateRelated(in: &queue, at: index)
+            sessionState.separateRelated()
             guard queue[index].card.memory.phase == .new, queue[index].studyRelation?.work == nil else { break }
+            let generation = startGeneration
+            let cardID = queue[index].id
+            let position = index
             isPreparingQueue = true
             do {
-                let eligible = try await library.isNewStudyCardEligible(cardID: queue[index].id, scope: sessionScope, asOf: clock())
+                let eligible = try await library.isNewStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
+                guard generation == startGeneration, currentCard?.id == cardID, index == position else { return }
                 isPreparingQueue = false
+                guard !Task.isCancelled else { return }
                 if eligible { break }
-                queue.remove(at: index)
+                sessionState.discardCurrent()
             } catch {
+                guard generation == startGeneration, currentCard?.id == cardID, index == position else { return }
                 isPreparingQueue = false
+                guard !Task.isCancelled else { return }
                 self.error = errorMapper.map(error)
                 return
             }
@@ -672,8 +646,8 @@ public final class StudyFeatureModel: Identifiable {
             return
         }
 
-        if !repairQueue.isEmpty {
-            materializePendingRepeats()
+        if sessionState.hasPendingRepairs {
+            sessionState.materializeRepairs()
             isFinished = false
             resetAttemptTiming()
             prepareCurrentInteraction()
@@ -682,31 +656,6 @@ public final class StudyFeatureModel: Identifiable {
 
         isFinished = true
         prepareCurrentInteraction()
-    }
-
-    /// Makes the deferred repair round concrete before another action changes
-    /// queue order. This lets Skip move a card behind every card already waiting
-    /// without creating a duplicate skipped entry.
-    private func materializePendingRepeats() {
-        guard !repairQueue.isEmpty else { return }
-
-        let passStart = queue.count
-        var sourceIndexByCardID: [UUID: Int] = [:]
-        sourceIndexByCardID.reserveCapacity(repairQueue.count)
-        for (sourceIndex, card) in queue.enumerated() {
-            sourceIndexByCardID[card.id] = sourceIndex
-        }
-        queue.reserveCapacity(queue.count + repairQueue.count)
-        for repeatEntry in repairQueue {
-            guard let sourceIndex = sourceIndexByCardID[repeatEntry.card.id] else {
-                continue
-            }
-            var repeatedCard = queue[sourceIndex]
-            repeatedCard.card = repeatEntry.card
-            queue.append(repeatedCard)
-        }
-        StudyQueueOrdering.orderWorks(in: &queue, from: passStart)
-        repairQueue = []
     }
 
     private func loadCompleteQueue(
@@ -725,7 +674,7 @@ public final class StudyFeatureModel: Identifiable {
         guard startIsCurrent(generation) else { return }
 
         let publicationStart = ContinuousClock.now
-        queue = completeQueue
+        sessionState.load(completeQueue)
         isFinished = queue.isEmpty
         prepareCurrentInteraction()
         if !queue.isEmpty { resetAttemptTiming() }

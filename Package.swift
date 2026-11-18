@@ -93,6 +93,8 @@ let package = Package(
             name: "NeoAnkiSharedUI",
             dependencies: [
                 "NeoAnkiTextEditing",
+                "PoemDeckBuilder",
+                "ProseDeckBuilder",
                 "NeoAnkiApplication",
                 "NeoAnkiFeatures",
                 "NeoAnkiVocabularyKit",

@@ -37,6 +37,10 @@ documentation, and releases.
 
 ## Understand decisions and history
 
+- [Shared native workflow and presentation boundary ADR]({{ '/adr/0005-shared-native-workflows/' | relative_url }})
+
+- [Whole-system architecture audit and source atlas (November 17, 2026)]({{ '/audits/architecture-2026-11-17/' | relative_url }})
+
 - [Typed native creation and bounded study heads ADR]({{ '/adr/0004-typed-native-creation-and-study-heads/' | relative_url }})
 - [Typed creation implementation and performance evidence]({{ '/audits/typed-native-creation-implementation-2026-11-16/' | relative_url }})
 

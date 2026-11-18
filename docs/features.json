@@ -104,8 +104,8 @@
       "id": "mobile-library-authoring",
       "name": "Browse, author, organize, and transfer on iOS",
       "article": "user/iphone-ipad.md",
-      "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiApplication/NativeLibraryCommands.swift", "Sources/NeoAnkiApplication/NativeLibraryReadCoordinator.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/NativeCommandReceipt.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemMoveSelection.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift"],
-      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/MediaAuthoringFeatureTests.swift"]
+      "sources": ["Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiApplication/NativeLibraryCommands.swift", "Sources/NeoAnkiApplication/NativeLibraryReadCoordinator.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/NativeCommandReceipt.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemMoveSelection.swift", "Sources/NeoAnkiIOS/ClozeSelectionEditor.swift", "Sources/NeoAnkiIOS/LibraryView.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/RichSpanTextEditor.swift", "Sources/NeoAnkiApplication/LatestAsyncWork.swift"],
+      "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/MediaAuthoringFeatureTests.swift", "Tests/NeoAnkiApplicationTests/LatestAsyncWorkTests.swift", "Tests/NeoAnkiFeaturesTests/NativeCommandCompletionTests.swift"]
     },
     {
       "id": "mobile-study",
@@ -126,7 +126,7 @@
       "name": "Opt in to offline-first private CloudKit sync",
       "article": "user/sync-reminders-widgets.md",
       "sources": ["Platforms/iOS/IOSPlatformServices.swift", "Platforms/iOS/MobilePaths.swift", "Sources/NeoAnki2/MacCloudSyncSettings.swift", "Sources/NeoAnki2/MacCloudSyncStatusModel.swift", "Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnkiCloudSync/CKSyncEngineTransport.swift", "Sources/NeoAnkiCloudSync/LibraryZoneChangeFetcher.swift", "Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift", "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift", "Sources/NeoAnkiCloudSync/SyncMergePolicy.swift", "Sources/NeoAnkiCloudSync/SyncMetadataStore.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift"],
-      "tests": ["Tests/NeoAnkiFeaturesTests/SyncConvergenceContractTests.swift", "Tests/NeoAnkiFeaturesTests/SyncLiveUpdateTests.swift", "Tests/NeoAnki2Tests/MacCloudSyncStatusModelTests.swift", "Tests/NeoAnkiApplicationTests/CKSyncEngineTransportTests.swift", "Tests/NeoAnkiApplicationTests/LibraryZoneChangeFetcherTests.swift", "Tests/NeoAnkiApplicationTests/OfflineFirstSyncServiceTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiApplicationTests/SyncMergePolicyTests.swift", "Tests/NeoAnkiApplicationTests/SyncStateMachineTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/SyncedReviewSchedulingTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/SynchronizedTypeDeletionTests.swift", "Tests/NeoAnkiApplicationTests/SyncMetadataStoreTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
+      "tests": ["Tests/NeoAnkiFeaturesTests/SyncConvergenceContractTests.swift", "Tests/NeoAnkiFeaturesTests/SyncLiveUpdateTests.swift", "Tests/NeoAnki2Tests/MacCloudSyncStatusModelTests.swift", "Tests/NeoAnki2Tests/ObservableTestReadiness.swift", "Tests/NeoAnkiApplicationTests/CKSyncEngineTransportTests.swift", "Tests/NeoAnkiApplicationTests/LibraryZoneChangeFetcherTests.swift", "Tests/NeoAnkiApplicationTests/OfflineFirstSyncServiceTests.swift", "Tests/NeoAnkiApplicationTests/SQLiteLibrarySyncAdapterTests.swift", "Tests/NeoAnkiApplicationTests/SyncMergePolicyTests.swift", "Tests/NeoAnkiApplicationTests/SyncStateMachineTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/SyncedReviewSchedulingTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/SynchronizedTypeDeletionTests.swift", "Tests/NeoAnkiApplicationTests/SyncMetadataStoreTests.swift", "Tests/NeoAnkiFeaturesTests/AppDeepLinkTests.swift"]
     },
     {
       "id": "app-icon-badge",
@@ -184,8 +184,8 @@
       "id": "item-create-edit",
       "name": "Create and edit items",
       "article": "user/authoring-items.md",
-      "sources": ["Sources/NeoAnkiTextEditing/DraftProtection.swift", "Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemsModel.swift", "Sources/NeoAnki2/ItemEditorState.swift"],
-      "tests": ["Tests/NeoAnkiTextEditingTests/TextEditingTests.swift", "UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift"],
+      "sources": ["Sources/NeoAnkiTextEditing/DraftProtection.swift", "Sources/NeoAnki2/AddItemView.swift", "Sources/NeoAnki2/ItemsModel.swift", "Sources/NeoAnki2/ItemEditorState.swift", "Sources/NeoAnkiApplication/EditorState.swift", "Sources/NeoAnkiFeatures/EditorSaveOperation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemDraftValidation.swift"],
+      "tests": ["Tests/NeoAnkiTextEditingTests/TextEditingTests.swift", "UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Tests/NeoAnki2Tests/ItemsModelTests.swift", "Tests/NeoAnki2Tests/ItemEditorStateTests.swift", "Tests/NeoAnki2Tests/EditorDecisionStateTests.swift", "Tests/NeoAnki2Tests/ItemEditReconciliationFlowTests.swift", "Tests/NeoAnkiApplicationTests/ItemEditingContractTests.swift", "Tests/NeoAnkiApplicationTests/GeneratedDeckEditingTests.swift", "Tests/NeoAnkiFeaturesTests/CardEditingRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/ItemEditingPersistenceTests.swift", "Tests/NeoAnkiFeaturesTests/ItemEditingStudyFlowTests.swift", "Tests/NeoAnki2Tests/NativeItemEditorHydrationTests.swift", "Tests/NeoAnki2Tests/ItemEditingRoundTripTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ClozeEditingInvariantTests.swift", "Tests/NeoAnkiApplicationTests/ItemEditorDraftTests.swift", "Tests/NeoAnkiFeaturesTests/EditorSaveOperationTests.swift"],
       "screenshot": "assets/screenshots/item-add.png"
     },
     {
@@ -214,7 +214,7 @@
       "id": "content-text-rich",
       "name": "Text and rich-text fields",
       "article": "user/content-and-media.md",
-      "sources": ["Sources/NeoAnkiTextEditing/PlainTextEditor.swift", "Sources/NeoAnkiTextEditing/EditingCommands.swift", "Sources/NeoAnki2/RichTextFieldEditor.swift", "Sources/NeoAnki2/SpanFormatting.swift"],
+      "sources": ["Sources/NeoAnkiTextEditing/PlainTextEditor.swift", "Sources/NeoAnkiTextEditing/EditingCommands.swift", "Sources/NeoAnki2/RichTextFieldEditor.swift", "Sources/NeoAnki2/SpanFormatting.swift", "Sources/NeoAnkiTextEditing/NativeTextEditorPolicy.swift"],
       "tests": ["Tests/NeoAnkiTextEditingTests/TextEditingTests.swift", "UITests/NeoAnki2UITests/LibraryUITests.swift", "Tests/NeoAnki2Tests/RichTextEditingTests.swift", "Tests/NeoAnki2Tests/SpanFormattingTests.swift"],
       "screenshot": "assets/screenshots/item-rich-text.png"
     },
@@ -244,11 +244,19 @@
       "id": "study-start",
       "name": "Start a scoped due-card session",
       "article": "user/studying.md",
-      "sources": ["Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift",
+      "sources": [
+        "Sources/NeoAnkiApplication/StudySessionState.swift",
+        "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift",
         "Sources/NeoAnkiFeatures/StudyFeatureModel.swift",
-        "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift"],
-      "tests": ["UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Tests/NeoAnki2Tests/StudyStartPerformanceTests.swift", "Tests/NeoAnki2Tests/DockBadgeTests.swift",
-        "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyEligibilityQueryPlanTests.swift"],
+        "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+        "Sources/NeoAnkiApplication/StudyItemSnapshot.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Models/ItemCardSnapshot.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+ItemCardSnapshot.swift"
+      ],
+      "tests": [
+        "Tests/NeoAnkiApplicationTests/StudySessionStateTests.swift",
+        "UITests/NeoAnki2UITests/StudyUITests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Tests/NeoAnki2Tests/StudyStartPerformanceTests.swift", "Tests/NeoAnki2Tests/DockBadgeTests.swift",
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyEligibilityQueryPlanTests.swift",
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/ItemCardSnapshotTests.swift"
+      ],
       "screenshot": "assets/screenshots/study-prompt.png"
     },
     {
@@ -336,8 +344,16 @@
       "id": "item-types",
       "name": "Edit item types and Card setups atomically",
       "article": "user/item-types-and-templates.md",
-      "sources": ["Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/MacItemTypeStudioView.swift", "Sources/NeoAnkiApplication/ItemTypeStudioDraft.swift", "Sources/NeoAnkiApplication/LibraryRepository.swift", "Sources/NeoAnkiFeatures/ItemTypesFeatureModel.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/ItemTypeStudioMobileView.swift", "Sources/NeoAnkiIOS/MobileCardSetupAccessibilityTestHost.swift", "Sources/NeoAnkiIOS/MobileItemTypeStudioUITestSeeder.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+ItemTypes.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeUpdateAuthorization.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Study/ItemStore+StudyResponses.swift"],
-      "tests": ["UITests/NeoAnki2UITests/TemplatesUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnki2Tests/UITestControlTests.swift", "Tests/NeoAnki2Tests/MobileRedesignFixtureTests.swift", "Tests/NeoAnkiApplicationTests/ItemTypeStudioDraftTests.swift", "Tests/NeoAnkiFeaturesTests/ItemTypesFeatureModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ItemTypeAtomicUpdateTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"],
+      "sources": [
+        "Sources/NeoAnkiApplication/ItemTypeAuthoring.swift",
+        "Sources/NeoAnkiFeatures/ItemTypeAuthoringFeatureModels.swift",
+        "Sources/NeoAnkiFeatures/LibraryFeatureFactory.swift",
+        "Sources/NeoAnkiIOS/MobileUITestFixtures.swift",
+        "Sources/NeoAnkiSharedUI/DeckItemTypesView.swift",
+        "Sources/NeoAnki2/TemplatesView.swift", "Sources/NeoAnki2/MacItemTypeStudioView.swift", "Sources/NeoAnkiApplication/ItemTypeStudioDraft.swift", "Sources/NeoAnkiApplication/LibraryRepository.swift", "Sources/NeoAnkiFeatures/ItemTypesFeatureModel.swift", "Sources/NeoAnkiIOS/ManagementViews.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiIOS/ItemTypeStudioMobileView.swift", "Sources/NeoAnkiIOS/MobileCardSetupAccessibilityTestHost.swift", "Sources/NeoAnkiIOS/MobileItemTypeStudioUITestSeeder.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+ItemTypes.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeCatalog.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Schema/ItemTypeUpdateAuthorization.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Study/ItemStore+StudyResponses.swift"],
+      "tests": [
+        "Tests/NeoAnkiFeaturesTests/ItemTypeAuthoringWorkflowTests.swift",
+        "UITests/NeoAnki2UITests/TemplatesUITests.swift", "UITests/NeoAnki2UITests/TemplatesAdvancedUITests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnki2Tests/UITestControlTests.swift", "Tests/NeoAnki2Tests/MobileRedesignFixtureTests.swift", "Tests/NeoAnkiApplicationTests/ItemTypeStudioDraftTests.swift", "Tests/NeoAnkiFeaturesTests/ItemTypesFeatureModelTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/ItemTypeAtomicUpdateTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/AuthoredDeckTests.swift"],
       "screenshot": "assets/screenshots/item-types.png"
     },
     {
@@ -385,8 +401,12 @@
       "id": "deck-builders",
       "name": "Build poem decks from guided input",
       "article": "user/import-export.md",
-      "sources": ["Sources/NeoAnki2/DeckBuilderSheet.swift", "Sources/PoemDeckBuilder/PoemDeckEditorView.swift", "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift", "Sources/PoemDeckBuilder/PoemDeckBuilderView.swift", "Sources/PoemDeckBuilder/PoemDeckGenerator.swift", "Sources/PoemDeckBuilder/PoemDeckReconciler.swift", "Sources/PoemDeckBuilder/PoemPromptPlanner.swift", "Sources/PoemDeckBuilder/PoemCardPlanner.swift", "Tools/NeoAnkiPoemRepair/PoemRepairCommand.swift"],
-      "tests": ["Tests/NeoAnki2Tests/DeckBuilderIntegrationTests.swift", "Tests/PoemDeckBuilderTests/PoemDeckBuilderTests.swift"]
+      "sources": [
+        "Sources/NeoAnkiSharedUI/GeneratedDeckEditorView.swift",
+        "Sources/NeoAnkiApplication/GeneratedDeckEditing.swift",
+        "Sources/NeoAnkiApplication/NativeDeckCreation.swift",
+        "Sources/NeoAnki2/DeckBuilderSheet.swift", "Sources/PoemDeckBuilder/PoemDeckEditorView.swift", "Sources/NeoAnkiDeckBuilderKit/DeckBuilderKit.swift", "Sources/PoemDeckBuilder/PoemDeckBuilderView.swift", "Sources/PoemDeckBuilder/PoemDeckGenerator.swift", "Sources/PoemDeckBuilder/PoemDeckReconciler.swift", "Sources/PoemDeckBuilder/PoemPromptPlanner.swift", "Sources/PoemDeckBuilder/PoemCardPlanner.swift", "Tools/NeoAnkiPoemRepair/PoemRepairCommand.swift"],
+      "tests": ["Tests/NeoAnki2Tests/GeneratedDeckEditorContextTests.swift", "Tests/NeoAnki2Tests/DeckBuilderIntegrationTests.swift", "Tests/PoemDeckBuilderTests/PoemDeckBuilderTests.swift"]
     },
     {
       "id": "scheduling-optimize",

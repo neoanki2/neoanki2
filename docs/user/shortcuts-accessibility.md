@@ -156,7 +156,8 @@ typing a number into an answer does not grade the card.
 - **Space** or **Return:** reveal the answer or run the current interaction's
   primary check action. After reveal, **Space** grades Good.
 - **Right Arrow:** reveal without automatic checking and self-grade on typed,
-  choice, record, and arrange cards.
+  choice, record, and arrange cards. The same action is in **More → Reveal &
+  Self-Grade** on Mac. Stop an active recording before using it.
 - **1–4:** select Again, Hard, Good, or Easy after reveal. With Fail / Pass
   grades enabled, **1** selects Fail (Again) and **2** selects Pass (Good).
   Before reveal, the same number keys choose a multiple-choice option when one

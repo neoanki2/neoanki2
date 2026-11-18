@@ -1,6 +1,7 @@
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
 
 /// Identifies a sidebar row in the deck navigator.
 enum SidebarSelection: Hashable, Sendable {
@@ -48,7 +49,8 @@ final class DecksModel {
 
     var selectedScope: SidebarSelection = .allDecks
 
-    let library: any LibraryBrowsing & LibraryDeckManaging
+    private let library: any LibraryBrowsing & LibraryDeckManaging
+    let features: LibraryFeatureFactory?
     private let onDueCountChange: (@MainActor (Int) -> Void)?
 
     init(
@@ -57,6 +59,7 @@ final class DecksModel {
         reads: NativeLibraryReadCoordinator? = nil
     ) {
         self.library = library
+        self.features = (library as? any LibraryRepository).map { LibraryFeatureFactory(library: $0) }
         self.reads = reads ?? NativeLibraryReadCoordinator(library: library)
         self.onDueCountChange = onDueCountChange
     }

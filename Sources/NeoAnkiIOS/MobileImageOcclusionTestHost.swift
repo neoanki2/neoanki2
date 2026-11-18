@@ -10,6 +10,7 @@ import UIKit
 /// SQLite commit, card generation, and study session without a photo-library
 /// permission or nondeterministic system file picker.
 public struct MobileImageOcclusionTestHost: View {
+    @Environment(\.mobileUITestFixtures) private var fixtures
     @Bindable var model: LibraryFeatureModel
     @State private var image: ImageOcclusionContent?
     @State private var saved: ImageOcclusionContent?
@@ -49,14 +50,14 @@ public struct MobileImageOcclusionTestHost: View {
             await model.bootstrap()
             do {
                 let candidate = try ItemTypeStudioDraft.newImageOcclusion().candidateItemType()
-                _ = try await model.library.createItemType(candidate)
+                try await fixtures?.createOcclusionType(candidate)
                 type = candidate
                 let renderer = UIGraphicsImageRenderer(size: .init(width: 400, height: 300))
                 let data = renderer.pngData { context in
                     UIColor.white.setFill(); context.fill(.init(x: 0, y: 0, width: 400, height: 300))
                     ("Diagram A     Diagram B" as NSString).draw(at: .init(x: 40, y: 60), withAttributes: [.font: UIFont.systemFont(ofSize: 24), .foregroundColor: UIColor.black])
                 }
-                var ref = try await model.library.reserveMedia(data: data, kind: .image, altText: "", asOf: .now).reference
+                guard var ref = try await fixtures?.reserveOcclusionImage(data) else { return }
                 ref.altText = nil
                 image = .init(image: ref)
             } catch { self.error = error.localizedDescription }
@@ -70,8 +71,7 @@ public struct MobileImageOcclusionTestHost: View {
         let id = itemID ?? UUID()
         let item = Item(id: id, itemTypeID: type.id, fields: [.init(fieldID: type.fields[0].id, value: .imageOcclusion(content))])
         do {
-            if itemID == nil { _ = try await model.library.createItem(item, asOf: .now) }
-            else { _ = try await model.library.updateItem(item, asOf: .now) }
+            try await fixtures?.saveOcclusionItem(item, isNew: itemID == nil)
             itemID = id; saved = content; editing = false
             await model.refresh()
         } catch { self.error = error.localizedDescription }

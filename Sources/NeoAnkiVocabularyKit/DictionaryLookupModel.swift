@@ -49,23 +49,33 @@ public final class DictionaryLookupModel {
     private var generation = 0
     private var packTask: (url: URL, id: UUID, task: Task<VocabularyPack, Error>)?
     private let delay: Duration
+    private let debounceSleep: @Sendable (Duration) async throws -> Void
     private let searchOverride: (@Sendable (String, URL, VocabularySearchMode) async throws -> [LexicalEntry])?
     private let openPack: @Sendable (URL) async throws -> VocabularyPack
 
     public init(delay: Duration = .milliseconds(300)) {
         self.delay = delay
+        debounceSleep = { try await Task.sleep(for: $0) }
         searchOverride = nil
         openPack = { try await VocabularyPack.open(at: $0) }
     }
 
-    init(delay: Duration, search: @escaping @Sendable (String, URL, VocabularySearchMode) async throws -> [LexicalEntry]) {
+    // Internal timing seam keeps debounce cancellation tests independent of
+    // executor latency; normal callers continue to use Task.sleep.
+    init(
+        delay: Duration,
+        debounceSleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        search: @escaping @Sendable (String, URL, VocabularySearchMode) async throws -> [LexicalEntry]
+    ) {
         self.delay = delay
+        self.debounceSleep = debounceSleep
         searchOverride = search
         openPack = { try await VocabularyPack.open(at: $0) }
     }
 
     init(delay: Duration, openPack: @escaping @Sendable (URL) async throws -> VocabularyPack) {
         self.delay = delay
+        debounceSleep = { try await Task.sleep(for: $0) }
         searchOverride = nil
         self.openPack = openPack
     }
@@ -86,7 +96,7 @@ public final class DictionaryLookupModel {
         let request = generation
         isSearching = true
         do {
-            try await Task.sleep(for: delay)
+            try await debounceSleep(delay)
             try Task.checkCancellation()
             let exact = try await search(query, url: packURL, mode: .exact)
             try Task.checkCancellation()

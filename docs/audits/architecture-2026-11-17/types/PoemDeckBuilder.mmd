@@ -1,0 +1,196 @@
+classDiagram
+direction LR
+  class t0["PlannedPoemCard"] {
+    <<struct>>
+    prompt
+    answer
+    isOpening
+  }
+  class t1["PoemCardPlanner"] {
+    <<enum>>
+    openingTag
+    openingPrompt
+    needsOpeningCard()
+    cards()
+    comparisonText()
+  }
+  class t2["PoemDeckBuilderFeature"] {
+    <<enum>>
+    descriptor
+    makeFeature()
+  }
+  class t3["PoemDeckBuilderView"] {
+    <<struct>>
+    focusedField
+    errorFocused
+    input
+    errorMessage
+    parsedPoem
+    plannedCards
+    pendingCreation
+    generationTask
+    isGenerating
+    textSession
+    dismissal
+    isPreviewing
+    rootDecks
+    workspaceProvider
+    limits
+    onGenerated
+    onPrepared
+    onCancel
+    init()
+    init()
+    body
+    lineSummary
+    refreshPlan()
+    openingSummary
+    hasDraft
+    requestCancel()
+    preview()
+    generate()
+  }
+  class t4["PoemDeckBuilderView.Field"] {
+    <<enum>>
+  }
+  class t5["PoemDeckEditorModel"] {
+    <<class>>
+    library
+    deckID
+    itemTypeID
+    deckName
+    records
+    previewedSourceText
+    initialSourceText
+    sourceText
+    preview
+    initialMismatchCount
+    isLoading
+    isSaving
+    errorMessage
+    init()
+    canPreview
+    canSave
+    load()
+    sourceDidChange()
+    preparePreview()
+    save()
+  }
+  class t6["PoemDeckEditorView"] {
+    <<struct>>
+    deckName
+    onSaved
+    onCancel
+    textSession
+    dismissal
+    isPreviewing
+    model
+    errorFocused
+    init()
+    body
+    editor
+    hasChanges
+    requestCancel()
+    isMobilePreview
+    save()
+  }
+  class t7["PoemReconciliationChangeView"] {
+    <<struct>>
+    change
+    body
+    changePair()
+  }
+  class t8["PoemDeckInput"] {
+    <<struct>>
+    destinationDeckID
+    author
+    title
+    text
+    init()
+  }
+  class t9["ParsedPoemLine"] {
+    <<struct>>
+    text
+    startsStanza
+    init()
+  }
+  class t10["ParsedPoem"] {
+    <<struct>>
+    stanzas
+    init()
+    lines
+  }
+  class t11["PoemDeckBuilderError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t12["PoemDeckGenerator"] {
+    <<enum>>
+    generate()
+    prepare()
+    parse()
+    usableLines()
+    poemTypeRecord
+  }
+  class t13["PoemSequenceMismatch"] {
+    <<struct>>
+    itemID
+    expectedPrompt
+    actualPrompt
+    id
+  }
+  class t14["PoemDeckSnapshot"] {
+    <<struct>>
+    openingRecord
+    orderedRecords
+    sourceText
+    mismatches
+  }
+  class t15["PoemDeckReconciliationChange"] {
+    <<struct>>
+    itemID
+    oldPrompt
+    newPrompt
+    oldAnswer
+    newAnswer
+    addsStanzaBreak
+    removesStanzaBreak
+    id
+  }
+  class t16["PoemDeckReconciliationPreview"] {
+    <<struct>>
+    poem
+    originalItemType
+    updatedItemType
+    replacements
+    changes
+    repairedMismatchCount
+    operations
+    order
+    openingCard
+    retiredOpeningCard
+    addedCount
+    retiredCount
+    changesItemType
+    hasChanges
+  }
+  class t17["PoemDeckReconciler"] {
+    <<enum>>
+    stanzaBreakFieldName
+    snapshot()
+    preview()
+    validateGeneratedChain()
+    field()
+    requiredTextField()
+    text()
+    setText()
+    normalize()
+    normalizeAnswer()
+    normalizeMultiline()
+    requiredLast()
+  }
+  class t18["PoemPromptPlanner"] {
+    <<enum>>
+    prompts()
+    context()
+  }

@@ -1,0 +1,6253 @@
+[
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 4,
+    "kind": "named declaration",
+    "name": "apiBase",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 11,
+    "kind": "named declaration",
+    "name": "APIError",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 22,
+    "kind": "named declaration",
+    "name": "makeAPI",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 55,
+    "kind": "named declaration",
+    "name": "revokeClient",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 60,
+    "kind": "named declaration",
+    "name": "allPages",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 74,
+    "kind": "named declaration",
+    "name": "basicFields",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 87,
+    "kind": "named declaration",
+    "name": "safeSource",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 95,
+    "kind": "named declaration",
+    "name": "emptyDraft",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 99,
+    "kind": "named declaration",
+    "name": "createPending",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 116,
+    "kind": "named declaration",
+    "name": "saveDraft",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 145,
+    "kind": "named declaration",
+    "name": "renderEntry",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 159,
+    "kind": "named declaration",
+    "name": "applyAutofill",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 166,
+    "kind": "named declaration",
+    "name": "DictionaryLookup",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/core.js",
+    "line": 208,
+    "kind": "named declaration",
+    "name": "readSelection",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 11,
+    "kind": "named declaration",
+    "name": "status",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 16,
+    "kind": "named declaration",
+    "name": "controls",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 23,
+    "kind": "named declaration",
+    "name": "showDraft",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 31,
+    "kind": "named declaration",
+    "name": "persistEdit",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 39,
+    "kind": "named declaration",
+    "name": "publishLookup",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 67,
+    "kind": "named declaration",
+    "name": "capture",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/popup.js",
+    "line": 134,
+    "kind": "named declaration",
+    "name": "init",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/settings.js",
+    "line": 7,
+    "kind": "named declaration",
+    "name": "status",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/settings.js",
+    "line": 11,
+    "kind": "named declaration",
+    "name": "controls",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/settings.js",
+    "line": 19,
+    "kind": "named declaration",
+    "name": "dictionaries",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/settings.js",
+    "line": 82,
+    "kind": "named declaration",
+    "name": "init",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/storage.js",
+    "line": 4,
+    "kind": "named declaration",
+    "name": "readState",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/storage.js",
+    "line": 11,
+    "kind": "named declaration",
+    "name": "writeState",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/tests/integration.mjs",
+    "line": 93,
+    "kind": "named declaration",
+    "name": "cleanup",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/tests/integration.mjs",
+    "line": 94,
+    "kind": "named declaration",
+    "name": "check",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/tests/integration.mjs",
+    "line": 111,
+    "kind": "named declaration",
+    "name": "select",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/tests/integration.mjs",
+    "line": 121,
+    "kind": "named declaration",
+    "name": "popup",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/tests/integration.mjs",
+    "line": 131,
+    "kind": "named declaration",
+    "name": "cleanup",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Extensions/Chrome/tests/integration.mjs",
+    "line": 153,
+    "kind": "named declaration",
+    "name": "discardStoredDraft",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/build-docs-redirect.py",
+    "line": 14,
+    "kind": "FunctionDef",
+    "name": "normalized_url",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/build-docs-redirect.py",
+    "line": 21,
+    "kind": "FunctionDef",
+    "name": "route_for_file",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/build-docs-redirect.py",
+    "line": 30,
+    "kind": "FunctionDef",
+    "name": "redirect_document",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/build-docs-redirect.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "not_found_document",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/build-docs-redirect.py",
+    "line": 87,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/build-release-artifact.sh",
+    "line": 36,
+    "kind": "named declaration",
+    "name": "cleanup",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/capture-ios-app-store.py",
+    "line": 19,
+    "kind": "FunctionDef",
+    "name": "run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/capture-ios-app-store.py",
+    "line": 23,
+    "kind": "FunctionDef",
+    "name": "app_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/capture-ios-app-store.py",
+    "line": 27,
+    "kind": "FunctionDef",
+    "name": "capture_products",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/capture-ios-app-store.py",
+    "line": 42,
+    "kind": "FunctionDef",
+    "name": "record_capture_build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/capture-ios-app-store.py",
+    "line": 52,
+    "kind": "FunctionDef",
+    "name": "validate_capture_build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/capture-ios-app-store.py",
+    "line": 70,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-docs-external-links.py",
+    "line": 24,
+    "kind": "FunctionDef",
+    "name": "is_public_http_url",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-docs-external-links.py",
+    "line": 45,
+    "kind": "FunctionDef",
+    "name": "external_urls",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-docs-external-links.py",
+    "line": 57,
+    "kind": "ClassDef",
+    "name": "PublicRedirectHandler",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-docs-external-links.py",
+    "line": 60,
+    "kind": "FunctionDef",
+    "name": "PublicRedirectHandler.redirect_request",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-docs-external-links.py",
+    "line": 78,
+    "kind": "FunctionDef",
+    "name": "check",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-docs-external-links.py",
+    "line": 111,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-published-docs.py",
+    "line": 17,
+    "kind": "FunctionDef",
+    "name": "fetch",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-published-docs.py",
+    "line": 28,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 37,
+    "kind": "ClassDef",
+    "name": "Edit",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 44,
+    "kind": "ClassDef",
+    "name": "Mutant",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 52,
+    "kind": "FunctionDef",
+    "name": "Mutant.marker",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 90,
+    "kind": "FunctionDef",
+    "name": "timestamp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 94,
+    "kind": "FunctionDef",
+    "name": "sha",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 98,
+    "kind": "FunctionDef",
+    "name": "save_json",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 104,
+    "kind": "FunctionDef",
+    "name": "git",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 113,
+    "kind": "FunctionDef",
+    "name": "relevant_untracked",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 122,
+    "kind": "FunctionDef",
+    "name": "snapshot",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 164,
+    "kind": "FunctionDef",
+    "name": "contract_environment",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 178,
+    "kind": "FunctionDef",
+    "name": "run_tests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 212,
+    "kind": "FunctionDef",
+    "name": "test_started",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 216,
+    "kind": "FunctionDef",
+    "name": "matching_issue",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 230,
+    "kind": "FunctionDef",
+    "name": "classify",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 257,
+    "kind": "FunctionDef",
+    "name": "apply_mutant",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 286,
+    "kind": "FunctionDef",
+    "name": "write_report",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/check-sync-test-sensitivity.py",
+    "line": 304,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 32,
+    "kind": "ClassDef",
+    "name": "DeploymentError",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 36,
+    "kind": "ClassDef",
+    "name": "DeviceUnavailable",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 40,
+    "kind": "FunctionDef",
+    "name": "save_receipt",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 46,
+    "kind": "FunctionDef",
+    "name": "bundle_digest",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 59,
+    "kind": "FunctionDef",
+    "name": "installed_app_matches",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 67,
+    "kind": "FunctionDef",
+    "name": "select_device",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 90,
+    "kind": "FunctionDef",
+    "name": "validate_profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 115,
+    "kind": "FunctionDef",
+    "name": "make_entitlements",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 142,
+    "kind": "FunctionDef",
+    "name": "validate_receipt",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 159,
+    "kind": "ClassDef",
+    "name": "Workflow",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 160,
+    "kind": "FunctionDef",
+    "name": "Workflow.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 167,
+    "kind": "FunctionDef",
+    "name": "Workflow.redact",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 172,
+    "kind": "FunctionDef",
+    "name": "Workflow.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 191,
+    "kind": "FunctionDef",
+    "name": "Workflow.device_command",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 200,
+    "kind": "FunctionDef",
+    "name": "Workflow.mark",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 204,
+    "kind": "FunctionDef",
+    "name": "Workflow.build_command",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 213,
+    "kind": "FunctionDef",
+    "name": "Workflow.signing_keychain",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 257,
+    "kind": "FunctionDef",
+    "name": "Workflow.prepare",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 326,
+    "kind": "FunctionDef",
+    "name": "Workflow.wait_for_device",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 344,
+    "kind": "FunctionDef",
+    "name": "Workflow.deliver",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 403,
+    "kind": "FunctionDef",
+    "name": "Workflow.execute",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/deploy-iphone.py",
+    "line": 413,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/documentation-screenshots-needed.py",
+    "line": 27,
+    "kind": "FunctionDef",
+    "name": "git",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/documentation-screenshots-needed.py",
+    "line": 40,
+    "kind": "FunctionDef",
+    "name": "file_at_revision",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/documentation-screenshots-needed.py",
+    "line": 57,
+    "kind": "FunctionDef",
+    "name": "capture_needed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/documentation-screenshots-needed.py",
+    "line": 81,
+    "kind": "FunctionDef",
+    "name": "capture_needed.screenshot_configuration",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/documentation-screenshots-needed.py",
+    "line": 122,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 76,
+    "kind": "FunctionDef",
+    "name": "span_is_dictionary_body",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 85,
+    "kind": "FunctionDef",
+    "name": "is_dictionary_page",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 102,
+    "kind": "FunctionDef",
+    "name": "dictionary_body_rects",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 114,
+    "kind": "FunctionDef",
+    "name": "word_in_dictionary_body",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 121,
+    "kind": "FunctionDef",
+    "name": "extract_rows",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 142,
+    "kind": "FunctionDef",
+    "name": "extract_pairs",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 189,
+    "kind": "FunctionDef",
+    "name": "has_stray_latin",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 197,
+    "kind": "FunctionDef",
+    "name": "normalize_homoglyphs",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 203,
+    "kind": "FunctionDef",
+    "name": "trim_merged_answer",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 216,
+    "kind": "FunctionDef",
+    "name": "strip_source_debris",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 227,
+    "kind": "FunctionDef",
+    "name": "delimiters_balanced",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 234,
+    "kind": "FunctionDef",
+    "name": "looks_like_prose",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 263,
+    "kind": "FunctionDef",
+    "name": "is_valid_entry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 329,
+    "kind": "FunctionDef",
+    "name": "letter_bucket",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 336,
+    "kind": "FunctionDef",
+    "name": "deck_id_for_letter",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 340,
+    "kind": "FunctionDef",
+    "name": "make_item",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/generate-movanekalka-deck.py",
+    "line": 353,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/install-app.sh",
+    "line": 23,
+    "kind": "named declaration",
+    "name": "usage",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/probe-ios-test-services.py",
+    "line": 15,
+    "kind": "FunctionDef",
+    "name": "save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/probe-ios-test-services.py",
+    "line": 21,
+    "kind": "FunctionDef",
+    "name": "select_runtime",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/probe-ios-test-services.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "capture_host_diagnostics",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/probe-ios-test-services.py",
+    "line": 70,
+    "kind": "FunctionDef",
+    "name": "capture_owned_service_diagnostics",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/probe-ios-test-services.py",
+    "line": 114,
+    "kind": "FunctionDef",
+    "name": "run_probe",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/probe-ios-test-services.py",
+    "line": 209,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/reconcile-release-workflows.sh",
+    "line": 12,
+    "kind": "named declaration",
+    "name": "usage",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/reconcile-release-workflows.sh",
+    "line": 60,
+    "kind": "named declaration",
+    "name": "get_exact_head_runs",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/reconcile-release-workflows.sh",
+    "line": 66,
+    "kind": "named declaration",
+    "name": "get_unrecognized_action_required",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 43,
+    "kind": "ClassDef",
+    "name": "ReleaseError",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 47,
+    "kind": "FunctionDef",
+    "name": "run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 73,
+    "kind": "FunctionDef",
+    "name": "digest",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 77,
+    "kind": "FunctionDef",
+    "name": "json_digest",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 81,
+    "kind": "FunctionDef",
+    "name": "validate_privacy_data",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 95,
+    "kind": "FunctionDef",
+    "name": "validate_ios_privacy_data",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 102,
+    "kind": "FunctionDef",
+    "name": "validate_ios_archive_privacy",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 110,
+    "kind": "FunctionDef",
+    "name": "validate_ios_package_privacy",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 121,
+    "kind": "FunctionDef",
+    "name": "production_input",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 128,
+    "kind": "FunctionDef",
+    "name": "application_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 135,
+    "kind": "FunctionDef",
+    "name": "binary_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 139,
+    "kind": "FunctionDef",
+    "name": "reuse_binary_candidate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 158,
+    "kind": "FunctionDef",
+    "name": "checked_evidence",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 168,
+    "kind": "FunctionDef",
+    "name": "object_list",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 174,
+    "kind": "FunctionDef",
+    "name": "concrete_observation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 180,
+    "kind": "FunctionDef",
+    "name": "read_test_cases",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 189,
+    "kind": "FunctionDef",
+    "name": "validate_production_capture",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 220,
+    "kind": "FunctionDef",
+    "name": "reviewable_app_info_attributes",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 227,
+    "kind": "FunctionDef",
+    "name": "validate_internal_review",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 333,
+    "kind": "FunctionDef",
+    "name": "select_review_submission",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 365,
+    "kind": "FunctionDef",
+    "name": "record_rejections",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 378,
+    "kind": "FunctionDef",
+    "name": "require_rejection_record",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 386,
+    "kind": "FunctionDef",
+    "name": "signing_archive",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 395,
+    "kind": "FunctionDef",
+    "name": "export_keychain_search",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 397,
+    "kind": "FunctionDef",
+    "name": "export_keychain_search.entries",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 409,
+    "kind": "FunctionDef",
+    "name": "validate_acceptance",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 433,
+    "kind": "FunctionDef",
+    "name": "source_snapshot",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 461,
+    "kind": "FunctionDef",
+    "name": "save_json",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 468,
+    "kind": "FunctionDef",
+    "name": "b64url",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 472,
+    "kind": "FunctionDef",
+    "name": "raw_es256",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 494,
+    "kind": "FunctionDef",
+    "name": "apple_error_entries",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 497,
+    "kind": "FunctionDef",
+    "name": "apple_error_entries.visit",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 518,
+    "kind": "ClassDef",
+    "name": "AppleAPI",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 519,
+    "kind": "FunctionDef",
+    "name": "AppleAPI.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 528,
+    "kind": "FunctionDef",
+    "name": "AppleAPI.token",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 540,
+    "kind": "FunctionDef",
+    "name": "AppleAPI.request",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 566,
+    "kind": "FunctionDef",
+    "name": "AppleAPI.list",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 575,
+    "kind": "FunctionDef",
+    "name": "AppleAPI.app",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 583,
+    "kind": "FunctionDef",
+    "name": "AppleAPI.bundle_identifier",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 593,
+    "kind": "FunctionDef",
+    "name": "validate_store_profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 614,
+    "kind": "FunctionDef",
+    "name": "installed_profiles",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 634,
+    "kind": "ClassDef",
+    "name": "Workflow",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 641,
+    "kind": "FunctionDef",
+    "name": "Workflow.reuse_binary_candidate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 644,
+    "kind": "FunctionDef",
+    "name": "Workflow.binary_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 647,
+    "kind": "FunctionDef",
+    "name": "Workflow.validate_review",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 650,
+    "kind": "FunctionDef",
+    "name": "Workflow.validate_release_acceptance",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 654,
+    "kind": "FunctionDef",
+    "name": "Workflow.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 685,
+    "kind": "FunctionDef",
+    "name": "Workflow.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 688,
+    "kind": "FunctionDef",
+    "name": "Workflow.mark",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 692,
+    "kind": "FunctionDef",
+    "name": "Workflow.verify_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 696,
+    "kind": "FunctionDef",
+    "name": "Workflow.require_api",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 706,
+    "kind": "FunctionDef",
+    "name": "Workflow.builds",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 711,
+    "kind": "FunctionDef",
+    "name": "Workflow.exact_build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 717,
+    "kind": "FunctionDef",
+    "name": "Workflow.prepare",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 739,
+    "kind": "FunctionDef",
+    "name": "Workflow.archive",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 777,
+    "kind": "FunctionDef",
+    "name": "Workflow.profiles",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 826,
+    "kind": "FunctionDef",
+    "name": "Workflow.export",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 881,
+    "kind": "FunctionDef",
+    "name": "Workflow.upload",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 915,
+    "kind": "FunctionDef",
+    "name": "Workflow.status",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 934,
+    "kind": "FunctionDef",
+    "name": "Workflow.internal_review_context",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 1037,
+    "kind": "FunctionDef",
+    "name": "Workflow.review_context",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-ios.py",
+    "line": 1046,
+    "kind": "FunctionDef",
+    "name": "Workflow.submit",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 40,
+    "kind": "FunctionDef",
+    "name": "binary_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 49,
+    "kind": "FunctionDef",
+    "name": "testflight_expected_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 65,
+    "kind": "FunctionDef",
+    "name": "reuse_binary_candidate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 120,
+    "kind": "FunctionDef",
+    "name": "application_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 127,
+    "kind": "FunctionDef",
+    "name": "validate_profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 157,
+    "kind": "FunctionDef",
+    "name": "validate_mac_privacy",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 167,
+    "kind": "FunctionDef",
+    "name": "validate_internal_review",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 269,
+    "kind": "ClassDef",
+    "name": "Workflow",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 276,
+    "kind": "FunctionDef",
+    "name": "Workflow.reuse_binary_candidate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 279,
+    "kind": "FunctionDef",
+    "name": "Workflow.binary_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 282,
+    "kind": "FunctionDef",
+    "name": "Workflow.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 309,
+    "kind": "FunctionDef",
+    "name": "Workflow.mark",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 313,
+    "kind": "FunctionDef",
+    "name": "Workflow.prepare",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 330,
+    "kind": "FunctionDef",
+    "name": "Workflow.archive",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 372,
+    "kind": "FunctionDef",
+    "name": "Workflow.profiles",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 404,
+    "kind": "FunctionDef",
+    "name": "Workflow.export",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 463,
+    "kind": "FunctionDef",
+    "name": "Workflow.upload",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 492,
+    "kind": "FunctionDef",
+    "name": "Workflow.internal_review_context",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 511,
+    "kind": "FunctionDef",
+    "name": "Workflow.validate_review",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release-macos-app-store.py",
+    "line": 514,
+    "kind": "FunctionDef",
+    "name": "Workflow.validate_release_acceptance",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 30,
+    "kind": "FunctionDef",
+    "name": "run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 53,
+    "kind": "FunctionDef",
+    "name": "module",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 60,
+    "kind": "FunctionDef",
+    "name": "write_json",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 68,
+    "kind": "FunctionDef",
+    "name": "sha",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 72,
+    "kind": "ClassDef",
+    "name": "GitHub",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 73,
+    "kind": "FunctionDef",
+    "name": "GitHub.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 77,
+    "kind": "FunctionDef",
+    "name": "GitHub.api",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 88,
+    "kind": "FunctionDef",
+    "name": "GitHub.history",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 100,
+    "kind": "FunctionDef",
+    "name": "GitHub.baseline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 119,
+    "kind": "FunctionDef",
+    "name": "GitHub.fetch_main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 124,
+    "kind": "FunctionDef",
+    "name": "GitHub.main_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 136,
+    "kind": "FunctionDef",
+    "name": "GitHub.verify_release_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 146,
+    "kind": "FunctionDef",
+    "name": "GitHub.reserve",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 165,
+    "kind": "FunctionDef",
+    "name": "GitHub.checkpoint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 172,
+    "kind": "FunctionDef",
+    "name": "GitHub.assets",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 176,
+    "kind": "FunctionDef",
+    "name": "GitHub.download",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 181,
+    "kind": "FunctionDef",
+    "name": "make_api",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 190,
+    "kind": "FunctionDef",
+    "name": "allocate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 204,
+    "kind": "FunctionDef",
+    "name": "preflight",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 227,
+    "kind": "ClassDef",
+    "name": "Release",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 228,
+    "kind": "FunctionDef",
+    "name": "Release.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 242,
+    "kind": "FunctionDef",
+    "name": "Release.verify_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 246,
+    "kind": "FunctionDef",
+    "name": "Release.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 252,
+    "kind": "FunctionDef",
+    "name": "Release.validate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 291,
+    "kind": "FunctionDef",
+    "name": "Release.builder",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 296,
+    "kind": "ClassDef",
+    "name": "Release.builder.Builder",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 297,
+    "kind": "FunctionDef",
+    "name": "Release.builder.Builder.prepare",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 301,
+    "kind": "FunctionDef",
+    "name": "Release.builder.Builder.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 319,
+    "kind": "FunctionDef",
+    "name": "Release.build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 359,
+    "kind": "FunctionDef",
+    "name": "Release.export",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 367,
+    "kind": "FunctionDef",
+    "name": "Release.publish_store",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 387,
+    "kind": "FunctionDef",
+    "name": "Release.publish_homebrew",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 438,
+    "kind": "FunctionDef",
+    "name": "Release.publish",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 465,
+    "kind": "FunctionDef",
+    "name": "Release.publish_until_ready",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 476,
+    "kind": "FunctionDef",
+    "name": "install_release_iphone",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 486,
+    "kind": "FunctionDef",
+    "name": "install_release_iphone.verified",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 541,
+    "kind": "FunctionDef",
+    "name": "status",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release.py",
+    "line": 564,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 11,
+    "kind": "ClassDef",
+    "name": "Pending",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 23,
+    "kind": "FunctionDef",
+    "name": "version_state",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 28,
+    "kind": "ClassDef",
+    "name": "AppStorePublisher",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 29,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 35,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.patch",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 40,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.versions",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 44,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.build_record",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 67,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.submissions",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 73,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.items",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 77,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.item_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 80,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.cancel",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 94,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.ensure_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 96,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.ensure_version.number",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 148,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.configure_listing",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 183,
+    "kind": "FunctionDef",
+    "name": "AppStorePublisher.submit",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_app_store.py",
+    "line": 250,
+    "kind": "FunctionDef",
+    "name": "listing",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 13,
+    "kind": "FunctionDef",
+    "name": "command",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 17,
+    "kind": "FunctionDef",
+    "name": "version_tuple",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 24,
+    "kind": "FunctionDef",
+    "name": "next_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 29,
+    "kind": "FunctionDef",
+    "name": "tree",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 58,
+    "kind": "ClassDef",
+    "name": "AppInputs",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 59,
+    "kind": "FunctionDef",
+    "name": "AppInputs.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 78,
+    "kind": "FunctionDef",
+    "name": "AppInputs.load",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 94,
+    "kind": "FunctionDef",
+    "name": "AppInputs.dependencies",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 109,
+    "kind": "FunctionDef",
+    "name": "AppInputs.closure",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 121,
+    "kind": "FunctionDef",
+    "name": "AppInputs.includes",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 139,
+    "kind": "FunctionDef",
+    "name": "AppInputs.snapshot",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 142,
+    "kind": "FunctionDef",
+    "name": "AppInputs.tests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/release_plan.py",
+    "line": 160,
+    "kind": "FunctionDef",
+    "name": "plan",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/review-ios-app.py",
+    "line": 22,
+    "kind": "FunctionDef",
+    "name": "application_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/review-ios-app.py",
+    "line": 27,
+    "kind": "FunctionDef",
+    "name": "interrupted",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/review-ios-app.py",
+    "line": 31,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/review-macos-app.py",
+    "line": 22,
+    "kind": "FunctionDef",
+    "name": "fresh_container_baseline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/review-macos-app.py",
+    "line": 29,
+    "kind": "FunctionDef",
+    "name": "fresh_container_baseline.inaccessible",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/review-macos-app.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/run-fsrs-performance.sh",
+    "line": 17,
+    "kind": "named declaration",
+    "name": "run_case",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/run-ios-ui-tests.sh",
+    "line": 18,
+    "kind": "named declaration",
+    "name": "cleanup_simulators",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/run-performance-tests.sh",
+    "line": 25,
+    "kind": "named declaration",
+    "name": "run_suite",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/run-ui-tests.sh",
+    "line": 33,
+    "kind": "named declaration",
+    "name": "cleanup_apps",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 34,
+    "kind": "ClassDef",
+    "name": "SigningError",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 38,
+    "kind": "FunctionDef",
+    "name": "run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 60,
+    "kind": "FunctionDef",
+    "name": "validate_profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 90,
+    "kind": "FunctionDef",
+    "name": "entitlements_for",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 101,
+    "kind": "FunctionDef",
+    "name": "validate_entitlements",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 110,
+    "kind": "ClassDef",
+    "name": "Material",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 111,
+    "kind": "FunctionDef",
+    "name": "Material.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 151,
+    "kind": "FunctionDef",
+    "name": "signing_keychain",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 186,
+    "kind": "FunctionDef",
+    "name": "check_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 195,
+    "kind": "FunctionDef",
+    "name": "verify",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 216,
+    "kind": "FunctionDef",
+    "name": "sign",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-macos-app.py",
+    "line": 259,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/sign-ui-artifacts.sh",
+    "line": 8,
+    "kind": "named declaration",
+    "name": "sign_app_bundle",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/signing_keychain_support.py",
+    "line": 6,
+    "kind": "FunctionDef",
+    "name": "search_list",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/signing_keychain_support.py",
+    "line": 10,
+    "kind": "FunctionDef",
+    "name": "register",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/signing_keychain_support.py",
+    "line": 18,
+    "kind": "FunctionDef",
+    "name": "unregister",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/signing_keychain_support.py",
+    "line": 27,
+    "kind": "FunctionDef",
+    "name": "verify_chain",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 18,
+    "kind": "ClassDef",
+    "name": "ScreenshotBuildSafetyTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 19,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.products",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 32,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.record",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 36,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_valid_cache_binds_app_test_executable_and_xctestrun",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 44,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_skip_build_requires_receipt_and_exact_candidate_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_changed_cached_app_tests_or_xctestrun_cannot_reuse_receipt",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 69,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_wrong_app_path_and_ambiguous_test_products_fail_closed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 82,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_real_package_manifest_only_edit_invalidates_screenshot_cache",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 103,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_source_change_during_build_does_not_write_cache_receipt",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 112,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_failed_fresh_build_invalidates_cache_without_creating_simulator",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 119,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_failed_fresh_build_invalidates_cache_without_creating_simulator.build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 132,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_actual_capture_failure_uses_xcode_lifecycle_once_and_deletes_owned_simulator",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 139,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_actual_capture_failure_uses_xcode_lifecycle_once_and_deletes_owned_simulator.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 149,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_actual_capture_failure_uses_xcode_lifecycle_once_and_deletes_owned_simulator.cleaned",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 166,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_existing_screenshot_evidence_is_never_overwritten",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-capture-ios-app-store.py",
+    "line": 177,
+    "kind": "FunctionDef",
+    "name": "ScreenshotBuildSafetyTests.test_malformed_cache_receipts_fail_with_release_errors",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 21,
+    "kind": "FunctionDef",
+    "name": "device",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 28,
+    "kind": "FunctionDef",
+    "name": "profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 41,
+    "kind": "ClassDef",
+    "name": "DeploymentTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 42,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_ready_package_detects_connection_without_user_confirmation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 51,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_ambiguous_device_selection_is_not_polled_as_readiness",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 58,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_unknown_install_outcome_is_not_repeated_and_successful_receipt_reconciles",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 67,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_unknown_install_outcome_is_not_repeated_and_successful_receipt_reconciles.query",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 81,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_changed_prepared_package_is_rejected_before_contacting_phone",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 92,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_installed_version_requires_exact_device_bundle_version_and_build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 102,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_preparation_precedes_device_contact_and_delivery_never_launches",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 120,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_preparation_precedes_device_contact_and_delivery_never_launches.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 140,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_preparation_precedes_device_contact_and_delivery_never_launches.device_command",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 168,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_preparation_precedes_device_contact_and_delivery_never_launches.codesign",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 191,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_release_build_uses_pinned_source_and_version_for_app_and_widget",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 199,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_standalone_build_keeps_project_versions",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 203,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_incomplete_or_invalid_release_version_stops_before_device_access",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 211,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_single_wired_phone_with_closed_tunnel_is_available",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 214,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_multiple_phones_require_explicit_selection",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 220,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_unpaired_simulator_and_wireless_offline_are_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 232,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_developer_mode_must_be_enabled",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 237,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_registered_distribution_profile_is_accepted",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 240,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_invalid_profiles_stop_before_build_or_install",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 251,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_entitlements_keep_production_cloud_and_app_group",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 268,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_install_receipt_requires_target_device_and_app",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 279,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_launch_receipt_requires_success_and_actual_app_process",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 290,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_password_is_redacted_and_timeout_does_not_echo_argv",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 301,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_signing_failure_removes_only_temporary_keychain",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 304,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_distribution_chain_is_discoverable_before_signing",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 307,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_distribution_chain_failure_stops_before_signing_and_cleans_up",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 310,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.check_chain_preflight",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 314,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.check_chain_preflight.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 350,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.test_keychain_delete_failure_still_removes_search_entry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 353,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.check_signing_cleanup",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-deploy-iphone.py",
+    "line": 355,
+    "kind": "FunctionDef",
+    "name": "DeploymentTests.check_signing_cleanup.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 155,
+    "kind": "ClassDef",
+    "name": "AppIconBadgeRegressionTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 157,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.setUpClass",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 181,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.run_scenario",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 187,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_count_permission_and_clearing",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 190,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_permission_denial_and_settings_recovery",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 193,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_failed_authorization_and_writes_can_retry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 196,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_overlapping_refreshes_cannot_restore_stale_count",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 199,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_mac_requests_badges_even_when_alerts_are_authorized",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 202,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_mac_denial_and_settings_recovery",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-app-icon-badge.py",
+    "line": 205,
+    "kind": "FunctionDef",
+    "name": "AppIconBadgeRegressionTests.test_mac_authorization_errors_can_retry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-background-refresh.py",
+    "line": 120,
+    "kind": "FunctionDef",
+    "name": "disable_core_dump",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-background-refresh.py",
+    "line": 124,
+    "kind": "ClassDef",
+    "name": "BackgroundRefreshRegressionTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-background-refresh.py",
+    "line": 126,
+    "kind": "FunctionDef",
+    "name": "BackgroundRefreshRegressionTests.setUpClass",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-background-refresh.py",
+    "line": 147,
+    "kind": "FunctionDef",
+    "name": "BackgroundRefreshRegressionTests.run_scenario",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-background-refresh.py",
+    "line": 154,
+    "kind": "FunctionDef",
+    "name": "BackgroundRefreshRegressionTests.test_scheduler_launch_respects_main_actor",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-background-refresh.py",
+    "line": 157,
+    "kind": "FunctionDef",
+    "name": "BackgroundRefreshRegressionTests.test_background_expiration_cancels_before_sync",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 27,
+    "kind": "ClassDef",
+    "name": "SelectionTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 28,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_actual_restricted_first_equal_version_inventory_selects_generic",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 32,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_newer_incompatible_runtime_does_not_override_compatible_one",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 36,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_newest_numeric_compatible_version_wins",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 41,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_equal_version_tie_is_deterministic_independent_of_order",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 48,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_numeric_trailing_zero_version_is_a_tie",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 53,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_unavailable_non_ios_and_malformed_version_are_excluded",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 59,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_missing_or_nonmatching_compatibility_fails_closed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 66,
+    "kind": "FunctionDef",
+    "name": "SelectionTests.test_missing_device_id_rejected_and_input_not_mutated",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 73,
+    "kind": "ClassDef",
+    "name": "ProbeIntegrationTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 74,
+    "kind": "FunctionDef",
+    "name": "ProbeIntegrationTests.run_fake",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 76,
+    "kind": "ClassDef",
+    "name": "ProbeIntegrationTests.run_fake.Recorder",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 77,
+    "kind": "FunctionDef",
+    "name": "ProbeIntegrationTests.run_fake.Recorder.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 80,
+    "kind": "FunctionDef",
+    "name": "ProbeIntegrationTests.run_fake.Recorder.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 81,
+    "kind": "FunctionDef",
+    "name": "ProbeIntegrationTests.run_fake.Recorder.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 94,
+    "kind": "FunctionDef",
+    "name": "ProbeIntegrationTests.test_selected_identity_and_compatibility_are_retained_before_create",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-runtime-selection.py",
+    "line": 107,
+    "kind": "FunctionDef",
+    "name": "ProbeIntegrationTests.test_no_compatible_runtime_fails_without_create_or_false_cleanup",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 15,
+    "kind": "FunctionDef",
+    "name": "load",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 26,
+    "kind": "FunctionDef",
+    "name": "ready",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 30,
+    "kind": "ClassDef",
+    "name": "FakeRecorder",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 31,
+    "kind": "FunctionDef",
+    "name": "FakeRecorder.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 36,
+    "kind": "FunctionDef",
+    "name": "FakeRecorder.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 39,
+    "kind": "FunctionDef",
+    "name": "FakeRecorder.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 45,
+    "kind": "ClassDef",
+    "name": "ReadinessTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 46,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_requires_initialized_running_and_exact_active_endpoint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_activates_both_before_waiting_for_either",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 57,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_activates_both_before_waiting_for_either.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 69,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_one_missing_endpoint_never_passes_shared_deadline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 73,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_one_missing_endpoint_never_passes_shared_deadline.clock",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 74,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_one_missing_endpoint_never_passes_shared_deadline.pause",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 75,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_one_missing_endpoint_never_passes_shared_deadline.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 87,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_timeout_retains_partial_output_and_unpassed_receipt",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 104,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_host_initialization_does_not_rerun_setup_when_already_complete",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 111,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_host_initialization_requires_positive_post_setup_status",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 116,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_host_initialization_requires_positive_post_setup_status.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 127,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_host_status_timeout_never_guesses_setup_state",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 131,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_host_status_timeout_never_guesses_setup_state.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 141,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_inventory_timeouts_poll_until_positive_owned_booted_observation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 145,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_inventory_timeouts_poll_until_positive_owned_booted_observation.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 158,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_inventory_polling_cannot_extend_the_absolute_deadline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 162,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_inventory_polling_cannot_extend_the_absolute_deadline.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 173,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_inventory_time_is_subtracted_from_endpoint_readiness_budget",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 176,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_inventory_time_is_subtracted_from_endpoint_readiness_budget.inventory",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 187,
+    "kind": "FunctionDef",
+    "name": "ReadinessTests.test_rejects_nonowned_or_unbooted_device_before_kickstart",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 196,
+    "kind": "ClassDef",
+    "name": "ProbeTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 197,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.run_probe",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 199,
+    "kind": "ClassDef",
+    "name": "ProbeTests.run_probe.Recorder",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 200,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.run_probe.Recorder.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 202,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.run_probe.Recorder.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 224,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.run_probe.wait",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 232,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_runtime_discovery_failure_has_receipt_without_fake_cleanup",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 242,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_success_requires_final_two_endpoint_snapshots_and_cleanup",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 251,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_service_failure_cleans_up_and_does_not_pass",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 259,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_uncertain_create_reconciles_only_its_unique_name",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 267,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_opt_in_cache_update_completes_before_any_simulator_is_created",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 280,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_cache_failure_remains_failure_without_boot_or_ui_retry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 288,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_targeted_diagnostics_use_only_owned_launchctl_pid_and_verify_program",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 299,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_targeted_diagnostics_use_only_owned_launchctl_pid_and_verify_program.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-test-services.py",
+    "line": 314,
+    "kind": "FunctionDef",
+    "name": "ProbeTests.test_guard_rejects_local_run_before_creating_output_or_running_commands",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 11,
+    "kind": "ClassDef",
+    "name": "IOSUIRetryClassificationTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 12,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.classify",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 18,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_exact_old_and_new_incomplete_audit_messages_allow_retry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 27,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_mixed_timeout_and_assertion_or_completed_audit_finding_never_retries",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 36,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_confirmed_zero_tests_and_no_findings_allows_only_infrastructure_retry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 45,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_launch_and_runner_operation_failures_allow_retry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 50,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_exact_background_assertion_lifecycle_timeout_and_mixed_failure",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 63,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_generic_timeouts_and_missing_failure_text_fail_closed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-retry.py",
+    "line": 69,
+    "kind": "FunctionDef",
+    "name": "IOSUIRetryClassificationTests.test_nested_results_preserve_a_real_finding",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-runner.py",
+    "line": 36,
+    "kind": "ClassDef",
+    "name": "IOSRunnerLifecycleTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-runner.py",
+    "line": 37,
+    "kind": "FunctionDef",
+    "name": "IOSRunnerLifecycleTests.exercise",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-runner.py",
+    "line": 78,
+    "kind": "FunctionDef",
+    "name": "IOSRunnerLifecycleTests.test_all_selected_cases_pass_once",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-runner.py",
+    "line": 82,
+    "kind": "FunctionDef",
+    "name": "IOSRunnerLifecycleTests.test_infrastructure_or_assertion_failure_is_not_automatically_retried",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-ios-ui-runner.py",
+    "line": 88,
+    "kind": "FunctionDef",
+    "name": "IOSRunnerLifecycleTests.test_zero_missing_selected_or_skipped_cases_fail_even_if_xcode_exits_zero",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 21,
+    "kind": "FunctionDef",
+    "name": "profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 38,
+    "kind": "ClassDef",
+    "name": "SigningTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 39,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_installer_signing_arguments_support_bash_three_empty_arrays",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 58,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_accepts_real_profile_and_expands_signed_entitlements",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 66,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_rejects_expired_wrong_team_bundle_certificate_or_distribution",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 85,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_requires_every_production_cloud_capability",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 101,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_signed_entitlements_cannot_enable_debugger",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 107,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_keychain_cleanup_preserves_concurrent_search_list_on_failure",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 112,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_keychain_cleanup_preserves_concurrent_search_list_on_failure.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 139,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_search_list_aliases_do_not_duplicate_or_survive_cleanup",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 147,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_search_list_aliases_do_not_duplicate_or_survive_cleanup.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 157,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_identity_preflight_requires_the_expected_valid_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 172,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_rejected_notarization_cannot_staple_or_verify",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 174,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_rejected_notarization_cannot_staple_or_verify.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 196,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_release_cannot_opt_out_or_silently_fallback",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 212,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_notarization_timeout_keeps_submission_id_without_accepting_app",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 215,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_notarization_timeout_keeps_submission_id_without_accepting_app.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 241,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_local_signing_does_not_require_notarization_credentials",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 242,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_local_signing_does_not_require_notarization_credentials.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 263,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_local_source_signing_never_submits_to_apple",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 265,
+    "kind": "FunctionDef",
+    "name": "SigningTests.test_local_source_signing_never_submits_to_apple.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 284,
+    "kind": "ClassDef",
+    "name": "UniversalArchitectureTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-signing.py",
+    "line": 285,
+    "kind": "FunctionDef",
+    "name": "UniversalArchitectureTests.test_universal_gate_requires_both_real_macho_slices",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 17,
+    "kind": "FunctionDef",
+    "name": "thin",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 30,
+    "kind": "FunctionDef",
+    "name": "fat",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 42,
+    "kind": "ClassDef",
+    "name": "MachOTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 43,
+    "kind": "FunctionDef",
+    "name": "MachOTests.test_signature_replacement_allowed_but_text_and_uuid_unchanged",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 48,
+    "kind": "FunctionDef",
+    "name": "MachOTests.test_unsectioned_linkedit_change_is_detected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 53,
+    "kind": "FunctionDef",
+    "name": "MachOTests.test_architecture_thinning_preserves_per_arch_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 58,
+    "kind": "FunctionDef",
+    "name": "MachOTests.test_truncation_signature_bounds_and_command_bounds_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 65,
+    "kind": "FunctionDef",
+    "name": "MachOTests.test_fat_overlap_and_mismatched_cpu_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 73,
+    "kind": "ClassDef",
+    "name": "CandidateTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 74,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 94,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.setUp.fake_run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 102,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.validate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 105,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_success_is_stable_and_uses_exclusive_testflight_requirement",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 116,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_signing_failure_is_not_ignored",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 120,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_stale_identity_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 126,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_export_debug_install_debug_and_sandbox_reduction_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 137,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_beta_marker_and_receipt_required",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 144,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_changed_privacy_resource_and_added_file_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 152,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_code_tamper_and_export_receipt_hash_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 160,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_unexpected_info_and_entitlement_changes_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-macos-testflight.py",
+    "line": 169,
+    "kind": "FunctionDef",
+    "name": "CandidateTests.test_symlink_payload_and_same_export_path_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 15,
+    "kind": "ClassDef",
+    "name": "PerformanceRunnerTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 16,
+    "kind": "FunctionDef",
+    "name": "PerformanceRunnerTests.exercise",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 58,
+    "kind": "FunctionDef",
+    "name": "PerformanceRunnerTests.test_each_package_runs_once_serially_from_another_directory",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 67,
+    "kind": "FunctionDef",
+    "name": "PerformanceRunnerTests.test_package_failure_propagates_and_cannot_report_success",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 76,
+    "kind": "FunctionDef",
+    "name": "PerformanceRunnerTests.test_bad_core_directory_never_runs_the_app_in_its_place",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 81,
+    "kind": "FunctionDef",
+    "name": "PerformanceRunnerTests.test_missing_or_empty_measurements_fail",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-performance-runner.py",
+    "line": 88,
+    "kind": "FunctionDef",
+    "name": "PerformanceRunnerTests.test_extended_launcher_also_requires_both_packages",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 21,
+    "kind": "ClassDef",
+    "name": "ReleaseTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 22,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_apple_validation_error_includes_nested_cause_and_redacts_token",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 38,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_codesign_failure_preserves_chain_diagnostic",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 44,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_authentication_command_failure_still_hides_output_and_arguments",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 51,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_actual_ipa_requires_app_group_and_widget_privacy_manifests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 56,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_actual_ipa_requires_app_group_and_widget_privacy_manifests.package",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 77,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_resolved_apple_state_preserves_review_but_age_rating_change_invalidates_it",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 98,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.review_fixture",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 154,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.review_fixture.xcrun",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 159,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_accepts_independent_reviews_and_real_test_results",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 167,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_rejects_stale_source_build_listing_and_pixels",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 177,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_rejects_self_review_superficial_flags_and_blockers",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 194,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_rejects_missing_scope_or_evidence",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 205,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_rejects_skips_failures_old_inputs_and_wrong_device",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 222,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_rejects_missing_apple_issue_and_regression",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 240,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_production_review_rejects_debug_seeds_launch_flags_and_missing_artifacts",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 264,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_internal_review_rejects_old_uploaded_images_even_with_new_capture_hash",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 277,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_production_review_rejects_flags_and_fixtures_in_target_app_fields",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 296,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_removed_or_accepted_target_cannot_count_as_resubmission",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 311,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_malformed_internal_review_receipts_raise_release_errors",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 338,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_rejected_submission_must_be_resolved_then_reused",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 350,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_unresolved_submission_parent_can_resubmit_only_when_every_rejected_item_resolved",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 360,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_rejection_evidence_remains_mandatory_after_ready_state_and_resolved_item",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 378,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_submission_reconcile_blocks_duplicate_active_and_unresolved_other_versions",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 387,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_submission_reconcile_resumes_empty_owned_draft_and_ignores_completed_history",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 394,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_metadata_only_binary_reuse_rejects_changed_production_inputs_or_missing_artifacts",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 420,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_real_manifest_only_edit_invalidates_binary_reuse_and_ui_receipts",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 468,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_ignored_swiftpm_resolution_and_configuration_are_production_inputs",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 492,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_runner_delegates_to_same_manifest_sensitive_application_fingerprint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 501,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 512,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_accepts_store_profile_and_production_entitlements",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 517,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_rejects_adhoc_and_enterprise_profiles",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 523,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_rejects_identity_expiry_and_capability_mismatches",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 538,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_jwt_signature_width_and_sign_padding",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 546,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_failed_signing_preserves_archive_and_cleans_scratch_copy",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 560,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_export_restores_keychain_search_after_failure_and_preserves_new_entries",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 562,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_export_restores_keychain_search_after_failure_and_preserves_new_entries.security",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 575,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_physical_waivers_require_explicit_option_and_user_authorization",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 598,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_api_refuses_to_forward_authentication_to_other_hosts",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 607,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_bundle_lookup_selects_exact_app_from_prefix_matches",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 616,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_snapshot_detects_dirty_untracked_deleted_and_mode_changes",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 631,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_historical_rejection_cannot_satisfy_a_new_versions_rejection",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 639,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_existing_build_without_upload_receipt_is_not_claimed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 647,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_uncertain_upload_is_not_retried",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 655,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_submission_requires_exact_build_and_auto_release",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 656,
+    "kind": "ClassDef",
+    "name": "ReleaseTests.test_submission_requires_exact_build_and_auto_release.API",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-ios.py",
+    "line": 657,
+    "kind": "FunctionDef",
+    "name": "ReleaseTests.test_submission_requires_exact_build_and_auto_release.API.request",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 19,
+    "kind": "ClassDef",
+    "name": "MacStoreTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 20,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.profile",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 31,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_actual_mac_bundle_requires_selected_file_metadata_reason",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 47,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_store_profile_produces_sandboxed_shared_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 53,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_apple_mac_profile_wildcards_are_restricted_to_production_in_signature",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 61,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_wrong_channel_identity_or_signing_material_is_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 74,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_ios_and_mac_build_lookup_are_isolated",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 82,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_store_configuration_does_not_change_homebrew_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 91,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_store_configuration_is_selectable_for_project_and_target",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 99,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_store_packaging_changes_invalidate_review_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 106,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_review_rejects_stale_and_bare_pass_claims",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 111,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_same_source_different_candidate_executable_cannot_reuse_review",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 142,
+    "kind": "FunctionDef",
+    "name": "MacStoreTests.test_mac_acceptance_cannot_waive_sandbox_or_ui",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 155,
+    "kind": "ClassDef",
+    "name": "MacBinaryReuseTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 156,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 196,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.setUp.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 201,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.changes",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 204,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_metadata_and_test_helper_only_changes_retain_original_build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 209,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_every_shipping_packaging_code_and_project_change_rejects_reuse",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 218,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_old_privacy_resources_and_unsigned_or_debug_exports_cannot_reuse",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 233,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_missing_or_mutated_upload_package_export_and_source_proofs_reject",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 248,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_wrong_version_build_team_source_stamp_or_apple_identity_rejects",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 257,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.args",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 261,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.workflow",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 267,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_view_preserves_original_paths_identity_and_omits_old_approvals",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 281,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_view_and_explicit_reuse_cannot_prepare_export_or_upload",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 292,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_resumed_view_rejects_modified_artifact_receipts_and_binary_identity",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 305,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_context_binds_current_qa_source_but_original_export_and_binary_stamp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-macos-app-store.py",
+    "line": 321,
+    "kind": "FunctionDef",
+    "name": "MacBinaryReuseTests.test_testflight_identity_maps_original_or_unreused_record_without_other_metadata",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release-workflow-reconciliation.sh",
+    "line": 54,
+    "kind": "named declaration",
+    "name": "run_reconcile",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/test-release-workflow-reconciliation.sh",
+    "line": 67,
+    "kind": "named declaration",
+    "name": "assert_log_absent",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/test-release-workflow-reconciliation.sh",
+    "line": 75,
+    "kind": "named declaration",
+    "name": "known_run",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 24,
+    "kind": "FunctionDef",
+    "name": "package_graph",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 25,
+    "kind": "FunctionDef",
+    "name": "package_graph.target",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 38,
+    "kind": "ClassDef",
+    "name": "PlanningTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 39,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 51,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.git",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 52,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.write",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.release_plan",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 55,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_ios_only",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 58,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_mac_and_api_changes_always_include_both_mac_distributions",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 61,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_shared_signing_helper_is_a_mac_packaging_input",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 64,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_cloudkit_direct_ios_dependency_selects_every_distribution",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 67,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_shared_core_changes_select_both_apps",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 70,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_docs_tests_cli_and_release_workflow_do_not_publish_apps",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 75,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_new_deleted_and_renamed_inputs_are_released",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 80,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_packaging_and_manifest_changes",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 85,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_independent_platform_baselines_do_not_forget_skipped_changes",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 91,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_content_checkpoints_detect_reverts_despite_different_git_history",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 97,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_dependency_closure_excludes_mac_only_code_from_ios",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 100,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_platform_condition_is_honored",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 103,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_real_project_routes_cloud_sync_api_and_mobile_code_correctly",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 112,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_noop_command_does_not_contact_apple_build_commit_or_publish",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 113,
+    "kind": "ClassDef",
+    "name": "PlanningTests.test_noop_command_does_not_contact_apple_build_commit_or_publish.Hub",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 114,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_noop_command_does_not_contact_apple_build_commit_or_publish.Hub.baseline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 115,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_noop_command_does_not_contact_apple_build_commit_or_publish.Hub.main_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 121,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_one_command_releases_only_ios_then_unchanged_source_is_a_noop",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 124,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_phone_blocker_keeps_release_pending_without_repeating_publication",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 127,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 130,
+    "kind": "ClassDef",
+    "name": "PlanningTests.one_command_release.Hub",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 132,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Hub.baseline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 133,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Hub.main_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 137,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Hub.verify_release_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 141,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Hub.reserve",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 142,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Hub.checkpoint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 143,
+    "kind": "ClassDef",
+    "name": "PlanningTests.one_command_release.API",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 144,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.API.list",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 145,
+    "kind": "ClassDef",
+    "name": "PlanningTests.one_command_release.Release",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 146,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Release.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 148,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Release.validate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 149,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Release.build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 150,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Release.export",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 151,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Release.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 154,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.Release.publish_until_ready",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 160,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.one_command_release.install",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 191,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_clean_synchronized_main_is_the_release_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 196,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_feature_branch_and_dirty_main_stop_before_remote_access",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 204,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_stale_main_cannot_supply_a_new_release",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 209,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_legacy_branch_candidate_cannot_reserve_a_tag_or_resume_publication",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 216,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_main_ref_is_read_only_through_authenticated_gh",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 222,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_main_prepared_revision_must_still_belong_to_remote_main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 235,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_main_blocker_prevents_apple_access_and_all_release_phases",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 237,
+    "kind": "ClassDef",
+    "name": "PlanningTests.test_main_blocker_prevents_apple_access_and_all_release_phases.Hub",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 238,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_main_blocker_prevents_apple_access_and_all_release_phases.Hub.baseline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 239,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_main_blocker_prevents_apple_access_and_all_release_phases.Hub.main_source",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 240,
+    "kind": "FunctionDef",
+    "name": "PlanningTests.test_main_blocker_prevents_apple_access_and_all_release_phases.Hub.reserve",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 249,
+    "kind": "ClassDef",
+    "name": "SigningPreflightTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 250,
+    "kind": "FunctionDef",
+    "name": "SigningPreflightTests.test_distribution_and_installer_chains_are_checked_without_building",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 259,
+    "kind": "ClassDef",
+    "name": "SigningPreflightTests.test_distribution_and_installer_chains_are_checked_without_building.Signer",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 260,
+    "kind": "FunctionDef",
+    "name": "SigningPreflightTests.test_distribution_and_installer_chains_are_checked_without_building.Signer.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 262,
+    "kind": "FunctionDef",
+    "name": "SigningPreflightTests.test_distribution_and_installer_chains_are_checked_without_building.Signer.signing_keychain",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 267,
+    "kind": "FunctionDef",
+    "name": "SigningPreflightTests.test_distribution_and_installer_chains_are_checked_without_building.Signer.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 277,
+    "kind": "FunctionDef",
+    "name": "SigningPreflightTests.test_missing_intermediate_stops_preflight_before_loading_signer",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 287,
+    "kind": "ClassDef",
+    "name": "LocalIPhoneTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 288,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 301,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.deploy",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 311,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_delivery_streams_readiness_and_preserves_the_original_log",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 320,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_mac_only_installs_latest_ios_version_from_pinned_source_and_retains_receipt",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 332,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_prepared_update_resumes_the_same_artifact_without_rebuilding",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 338,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_prepared_update_resumes_the_same_artifact_without_rebuilding.deliver",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 350,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_crash_after_verified_install_recovers_without_another_device_mutation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 358,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_unavailable_phone_can_resume_after_connection",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 369,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_lost_verified_receipt_never_triggers_another_install",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 378,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_wrong_version_or_source_cannot_count_as_installed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 382,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_wrong_version_or_source_cannot_count_as_installed.deploy",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 394,
+    "kind": "FunctionDef",
+    "name": "LocalIPhoneTests.test_device_details_are_excluded_from_public_checkpoint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 403,
+    "kind": "ClassDef",
+    "name": "VersionTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 404,
+    "kind": "FunctionDef",
+    "name": "VersionTests.test_global_version_is_above_store_brew_and_reserved_versions",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 405,
+    "kind": "ClassDef",
+    "name": "VersionTests.test_global_version_is_above_store_brew_and_reserved_versions.API",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 406,
+    "kind": "FunctionDef",
+    "name": "VersionTests.test_global_version_is_above_store_brew_and_reserved_versions.API.list",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 415,
+    "kind": "FunctionDef",
+    "name": "VersionTests.test_numeric_sort_not_lexical",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 418,
+    "kind": "ClassDef",
+    "name": "EntrypointTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 419,
+    "kind": "FunctionDef",
+    "name": "EntrypointTests.test_retired_publishers_cannot_publish_or_allocate_an_independent_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 430,
+    "kind": "ClassDef",
+    "name": "AppleFake",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 431,
+    "kind": "FunctionDef",
+    "name": "AppleFake.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 436,
+    "kind": "FunctionDef",
+    "name": "AppleFake.list",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 443,
+    "kind": "FunctionDef",
+    "name": "AppleFake.request",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 481,
+    "kind": "FunctionDef",
+    "name": "AppleFake.prior_review",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 488,
+    "kind": "ClassDef",
+    "name": "StoreTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 489,
+    "kind": "FunctionDef",
+    "name": "StoreTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 494,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_processing_does_not_create_or_submit_anything",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 498,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_exact_build_and_automatic_release_with_no_ui_gate",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 504,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_first_public_release_omits_whats_new_despite_high_marketing_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 508,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_version_update_includes_whats_new_after_public_platform_history",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 513,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_listing_contact_fields_use_the_app_store_review_api_schema",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 519,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_resume_does_not_duplicate_submissions_or_edit_reviewing_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 523,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_acknowledged_submission_survives_version_state_lag",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 526,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_cancellation_waits_for_parent_not_just_editable_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 540,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_cancel_does_not_remove_other_review_items",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 544,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_apple_rejection_requires_actual_remediation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 548,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_newer_store_version_cannot_be_downgraded",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 552,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_invalid_or_changed_binary_cannot_be_submitted",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 558,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_uncertain_create_response_resumes_the_owned_empty_draft",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 562,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_unrelated_active_submission_is_never_reused",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 566,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_old_public_and_replaced_versions_do_not_block_a_new_version",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 572,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_current_apple_state_field_takes_precedence",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 578,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_unknown_apple_state_is_never_edited",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 582,
+    "kind": "FunctionDef",
+    "name": "StoreTests.test_review_draft_with_other_items_is_never_submitted",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 590,
+    "kind": "ClassDef",
+    "name": "RecoveryTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 591,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.release",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 600,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_lost_main_provenance_blocks_every_publication_channel",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 606,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_apple_processing_does_not_roll_back_brew_or_repeat_finished_channel",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 608,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_apple_processing_does_not_roll_back_brew_or_repeat_finished_channel.store",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 617,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_ios_only_never_calls_mac_or_homebrew",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 621,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_uploading_phase_never_rebuilds_or_reuploads",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 625,
+    "kind": "ClassDef",
+    "name": "RecoveryTests.test_uploading_phase_never_rebuilds_or_reuploads.Publisher",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 626,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_uploading_phase_never_rebuilds_or_reuploads.Publisher.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 627,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_uploading_phase_never_rebuilds_or_reuploads.Publisher.submit",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 630,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_a_newer_global_release_stops_old_publication",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 634,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_crash_after_submission_acknowledgment_still_advances_channel_baseline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 640,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_real_errors_are_not_polled_as_apple_readiness",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 646,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_failed_verification_is_preserved_and_never_rerun",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 651,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_failed_verification_is_preserved_and_never_rerun.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 660,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_resume_downloads_original_homebrew_artifact_instead_of_resigning",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-release.py",
+    "line": 669,
+    "kind": "FunctionDef",
+    "name": "RecoveryTests.test_resume_downloads_original_homebrew_artifact_instead_of_resigning.download",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 17,
+    "kind": "ClassDef",
+    "name": "InternalReviewSafetyTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 18,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.exercise_failure",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 26,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.exercise_failure.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 33,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.exercise_failure.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 56,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.exercise_failure.cleaned",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 82,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.test_receipt_write_failure_after_create_still_deletes_owned_simulator",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 85,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.test_real_journey_failure_still_deletes_owned_simulator",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 88,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.test_missing_summary_counts_cannot_pass",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-ios-app.py",
+    "line": 91,
+    "kind": "FunctionDef",
+    "name": "InternalReviewSafetyTests.test_skipped_journey_cannot_pass",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 9,
+    "kind": "ClassDef",
+    "name": "FreshContainerTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 10,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 12,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.test_absent_and_installer_created_empty_are_fresh",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 18,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.test_existing_library_or_preferences_never_count_as_fresh",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 24,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.test_shared_folder_links_are_not_followed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 28,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.test_redirected_app_storage_is_rejected",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 31,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.test_unreadable_app_directory_does_not_silently_pass",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-review-macos-app.py",
+    "line": 33,
+    "kind": "FunctionDef",
+    "name": "FreshContainerTests.test_unreadable_app_directory_does_not_silently_pass.denied",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 18,
+    "kind": "ClassDef",
+    "name": "SensitivityQualificationTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 19,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.setUp",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 27,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.classify",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 30,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_expected_executed_assertion_kills_mutant",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 33,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_compile_error_with_marker_is_inconclusive",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 36,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_marker_printed_before_unrelated_issue_is_inconclusive",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 40,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_process_timeout_is_not_a_kill_even_after_assertion",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 44,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_successful_mutant_survives",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 47,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_empty_or_wrong_test_baseline_is_not_passed",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 52,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_failed_baseline_is_not_a_killed_mutant",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 56,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_crash_after_expected_issue_is_not_a_killed_mutant",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 60,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_campaign_ignores_callers_seed_replay_and_artifact_controls",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 77,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_failed_second_anchor_restores_first_edit",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 92,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_mutation_cannot_follow_a_symlink_out_of_snapshot",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync-test-sensitivity.py",
+    "line": 106,
+    "kind": "FunctionDef",
+    "name": "SensitivityQualificationTests.test_snapshot_preserves_dirty_and_untracked_source_without_changing_index",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-sync.sh",
+    "line": 9,
+    "kind": "named declaration",
+    "name": "usage",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/test-validate-architecture.py",
+    "line": 12,
+    "kind": "ClassDef",
+    "name": "ArchitectureGuardTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-validate-architecture.py",
+    "line": 13,
+    "kind": "FunctionDef",
+    "name": "ArchitectureGuardTests.exercise",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-validate-architecture.py",
+    "line": 30,
+    "kind": "FunctionDef",
+    "name": "ArchitectureGuardTests.test_missing_ripgrep_fails_before_any_scan_or_success_message",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-validate-architecture.py",
+    "line": 37,
+    "kind": "FunctionDef",
+    "name": "ArchitectureGuardTests.test_scanner_error_stops_immediately_and_cannot_look_like_no_matches",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-validate-architecture.py",
+    "line": 44,
+    "kind": "FunctionDef",
+    "name": "ArchitectureGuardTests.test_no_matches_checks_every_boundary_and_succeeds",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/test-validate-architecture.py",
+    "line": 50,
+    "kind": "FunctionDef",
+    "name": "ArchitectureGuardTests.test_forbidden_matches_fail_and_preserve_all_boundary_checks",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 17,
+    "kind": "ClassDef",
+    "name": "ExternalURLTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 18,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_extracts_public_links_and_strips_markdown_punctuation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 33,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_rejects_private_and_malformed_targets",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 45,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_retries_transient_failures",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 48,
+    "kind": "ClassDef",
+    "name": "ExternalURLTests.test_retries_transient_failures.Response",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 51,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_retries_transient_failures.Response.__enter__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_retries_transient_failures.Response.__exit__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 57,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_retries_transient_failures.open_url",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 73,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_reports_permanent_http_failure_without_retrying",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/tests/test_check_docs_external_links.py",
+    "line": 76,
+    "kind": "FunctionDef",
+    "name": "ExternalURLTests.test_reports_permanent_http_failure_without_retrying.open_url",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-architecture.sh",
+    "line": 12,
+    "kind": "named declaration",
+    "name": "reject_matches",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/validate-architecture.sh",
+    "line": 31,
+    "kind": "named declaration",
+    "name": "reject_imports",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 17,
+    "kind": "ClassDef",
+    "name": "Reference",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 24,
+    "kind": "ClassDef",
+    "name": "Document",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 35,
+    "kind": "ClassDef",
+    "name": "DocumentParser",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 38,
+    "kind": "FunctionDef",
+    "name": "DocumentParser.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 53,
+    "kind": "FunctionDef",
+    "name": "DocumentParser.handle_starttag",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 122,
+    "kind": "FunctionDef",
+    "name": "DocumentParser.handle_startendtag",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 127,
+    "kind": "FunctionDef",
+    "name": "DocumentParser._error_marker",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 131,
+    "kind": "FunctionDef",
+    "name": "route_for_file",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 140,
+    "kind": "FunctionDef",
+    "name": "normalized_base_url",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 150,
+    "kind": "FunctionDef",
+    "name": "route_to_file",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 171,
+    "kind": "FunctionDef",
+    "name": "expected_canonical",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 175,
+    "kind": "FunctionDef",
+    "name": "validate_document",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 184,
+    "kind": "FunctionDef",
+    "name": "validate_document.report",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 258,
+    "kind": "FunctionDef",
+    "name": "validate_reference",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 316,
+    "kind": "FunctionDef",
+    "name": "validate_css_assets",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 328,
+    "kind": "FunctionDef",
+    "name": "validate_css_assets.report",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 350,
+    "kind": "FunctionDef",
+    "name": "parse_document",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-built-docs.py",
+    "line": 363,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-doc-image.py",
+    "line": 14,
+    "kind": "FunctionDef",
+    "name": "paeth",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-doc-image.py",
+    "line": 26,
+    "kind": "FunctionDef",
+    "name": "rgba_rows",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-doc-image.py",
+    "line": 90,
+    "kind": "FunctionDef",
+    "name": "alpha",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-doc-image.py",
+    "line": 94,
+    "kind": "FunctionDef",
+    "name": "has_transparent_window_corners",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-doc-image.py",
+    "line": 113,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-docs-redirect.py",
+    "line": 12,
+    "kind": "FunctionDef",
+    "name": "route_for_file",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-docs-redirect.py",
+    "line": 21,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 45,
+    "kind": "FunctionDef",
+    "name": "digest",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 49,
+    "kind": "FunctionDef",
+    "name": "run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 56,
+    "kind": "FunctionDef",
+    "name": "_thin",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 133,
+    "kind": "FunctionDef",
+    "name": "macho_fingerprint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 167,
+    "kind": "FunctionDef",
+    "name": "_resources",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 185,
+    "kind": "FunctionDef",
+    "name": "_info",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 195,
+    "kind": "FunctionDef",
+    "name": "_entitlements",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 199,
+    "kind": "FunctionDef",
+    "name": "validate_testflight_app",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-macos-testflight.py",
+    "line": 281,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/validate-xcode-build-paths.sh",
+    "line": 7,
+    "kind": "named declaration",
+    "name": "check_project",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 16,
+    "kind": "FunctionDef",
+    "name": "service_ready",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 24,
+    "kind": "ClassDef",
+    "name": "CommandRecorder",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 26,
+    "kind": "FunctionDef",
+    "name": "CommandRecorder.__init__",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 33,
+    "kind": "FunctionDef",
+    "name": "CommandRecorder.save",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 38,
+    "kind": "FunctionDef",
+    "name": "CommandRecorder.run",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 61,
+    "kind": "FunctionDef",
+    "name": "CommandRecorder.run.text",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 88,
+    "kind": "FunctionDef",
+    "name": "initialize_host",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 106,
+    "kind": "FunctionDef",
+    "name": "validate_owned_simulator",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 133,
+    "kind": "FunctionDef",
+    "name": "wait_for_services",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/wait-ios-test-services.py",
+    "line": 164,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Scripts/watch-release-workflow.sh",
+    "line": 10,
+    "kind": "named declaration",
+    "name": "usage",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Scripts/watch-release-workflow.sh",
+    "line": 41,
+    "kind": "named declaration",
+    "name": "read_run_state",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/build_ukrainian_source_cache.py",
+    "line": 16,
+    "kind": "FunctionDef",
+    "name": "lookup_key",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/build_ukrainian_source_cache.py",
+    "line": 23,
+    "kind": "FunctionDef",
+    "name": "sha256",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/build_ukrainian_source_cache.py",
+    "line": 31,
+    "kind": "FunctionDef",
+    "name": "build",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/build_ukrainian_source_cache.py",
+    "line": 165,
+    "kind": "FunctionDef",
+    "name": "parse_arguments",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/build_ukrainian_source_cache.py",
+    "line": 174,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 17,
+    "kind": "named declaration",
+    "name": "usage",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 83,
+    "kind": "named declaration",
+    "name": "logical_file_size",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 87,
+    "kind": "named declaration",
+    "name": "sha256_file",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 91,
+    "kind": "named declaration",
+    "name": "repository_logical_bytes",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 96,
+    "kind": "named declaration",
+    "name": "repository_content_sha256",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 107,
+    "kind": "named declaration",
+    "name": "lfs_pointer_list",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 118,
+    "kind": "named declaration",
+    "name": "available_bytes",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 122,
+    "kind": "named declaration",
+    "name": "preflight_locked_size",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 148,
+    "kind": "named declaration",
+    "name": "download_http",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 165,
+    "kind": "named declaration",
+    "name": "download_github_release",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 180,
+    "kind": "named declaration",
+    "name": "download_github_api_file",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 194,
+    "kind": "named declaration",
+    "name": "validate_file_format",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 214,
+    "kind": "named declaration",
+    "name": "verify_locked_file",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 228,
+    "kind": "named declaration",
+    "name": "ensure_locked_file",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 270,
+    "kind": "named declaration",
+    "name": "ensure_locked_repository",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 328,
+    "kind": "named declaration",
+    "name": "write_inventory",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/download-ukrainian.sh",
+    "line": 356,
+    "kind": "named declaration",
+    "name": "refresh_lock",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 29,
+    "kind": "ClassDef",
+    "name": "CorpusOccurrence",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 37,
+    "kind": "FunctionDef",
+    "name": "list_value",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 42,
+    "kind": "FunctionDef",
+    "name": "localized",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 49,
+    "kind": "FunctionDef",
+    "name": "provenance",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 68,
+    "kind": "FunctionDef",
+    "name": "content_digest",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 74,
+    "kind": "FunctionDef",
+    "name": "stable_entry_id",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 80,
+    "kind": "FunctionDef",
+    "name": "stable_id",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 84,
+    "kind": "FunctionDef",
+    "name": "parse_codepoint",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 101,
+    "kind": "FunctionDef",
+    "name": "lookup_token",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 107,
+    "kind": "FunctionDef",
+    "name": "unicode_word_tokens",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 124,
+    "kind": "FunctionDef",
+    "name": "build_tatoeba_index",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 169,
+    "kind": "FunctionDef",
+    "name": "is_lexical_surface",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 178,
+    "kind": "FunctionDef",
+    "name": "traits",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 187,
+    "kind": "FunctionDef",
+    "name": "text_representation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 191,
+    "kind": "FunctionDef",
+    "name": "valid_bold_target",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 211,
+    "kind": "FunctionDef",
+    "name": "normalize_entry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 406,
+    "kind": "FunctionDef",
+    "name": "single_word_lookup_key",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 416,
+    "kind": "FunctionDef",
+    "name": "enrich_with_tatoeba",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 504,
+    "kind": "FunctionDef",
+    "name": "open_input",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 510,
+    "kind": "FunctionDef",
+    "name": "open_bzip2_or_text",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 516,
+    "kind": "FunctionDef",
+    "name": "normalized_records",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 557,
+    "kind": "FunctionDef",
+    "name": "parser",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_kaikki.py",
+    "line": 607,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 53,
+    "kind": "FunctionDef",
+    "name": "sha256",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 61,
+    "kind": "FunctionDef",
+    "name": "stable_id",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 68,
+    "kind": "FunctionDef",
+    "name": "clean_html",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 76,
+    "kind": "FunctionDef",
+    "name": "plain_inline",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 80,
+    "kind": "FunctionDef",
+    "name": "normalized_lookup",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 87,
+    "kind": "FunctionDef",
+    "name": "find_member",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 102,
+    "kind": "FunctionDef",
+    "name": "stardict_records",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 117,
+    "kind": "FunctionDef",
+    "name": "provenance",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 125,
+    "kind": "FunctionDef",
+    "name": "localized",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 129,
+    "kind": "FunctionDef",
+    "name": "text_pronunciation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 140,
+    "kind": "FunctionDef",
+    "name": "sum_head_definition",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 155,
+    "kind": "FunctionDef",
+    "name": "sum_dictionary_header",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 167,
+    "kind": "FunctionDef",
+    "name": "normalize_sum_entry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 241,
+    "kind": "FunctionDef",
+    "name": "load_sum_word_set",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 257,
+    "kind": "FunctionDef",
+    "name": "translation_forms",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 289,
+    "kind": "FunctionDef",
+    "name": "normalize_ruuk_entry",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 331,
+    "kind": "FunctionDef",
+    "name": "normalize",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 373,
+    "kind": "FunctionDef",
+    "name": "parse_arguments",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/normalize_stardict_ukrainian.py",
+    "line": 383,
+    "kind": "FunctionDef",
+    "name": "main",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 18,
+    "kind": "ClassDef",
+    "name": "KaikkiNormalizerTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 19,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_preserves_generic_lexical_content_and_scalar_target",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 70,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_null_source_collections_are_treated_as_empty",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 86,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_ambiguous_bold_offsets_do_not_guess_a_target",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 90,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_main_filters_language_and_reads_gzip_without_network",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 110,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_ids_ignore_physical_line_and_semantic_duplicates_are_deduped",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 136,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_filters_placeholder_forms_and_leaves_romanization_language_unspecified",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 158,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_only_combining_mark_codepoints_can_be_stripped",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_kaikki.py",
+    "line": 163,
+    "kind": "FunctionDef",
+    "name": "KaikkiNormalizerTests.test_tatoeba_bzip2_enrichment_is_bounded_generic_and_scalar_exact",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_stardict_ukrainian.py",
+    "line": 18,
+    "kind": "FunctionDef",
+    "name": "star_index",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_stardict_ukrainian.py",
+    "line": 30,
+    "kind": "ClassDef",
+    "name": "NormalizeStarDictTests",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_stardict_ukrainian.py",
+    "line": 31,
+    "kind": "FunctionDef",
+    "name": "NormalizeStarDictTests.test_sum_entry_preserves_head_definition_and_stress",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_stardict_ukrainian.py",
+    "line": 54,
+    "kind": "FunctionDef",
+    "name": "NormalizeStarDictTests.test_ruuk_entry_indexes_exact_ukrainian_translation",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_stardict_ukrainian.py",
+    "line": 68,
+    "kind": "FunctionDef",
+    "name": "NormalizeStarDictTests.test_sum_header_only_uses_next_dictionary_paragraph",
+    "method": "Python AST"
+  },
+  {
+    "file": "Tools/VocabularySources/tests/test_normalize_stardict_ukrainian.py",
+    "line": 82,
+    "kind": "FunctionDef",
+    "name": "NormalizeStarDictTests.test_archive_member_resolution_and_normalization",
+    "method": "Python AST"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 10,
+    "kind": "named declaration",
+    "name": "syncNavigation",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 70,
+    "kind": "named declaration",
+    "name": "normalize",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 74,
+    "kind": "named declaration",
+    "name": "searchTerms",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 93,
+    "kind": "named declaration",
+    "name": "clearResults",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 99,
+    "kind": "named declaration",
+    "name": "showPanel",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 103,
+    "kind": "named declaration",
+    "name": "resultScore",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 129,
+    "kind": "named declaration",
+    "name": "createSnippet",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 146,
+    "kind": "named declaration",
+    "name": "appendRecoveryLinks",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 163,
+    "kind": "named declaration",
+    "name": "renderResults",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 220,
+    "kind": "named declaration",
+    "name": "loadIndex",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "_site/assets/js/search.js",
+    "line": 241,
+    "kind": "named declaration",
+    "name": "search",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 16,
+    "kind": "named declaration",
+    "name": "setNavigationModal",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 34,
+    "kind": "named declaration",
+    "name": "syncNavigation",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 51,
+    "kind": "named declaration",
+    "name": "closeNavigation",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 142,
+    "kind": "named declaration",
+    "name": "normalize",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 146,
+    "kind": "named declaration",
+    "name": "searchTerms",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 165,
+    "kind": "named declaration",
+    "name": "clearResults",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 171,
+    "kind": "named declaration",
+    "name": "showPanel",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 175,
+    "kind": "named declaration",
+    "name": "resultScore",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 201,
+    "kind": "named declaration",
+    "name": "createSnippet",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 218,
+    "kind": "named declaration",
+    "name": "appendRecoveryLinks",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 235,
+    "kind": "named declaration",
+    "name": "renderResults",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 292,
+    "kind": "named declaration",
+    "name": "loadIndex",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  },
+  {
+    "file": "docs/assets/js/search.js",
+    "line": 313,
+    "kind": "named declaration",
+    "name": "search",
+    "method": "line pattern; excludes anonymous callbacks and JS methods"
+  }
+]

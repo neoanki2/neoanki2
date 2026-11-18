@@ -36,9 +36,11 @@ Enter one or more lines in the field editor. Empty or whitespace-only content
 does not satisfy a required field. Text is stored as native content rather
 than HTML, and may carry language metadata when it came from an import.
 
-The Text editor exposes the same semantic formatting controls as Rich Text.
+On Mac, the Text editor exposes the same semantic formatting controls as Rich Text.
 Unformatted input remains plain text; applying a style preserves it as rich
-spans.
+spans. On iPhone and iPad, an existing Text value with formatting opens with
+formatting controls so typing does not remove its styles or links. Editing
+another field preserves untouched text, language metadata, media, and masks.
 
 On Mac, text fields support normal typing, selection, clipboard commands, and
 **Command-Z** / **Shift-Command-Z** for undo and redo. These commands edit the
@@ -80,7 +82,8 @@ content are not supported.
 Enter a value Swift can parse as a `Double`, such as `42`, `-3.5`, or `1e6`.
 NeoAnki2 stores the numeric value, not its original spelling, and formats it
 for the current locale when displaying it. Non-numeric text cannot satisfy a
-required Number field.
+required Number field. Populated Number fields must be finite: values such
+as infinity and NaN cannot be saved, even in an optional field.
 
 Number fields behave identically in ordinary Item Types and types included with
 an imported deck. Selecting a deck can recommend its included type, but it does

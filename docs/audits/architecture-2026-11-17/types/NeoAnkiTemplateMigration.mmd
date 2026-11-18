@@ -1,0 +1,85 @@
+classDiagram
+direction LR
+  class t0["TemplateDefinitionMigrationError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t1["TemplateMigrationMapping"] {
+    <<struct>>
+    itemTypeID
+    templateID
+    layout
+    questionCount
+    answerCount
+    supportingCount
+    mediaCount
+  }
+  class t2["TemplateMigrationReport"] {
+    <<struct>>
+    alreadyMigrated
+    itemTypeCount
+    templateCount
+    mappings
+  }
+  class t3["TemplateMigrationVerification"] {
+    <<struct>>
+    itemTypeCount
+    itemCount
+    cardCount
+    reviewLogCount
+    responseCount
+    mediaCount
+    quarantineCount
+  }
+  class t4["TemplateDefinitionMigrator"] {
+    <<enum>>
+    metadataKey
+    currentFormat
+    plan()
+    apply()
+    verify()
+    loadMigratedDefinitions()
+    loadCurrentDefinitions()
+    report()
+    deterministicComponentID()
+    identitySnapshot()
+  }
+  class t5["LegacyItemType"] {
+    <<struct>>
+    id
+    name
+    fields
+    templates
+  }
+  class t6["LegacyTemplate"] {
+    <<struct>>
+    id
+    name
+    prompt
+    answer
+    interaction
+    skill
+    generateWhen
+  }
+  class t7["MigrationDatabase"] {
+    <<class>>
+    handle
+    init()
+    close()
+    metadataValue()
+    definitionRows()
+    count()
+    strings()
+    execute()
+    rows()
+    bind()
+    databaseError()
+  }
+  class t8["MigrationDatabase.Binding"] {
+    <<enum>>
+  }
+  class t9["MigrationDatabase.DefinitionRow"] {
+    <<struct>>
+    id
+    data
+  }

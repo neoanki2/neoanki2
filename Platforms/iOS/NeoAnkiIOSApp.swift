@@ -12,6 +12,7 @@ struct NeoAnkiIOSApp: App {
     @UIApplicationDelegateAdaptor(IOSCloudSyncAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: LibraryFeatureModel
+    private let fixtures: MobileUITestFixtures
     private var packCloudTransport: (any VocabularyPackCloudTransport)? {
         if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") {
             return MobileVocabularyCloudUITestTransport.makeIfRequested()
@@ -67,15 +68,29 @@ struct NeoAnkiIOSApp: App {
         if usesPackFixture { syncService = DisabledSyncService() }
         else if usesSyncFixture { syncService = MobileSyncRecoveryUITestService(repository: repository) }
         else { syncService = MobileSyncCoordinator(repository: repository, paths: paths) }
+        let badgePublisher: any AppIconBadgePublishing
+        #if targetEnvironment(simulator)
+        if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset"),
+           ProcessInfo.processInfo.environment["NEOANKI_TEST_HOLD_EDIT_BADGE"] == "1",
+           let rawNonce = ProcessInfo.processInfo.environment["NEOANKI_EDITOR_GATE_NONCE"],
+           let nonce = UUID(uuidString: rawNonce) {
+            badgePublisher = IOSItemEditBadgeUITestGate(library: repository, nonce: nonce)
+        } else {
+            badgePublisher = IOSAppIconBadgePublisher()
+        }
+        #else
+        badgePublisher = IOSAppIconBadgePublisher()
+        #endif
         let model = LibraryFeatureModel(
             library: repository,
             syncService: syncService,
             notifier: IOSNotificationScheduler(),
             widgetPublisher: AppGroupWidgetPublisher(),
-            badgePublisher: IOSAppIconBadgePublisher(),
+            badgePublisher: badgePublisher,
             settingsStore: IOSMobileSettingsStore()
         )
         _model = State(initialValue: model)
+        fixtures = MobileUITestFixtures(library: repository)
         IOSCloudSyncAppDelegate.model = model
         IOSBackgroundRefresh.shared.register(model: model)
     }
@@ -83,24 +98,24 @@ struct NeoAnkiIOSApp: App {
     var body: some Scene {
         WindowGroup {
             if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset") && ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "image-occlusion" {
-                MobileImageOcclusionTestHost(model: model)
+                MobileImageOcclusionTestHost(model: model).environment(\.mobileUITestFixtures, fixtures)
             } else if usesAccessibilityUITestEnvironment && usesCardSetupAccessibilityTestHost {
-                MobileCardSetupAccessibilityTestHost(model: model)
+                MobileCardSetupAccessibilityTestHost(model: model).environment(\.mobileUITestFixtures, fixtures)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
                     .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
             } else if usesAccessibilityUITestEnvironment {
-                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport)
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport, fixtures: fixtures)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.accessibility5)
                     .environment(\.neoAnkiAccessibilityReduceMotionOverride, true)
             } else if ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingReset")
                         && ProcessInfo.processInfo.arguments.contains("-NeoAnkiUITestingLargeText") {
-                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport)
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport, fixtures: fixtures)
                     .preferredColorScheme(.dark)
                     .dynamicTypeSize(.xxxLarge)
             } else {
-                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport)
+                NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport, fixtures: fixtures)
             }
         }
         .onChange(of: scenePhase) { _, phase in

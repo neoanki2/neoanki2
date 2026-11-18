@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class PoemDeckEditorModel {
-    private let library: any LibraryBrowsing & LibraryCoordinatedItemEditing
+    private let editing: GeneratedDeckEditing
     private let deckID: UUID
     private let itemTypeID: UUID
     private let deckName: String
@@ -21,13 +21,22 @@ final class PoemDeckEditorModel {
     var isSaving = false
     var errorMessage: String?
 
-    init(
+    convenience init(
         library: any LibraryBrowsing & LibraryCoordinatedItemEditing,
         deckID: UUID,
         itemTypeID: UUID,
         deckName: String
     ) {
-        self.library = library
+        self.init(editing: .init(library: library), deckID: deckID, itemTypeID: itemTypeID, deckName: deckName)
+    }
+
+    init(
+        editing: GeneratedDeckEditing,
+        deckID: UUID,
+        itemTypeID: UUID,
+        deckName: String
+    ) {
+        self.editing = editing
         self.deckID = deckID
         self.itemTypeID = itemTypeID
         self.deckName = deckName
@@ -48,33 +57,20 @@ final class PoemDeckEditorModel {
         isLoading = true
         errorMessage = nil
         do {
-            let summaries = try await library.items(
-                scope: .deck(deckID, includeDescendants: false),
-                sort: .createdAscending,
-                search: ""
-            )
-            guard summaries.allSatisfy({ $0.itemTypeID == itemTypeID }) else {
-                throw PoemDeckReconciliationError.mixedItemTypes
-            }
-            var loaded: [PoemDeckItemRecord] = []
-            loaded.reserveCapacity(summaries.count)
-            for summary in summaries {
-                guard let record = try await library.item(id: summary.id) else {
-                    throw PoemDeckReconciliationError.brokenChain
-                }
-                loaded.append(.init(
-                    item: record.item,
-                    itemType: record.itemType,
-                    createdAt: summary.createdAt
-                ))
-            }
-            let snapshot = try PoemDeckReconciler.snapshot(records: loaded)
-            records = loaded
+            let loaded = try await editing.load(deckID: deckID, itemTypeID: itemTypeID)
+            let editorRecords = loaded.map { PoemDeckItemRecord(item: $0.item, itemType: $0.itemType, createdAt: $0.createdAt) }
+            let snapshot = try PoemDeckReconciler.snapshot(records: editorRecords)
+            records = editorRecords
             sourceText = snapshot.sourceText
             initialSourceText = snapshot.sourceText
             initialMismatchCount = snapshot.mismatches.count
             preview = nil
             previewedSourceText = nil
+        } catch let error as GeneratedDeckEditingError {
+            errorMessage = switch error {
+            case .mixedItemTypes: PoemDeckReconciliationError.mixedItemTypes.localizedDescription
+            case .missingItem: PoemDeckReconciliationError.brokenChain.localizedDescription
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -110,7 +106,7 @@ final class PoemDeckEditorModel {
         isSaving = true
         defer { isSaving = false }
         guard let order = preview.order else { return }
-        _ = try await library.reconcileOrderedDeckItems(
+        try await editing.save(
             preview.operations, order: order, asOf: .now
         )
     }
@@ -135,11 +131,23 @@ public struct PoemDeckEditorView: View {
         onSaved: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
+        self.init(editing: .init(library: library), deckID: deckID, itemTypeID: itemTypeID,
+                  deckName: deckName, onSaved: onSaved, onCancel: onCancel)
+    }
+
+    public init(
+        editing: GeneratedDeckEditing,
+        deckID: UUID,
+        itemTypeID: UUID,
+        deckName: String,
+        onSaved: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
         self.deckName = deckName
         self.onSaved = onSaved
         self.onCancel = onCancel
         _model = State(initialValue: PoemDeckEditorModel(
-            library: library,
+            editing: editing,
             deckID: deckID,
             itemTypeID: itemTypeID,
             deckName: deckName

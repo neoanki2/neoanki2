@@ -2,8 +2,6 @@ import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
-import PoemDeckBuilder
-import ProseDeckBuilder
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -81,7 +79,7 @@ struct LibraryView: View {
         List {
             if embedsNavigation {
                 Section {
-                    NavigationLink { SavedResponsesMobileView(library: model.library) } label: {
+                    NavigationLink { SavedResponsesMobileView(model: model.features.makeSavedResponses()) } label: {
                         Label("Saved Responses", systemImage: "waveform")
                     }
                 }
@@ -213,7 +211,7 @@ struct LibraryView: View {
     }
     private func move(to deck: UUID?) { Task { await perform { try await model.moveItems(selection, to: deck, rows: items) } } }
     private func markOK(_ ids: Set<UUID>) async {
-        await perform { _ = try await model.library.acknowledgeRepeatedLapses(itemIDs: ids, asOf: .now); await model.refresh() }
+        await perform { try await model.acknowledgeRepeatedLapses(itemIDs: ids) }
     }
     private func requestDeletion(_ ids: Set<UUID>) {
         guard !ids.isEmpty else { return }
@@ -319,7 +317,7 @@ struct AddItemView: View {
             .onAppear { isEditorActive = true }
             .task { await loadChoices() }
             .sheet(isPresented: $showTypeChooser) {
-                ItemTypeChooserView(library: model.library, deckID: selectedDeckID) { type in
+                ItemTypeChooserView(model: model.features.makeTypeChooser(deckID: selectedDeckID)) { type in
                     await model.refresh()
                     await loadChoices(resolve: false)
                     typeBinding.wrappedValue = type.id
@@ -334,7 +332,7 @@ struct AddItemView: View {
                     Button("Attach Type and Keep Content") {
                         Task {
                             do {
-                                if let id = selectedTypeID, let deck = pendingDeckID { try await model.library.attachItemType(id: id, to: deck) }
+                                if let id = selectedTypeID, let deck = pendingDeckID { try await model.attachType(id: id, to: deck) }
                                 selectedDeckID = pendingDeckID; await loadChoices(resolve: false)
                             } catch { errorMessage = error.localizedDescription }
                         }
@@ -546,7 +544,7 @@ struct AddItemView: View {
             let generation = deckRequestGeneration
             Task {
                 do {
-                    let choices = try await model.library.authoringItemTypes(for: id)
+                    let choices = try await model.authoringChoices(for: id)
                     guard generation == deckRequestGeneration, !isSaving else { return }
                     if hasChanges, let selectedTypeID, !choices.itemTypes.contains(where: { $0.id == selectedTypeID }) {
                         pendingDeckID = id; confirmsDeckChange = true
@@ -563,8 +561,8 @@ struct AddItemView: View {
         let generation = typeLoadGeneration
         let deckID = selectedDeckID
         do {
-            let choices = try await model.library.authoringItemTypes(for: deckID)
-            let libraryID = try await model.library.libraryID()
+            let choices = try await model.authoringChoices(for: deckID)
+            let libraryID = try await model.libraryIdentity()
             guard generation == typeLoadGeneration, deckID == selectedDeckID else { return }
             typeChoices = choices.itemTypes
             if resolve {
@@ -600,8 +598,8 @@ struct AddItemView: View {
                     case .text: content[field.id] = .text(values[field.id] ?? "")
                     }
                 }
+                let libraryID = try await model.libraryIdentity()
                 try await model.createItem(itemType: selectedType, deckID: selectedDeckID, values: content)
-                let libraryID = try await model.library.libraryID()
                 UserDefaults.standard.set(selectedType.id.uuidString, forKey: "authoring.type.\(libraryID).\(selectedDeckID?.uuidString ?? "unassigned")")
                 closeEditor()
             } catch {
@@ -794,32 +792,13 @@ private struct ItemDetailView: View {
         }
         .sheet(isPresented: $isEditing) {
             if let loaded {
-                if loaded.itemType.name == "Poem Line",
-                   let deckID = loaded.item.deckID {
-                    PoemDeckEditorView(
-                        library: model.library,
-                        deckID: deckID,
-                        itemTypeID: loaded.itemType.id,
-                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Poem",
+                if let context = GeneratedDeckEditorContext(item: loaded.item, itemType: loaded.itemType,
+                    deckName: model.decks.first(where: { $0.id == loaded.item.deckID })?.name) {
+                    GeneratedDeckEditorView(editing: model.features.generatedDeckEditing, context: context,
                         onSaved: {
                             isEditing = false
                             Task { await reloadAfterSourceEditing() }
-                        },
-                        onCancel: { isEditing = false }
-                    )
-                } else if loaded.itemType.name == "Prose Unit",
-                          let deckID = loaded.item.deckID {
-                    ProseDeckEditorView(
-                        library: model.library,
-                        deckID: deckID,
-                        itemTypeID: loaded.itemType.id,
-                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Prose",
-                        onSaved: {
-                            isEditing = false
-                            Task { await reloadAfterSourceEditing() }
-                        },
-                        onCancel: { isEditing = false }
-                    )
+                        }, onCancel: { isEditing = false })
                 } else {
                     ItemEditMobileView(model: model, loaded: loaded) { self.loaded = $0 }
                 }
@@ -843,7 +822,7 @@ private struct ItemDetailView: View {
 
     private func loadMaturity() async {
         do {
-            cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: itemID)
+            cardMaturityDetails = try await model.cardMaturityDetails(itemID: itemID)
             maturityIssue = nil
         } catch {
             maturityIssue = "Maturity is unavailable. " + error.localizedDescription
@@ -902,12 +881,12 @@ private struct MobileItemFieldRow<Editor: View>: View {
 struct ItemEditMobileView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var model: MobileAppModel
-    @State var item: Item
-    private let originalItem: Item
+    @State private var draft: ItemEditorDraft
     let itemType: ItemType
     let onSaved: ((item: Item, itemType: ItemType)) -> Void
     @State private var errorMessage: String?
-    @State private var mediaDescriptions: [UUID: String]
+    @State private var saveOperation = EditorSaveOperation()
+    private var isSaving: Bool { saveOperation.isSaving }
     @State private var selectedMediaField: FieldDef?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var isImportingMediaFile = false
@@ -921,21 +900,16 @@ struct ItemEditMobileView: View {
 
     init(model: MobileAppModel, loaded: (item: Item, itemType: ItemType), onSaved: @escaping ((item: Item, itemType: ItemType)) -> Void) {
         self.model = model
-        _item = State(initialValue: loaded.item)
-        originalItem = loaded.item
+        _draft = State(initialValue: ItemEditorDraft(item: loaded.item, itemType: loaded.itemType))
         itemType = loaded.itemType
         self.onSaved = onSaved
-        _mediaDescriptions = State(initialValue: Dictionary(uniqueKeysWithValues: loaded.item.fields.compactMap { value in
-            guard let reference = value.value.mediaReference else { return nil }
-            return (value.fieldID, reference.altText ?? "")
-        }))
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Deck") {
-                    Picker("Deck", selection: $item.deckID) {
+                    Picker("Deck", selection: $draft.deckID) {
                         Text("Unassigned").tag(Optional<UUID>.none)
                         ForEach(model.decks) { Text($0.name).tag(Optional($0.id)) }
                     }
@@ -950,16 +924,16 @@ struct ItemEditMobileView: View {
                         }
                     }
                 }
-                ContextAuthoringEntry(library: model.library, deckID: item.deckID, fields: ContextExamplePreset.authoringFields(in: itemType),
+                ContextAuthoringEntry(features: model.features, deckID: draft.deckID, fields: ContextExamplePreset.authoringFields(in: itemType),
                     text: { id in
-                        switch item.value(for: id) {
+                        switch draft.value(for: id) {
                         case let .text(value, _), let .cloze(value, _): value
                         case let .rich(spans): spans.map(\.text).joined()
                         default: ""
                         }
                     }, onSaved: { await model.authoringDidCommit() })
             }
-            .disabled(isPreparingMedia)
+            .disabled(isPreparingMedia || isSaving)
             .environment(\.attachmentProcessing, isPreparingMedia || processingAttachments > 0)
             .onPreferenceChange(AttachmentProcessingPreferenceKey.self) { processingAttachments = $0 }
             .onAppear { isEditorActive = true }
@@ -967,11 +941,18 @@ struct ItemEditMobileView: View {
             .navigationTitle("Edit Item").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { if item == originalItem { closeEditor() } else { confirmsDiscard = true } }
+                    Button("Cancel") { if draft.hasChanges { confirmsDiscard = true } else { closeEditor() } }
+                        .disabled(isSaving)
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(isPreparingMedia || processingAttachments > 0 || itemType.fields.contains { fieldIssue($0) != nil }) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { Task { await save() } } label: {
+                        if isSaving { ProgressView().accessibilityLabel("Saving changes") }
+                        else { Text("Save") }
+                    }
+                    .disabled(isSaving || isPreparingMedia || processingAttachments > 0 || itemType.fields.contains { fieldIssue($0) != nil })
+                }
             }
-            .interactiveDismissDisabled(item != originalItem)
+            .interactiveDismissDisabled(isSaving || draft.hasChanges)
             .alert("Could Not Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
             .confirmationDialog("Discard changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
                 Button("Discard Changes", role: .destructive) { closeEditor() }
@@ -1001,7 +982,7 @@ struct ItemEditMobileView: View {
     }
 
     @ViewBuilder private func editor(_ field: FieldDef) -> some View {
-        let value = item.value(for: field.id) ?? .empty
+        let value = draft.value(for: field.id)
         let photoTitle = mediaReference(field.id) == nil ? "Photos" : "Replace from Photos"
         switch field.type {
         case .richText:
@@ -1010,20 +991,20 @@ struct ItemEditMobileView: View {
                 .modifier(MobileTextEditorHeight())
         case .imageOcclusion:
             ImageOcclusionFieldEditor(label: field.name, content: Binding(get: {
-                if case let .imageOcclusion(content) = item.value(for: field.id) { return content }
+                if case let .imageOcclusion(content) = draft.value(for: field.id) { return content }
                 return nil
             }, set: { set($0.map(ContentValue.imageOcclusion) ?? .empty, field.id) }), mediaStore: model.mediaStore)
         case .cloze:
             let text = textFor(field.id) ?? ""
             let blanks: [ClozeSpan] = clozeFor(field.id) ?? []
-            ClozeSelectionEditor(text: Binding(get: { textFor(field.id) ?? text }, set: { set(.cloze($0, blanks: clozeFor(field.id) ?? blanks), field.id) }), blanks: Binding(get: { clozeFor(field.id) ?? blanks }, set: { set(.cloze(textFor(field.id) ?? text, blanks: $0), field.id) }))
+            ClozeSelectionEditor(text: Binding(get: { textFor(field.id) ?? text }, set: { draft.setText($0, for: field.id); saveOperation.beginEditing() }), blanks: Binding(get: { clozeFor(field.id) ?? blanks }, set: { set(.cloze(textFor(field.id) ?? text, blanks: $0), field.id) }))
         case .audio, .image, .gif, .video:
             VStack(alignment: .leading, spacing: 8) {
                 TextField(mediaDescriptionPrompt(field.type), text: Binding(
-                    get: { mediaDescriptions[field.id] ?? "" },
+                    get: { draft.snapshot.fieldMediaAltText[field.id] ?? "" },
                     set: { description in
-                        mediaDescriptions[field.id] = description
-                        if case .media(var reference) = item.value(for: field.id) {
+                        draft.snapshot.fieldMediaAltText[field.id] = description
+                        if case .media(var reference) = draft.value(for: field.id) {
                             reference.altText = description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
                             set(.media(reference), field.id)
                         }
@@ -1074,26 +1055,20 @@ struct ItemEditMobileView: View {
             TextField("Number", value: Binding(get: { numberFor(field.id) }, set: { set($0.map(ContentValue.number) ?? .empty, field.id) }), format: .number)
                 .keyboardType(.decimalPad)
         case .text:
-            TextField(field.name, text: Binding(get: { textFor(field.id) ?? "" }, set: { set(.text($0), field.id) }), axis: .vertical)
-        }
-    }
-    private func fieldIssue(_ field: FieldDef) -> String? {
-        let value = item.value(for: field.id) ?? .empty
-        if field.isRequired {
-            switch value {
-            case .empty: return "This field is required."
-            case let .text(text, _), let .cloze(text, _):
-                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "This field is required." }
-            case let .rich(spans):
-                if spans.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "This field is required." }
-            default: break
+            if draft.requiresSpanEditing(for: field.id) {
+                RichSpanTextEditor(spans: Binding(
+                    get: { spansFor(field.id) ?? [] },
+                    set: { set(.rich($0), field.id) }
+                ))
+                .modifier(MobileTextEditorHeight())
+                .accessibilityIdentifier("edit-card-field-\(field.name.lowercased())")
+            } else {
+                TextField(field.name, text: Binding(get: { textFor(field.id) ?? "" }, set: { set(.text($0), field.id) }), axis: .vertical)
+                    .accessibilityIdentifier("edit-card-field-\(field.name.lowercased())")
             }
         }
-        if case let .imageOcclusion(content) = value {
-            do { try ImageOcclusionValidation.validate(content) } catch { return error.localizedDescription }
-        }
-        return nil
     }
+    private func fieldIssue(_ field: FieldDef) -> String? { draft.issue(for: field.id) }
 
     private func closeEditor() {
         isEditorActive = false
@@ -1105,14 +1080,14 @@ struct ItemEditMobileView: View {
 
     private func set(_ value: ContentValue, _ fieldID: UUID) {
         if case let .imageOcclusion(content) = value { occlusionDraftReferences.append(content.image) }
-        if let index = item.fields.firstIndex(where: { $0.fieldID == fieldID }) { item.fields[index].value = value }
-        else { item.fields.append(FieldValue(fieldID: fieldID, value: value)) }
+        draft.setValue(value, for: fieldID)
+        saveOperation.beginEditing()
     }
-    private func textFor(_ id: UUID) -> String? { switch item.value(for: id) { case let .text(v, _), let .cloze(v, _): v; default: nil } }
-    private func spansFor(_ id: UUID) -> [Span]? { if case let .rich(v) = item.value(for: id) { v } else { nil } }
-    private func clozeFor(_ id: UUID) -> [ClozeSpan]? { if case let .cloze(_, v) = item.value(for: id) { v } else { nil } }
-    private func numberFor(_ id: UUID) -> Double? { if case let .number(v) = item.value(for: id) { v } else { nil } }
-    private func mediaReference(_ id: UUID) -> MediaRef? { if case let .media(value) = item.value(for: id) { value } else { nil } }
+    private func textFor(_ id: UUID) -> String? { draft.text(for: id) }
+    private func spansFor(_ id: UUID) -> [Span]? { draft.snapshot.fieldSpans[id] }
+    private func clozeFor(_ id: UUID) -> [ClozeSpan]? { draft.snapshot.fieldClozeBlanks[id] }
+    private func numberFor(_ id: UUID) -> Double? { Double(draft.snapshot.fieldText[id, default: ""]) }
+    private func mediaReference(_ id: UUID) -> MediaRef? { draft.snapshot.fieldMedia[id] }
     private var allowedMediaTypes: [UTType] {
         guard let field = selectedMediaField else { return [.data] }
         return switch field.type { case .audio: [.audio]; case .image: [.image]; case .gif: [.gif]; case .video: [.movie]; default: [.data] }
@@ -1162,20 +1137,23 @@ struct ItemEditMobileView: View {
     private func ingestData(_ data: Data, for field: FieldDef) async throws {
         let kind: MediaKind = switch field.type { case .audio: .audio; case .image: .image; case .gif: .gif; case .video: .video; default: .image }
         guard isEditorActive, !Task.isCancelled else { return }
-        var reference = try await model.reserveMedia(data: data, kind: kind, altText: mediaDescriptions[field.id] ?? "")
+        var reference = try await model.reserveMedia(data: data, kind: kind, altText: draft.snapshot.fieldMediaAltText[field.id] ?? "")
         guard isEditorActive, !Task.isCancelled else { try? await model.mediaStore?.discardDraftReference(reference); return }
-        let description = (mediaDescriptions[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = (draft.snapshot.fieldMediaAltText[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         reference.altText = description.isEmpty ? nil : description
         set(.media(reference), field.id)
     }
     private func save() async {
-        guard !isPreparingMedia, processingAttachments == 0 else { return }
-        do {
-            try await model.updateItem(item)
-            if let saved = try await model.library.item(id: item.id) { onSaved(saved) }
-            else { onSaved((item, itemType)) }
-            closeEditor()
-        } catch { errorMessage = MobileAppModel.message(for: error) }
+        guard !isSaving, !isPreparingMedia, processingAttachments == 0 else { return }
+        let saved: Item? = await saveOperation.perform {
+            try await model.commitItemEdit(draft.item())
+        }
+        guard let saved else {
+            errorMessage = saveOperation.error?.message
+            return
+        }
+        onSaved((saved, itemType))
+        closeEditor()
     }
 }
 #endif

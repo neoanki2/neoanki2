@@ -123,13 +123,24 @@ private func makeInteractionModel(
 
 private actor StudyQueueLoadGate {
     private var isOpen = false
+    private var hasEntered = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
 
     func wait() async {
         guard !isOpen else { return }
         await withCheckedContinuation { continuation in
             waiters.append(continuation)
+            hasEntered = true
+            let entered = entryWaiters
+            entryWaiters.removeAll()
+            entered.forEach { $0.resume() }
         }
+    }
+
+    func waitUntilEntered() async {
+        guard !hasEntered else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
     }
 
     func open() {
@@ -153,30 +164,30 @@ private actor StudyQueueGateProbe {
 private actor FirstStudyQueueLoadGate {
     private var invocationCount = 0
     private var firstWaiter: CheckedContinuation<Void, Never>?
+    private var hasEntered = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
 
     func wait() async {
         invocationCount += 1
         guard invocationCount == 1 else { return }
         await withCheckedContinuation { continuation in
             firstWaiter = continuation
+            hasEntered = true
+            let entered = entryWaiters
+            entryWaiters.removeAll()
+            entered.forEach { $0.resume() }
         }
+    }
+
+    func waitUntilEntered() async {
+        guard !hasEntered else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
     }
 
     func releaseFirst() {
         firstWaiter?.resume()
         firstWaiter = nil
     }
-}
-
-@MainActor
-private func waitForProgressiveStudyHead(_ model: StudyFeatureModel) async throws {
-    for _ in 0..<10_000 {
-        if model.isPreparingQueue, model.currentCard != nil, !model.isLoading {
-            return
-        }
-        await Task.yield()
-    }
-    throw DatabaseError.queryFailed("Timed out waiting for the progressive study head.")
 }
 
 @Test @MainActor func studyModelStartsScopedSession() async throws {
@@ -238,7 +249,10 @@ private func waitForProgressiveStudyHead(_ model: StudyFeatureModel) async throw
     )
 
     let startTask = Task { await model.start() }
-    try await waitForProgressiveStudyHead(model)
+    await gate.waitUntilEntered()
+    #expect(model.isPreparingQueue)
+    #expect(model.currentCard != nil)
+    #expect(!model.isLoading)
 
     #expect(model.queue.map(\.id) == [expected[0].id])
     #expect(model.remainingCount == 2)
@@ -334,7 +348,10 @@ private func waitForProgressiveStudyHead(_ model: StudyFeatureModel) async throw
         remainingQueueLoadGate: { await gate.wait() }
     )
     let firstStart = Task { await model.start() }
-    try await waitForProgressiveStudyHead(model)
+    await gate.waitUntilEntered()
+    #expect(model.isPreparingQueue)
+    #expect(model.currentCard != nil)
+    #expect(!model.isLoading)
 
     let secondScope = DeckScope.deck(secondDeck.id)
     await model.start(scope: secondScope, title: secondDeck.name)
@@ -1178,7 +1195,10 @@ private func waitForProgressiveStudyHead(_ model: StudyFeatureModel) async throw
     )
 
     let startTask = Task { await model.start() }
-    try await waitForProgressiveStudyHead(model)
+    await gate.waitUntilEntered()
+    #expect(model.isPreparingQueue)
+    #expect(model.currentCard != nil)
+    #expect(!model.isLoading)
     #expect(model.currentCard?.id == ordered[0].id)
     #expect(model.remainingCount == 2)
 

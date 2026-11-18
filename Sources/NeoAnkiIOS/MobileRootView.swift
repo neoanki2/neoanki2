@@ -26,6 +26,7 @@ public struct MobileRootView: View {
     @State private var retriedFailureFixture = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.mobileUITestFixtures) private var fixtures
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("mobile-conceals-answers") private var concealsAnswers = true
     @State private var vocabularyLibrary: MobileVocabularyLibraryModel
@@ -77,18 +78,18 @@ public struct MobileRootView: View {
             showsWordCapture = true
         })
         .sheet(isPresented: $showsWordCapture, onDismiss: { Task { await vocabularyLibrary.load() } }) {
-            WordCaptureView(library: model.library, rootURL: vocabularyRootURL, deckID: wordCaptureDeckID) {
+            WordCaptureView(model: model.features.makeWordCapture(rootURL: vocabularyRootURL) {
                 await model.authoringDidCommit()
-            }
+            }, deckID: wordCaptureDeckID)
             .dynamicTypeSize(dynamicTypeSize)
         }
         .alert("Visual Fixture Failed", isPresented: Binding(get: { fixtureError != nil }, set: { if !$0 { fixtureError = nil } })) {
             Button("OK") { fixtureError = nil }
         } message: { Text(fixtureError ?? "") }
         .sheet(isPresented: $showsLearnInContext) {
-            LearnInContextView(library: model.library, rootURL: vocabularyRootURL, deckID: wordCaptureDeckID) {
+            LearnInContextView(model: model.features.makeLearnInContext(rootURL: vocabularyRootURL) {
                 await model.authoringDidCommit()
-            }.dynamicTypeSize(dynamicTypeSize)
+            }, deckID: wordCaptureDeckID).dynamicTypeSize(dynamicTypeSize)
         }
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
@@ -103,11 +104,11 @@ public struct MobileRootView: View {
             catch { fixtureError = MobileAppModel.message(for: error) }
             #endif
             if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
-                do { try await MobileRedesignUITestSeeder.seedIfRequested(library: model.library); await model.refresh() }
+                do { try await fixtures?.prepareRedesign(); await model.refresh() }
                 catch { fixtureError = MobileAppModel.message(for: error); await model.refresh() }
                 fixturesReady = true
             } else if ["mobile-vocabulary", "mobile-item-lookup"].contains(ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] ?? "") {
-                do { try await vocabularyLibrary.seedVisualFixtureIfRequested(library: model.library); await model.refresh() }
+                do { try await fixtures?.prepareVocabulary(vocabularyLibrary); await model.refresh() }
                 catch { fixtureError = MobileAppModel.message(for: error) }
                 fixturesReady = true
             }
@@ -212,7 +213,7 @@ private struct MobileTabView: View {
         case .create: CreateHubView(model: model, vocabularyLibrary: vocabularyLibrary, path: $createPath)
         case .statistics:
             NavigationStack(path: $statisticsPath) {
-                StatisticsView(library: model.library, scope: model.statisticsScope, sessionID: model.statisticsSessionID)
+                StatisticsView(model: model.features.makeStatistics(scope: model.statisticsScope, sessionID: model.statisticsSessionID))
                     .id(model.statisticsNavigationID)
             }
         case .settings: SettingsView(model: model, vocabularyLibrary: vocabularyLibrary, path: $settingsPath)
@@ -342,7 +343,7 @@ private struct SettingsView: View {
             .navigationTitle("Settings")
             .modifier(MobileTabBarVisibility())
             .task {
-                do { rolloverMinutes = try await model.library.studyDayRolloverMinutes() }
+                do { rolloverMinutes = try await model.studyDayRolloverMinutes() }
                 catch { errorMessage = MobileAppModel.message(for: error) }
             }
             .alert("Enable iCloud Sync?", isPresented: $showsSyncConsent) {
@@ -382,9 +383,8 @@ private struct SettingsView: View {
                 Task {
                     defer { isSavingRollover = false }
                     do {
-                        try await model.library.setStudyDayRolloverMinutes(minutes)
+                        try await model.setStudyDayRolloverMinutes(minutes)
                         rolloverMinutes = minutes
-                        await model.refresh()
                     } catch { errorMessage = MobileAppModel.message(for: error) }
                 }
             }
@@ -657,13 +657,9 @@ private struct DeckSettingsMobileView: View {
                 }
                 Section("Item Types") {
                     NavigationLink("Manage Item Types") {
-                        DeckItemTypesView(library: model.library, deckID: deckID, refreshToken: typesRevision, onEdit: { type in
-                            if let library = model.itemTypeStudioLibrary {
-                                let studio = ItemTypesFeatureModel(library: library)
-                                studio.destinationDeckID = deckID
-                                Task { await studio.load(); studio.selectItemType(id: type.id); studio.beginEditingSelectedItemType(); typeStudio = studio }
-                            }
-                        }, onChanged: { await model.authoringDidCommit() })
+                        DeckItemTypesView(model: model.features.makeDeckItemTypes(deckID: deckID, onChanged: { await model.authoringDidCommit() }), refreshToken: typesRevision, onEdit: { type in
+                            Task { typeStudio = await model.features.openItemType(id: type.id, deckID: deckID) }
+                        })
                     }
                 }
                 Section("Daily New Cards") {
@@ -671,7 +667,7 @@ private struct DeckSettingsMobileView: View {
                     Stepper("\(newCardLimit) per day", value: $newCardLimit, in: 0...999).disabled(!limitEnabled)
                 }
                 Section("Progress") {
-                    Button("Reset Progress", role: .destructive) { Task { resetImpact = try? await model.library.deckResetImpact(id: deckID) } }
+                    Button("Reset Progress", role: .destructive) { Task { resetImpact = try? await model.deckResetImpact(id: deckID) } }
                 }
                 Section { Button("Delete Deck", role: .destructive) { Task { deletionImpact = try? await model.deckDeletionImpact(id: deckID, policy: .unassignItems) } } }
             }
@@ -697,7 +693,7 @@ private struct DeckSettingsMobileView: View {
             .alert("Could Not Update Deck", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) {} } message: { Text(errorMessage ?? "Please try again.") }
         }
     }
-    private func load() async { if let deck = try? await model.library.deck(id: deckID) { name = deck.name; parentID = deck.parentID; limitEnabled = deck.newCardsPerDay != nil; newCardLimit = deck.newCardsPerDay ?? 20 } }
+    private func load() async { if let deck = try? await model.deck(id: deckID) { name = deck.name; parentID = deck.parentID; limitEnabled = deck.newCardsPerDay != nil; newCardLimit = deck.newCardsPerDay ?? 20 } }
     private func save() async { do { try await model.updateDeck(id: deckID, name: name, parentID: parentID, newCardsPerDay: limitEnabled ? newCardLimit : nil); dismiss() } catch { errorMessage = MobileAppModel.message(for: error) } }
     private func deleteDeck() async {
         do {

@@ -12,6 +12,7 @@ markdown: kramdown
 permalink: pretty
 exclude:
   - README.md
+  - audits/architecture-2026-11-17/viewer-template.html
 defaults:
   - scope:
       path: ""

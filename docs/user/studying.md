@@ -212,7 +212,7 @@ Read the prompt, recall the answer, then choose **Show Answer**. This is the int
 
 Enter a response in **Your answer**, then press Return or choose **Check Answer**. Checking ignores case and diacritics, normalizes whitespace, and ignores surrounding punctuation. It compares your response with usable text representations on the answer side. A match shows **Your response matches**; otherwise, NeoAnki2 asks you to compare your response with the answer.
 
-An empty response is not checked. Enter an answer or choose **Reveal & Self-Grade**. If the answer side has no checkable text, automatic checking is unavailable and the answer is revealed for self-grading.
+An empty response is not checked. Enter an answer or, on Mac, choose **More → Reveal & Self-Grade** (Right Arrow) to reveal without checking. If the answer side has no checkable text, automatic checking is unavailable and the answer is revealed for self-grading.
 
 [![Typing and checking an answer]({{ site.baseurl }}/assets/screenshots/study-type.png)]({{ site.baseurl }}/assets/screenshots/study-type.png)
 
@@ -230,7 +230,7 @@ For keyboard-only ordering, press Command-1 through Command-9 to select one of t
 
 ### Record
 
-The footer keeps one primary recording action in a stable location: choose **Start Recording**, speak, and choose **Stop Recording** in the same place. Once the recording is ready, that action becomes **Reveal & Compare**. Use the adjacent **Recording** menu to play the temporary recording or record again. If the answer contains reference audio, play that real recording from the answer; otherwise, NeoAnki2 states that reference audio is unavailable and you compare your recording with the written answer. NeoAnki2 never synthesizes a reference voice. **Reveal & Self-Grade** remains available as a fallback when you do not want to record.
+The footer keeps one primary recording action in a stable location: choose **Start Recording**, speak, and choose **Stop Recording** in the same place. Once the recording is ready, that action becomes **Reveal & Compare**. Use the adjacent **Recording** menu to play the temporary recording or record again. If the answer contains reference audio, play that real recording from the answer; otherwise, NeoAnki2 states that reference audio is unavailable and you compare your recording with the written answer. NeoAnki2 never synthesizes a reference voice. On Mac, choose **More → Reveal & Self-Grade** (Right Arrow) when you do not want to record.
 
 The first recording attempt may trigger the macOS microphone permission prompt. If access is denied or restricted, enable NeoAnki2 in **System Settings → Privacy & Security → Microphone**. Recordings are temporary: NeoAnki2 removes them when the card changes, the study view closes, or a new recording replaces the old one.
 

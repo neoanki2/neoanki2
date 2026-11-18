@@ -93,6 +93,10 @@ you end the session. **Skip** moves the current card to the end of the session
 without grading it or changing its schedule. Edit updates the current item and
 the remaining queued cards generated from it. For a generated poem line, Edit
 opens the whole poem so line order and its generated cards stay in sync.
+For an ordinary item, **Save** shows progress and returns to study after the
+change is stored. Removing a cloze group removes its retired card from the
+remaining session; newly generated cards wait for the next session. A failed
+save keeps the editor and your correction available to retry.
 **End** leaves immediately;
 completion reports reviews and saved submissions separately.
 

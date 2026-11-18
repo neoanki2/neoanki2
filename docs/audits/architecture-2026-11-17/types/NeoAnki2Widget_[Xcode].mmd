@@ -1,0 +1,43 @@
+classDiagram
+direction LR
+  class t0["WidgetDeckSummary"] {
+    <<struct>>
+    id
+    name
+    dueCount
+    nextDueAt
+  }
+  class t1["WidgetSnapshot"] {
+    <<struct>>
+    totalDueCount
+    nextDueAt
+    decks
+    updatedAt
+  }
+  class t2["DueEntry"] {
+    <<struct>>
+    date
+    snapshot
+  }
+  class t3["DueProvider"] {
+    <<struct>>
+    placeholder()
+    getSnapshot()
+    getTimeline()
+    load()
+  }
+  class t4["DueWidgetView"] {
+    <<struct>>
+    family
+    entry
+    body
+  }
+  class t5["NeoAnkiDueWidget"] {
+    <<struct>>
+    kind
+    body
+  }
+  class t6["NeoAnkiWidgets"] {
+    <<struct>>
+    body
+  }

@@ -44,7 +44,7 @@ jobs:
 
   swift-tests:
     name: Swift unit + flow + architecture tests
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 25
     env:
       NEOANKI_SYNC_CONTRACT_ARTIFACTS: ${{ github.workspace }}/.build/sync-contract-artifacts
@@ -70,6 +70,8 @@ jobs:
             Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
             Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh || failures=1
           python3 Scripts/test-sync-test-sensitivity.py || failures=1
+          python3 Scripts/test-editor-test-sensitivity.py || failures=1
+          python3 Scripts/test-editor-save-ui.py || failures=1
           python3 Scripts/test-performance-runner.py || failures=1
           python3 Scripts/test-release.py || failures=1
           python3 Scripts/test-deploy-iphone.py || failures=1
@@ -102,6 +104,39 @@ jobs:
               python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
             fi
           fi
+      - name: Qualify editor contracts against layout and completion regressions
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            python3 Scripts/check-editor-test-sensitivity.py --output .build/editor-sensitivity
+          else
+            editor_changes="$(git diff --name-only "$BASE_SHA" HEAD -- \
+              'Sources/NeoAnkiTextEditing/NativeTextEditorPolicy.swift' \
+              'Sources/NeoAnki2/RichTextFieldEditor.swift' \
+              'Sources/NeoAnki2/ClozeFieldEditor.swift' \
+              'Sources/NeoAnkiTextEditing/PlainTextEditor.swift' \
+              'Sources/NeoAnkiApplication/LatestAsyncWork.swift' \
+              'Sources/NeoAnkiFeatures/LibraryFeatureModel.swift' \
+              'Tests/NeoAnki2Tests/NativeItemEditorHydrationTests.swift' \
+              'Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift' \
+              'Scripts/check-editor-test-sensitivity.py' \
+              'Scripts/check-sync-test-sensitivity.py' \
+              'Scripts/test-editor-test-sensitivity.py' \
+              'Scripts/run-editor-save-ui.py' 'Scripts/test-editor-save-ui.py')"
+            if [[ -n "$editor_changes" ]]; then
+              python3 Scripts/check-editor-test-sensitivity.py --output .build/editor-sensitivity
+            fi
+          fi
+      - name: Preserve editor qualification evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: editor-contract-failures
+          path: .build/editor-sensitivity/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Preserve sync scenarios and qualification evidence on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -115,7 +150,7 @@ jobs:
 
   shared-platforms:
     name: Shared targets (macOS + iOS Simulator)
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -144,7 +179,7 @@ jobs:
 
   ios-build:
     name: iPhone/iPad app + widget + archive
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

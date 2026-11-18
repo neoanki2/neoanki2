@@ -1,0 +1,1363 @@
+classDiagram
+direction LR
+  class t0["AppIconBadge"] {
+    <<struct>>
+    count
+    label
+    init()
+  }
+  class t1["AppIconBadgePublishing"] {
+    <<protocol>>
+    publish()
+  }
+  class t2["AppSection"] {
+    <<enum>>
+    id
+  }
+  class t3["AppRoute"] {
+    <<enum>>
+  }
+  class t4["AppPresentation"] {
+    <<enum>>
+    id
+  }
+  class t5["AppDeepLink"] {
+    <<enum>>
+    init()
+    route
+  }
+  class t6["AppSession"] {
+    <<class>>
+    route
+    presentation
+    startupState
+    dueCount
+    syncStatus
+    syncIssues
+    init()
+    show()
+    dismissPresentation()
+    updateStartupState()
+    updateDueCount()
+    updateSync()
+  }
+  class t7["StartupState"] {
+    <<enum>>
+  }
+  class t8["PreparedAttachmentImage"] {
+    <<struct>>
+    data
+    fileExtension
+  }
+  class t9["AttachmentImagePreparer"] {
+    <<enum>>
+    maximumPixelSize
+    prepare()
+    prepare()
+    sourceOptions
+    run()
+    hasTransparency()
+    prepare()
+  }
+  class t10["ContextTarget"] {
+    <<struct>>
+    expression
+    language
+    meaning
+    forms
+    packID
+    entryID
+    senseID
+    init()
+  }
+  class t11["ContextSpan"] {
+    <<struct>>
+    start
+    length
+    init()
+  }
+  class t12["ContextProvenance"] {
+    <<struct>>
+    origin
+    sourceName
+    sourceID
+    recordID
+    attribution
+    license
+    sourceURL
+    createdAt
+    systemVersion
+    promptVersion
+    originalText
+    inheritedSources
+    init()
+  }
+  class t13["ContextProvenance.Origin"] {
+    <<enum>>
+  }
+  class t14["ContextExample"] {
+    <<struct>>
+    id
+    sentence
+    spans
+    usageNote
+    meaning
+    language
+    provenance
+    isSelected
+    needsMeaningCheck
+    isEdited
+    mediaURL
+    mediaKind
+    clipStart
+    clipEnd
+    init()
+  }
+  class t15["ContextCapability"] {
+    <<enum>>
+    reason
+  }
+  class t16["LocalContextRetrieving"] {
+    <<protocol>>
+    examples()
+  }
+  class t17["ContextGenerating"] {
+    <<protocol>>
+    availability()
+    examples()
+  }
+  class t18["ContextSpeechAsset"] {
+    <<struct>>
+    data
+    voiceID
+    init()
+  }
+  class t19["ContextSpeechSynthesizing"] {
+    <<protocol>>
+    availability()
+    audio()
+  }
+  class t20["ContextAuthoringError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t21["EditorDismissalDecision"] {
+    <<enum>>
+  }
+  class t22["EditorDecisionState"] {
+    <<enum>>
+    dismissalDecision()
+  }
+  class t23["ItemEditorSnapshot"] {
+    <<struct>>
+    fieldSpans
+    fieldText
+    fieldMedia
+    fieldMediaAltText
+    fieldOcclusions
+    fieldClozeBlanks
+    init()
+  }
+  class t24["ItemEditorState"] {
+    <<enum>>
+    empty()
+    hydrated()
+    canSave()
+  }
+  class t25["ItemTypeFieldDraft"] {
+    <<struct>>
+    id
+    name
+    type
+    isRequired
+    init()
+    init()
+    fieldDefinition
+  }
+  class t26["ItemTypeStudioFieldMoveDirection"] {
+    <<enum>>
+  }
+  class t27["CardSetupComponentSourceDraft"] {
+    <<enum>>
+    init()
+    fieldID
+    slotSource
+  }
+  class t28["CardSetupComponentDraft"] {
+    <<struct>>
+    id
+    source
+    region
+    purpose
+    reveal
+    mediaBehavior
+    preservesPersistedLiteral
+    init()
+    init()
+    templateComponent()
+    setSource()
+    setFixedText()
+    resolvedSlotSource
+  }
+  class t29["CardSetupAvailabilityDraft"] {
+    <<enum>>
+    init()
+    condition
+    resolve()
+    referencedFieldIDs
+    clearReference()
+  }
+  class t30["CardSetupRecommendation"] {
+    <<struct>>
+    layout
+    learningRoute
+    init()
+    make()
+    responseRoute()
+    modality()
+    operation()
+  }
+  class t31["AudioSubmissionAnswerStash"] {
+    <<struct>>
+    generationID
+    answers
+    interaction
+    learningRoute
+    __()
+  }
+  class t32["CardSetupDraft"] {
+    <<struct>>
+    id
+    name
+    layout
+    interaction
+    learningRoute
+    availability
+    components
+    recommendation
+    isLayoutManuallySelected
+    audioSubmissionAnswerStash
+    init()
+    init()
+    chooseLayout()
+    refreshRecommendation()
+    useRecommendation()
+    discardTransientEditingHistory()
+    audioSubmissionAnswerStashGenerationID
+    discardAudioSubmissionAnswerStash()
+    referencedFieldIDsIncludingStashedAnswers
+    clearReferenceIncludingStashedAnswers()
+    stashUnsupportedMediaBehavior()
+    restoreMediaBehavior()
+    requiresAudioAnswerRemovalConfirmation
+    setInteraction()
+    template()
+  }
+  class t33["CardSetupStarter"] {
+    <<enum>>
+    isApplicable()
+    makeCardSetup()
+  }
+  class t34["ItemTypeStudioValidationTarget"] {
+    <<enum>>
+  }
+  class t35["ItemTypeStudioValidationIssue"] {
+    <<struct>>
+    target
+    message
+    id
+    init()
+  }
+  class t36["ItemTypeStudioFieldTypeChange"] {
+    <<struct>>
+    fieldID
+    oldType
+    newType
+    init()
+  }
+  class t37["ItemTypeStudioChangeSet"] {
+    <<struct>>
+    removedFieldIDs
+    fieldTypeChanges
+    affectedCardSetupIDs
+    clearedComponentIDs
+    clearedAvailabilityCardSetupIDs
+    removedCardSetupIDs
+    init()
+  }
+  class t38["ItemTypeStudioDraftError"] {
+    <<enum>>
+  }
+  class t39["RemovedCardSetup"] {
+    <<struct>>
+    offset
+    setup
+  }
+  class t40["StashedMediaBehavior"] {
+    <<struct>>
+    generationID
+    fieldID
+    behavior
+  }
+  class t41["CardSetupComponentKey"] {
+    <<struct>>
+    cardSetupID
+    componentID
+  }
+  class t42["PersistedCardSetupComponentDraftState"] {
+    <<struct>>
+    id
+    source
+    region
+    purpose
+    reveal
+    mediaBehavior
+    init()
+  }
+  class t43["PersistedCardSetupDraftState"] {
+    <<struct>>
+    id
+    name
+    layout
+    interaction
+    learningRoute
+    availability
+    components
+    init()
+  }
+  class t44["ItemTypeStudioDraft"] {
+    <<struct>>
+    id
+    originalSnapshot
+    name
+    fields
+    cardSetups
+    initialName
+    initialFields
+    initialCardSetups
+    removedCardSetupUndoStack
+    mediaBehaviorStash
+    init()
+    init()
+    new()
+    newImageOcclusion()
+    isDirty
+    validationIssues
+    isValid
+    candidateItemType()
+    removeCardSetup()
+    removeCardSetupChangeSet()
+    undoLastCardSetupRemoval()
+    pendingRemovedCardSetupIDs
+    removeField()
+    moveField()
+    changeFieldType()
+    markSaved()
+    rebaseOriginalSnapshot()
+    rebaseOriginalSnapshot()
+    rebaseOriginalSnapshot()
+    validationIssues()
+    validate()
+  }
+  class t45["LibraryLearningTime"] {
+    <<protocol>>
+    recordLearningTimeAliases()
+    learningTimeItemAliases()
+    learningTimeLibraryID()
+    recordLearningTime()
+    learningTimeSummary()
+    learningTimeSegments()
+    learningTimeNotifications()
+  }
+  class t46["LearningTimeClock"] {
+    <<struct>>
+    instant
+    date
+    init()
+    continuous
+  }
+  class t47["LearningTimeSaveStatus"] {
+    <<class>>
+    shared
+    pendingSessions
+    failures
+    hasPendingSaves
+    errorMessage
+    init()
+    pending()
+    failed()
+    saved()
+  }
+  class t48["LearningTimeTracker"] {
+    <<class>>
+    inactivitySeconds
+    checkpointSeconds
+    awaitingSave
+    owner
+    installationID
+    recordedMilliseconds
+    sessionMilliseconds
+    isManuallyPaused
+    isIdle
+    persistenceError
+    isPaused
+    library
+    clock
+    deviceID
+    sessionID
+    libraryID
+    itemID
+    cardID
+    visible
+    active
+    busy
+    editing
+    mediaSources
+    mediaActive
+    lastInstant
+    lastInteraction
+    lastCheckpoint
+    segmentStart
+    accumulatedSeconds
+    pending
+    unidentified
+    saveWaiters
+    isSaving
+    timer
+    init()
+    setCard()
+    setVisible()
+    setActive()
+    setBusy()
+    setEditing()
+    setMediaActivity()
+    setMediaActive()
+    togglePause()
+    interaction()
+    tick()
+    finish()
+    eligible
+    settle()
+    transition()
+    emit()
+    scheduleFlush()
+    startTimer()
+    retryPendingSaves()
+    flush()
+  }
+  class t49["LibraryBootstrapping"] {
+    <<protocol>>
+    bootstrap()
+    coldHomeSnapshot()
+    mediaStore()
+  }
+  class t50["LibraryBrowsing"] {
+    <<protocol>>
+    libraryID()
+    loadItemTypes()
+    loadItemTypeCatalog()
+    authoringItemTypes()
+    effectiveItemTypePolicy()
+    items()
+    item()
+    cardMaturityDetails()
+    itemBrowseSchedules()
+    scopeSummary()
+    itemRecordsPage()
+  }
+  class t51["LibraryBrowsing"] {
+    <<extension>>
+    cardMaturityDetails()
+  }
+  class t52["LibraryItemMutating"] {
+    <<protocol>>
+    createItem()
+    updateItem()
+    deleteItem()
+    deleteAllUnassignedItems()
+    moveItem()
+    acknowledgeRepeatedLapses()
+    performBulkItemOperations()
+    reserveMedia()
+  }
+  class t53["LibraryCoordinatedItemEditing"] {
+    <<protocol>>
+    deleteUnchangedUnreviewedItems()
+    reconcileItemTypeAndItems()
+    reconcileOrderedDeckItems()
+  }
+  class t54["LibraryDeckManaging"] {
+    <<protocol>>
+    deck()
+    deckSummaries()
+    createDeck()
+    updateDeck()
+    moveDeck()
+    deleteDeck()
+    resetDeckProgress()
+    deckDeletionImpact()
+    commitDeckDeletion()
+    deckResetImpact()
+  }
+  class t55["LibraryItemTypeManaging"] {
+    <<protocol>>
+    createItemType()
+    attachItemType()
+    setDeckItemTypes()
+    setItemTypeAvailability()
+    createItemType()
+    updateItemType()
+    duplicateItemType()
+    repairItemTypeDefinition()
+    countItems()
+    deleteItemType()
+  }
+  class t56["LibraryItemTypeEditingSafeguarding"] {
+    <<protocol>>
+    itemTypeEditingImpact()
+    unlockItemType()
+    itemTypeSchemaChangeImpact()
+  }
+  class t57["LibraryItemTypeStudioSaving"] {
+    <<protocol>>
+    prepareItemTypeUpdateAuthorization()
+    updateItemType()
+  }
+  class t58["LibraryStudying"] {
+    <<protocol>>
+    dueCount()
+    dueCards()
+    isNewStudyCardEligible()
+    submitReview()
+    revertReview()
+    reviewSchedulePreviews()
+  }
+  class t59["ReviewSchedulePreview"] {
+    <<struct>>
+    rating
+    reviewedAt
+    memoryBefore
+    memoryAfter
+    predictedRetrievability
+    rawIntervalDays
+    operationalIntervalSeconds
+    presetID
+    cohortID
+    parameterSetID
+    modelVersion
+    timingPolicyVersion
+    intervalPolicyVersion
+    finalDueAt
+    constraintReason
+    init()
+    init()
+    memory
+    intervalSeconds
+  }
+  class t60["LibraryStudyResponses"] {
+    <<protocol>>
+    completeAudioSubmission()
+    studyResponses()
+    studyResponse()
+    studyResponseMediaBytes()
+    deleteStudyResponse()
+    ordinaryMediaReferenceCount()
+    isStudyResponseMediaHash()
+    studyResponseCount()
+    studyResponseCount()
+    studyResponseCount()
+  }
+  class t61["LibraryScheduling"] {
+    <<protocol>>
+    studyDayRolloverMinutes()
+    setStudyDayRolloverMinutes()
+    requestAutomaticSchedulingMaintenance()
+    schedulingHealthSnapshot()
+    fsrsParameterSetHistory()
+    fsrsOptimizationRunHistory()
+  }
+  class t62["LibrarySchedulingHealth"] {
+    <<struct>>
+    modelIdentifier
+    desiredRetention
+    maximumIntervalDays
+    automaticOptimizationEnabled
+    parameterCount
+    usesPopulationDefaults
+    activeParameterSetID
+    activeParameterSource
+    optimizerParityVerified
+    lastOptimizationDecision
+    lastOptimizationReason
+    lastOptimizationCompletedAt
+    migrationStatus
+    legacyParametersQuarantined
+    cohortCount
+    personalizedCohortCount
+    inheritedCohortCount
+    pendingMaintenance
+    lastMaintenanceAt
+    optimizerStatus
+    init()
+  }
+  class t63["LibraryFSRSParameterSet"] {
+    <<struct>>
+    id
+    isActive
+    weights
+    modelVersion
+    upstreamCommit
+    sourceChecksum
+    fixtureChecksum
+    scope
+    cohortID
+    source
+    inputFingerprint
+    trainingCutoff
+    metrics
+    previousParameterSetID
+    createdAt
+    init()
+  }
+  class t64["LibraryFSRSOptimizationRun"] {
+    <<struct>>
+    id
+    presetID
+    cohortID
+    startedAt
+    completedAt
+    trainingCutoff
+    inputFingerprint
+    eligibleTargetCount
+    distinctCardCount
+    failureCount
+    studyDayCount
+    excludedCounts
+    foldCount
+    metrics
+    decision
+    reason
+    candidateParameterSetID
+    init()
+  }
+  class t65["LibraryImporting"] {
+    <<protocol>>
+    importJSONItems()
+    importCSVItems()
+  }
+  class t66["LibraryTransferring"] {
+    <<protocol>>
+    importPortableDeck()
+    importAuthoredDeck()
+    importAuthoredItems()
+    exportPortableDeck()
+  }
+  class t67["LibraryChangePersisting"] {
+    <<protocol>>
+    changeNotifications()
+    currentChangeCursor()
+    changes()
+    createBackup()
+    verifyBackup()
+  }
+  class t68["LibraryChangePersisting"] {
+    <<extension>>
+    changeNotifications()
+    verifyBackup()
+  }
+  class t69["LibraryRepository"] {
+    <<protocol>>
+  }
+  class t70["LibraryCoordinatedItemEditing"] {
+    <<extension>>
+    deleteUnchangedUnreviewedItems()
+    reconcileItemTypeAndItems()
+    reconcileOrderedDeckItems()
+  }
+  class t71["LibraryScenarioSeeding"] {
+    <<protocol>>
+    corruptItemTypeDefinitionForTesting()
+  }
+  class t72["LibraryBrowsing"] {
+    <<extension>>
+    listItems()
+    fetchItem()
+    items()
+    scopeSummary()
+  }
+  class t73["LibraryItemMutating"] {
+    <<extension>>
+    createItem()
+    updateItem()
+    deleteItem()
+    deleteAllUnassignedItems()
+    acknowledgeRepeatedLapses()
+  }
+  class t74["LibraryDeckManaging"] {
+    <<extension>>
+    deckSummaries()
+    resetDeckProgress()
+  }
+  class t75["LibraryItemTypeManaging"] {
+    <<extension>>
+    updateItemType()
+    repairItemTypeDefinition()
+  }
+  class t76["LibraryStudying"] {
+    <<extension>>
+    isNewStudyCardEligible()
+    dueCards()
+    reviewSchedulePreviews()
+  }
+  class t77["LibraryStudyResponses"] {
+    <<extension>>
+    completeAudioSubmission()
+    studyResponses()
+    deleteStudyResponse()
+  }
+  class t78["LibraryScheduling"] {
+    <<extension>>
+    requestAutomaticSchedulingMaintenance()
+    schedulingHealthSnapshot()
+    fsrsParameterSetHistory()
+    fsrsOptimizationRunHistory()
+  }
+  class t79["SQLiteLibraryRepository"] {
+    <<actor>>
+    store
+    init()
+    init()
+    bootstrap()
+    coldHomeSnapshot()
+    mediaStore()
+    libraryID()
+    loadItemTypes()
+    loadItemTypeCatalog()
+    effectiveItemTypePolicy()
+    items()
+    item()
+    cardMaturityDetails()
+    itemBrowseSchedules()
+    scopeSummary()
+    createItem()
+    updateItem()
+    reconcileItemTypeAndItems()
+    reconcileOrderedDeckItems()
+    deleteUnchangedUnreviewedItems()
+    deleteItem()
+    deleteAllUnassignedItems()
+    moveItem()
+    acknowledgeRepeatedLapses()
+    performBulkItemOperations()
+    reserveMedia()
+    deck()
+    deckSummaries()
+    createDeck()
+    updateDeck()
+    moveDeck()
+    deleteDeck()
+    resetDeckProgress()
+    authoringItemTypes()
+    createItemType()
+    attachItemType()
+    setDeckItemTypes()
+    setItemTypeAvailability()
+    createItemType()
+    updateItemType()
+    updateItemType()
+    duplicateItemType()
+    itemTypeEditingImpact()
+    unlockItemType()
+    itemTypeSchemaChangeImpact()
+    prepareItemTypeUpdateAuthorization()
+    repairItemTypeDefinition()
+    countItems()
+    deleteItemType()
+    dueCount()
+    dueCards()
+    isNewStudyCardEligible()
+    submitReview()
+    reviewSchedulePreviews()
+    completeAudioSubmission()
+    studyResponses()
+    studyResponse()
+    studyResponseMediaBytes()
+    deleteStudyResponse()
+    ordinaryMediaReferenceCount()
+    isStudyResponseMediaHash()
+    studyResponseCount()
+    studyResponseCount()
+    studyResponseCount()
+    revertReview()
+    studyDayRolloverMinutes()
+    setStudyDayRolloverMinutes()
+    requestAutomaticSchedulingMaintenance()
+    schedulingHealthSnapshot()
+    fsrsParameterSetHistory()
+    fsrsOptimizationRunHistory()
+    importJSONItems()
+    importCSVItems()
+    importPortableDeck()
+    importAuthoredDeck()
+    importAuthoredItems()
+    exportPortableDeck()
+    currentChangeCursor()
+    changeNotifications()
+    recordLibraryAlias()
+    libraryAliases()
+    changes()
+    resourceRevisionSnapshot()
+    recordSyncItemTypeAlias()
+    syncItemTypeAliases()
+    createBackup()
+    applySynchronizedCard()
+    applySynchronizedReview()
+    synchronizedReviewRecord()
+    synchronizedItemRecord()
+    reviewRevertRecord()
+    itemTypeMembershipRecord()
+    schedulingSettingsRecord()
+    portableItemTypeMappingRecord()
+    applySynchronizedBatch()
+    verifyBackup()
+  }
+  class t80["SQLiteLibraryRepository"] {
+    <<extension>>
+    corruptItemTypeDefinitionForTesting()
+  }
+  class t81["LibraryBrowsing"] {
+    <<extension>>
+    authoringItemTypes()
+  }
+  class t82["LibraryItemTypeManaging"] {
+    <<extension>>
+    createItemType()
+    attachItemType()
+    setDeckItemTypes()
+    setItemTypeAvailability()
+  }
+  class t83["SQLiteLibraryRepository"] {
+    <<extension>>
+    recordLearningTimeAliases()
+    learningTimeItemAliases()
+    learningTimeLibraryID()
+    recordLearningTime()
+    learningTimeSegments()
+    learningTimeNotifications()
+    learningTimeSummary()
+  }
+  class t84["LibraryStatistics"] {
+    <<protocol>>
+    statisticsRevision()
+    statisticsSource()
+    statisticsEvents()
+    recordStatisticsEvents()
+  }
+  class t85["LibraryStatistics"] {
+    <<extension>>
+    statisticsRevision()
+  }
+  class t86["SQLiteLibraryRepository"] {
+    <<extension>>
+    statisticsRevision()
+    statisticsSource()
+    statisticsEvents()
+    recordStatisticsEvents()
+  }
+  class t87["LibraryStudyAvailabilityReading"] {
+    <<protocol>>
+    studyAvailability()
+  }
+  class t88["SQLiteLibraryRepository"] {
+    <<extension>>
+    studyAvailability()
+  }
+  class t89["TemporaryLocalAPILibrary"] {
+    <<class>>
+    library
+    directory
+    init()
+  }
+  class t90["LocalAPILibrary"] {
+    <<protocol>>
+    withAPIMutation()
+    apiTransferStateURL()
+    createValidationSnapshot()
+    makeValidationLibrary()
+    listDecks()
+    deckDeletionImpact()
+    commitDeckDeletion()
+    deckResetImpact()
+    oldestChangeCursor()
+    resourceRevision()
+    idempotencyClaim()
+    claimIdempotency()
+    completeIdempotency()
+    createStudySession()
+    studySession()
+    reserveNextStudyCard()
+    skipReservedStudyCard()
+    endStudySession()
+    submitReservedReview()
+    itemRecord()
+    itemRecords()
+    itemRecordsPage()
+    validateItem()
+    executeItemBulk()
+    executeOrderedItemBulk()
+    renameTag()
+    removeTag()
+    normalizedTagForLookup()
+    cards()
+    card()
+    cardMaturityStatus()
+    cardMaturityStatuses()
+    reviewLog()
+    hydratedCard()
+    reviewPreviews()
+    setCardSuspended()
+    resetCardProgress()
+    itemType()
+    listItemTypes()
+    reserveMedia()
+    mediaAsset()
+    mediaBytes()
+  }
+  class t91["LocalAPILibrary"] {
+    <<extension>>
+    cardMaturityStatus()
+    cardMaturityStatuses()
+    claimIdempotency()
+    completeIdempotency()
+    createStudySession()
+    reserveNextStudyCard()
+    skipReservedStudyCard()
+    endStudySession()
+    submitReservedReview()
+    executeItemBulk()
+    executeOrderedItemBulk()
+    renameTag()
+    removeTag()
+    reviewPreviews()
+    resetCardProgress()
+    reserveMedia()
+  }
+  class t92["SQLiteLibraryRepository"] {
+    <<extension>>
+    withAPIMutation()
+    apiTransferStateURL()
+    createValidationSnapshot()
+    makeValidationLibrary()
+    listDecks()
+    deckDeletionImpact()
+    commitDeckDeletion()
+    deckResetImpact()
+    oldestChangeCursor()
+    resourceRevision()
+    idempotencyClaim()
+    claimIdempotency()
+    completeIdempotency()
+    createStudySession()
+    studySession()
+    reserveNextStudyCard()
+    skipReservedStudyCard()
+    endStudySession()
+    submitReservedReview()
+    itemRecord()
+    itemRecords()
+    itemRecordsPage()
+    validateItem()
+    executeItemBulk()
+    executeOrderedItemBulk()
+    renameTag()
+    removeTag()
+    normalizedTagForLookup()
+    cards()
+    card()
+    cardMaturityStatus()
+    cardMaturityStatuses()
+    reviewLog()
+    hydratedCard()
+    reviewPreviews()
+    setCardSuspended()
+    resetCardProgress()
+    itemType()
+    listItemTypes()
+    reserveMedia()
+    mediaAsset()
+    mediaBytes()
+  }
+  class t93["LibraryNativeCommandSupporting"] {
+    <<protocol>>
+    moveItems()
+    importItems()
+    deleteItemsAtomically()
+    nativeCommandReceipt()
+  }
+  class t94["NativeImportFormat"] {
+    <<enum>>
+  }
+  class t95["SQLiteLibraryRepository"] {
+    <<extension>>
+    moveItems()
+    importItems()
+    deleteItemsAtomically()
+    nativeCommandReceipt()
+  }
+  class t96["CommandOutcome"] {
+    <<struct>>
+    value
+    receipt
+    warnings
+    affectedCount
+  }
+  class t97["NativeCommandConfirmationUnavailable"] {
+    <<struct>>
+    commandID
+    errorDescription
+  }
+  class t98["NativeLibraryCommands"] {
+    <<enum>>
+    perform()
+    importDeck()
+    selection()
+    move()
+    delete()
+    importItems()
+  }
+  class t99["LibraryGeneratedDeckCreating"] {
+    <<protocol>>
+    createGeneratedDeck()
+    createGeneratedDeck()
+  }
+  class t100["SQLiteLibraryRepository"] {
+    <<extension>>
+    createGeneratedDeck()
+    createGeneratedDeck()
+  }
+  class t101["NativeLibraryCommands"] {
+    <<extension>>
+    createGeneratedDeck()
+    createGeneratedDeck()
+  }
+  class t102["LibraryNativeReadSupporting"] {
+    <<protocol>>
+    nativeHomeSnapshot()
+    nativeScopeSummary()
+  }
+  class t103["SQLiteLibraryRepository"] {
+    <<extension>>
+    nativeHomeSnapshot()
+    nativeScopeSummary()
+  }
+  class t104["NativeLibraryReadDemand"] {
+    <<enum>>
+  }
+  class t105["NativeLibrarySnapshot"] {
+    <<struct>>
+    scope
+    sort
+    asOf
+    sourceRevision
+    home
+    summary
+    items
+    catalog
+    maturityIssue
+  }
+  class t106["NativeLibraryReadCoordinator"] {
+    <<actor>>
+    library
+    init()
+    invalidations()
+    load()
+  }
+  class t107["Clock"] {
+    <<protocol>>
+    now
+  }
+  class t108["SystemClock"] {
+    <<struct>>
+    init()
+    now
+  }
+  class t109["FixedClock"] {
+    <<struct>>
+    now
+    init()
+  }
+  class t110["PreferencesService"] {
+    <<protocol>>
+    bool()
+    set()
+  }
+  class t111["MobileSettingsStoring"] {
+    <<protocol>>
+    loadSyncEnabled()
+    saveSyncEnabled()
+    loadReminderSettings()
+    saveReminderSettings()
+  }
+  class t112["VolatileMobileSettingsStore"] {
+    <<actor>>
+    syncEnabled
+    reminderSettings
+    init()
+    loadSyncEnabled()
+    saveSyncEnabled()
+    loadReminderSettings()
+    saveReminderSettings()
+  }
+  class t113["DocumentAccessService"] {
+    <<protocol>>
+    openDocument()
+    saveDocument()
+    withSecurityScopedAccess()
+  }
+  class t114["AudioService"] {
+    <<protocol>>
+    play()
+    beginRecording()
+    finishRecording()
+    cancelRecording()
+  }
+  class t115["PickedMedia"] {
+    <<struct>>
+    url
+    contentType
+    suggestedFilename
+    init()
+  }
+  class t116["MediaCaptureKind"] {
+    <<enum>>
+  }
+  class t117["MediaCaptureService"] {
+    <<protocol>>
+    pickMedia()
+    captureMedia()
+    discardTemporaryMedia()
+  }
+  class t118["NotificationSchedulingService"] {
+    <<protocol>>
+    authorizationStatus()
+    requestAuthorization()
+    replaceDailyReminder()
+  }
+  class t119["NotificationAuthorizationStatus"] {
+    <<enum>>
+  }
+  class t120["WidgetSnapshotPublishing"] {
+    <<protocol>>
+    publish()
+  }
+  class t121["BackgroundRefreshScheduling"] {
+    <<protocol>>
+    register()
+    scheduleNextRefresh()
+  }
+  class t122["DocumentSharingService"] {
+    <<protocol>>
+    share()
+  }
+  class t123["ReminderScope"] {
+    <<enum>>
+    deckScope
+  }
+  class t124["ReminderSettings"] {
+    <<struct>>
+    isEnabled
+    hour
+    minute
+    scope
+    init()
+  }
+  class t125["DailyReminderRequest"] {
+    <<struct>>
+    hour
+    minute
+    scope
+    dueCount
+    init()
+  }
+  class t126["DueWidgetDeckSummary"] {
+    <<struct>>
+    id
+    name
+    dueCount
+    nextDueAt
+    init()
+  }
+  class t127["DueWidgetSnapshot"] {
+    <<struct>>
+    totalDueCount
+    nextDueAt
+    decks
+    updatedAt
+    init()
+  }
+  class t128["RuntimeConfiguration"] {
+    <<struct>>
+    isAutomatedTesting
+    enablesCloudSync
+    initialRoute
+    init()
+  }
+  class t129["UserFacingError"] {
+    <<struct>>
+    title
+    message
+    recoverySuggestion
+    init()
+  }
+  class t130["UserFacingErrorMapping"] {
+    <<protocol>>
+    map()
+  }
+  class t131["DefaultUserFacingErrorMapper"] {
+    <<struct>>
+    init()
+    map()
+  }
+  class t132["ReviewTimingTracker"] {
+    <<struct>>
+    accumulatedMilliseconds
+    startedAt
+    init()
+    reset()
+    pause()
+    resume()
+    elapsedMilliseconds()
+    milliseconds()
+  }
+  class t133["SyncStatus"] {
+    <<enum>>
+  }
+  class t134["SyncIssueKind"] {
+    <<enum>>
+  }
+  class t135["SyncIssue"] {
+    <<struct>>
+    id
+    kind
+    resourceID
+    summary
+    createdAt
+    conflictCopy
+    init()
+  }
+  class t136["SyncConflictCopy"] {
+    <<struct>>
+    id
+    resourceKind
+    originalResourceID
+    sourceDeviceID
+    payload
+    preservedAt
+    wasTombstone
+    acceptedWasTombstone
+    isRestorable
+    init()
+    init()
+    encode()
+  }
+  class t137["SyncConflictCopy.CodingKeys"] {
+    <<enum>>
+  }
+  class t138["SyncRecordEnvelope"] {
+    <<struct>>
+    id
+    resourceKind
+    revision
+    deviceID
+    order
+    isTombstone
+    payload
+    asset
+    stagedFileURL
+    init()
+  }
+  class t139["SyncAssetDescriptor"] {
+    <<struct>>
+    hash
+    byteSize
+    signature
+    fileExtension
+    contentType
+    init()
+  }
+  class t140["CloudSyncTransport"] {
+    <<protocol>>
+    start()
+    stop()
+    enqueue()
+    fetchPendingChanges()
+  }
+  class t141["LibrarySyncAdapter"] {
+    <<protocol>>
+    encode()
+    applyRemote()
+    initialMerge()
+    preservedConflictCopies()
+    restoreConflictCopy()
+  }
+  class t142["LibrarySyncAdapter"] {
+    <<extension>>
+    preservedConflictCopies()
+    restoreConflictCopy()
+  }
+  class t143["SyncService"] {
+    <<protocol>>
+    libraryChanges()
+    start()
+    synchronize()
+    synchronizeAndWait()
+    stop()
+    status()
+    issues()
+    retryIssue()
+    dismissIssue()
+    restoreConflictCopy()
+  }
+  class t144["SyncService"] {
+    <<extension>>
+    synchronizeAndWait()
+    libraryChanges()
+    retryIssue()
+    dismissIssue()
+    restoreConflictCopy()
+  }
+  class t145["SyncLibraryChanges"] {
+    <<actor>>
+    observers
+    init()
+    stream()
+    publish()
+    remove()
+  }
+  class t146["DisabledSyncService"] {
+    <<actor>>
+    init()
+    start()
+    synchronize()
+    stop()
+    status()
+    issues()
+  }
+  t49 <|-- t69
+  t65 <|-- t69
+  t66 <|-- t69
+  t69 <|-- t71
+  t69 <|-- t79
+  t56 <|-- t79
+  t57 <|-- t79
+  t71 <|-- t80
+  t45 <|-- t83
+  t87 <|-- t88
+  t69 <|-- t90
+  t93 <|-- t95
+  t99 <|-- t100
+  t102 <|-- t103
+  t107 <|-- t108
+  t107 <|-- t109
+  t111 <|-- t112
+  t130 <|-- t131

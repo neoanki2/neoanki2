@@ -185,7 +185,18 @@ public final class ItemTypesFeatureModel {
     public var creationDeckID: UUID?
     public var createsSharedType = true
     public private(set) var needsOrganization: [ItemType] = []
+    public var refreshWarning: String? {
+        let warnings = [catalogRefreshWarning, ownerRefreshWarning].compactMap { $0 }
+        return warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+    }
+    private var catalogRefreshWarning: String?
+    private var ownerRefreshWarning: String?
+    private typealias OwnerRefresh = @MainActor @Sendable () async throws -> Void
+    @ObservationIgnored private var ownerRefreshWorker: LatestAsyncWork<OwnerRefresh>?
+    @ObservationIgnored private var catalogRefreshWorker: LatestAsyncWork<Void>?
+    private var catalogReadGeneration: UInt64 = 0
     private var readOnlyIDs: Set<UUID> = []
+    private var committedTypes: [UUID: ItemType] = [:]
 
     private let library: any LibraryBrowsing
         & LibraryItemTypeManaging
@@ -206,7 +217,7 @@ public final class ItemTypesFeatureModel {
 
     public var selectedItemType: ItemType? {
         guard let selectedItemTypeID else { return nil }
-        return itemTypes.first { $0.id == selectedItemTypeID }
+        return committedTypes[selectedItemTypeID] ?? itemTypes.first { $0.id == selectedItemTypeID }
             ?? needsOrganization.first { $0.id == selectedItemTypeID }
             ?? includedItemTypeGroups.lazy
                 .flatMap(\.itemTypes)
@@ -226,6 +237,7 @@ public final class ItemTypesFeatureModel {
         loadState = .loading
         do {
             try await reloadCatalog(selecting: selectedItemTypeID)
+            catalogRefreshWarning = nil
             loadState = .ready
         } catch {
             loadState = .failed(errorMapper.map(error))
@@ -323,7 +335,7 @@ public final class ItemTypesFeatureModel {
 
     /// Persists one complete candidate with exactly one create/update call.
     /// Core performs generated-card reconciliation transactionally inside the
-    /// update; this feature then reloads the catalog and keeps the saved type selected.
+    /// update; this feature installs that durable result before optional catalog refresh.
     @discardableResult
     public func commitSave(
         _ preparation: ItemTypeStudioSavePreparation,
@@ -336,6 +348,7 @@ public final class ItemTypesFeatureModel {
             throw ItemTypesFeatureError.staleSavePreparation
         }
         let committedDraft = draft
+        let selectionAtCommit = selectedItemTypeID
 
         let saved: ItemType
         if preparation.createsItemType {
@@ -366,7 +379,7 @@ public final class ItemTypesFeatureModel {
             }
         }
 
-        try await reloadCatalog(selecting: saved.id)
+        installCommittedType(saved, selecting: selectedItemTypeID == selectionAtCommit)
         if studioDraft == committedDraft {
             studioDraft = ItemTypeStudioDraft(itemType: saved)
         } else if var newerDraft = studioDraft,
@@ -379,6 +392,7 @@ public final class ItemTypesFeatureModel {
             studioDraft = newerDraft
         }
         loadState = .ready
+        scheduleCatalogRefresh()
         return saved
     }
 
@@ -412,7 +426,9 @@ public final class ItemTypesFeatureModel {
             throw ItemTypesFeatureError.includedItemTypeRequired
         }
         let unlocked = try await library.unlockItemType(id: id)
-        try await reloadCatalog(selecting: unlocked.id)
+        readOnlyIDs.remove(unlocked.id)
+        installCommittedType(unlocked)
+        scheduleCatalogRefresh()
         loadState = .ready
         return unlocked
     }
@@ -426,7 +442,8 @@ public final class ItemTypesFeatureModel {
         guard let original = itemType(id: selectedItemTypeID) else { throw ItemTypesFeatureError.itemTypeNotFound(selectedItemTypeID) }
         let targetDeckID = destinationDeckID ?? creationDeckID
         let duplicate = try await library.createItemType(original.duplicated(name: name), deckID: targetDeckID, availableEverywhere: targetDeckID == nil)
-        try await reloadCatalog(selecting: duplicate.id)
+        installCommittedType(duplicate)
+        scheduleCatalogRefresh()
         loadState = .ready
         return duplicate
     }
@@ -442,7 +459,8 @@ public final class ItemTypesFeatureModel {
             )
         }
         let repaired = try await library.repairItemTypeDefinition(id: id, asOf: now)
-        try await reloadCatalog(selecting: repaired.id)
+        installCommittedType(repaired)
+        scheduleCatalogRefresh()
         loadState = .ready
         return repaired
     }
@@ -466,32 +484,37 @@ public final class ItemTypesFeatureModel {
             throw ItemTypesFeatureError.deletionFailed
         }
         studioDraft = nil
-        try await reloadCatalog(selecting: nil)
+        committedTypes.removeValue(forKey: selectedItemTypeID)
+        itemTypes.removeAll { $0.id == selectedItemTypeID }
+        needsOrganization.removeAll { $0.id == selectedItemTypeID }
+        self.selectedItemTypeID = itemTypes.first?.id ?? needsOrganization.first?.id
+        scheduleCatalogRefresh()
         loadState = .ready
     }
 
     public func attachSelectedType(to deckID: UUID) async throws {
         guard let id = selectedItemTypeID else { throw ItemTypesFeatureError.noSelection }
         try await library.attachItemType(id: id, to: deckID)
-        try await reloadCatalog(selecting: id)
+        scheduleCatalogRefresh()
     }
     public func makeIndependentCopyForCurrentDeck() async throws {
         guard let type = selectedItemType else { throw ItemTypesFeatureError.noSelection }
         let source = try studioDraft?.candidateItemType() ?? type
         let targetDeckID = destinationDeckID ?? creationDeckID
         let copy = try await library.createItemType(source.duplicated(), deckID: targetDeckID, availableEverywhere: targetDeckID == nil)
-        try await reloadCatalog(selecting: copy.id)
+        installCommittedType(copy)
         studioDraft = ItemTypeStudioDraft(itemType: copy)
+        scheduleCatalogRefresh()
     }
 
     public func makeSelectedTypeAvailableEverywhere() async throws {
         guard let id = selectedItemTypeID else { throw ItemTypesFeatureError.noSelection }
         try await library.setItemTypeAvailability(id: id, availableEverywhere: true)
-        try await reloadCatalog(selecting: id)
+        scheduleCatalogRefresh()
     }
 
     private func itemType(id: UUID) -> ItemType? {
-        itemTypes.first { $0.id == id }
+        committedTypes[id] ?? itemTypes.first { $0.id == id }
             ?? needsOrganization.first { $0.id == id }
             ?? includedItemTypeGroups.lazy.flatMap(\.itemTypes).first { $0.id == id }
     }
@@ -500,17 +523,80 @@ public final class ItemTypesFeatureModel {
         readOnlyIDs.contains(id)
     }
 
+    private func installCommittedType(_ type: ItemType, selecting shouldSelect: Bool = true) {
+        // Invalidate older catalog reads before publishing the durable result.
+        catalogReadGeneration &+= 1
+        committedTypes[type.id] = type
+        let knownInCatalog = itemTypes.contains { $0.id == type.id }
+            || needsOrganization.contains { $0.id == type.id }
+            || includedItemTypeGroups.contains { $0.itemTypes.contains { $0.id == type.id } }
+        if let index = itemTypes.firstIndex(where: { $0.id == type.id }) { itemTypes[index] = type }
+        else if !knownInCatalog, creationDeckID == nil { itemTypes.append(type) }
+        if let index = needsOrganization.firstIndex(where: { $0.id == type.id }) { needsOrganization[index] = type }
+        includedItemTypeGroups = includedItemTypeGroups.map { group in
+            .init(rootDeck: group.rootDeck, deckPath: group.deckPath,
+                  itemTypes: group.itemTypes.map { $0.id == type.id ? type : $0 })
+        }
+        if shouldSelect { selectedItemTypeID = type.id }
+        catalogRefreshWarning = nil
+    }
+
+    private func scheduleCatalogRefresh() {
+        if catalogRefreshWorker == nil {
+            catalogRefreshWorker = LatestAsyncWork { [weak self] (_: Void) in
+                guard let self else { return }
+                let generation = catalogReadGeneration &+ 1
+                do {
+                    try await reloadCatalog(selecting: selectedItemTypeID)
+                    if generation == catalogReadGeneration { catalogRefreshWarning = nil }
+                } catch {
+                    if generation == catalogReadGeneration {
+                        catalogRefreshWarning = "Saved. Catalog refresh could not finish: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+        catalogRefreshWorker?.request(())
+    }
+
+    /// Native owners enqueue their optional projections here, so refresh
+    /// failure cannot turn a committed Studio save into a failed save.
+    public func requestOwnerRefresh(_ callback: @escaping @MainActor @Sendable () async throws -> Void) {
+        if ownerRefreshWorker == nil {
+            ownerRefreshWorker = LatestAsyncWork { [weak self] callback in
+                do { try await callback(); self?.ownerRefreshWarning = nil }
+                catch { self?.ownerRefreshWarning = "Saved. Owner refresh could not finish: \(error.localizedDescription)" }
+            }
+        }
+        ownerRefreshWorker?.request(callback)
+    }
+
+    public func awaitOwnerRefresh() async { await ownerRefreshWorker?.waitUntilSettled() }
+
+    public func awaitCatalogRefresh() async { await catalogRefreshWorker?.waitUntilSettled() }
+
     private func reloadCatalog(selecting preferredID: UUID?) async throws {
+        catalogReadGeneration &+= 1
+        let generation = catalogReadGeneration
+        let selectionAtStart = selectedItemTypeID
         let catalog = try await library.loadItemTypeCatalog()
-        if let deckLibrary = library as? any LibraryDeckManaging { decks = try await deckLibrary.deckSummaries(asOf: .now) }
+        let refreshedDecks: [DeckSummary]?
+        if let deckLibrary = library as? any LibraryDeckManaging { refreshedDecks = try await deckLibrary.deckSummaries(asOf: .now) }
+        else { refreshedDecks = nil }
+        let refreshedTypes: [ItemType]
+        if let destinationDeckID { refreshedTypes = try await library.authoringItemTypes(for: destinationDeckID).itemTypes }
+        else { refreshedTypes = catalog.itemTypes }
+        guard generation == catalogReadGeneration else { return }
+        if let refreshedDecks { decks = refreshedDecks }
         needsOrganization = catalog.needsOrganization
         readOnlyIDs = catalog.readOnlyIDs
-        if let destinationDeckID {
-            itemTypes = try await library.authoringItemTypes(for: destinationDeckID).itemTypes
-        } else { itemTypes = catalog.itemTypes }
+        itemTypes = refreshedTypes
         includedItemTypeGroups = destinationDeckID == nil ? catalog.includedWithDecks : []
         corruptedDefinitions = catalog.corruptions
+        committedTypes.removeAll()
 
+        // A delayed optional refresh cannot select over newer user navigation.
+        guard selectedItemTypeID == selectionAtStart else { return }
         if let preferredID, itemType(id: preferredID) != nil {
             selectedItemTypeID = preferredID
         } else if let current = selectedItemTypeID, itemType(id: current) != nil {

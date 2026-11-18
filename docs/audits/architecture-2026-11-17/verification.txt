@@ -1,0 +1,9 @@
+PASS: JavaScript syntax and offline atlas initialization
+PASS: symbol search, declaration drill-down, module graph and empty dependency view
+PASS: 28926 declaration source/parent/span identities
+PASS: 43 components, all declared targets resolve, no target cycles
+PASS: 1358 type/extension graph nodes and 2960 candidate edges
+No browser or desktop was launched; visual rendering was not inspected.
+PASS: 891 tracked-file SHA-256 hashes match the audited snapshot
+PASS: Python/JSON/GraphML syntax and 26 per-module Mermaid class diagram structures
+PASS: existing unrelated edits retain their original modified-file set and diff sizes

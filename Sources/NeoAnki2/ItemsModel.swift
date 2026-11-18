@@ -116,7 +116,7 @@ final class ItemsModel {
         await searchTask?.value
     }
 
-    let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
+    private let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
         & LibraryStudyResponses & LibraryCoordinatedItemEditing
     let mediaStore: MediaStore?
 
@@ -135,12 +135,28 @@ final class ItemsModel {
                 guard !Task.isCancelled, let self else { return }
                 browseDataInvalidated = true
                 guard hasLoaded else { continue }
-                await refreshAfterSync()
+                invalidateItemTypes()
+                scheduleCommittedRefresh(browse: loadedItemsScope != nil)
             }
         }
     }
 
     deinit { libraryChangesTask?.cancel(); searchTask?.cancel() }
+
+    var generatedDeckEditing: GeneratedDeckEditing { .init(library: library) }
+    func makeTypeChooser(deckID: UUID?) -> ItemTypeChooserFeatureModel {
+        .init(authoring: .init(library: library), deckID: deckID)
+    }
+    func authoringChoices(for deckID: UUID?) async throws -> AuthoringItemTypes {
+        try await ItemTypeAuthoring(library: library).choices(for: deckID)
+    }
+    func attachType(id: UUID, to deckID: UUID) async throws {
+        try await ItemTypeAuthoring(library: library).attach(id: id, to: deckID)
+    }
+    func item(id: UUID) async throws -> (item: Item, itemType: ItemType)? { try await library.item(id: id) }
+    func cardMaturityDetails(itemID: UUID) async throws -> [CardMaturityDetail] {
+        try await library.cardMaturityDetails(itemID: itemID)
+    }
 
     var itemType: ItemType? {
         guard let addItemTypeID else { return nil }
@@ -174,11 +190,11 @@ final class ItemsModel {
     }
 
     private func load(scope: StudyScope, asOf now: Date, browse: Bool) async {
+        updateCachedScope(scope)
         loadGeneration &+= 1
         let generation = loadGeneration
         isLoading = isLoading || !hasLoaded
         errorMessage = itemTypeWarning
-        updateCachedScope(scope)
         do {
             var demand: Set<NativeLibraryReadDemand> = [.summary]
             if browse { demand.insert(.browse) }
@@ -211,6 +227,7 @@ final class ItemsModel {
     }
 
     func applyColdSnapshot(_ snapshot: ColdLibrarySnapshot, scope: StudyScope) {
+        loadGeneration &+= 1
         updateCachedScope(scope)
         applyItemTypes(snapshot.itemTypes)
         // The snapshot arrives in creation order. Honor the browse comparator
@@ -228,6 +245,7 @@ final class ItemsModel {
         _ snapshot: ColdLibraryHomeSnapshot,
         scope: StudyScope
     ) {
+        loadGeneration &+= 1
         updateCachedScope(scope)
         applyItemTypes(snapshot.itemTypes)
         items = []
@@ -370,15 +388,20 @@ final class ItemsModel {
             )
 
             let item = Item(itemTypeID: itemType.id, fields: fields, deckID: resolvedDeckID)
+            let rememberedLibraryID = try? await library.libraryID()
+            let selectedScope = currentScopeFilter()
+            let destinationIsVisible = await scopeContains(deckID: resolvedDeckID, scope: selectedScope)
             let outcome = try await command("create-item") { try await library.createItem(item) }
-            guard let saved = outcome.value else { await load(scope: cachedScope); return true }
-            if let libraryID = try? await library.libraryID() {
+            guard let saved = outcome.value else { scheduleCommittedRefresh(browse: true); return true }
+            if let libraryID = rememberedLibraryID {
                 UserDefaults.standard.set(itemType.id.uuidString, forKey: "authoring.type.\(libraryID).\(resolvedDeckID?.uuidString ?? "unassigned")")
             }
-            items.removeAll { $0.id == saved.id }
-            items.append(saved)
-            items.sort(using: tableSort)
-            await refreshCommittedSummary(scope: currentScopeFilter())
+            if selectedScope == currentScopeFilter(), destinationIsVisible == true {
+                items.removeAll { $0.id == saved.id }
+                items.append(saved)
+                items.sort(using: tableSort)
+            }
+            scheduleCommittedRefresh(browse: selectedScope != currentScopeFilter() || destinationIsVisible == nil)
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -405,31 +428,18 @@ final class ItemsModel {
                 throw ItemEditingError.missingItem
             }
 
-            var fields = try makeFields(
-                for: stored.itemType,
-                fieldSpans: fieldSpans,
-                fieldText: fieldText,
-                fieldMedia: fieldMedia,
-                fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks,
-                fieldOcclusions: fieldOcclusions
-            )
-            preserveTextLanguages(in: &fields, from: stored.item)
-
-            let item = Item(
-                id: stored.item.id,
-                itemTypeID: stored.item.itemTypeID,
-                fields: fields,
-                tags: stored.item.tags,
-                deckID: stored.item.deckID
-            )
+            var draft = ItemEditorDraft(item: stored.item, itemType: stored.itemType)
+            draft.snapshot = ItemEditorSnapshot(fieldSpans: fieldSpans, fieldText: fieldText,
+                fieldMedia: fieldMedia, fieldMediaAltText: fieldMediaAltText,
+                fieldClozeBlanks: fieldClozeBlanks, fieldOcclusions: fieldOcclusions)
+            let item = try draft.item()
             let updated = ContextDerivedContent.invalidatingSpeech(in: item, original: stored.item, type: stored.itemType)
             let outcome = try await command("update-item") { try await library.updateItem(updated) }
-            guard let saved = outcome.value else { await load(scope: cachedScope); return true }
+            guard let saved = outcome.value else { scheduleCommittedRefresh(browse: true); return true }
             if let index = items.firstIndex(where: { $0.id == saved.id }) {
                 items[index] = saved
             }
-            await refreshCommittedSummary(scope: currentScopeFilter())
+            scheduleCommittedRefresh()
             return true
         } catch DatabaseError.requiredFieldEmpty(let field) {
             errorMessage = "\(field) is required."
@@ -452,73 +462,10 @@ final class ItemsModel {
         fieldClozeBlanks: [UUID: [ClozeSpan]],
         fieldOcclusions: [UUID: ImageOcclusionContent]
     ) throws -> [FieldValue] {
-        var fields: [FieldValue] = []
-        for field in itemType.fields {
-            let value = try contentValue(
-                for: field,
-                fieldSpans: fieldSpans,
-                fieldText: fieldText,
-                fieldMedia: fieldMedia,
-                fieldMediaAltText: fieldMediaAltText,
-                fieldClozeBlanks: fieldClozeBlanks,
-                fieldOcclusions: fieldOcclusions
-            )
-            if value.isEmpty, field.isRequired {
-                throw DatabaseError.requiredFieldEmpty(field.name)
-            }
-            if !value.isEmpty {
-                fields.append(FieldValue(fieldID: field.id, value: value))
-            }
-        }
-        return fields
-    }
-
-    private func contentValue(
-        for field: FieldDef,
-        fieldSpans: [UUID: [Span]],
-        fieldText: [UUID: String],
-        fieldMedia: [UUID: MediaRef],
-        fieldMediaAltText: [UUID: String],
-        fieldClozeBlanks: [UUID: [ClozeSpan]],
-        fieldOcclusions: [UUID: ImageOcclusionContent]
-    ) throws -> ContentValue {
-        switch field.type {
-        case .text, .richText:
-            return field.contentValue(from: fieldSpans[field.id, default: []])
-        case .number:
-            return field.contentValue(from: fieldText[field.id, default: ""])
-        case .audio, .image, .gif, .video:
-            if var ref = fieldMedia[field.id] {
-                let alt = fieldMediaAltText[field.id, default: ""]
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                ref.altText = alt.isEmpty ? nil : alt
-                return field.contentValue(from: ref)
-            }
-            return .empty
-        case .imageOcclusion:
-            guard let content = fieldOcclusions[field.id] else { return .empty }
-            try ImageOcclusionValidation.validate(content)
-            return .imageOcclusion(content)
-        case .cloze:
-            let text = fieldText[field.id, default: ""]
-            let blanks = fieldClozeBlanks[field.id, default: []]
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty && blanks.isEmpty {
-                return .empty
-            }
-            try ClozeValidation.validate(text: text, blanks: blanks)
-            return field.contentValue(fromClozeText: text, blanks: blanks)
-        }
-    }
-
-    private func preserveTextLanguages(in fields: inout [FieldValue], from original: Item) {
-        for index in fields.indices {
-            guard case let .text(text, _) = fields[index].value,
-                  case let .text(_, language)? = original.value(for: fields[index].fieldID) else {
-                continue
-            }
-            fields[index].value = .text(text, lang: language)
-        }
+        return try ItemEditorState.fields(from: ItemEditorSnapshot(
+            fieldSpans: fieldSpans, fieldText: fieldText, fieldMedia: fieldMedia,
+            fieldMediaAltText: fieldMediaAltText, fieldClozeBlanks: fieldClozeBlanks,
+            fieldOcclusions: fieldOcclusions), itemType: itemType)
     }
 
     func deleteItem(id: UUID, scope: StudyScope = .allDecks) async -> Bool {
@@ -530,8 +477,8 @@ final class ItemsModel {
         do {
             let outcome = try await command("delete-unassigned") { try await library.deleteAllUnassignedItems() }
             let deleted = outcome.value ?? outcome.affectedCount ?? 0
-            items.removeAll()
-            await refreshCommittedSummary(scope: scope.filter)
+            items.removeAll { $0.deckID == nil }
+            scheduleCommittedRefresh()
             return deleted
         } catch {
             errorMessage = UserFacingError.message(from: error)
@@ -550,10 +497,24 @@ final class ItemsModel {
         errorMessage = nil
         do {
             let selection = try NativeLibraryCommands.selection(ids, rows: items)
+            let selectedScope = currentScopeFilter()
+            let destinationIsVisible = await scopeContains(deckID: deckID, scope: selectedScope)
             let outcome = try await command("move", count: ids.count) {
                 try await NativeLibraryCommands.move(on: library, selection: selection, to: deckID)
             }
-            await load(scope: scope, asOf: now)
+            // Publish the committed selection before any optional read. A journal
+            // reload can supersede another reload while either is suspended.
+            if selectedScope == currentScopeFilter() {
+                items = items.compactMap { row in
+                    guard ids.contains(row.id) else { return row }
+                    guard destinationIsVisible == true else { return nil }
+                    return SavedItemSummary(id: row.id, itemTypeID: row.itemTypeID,
+                        itemTypeName: row.itemTypeName, title: row.title, subtitle: row.subtitle,
+                        cardCount: row.cardCount, deckID: deckID, createdAt: row.createdAt,
+                        schedule: row.schedule)
+                }
+            }
+            scheduleCommittedRefresh(browse: true, asOf: now)
             return outcome.value ?? outcome.affectedCount ?? 0
         } catch { errorMessage = UserFacingError.message(from: error); return 0 }
     }
@@ -586,7 +547,8 @@ final class ItemsModel {
             let outcome = try await command("delete", count: ids.count) {
                 try await NativeLibraryCommands.delete(on: library, ids: ids, asOf: now)
             }
-            await load(scope: scope, asOf: now)
+            items.removeAll { ids.contains($0.id) }
+            scheduleCommittedRefresh(asOf: now)
             return outcome.value ?? outcome.affectedCount ?? 0
         } catch { errorMessage = UserFacingError.message(from: error); return 0 }
     }
@@ -603,21 +565,80 @@ final class ItemsModel {
     private func command<Value: Sendable>(_ name: String, count: Int = 1,
         _ action: () async throws -> Value) async throws -> CommandOutcome<Value> {
         loadGeneration &+= 1
+        defer { loadGeneration &+= 1 }
         let outcome = try await NativeLibraryCommands.perform(on: library,
             context: NativeCommandContext(operation: name, input: Data(), expectedCount: count), operation: action)
-        loadGeneration &+= 1
         lastCommandReceipt = outcome.receipt
         if let warning = outcome.warnings.first { errorMessage = warning }
         return outcome
     }
 
-    private func refreshCommittedSummary(scope: DeckScope) async {
+    private struct CommittedRefresh: Sendable {
+        let scope: DeckScope
+        let generation: UInt64
+        let asOf: Date
+        let browse: Bool
+    }
+
+    @ObservationIgnored private lazy var committedSummaryRefresh = LatestAsyncWork<CommittedRefresh> { [weak self] request in
+        await self?.refreshCommittedSummary(request)
+    }
+
+    func awaitReadModels() async { await committedSummaryRefresh.waitUntilSettled() }
+
+    private func scheduleCommittedRefresh(browse: Bool = false, asOf now: Date = .now) {
+        if browse { browseDataInvalidated = true }
+        let needsRows = browse || (browseDataInvalidated && loadedItemsScope != nil)
+        committedSummaryRefresh.request(CommittedRefresh(scope: currentScopeFilter(),
+            generation: loadGeneration, asOf: now, browse: needsRows))
+    }
+
+    private func refreshCommittedSummary(_ request: CommittedRefresh) async {
+        guard request.generation == loadGeneration, request.scope == currentScopeFilter() else { return }
         do {
-            let snapshot = try await reads.load(scope: scope, demand: [.summary], asOf: .now)
+            var demand: Set<NativeLibraryReadDemand> = [.summary]
+            if request.browse { demand.insert(.browse) }
+            if !itemTypesLoaded { demand.insert(.catalog) }
+            let snapshot = try await reads.load(scope: request.scope, demand: demand, asOf: request.asOf)
+            guard request.generation == loadGeneration, request.scope == currentScopeFilter() else { return }
+            if let catalog = snapshot.catalog {
+                applyItemTypes(ItemTypeLoadResult(itemTypes: catalog.allItemTypes, corruptions: catalog.corruptions))
+            }
+            if let rows = snapshot.items {
+                items = rows.sorted(using: tableSort)
+                loadedItemsScope = request.scope
+                browseDataInvalidated = false
+            }
             if let summary = snapshot.summary { scopeSummary = summary }
             maturityUnavailable = snapshot.maturityIssue != nil
-            errorMessage = snapshot.maturityIssue
-        } catch { errorMessage = "Saved. Refresh could not finish: \(error.localizedDescription)" }
+            errorMessage = snapshot.maturityIssue.map { "Maturity is unavailable. " + $0 } ?? itemTypeWarning
+        } catch {
+            guard request.generation == loadGeneration, request.scope == currentScopeFilter() else { return }
+            errorMessage = "Saved. Refresh could not finish: \(error.localizedDescription)"
+        }
+    }
+
+    /// Resolve descendant membership before committing, so publishing a move
+    /// never waits for a read after the durable write. Older adapters may leave
+    /// ancestry unknown; their optional browse refresh supplies the final rows.
+    private func scopeContains(deckID: UUID?, scope: DeckScope) async -> Bool? {
+        switch scope {
+        case .allDecks: return true
+        case .unassigned: return deckID == nil
+        case let .deck(root, includeDescendants):
+            guard var candidate = deckID else { return false }
+            if candidate == root { return true }
+            guard includeDescendants else { return false }
+            guard let decks = library as? any LibraryDeckManaging else { return nil }
+            var visited: Set<UUID> = []
+            while visited.insert(candidate).inserted {
+                guard let deck = try? await decks.deck(id: candidate) else { return nil }
+                guard let parent = deck.parentID else { return false }
+                if parent == root { return true }
+                candidate = parent
+            }
+            return false
+        }
     }
 
     private var cachedScope: StudyScope = .allDecks
@@ -632,6 +653,7 @@ final class ItemsModel {
 
     private func updateCachedScope(_ scope: StudyScope) {
         if cachedScope.filter != scope.filter {
+            loadGeneration &+= 1
             browseDataInvalidated = true
         }
         cachedScope = scope
@@ -641,13 +663,16 @@ final class ItemsModel {
     /// `isLoading` or the error banner. Cards come due while the app sits idle,
     /// so this is the path that keeps the headline honest between reloads.
     func refreshCounts(asOf now: Date = .now) async {
+        let scope = currentScopeFilter()
+        let generation = loadGeneration
         guard hasLoaded,
               let summary = try? await library.scopeSummary(
-                  scope: currentScopeFilter(),
+                  scope: scope,
                   asOf: now
               )
         else { return }
 
+        guard generation == loadGeneration, scope == currentScopeFilter() else { return }
         if scopeSummary != summary {
             scopeSummary = summary
         }

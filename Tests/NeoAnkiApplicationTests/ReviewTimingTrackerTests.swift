@@ -2,28 +2,33 @@ import NeoAnkiApplication
 import NeoAnkiCore
 import Testing
 
-@Test func reviewTimingUsesMonotonicForegroundTime() async throws {
+@Test func reviewTimingUsesMonotonicForegroundTime() {
+    let origin = ContinuousClock.now
     var tracker = ReviewTimingTracker()
-    tracker.reset()
-    try await Task.sleep(for: .milliseconds(20))
-    tracker.pause()
-    let paused = tracker.elapsedMilliseconds()
-    try await Task.sleep(for: .milliseconds(20))
-    let stillPaused = tracker.elapsedMilliseconds()
+    tracker.reset(at: origin)
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .milliseconds(20))) == 20)
+    tracker.pause(at: origin.advanced(by: .milliseconds(20)))
+    tracker.pause(at: origin.advanced(by: .milliseconds(40)))
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .milliseconds(1_020))) == 20)
 
-    #expect(paused >= 10)
-    #expect(stillPaused - paused < 5)
-
-    tracker.resume()
-    try await Task.sleep(for: .milliseconds(20))
-    tracker.pause()
-    #expect(tracker.elapsedMilliseconds() >= paused + 10)
+    tracker.resume(at: origin.advanced(by: .milliseconds(1_020)))
+    tracker.resume(at: origin.advanced(by: .milliseconds(1_030)))
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .milliseconds(1_040))) == 40)
+    tracker.pause(at: origin.advanced(by: .milliseconds(1_040)))
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .seconds(10))) == 40)
 }
 
-@Test func freshReviewTimingStartsNearZero() {
+@Test func freshReviewTimingAndResetStartAtZero() {
+    let origin = ContinuousClock.now
     var tracker = ReviewTimingTracker()
-    tracker.reset()
-    #expect(tracker.elapsedMilliseconds() < 100)
+    #expect(tracker.elapsedMilliseconds(at: origin) == 0)
+    tracker.reset(at: origin)
+    #expect(tracker.elapsedMilliseconds(at: origin) == 0)
+    tracker.pause(at: origin.advanced(by: .milliseconds(75)))
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .milliseconds(100))) == 75)
+    tracker.reset(at: origin.advanced(by: .milliseconds(100)))
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .milliseconds(100))) == 0)
+    #expect(tracker.elapsedMilliseconds(at: origin.advanced(by: .milliseconds(125))) == 25)
 }
 
 @Test func reviewWorkloadTimingClampsStorageAndFiltersEvaluationSamples() {

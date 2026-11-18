@@ -1,0 +1,182 @@
+classDiagram
+direction LR
+  class t0["ProseDeckBuilderFeature"] {
+    <<enum>>
+    descriptor
+    makeFeature()
+  }
+  class t1["ProseDeckBuilderView"] {
+    <<struct>>
+    focusedField
+    errorFocused
+    input
+    units
+    previewedUnits
+    textSession
+    dismissal
+    isPreviewing
+    pendingCreation
+    generationTask
+    isGenerating
+    errorMessage
+    rootDecks
+    workspaceProvider
+    limits
+    onGenerated
+    onPrepared
+    onCancel
+    init()
+    init()
+    body
+    hasDraft
+    requestCancel()
+    preview()
+    generate()
+  }
+  class t2["ProseDeckBuilderView.Field"] {
+    <<enum>>
+  }
+  class t3["ProseDeckEditorModel"] {
+    <<class>>
+    library
+    deckID
+    itemTypeID
+    records
+    previewedUnits
+    initialSourceText
+    sourceText
+    units
+    preview
+    isLoading
+    isSaving
+    errorMessage
+    init()
+    load()
+    preparePreview()
+    returnToSource()
+    refreshPreview()
+    save()
+  }
+  class t4["ProseDeckEditorView"] {
+    <<struct>>
+    deckName
+    onSaved
+    onCancel
+    model
+    textSession
+    dismissal
+    isPreviewing
+    init()
+    body
+    requestCancel()
+    hasChanges
+  }
+  class t5["ProseDeckInput"] {
+    <<struct>>
+    destinationDeckID
+    author
+    title
+    text
+    init()
+  }
+  class t6["ProseDeckBuilderError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t7["ProseDeckGenerator"] {
+    <<enum>>
+    generate()
+    prepare()
+    valid()
+    proseTypeRecord
+  }
+  class t8["ProseDeckItemRecord"] {
+    <<struct>>
+    item
+    itemType
+    init()
+  }
+  class t9["ProseDeckSnapshot"] {
+    <<struct>>
+    records
+    units
+    sourceText
+    attribution
+  }
+  class t10["ProseDeckEditPreview"] {
+    <<struct>>
+    operations
+    order
+    newCardIndices
+    retiredCards
+    addedCount
+    retiredCount
+    retainedCount
+    revisedCount
+    changedPromptCount
+    unitCount
+    paragraphCount
+    hasChanges
+  }
+  class t11["ProseRetiredCard"] {
+    <<struct>>
+    prompt
+    answer
+  }
+  class t12["ProseDeckEditError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t13["ProseDeckReconciler"] {
+    <<enum>>
+    snapshot()
+    preview()
+    field()
+    text()
+  }
+  class t14["ProseUnit"] {
+    <<struct>>
+    text
+    separator
+    init()
+  }
+  class t15["ProseText"] {
+    <<enum>>
+    sourceAfterReview()
+    parse()
+    source()
+    parse()
+    paragraphCount()
+    wordCount()
+    splitPositionCount()
+    split()
+    paragraphs()
+    splitLongSentence()
+  }
+  class t16["ProsePromptPlanner"] {
+    <<enum>>
+    prompts()
+    context()
+    excerpt()
+  }
+  class t17["ProseUnitReviewView"] {
+    <<struct>>
+    units
+    newCardIndices
+    retiredCards
+    body
+  }
+  class t18["ProseUnitRow"] {
+    <<struct>>
+    index
+    unit
+    prompt
+    isNewCard
+    canJoin
+    onSplit
+    onJoin
+    splitAfter
+    body
+    usesWords
+    positionCount
+  }

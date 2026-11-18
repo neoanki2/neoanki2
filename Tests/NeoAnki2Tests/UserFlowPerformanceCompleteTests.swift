@@ -259,7 +259,7 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
         startIndex += batchSize
     }
 
-    let model = ImportModel(itemsModel: itemsModel)
+    let model = ImportModel(itemsModel: itemsModel, library: SQLiteLibraryRepository(store: store))
 
     _ = try await PerformanceHarness.measure(
         flow: "import-model-csv",

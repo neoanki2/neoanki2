@@ -48,6 +48,7 @@ private actor FailingNativeBadgePublisher: AppIconBadgePublishing {
         try await model.createItem(itemType: type, deckID: nil, values: [
             BuiltInItemTypes.frontFieldID: .text("Question"), BuiltInItemTypes.backFieldID: .text("Answer"),
         ])
+        await model.awaitReadModels()
         #expect(model.items.isEmpty)
         #expect(model.allDecksSummary.itemCount == 1)
         let rows = try await model.loadBrowse(scope: .allDecks)
@@ -135,6 +136,7 @@ private actor FailingNativeBadgePublisher: AppIconBadgePublishing {
         try await model.createItem(itemType: type, deckID: nil, values: [
             BuiltInItemTypes.frontFieldID: .text("Question"), BuiltInItemTypes.backFieldID: .text("Answer"),
         ])
+        await model.awaitDevicePublication()
         #expect(model.lastCommandReceipt != nil)
         #expect(model.recoveryMessage?.contains("Device updates could not finish") == true)
         #expect(try await repository.scopeSummary(scope: .allDecks, asOf: .now).itemCount == 1)

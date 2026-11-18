@@ -26,6 +26,7 @@ private actor DelayedItemTypeStudioRepository:
     private var updateStarted = false
     private var updateStartWaiters: [CheckedContinuation<Void, Never>] = []
     private var updateRelease: CheckedContinuation<Void, Never>?
+    private var catalogFails = false
 
     init(base: SQLiteLibraryRepository) {
         self.base = base
@@ -41,10 +42,13 @@ private actor DelayedItemTypeStudioRepository:
         updateRelease = nil
     }
 
+    func failCatalogReads() { catalogFails = true }
+
     func libraryID() async throws -> UUID { try await base.libraryID() }
     func loadItemTypes() async throws -> ItemTypeLoadResult { try await base.loadItemTypes() }
     func loadItemTypeCatalog() async throws -> ItemTypeCatalog {
-        try await base.loadItemTypeCatalog()
+        if catalogFails { throw DatabaseError.executeFailed("Injected post-commit catalog failure") }
+        return try await base.loadItemTypeCatalog()
     }
     func effectiveItemTypePolicy(for deckID: UUID) async throws -> DeckItemTypePolicy? {
         try await base.effectiveItemTypePolicy(for: deckID)
@@ -1135,20 +1139,25 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     created.name = "Compatibility Type"
     let original = try created.candidateItemType()
     try await model.createItemType(original)
+    await model.awaitReadModels()
     #expect(model.itemTypes.contains { $0.id == original.id })
 
     var updated = original
     updated.name = "Compatibility Type Updated"
     try await model.updateItemType(updated)
+    await model.awaitReadModels()
     #expect(model.itemTypes.first { $0.id == original.id }?.name == updated.name)
 
     try await model.duplicateItemType(id: original.id, name: "Compatibility Copy")
+    await model.awaitReadModels()
     let duplicate = try #require(model.itemTypes.first { $0.name == "Compatibility Copy" })
     #expect(duplicate.id != original.id)
     try await model.deleteItemType(id: duplicate.id)
+    await model.awaitReadModels()
     #expect(model.itemTypes.contains { $0.id == duplicate.id } == false)
 
     try await model.repairItemType(id: original.id)
+    await model.awaitReadModels()
     let repaired = try #require(model.itemTypes.first { $0.id == original.id })
     #expect(repaired.name == updated.name)
     #expect(repaired.fields.map(\.name) == ["Front", "Back"])
@@ -1211,6 +1220,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     #expect(impact.requiresConfirmation == false)
 
     try await model.unlockItemType(id: included.id)
+    await model.awaitReadModels()
     #expect(model.includedItemTypeOwner(id: included.id) != nil)
     #expect(model.itemTypes.contains { $0.id == included.id })
 }
@@ -1229,7 +1239,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
 
     #expect(model.loadState == .ready)
     #expect(model.itemTypes.isEmpty == false)
-    #expect(model.itemTypeStudioLibrary == nil)
+    #expect(model.features.makeItemTypesModel() == nil)
 }
 
 @Test @MainActor func sqliteLibraryOffersCompileTimeSafeStudioProjection() async throws {
@@ -1239,8 +1249,7 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     let sqlite = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
     try await sqlite.bootstrap()
     let libraryModel = LibraryFeatureModel(library: sqlite)
-    let studioLibrary = try #require(libraryModel.itemTypeStudioLibrary)
-    let studioModel = ItemTypesFeatureModel(library: studioLibrary)
+    let studioModel = try #require(libraryModel.features.makeItemTypesModel())
 
     await studioModel.load()
 
@@ -1270,4 +1279,46 @@ private func makeItemTypeStudioFeatureFixture() async throws -> ItemTypeStudioFe
     #expect(try await repository.authoringItemTypes(for: deck.id).itemTypes.contains { $0.id == copy.id })
     #expect(try await repository.loadItemTypeCatalog().itemTypes.contains { $0.id == copy.id } == false)
 
+}
+
+
+@Test @MainActor func studioCatalogFailureCannotTurnADurableSaveIntoFailure() async throws {
+    let fixture = try await makeItemTypeStudioFeatureFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.root) }
+    let delayed = DelayedItemTypeStudioRepository(base: fixture.repository)
+    let model = ItemTypesFeatureModel(library: delayed)
+    await model.load()
+    model.selectItemType(id: fixture.itemType.id)
+    #expect(model.beginEditingSelectedItemType())
+    model.studioDraft?.name = "Durably saved name"
+    let preparation = try await model.prepareSave()
+    await delayed.failCatalogReads()
+    let save = Task { try await model.commitSave(preparation) }
+    await delayed.waitUntilUpdateStarts()
+    await delayed.releaseUpdate()
+    let saved = try await save.value
+    await model.awaitCatalogRefresh()
+    #expect(saved.name == "Durably saved name")
+    #expect(model.selectedItemType == saved)
+    #expect(model.studioDraft?.originalSnapshot == saved)
+    #expect(model.studioDraft?.isDirty == false)
+    #expect(model.loadState == .ready)
+    #expect(model.refreshWarning?.hasPrefix("Saved.") == true)
+    #expect(try await fixture.store.itemType(id: saved.id) == saved)
+}
+
+@Test @MainActor func studioOwnerRefreshWarningSurvivesSuccessfulCatalogRefresh() async throws {
+    let fixture = try await makeItemTypeStudioFeatureFixture()
+    defer { try? FileManager.default.removeItem(at: fixture.root) }
+    let model = ItemTypesFeatureModel(library: fixture.repository)
+    await model.load()
+    model.requestOwnerRefresh { throw DatabaseError.executeFailed("Injected owner refresh failure") }
+    await model.awaitOwnerRefresh()
+    #expect(model.refreshWarning?.contains("Owner refresh") == true)
+    await model.load()
+    #expect(model.loadState == .ready)
+    #expect(model.refreshWarning?.contains("Owner refresh") == true)
+    model.requestOwnerRefresh {}
+    await model.awaitOwnerRefresh()
+    #expect(model.refreshWarning == nil)
 }

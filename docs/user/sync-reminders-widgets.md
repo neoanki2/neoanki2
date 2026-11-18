@@ -12,7 +12,9 @@ permalink: /user/sync-reminders-widgets/
 Saved library changes refresh native counts whether they come from this device,
 the local API, or iCloud. A device-update warning after saving means the library
 change is already stored; refresh to retry badge, reminder, or widget
-publication rather than creating or importing the same content again.
+publication rather than creating or importing the same content again. Saving
+an item does not wait for those device updates or for iCloud to finish. The
+local change remains usable while its counts and device indicators catch up.
 
 Statistics also has an independent private iCloud zone for content-free review,
 undo, lifecycle, and session evidence. Idempotent event identities prevent

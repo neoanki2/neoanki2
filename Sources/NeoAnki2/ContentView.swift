@@ -59,7 +59,10 @@ struct ContentView: View {
     @State private var importNotice: ImportNotice?
     @State private var isCreatingGeneratedDeck = false
     @State private var portableDeckTransfer: PortableDeckTransferModel
-    private let library: any LibraryRepository
+    private let features: LibraryFeatureFactory
+    private let makeStudyModel: () -> StudyModel
+    private let makeImportModel: () -> ImportModel
+    private let loadHome: (DeckScope, Date) async throws -> ColdLibraryHomeSnapshot
     private let deckBuilderRegistry: DeckBuilderRegistry
 
     private var isAddingItem: Bool {
@@ -177,7 +180,10 @@ struct ContentView: View {
         self.decksModel = decksModel
         self.schedulingModel = schedulingModel
         self.vocabularyLibraryModel = vocabularyLibraryModel
-        self.library = library
+        self.features = LibraryFeatureFactory(library: library)
+        self.makeStudyModel = { StudyModel(library: library) }
+        self.makeImportModel = { ImportModel(itemsModel: itemsModel, library: library) }
+        self.loadHome = { try await library.coldHomeSnapshot(scope: $0, asOf: $1) }
         _portableDeckTransfer = State(
             initialValue: PortableDeckTransferModel(library: library)
         )
@@ -198,7 +204,10 @@ struct ContentView: View {
         self.decksModel = decksModel
         self.schedulingModel = schedulingModel
         self.vocabularyLibraryModel = vocabularyLibraryModel
-        self.library = library
+        self.features = LibraryFeatureFactory(library: library)
+        self.makeStudyModel = { StudyModel(library: library) }
+        self.makeImportModel = { ImportModel(itemsModel: itemsModel, library: library) }
+        self.loadHome = { try await library.coldHomeSnapshot(scope: $0, asOf: $1) }
         _portableDeckTransfer = State(
             initialValue: PortableDeckTransferModel(library: library)
         )
@@ -317,17 +326,16 @@ struct ContentView: View {
         .sheet(isPresented: wordCapturePresentation, onDismiss: {
             Task { await vocabularyLibraryModel.load() }
         }) {
-            WordCaptureView(library: library, rootURL: vocabularyLibraryModel.rootURL,
-                            deckID: decksModel.selectedDeckID) {
+            WordCaptureView(model: features.makeWordCapture(rootURL: vocabularyLibraryModel.rootURL) {
                 await decksModel.load(asOf: .now)
                 await reloadScope()
-            }
+            }, deckID: decksModel.selectedDeckID)
         }
         .sheet(isPresented: Binding(get: { showsLearnInContext }, set: { showsLearnInContext = $0 })) {
-            LearnInContextView(library: library, rootURL: vocabularyLibraryModel.rootURL, deckID: decksModel.selectedDeckID) {
+            LearnInContextView(model: features.makeLearnInContext(rootURL: vocabularyLibraryModel.rootURL) {
                 await decksModel.load(asOf: .now)
                 await reloadScope()
-            }
+            }, deckID: decksModel.selectedDeckID)
         }
         .sheet(isPresented: $schedulingModel.isShowingSettings) {
             SchedulingSettingsView(model: schedulingModel) {
@@ -624,7 +632,7 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         if case let .statistics(scope) = appSession.route {
-            StatisticsView(library: library, scope: scope, sessionID: statisticsSessionID)
+            StatisticsView(model: features.makeStatistics(scope: scope, sessionID: statisticsSessionID))
                 .id(scope)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -632,7 +640,7 @@ struct ContentView: View {
                     }
                 }
         } else if isShowingSavedResponses {
-            SavedResponsesView(library: library)
+            SavedResponsesView(model: features.makeSavedResponses())
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if isManagingTemplates, let templatesModel {
             TemplatesView(
@@ -703,7 +711,7 @@ struct ContentView: View {
         } else {
             ScopeHomeView(
                 itemsModel: itemsModel,
-                library: library,
+                statistics: features.makeStatistics(scope: decksModel.studyScope.filter),
                 scope: decksModel.studyScope,
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },
@@ -743,7 +751,7 @@ struct ContentView: View {
     }
 
     private func openImport() {
-        importModel = ImportModel(itemsModel: itemsModel, library: library)
+        importModel = makeImportModel()
         isChoosingImportFile = true
     }
 
@@ -770,7 +778,7 @@ struct ContentView: View {
         if let importPath = environment["NEOANKI_TEST_IMPORT_PATH"], !importPath.isEmpty {
             let source = URL(fileURLWithPath: importPath)
             guard let accessible = copyTestingTransferFile(source) else { return }
-            importModel = ImportModel(itemsModel: itemsModel, library: library)
+            importModel = makeImportModel()
             guard let importModel, await importModel.selectFile(accessible) else { return }
             isShowingImport = true
             return
@@ -918,8 +926,7 @@ struct ContentView: View {
         Task {
             defer { isCreatingGeneratedDeck = false }
             do {
-                let outcome = try await NativeLibraryCommands.createGeneratedDeck(on: library,
-                    prepared: creation.prepared, parentDeckID: creation.parentDeckID, context: creation.command)
+                let outcome = try await features.deckCreation.create(creation.prepared, parentDeckID: creation.parentDeckID, context: creation.command)
                 await refreshAfterPortableDeckImport(outcome.result)
                 portableDeckTransfer.notice = PortableDeckTransferNotice(title: "Deck Imported",
                     message: outcome.warnings.first ?? "\(outcome.result.itemCount) items imported.")
@@ -936,14 +943,8 @@ struct ContentView: View {
         Task {
             defer { generated.cleanup(); isCreatingGeneratedDeck = false }
             do {
-                let result: PortableDeckImportResult
-                if let parent = generated.destinationDeckID {
-                    result = try await NativeLibraryCommands.createGeneratedDeck(on: library,
-                        source: generated.bundleURL, parentDeckID: parent)
-                } else {
-                    result = try await NativeLibraryCommands.importDeck(on: library,
-                        source: generated.bundleURL, authored: true)
-                }
+                let result = try await features.deckCreation.importGeneratedBundle(
+                    from: generated.bundleURL, parentDeckID: generated.destinationDeckID)
                 await refreshAfterPortableDeckImport(result)
                 isShowingDeckBuilder = false
             } catch {
@@ -1051,10 +1052,7 @@ struct ContentView: View {
         if decksModel.needsInitialLoad || itemsModel.needsInitialLoad {
             let scope = decksModel.studyScope
             do {
-                let snapshot = try await library.coldHomeSnapshot(
-                    scope: scope.filter,
-                    asOf: now
-                )
+                let snapshot = try await loadHome(scope.filter, now)
                 decksModel.applyColdHomeSnapshot(snapshot)
                 itemsModel.setCachedScope(scope)
                 itemsModel.addItemDeckID = decksModel.defaultDeckIDForNewItem
@@ -1116,7 +1114,7 @@ struct ContentView: View {
 
     private func startStudy() {
         studyScope = decksModel.studyScope
-        studyModel = StudyModel(library: library)
+        studyModel = makeStudyModel()
         isStudying = true
     }
 
@@ -1142,12 +1140,8 @@ struct ContentView: View {
 
     private func openTemplates() {
         if templatesModel == nil {
-            guard let studioLibrary = library as? any LibraryBrowsing
-                & LibraryItemTypeManaging
-                & LibraryItemTypeEditingSafeguarding
-                & LibraryItemTypeStudioSaving
-            else { return }
-            templatesModel = ItemTypesFeatureModel(library: studioLibrary)
+            guard let studio = features.makeItemTypesModel() else { return }
+            templatesModel = studio
         }
         templatesModel?.creationDeckID = decksModel.selectedDeckID
         selectedItemID = nil

@@ -1,0 +1,26 @@
+[
+  {
+    "importSyntax": "import SwiftUI",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": "Architecture violation: NeoAnkiFeatures must remain platform neutral.\n/var/folders/33/fl70t0357pqf3t52zdm5j11w0000gn/T/neoanki-guard-witness-75ltafib/Sources/NeoAnkiFeatures/Injected.swift:1:import SwiftUI\n"
+  },
+  {
+    "importSyntax": "@preconcurrency import SwiftUI",
+    "exitCode": 0,
+    "stdout": "Architecture boundaries passed.\n",
+    "stderr": ""
+  },
+  {
+    "importSyntax": "import struct SwiftUI.Color",
+    "exitCode": 0,
+    "stdout": "Architecture boundaries passed.\n",
+    "stderr": ""
+  },
+  {
+    "importSyntax": "import  SwiftUI",
+    "exitCode": 0,
+    "stdout": "Architecture boundaries passed.\n",
+    "stderr": ""
+  }
+]

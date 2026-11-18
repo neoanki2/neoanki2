@@ -1,0 +1,27 @@
+classDiagram
+direction LR
+  class t0["VocabularyCLI"] {
+    <<struct>>
+    usage
+    init()
+    run()
+    compile()
+    validate()
+    search()
+    localURL()
+  }
+  class t1["CLIError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t2["ParsedOptions"] {
+    <<struct>>
+    valuesByName
+    flags
+    init()
+    values()
+    first()
+    hasFlag()
+    required()
+    rejectUnknown()
+  }

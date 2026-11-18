@@ -272,7 +272,7 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
         startIndex += batchSize
     }
 
-    let model = ImportModel(itemsModel: itemsModel)
+    let model = ImportModel(itemsModel: itemsModel, library: SQLiteLibraryRepository(store: store))
 
     _ = try await PerformanceHarness.measure(
         flow: "import-model-json",
@@ -304,7 +304,7 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
 
     let itemsModel = ItemsModel(store: store, mediaStore: await store.media)
     await itemsModel.load()
-    let model = ImportModel(itemsModel: itemsModel)
+    let model = ImportModel(itemsModel: itemsModel, library: SQLiteLibraryRepository(store: store))
     var fileURLs: [URL] = []
     for index in 0..<fileCount {
         let url = directory.appendingPathComponent("items-\(index).json")

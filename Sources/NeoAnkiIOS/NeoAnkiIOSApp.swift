@@ -9,16 +9,19 @@ import SwiftUI
 public struct NeoAnkiMobileScene: View {
     @State private var model: LibraryFeatureModel
     private let vocabularyRootURL: URL
+    private let fixtures: MobileUITestFixtures?
     private let packCloudTransport: (any VocabularyPackCloudTransport)?
 
-    public init(model: LibraryFeatureModel, vocabularyRootURL: URL, packCloudTransport: (any VocabularyPackCloudTransport)? = nil) {
+    public init(model: LibraryFeatureModel, vocabularyRootURL: URL, packCloudTransport: (any VocabularyPackCloudTransport)? = nil, fixtures: MobileUITestFixtures? = nil) {
         _model = State(initialValue: model)
         self.vocabularyRootURL = vocabularyRootURL
         self.packCloudTransport = packCloudTransport
+        self.fixtures = fixtures
     }
 
     public var body: some View {
         MobileRootView(model: model, vocabularyRootURL: vocabularyRootURL, packCloudTransport: packCloudTransport)
+            .environment(\.mobileUITestFixtures, fixtures)
             .onOpenURL { _ = model.handle(url: $0) }
     }
 }

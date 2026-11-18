@@ -25,23 +25,48 @@ private final class PortableDeckScopedAccessSpy: SecurityScopedResourceAccessing
     }
 }
 
+private actor PortableDeckExportGate {
+    private var entered = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseExport: CheckedContinuation<Void, Never>?
+
+    func hold() async {
+        await withCheckedContinuation { continuation in
+            releaseExport = continuation
+            entered = true
+            let pending = entryWaiters
+            entryWaiters.removeAll()
+            pending.forEach { $0.resume() }
+        }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
+    }
+
+    func release() { releaseExport?.resume(); releaseExport = nil }
+}
+
 @Test @MainActor func portableDeckExportTracksBusyStateAndScopedAccess() async {
     let access = PortableDeckScopedAccessSpy()
     let destination = URL(fileURLWithPath: "/tmp/example.neodeck")
+    let gate = PortableDeckExportGate()
     let model = PortableDeckTransferModel(
         scopedAccess: access,
         importOperation: { _, _ in
             throw PortableDeckError.invalidPackage("Unused")
         },
         exportOperation: { _, _ in
-            try await Task.sleep(for: .milliseconds(50))
+            await gate.hold()
         }
     )
 
     let task = Task { await model.exportDeck(id: UUID(), to: destination) }
-    await Task.yield()
+    await gate.waitUntilEntered()
 
     #expect(model.isBusy)
+    await gate.release()
     #expect(await task.value)
     #expect(!model.isBusy)
     #expect(access.started == [destination])

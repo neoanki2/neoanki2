@@ -1,0 +1,16 @@
+PASS S1: All 891 audited tracked files still match their recorded SHA-256 digests
+PASS S2: 488 Swift file identities match git; saved scanner output has 28,926 declaration records and no parser errors
+PASS S3: All 37 SwiftPM target dependency lists match fresh SwiftPM output
+PASS S4: Application contracts and SQLite repository adapter share a target; Core includes both model and SQLite implementation
+PASS S5: LibraryFeatureModel publicly exposes an aggregate LibraryRepository
+PASS S6: Typed HTTP endpoint metadata and a separate method/path execution switch coexist
+PASS S7: Features contains Apple provider imports; iOS filesystem/repository initialization uses try!
+PASS S8: Router and statistics snapshot span 538 and 559 source lines respectively
+PASS W7: Actual guard rejects plain forbidden import but accepts attributed, selective and extra-space variants
+PASS W1: changing only the type name changes ordinal refresh (7 versus 1)
+PASS W2: feature envelope format in an ordinary text field controls family identity
+PASS W3: a valid LibraryStudying conformer inherits an empty preview result
+PASS W4: a valid coordinated-editing conformer can reject every operation by default
+PASS W5: generated-deck command accepts Int at compile time and rejects it at runtime
+PASS W6: generic command wrapper can succeed with no receipt capability
+15 bounded claims confirmed.

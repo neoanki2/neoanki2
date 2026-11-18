@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiCore
+import NeoAnkiApplication
 import Testing
 
 @testable import NeoAnki2
@@ -55,7 +56,10 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
 /// The bug this closes: every reload used to raise `isLoading`, so the sidebar
 /// blinked into a progress view on each save and each count refresh.
 @Test @MainActor func decksModelReloadKeepsTheSidebarOnScreen() async throws {
-    let (model, store) = try await makeDecksModel()
+    let (_, store) = try await makeDecksModel()
+    let library = SQLiteLibraryRepository(store: store)
+    let heldReads = HeldSummaryReads(library: library)
+    let model = DecksModel(library: library, reads: NativeLibraryReadCoordinator(library: heldReads))
     _ = try await store.createDeck(Deck(name: "Geography"))
     #expect(model.isLoading)
 
@@ -63,11 +67,11 @@ private func makeDecksModel() async throws -> (DecksModel, ItemStore) {
     #expect(!model.isLoading)
 
     _ = try await store.createDeck(Deck(name: "History"))
+    await heldReads.holdNextSummary()
     let reload = Task { await model.load() }
-    // Yielding lets the reload run up to its first store call, which is past the
-    // point where it would have raised `isLoading`.
-    await Task.yield()
+    await heldReads.waitUntilHeld()
     #expect(!model.isLoading)
+    await heldReads.release()
     await reload.value
 
     #expect(model.deckTree.count == 2)
