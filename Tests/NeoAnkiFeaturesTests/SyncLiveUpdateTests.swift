@@ -38,12 +38,20 @@ private actor StartupSyncService: SyncService {
     let model = LibraryFeatureModel(library: repository, syncService: service)
     let scene = Task { await model.bootstrap(startSync: true) }
     await service.waitUntilStarted()
-    var backgroundEntered = false
+    let (entries, entered) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    defer { entered.finish() }
     let background = Task {
-        backgroundEntered = true
+        entered.yield(())
         await model.bootstrap(startSync: true)
     }
-    while !backgroundEntered { await Task.yield() }
+    var entry = entries.makeAsyncIterator()
+    guard await entry.next() != nil else {
+        await service.finish()
+        await scene.value
+        await background.value
+        Issue.record("Background initialization entry was cancelled before it arrived")
+        return
+    }
     await service.finish()
     await scene.value
     await background.value

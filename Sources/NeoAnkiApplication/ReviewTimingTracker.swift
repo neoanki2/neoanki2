@@ -9,24 +9,24 @@ public struct ReviewTimingTracker: Sendable {
 
     public init() {}
 
-    public mutating func reset() {
+    public mutating func reset(at now: ContinuousClock.Instant = .now) {
         accumulatedMilliseconds = 0
-        startedAt = .now
+        startedAt = now
     }
 
-    public mutating func pause() {
+    public mutating func pause(at now: ContinuousClock.Instant = .now) {
         guard let startedAt else { return }
-        accumulatedMilliseconds += Self.milliseconds(from: startedAt, to: .now)
+        accumulatedMilliseconds += Self.milliseconds(from: startedAt, to: now)
         self.startedAt = nil
     }
 
-    public mutating func resume() {
+    public mutating func resume(at now: ContinuousClock.Instant = .now) {
         guard startedAt == nil else { return }
-        startedAt = .now
+        startedAt = now
     }
 
-    public func elapsedMilliseconds() -> Int {
-        let running = startedAt.map { Self.milliseconds(from: $0, to: .now) } ?? 0
+    public func elapsedMilliseconds(at now: ContinuousClock.Instant = .now) -> Int {
+        let running = startedAt.map { Self.milliseconds(from: $0, to: now) } ?? 0
         return ReviewWorkloadTimingPolicy.clamped(
             Int((accumulatedMilliseconds + running).rounded())
         )

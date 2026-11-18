@@ -1,7 +1,7 @@
 import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
-import NeoAnkiVocabularyKit
+@testable import NeoAnkiVocabularyKit
 import Testing
 @testable import NeoAnkiFeatures
 
@@ -47,9 +47,9 @@ import Testing
         await model.start(deckID: deck.id)
     }
     func cleanup() { try? FileManager.default.removeItem(at: root) }
-    func makeModel(delay: Duration = .zero, onSaved: @escaping @MainActor () async -> Void = {}) -> WordCaptureModel {
+    func makeModel(delay: Duration = .zero, lookup: DictionaryLookupModel? = nil, onSaved: @escaping @MainActor () async -> Void = {}) -> WordCaptureModel {
         WordCaptureModel(library: repository, rootURL: packs, configurationStore: store,
-                         lookup: DictionaryLookupModel(delay: delay), onSaved: onSaved)
+                         lookup: lookup ?? DictionaryLookupModel(delay: delay), onSaved: onSaved)
     }
     func configuration(source: VocabularyFieldSource = .pronunciationText, dictionaryID: String = "first", deckID: UUID? = nil) -> VocabularyDeckConfiguration {
         .init(dictionaryID: dictionaryID, deckID: deckID ?? deck.id, itemTypeID: type.id, bindings: [
@@ -198,10 +198,39 @@ private actor CaptureSavedCallbackGate {
     #expect(!model.canSave) // The two pronunciations now require their own choice.
 }
 
+private actor CaptureDictionaryRequestGate {
+    private var held: CheckedContinuation<Void, Never>?
+    private var didEnter = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func hold() async {
+        await withCheckedContinuation { continuation in
+            held = continuation
+            didEnter = true
+            let pending = entryWaiters
+            entryWaiters.removeAll()
+            pending.forEach { $0.resume() }
+        }
+    }
+
+    func waitUntilEntered() async {
+        guard !didEnter else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
+    }
+
+    func release() { held?.resume(); held = nil }
+}
+
 @Test @MainActor func capturePreservesManualEditsAndRejectsStaleQueryResults() async throws {
     let fixture = try await CaptureFixture(entries: [CaptureFixture.entry(), CaptureFixture.entry(word: "інший")])
     defer { fixture.cleanup() }
-    let model = fixture.makeModel(delay: .milliseconds(40))
+    let gate = CaptureDictionaryRequestGate()
+    let lookup = DictionaryLookupModel(delay: .zero) { query, url, mode in
+        if query == "нач", mode == .exact { await gate.hold() }
+        let pack = try await VocabularyPack.open(at: url)
+        return try await pack.search(query: query, mode: mode, limit: 50)
+    }
+    let model = fixture.makeModel(lookup: lookup)
     await model.start(deckID: fixture.deck.id)
     model.selectDictionary("first")
     #expect(model.saveConfiguration(fixture.configuration()))
@@ -211,11 +240,13 @@ private actor CaptureSavedCallbackGate {
     #expect(model.text[fixture.answer.id] == "My own answer")
     model.query = "нач"
     let old = Task { await model.search() }
-    await Task.yield()
+    await gate.waitUntilEntered()
     model.query = "інший"
     #expect(model.selectedEntry == nil && !model.canSave)
     old.cancel()
-    await model.search(); await old.value
+    await model.search()
+    await gate.release()
+    await old.value
     #expect(model.selectedEntry?.id == "інший")
     #expect(model.text[fixture.word.id] == "інший")
     #expect(model.text[fixture.answer.id] == "My own answer")

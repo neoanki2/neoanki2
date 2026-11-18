@@ -28,15 +28,10 @@ private func trackedBasicItem(deckID: UUID? = nil) -> Item {
 }
 
 private func nextCommittedCursor(_ stream: AsyncStream<Int64>) async throws -> Int64 {
-    try await withThrowingTaskGroup(of: Int64.self) { group in
-        group.addTask {
-            var iterator = stream.makeAsyncIterator()
-            return try #require(await iterator.next())
-        }
-        group.addTask { try await Task.sleep(for: .seconds(2)); throw CancellationError() }
-        defer { group.cancelAll() }
-        return try #require(try await group.next())
-    }
+    // Callers register this buffered stream before the write, then await that
+    // committed event directly; unrelated test scheduling cannot expire it.
+    var iterator = stream.makeAsyncIterator()
+    return try #require(await iterator.next())
 }
 
 @Test func changeNotificationsExposeOnlyCommittedJournalCursors() async throws {

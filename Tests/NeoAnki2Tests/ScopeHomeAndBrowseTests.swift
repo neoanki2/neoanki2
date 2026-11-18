@@ -107,7 +107,11 @@ private func addItem(
 /// read before either is published, so the detail pane never shows one scope's
 /// items beside another's totals, and never shows a progress view instead.
 @Test @MainActor func scopeReloadKeepsTheDetailPaneOnScreen() async throws {
-    let (model, _, store) = try await makeModels()
+    let (_, _, store) = try await makeModels()
+    let library = SQLiteLibraryRepository(store: store)
+    let heldReads = HeldSummaryReads(library: library)
+    let model = ItemsModel(library: library, mediaStore: nil,
+        reads: NativeLibraryReadCoordinator(library: heldReads))
     let deck = Deck(name: "Geography")
     _ = try await store.createDeck(deck)
     #expect(model.isLoading)
@@ -116,9 +120,12 @@ private func addItem(
     #expect(!model.isLoading)
 
     _ = await addItem(model, front: "France", back: "Paris", deckID: deck.id)
+    await model.awaitReadModels()
+    await heldReads.holdNextSummary()
     let reload = Task { await model.load(scope: .deck(deck.id, name: deck.name)) }
-    await Task.yield()
+    await heldReads.waitUntilHeld()
     #expect(!model.isLoading)
+    await heldReads.release()
     await reload.value
 
     #expect(model.items.count == 1)
@@ -469,7 +476,11 @@ private func addItem(
 }
 
 @Test @MainActor func populatedBrowseReloadDoesNotReturnToLoadingState() async throws {
-    let (model, _, store) = try await makeModels()
+    let (_, _, store) = try await makeModels()
+    let library = SQLiteLibraryRepository(store: store)
+    let heldReads = HeldSummaryReads(library: library)
+    let model = ItemsModel(library: library, mediaStore: nil,
+        reads: NativeLibraryReadCoordinator(library: heldReads))
     let deck = Deck(name: "Geography")
     _ = try await store.createDeck(deck)
     await model.load()
@@ -477,12 +488,15 @@ private func addItem(
     #expect(!model.items.isEmpty)
     #expect(!model.isLoading)
 
+    await model.awaitReadModels()
+    await heldReads.holdNextSummary()
     let reload = Task { @MainActor in
         await model.load(scope: .deck(deck.id, name: deck.name))
     }
-    await Task.yield()
+    await heldReads.waitUntilHeld()
 
     #expect(!model.isLoading)
+    await heldReads.release()
     await reload.value
     #expect(!model.isLoading)
 }
@@ -671,7 +685,7 @@ private func addItem(
 
 /// Holds a completed read rather than sleeping, so tests control publication
 /// order independently from the real SQLite command boundary.
-private actor HeldSummaryReads: LibraryBrowsing {
+actor HeldSummaryReads: LibraryBrowsing, LibraryNativeReadSupporting {
     let library: SQLiteLibraryRepository
     private var holdNext = false
     private var held = false
@@ -687,6 +701,20 @@ private actor HeldSummaryReads: LibraryBrowsing {
     func release() { releaseRead?.resume(); releaseRead = nil; held = false }
     func scopeSummary(scope: DeckScope, asOf: Date) async throws -> ScopeSummary {
         let result = try await library.scopeSummary(scope: scope, asOf: asOf)
+        await holdIfRequested()
+        return result
+    }
+    func nativeScopeSummary(scope: DeckScope, asOf: Date) async throws -> (ScopeSummary, String?) {
+        let result = try await library.nativeScopeSummary(scope: scope, asOf: asOf)
+        await holdIfRequested()
+        return result
+    }
+    func nativeHomeSnapshot(scope: DeckScope, asOf: Date) async throws -> (ColdLibraryHomeSnapshot, String?) {
+        let result = try await library.nativeHomeSnapshot(scope: scope, asOf: asOf)
+        await holdIfRequested()
+        return result
+    }
+    private func holdIfRequested() async {
         if holdNext {
             holdNext = false
             held = true
@@ -695,7 +723,6 @@ private actor HeldSummaryReads: LibraryBrowsing {
             waiting.forEach { $0.resume() }
             await withCheckedContinuation { releaseRead = $0 }
         }
-        return result
     }
     func libraryID() async throws -> UUID { try await library.libraryID() }
     func loadItemTypes() async throws -> ItemTypeLoadResult { try await library.loadItemTypes() }

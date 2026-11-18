@@ -539,6 +539,7 @@ private actor VocabularyPackOpenCounter {
 
 private actor BlockingPairingApprover: APIPairingApprover {
     private var continuation: CheckedContinuation<Bool, Never>?
+    private var startedWaiters: [CheckedContinuation<Void, Never>] = []
     private(set) var started = false
     private(set) var completed = false
     private(set) var requestedApproval: APIPairingRequest?
@@ -546,11 +547,19 @@ private actor BlockingPairingApprover: APIPairingApprover {
 
     func approve(_ request: APIPairingRequest) async -> Bool {
         started = true
+        let waiters = startedWaiters
+        startedWaiters.removeAll()
+        waiters.forEach { $0.resume() }
         requestedApproval = request
         defer { completed = true }
         // The expiry task may win before the approval task enters this actor.
         if cancelledRequest != nil { return false }
         return await withCheckedContinuation { continuation = $0 }
+    }
+
+    func waitUntilStarted() async {
+        guard !started else { return }
+        await withCheckedContinuation { startedWaiters.append($0) }
     }
 
     func cancel(_ request: APIPairingRequest) {
@@ -769,6 +778,15 @@ private func loopbackHTTPResponse(port: NWEndpoint.Port, request: Data) async th
                 else { continuation.resume() }
             })
         }
+        return try await loopbackReadToEOF(connection)
+    } onCancel: {
+        connection.cancel()
+    }
+}
+
+private func loopbackReadToEOF(_ connection: NWConnection) async throws -> Data {
+    try Task.checkCancellation()
+    return try await withTaskCancellationHandler {
         var bytes = Data()
         while true {
             let (data, complete) = try await withCheckedThrowingContinuation {
@@ -816,6 +834,7 @@ private func loopbackHTTPResponse(port: NWEndpoint.Port, request: Data) async th
 
     let actualPort = try #require(await server.listeningPort)
     let connection = NWConnection(host: "127.0.0.1", port: actualPort, using: .tcp)
+    defer { connection.cancel() }
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
         connection.stateUpdateHandler = { state in
             switch state {
@@ -871,9 +890,18 @@ private func loopbackHTTPResponse(port: NWEndpoint.Port, request: Data) async th
         ]
     ))
     #expect(revoked.status == 204)
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-    while await server.activeConnectionCount != 0, ContinuousClock.now < deadline {
-        try await Task.sleep(for: .milliseconds(25))
+    do {
+        _ = try await loopbackReadToEOF(connection)
+    } catch let error as NWError {
+        // Either orderly EOF or a peer reset proves that revocation closed the
+        // stream. Other network errors remain failures.
+        guard case .posix(.ECONNRESET) = error else {
+            await server.stop()
+            throw error
+        }
+    } catch {
+        await server.stop()
+        throw error
     }
     #expect(await server.activeConnectionCount == 0)
     connection.cancel()
@@ -1356,7 +1384,7 @@ private func pairWithAuthority(
             body: pairingBody
         ))
     }
-    while !(await blocker.started) { await Task.yield() }
+    await blocker.waitUntilStarted()
     let overlapping = await blockedAPI.handle(request(
         .post,
         "/v1/pairings",

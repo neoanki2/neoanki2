@@ -295,6 +295,13 @@ and runner load could violate those thresholds without either behavior failing.
 The loopback lifecycle contract observes TCP readiness, complete HTTP framing,
 and EOF directly. It no longer measures the shared URLSession's scheduling or
 default request deadline alongside unrelated parallel tests.
+Sync, vocabulary catalog, dictionary/debounce, progressive study, export, and reload tests use
+observable state, buffered stream events, or explicit operation-entry/release
+gates. Assertions run after the exact relevant work completes, including stale
+work being rejected. Review-duration arithmetic uses explicit monotonic
+instants. These contracts replace readiness sleeps, yield counts, and short
+wall-clock deadlines; domain timers and opt-in performance checks remain
+separate.
 
 The signed FSRS fixture manifest preserves the original August 16, 2026
 verification and its tolerances. Current analytic-gradient tests permit the

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 @testable import NeoAnkiVocabularyKit
 
@@ -55,10 +56,20 @@ private func dictionaryEntry(_ word: String, id: String = "word") -> LexicalEntr
 
 private actor DictionarySearchGate {
     var continuation: CheckedContinuation<Void, Never>?
-    var started = false
+    private var started = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
     func pause() async {
-        started = true
-        await withCheckedContinuation { continuation = $0 }
+        await withCheckedContinuation {
+            continuation = $0
+            started = true
+            let pending = entryWaiters
+            entryWaiters.removeAll()
+            pending.forEach { $0.resume() }
+        }
+    }
+    func waitUntilEntered() async {
+        guard !started else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
     }
     func resume() { continuation?.resume(); continuation = nil }
 }
@@ -71,20 +82,61 @@ private actor DictionarySearchGate {
     }
     let url = URL(fileURLWithPath: "/unused.neovocab")
     let old = Task { await model.lookup(query: "old", packURL: url) }
-    while !(await gate.started) { await Task.yield() }
+    await gate.waitUntilEntered()
     await model.lookup(query: "new", packURL: url)
     await gate.resume()
     await old.value
     #expect(model.automaticText == "new\n\nA definition.")
 }
 
+private actor DictionaryDebounceGate {
+    private var suspended: CheckedContinuation<Void, any Error>?
+    private var entered = false
+    private var cancelled = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private(set) var requestedDuration: Duration?
+
+    func sleep(for duration: Duration) async throws {
+        requestedDuration = duration
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                if cancelled || Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                suspended = continuation
+                entered = true
+                let pending = entryWaiters
+                entryWaiters.removeAll()
+                pending.forEach { $0.resume() }
+            }
+        } onCancel: {
+            Task { await self.cancel() }
+        }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
+    }
+
+    private func cancel() {
+        cancelled = true
+        suspended?.resume(throwing: CancellationError())
+        suspended = nil
+    }
+}
+
 @Test @MainActor func dictionaryLookupCancellationAndErrorsLeaveManualAuthoringAvailable() async {
-    let model = DictionaryLookupModel(delay: .seconds(10)) { _, _, _ in
+    let debounce = DictionaryDebounceGate()
+    let model = DictionaryLookupModel(delay: .seconds(10), debounceSleep: { try await debounce.sleep(for: $0) }) { _, _, _ in
         Issue.record("A canceled debounce must not reach the dictionary.")
         return []
     }
     let task = Task { await model.lookup(query: "word", packURL: URL(fileURLWithPath: "/unused.neovocab")) }
-    while !model.isSearching { await Task.yield() }
+    await debounce.waitUntilEntered()
+    #expect(model.isSearching)
+    #expect(await debounce.requestedDuration == .seconds(10))
     task.cancel()
     await task.value
     #expect(model.errorMessage == nil && model.results.isEmpty && !model.isSearching)
@@ -115,11 +167,34 @@ private actor DictionarySearchGate {
 private actor DictionaryPackOpenGate {
     var count = 0
     var continuation: CheckedContinuation<Void, Never>?
+    private var countWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
     func open() async {
         count += 1
+        let pending = countWaiters.filter { count >= $0.0 }
+        countWaiters.removeAll { count >= $0.0 }
+        pending.forEach { $0.1.resume() }
         if count == 1 { await withCheckedContinuation { continuation = $0 } }
     }
+    func waitForOpenCount(_ expected: Int) async {
+        guard count < expected else { return }
+        await withCheckedContinuation { countWaiters.append((expected, $0)) }
+    }
     func resume() { continuation?.resume(); continuation = nil }
+}
+
+@MainActor
+private func waitForDictionaryState(_ condition: @escaping @MainActor () -> Bool) async {
+    while !condition() {
+        let (changes, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let ready = withObservationTracking { condition() } onChange: {
+            continuation.yield(())
+            continuation.finish()
+        }
+        if ready { continuation.finish(); return }
+        var iterator = changes.makeAsyncIterator()
+        _ = await iterator.next()
+        continuation.finish()
+    }
 }
 
 @Test @MainActor func dictionaryLookupSharesPendingPackValidationWhileTyping() async throws {
@@ -139,15 +214,15 @@ private actor DictionaryPackOpenGate {
         return try await VocabularyPack.open(at: url)
     })
     let old = Task { await model.lookup(query: "на", packURL: pack) }
-    while await gate.count == 0 { await Task.yield() }
+    await gate.waitForOpenCount(1)
     old.cancel()
-    let release = Task {
-        try? await Task.sleep(for: .milliseconds(30))
-        await gate.resume()
-    }
-    await model.lookup(query: "начинка", packURL: pack)
+    model.invalidate()
+    let replacement = Task { await model.lookup(query: "начинка", packURL: pack) }
+    await waitForDictionaryState { model.isSearching }
+    #expect(await gate.count == 1)
+    await gate.resume()
+    await replacement.value
     await old.value
-    await release.value
     #expect(await gate.count == 1)
     #expect(model.automaticText?.contains("НА\u{301}ЧИНКА") == true)
     await model.lookup(query: "нач", packURL: pack)
@@ -163,7 +238,7 @@ private actor DictionaryPackOpenGate {
         return []
     }
     let old = Task { await model.lookup(query: "на", packURL: URL(fileURLWithPath: "/unused.neovocab")) }
-    while !(await gate.started) { await Task.yield() }
+    await gate.waitUntilEntered()
     old.cancel()
     await gate.resume()
     await old.value

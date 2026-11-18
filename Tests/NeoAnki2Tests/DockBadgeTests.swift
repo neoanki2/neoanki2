@@ -55,17 +55,22 @@ import Testing
 
 @Test @MainActor func dockBadgePermissionCompletionUsesLatestCount() async {
     var labels: [String?] = []
-    var grant: CheckedContinuation<Bool, Never>?
+    let (requests, entered) = AsyncStream<CheckedContinuation<Bool, Never>>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    defer { entered.finish() }
     let badge = DockBadgeController(apply: { labels.append($0) }, authorize: {
-        await withCheckedContinuation { grant = $0 }
+        await withCheckedContinuation { _ = entered.yield($0) }
     })
     badge.update(dueCount: 7)
     let pending = badge.authorizationTask
     // Resume only after the production authorization task reaches its await.
-    while grant == nil { await Task.yield() }
+    var request = requests.makeAsyncIterator()
+    guard let grant = await request.next() else {
+        Issue.record("Authorization entry was cancelled before its request arrived")
+        return
+    }
     badge.update(dueCount: 3)
     badge.update(dueCount: 0)
-    grant?.resume(returning: true)
+    grant.resume(returning: true)
     await pending?.value
     #expect(labels == ["7", "3", nil, nil])
 }
