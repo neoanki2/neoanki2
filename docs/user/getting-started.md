@@ -16,7 +16,9 @@ message identifies unavailable maturity while keeping the library accessible.
 Choose **Statistics** in the Mac/iPad sidebar or iPhone tab bar for activity,
 learning time, progress, streaks, and workload charts. Select a deck using the
 scope filter in that screen. Reports use one shared screen across all Apple platforms;
-home keeps due counts and study actions. See [Statistics](../statistics/).
+Mac home pairs due counts and Study with today's distinct reviewed-card count,
+recorded study time, and scheduled cards for today and the next six study days. Detailed
+reports remain in Statistics. See [Statistics](../statistics/).
 
 NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and
 iPad. Homebrew is the recommended Mac installation because it verifies the

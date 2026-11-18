@@ -10,7 +10,35 @@ private func homeCalendar() -> Calendar {
     return calendar
 }
 
-@Test func homeUpcomingKeepsEmptyDaysAndExcludesTodayAndDistantCards() throws {
+@Test func homeUpcomingShowsAnIntradayReviewBeforeItIsDue() async throws {
+    let calendar = homeCalendar()
+    let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 17, hour: 12)))
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("home-intraday-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    // Use real FSRS with high retention to produce a deterministic intraday
+    // interval. Again intentionally stays due immediately for repair rounds.
+    let store = try ItemStore(
+        databaseURL: directory.appendingPathComponent("library.sqlite"),
+        scheduler: LearningScheduler(parameters: .init(requestRetention: 0.99)))
+    try await store.bootstrap()
+    _ = try await store.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+    ]))
+    let card = try #require(try await store.fetchDueCards().first)
+    let memory = try await store.submitReview(cardID: card.id, rating: .hard, now: now)
+    #expect(memory.due > now)
+    #expect(memory.due < StudyDay.nextRollover(after: now, rolloverMinutes: 240, calendar: calendar))
+    let source = try await store.statisticsSource()
+    let snapshot = StatisticsEngine.snapshot(source: source, query: .init(), now: now, calendar: calendar)
+    let days = ScopeHomeUpcoming.days(
+        points: snapshot.due, asOf: now, rollover: source.rollover, calendar: calendar)
+
+    #expect(days.first?.isToday == true)
+    #expect(days.map(\.count) == [1, 0, 0, 0, 0, 0, 0])
+}
+
+@Test func homeUpcomingIncludesTodayAndKeepsEmptyDaysButExcludesDistantCards() throws {
     let calendar = homeCalendar()
     let today = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 17, hour: 4)))
     func date(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: today)! }
@@ -19,22 +47,23 @@ private func homeCalendar() -> Calendar {
             .init(date: today, series: "Scheduled cards", value: 121),
             .init(date: date(1), series: "Scheduled cards", value: 42),
             .init(date: date(3), series: "Scheduled cards", value: 61),
-            .init(date: date(7), series: "Scheduled cards", value: 16),
-            .init(date: date(8), series: "Scheduled cards", value: 99),
+            .init(date: date(6), series: "Scheduled cards", value: 16),
+            .init(date: date(7), series: "Scheduled cards", value: 99),
         ], asOf: today.addingTimeInterval(3600), rollover: 240, calendar: calendar)
 
-    #expect(days.map(\.date) == (1...7).map(date))
-    #expect(days.map(\.count) == [42, 0, 61, 0, 0, 0, 16])
+    #expect(days.map(\.date) == (0..<7).map(date))
+    #expect(days.map(\.count) == [121, 42, 0, 61, 0, 0, 16])
+    #expect(days.map(\.isToday) == [true, false, false, false, false, false, false])
 }
 
 @Test(arguments: [3, 10], [240, 150])
 func homeUpcomingUsesStudyRolloverAcrossDaylightSavingChanges(month: Int, rollover: Int) throws {
     let calendar = homeCalendar()
-    // At 02:00 before the 04:00 rollover, the first future bucket is today's
-    // 04:00, even when the next seven dates span a 23- or 25-hour calendar day.
+    // At 02:00 before rollover, Today is still the previous calendar day's
+    // study bucket. Keep boundaries correct across 23- and 25-hour dates.
     let date = try #require(calendar.date(from: DateComponents(
         year: 2026, month: month, day: month == 3 ? 7 : 31, hour: 2)))
-    let first = StudyDay.nextRollover(after: date, rolloverMinutes: rollover, calendar: calendar)
+    let first = StudyDay.start(for: date, rolloverMinutes: rollover, calendar: calendar)
     let last = calendar.date(byAdding: .day, value: 6, to: first)!
     let days = ScopeHomeUpcoming.days(
         points: [.init(date: first, series: "Scheduled cards", value: 7),

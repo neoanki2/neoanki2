@@ -91,8 +91,13 @@ The allowance is shared by the deck and its entire subtree. When you set a
 parent deck to 20, at most 20 new cards total are available from that parent and
 all of its subdecks that study day. A subdeck can add a stricter limit of its
 own; cards in that subdeck must fit both allowances. Unassigned cards remain
-unlimited. The scope home keeps **New** as the full backlog while explaining
-how many due new cards are available today and how many are deferred.
+unlimited. The scope home's due count includes only new cards currently eligible
+under these limits. On Mac, **Coming up** shows current due dates of introduced
+cards for today and the next six study days. **Today** includes overdue cards
+and intraday reviews scheduled for later today. It excludes unintroduced cards, so changing
+an introduction limit need not change those bars. The chart uses the configured
+study-day rollover, rather than calendar midnight, and is not a simulation of
+future grades or repeated attempts.
 Generated poem and prose decks are children of the selected root without their
 own default cap. Their new cards share the parent's allowance as soon as the
 save completes. Creating a deck does not consume that allowance; first grading

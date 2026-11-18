@@ -163,7 +163,7 @@ struct ScopeHomeView: View {
                     points: snapshot.due, asOf: snapshot.asOf, rollover: statistics.rollover)
                 Chart(days) { day in
                     BarMark(
-                        x: .value("Day", day.date.formatted(.dateTime.weekday(.abbreviated))),
+                        x: .value("Day", day.isToday ? "Today" : day.date.formatted(.dateTime.weekday(.abbreviated))),
                         y: .value("Scheduled cards", day.count),
                         width: .ratio(0.55)
                     )
@@ -184,9 +184,9 @@ struct ScopeHomeView: View {
                 }
                 .chartYScale(domain: 0...Double(max(1, days.map(\.count).max() ?? 0)) * 1.3)
                 .frame(height: 160)
-                .accessibilityLabel("Scheduled cards over the next seven study days")
+                .accessibilityLabel("Scheduled cards today and over the next six study days")
                 .accessibilityIdentifier("scopeHomeUpcomingChart")
-                Text("Next 7 days. Counts change as you study.")
+                Text("Today includes overdue cards and reviews scheduled for later today. Counts change as you study.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if statistics.error == nil {
