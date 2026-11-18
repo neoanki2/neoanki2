@@ -540,13 +540,21 @@ private actor VocabularyPackOpenCounter {
 private actor BlockingPairingApprover: APIPairingApprover {
     private var continuation: CheckedContinuation<Bool, Never>?
     private(set) var started = false
+    private(set) var completed = false
+    private(set) var requestedApproval: APIPairingRequest?
+    private(set) var cancelledRequest: APIPairingRequest?
 
     func approve(_ request: APIPairingRequest) async -> Bool {
         started = true
+        requestedApproval = request
+        defer { completed = true }
+        // The expiry task may win before the approval task enters this actor.
+        if cancelledRequest != nil { return false }
         return await withCheckedContinuation { continuation = $0 }
     }
 
     func cancel(_ request: APIPairingRequest) {
+        cancelledRequest = request
         continuation?.resume(returning: false)
         continuation = nil
     }
@@ -554,17 +562,6 @@ private actor BlockingPairingApprover: APIPairingApprover {
     func resolve(_ approved: Bool) {
         continuation?.resume(returning: approved)
         continuation = nil
-    }
-}
-
-private struct SlowPairingApprover: APIPairingApprover {
-    func approve(_ request: APIPairingRequest) async -> Bool {
-        do {
-            try await Task.sleep(for: .seconds(10))
-            return true
-        } catch {
-            return false
-        }
     }
 }
 
@@ -1354,16 +1351,16 @@ private func pairWithAuthority(
 
     let expiringStore = try ItemStore(databaseURL: apiTestDatabaseURL(), starterItemTypes: [])
     try await expiringStore.bootstrap()
+    let expiringApprover = BlockingPairingApprover()
     let expiringAPI = NeoAnkiAPIService(
         store: expiringStore,
         authorization: APIAuthorizationStore(
             persistence: InMemoryAPICredentialPersistence()
         ),
-        pairingApprover: SlowPairingApprover(),
+        pairingApprover: expiringApprover,
         applicationVersion: "test",
-        pairingRequestLifetime: 0.01
+        pairingRequestLifetime: 0
     )
-    let startedAt = ContinuousClock.now
     let expired = await expiringAPI.handle(request(
         .post,
         "/v1/pairings",
@@ -1371,7 +1368,11 @@ private func pairWithAuthority(
     ))
     #expect(expired.status == 403)
     #expect(try jsonObject(expired)["code"] as? String == "pairing_denied")
-    #expect(startedAt.duration(to: .now) < .seconds(1))
+    #expect(await expiringApprover.started)
+    #expect(await expiringApprover.completed)
+    let expiredRequest = APIPairingRequest(displayName: "Expires", origin: nil, requestedScopes: [.libraryRead])
+    #expect(await expiringApprover.requestedApproval == expiredRequest)
+    #expect(await expiringApprover.cancelledRequest == expiredRequest)
 }
 
 @Test func verifierFilePersistsOnlyTokenHashesWithPrivatePermissions() async throws {

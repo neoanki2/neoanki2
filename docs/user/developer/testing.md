@@ -288,6 +288,19 @@ archive still target ARM64. Local Apple Silicon verification remains separate.
 The [official image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md)
 lists the pinned Xcode installation.
 
+Resource contracts check each checksum read's autorelease lifetime and pairing
+approval cancellation/completion directly. The former process-wide RSS growth
+budget and one-second pairing-response deadline were removed: parallel tests
+and runner load could violate those thresholds without either behavior failing.
+
+The signed FSRS fixture manifest preserves the original August 16, 2026
+verification and its tolerances. Current analytic-gradient tests permit the
+larger of `1e-10` and two Float ULPs at each nonzero oracle derivative's magnitude,
+because forward caches use Float and platform math libraries can differ.
+Inactive derivatives and signs remain exact; loss parity, independent finite
+differences, and optimizer parity retain their separate checks. This fixture
+tolerance is not an error bound for arbitrary review histories.
+
 Automatic CI runs all root-package Swift tests and all NeoAnkiCore tests,
 architecture and release contracts, documentation checks, shared macOS/iOS
 builds, and the unsigned iOS app/widget archive. Performance benchmarks remain

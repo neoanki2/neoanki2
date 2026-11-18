@@ -64,7 +64,7 @@ struct AnalyticTests {
 
     @Test func analyticBranchesMatchPinnedRustOracle() throws {
         let fixture = try OptimizerReferenceFixture.load()
-        for reference in fixture.gradientCases {
+        for (caseIndex, reference) in fixture.gradientCases.enumerated() {
             var gradient = [Double](repeating: 0, count: 21)
             let loss = Analytic.prefixLossAndGradient(
                 weights: Parameters.defaults, timeHistory: reference.times,
@@ -72,9 +72,39 @@ struct AnalyticTests {
                 sequenceLengths: [3], deltaTimes: [reference.delta], labels: [reference.label],
                 exampleWeights: [1], gradient: &gradient
             )
-            #expect(abs(loss - reference.loss) < 1e-12)
-            for (actual, expected) in zip(gradient, reference.gradient) {
-                #expect(abs(actual - expected) < 1e-10)
+            let context = "case \(caseIndex), times \(reference.times), ratings \(reference.ratings), delta \(reference.delta), label \(reference.label)"
+            #expect(abs(loss - reference.loss) < 1e-12, "\(context): loss \(loss), oracle \(reference.loss)")
+            try #require(gradient.count == reference.gradient.count, "\(context): gradient shape differs")
+            for (parameter, expected) in reference.gradient.enumerated() {
+                let actual = gradient[parameter]
+                let parameterContext = "\(context), parameter \(parameter): actual \(actual), oracle \(expected)"
+                try #require(actual.isFinite && expected.isFinite, "\(parameterContext): nonfinite derivative")
+                if expected == 0 {
+                    // Inactive/clamped branches must remain exactly inactive.
+                    #expect(actual == 0, "\(parameterContext): an inactive derivative became active")
+                    continue
+                }
+
+                // The pinned Rust analytic.rs and Swift both cache Float
+                // forward states before Double backpropagation. Promoting a
+                // cache does not recover the precision lost in exp/pow/log;
+                // their Float results can differ across platform math libraries.
+                // Compare these three-step fixtures to two Float ULPs at each
+                // derivative's magnitude, retaining the original 1e-10 bound
+                // for tiny derivatives. This is a fixture precision contract,
+                // not a general error bound for arbitrary-length histories.
+                // Intel's observed maximum was 1.14 Float ULPs; exact zero and
+                // sign, strict loss parity, and independent finite differences
+                // remain separate requirements.
+                // https://doc.rust-lang.org/std/primitive.f32.html#method.powf
+                let floatMagnitude = Float(abs(expected))
+                try #require(floatMagnitude.isFinite && floatMagnitude > 0, "\(parameterContext): oracle exceeds Float range")
+                let floatULP = Double(floatMagnitude.ulp)
+                let allowedDifference = max(1e-10, 2 * floatULP)
+                let difference = abs(actual - expected)
+                #expect(actual.sign == expected.sign, "\(parameterContext): derivative sign changed")
+                #expect(difference <= allowedDifference,
+                        "\(parameterContext): absolute difference \(difference), Float ULPs \(difference / floatULP), allowed \(allowedDifference)")
             }
         }
     }

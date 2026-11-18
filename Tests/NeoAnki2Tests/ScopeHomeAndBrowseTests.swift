@@ -414,6 +414,7 @@ private func addItem(
     await model.load()
     #expect(await addItem(model, front: "France", back: "Paris", deckID: deck.id))
     #expect(await addItem(model, front: "Japan", back: "Tokyo"))
+    await model.awaitReadModels()
     await decksModel.load()
 
     let snapshot = try await store.coldLibraryHomeSnapshot(scope: .allDecks)
