@@ -292,6 +292,9 @@ Resource contracts check each checksum read's autorelease lifetime and pairing
 approval cancellation/completion directly. The former process-wide RSS growth
 budget and one-second pairing-response deadline were removed: parallel tests
 and runner load could violate those thresholds without either behavior failing.
+The loopback lifecycle contract observes TCP readiness, complete HTTP framing,
+and EOF directly. It no longer measures the shared URLSession's scheduling or
+default request deadline alongside unrelated parallel tests.
 
 The signed FSRS fixture manifest preserves the original August 16, 2026
 verification and its tolerances. Current analytic-gradient tests permit the

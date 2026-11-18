@@ -705,18 +705,86 @@ private func makeAPIAndStore() async throws -> (NeoAnkiAPIService, ItemStore) {
     )
 
     try await server.start()
-    #expect(await server.isRunning)
-    let actualPort = try #require(await server.listeningPort)
-    let url = try #require(URL(string: "http://127.0.0.1:\(actualPort.rawValue)/health"))
-    var healthRequest = URLRequest(url: url)
-    healthRequest.setValue(authority, forHTTPHeaderField: "Host")
-    let (data, response) = try await URLSession.shared.data(for: healthRequest)
-    #expect((response as? HTTPURLResponse)?.statusCode == 200)
-    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
-    #expect(body == ["status": "ok"])
+    do {
+        #expect(await server.isRunning)
+        let actualPort = try #require(await server.listeningPort)
+        // Observe this socket's readiness and EOF directly. URLSession.shared's
+        // process-wide scheduling/deadline is unrelated to the server contract.
+        let bytes = try await loopbackHTTPResponse(
+            port: actualPort,
+            request: Data("GET /health HTTP/1.1\r\nHost: \(authority)\r\nConnection: close\r\n\r\n".utf8)
+        )
+        let separator = try #require(bytes.range(of: Data("\r\n\r\n".utf8)))
+        let head = String(decoding: bytes[..<separator.lowerBound], as: UTF8.self)
+        let lines = head.components(separatedBy: "\r\n")
+        #expect(lines.first == "HTTP/1.1 200 OK")
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            let colon = try #require(line.firstIndex(of: ":"))
+            let name = line[..<colon].lowercased()
+            let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            #expect(headers[name] == nil, "Duplicate response header: \(name)")
+            headers[name] = value
+        }
+        let length = try #require(headers["content-length"].flatMap(Int.init))
+        let data = Data(bytes[separator.upperBound...])
+        #expect(length == data.count, "EOF must follow exactly the declared response body.")
+        #expect(headers["connection"]?.lowercased() == "close")
+        #expect(headers["transfer-encoding"] == nil)
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
+        #expect(body == ["status": "ok"])
+    } catch {
+        await server.stop()
+        throw error
+    }
 
     await server.stop()
     #expect(await !server.isRunning)
+}
+
+private func loopbackHTTPResponse(port: NWEndpoint.Port, request: Data) async throws -> Data {
+    let connection = NWConnection(host: "127.0.0.1", port: port, using: .tcp)
+    defer { connection.cancel() }
+    return try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    connection.stateUpdateHandler = nil
+                    continuation.resume()
+                case let .failed(error):
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: error)
+                case .cancelled:
+                    connection.stateUpdateHandler = nil
+                    continuation.resume(throwing: CancellationError())
+                default: break
+                }
+            }
+            connection.start(queue: DispatchQueue(label: "neoanki-api-http-test"))
+        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.send(content: request, completion: .contentProcessed { error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            })
+        }
+        var bytes = Data()
+        while true {
+            let (data, complete) = try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<(Data, Bool), Error>) in
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) {
+                    data, _, complete, error in
+                    if let error { continuation.resume(throwing: error) }
+                    else { continuation.resume(returning: (data ?? Data(), complete)) }
+                }
+            }
+            bytes.append(data)
+            if complete { return bytes }
+        }
+    } onCancel: {
+        connection.cancel()
+    }
 }
 
 @Test func openEventStreamClosesAfterClientRevocation() async throws {
