@@ -12,6 +12,8 @@ cd "$ROOT"
 swift test --parallel
 
 python3 "$ROOT/Scripts/test-sync-test-sensitivity.py"
+python3 "$ROOT/Scripts/test-editor-test-sensitivity.py"
+python3 "$ROOT/Scripts/test-editor-save-ui.py"
 python3 "$ROOT/Scripts/test-performance-runner.py"
 
 echo "==> Generated API reference"

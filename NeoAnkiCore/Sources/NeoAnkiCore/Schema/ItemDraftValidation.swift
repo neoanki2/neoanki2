@@ -28,6 +28,7 @@ public enum ItemDraftValidationIssue: Sendable, Equatable {
     case missingMediaDescription(UUID)
     case invalidCloze(UUID)
     case invalidOcclusion(UUID)
+    case invalidValue(UUID)
 }
 
 public enum ItemDraftValidation {
@@ -36,16 +37,27 @@ public enum ItemDraftValidation {
         itemType: ItemType
     ) -> [ItemDraftValidationIssue] {
         itemType.fields.compactMap { field in
+            if field.type == .number {
+                let input = draft.text[field.id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+                if !input.isEmpty, Double(input)?.isFinite != true { return .invalidValue(field.id) }
+            }
+            if let reference = draft.media[field.id],
+               reference.kind != field.type.mediaKind || !reference.isValidStoredReference {
+                return .invalidValue(field.id)
+            }
             if field.type == .imageOcclusion, let content = draft.occlusions[field.id] {
                 do { try ImageOcclusionValidation.validate(content) }
                 catch { return .invalidOcclusion(field.id) }
             }
             if field.type == .cloze {
-                let characterCount = draft.text[field.id, default: ""].count
-                let valid = draft.clozeBlanks[field.id, default: []].allSatisfy {
-                    $0.start >= 0 && $0.length > 0 && $0.start + $0.length <= characterCount
+                let text = draft.text[field.id, default: ""]
+                let blanks = draft.clozeBlanks[field.id, default: []]
+                // An absent optional cloze is allowed; every populated cloze
+                // uses the same overlap/Unicode/overflow-safe contract as writes.
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !blanks.isEmpty {
+                    do { try ClozeValidation.validate(text: text, blanks: blanks) }
+                    catch { return .invalidCloze(field.id) }
                 }
-                if !valid { return .invalidCloze(field.id) }
             }
             guard field.isRequired else { return nil }
             let hasValue: Bool

@@ -95,6 +95,55 @@ import Testing
     #expect(model.configuration != nil && model.text[fixture.answer.id] == "НА\u{301}ЧИНКА")
 }
 
+private actor CaptureSavedCallbackGate {
+    private var held: CheckedContinuation<Void, Never>?
+    private var observer: CheckedContinuation<Void, Never>?
+    private var didHold = false
+    func notify() async {
+        guard !didHold else { return }
+        didHold = true
+        await withCheckedContinuation { continuation in
+            held = continuation
+            observer?.resume(); observer = nil
+        }
+    }
+    func waitUntilHeld() async {
+        guard held == nil else { return }
+        await withCheckedContinuation { observer = $0 }
+    }
+    func release() { held?.resume(); held = nil }
+}
+
+@Test @MainActor func committedWordCaptureDoesNotWaitForOptionalOwnerRefresh() async throws {
+    let fixture = try await CaptureFixture()
+    defer { fixture.cleanup() }
+    let gate = CaptureSavedCallbackGate()
+    fixture.model = fixture.makeModel(onSaved: { await gate.notify() })
+    let model = fixture.model!
+    await model.start(deckID: fixture.deck.id)
+    fixture.configure()
+    model.query = "начинка"
+    await model.search()
+    var returned = false
+    let save = Task { await model.save(); returned = true }
+    await gate.waitUntilHeld()
+    #expect(returned)
+    #expect(!model.isSaving)
+    #expect(model.successMessage != nil)
+    #expect(model.query.isEmpty)
+    #expect(try await fixture.repository.items(scope: .deck(fixture.deck.id), sort: .createdAscending, search: "").count == 1)
+    if returned {
+        model.query = "начинка"
+        await model.search()
+        await model.save()
+        #expect(model.focusGeneration == 2)
+        #expect(try await fixture.repository.items(scope: .deck(fixture.deck.id), sort: .createdAscending, search: "").count == 2)
+    }
+    await gate.release()
+    await save.value
+    await model.awaitSavedNotifications()
+}
+
 @Test @MainActor func capturePairPreferencesAreIndependentAndSurviveRelaunchAndRenames() async throws {
     let fixture = try await CaptureFixture()
     defer { fixture.cleanup() }

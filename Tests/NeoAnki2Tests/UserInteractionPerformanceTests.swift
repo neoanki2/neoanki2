@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiCore
+import NeoAnkiApplication
 import NeoAnkiTestSupport
 import Testing
 
@@ -303,7 +304,7 @@ private struct InteractionFixture {
     let fileURL = fixture.directory.appendingPathComponent("one-import.json")
     try PerformanceFixtures.makeJSONImportPayload(rowCount: batchSize, startIndex: scale.itemCount)
         .write(to: fileURL)
-    let importModel = ImportModel(itemsModel: fixture.itemsModel)
+    let importModel = ImportModel(itemsModel: fixture.itemsModel, library: SQLiteLibraryRepository(store: fixture.store))
 
     _ = try await PerformanceHarness.measure(
         flow: "interaction-import-one-json-file",

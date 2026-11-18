@@ -1,0 +1,1230 @@
+classDiagram
+direction LR
+  class t0["StudyStageGeometry"] {
+    <<enum>>
+    effectiveLayout()
+    mediaFraction()
+    usesVerticalSplit()
+    accessibilityRegions()
+  }
+  class t1["StudyStageContent"] {
+    <<struct>>
+    spacing
+    composition
+    response
+    init()
+    body
+  }
+  class t2["AdaptiveStudyStage"] {
+    <<struct>>
+    layout
+    stage
+    footer
+    init()
+    body
+  }
+  class t3["StudyRegionLayout"] {
+    <<struct>>
+    spacing
+    sizeThatFits()
+    placeSubviews()
+  }
+  class t4["CardLayoutID"] {
+    <<extension>>
+    displayName
+    guidance
+  }
+  class t5["ItemTypeStudioAccessibilityID"] {
+    <<enum>>
+    cardSetupList
+    cardSetupListScroll
+    addBasicCardSetup
+    addCardSetupMenu
+    undoCardSetupRemoval
+    cardSetupEditor
+    canvas
+    inspector
+    inspectorButton
+    inspectorDone
+    validationSummary
+    addContent
+    cardSetupName
+    answerMethod
+    recipeQuestion
+    recipeAnswer
+    showAnswer
+    layoutPicker
+    advanced
+    additionalContent
+    availability
+    availabilityCombination
+    learningRoute
+    auditPreview
+    cardSetup()
+    auditSection()
+    layout()
+    hole()
+    component()
+    fixedText()
+    reveal()
+    playback()
+    additionalSource()
+    additionalMoveUp()
+    additionalMoveDown()
+    revealRepair()
+    sourcePicker()
+    sourcePickerField()
+    sourcePickerFixedText()
+    sourcePickerCancel()
+  }
+  class t6["CardSetupEditorAuditSection"] {
+    <<enum>>
+    displayName
+  }
+  class t7["CardSetupEditorProjection"] {
+    <<struct>>
+    descriptor
+    resolvedComponents
+    canonicalComponentIDs
+    additionalComponentIDs
+    fieldTypesByComponentID
+    init()
+    isAdditional()
+    previewRendering()
+    previewLabel()
+  }
+  class t8["CardSetupEditorPreviewRendering"] {
+    <<enum>>
+  }
+  class t9["CardSetupEditorPreviewPolicy"] {
+    <<enum>>
+    rendering()
+  }
+  class t10["SharedStudyContentVisibility"] {
+    <<struct>>
+    rendering
+    accessibilityLabel
+    shouldResolveMedia
+    init()
+  }
+  class t11["SharedStudyContentVisibilityPolicy"] {
+    <<enum>>
+    decision()
+    contentDescription()
+  }
+  class t12["SharedStudyClozePresentation"] {
+    <<enum>>
+    displayText()
+  }
+  class t13["CardSetupRevealControlPolicy"] {
+    <<enum>>
+    allowedModes()
+    isValid()
+    repairMode()
+  }
+  class t14["CardSetupEditorMoveDirection"] {
+    <<enum>>
+  }
+  class t15["CardSetupEditorAction"] {
+    <<enum>>
+  }
+  class t16["CardSetupEditorReducer"] {
+    <<enum>>
+    apply()
+    normalizeMediaBehavior()
+    mediaKind()
+    placementSiblingIndices()
+    fieldType()
+    additionalComponentIndices()
+  }
+  class t17["SendableWritableKeyPath"] {
+    <<struct>>
+    value
+  }
+  class t18["CardSetupEditorBindingFactory"] {
+    <<enum>>
+    setupValue()
+    componentValue()
+    fixedText()
+    reveal()
+    availability()
+    componentActionValue()
+  }
+  class t19["ItemTypeStudioDraftReducer"] {
+    <<enum>>
+    changeFieldType()
+  }
+  class t20["CardSetupEditorLayoutMetrics"] {
+    <<enum>>
+    minimumTouchTarget
+    maximumAvailabilityIndentation
+    macSourcePickerMinimumDimension
+    workspaceInspectorThreshold
+    availabilityIndentation()
+    availabilityIndentationIncrement()
+    usesVerticalAvailabilityControls()
+  }
+  class t21["AvailabilityRuleEditorIdentityState"] {
+    <<struct>>
+    childIDs
+    init()
+    appendChild()
+    removeChild()
+    reconcile()
+  }
+  class t22["CardSetupEditorAdvancedPolicy"] {
+    <<enum>>
+    startsExpanded
+  }
+  class t23["CardSetupEditorFocusPolicy"] {
+    <<enum>>
+    target()
+    disclosures()
+  }
+  class t24["CardSetupEditorFocusPolicy.DisclosureState"] {
+    <<struct>>
+    showsAdvanced
+    showsAdditionalContent
+    init()
+  }
+  class t25["CardSetupCollectionView"] {
+    <<struct>>
+    draft
+    selection
+    init()
+    body
+    applicableAlternativeStarters
+    setupSummary()
+    setupAccessibilityLabel()
+    add()
+    remove()
+  }
+  class t26["CardSetupEditorPresentation"] {
+    <<enum>>
+  }
+  class t27["MobileCardSetupValidationRoute"] {
+    <<enum>>
+    id
+  }
+  class t28["CardSetupEditorView"] {
+    <<struct>>
+    systemReduceMotion
+    colorScheme
+    colorSchemeContrast
+    dynamicTypeSize
+    reduceMotionOverride
+    draft
+    cardSetupID
+    validationFocus
+    validationMessage
+    auditSection
+    presentation
+    mobilePage
+    mobileValidationRoute
+    isAnswerRevealed
+    showsAdvanced
+    showsAdditionalContent
+    pendingAudioSubmission
+    sourceRequest
+    selectedComponentID
+    isInspectorPresented
+    workspaceUsesInspectorSheet
+    focusedTarget
+    init()
+    reduceMotion
+    body
+    selectedSetupComponentIDs
+    canvasSourceRequest
+    rootAudioSubmissionConfirmation
+    workspaceEditor()
+    workspaceCanvas()
+    workspaceLayoutMenu()
+    workspaceAddContentMenu()
+    answerVisibilityButton
+    workspaceInspector()
+    workspaceInspectorSheet()
+    selectedContentSection()
+    setupIndex
+    applyValidationFocus()
+    targetUsesWorkspaceInspector()
+    auditEditorSection()
+    auditSectionMarker()
+    mobileEditor()
+    focusedMobileEditor()
+    mobilePageContent()
+    mobileContentOverview()
+    editorSections()
+    identitySection()
+    recipeSection()
+    recipeContents()
+    recipeSourceButton()
+    layoutSection()
+    previewUsesVerticalHeader
+    previewSection()
+    emptyHole()
+    previewComponent()
+    namedContentSection()
+    namedHoleContent()
+    contentActionIcon()
+    componentEditorRow()
+    additionalContentRow()
+    componentContextControls()
+    localMoveButtons()
+    placementMoveButtons()
+    advancedSection()
+    availabilityEditor()
+    learningRouteEditor()
+    recommendationButton()
+    validationMessages()
+    interactionBinding()
+    availabilityEnabledBinding()
+    availabilityBinding()
+    setupBinding()
+    componentBinding()
+    revealBinding()
+    skillBinding()
+    fixedTextBinding()
+    apply()
+    duplicateComponent()
+    canonicalSiblingIndices()
+    additionalComponentIndices()
+    moveWithinHole()
+    apply()
+    sourceLabel()
+    sourceFields()
+    mediaKind()
+    fieldType()
+    previewSymbol()
+    previewAccessibilityLabel()
+  }
+  class t29["CardSetupSourceRequest"] {
+    <<struct>>
+    id
+    componentID
+    hole
+  }
+  class t30["CardSetupSourcePicker"] {
+    <<struct>>
+    dismiss
+    fields
+    allowsFixedText
+    componentID
+    hole
+    onSelect
+    query
+    body
+    filteredFields
+  }
+  class t31["CardLayoutChoice"] {
+    <<struct>>
+    layout
+    isSelected
+    isRecommended
+    action
+    body
+  }
+  class t32["CardLayoutThumbnail"] {
+    <<struct>>
+    layout
+    body
+  }
+  class t33["AvailabilityRuleEditor"] {
+    <<struct>>
+    dynamicTypeSize
+    rule
+    fields
+    depth
+    identityState
+    init()
+    body
+    childCount
+    combinationPicker
+    leafEditor
+    leafControls
+    leafFieldBinding
+    leafPresenceBinding
+    combinationBinding
+    childBinding()
+    appendChild()
+    removeChild()
+  }
+  class t34["AvailabilityRuleEditor.Combination"] {
+    <<enum>>
+  }
+  class t35["AvailabilityControlsLayout"] {
+    <<struct>>
+    isAccessibilitySize
+    spacing
+    sizeThatFits()
+    placeSubviews()
+    usesVerticalLayout()
+    finiteWidth()
+    intrinsicWidth()
+  }
+  class t36["ContentValue"] {
+    <<extension>>
+    editorPreviewText
+  }
+  class t37["FieldType"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t38["CardSetupStarter"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t39["Interaction"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t40["ComponentPurpose"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t41["RevealMode"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t42["MediaBehavior"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t43["Modality"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t44["NeoAnkiCore.Operation"] {
+    <<extension>>
+    editorDisplayName
+  }
+  class t45["CardWireframeHole"] {
+    <<enum>>
+    id
+    displayName
+  }
+  class t46["CardWireframeRevealPhase"] {
+    <<enum>>
+  }
+  class t47["CardWireframeThumbnailFrame"] {
+    <<struct>>
+    x
+    y
+    width
+    height
+    init()
+  }
+  class t48["CardWireframeHoleDescriptor"] {
+    <<struct>>
+    hole
+    region
+    accessibilityOrder
+    thumbnailFrame
+    id
+    init()
+  }
+  class t49["CardWireframeInsertion"] {
+    <<struct>>
+    region
+    purpose
+    init()
+  }
+  class t50["CardWireframeGeometry"] {
+    <<enum>>
+  }
+  class t51["CardWireframeAxisAllocation"] {
+    <<struct>>
+    leading
+    trailing
+    init()
+  }
+  class t52["CardWireframeLayoutMetrics"] {
+    <<enum>>
+    proportionalSections()
+    verticalMediaSections()
+  }
+  class t53["CardWireframeRenderedComponent"] {
+    <<struct>>
+    component
+    hole
+    phase
+    authoredIndex
+    id
+    init()
+  }
+  class t54["CardWireframeAnswerPanelProjection"] {
+    <<struct>>
+    visibleComponents
+    hasConcealedExpectedAnswer
+    init()
+  }
+  class t55["CardWireframeDescriptor"] {
+    <<struct>>
+    layout
+    geometry
+    holes
+    id
+    regionOrder
+    accessibilityHoles
+    descriptor()
+    hole()
+    canonicalInsertion()
+    revealPhase()
+    renderedComponents()
+    answerPanelProjection()
+    init()
+    region()
+  }
+  class t56["CardWireframeView"] {
+    <<struct>>
+    sizingMode
+    mobileReading
+    descriptor
+    components
+    isAnswerRevealed
+    emptyHoleView
+    componentView
+    init()
+    body
+    composition
+    centeredContent()
+    questionPanel
+    answerPanel
+    mediaAsideContent
+    mediaPanel
+    hole()
+    visibleComponents()
+    authoredComponents()
+    accessibilityPriority()
+    font()
+  }
+  class t57["CardWireframeSizingMode"] {
+    <<enum>>
+    fillsAvailableHeight
+    referenceHeight
+  }
+  class t58["CardWireframeSizingModeKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t59["EnvironmentValues"] {
+    <<extension>>
+    cardWireframeSizingMode
+  }
+  class t60["View"] {
+    <<extension>>
+    cardWireframeIntrinsicSizing()
+  }
+  class t61["CardWireframeProportionalHStack"] {
+    <<struct>>
+    trailingFraction
+    spacing
+    sizeThatFits()
+    placeSubviews()
+  }
+  class t62["CardWireframeVerticalMediaLayout"] {
+    <<struct>>
+    geometry
+    spacing
+    sizingMode
+    sizeThatFits()
+    placeSubviews()
+  }
+  class t63["OpenLearnInContextKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t64["EnvironmentValues"] {
+    <<extension>>
+    openLearnInContext
+  }
+  class t65["ContextAuthoringEntry"] {
+    <<struct>>
+    rootURL
+    library
+    deckID
+    fields
+    text
+    onSaved
+    showing
+    init()
+    seedExpression
+    body
+  }
+  class t66["ItemTypeChooserView"] {
+    <<struct>>
+    dismiss
+    library
+    deckID
+    onSelected
+    catalog
+    query
+    name
+    error
+    isWorking
+    init()
+    body
+    matches()
+    choose()
+    create()
+  }
+  class t67["DeckItemTypesView"] {
+    <<struct>>
+    library
+    deckID
+    refreshToken
+    onEdit
+    onChanged
+    choices
+    sourceDeckName
+    affectedDeckCounts
+    hasParent
+    inherits
+    catalog
+    showChooser
+    error
+    isWorking
+    init()
+    body
+    attachedIDs
+    change()
+    reload()
+  }
+  class t68["VocabularyPackRootKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t69["EnvironmentValues"] {
+    <<extension>>
+    vocabularyPackRootURL
+  }
+  class t70["DictionaryFieldLookupSection"] {
+    <<struct>>
+    rootURL
+    packs
+    packID
+    sourceID
+    destinationID
+    expanded
+    loadingError
+    lookup
+    autofill
+    previousRequest
+    fields
+    text
+    init()
+    query
+    selectedPackURL
+    request
+    body
+    canAutofill
+    apply()
+  }
+  class t71["DictionaryFieldLookupSection.Request"] {
+    <<struct>>
+    packURL
+    sourceID
+    destinationID
+    query
+    enabled
+  }
+  class t72["ImportedAttachmentImage"] {
+    <<struct>>
+    image
+    transferRepresentation
+  }
+  class t73["AttachmentProcessingEnvironmentKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t74["EnvironmentValues"] {
+    <<extension>>
+    attachmentProcessing
+  }
+  class t75["AttachmentProcessingPreferenceKey"] {
+    <<struct>>
+    defaultValue
+    reduce()
+  }
+  class t76["ImageAttachmentTransfer"] {
+    <<enum>>
+    prepare()
+    prepare()
+    prepareRepresentation()
+    temporaryFile()
+  }
+  class t77["ImageAttachmentPasteButton"] {
+    <<struct>>
+    receive
+    task
+    processing
+    otherAttachmentProcessing
+    init()
+    body
+  }
+  class t78["OcclusionBitmap"] {
+    <<struct>>
+    image
+    load()
+  }
+  class t79["OcclusionImage"] {
+    <<struct>>
+    reference
+    store
+    bitmap
+    failed
+    overlay
+    body
+  }
+  class t80["ImageOcclusionStudyView"] {
+    <<struct>>
+    content
+    mediaStore
+    group
+    revealed
+    init()
+    body
+  }
+  class t81["ImageOcclusionFieldEditor"] {
+    <<struct>>
+    label
+    content
+    mediaStore
+    draft
+    editing
+    importing
+    confirmReplacement
+    error
+    importedReference
+    importingBytes
+    pasteProcessing
+    pendingPaste
+    otherAttachmentProcessing
+    importTask
+    isActive
+    confirmsRemoval
+    nextGroupFloor
+    selectedPhoto
+    init()
+    body
+    maskEditor
+    cancelImport()
+    accept()
+    ingestFile()
+    ingestPrepared()
+    ingestPhoto()
+  }
+  class t82["ImageOcclusionEditor"] {
+    <<struct>>
+    initial
+    dismissal
+    draft
+    selected
+    undo
+    redo
+    drawing
+    panning
+    zoom
+    preview
+    revealed
+    previewGroup
+    gestureStart
+    pendingRect
+    sizeClass
+    mediaStore
+    onDone
+    onCancel
+    init()
+    body
+    controls
+    canvas
+    editingOverlay()
+    canvasGesture()
+    resizeGesture()
+    inspector
+    coordinate()
+    change()
+    finishGesture()
+    undoEdit()
+    redoEdit()
+  }
+  class t83["ContextPreviewPlayback"] {
+    <<class>>
+    requestID
+    player
+    preparation
+    begin()
+    track()
+    attach()
+  }
+  class t84["LearnInContextView"] {
+    <<struct>>
+    dismiss
+    model
+    previewPlayback
+    expressionFocused
+    deckID
+    expression
+    language
+    meaning
+    init()
+    body
+    canFindExamples
+    unavailableSpeechMessage
+    sourceLabel()
+  }
+  class t85["ContextInlinePlayback"] {
+    <<struct>>
+    playback
+    model
+    example
+    sourceLabel
+    player
+    temporaryURL
+    task
+    preparing
+    requestID
+    body
+    playButton
+  }
+  class t86["LearningTimeMediaActivity"] {
+    <<struct>>
+    changed
+    init()
+  }
+  class t87["LearningTimeMediaActivityKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t88["EnvironmentValues"] {
+    <<extension>>
+    learningTimeActivity
+  }
+  class t89["LearningTimePlaybackObserver"] {
+    <<class>>
+    id
+    observation
+    generation
+    activity
+    observe()
+    stop()
+  }
+  class t90["LearningTimePlaybackModifier"] {
+    <<struct>>
+    player
+    activity
+    observer
+    body()
+  }
+  class t91["View"] {
+    <<extension>>
+    trackingLearningTimePlayback()
+  }
+  class t92["LearningTimeSaveStatusView"] {
+    <<struct>>
+    status
+    init()
+    body
+  }
+  class t93["LearningTimeFormat"] {
+    <<enum>>
+    duration()
+    accessibleDuration()
+  }
+  class t94["CardMaturityStatus"] {
+    <<extension>>
+    displayName
+  }
+  class t95["MaturitySummary"] {
+    <<extension>>
+    displayName
+    progressText
+  }
+  class t96["ReviewMediaAccessibility"] {
+    <<enum>>
+    description()
+  }
+  class t97["NeoAnkiAccessibilityReduceMotionOverrideKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t98["EnvironmentValues"] {
+    <<extension>>
+    neoAnkiAccessibilityReduceMotionOverride
+  }
+  class t99["SharedDesignSystem"] {
+    <<enum>>
+    readingColumnMax
+    minimumTouchTarget
+    compactSpacing
+    standardSpacing
+    sectionSpacing
+    accent
+    mobileTint()
+    surface
+    separator
+  }
+  class t100["AdaptiveReadingColumn"] {
+    <<struct>>
+    horizontalSizeClass
+    content
+    init()
+    body
+  }
+  class t101["View"] {
+    <<extension>>
+    neoAnkiMobilePrimaryActionTint()
+    neoAnkiTouchTarget()
+  }
+  class t102["StatisticsCalendarLayout"] {
+    <<struct>>
+    points
+    calendar
+    yearStart
+    row()
+    column()
+    lastActiveWeek
+    weekCount
+    months
+    weekday()
+  }
+  class t103["StatisticsCalendarMetrics"] {
+    <<struct>>
+    visibleWeeks
+    cellSide
+    height
+    init()
+    initialX()
+  }
+  class t104["CalendarSizing"] {
+    <<struct>>
+    weeks
+    minimumCell
+    axisWidth
+    axisHeight
+    sizeThatFits()
+    placeSubviews()
+  }
+  class t105["StatisticsCalendarPlot"] {
+    <<struct>>
+    points
+    calendar
+    selectedWeek
+    selectedWeekday
+    minimumCell
+    axisWidth
+    axisHeight
+    layout
+    calendarIdentity
+    body
+    chart
+  }
+  class t106["StatisticsExportKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t107["EnvironmentValues"] {
+    <<extension>>
+    statisticsExportCSV
+  }
+  class t108["StatisticsChartSelection"] {
+    <<struct>>
+    text
+    onSelect
+    body
+    minimumHeight
+  }
+  class t109["StatisticsTimeChart"] {
+    <<struct>>
+    export
+    title
+    points
+    lines
+    onSelect
+    selected
+    body
+    axisDayStride
+    selectedDate
+    selectedDescription
+  }
+  class t110["StatisticsBarChart"] {
+    <<struct>>
+    export
+    title
+    bins
+    percent
+    onSelect
+    selected
+    body
+    horizontal
+    selectedDescription
+  }
+  class t111["StatisticsHeatmap"] {
+    <<struct>>
+    export
+    points
+    onSelect
+    selectedWeek
+    selectedWeekday
+    unit
+    calendar
+    body
+    selectedPoint
+    layout
+  }
+  class t112["StatisticsForecastChart"] {
+    <<struct>>
+    export
+    forecast
+    baseline
+    body
+  }
+  class t113["StatisticsCohortChart"] {
+    <<struct>>
+    export
+    points
+    body
+  }
+  class t114["StatisticsMatrixCell"] {
+    <<struct>>
+    column
+    row
+    value
+    label
+    id
+  }
+  class t115["StatisticsMatrixPlot"] {
+    <<struct>>
+    cells
+    columns
+    rows
+    unit
+    maximum
+    height
+    peak
+    columnTicks
+    body
+    mark()
+    plot
+    columnAnchor()
+    legend
+  }
+  class t116["StatisticsHourChart"] {
+    <<struct>>
+    export
+    points
+    calendar
+    weekdayNumbers
+    cells
+    body
+  }
+  class t117["StatisticsDensityChart"] {
+    <<struct>>
+    export
+    cards
+    studied
+    magnitudes
+    stabilityLabel()
+    cells
+    body
+  }
+  class t118["StatisticsForgettingCurve"] {
+    <<struct>>
+    memory
+    body
+  }
+  class t119["StatisticsCSV"] {
+    <<struct>>
+    readableContentTypes
+    text
+    init()
+    init()
+    fileWrapper()
+  }
+  class t120["StatisticsView"] {
+    <<struct>>
+    model
+    heatmapTime
+    exportText
+    exporting
+    selectedInterval
+    selectedGrade
+    selectedCardGroup
+    selectedReview
+    visibleReviews
+    customPace
+    customRetention
+    init()
+    body
+    filters
+    scopePicker
+    periodPicker
+    overview()
+    activity()
+    memory()
+    workload()
+    sessionList()
+    reviewList()
+    reviewButton()
+    inspect()
+    reviewDetail()
+    selectDay()
+    selectInterval()
+    seconds()
+    years()
+  }
+  class t121["StatisticsCardGroup"] {
+    <<struct>>
+    id
+    title
+    cards
+  }
+  class t122["StatisticsCardInspector"] {
+    <<struct>>
+    group
+    dismiss
+    limit
+    body
+  }
+  class t123["StudyAnswerReviewProjection"] {
+    <<struct>>
+    prompt
+    answer
+    explanation
+    init()
+    isExplanation()
+  }
+  class t124["StudyAnswerDifference"] {
+    <<struct>>
+    response
+    answer
+    init()
+    tokens()
+    segments()
+  }
+  class t125["StudyAnswerDifference.Segment"] {
+    <<struct>>
+    text
+    changed
+  }
+  class t126["StudyAnswerReview"] {
+    <<struct>>
+    layout
+    components
+    isAnswerRevealed
+    response
+    evaluation
+    mobileReading
+    enabled
+    content
+    showsExplanation
+    init()
+    body
+    review
+    caption()
+    textDifference()
+    attributed()
+  }
+  class t127["StudyPreferences"] {
+    <<enum>>
+    usesPassFailGrades
+  }
+  class t128["StudyGradeChoice"] {
+    <<struct>>
+    title
+    rating
+    shortcutLabel
+    guidance
+    init()
+    titleWithShortcut
+    accessibilityLabel
+  }
+  class t129["StudyGradingMode"] {
+    <<enum>>
+    init()
+    choices
+    title()
+    standardTitle()
+  }
+  class t130["SyncStatusView"] {
+    <<struct>>
+    status
+    openIssues
+    init()
+    body
+    label
+    title
+    symbol
+    foregroundStyle
+  }
+  class t131["SyncIssuesView"] {
+    <<struct>>
+    issues
+    init()
+    body
+  }
+  class t132["VocabularyPackCloudList"] {
+    <<struct>>
+    model
+    onLocalChange
+    removing
+    replacing
+    actionHeight
+    init()
+    body
+    progress()
+  }
+  class t133["WordCaptureView"] {
+    <<struct>>
+    dismiss
+    dynamicTypeSize
+    colorScheme
+    verticalSizeClass
+    model
+    showsSetup
+    showsImporter
+    confirmsDiscard
+    pendingChange
+    highlightedIndex
+    focus
+    initialDeckID
+    init()
+    body
+    scrollsHeader
+    header
+    setupButton
+    queryField
+    deckPicker
+    dictionaryPicker
+    captureContent
+    fieldEditor()
+    footer
+    chooseHighlightedEntry()
+    requestChange()
+    requestClose()
+  }
+  class t134["WordCaptureView.CaptureFocus"] {
+    <<enum>>
+  }
+  class t135["WordCaptureSetupView"] {
+    <<struct>>
+    dismiss
+    model
+    typeID
+    bindings
+    errorMessage
+    didInitialize
+    showsTypeChooser
+    type
+    body
+    resetBindings()
+    sourceBinding()
+    variantBinding()
+    variants()
+    languages()
+    save()
+  }
+  class t136["CaptureActionButtonStyle"] {
+    <<struct>>
+    isEnabled
+    makeBody()
+  }

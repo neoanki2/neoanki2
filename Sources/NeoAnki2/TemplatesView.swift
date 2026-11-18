@@ -205,6 +205,13 @@ struct TemplatesView: View {
                 ErrorBanner(message: actionError)
                     .accessibilityIdentifier("itemTypeStudioActionError")
             }
+            if let warning = model.refreshWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, DesignSystem.Spacing.md)
+                    .accessibilityIdentifier("itemTypeStudioRefreshWarning")
+            }
 
             ForEach(model.corruptedDefinitions) { corruption in
                 HStack {
@@ -447,7 +454,7 @@ struct TemplatesView: View {
         do {
             try await model.deleteSelectedItemType()
             actionError = nil
-            await onTemplatesChanged()
+            model.requestOwnerRefresh { await onTemplatesChanged() }
         } catch { actionError = error.localizedDescription }
     }
 
@@ -478,7 +485,7 @@ struct TemplatesView: View {
         do {
             _ = try await model.unlockItemType(id: requested.itemTypeID)
             actionError = nil
-            await onTemplatesChanged()
+            model.requestOwnerRefresh { await onTemplatesChanged() }
         } catch { actionError = error.localizedDescription }
     }
 
@@ -488,7 +495,7 @@ struct TemplatesView: View {
         do {
             _ = try await model.duplicateSelectedIncludedItemType(name: duplicateName)
             actionError = nil
-            await onTemplatesChanged()
+            model.requestOwnerRefresh { await onTemplatesChanged() }
         } catch { actionError = error.localizedDescription }
     }
 

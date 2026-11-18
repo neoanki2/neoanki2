@@ -28,10 +28,13 @@ public struct WordCaptureView: View {
     @FocusState private var focus: CaptureFocus?
     private let initialDeckID: UUID?
 
+    public init(model: WordCaptureModel, deckID: UUID? = nil) {
+        _model = State(initialValue: model); initialDeckID = deckID
+    }
+
     public init(library: any LibraryRepository, rootURL: URL, deckID: UUID? = nil,
                 onSaved: @escaping @MainActor () async -> Void = {}) {
-        _model = State(initialValue: WordCaptureModel(library: library, rootURL: rootURL, onSaved: onSaved))
-        initialDeckID = deckID
+        self.init(model: WordCaptureModel(library: library, rootURL: rootURL, onSaved: onSaved), deckID: deckID)
     }
 
     public var body: some View {
@@ -412,7 +415,7 @@ private struct WordCaptureSetupView: View {
                     }.accessibilityIdentifier("word-capture-setup-type")
                     Button("Use another type…") { showsTypeChooser = true }
                         .sheet(isPresented: $showsTypeChooser) {
-                            ItemTypeChooserView(library: model.library, deckID: model.deckID) { selected in
+                            ItemTypeChooserView(model: model.makeTypeChooser()) { selected in
                                 try? await model.reloadCatalog(); typeID = selected.id
                             }
                         }

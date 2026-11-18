@@ -93,6 +93,60 @@ actor IOSAppIconBadgePublisher: AppIconBadgePublishing {
     }
 }
 
+#if targetEnvironment(simulator)
+/// A deterministic slow-OS fixture for the real nested study editor journey.
+/// Enabled only by the reset-only UI-test launch path in the composition root.
+actor IOSItemEditBadgeUITestGate: AppIconBadgePublishing {
+    private struct Receipt: Encodable {
+        let version = 1
+        let nonce: String
+        let phase: String
+        let itemID: UUID?
+        let fieldID: UUID
+        let originalPrompt: String
+        let originalText: String
+        let observedText: String?
+    }
+    private let library: any LibraryBrowsing
+    private let publisher = IOSAppIconBadgePublisher()
+    private let nonce: String
+    private let originalPrompt: String
+    private let originalText = "Original answer"
+    private let receiptURL: URL
+    private var watchedItemID: UUID?
+    private var held: [CheckedContinuation<Void, Never>] = []
+
+    init(library: any LibraryBrowsing, nonce: UUID) {
+        self.library = library
+        self.nonce = nonce.uuidString
+        originalPrompt = "Original study question " + nonce.uuidString
+        let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("neoanki-editor-gate", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        receiptURL = folder.appendingPathComponent(nonce.uuidString + "-held.json")
+        let receipt = Receipt(nonce: nonce.uuidString, phase: "armed", itemID: nil,
+            fieldID: BuiltInItemTypes.backFieldID, originalPrompt: originalPrompt, originalText: originalText, observedText: nil)
+        if let bytes = try? JSONEncoder().encode(receipt) { try? bytes.write(to: folder.appendingPathComponent(nonce.uuidString + "-armed.json"), options: .atomic) }
+    }
+
+    func publish(_ badge: AppIconBadge) async throws {
+        if watchedItemID == nil {
+            let candidates = try await library.items(scope: .allDecks, sort: .createdAscending, search: originalPrompt)
+            watchedItemID = candidates.first(where: { $0.title == originalPrompt && $0.itemTypeID == BuiltInItemTypes.basicID })?.id
+        }
+        if let id = watchedItemID, let item = try await library.item(id: id)?.item,
+           case let .text(observed, _)? = item.value(for: BuiltInItemTypes.backFieldID), observed != originalText {
+            // Exact watched item + field transition, never a broad content search.
+            let receipt = Receipt(nonce: nonce, phase: "held", itemID: id,
+                fieldID: BuiltInItemTypes.backFieldID, originalPrompt: originalPrompt, originalText: originalText, observedText: observed)
+            try JSONEncoder().encode(receipt).write(to: receiptURL, options: .atomic)
+            await withCheckedContinuation { held.append($0) }
+        }
+        try await publisher.publish(badge)
+    }
+}
+#endif
+
 actor AppGroupWidgetPublisher: WidgetSnapshotPublishing {
     private let suite = UserDefaults(suiteName: "group.com.neoanki2.shared")
     func publish(_ snapshot: DueWidgetSnapshot) async throws {

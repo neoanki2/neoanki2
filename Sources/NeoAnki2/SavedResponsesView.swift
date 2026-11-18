@@ -9,6 +9,8 @@ struct SavedResponsesView: View {
     @State private var player = SavedResponsePlayer()
     @State private var responseToDelete: StudyResponse?
 
+    init(model: SavedResponsesFeatureModel) { _model = State(initialValue: model) }
+
     init(library: any LibraryStudyResponses) {
         _model = State(initialValue: SavedResponsesFeatureModel(library: library))
     }

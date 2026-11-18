@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 @Observable
 final class ProseDeckEditorModel {
-    private let library: any LibraryBrowsing & LibraryCoordinatedItemEditing
+    private let editing: GeneratedDeckEditing
     private let deckID: UUID
     private let itemTypeID: UUID
     private var records: [ProseDeckItemRecord] = []
@@ -20,12 +20,20 @@ final class ProseDeckEditorModel {
     var isSaving = false
     var errorMessage: String?
 
-    init(
+    convenience init(
         library: any LibraryBrowsing & LibraryCoordinatedItemEditing,
         deckID: UUID,
         itemTypeID: UUID
     ) {
-        self.library = library
+        self.init(editing: .init(library: library), deckID: deckID, itemTypeID: itemTypeID)
+    }
+
+    init(
+        editing: GeneratedDeckEditing,
+        deckID: UUID,
+        itemTypeID: UUID
+    ) {
+        self.editing = editing
         self.deckID = deckID
         self.itemTypeID = itemTypeID
     }
@@ -34,28 +42,16 @@ final class ProseDeckEditorModel {
         isLoading = true
         errorMessage = nil
         do {
-            let summaries = try await library.items(
-                scope: .deck(deckID, includeDescendants: false),
-                sort: .createdAscending,
-                search: ""
-            )
-            guard summaries.allSatisfy({ $0.itemTypeID == itemTypeID }) else {
-                throw ProseDeckEditError.mixedContent
-            }
-            var loaded: [ProseDeckItemRecord] = []
-            loaded.reserveCapacity(summaries.count)
-            for summary in summaries {
-                guard let record = try await library.item(id: summary.id) else {
-                    throw ProseDeckEditError.mixedContent
-                }
-                loaded.append(.init(item: record.item, itemType: record.itemType))
-            }
-            let snapshot = try ProseDeckReconciler.snapshot(records: loaded)
-            records = loaded
+            let loaded = try await editing.load(deckID: deckID, itemTypeID: itemTypeID)
+            let editorRecords = loaded.map { ProseDeckItemRecord(item: $0.item, itemType: $0.itemType) }
+            let snapshot = try ProseDeckReconciler.snapshot(records: editorRecords)
+            records = editorRecords
             sourceText = snapshot.sourceText
             initialSourceText = snapshot.sourceText
             units = snapshot.units
             preview = nil
+        } catch is GeneratedDeckEditingError {
+            errorMessage = ProseDeckEditError.mixedContent.localizedDescription
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -93,7 +89,7 @@ final class ProseDeckEditorModel {
         guard let preview, preview.hasChanges, !isSaving else { return }
         isSaving = true
         defer { isSaving = false }
-        _ = try await library.reconcileOrderedDeckItems(
+        try await editing.save(
             preview.operations,
             order: preview.order,
             asOf: .now
@@ -118,11 +114,23 @@ public struct ProseDeckEditorView: View {
         onSaved: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
+        self.init(editing: .init(library: library), deckID: deckID, itemTypeID: itemTypeID,
+                  deckName: deckName, onSaved: onSaved, onCancel: onCancel)
+    }
+
+    public init(
+        editing: GeneratedDeckEditing,
+        deckID: UUID,
+        itemTypeID: UUID,
+        deckName: String,
+        onSaved: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
         self.deckName = deckName
         self.onSaved = onSaved
         self.onCancel = onCancel
         _model = State(initialValue: ProseDeckEditorModel(
-            library: library,
+            editing: editing,
             deckID: deckID,
             itemTypeID: itemTypeID
         ))

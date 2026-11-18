@@ -1,0 +1,19 @@
+classDiagram
+direction LR
+  class t0["AnyDeckBuilderFeature"] {
+    <<struct>>
+    descriptor
+    makeViewOperation
+    preparedView
+    id
+    init()
+    withPreparedView()
+    makeCreationView()
+    makeView()
+  }
+  class t1["DeckBuilderRegistry"] {
+    <<struct>>
+    features
+    init()
+    feature()
+  }

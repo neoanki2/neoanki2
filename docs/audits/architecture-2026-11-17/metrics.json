@@ -1,0 +1,1280 @@
+{
+  "swiftFiles": 488,
+  "productionSwiftFiles": 278,
+  "productionLines": 87116,
+  "swiftDeclarations": 28926,
+  "productionDeclarations": 17002,
+  "references": 291035,
+  "productionKinds": {
+    "struct": 752,
+    "variable": 10826,
+    "initializer": 482,
+    "enum": 326,
+    "case": 939,
+    "function": 3374,
+    "extension": 109,
+    "actor": 34,
+    "deinitializer": 10,
+    "protocol": 56,
+    "class": 72,
+    "typealias": 21,
+    "subscript": 1
+  },
+  "parseErrors": [],
+  "productionFilesOver500": 45,
+  "productionFilesOver1000": 14,
+  "functionsOver50": 169,
+  "functionsOver100": 44,
+  "explicitPublicDeclarations": 2056,
+  "documentedPublicDeclarations": 313,
+  "modules": [
+    {
+      "name": "NeoAnkiTextEditing",
+      "files": 3,
+      "lines": 523,
+      "types": 20,
+      "functions": 40,
+      "dependencies": []
+    },
+    {
+      "name": "NeoAnkiTextEditingTests",
+      "files": 1,
+      "lines": 248,
+      "types": 1,
+      "functions": 16,
+      "dependencies": [
+        "NeoAnkiTextEditing"
+      ]
+    },
+    {
+      "name": "NeoAnkiFeatures",
+      "files": 13,
+      "lines": 4154,
+      "types": 55,
+      "functions": 229,
+      "dependencies": [
+        "NeoAnkiCore",
+        "NeoAnkiApplication",
+        "NeoAnkiVocabularyKit"
+      ]
+    },
+    {
+      "name": "NeoAnkiMobile",
+      "files": 17,
+      "lines": 5459,
+      "types": 65,
+      "functions": 154,
+      "dependencies": [
+        "NeoAnkiCore",
+        "NeoAnkiApplication",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "NeoAnkiDeckBuilderKit",
+        "NeoAnkiVocabularyKit",
+        "PoemDeckBuilder",
+        "ProseDeckBuilder"
+      ]
+    },
+    {
+      "name": "NeoAnki2",
+      "files": 61,
+      "lines": 14633,
+      "types": 170,
+      "functions": 505,
+      "dependencies": [
+        "NeoAnkiTextEditing",
+        "NeoAnkiCore",
+        "NeoAnkiApplication",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "NeoAnkiCloudSync",
+        "NeoAnkiAPI",
+        "NeoAnkiDeckBuilderKit",
+        "NeoAnkiVocabularyKit",
+        "PoemDeckBuilder",
+        "ProseDeckBuilder"
+      ]
+    },
+    {
+      "name": "NeoAnkiApplication",
+      "files": 16,
+      "lines": 4502,
+      "types": 122,
+      "functions": 510,
+      "dependencies": [
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiSharedUI",
+      "files": 23,
+      "lines": 8080,
+      "types": 115,
+      "functions": 227,
+      "dependencies": [
+        "NeoAnkiTextEditing",
+        "NeoAnkiApplication",
+        "NeoAnkiFeatures",
+        "NeoAnkiVocabularyKit",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiCloudSync",
+      "files": 9,
+      "lines": 2505,
+      "types": 18,
+      "functions": 127,
+      "dependencies": [
+        "NeoAnkiApplication",
+        "NeoAnkiVocabularyKit",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiDeckBuilderKit",
+      "files": 1,
+      "lines": 70,
+      "types": 2,
+      "functions": 4,
+      "dependencies": [
+        "NeoAnkiDeckBuilderCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiDeckBuilderCore",
+      "files": 1,
+      "lines": 121,
+      "types": 7,
+      "functions": 6,
+      "dependencies": [
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiAPI",
+      "files": 9,
+      "lines": 9307,
+      "types": 149,
+      "functions": 275,
+      "dependencies": [
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiVocabularyKit"
+      ]
+    },
+    {
+      "name": "NeoAnkiVocabularyKit",
+      "files": 8,
+      "lines": 2479,
+      "types": 43,
+      "functions": 92,
+      "dependencies": []
+    },
+    {
+      "name": "NeoAnkiVocabularyCLI",
+      "files": 1,
+      "lines": 220,
+      "types": 3,
+      "functions": 10,
+      "dependencies": [
+        "NeoAnkiVocabularyKit"
+      ]
+    },
+    {
+      "name": "neoanki-vocab",
+      "files": 1,
+      "lines": 10,
+      "types": 1,
+      "functions": 1,
+      "dependencies": [
+        "NeoAnkiVocabularyCLI"
+      ]
+    },
+    {
+      "name": "NeoAnkiAPIReferenceGenerator",
+      "files": 1,
+      "lines": 308,
+      "types": 2,
+      "functions": 13,
+      "dependencies": [
+        "NeoAnkiAPI"
+      ]
+    },
+    {
+      "name": "neoanki-chrome-fixture",
+      "files": 1,
+      "lines": 86,
+      "types": 3,
+      "functions": 3,
+      "dependencies": [
+        "NeoAnkiAPI",
+        "NeoAnkiApplication",
+        "NeoAnkiVocabularyKit",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiTemplateMigration",
+      "files": 1,
+      "lines": 401,
+      "types": 10,
+      "functions": 17,
+      "dependencies": [
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiTemplateMigrator",
+      "files": 1,
+      "lines": 55,
+      "types": 2,
+      "functions": 4,
+      "dependencies": [
+        "NeoAnkiTemplateMigration"
+      ]
+    },
+    {
+      "name": "NeoAnkiPoemRepair",
+      "files": 1,
+      "lines": 293,
+      "types": 4,
+      "functions": 8,
+      "dependencies": [
+        "NeoAnkiAPI",
+        "PoemDeckBuilder",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "PoemDeckBuilder",
+      "files": 6,
+      "lines": 1231,
+      "types": 19,
+      "functions": 32,
+      "dependencies": [
+        "NeoAnkiTextEditing",
+        "NeoAnkiApplication",
+        "NeoAnkiDeckBuilderKit",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "ProseDeckBuilder",
+      "files": 6,
+      "lines": 1235,
+      "types": 19,
+      "functions": 30,
+      "dependencies": [
+        "NeoAnkiTextEditing",
+        "NeoAnkiApplication",
+        "NeoAnkiDeckBuilderKit",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiFeaturesTests",
+      "files": 20,
+      "lines": 5913,
+      "types": 60,
+      "functions": 418,
+      "dependencies": [
+        "NeoAnkiFeatures",
+        "NeoAnkiApplication",
+        "NeoAnkiCloudSync",
+        "NeoAnkiVocabularyKit",
+        "NeoAnkiCore",
+        "NeoAnkiTestSupport"
+      ]
+    },
+    {
+      "name": "NeoAnkiApplicationTests",
+      "files": 17,
+      "lines": 4398,
+      "types": 39,
+      "functions": 261,
+      "dependencies": [
+        "NeoAnkiApplication",
+        "NeoAnkiCloudSync",
+        "NeoAnkiVocabularyKit",
+        "NeoAnkiCore",
+        "NeoAnkiTestSupport"
+      ]
+    },
+    {
+      "name": "NeoAnki2Tests",
+      "files": 58,
+      "lines": 9535,
+      "types": 35,
+      "functions": 427,
+      "dependencies": [
+        "NeoAnki2",
+        "NeoAnkiMobile",
+        "NeoAnkiApplication",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "NeoAnkiCore",
+        "NeoAnkiTestSupport",
+        "NeoAnkiDeckBuilderKit",
+        "NeoAnkiVocabularyKit",
+        "PoemDeckBuilder",
+        "ProseDeckBuilder",
+        "NeoAnkiTemplateMigration"
+      ]
+    },
+    {
+      "name": "NeoAnkiAPITests",
+      "files": 2,
+      "lines": 4680,
+      "types": 6,
+      "functions": 102,
+      "dependencies": [
+        "NeoAnkiAPI",
+        "NeoAnkiApplication",
+        "NeoAnkiVocabularyKit",
+        "NeoAnkiCore",
+        "NeoAnkiTestSupport"
+      ]
+    },
+    {
+      "name": "PoemDeckBuilderTests",
+      "files": 1,
+      "lines": 738,
+      "types": 1,
+      "functions": 23,
+      "dependencies": [
+        "PoemDeckBuilder",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "ProseDeckBuilderTests",
+      "files": 1,
+      "lines": 251,
+      "types": 0,
+      "functions": 10,
+      "dependencies": [
+        "ProseDeckBuilder",
+        "NeoAnkiApplication",
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiVocabularyKitTests",
+      "files": 4,
+      "lines": 1101,
+      "types": 5,
+      "functions": 52,
+      "dependencies": [
+        "NeoAnkiVocabularyKit"
+      ]
+    },
+    {
+      "name": "NeoAnkiVocabularyCLITests",
+      "files": 1,
+      "lines": 79,
+      "types": 0,
+      "functions": 3,
+      "dependencies": [
+        "NeoAnkiVocabularyCLI",
+        "NeoAnkiVocabularyKit"
+      ]
+    },
+    {
+      "name": "NeoAnkiFSRS",
+      "files": 8,
+      "lines": 1436,
+      "types": 35,
+      "functions": 54,
+      "dependencies": []
+    },
+    {
+      "name": "NeoAnkiCore",
+      "files": 84,
+      "lines": 29244,
+      "types": 356,
+      "functions": 984,
+      "dependencies": [
+        "NeoAnkiFSRS"
+      ]
+    },
+    {
+      "name": "NeoAnkiTestSupport",
+      "files": 8,
+      "lines": 738,
+      "types": 14,
+      "functions": 41,
+      "dependencies": [
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiDeckCLI",
+      "files": 1,
+      "lines": 151,
+      "types": 1,
+      "functions": 5,
+      "dependencies": [
+        "NeoAnkiCore"
+      ]
+    },
+    {
+      "name": "NeoAnkiFSRSBenchmark",
+      "files": 1,
+      "lines": 101,
+      "types": 2,
+      "functions": 5,
+      "dependencies": [
+        "NeoAnkiFSRS"
+      ]
+    },
+    {
+      "name": "NeoAnkiCoreTests",
+      "files": 58,
+      "lines": 13158,
+      "types": 23,
+      "functions": 577,
+      "dependencies": [
+        "NeoAnkiCore",
+        "NeoAnkiTestSupport"
+      ]
+    },
+    {
+      "name": "NeoAnkiFSRSTests",
+      "files": 4,
+      "lines": 456,
+      "types": 11,
+      "functions": 27,
+      "dependencies": [
+        "NeoAnkiFSRS"
+      ]
+    },
+    {
+      "name": "NeoAnkiFlowTests",
+      "files": 14,
+      "lines": 1413,
+      "types": 0,
+      "functions": 52,
+      "dependencies": [
+        "NeoAnkiCore",
+        "NeoAnkiTestSupport"
+      ]
+    },
+    {
+      "name": "NeoAnkiiOS [Xcode]",
+      "files": 3,
+      "lines": 430,
+      "types": 10,
+      "functions": 35,
+      "dependencies": [
+        "NeoAnkiMobile",
+        "NeoAnkiFeatures",
+        "NeoAnkiApplication",
+        "NeoAnkiCloudSync",
+        "NeoAnki2Widget [Xcode]"
+      ]
+    },
+    {
+      "name": "NeoAnki2Widget [Xcode]",
+      "files": 1,
+      "lines": 82,
+      "types": 7,
+      "functions": 4,
+      "dependencies": []
+    },
+    {
+      "name": "NeoAnki2MobileUITests [Xcode]",
+      "files": 1,
+      "lines": 2255,
+      "types": 19,
+      "functions": 80,
+      "dependencies": [
+        "NeoAnkiMobile",
+        "NeoAnkiiOS [Xcode]"
+      ]
+    },
+    {
+      "name": "NeoAnkiMac [Xcode]",
+      "files": 0,
+      "lines": 0,
+      "types": 0,
+      "functions": 0,
+      "dependencies": [
+        "NeoAnki2"
+      ]
+    },
+    {
+      "name": "NeoAnki2UITests [Xcode]",
+      "files": 16,
+      "lines": 6836,
+      "types": 11,
+      "functions": 297,
+      "dependencies": [
+        "NeoAnki2"
+      ]
+    },
+    {
+      "name": "Chrome Companion",
+      "files": 0,
+      "lines": 0,
+      "types": 0,
+      "functions": 0,
+      "dependencies": [
+        "NeoAnkiAPI"
+      ]
+    }
+  ],
+  "largestFiles": [
+    {
+      "imports": [
+        "CryptoKit",
+        "Darwin",
+        "Foundation",
+        "SQLite3"
+      ],
+      "lines": 8480,
+      "parseErrors": false,
+      "path": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+      "module": "NeoAnkiCore",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiApplication",
+        "NeoAnkiCore"
+      ],
+      "lines": 4589,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift",
+      "module": "NeoAnkiAPI",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "SwiftUI"
+      ],
+      "lines": 3197,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiSharedUI/CardSetupEditorView.swift",
+      "module": "NeoAnkiSharedUI",
+      "production": true
+    },
+    {
+      "imports": [
+        "CryptoKit",
+        "Darwin",
+        "Foundation"
+      ],
+      "lines": 2151,
+      "parseErrors": false,
+      "path": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift",
+      "module": "NeoAnkiCore",
+      "production": true
+    },
+    {
+      "imports": [
+        "CryptoKit",
+        "Foundation",
+        "SQLite3"
+      ],
+      "lines": 1902,
+      "parseErrors": false,
+      "path": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
+      "module": "NeoAnkiCore",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation"
+      ],
+      "lines": 1801,
+      "parseErrors": false,
+      "path": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore.swift",
+      "module": "NeoAnkiCore",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation"
+      ],
+      "lines": 1581,
+      "parseErrors": false,
+      "path": "NeoAnkiCore/Sources/NeoAnkiCore/Database/Schema.swift",
+      "module": "NeoAnkiCore",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiApplication",
+        "NeoAnkiCore"
+      ],
+      "lines": 1405,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiAPI/APIDTOs.swift",
+      "module": "NeoAnkiAPI",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiCore"
+      ],
+      "lines": 1279,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiApplication/ItemTypeStudioDraft.swift",
+      "module": "NeoAnkiApplication",
+      "production": true
+    },
+    {
+      "imports": [
+        "AppKit",
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiDeckBuilderKit",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "SwiftUI",
+        "UniformTypeIdentifiers"
+      ],
+      "lines": 1185,
+      "parseErrors": false,
+      "path": "Sources/NeoAnki2/ContentView.swift",
+      "module": "NeoAnki2",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "PhotosUI",
+        "PoemDeckBuilder",
+        "ProseDeckBuilder",
+        "SwiftUI",
+        "UIKit",
+        "UniformTypeIdentifiers"
+      ],
+      "lines": 1181,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiIOS/LibraryView.swift",
+      "module": "NeoAnkiMobile",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiCore"
+      ],
+      "lines": 1138,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiAPI/APIOpenAPI.swift",
+      "module": "NeoAnkiAPI",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiCore"
+      ],
+      "lines": 1093,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiApplication/LibraryRepository.swift",
+      "module": "NeoAnkiApplication",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "SwiftUI"
+      ],
+      "lines": 1008,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiIOS/ItemTypeStudioMobileView.swift",
+      "module": "NeoAnkiMobile",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiSharedUI",
+        "NeoAnkiTextEditing",
+        "PoemDeckBuilder",
+        "ProseDeckBuilder",
+        "SwiftUI"
+      ],
+      "lines": 976,
+      "parseErrors": false,
+      "path": "Sources/NeoAnki2/StudyView.swift",
+      "module": "NeoAnki2",
+      "production": true
+    },
+    {
+      "imports": [
+        "AppKit",
+        "NeoAnkiCore",
+        "SwiftUI"
+      ],
+      "lines": 952,
+      "parseErrors": false,
+      "path": "Sources/NeoAnki2/RichTextFieldEditor.swift",
+      "module": "NeoAnki2",
+      "production": true
+    },
+    {
+      "imports": [
+        "CryptoKit",
+        "Darwin",
+        "Foundation",
+        "NeoAnkiVocabularyKit"
+      ],
+      "lines": 904,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiAPI/APIVocabularyLibrary.swift",
+      "module": "NeoAnkiAPI",
+      "production": true
+    },
+    {
+      "imports": [
+        "CryptoKit",
+        "Foundation"
+      ],
+      "lines": 846,
+      "parseErrors": false,
+      "path": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift",
+      "module": "NeoAnkiCore",
+      "production": true
+    },
+    {
+      "imports": [
+        "AVFoundation",
+        "AVKit",
+        "ImageIO",
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "PoemDeckBuilder",
+        "ProseDeckBuilder",
+        "SwiftUI"
+      ],
+      "lines": 808,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiIOS/StudySessionView.swift",
+      "module": "NeoAnkiMobile",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiCore",
+        "SwiftUI"
+      ],
+      "lines": 781,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiSharedUI/CardWireframeView.swift",
+      "module": "NeoAnkiSharedUI",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiFeatures",
+        "NeoAnkiSharedUI",
+        "NeoAnkiVocabularyKit",
+        "SwiftUI",
+        "UIKit"
+      ],
+      "lines": 770,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiIOS/MobileRootView.swift",
+      "module": "NeoAnkiMobile",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "Observation"
+      ],
+      "lines": 750,
+      "parseErrors": false,
+      "path": "Sources/NeoAnkiFeatures/StudyFeatureModel.swift",
+      "module": "NeoAnkiFeatures",
+      "production": true
+    },
+    {
+      "imports": [
+        "NeoAnkiCore",
+        "SwiftUI",
+        "UniformTypeIdentifiers"
+      ],
+      "lines": 732,
+      "parseErrors": false,
+      "path": "Sources/NeoAnki2/DeckSidebarView.swift",
+      "module": "NeoAnki2",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiApplication",
+        "NeoAnkiCore",
+        "NeoAnkiFeatures"
+      ],
+      "lines": 696,
+      "parseErrors": false,
+      "path": "Sources/NeoAnki2/ItemsModel.swift",
+      "module": "NeoAnki2",
+      "production": true
+    },
+    {
+      "imports": [
+        "Foundation",
+        "NeoAnkiApplication",
+        "NeoAnkiCore"
+      ],
+      "lines": 685,
+      "parseErrors": false,
+      "path": "Sources/NeoAnki2/UITestScenarioSeeder.swift",
+      "module": "NeoAnki2",
+      "production": true
+    }
+  ],
+  "largestFunctions": [
+    {
+      "documented": false,
+      "endLine": 587,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsEngine.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsEngine.swift:1189:snapshot",
+      "inherited": [],
+      "kind": "function",
+      "line": 29,
+      "modifiers": "public static",
+      "name": "snapshot",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsEngine.swift:256:StatisticsEngine",
+      "signature": "public static func snapshot( source: StatisticsSource, query: StatisticsQuery, now: Date, calendar: Calendar = .autoupdatingCurrent ) -> StatisticsSnapshot",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "StatisticsEngine.snapshot"
+    },
+    {
+      "documented": false,
+      "endLine": 709,
+      "file": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift",
+      "id": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift:6182:route",
+      "inherited": [],
+      "kind": "function",
+      "line": 172,
+      "modifiers": "private",
+      "name": "route",
+      "parent": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift:681:NeoAnkiAPIService",
+      "signature": "private func route( _ request: APIRequest, bypassGenericIdempotency: Bool = false ) async throws -> APIResponse",
+      "module": "NeoAnkiAPI",
+      "production": true,
+      "local": false,
+      "qualifiedName": "NeoAnkiAPIService.route"
+    },
+    {
+      "documented": false,
+      "endLine": 1086,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift:31854:readPackage",
+      "inherited": [],
+      "kind": "function",
+      "line": 739,
+      "modifiers": "private",
+      "name": "readPackage",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift:9362:PortableDeckDatabase",
+      "signature": "private func readPackage( limits: PortableDeckLimits, stagingDirectory: URL ) throws -> PortableDeckPackage",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "PortableDeckDatabase.readPackage"
+    },
+    {
+      "documented": false,
+      "endLine": 680,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:18042:migrate",
+      "inherited": [],
+      "kind": "function",
+      "line": 368,
+      "modifiers": "",
+      "name": "migrate",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:4355:SQLiteDatabase",
+      "signature": "func migrate() throws",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "SQLiteDatabase.migrate"
+    },
+    {
+      "documented": false,
+      "endLine": 371,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift:2311:runAutomaticFSRSOptimization",
+      "inherited": [],
+      "kind": "function",
+      "line": 66,
+      "modifiers": "",
+      "name": "runAutomaticFSRSOptimization",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift:346:ItemStore",
+      "signature": "func runAutomaticFSRSOptimization( minimumObservations: Int, now: Date, cohortID: UUID = SchedulerPersistenceConstants.globalCohortID, enforceCadence: Bool = true, optimizerParityVerified: Bool = SchedulerPersistenceConstants.optimizerParityVerified, probationEvidenceOverride: FSRSProbationEvidence? = nil ) async throws -> FSRSOptimizationResult?",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "ItemStore.runAutomaticFSRSOptimization"
+    },
+    {
+      "documented": false,
+      "endLine": 448,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift:8708:importPortableDeck",
+      "inherited": [],
+      "kind": "function",
+      "line": 182,
+      "modifiers": "",
+      "name": "importPortableDeck",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift:19:ItemStore",
+      "signature": "func importPortableDeck( _ incomingPackage: consuming PortableDeckPackage, limits: PortableDeckLimits, resolver: any PortableDeckTypeResolver, conflictResolution: PortableDeckTypeConflictResolution, now: Date ) async throws -> PortableDeckImportResult",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "ItemStore.importPortableDeck"
+    },
+    {
+      "documented": false,
+      "endLine": 1106,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift:33502:compile",
+      "inherited": [],
+      "kind": "function",
+      "line": 847,
+      "modifiers": "",
+      "name": "compile",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift:33289:AuthoredDeckCompiler",
+      "signature": "func compile() -> LoadedAuthoredDeck",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "AuthoredDeckCompiler.compile"
+    },
+    {
+      "documented": false,
+      "endLine": 231,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift:45:importAuthoredDeck",
+      "inherited": [],
+      "kind": "function",
+      "line": 4,
+      "modifiers": "",
+      "name": "importAuthoredDeck",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/ItemStore+AuthoredDeck.swift:19:ItemStore",
+      "signature": "func importAuthoredDeck( _ package: AuthoredDeckPackage, limits: PortableDeckLimits, now: Date, destinationDeckID: UUID?, parentDeckID: UUID? = nil ) async throws -> PortableDeckImportResult",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "ItemStore.importAuthoredDeck"
+    },
+    {
+      "documented": true,
+      "endLine": 2624,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:97743:importPortableDeck",
+      "inherited": [],
+      "kind": "function",
+      "line": 2415,
+      "modifiers": "",
+      "name": "importPortableDeck",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:4355:SQLiteDatabase",
+      "signature": "func importPortableDeck( _ plan: PortableDeckImportPlan, now: Date, initialDueDates: [UUID: Date] = [:], result: PortableDeckImportResult? = nil ) throws",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "SQLiteDatabase.importPortableDeck"
+    },
+    {
+      "documented": false,
+      "endLine": 452,
+      "file": "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift",
+      "id": "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift:12127:normalizeRemote",
+      "inherited": [],
+      "kind": "function",
+      "line": 244,
+      "modifiers": "private",
+      "name": "normalizeRemote",
+      "parent": "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift:1453:SQLiteLibrarySyncAdapter",
+      "signature": "private func normalizeRemote( _ remote: [SyncRecordEnvelope], against local: [SyncRecordEnvelope], canonicalLibraryID: UUID, sourceLibraryID: UUID?, knownAliases: Set<UUID>, typeRemap: [UUID: UUID], dropAliasedTypes: Bool = true ) throws -> [SyncRecordEnvelope]",
+      "module": "NeoAnkiCloudSync",
+      "production": true,
+      "local": false,
+      "qualifiedName": "SQLiteLibrarySyncAdapter.normalizeRemote"
+    },
+    {
+      "documented": false,
+      "endLine": 516,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift:12367:write",
+      "inherited": [],
+      "kind": "function",
+      "line": 331,
+      "modifiers": "",
+      "name": "write",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/PortableDeck.swift:9362:PortableDeckDatabase",
+      "signature": "func write(_ package: PortableDeckPackage) throws",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "PortableDeckDatabase.write"
+    },
+    {
+      "documented": true,
+      "endLine": 3750,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:148129:newCardLimitShape",
+      "inherited": [],
+      "kind": "function",
+      "line": 3572,
+      "modifiers": "private",
+      "name": "newCardLimitShape",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:4355:SQLiteDatabase",
+      "signature": "private func newCardLimitShape( scope: CardScope, studyDay: String ) throws -> NewCardLimitShape",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "SQLiteDatabase.newCardLimitShape"
+    },
+    {
+      "documented": false,
+      "endLine": 180,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift:45:portableDeckSnapshot",
+      "inherited": [],
+      "kind": "function",
+      "line": 4,
+      "modifiers": "",
+      "name": "portableDeckSnapshot",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/PortableDeck/ItemStore+PortableDeck.swift:19:ItemStore",
+      "signature": "func portableDeckSnapshot( rootDeckID: UUID, limits: PortableDeckLimits, resolver: any PortableDeckTypeResolver ) async throws -> PortableDeckPackage",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "ItemStore.portableDeckSnapshot"
+    },
+    {
+      "documented": false,
+      "endLine": 233,
+      "file": "Sources/NeoAnkiAPI/APIOpenAPI.swift",
+      "id": "Sources/NeoAnkiAPI/APIOpenAPI.swift:2564:add",
+      "inherited": [],
+      "kind": "function",
+      "line": 62,
+      "modifiers": "",
+      "name": "add",
+      "parent": "Sources/NeoAnkiAPI/APIOpenAPI.swift:68:document",
+      "signature": "func add( _ path: String, _ method: APIHTTPMethod, _ handler: APIEndpointHandler, authorization: APIEndpointAuthorization = .publicAccess, success: Int = 200, request: String? = nil, response: String? = \"Resource\", requestContentType: String = \"application/json\", responseContentType: String = \"application/json\", query: [String] = [], requiredQuery: Set<String> = [], successHeaders: [String: Any] = [:] )",
+      "module": "NeoAnkiAPI",
+      "production": true,
+      "local": true,
+      "qualifiedName": "APIOpenAPI.document.add"
+    },
+    {
+      "documented": false,
+      "endLine": 851,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:29802:migrateSchedulerCohortsV28",
+      "inherited": [],
+      "kind": "function",
+      "line": 682,
+      "modifiers": "private",
+      "name": "migrateSchedulerCohortsV28",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:4355:SQLiteDatabase",
+      "signature": "private func migrateSchedulerCohortsV28(now: Date) throws",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "SQLiteDatabase.migrateSchedulerCohortsV28"
+    },
+    {
+      "documented": true,
+      "endLine": 541,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift:16503:evaluateActiveFSRSProbation",
+      "inherited": [],
+      "kind": "function",
+      "line": 385,
+      "modifiers": "private",
+      "name": "evaluateActiveFSRSProbation",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/ItemStore+FSRSOptimization.swift:346:ItemStore",
+      "signature": "private func evaluateActiveFSRSProbation( policy: FSRSPromotionPolicy, logs: [ReviewLog], context: ActiveSchedulingContext, now: Date, evidenceOverride: FSRSProbationEvidence? ) async throws -> Bool",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "ItemStore.evaluateActiveFSRSProbation"
+    },
+    {
+      "documented": false,
+      "endLine": 476,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift:10527:load",
+      "inherited": [],
+      "kind": "function",
+      "line": 323,
+      "modifiers": "",
+      "name": "load",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift:10236:AuthoredDeckLoader",
+      "signature": "func load() throws -> LoadedAuthoredDeck",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "AuthoredDeckLoader.load"
+    },
+    {
+      "documented": true,
+      "endLine": 400,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/BulkItems.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/BulkItems.swift:10060:executeItemBulk",
+      "inherited": [],
+      "kind": "function",
+      "line": 251,
+      "modifiers": "",
+      "name": "executeItemBulk",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/BulkItems.swift:2081:ItemStore",
+      "signature": "func executeItemBulk( _ operations: [ItemBulkOperation], dryRun: Bool, now: Date = .now, orderedDeck: OrderedDeckItemReconciliation? = nil, nativeSelection: Bool = false ) async throws -> [ItemBulkOperationResult]",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "ItemStore.executeItemBulk"
+    },
+    {
+      "documented": false,
+      "endLine": 2483,
+      "file": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift",
+      "id": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift:97141:bulkItems",
+      "inherited": [],
+      "kind": "function",
+      "line": 2336,
+      "modifiers": "private",
+      "name": "bulkItems",
+      "parent": "Sources/NeoAnkiAPI/NeoAnkiAPIService.swift:681:NeoAnkiAPIService",
+      "signature": "private func bulkItems(_ request: APIRequest, grant: APIClientGrant) async throws -> APIResponse",
+      "module": "NeoAnkiAPI",
+      "production": true,
+      "local": false,
+      "qualifiedName": "NeoAnkiAPIService.bulkItems"
+    },
+    {
+      "documented": false,
+      "endLine": 1331,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift:49094:compileValue",
+      "inherited": [],
+      "kind": "function",
+      "line": 1192,
+      "modifiers": "private",
+      "name": "compileValue",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/AuthoredDeck/AuthoredDeck.swift:33289:AuthoredDeckCompiler",
+      "signature": "private func compileValue( _ raw: Any, definition: FieldDef, mediaByHash: inout [String: PortableDeckMediaRecord], totalMediaBytes: inout Int64 ) throws -> ContentValue",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "AuthoredDeckCompiler.compileValue"
+    },
+    {
+      "documented": true,
+      "endLine": 3895,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:155303:multipleLimiterEligibleDueCardsCTE",
+      "inherited": [],
+      "kind": "function",
+      "line": 3756,
+      "modifiers": "private",
+      "name": "multipleLimiterEligibleDueCardsCTE",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift:4355:SQLiteDatabase",
+      "signature": "private func multipleLimiterEligibleDueCardsCTE( scopeFilter: (sql: String, bindings: [Binding]), asOf now: Date, studyDay: String, limiters: MultipleNewCardLimiters, familyEligibility: String ) -> (sql: String, bindings: [Binding])",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "SQLiteDatabase.multipleLimiterEligibleDueCardsCTE"
+    },
+    {
+      "documented": false,
+      "endLine": 575,
+      "file": "Sources/NeoAnki2/DeckSidebarView.swift",
+      "id": "Sources/NeoAnki2/DeckSidebarView.swift:16787:deckRow",
+      "inherited": [],
+      "kind": "function",
+      "line": 437,
+      "modifiers": "private",
+      "name": "deckRow",
+      "parent": "Sources/NeoAnki2/DeckSidebarView.swift:14978:DeckSidebarNode",
+      "signature": "private func deckRow(_ summary: DeckSummary) -> some View",
+      "module": "NeoAnki2",
+      "production": true,
+      "local": false,
+      "qualifiedName": "DeckSidebarNode.deckRow"
+    },
+    {
+      "documented": false,
+      "endLine": 305,
+      "file": "Sources/NeoAnkiFeatures/StudyFeatureModel.swift",
+      "id": "Sources/NeoAnkiFeatures/StudyFeatureModel.swift:7663:start",
+      "inherited": [],
+      "kind": "function",
+      "line": 171,
+      "modifiers": "public",
+      "name": "start",
+      "parent": "Sources/NeoAnkiFeatures/StudyFeatureModel.swift:1514:StudyFeatureModel",
+      "signature": "public func start(scope: DeckScope, title: String) async",
+      "module": "NeoAnkiFeatures",
+      "production": true,
+      "local": false,
+      "qualifiedName": "StudyFeatureModel.start"
+    },
+    {
+      "documented": false,
+      "endLine": 171,
+      "file": "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsForecast.swift",
+      "id": "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsForecast.swift:1222:simulate",
+      "inherited": [],
+      "kind": "function",
+      "line": 38,
+      "modifiers": "public static",
+      "name": "simulate",
+      "parent": "NeoAnkiCore/Sources/NeoAnkiCore/Statistics/StatisticsForecast.swift:924:StatisticsSimulator",
+      "signature": "public static func simulate( snapshot: StatisticsSnapshot, decks: [Deck], request: StatisticsForecastRequest, rollover: Int, calendar: Calendar = .autoupdatingCurrent ) throws -> StatisticsForecast",
+      "module": "NeoAnkiCore",
+      "production": true,
+      "local": false,
+      "qualifiedName": "StatisticsSimulator.simulate"
+    },
+    {
+      "documented": true,
+      "endLine": 493,
+      "file": "Sources/NeoAnkiSharedUI/CardSetupEditorView.swift",
+      "id": "Sources/NeoAnkiSharedUI/CardSetupEditorView.swift:14132:apply",
+      "inherited": [],
+      "kind": "function",
+      "line": 360,
+      "modifiers": "public static",
+      "name": "apply",
+      "parent": "Sources/NeoAnkiSharedUI/CardSetupEditorView.swift:13946:CardSetupEditorReducer",
+      "signature": "@discardableResult public static func apply( _ action: CardSetupEditorAction, to draft: inout ItemTypeStudioDraft, cardSetupID: UUID ) -> Bool",
+      "module": "NeoAnkiSharedUI",
+      "production": true,
+      "local": false,
+      "qualifiedName": "CardSetupEditorReducer.apply"
+    }
+  ]
+}

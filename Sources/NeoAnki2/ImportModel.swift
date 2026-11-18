@@ -145,7 +145,7 @@ final class ImportModel {
         typesGeneration += 1
         let generation = typesGeneration
         do {
-            let result = try await itemsModel.library.authoringItemTypes(for: destinationDeckID)
+            let result = try await itemsModel.authoringChoices(for: destinationDeckID)
             guard generation == typesGeneration else { return }
             availableItemTypes = result.itemTypes
             if !availableItemTypes.contains(where: { $0.id == selectedItemTypeID }) {

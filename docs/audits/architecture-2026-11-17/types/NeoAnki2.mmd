@@ -1,0 +1,2138 @@
+classDiagram
+direction LR
+  class t0["APIPairingPrompt"] {
+    <<struct>>
+    id
+    request
+  }
+  class t1["AppPairingApprover"] {
+    <<struct>>
+    handler
+    cancellationHandler
+    approve()
+    cancel()
+  }
+  class t2["APIControlModel"] {
+    <<class>>
+    library
+    vocabularyRootURL
+    authorization
+    server
+    pairingContinuation
+    isEnabled
+    port
+    isRunning
+    isChangingState
+    diagnostic
+    clients
+    pendingPairing
+    init()
+    restore()
+    setEnabled()
+    applyPort()
+    reloadClients()
+    revoke()
+    resolvePairing()
+    start()
+    stop()
+    requestPairingApproval()
+    cancelPairingApproval()
+  }
+  class t3["APISettingsView"] {
+    <<struct>>
+    model
+    portText
+    body
+  }
+  class t4["AccessibilityEvent"] {
+    <<enum>>
+  }
+  class t5["AccessibilityRoute"] {
+    <<struct>>
+    announcement
+    focus
+  }
+  class t6["AccessibilityRoute.Focus"] {
+    <<enum>>
+  }
+  class t7["AccessibilityRouter"] {
+    <<class>>
+    lastEvent
+    route()
+  }
+  class t8["AccessibilityNotifier"] {
+    <<class>>
+    shared
+    router
+    post()
+  }
+  class t9["AddItemView"] {
+    <<struct>>
+    model
+    decksModel
+    editingItem
+    editingItemType
+    onDismiss
+    fieldSpans
+    fieldText
+    fieldMedia
+    fieldMediaAltText
+    occlusionDraftReferences
+    fieldOcclusions
+    fieldClozeBlanks
+    actionError
+    showTypeChooser
+    deckRequestGeneration
+    pendingDeckID
+    showDeckChangeConfirmation
+    selectedDeckID
+    isSaving
+    processingAttachments
+    didInitialize
+    initialSnapshot
+    showDiscardConfirmation
+    showTypeChangeConfirmation
+    pendingItemTypeID
+    focusedFieldID
+    init()
+    itemType
+    isEditing
+    body
+    fieldEditor()
+    deckBinding
+    addItemTypeBinding
+    hasEnteredContent
+    canSave
+    fieldLabel()
+    spanBinding()
+    richTextFocusBinding()
+    textBinding()
+    mediaBinding()
+    mediaAltTextBinding()
+    clozeBlanksBinding()
+    resetFields()
+    initializeIfNeeded()
+    loadFields()
+    apply()
+    currentSnapshot
+    closeEditor()
+    requestDismissal()
+    focusFirstField()
+    save()
+  }
+  class t10["AppStartupTrace"] {
+    <<enum>>
+    mark()
+    recorder
+  }
+  class t11["AppStartupTrace.Recorder"] {
+    <<class>>
+    lock
+    events
+    mark()
+  }
+  class t12["AppDatabase"] {
+    <<enum>>
+    isTesting
+    defaultURL
+    productionURL
+    testURL()
+  }
+  class t13["AppDelegate"] {
+    <<class>>
+    windowBottomClearance
+    windowPresentations
+    synchronizeCloudChanges
+    cloudPushLogger
+    application()
+    application()
+    application()
+    applicationDidFinishLaunching()
+    applicationDidChangeScreenParameters()
+    applicationDidBecomeActive()
+    windowGeometryDidChange()
+    windowFullScreenDidChange()
+    windowWillClose()
+    constrainToVisibleScreen()
+    badgeLogger
+    dockBadge
+    updateDockBadge()
+    badgeLabel()
+    applicationShouldTerminateAfterLastWindowClosed()
+  }
+  class t14["DockBadgeController"] {
+    <<class>>
+    badge
+    apply
+    authorize
+    isAuthorized
+    authorizationTask
+    init()
+    update()
+    reapply()
+  }
+  class t15["WindowFramePolicy"] {
+    <<enum>>
+    maximumHeight()
+    constrainedFrame()
+  }
+  class t16["WindowFramePolicy.Presentation"] {
+    <<struct>>
+    isTransitioning
+    observe()
+  }
+  class t17["AppPreferences"] {
+    <<enum>>
+    browseShowsAnswerColumn
+    localAPIEnabled
+    localAPIPort
+    cloudSyncEnabled
+    all
+    resetForTesting()
+  }
+  class t18["ClozeFieldEditor"] {
+    <<struct>>
+    label
+    text
+    blanks
+    accessibilityIdentifier
+    selectionStart
+    selectionLength
+    errorMessage
+    selectedGroup
+    body
+    clozeBlankRow()
+    groupBinding()
+    hintBinding()
+    snippet()
+    markSelectionAsBlank()
+    rebaseBlanks()
+    nextGroup()
+  }
+  class t19["ClozeBlankBuilder"] {
+    <<enum>>
+    blank()
+  }
+  class t20["ClozeTextEditor"] {
+    <<struct>>
+    isEnabled
+    text
+    selectionStart
+    selectionLength
+    accessibilityLabel
+    accessibilityIdentifier
+    makeCoordinator()
+    makeNSView()
+    updateNSView()
+  }
+  class t21["ClozeTextEditor.Coordinator"] {
+    <<class>>
+    parent
+    init()
+    textDidChange()
+    textViewDidChangeSelection()
+    textView()
+    updateSelection()
+  }
+  class t22["ClozeFocusNavigation"] {
+    <<enum>>
+    direction()
+  }
+  class t23["ClozeContentView"] {
+    <<struct>>
+    text
+    blanks
+    revealMode
+    isAnswerRevealed
+    group
+    body
+    displayText
+  }
+  class t24["ContentRenderingPolicy"] {
+    <<enum>>
+    decision()
+    contentDescription()
+  }
+  class t25["ContentRenderingPolicy.Rendering"] {
+    <<enum>>
+  }
+  class t26["ContentRenderingPolicy.Decision"] {
+    <<struct>>
+    rendering
+    accessibilityLabel
+    shouldResolveMedia
+  }
+  class t27["ContentValueView"] {
+    <<struct>>
+    locale
+    value
+    presentation
+    isAnswerRevealed
+    richTextPointSize
+    mediaStore
+    isStudyContent
+    occlusionGroup
+    clozeGroup
+    body
+    fieldType()
+  }
+  class t28["ConcealedContentPlaceholder"] {
+    <<struct>>
+    accessibilityLabel
+    body
+  }
+  class t29["LanguageMetadata"] {
+    <<enum>>
+    attributedString()
+    accessibilityTag()
+  }
+  class t30["SideContentView"] {
+    <<struct>>
+    side
+    item
+    isAnswerRevealed
+    richTextPointSize
+    mediaStore
+    occlusionGroup
+    clozeGroup
+    body
+  }
+  class t31["ImportNotice"] {
+    <<struct>>
+    id
+    title
+    message
+  }
+  class t32["ContentLayoutPolicy"] {
+    <<enum>>
+    usesLibrarySplitView()
+  }
+  class t33["ContentView"] {
+    <<struct>>
+    reduceMotion
+    scenePhase
+    itemsModel
+    decksModel
+    schedulingModel
+    vocabularyLibraryModel
+    appSession
+    showsLearnInContext
+    browseShowsAnswerColumn
+    itemBrowserFilter
+    studyModel
+    studyScope
+    templatesModel
+    isEditingTemplate
+    endSessionTrigger
+    isEditingStudyCard
+    statisticsSessionID
+    columnVisibility
+    importModel
+    isChoosingImportFile
+    importNotice
+    isCreatingGeneratedDeck
+    portableDeckTransfer
+    library
+    deckBuilderRegistry
+    isAddingItem
+    isManagingTemplates
+    isStudying
+    isBrowsing
+    isShowingSavedResponses
+    selectedItemID
+    isShowingImport
+    isShowingDeckBuilder
+    isShowingVocabularyPacks
+    isAddingFromVocabulary
+    importPresentation
+    deckBuilderPresentation
+    vocabularyPacksPresentation
+    wordCapturePresentation
+    syncIssuesPresentation
+    testingEnvironment
+    testingInitialRoute
+    init()
+    init()
+    body
+    rootContent
+    windowTitle
+    updateRoute()
+    updatePresentation()
+    libraryCommandHandlers
+    canTransferPortableDeck
+    canUseVocabularyUI
+    testingForcePortableBusy
+    deckBuilderContext
+    studyCommandHandlers
+    studyModelCanGrade()
+    detail
+    openBrowse()
+    closeBrowse()
+    openAddItem()
+    openImport()
+    openVocabularyPackImport()
+    openTestingTransfersIfRequested()
+    openTestingInitialRouteIfRequested()
+    copyTestingTransferFile()
+    handleImportFile()
+    finishImport()
+    openPortableDeckImport()
+    handlePortableDeckFile()
+    createPreparedDeck()
+    importGeneratedDeck()
+    refreshAfterPortableDeckImport()
+    resolvePortableDeckConflict()
+    openPortableDeckExport()
+    safeExportFileName()
+    closeAddItem()
+    updateForScenePhase()
+    reloadScope()
+    refreshLibrary()
+    refreshAfterStudy()
+    refreshCounts()
+    trackDueCounts()
+    dueCountRefreshDelay
+    startStudy()
+    endStudy()
+    closeItemTypes()
+    openTemplates()
+    setAddItemFocus()
+    setTemplatesFocus()
+  }
+  class t34["DeckBuilderSheet"] {
+    <<struct>>
+    registry
+    context
+    isImporting
+    onPrepared
+    onGenerated
+    onCancel
+    selectedBuilderID
+    draftGuard
+    init()
+    creationView()
+    body
+  }
+  class t35["DeckSettingsView"] {
+    <<struct>>
+    dismiss
+    decksModel
+    deck
+    onSaved
+    onProgressReset
+    typesRevision
+    typeStudio
+    showsTypes
+    dismissal
+    isLimited
+    newCardsPerDay
+    isSaving
+    isResetting
+    showResetConfirmation
+    resetCardCount
+    init()
+    body
+    pendingLimit
+    save()
+    resetProgress()
+  }
+  class t36["DeckDragPayload"] {
+    <<enum>>
+    contentType
+    itemProvider()
+  }
+  class t37["LibrarySidebarDestination"] {
+    <<enum>>
+  }
+  class t38["DeckSidebarView"] {
+    <<struct>>
+    decksModel
+    selection
+    isShowingStatistics
+    isShowingSavedResponses
+    onDeleteAllUnassigned
+    onDeckSettingsSaved
+    onDeckProgressReset
+    deckToRename
+    deckToConfigure
+    renameText
+    deckToDelete
+    affectedResponseCount
+    showDeleteAllUnassignedConfirm
+    showNewDeckPrompt
+    newDeckName
+    newDeckParentID
+    draggingDeckID
+    isTopLevelDropTargeted
+    body
+    sidebarSelection
+    renamePresented
+    deletePresented
+    beginRename()
+    prepareDeckDeletion()
+    beginNewSubdeck()
+    virtualRow()
+    sidebarRow()
+    topLevelDropTarget
+    dueCaption()
+    scopeAccessibilityIdentifier()
+  }
+  class t39["DeckSidebarNode"] {
+    <<struct>>
+    node
+    decksModel
+    onConfigure
+    onRename
+    onDelete
+    onNewSubdeck
+    draggingDeckID
+    isExpanded
+    dropZone
+    rowHeight
+    body
+    containsDescendant()
+    containsDeck()
+    deckRow()
+    rowSubtitle()
+    compactSubtitle()
+  }
+  class t40["DeckRowDropZone"] {
+    <<enum>>
+    resolve()
+    destination()
+  }
+  class t41["DeckRowHeightPreferenceKey"] {
+    <<struct>>
+    defaultValue
+    reduce()
+  }
+  class t42["DeckRowDropDelegate"] {
+    <<struct>>
+    targetID
+    rowHeight
+    draggingDeckID
+    dropZone
+    canMove
+    move
+    validateDrop()
+    dropEntered()
+    dropUpdated()
+    dropExited()
+    performDrop()
+    updateDropZone()
+  }
+  class t43["TopLevelDeckDropDelegate"] {
+    <<struct>>
+    draggingDeckID
+    isTargeted
+    canMove
+    move
+    validateDrop()
+    dropEntered()
+    dropExited()
+    dropUpdated()
+    performDrop()
+  }
+  class t44["SidebarScopeCaption"] {
+    <<enum>>
+    text()
+    compactText()
+  }
+  class t45["SidebarSelection"] {
+    <<enum>>
+  }
+  class t46["StudyScope"] {
+    <<struct>>
+    filter
+    label
+    allDecks
+    unassigned
+    deck()
+  }
+  class t47["DecksModel"] {
+    <<class>>
+    deckTree
+    summaries
+    allDecksDueCount
+    unassignedDueCount
+    unassignedItemCount
+    isLoading
+    errorMessage
+    hasLoaded
+    reads
+    loadGeneration
+    needsInitialLoad
+    selectedScope
+    library
+    onDueCountChange
+    init()
+    studyScope
+    scopeDueCount
+    selectedDeckID
+    defaultDeckIDForNewItem
+    showsUnassigned
+    load()
+    applyColdSnapshot()
+    applyColdHomeSnapshot()
+    refreshCounts()
+    loadOrRefresh()
+    applyCounts()
+    createDeck()
+    renameDeck()
+    updateNewCardsPerDay()
+    moveDeck()
+    canMoveDeck()
+    canMoveDeckUp()
+    canMoveDeckDown()
+    moveDeckUp()
+    moveDeckDown()
+    moveDeckOutOneLevel()
+    canMoveDeckOutOneLevel()
+    movableParentDecks()
+    deckPath()
+    deleteDeck()
+    deletionImpact()
+    resetProgress()
+    deckName()
+    command()
+    siblingSummaries()
+    flattenedDeckTree()
+    resetHiddenSelectionIfNeeded()
+  }
+  class t48["DesignSystem"] {
+    <<enum>>
+    accent
+    sidebarBackground
+    detailBackground
+    errorBannerBackground()
+    contentHighlightBackground
+    readingColumnMaxWidth
+    sidebarMin
+    sidebarIdeal
+    sidebarMax
+    revealDuration
+  }
+  class t49["DesignSystem.Spacing"] {
+    <<enum>>
+    rowTight
+    xs
+    sm
+    md
+    studyHorizontal
+    lg
+    xl
+  }
+  class t50["DesignSystem.Typography"] {
+    <<enum>>
+    cardPrompt
+    cardAnswer
+    cardSecondary
+    uiDisplay
+    uiTitle
+    uiSection
+    uiBody
+    uiRowTitle
+    uiRowMeta
+    sidebarRowTitle
+    sidebarRowMeta
+    uiSecondary
+    uiCaption
+    uiHint
+    emptyIcon
+    emptyTitle
+    emptyMessage
+    richTextPointSize
+    cardPromptPointSize
+    cardAnswerPointSize
+    cardSecondaryPointSize
+    richTextFont
+  }
+  class t51["ErrorBanner"] {
+    <<struct>>
+    message
+    colorSchemeContrast
+    isAccessibilityFocused
+    body
+  }
+  class t52["StudyAnimation"] {
+    <<enum>>
+    revealAnswer()
+  }
+  class t53["ReadingColumnLayout"] {
+    <<struct>>
+    body()
+  }
+  class t54["View"] {
+    <<extension>>
+    readingColumnLayout()
+    neoAnkiFormTypography()
+  }
+  class t55["SidebarEmptyState"] {
+    <<struct>>
+    title
+    message
+    systemImage
+    actionTitle
+    action
+    actionIdentifier
+    contentIdentifier
+    body
+  }
+  class t56["OptionalAccessibilityIdentifier"] {
+    <<struct>>
+    identifier
+    body()
+  }
+  class t57["EditorDismissalDecision"] {
+    <<typealias>>
+  }
+  class t58["EditorDecisionState"] {
+    <<typealias>>
+  }
+  class t59["MediaStoreKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t60["EnvironmentValues"] {
+    <<extension>>
+    mediaStore
+  }
+  class t61["FieldTypeLabels"] {
+    <<enum>>
+    name()
+    authoringTypes
+  }
+  class t62["GradeGuideView"] {
+    <<struct>>
+    gradingMode
+    body
+    gradeShortcutSummary
+    accessibilitySummary
+  }
+  class t63["SecurityScopedResourceAccessing"] {
+    <<protocol>>
+    startAccessing()
+    stopAccessing()
+  }
+  class t64["SystemSecurityScopedResourceAccess"] {
+    <<struct>>
+    startAccessing()
+    stopAccessing()
+  }
+  class t65["ImportFileFormat"] {
+    <<enum>>
+  }
+  class t66["ImportFileInspection"] {
+    <<struct>>
+    containsRelativeMediaPaths
+  }
+  class t67["ImportFileInspecting"] {
+    <<protocol>>
+    inspectSelection()
+    readPayload()
+  }
+  class t68["SystemImportFileInspector"] {
+    <<struct>>
+    relativeMediaProbe
+    init()
+    inspectSelection()
+    readPayload()
+    validateFileSize()
+    readBoundedPayload()
+    oversizedFileError
+    containsRelativePath()
+    containsRelativePath()
+  }
+  class t69["ImportModel"] {
+    <<class>>
+    selectedURL
+    mediaDirectoryURL
+    requiresMediaDirectory
+    format
+    isImporting
+    errorMessage
+    importedCount
+    destinationDeckID
+    availableItemTypes
+    typesGeneration
+    selectedItemTypeID
+    itemsModel
+    library
+    scopedAccess
+    fileInspector
+    init()
+    configureTypes()
+    selectedFileName
+    selectedMediaDirectoryName
+    needsItemTypeSelection
+    canImport
+    selectFile()
+    selectMediaDirectory()
+    cancel()
+    importSelected()
+  }
+  class t70["ImportView"] {
+    <<struct>>
+    model
+    itemTypes
+    decks
+    scope
+    onCancel
+    onImported
+    choosingMediaDirectory
+    body
+  }
+  class t71["ItemBrowserPagination"] {
+    <<struct>>
+    defaultPageSize
+    itemCount
+    pageSize
+    pageCount
+    pageIndex
+    itemRange
+    init()
+    hasMultiplePages
+    canGoBackward
+    canGoForward
+    previousPageIndex
+    nextPageIndex
+    firstItemNumber
+    lastItemNumber
+  }
+  class t72["ItemBrowserFilter"] {
+    <<enum>>
+    apply()
+  }
+  class t73["ItemBrowserView"] {
+    <<struct>>
+    itemsModel
+    decksModel
+    showsAnswerColumn
+    filter
+    scope
+    onOpenItem
+    onAddItem
+    onStudy
+    onDone
+    onReady
+    dynamicTypeSize
+    selection
+    columnCustomization
+    pendingDeleteIDs
+    affectedResponseCount
+    isMarkingOK
+    pageIndex
+    answerColumnIsVisible
+    body
+    subtitle
+    studyHelp
+    deleteConfirmationTitle
+    browserItems
+    selectedAffectedItemIDs
+    pagination
+    pageItems
+    tableSort
+    paginatedTable
+    attentionFilterBar
+    table
+    paginationBar
+    showPage()
+    resetPagination()
+    moveMenu()
+    move()
+    markOKButton()
+    markOK()
+    textLineLimit
+    promptMinWidth
+    promptIdealWidth
+    dueText()
+    phaseText()
+    accessibilityLabel()
+    dueAccessibilityLabel()
+    phaseAccessibilityLabel()
+    lapseAccessibilityLabel()
+    noItemsNeedingAttention
+    emptyScope
+  }
+  class t74["SavedItemSummary"] {
+    <<extension>>
+    dueSortKey
+    phaseSortKey
+    lapseSortKey
+  }
+  class t75["ItemEditorSnapshot"] {
+    <<typealias>>
+  }
+  class t76["ItemEditorState"] {
+    <<typealias>>
+  }
+  class t77["ItemReadingPreview"] {
+    <<struct>>
+    item
+    itemType
+    mediaStore
+    displayFields
+    body
+    font()
+    pointSize()
+  }
+  class t78["ItemDetailView"] {
+    <<struct>>
+    model
+    decksModel
+    scope
+    summary
+    onBack
+    onDeleted
+    onSaved
+    item
+    itemType
+    cardMaturityDetails
+    maturityIssue
+    selectedDeckID
+    isLoading
+    isDeleting
+    isMovingDeck
+    isEditing
+    showDeleteConfirm
+    affectedResponseCount
+    errorMessage
+    body
+    load()
+    cardMaturityName()
+    moveDeck()
+    deleteItem()
+  }
+  class t79["ItemEditingError"] {
+    <<enum>>
+  }
+  class t80["ItemsModel"] {
+    <<class>>
+    items
+    itemTypes
+    authoringLoadGeneration
+    loadGeneration
+    reads
+    libraryChangesTask
+    lastCommandReceipt
+    normalItemTypes
+    effectiveItemTypePolicy
+    scopeSummary
+    maturityUnavailable
+    isLoading
+    errorMessage
+    hasLoaded
+    itemTypesLoaded
+    itemTypeWarning
+    loadedItemsScope
+    browseDataInvalidated
+    needsInitialLoad
+    needsBrowseLoad
+    addItemTypeID
+    addItemDeckID
+    tableSort
+    searchText
+    dueCount
+    visibleItems
+    searchTask
+    searchGeneration
+    refreshVisibleItems()
+    scheduleVisibleItemsRefresh()
+    publishVisibleItems()
+    waitForPendingSearch()
+    library
+    mediaStore
+    init()
+    itemType
+    policyItemTypes
+    retainedItemType
+    isRecommendedItemType()
+    load()
+    loadHome()
+    load()
+    beginBrowseLoad()
+    applyColdSnapshot()
+    applyColdHomeSnapshot()
+    applyItemTypes()
+    invalidateItemTypes()
+    applyImportedItems()
+    compareUsingTableSort()
+    configureAddItem()
+    addItem()
+    updateItem()
+    makeFields()
+    contentValue()
+    preserveTextLanguages()
+    deleteItem()
+    deleteAllUnassigned()
+    moveItem()
+    moveItems()
+    markRepeatedLapsesOK()
+    deleteItems()
+    studyResponseCount()
+    command()
+    refreshCommittedSummary()
+    cachedScope
+    currentScopeFilter()
+    setCachedScope()
+    updateCachedScope()
+    refreshCounts()
+    refreshAfterSync()
+    refreshSchedules()
+  }
+  class t81["LibraryCommandHandlers"] {
+    <<struct>>
+    openAddItem
+    openImport
+    openPortableDeckImport
+    openPortableDeckExport
+    openVocabularyPackImport
+    openVocabularyPacks
+    openAddFromVocabulary
+    openLearnInContext
+    openDeckBuilder
+    openTemplates
+    openBrowse
+    toggleAnswerColumn
+    showSidebar
+    isAnswerColumnVisible
+    canToggleAnswerColumn
+    canAddItem
+    canImport
+    canImportPortableDeck
+    canExportPortableDeck
+    canImportVocabularyPack
+    canOpenVocabularyPacks
+    canAddFromVocabulary
+    canOpenDeckBuilder
+    canOpenTemplates
+    canBrowse
+  }
+  class t82["LibraryCommandHandlersKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t83["LibraryCommandHandlersKey.Value"] {
+    <<typealias>>
+  }
+  class t84["FocusedValues"] {
+    <<extension>>
+    libraryCommandHandlers
+  }
+  class t85["LibraryCommands"] {
+    <<struct>>
+    handlers
+    body
+  }
+  class t86["MacAppIconBadgeAuthorization"] {
+    <<enum>>
+    logger
+    request()
+  }
+  class t87["MacCloudSyncSettings"] {
+    <<struct>>
+    isEnabled
+    status
+    isAvailable
+    onChange
+    synchronize
+    showsConsent
+    body
+    label
+    helperText
+  }
+  class t88["MacCloudSyncStatusModel"] {
+    <<class>>
+    logger
+    status
+    service
+    monitor
+    changesMonitor
+    generation
+    interval
+    init()
+    observe()
+    refresh()
+    stop()
+    updateStatus()
+  }
+  class t89["PendingFieldRemoval"] {
+    <<struct>>
+    id
+    name
+    affectedSetupNames
+  }
+  class t90["MacItemTypeStudioFieldRemovalPolicy"] {
+    <<enum>>
+    affectedSetupNames()
+  }
+  class t91["MacItemTypeStudioDraftBindingPolicy"] {
+    <<enum>>
+    isSameMountedDraft()
+  }
+  class t92["MacItemTypeStudioView"] {
+    <<struct>>
+    model
+    onSaved
+    selectedCardSetupID
+    validationFocus
+    pendingSave
+    pendingFieldRemoval
+    showDiscardConfirmation
+    errorMessage
+    repairMessage
+    isSaving
+    isNameFocused
+    focusedFieldID
+    body
+    draft
+    studioToolbar
+    studioOutline
+    fieldEditor()
+    editor
+    fieldNameBinding()
+    fieldTypeBinding()
+    fieldRequiredBinding()
+    addField()
+    canMoveField()
+    moveField()
+    prepareFieldRemoval()
+    confirmFieldRemoval()
+    selectFirstCardSetupIfNeeded()
+    cancel()
+    hasUnsavedStudioChanges
+    prepareSave()
+    focusFirstIssue()
+    commit()
+    saveImpactMessage()
+    saveImpactConfirmationLabel
+  }
+  class t93["MediaFieldPolicy"] {
+    <<enum>>
+    descriptionLabel()
+    allowedContentTypes()
+    allowedFilenameExtensions()
+  }
+  class t94["MediaFieldEditor"] {
+    <<struct>>
+    label
+    kind
+    media
+    altText
+    mediaStore
+    accessibilityIdentifier
+    isImporting
+    isActive
+    importTask
+    pasteProcessing
+    otherAttachmentProcessing
+    errorMessage
+    fileName
+    body
+    iconName
+    descriptionLabel
+    chooseFile()
+    handleDrop()
+    ingest()
+    attach()
+  }
+  class t95["MediaPreviewView"] {
+    <<struct>>
+    ref
+    store
+    resolvedURL
+    resolutionError
+    loadedImage
+    imageLoadFailed
+    body
+    mediaContent
+  }
+  class t96["MediaImageLoader"] {
+    <<class>>
+    shared
+    cache
+    init()
+    image()
+    loadPayload()
+  }
+  class t97["LoadedImagePayload"] {
+    <<enum>>
+  }
+  class t98["MediaPlaybackPolicy"] {
+    <<enum>>
+    shouldAutoplay()
+    shouldLoop()
+    gifAnimates()
+  }
+  class t99["ReviewMediaPlayer"] {
+    <<class>>
+    player
+    loopObserver
+    configure()
+    replay()
+    reset()
+  }
+  class t100["ReviewMediaConfiguration"] {
+    <<struct>>
+    url
+    behavior
+    reduceMotion
+  }
+  class t101["AudioPlayerView"] {
+    <<struct>>
+    url
+    behavior
+    altText
+    reduceMotion
+    playback
+    body
+    playButtonAccessibilityLabel
+  }
+  class t102["ImageMediaView"] {
+    <<struct>>
+    url
+    kind
+    behavior
+    revealMode
+    isAnswerRevealed
+    altText
+    reduceMotion
+    playOnTapActive
+    loadedImage
+    imageLoadFailed
+    body
+    shouldHide
+    placeholder
+    unavailablePlaceholder
+    accessibilityDescription
+    imageView()
+    gifView()
+  }
+  class t103["ImageMediaView.ImageLoadTaskID"] {
+    <<struct>>
+    url
+    shouldLoad
+  }
+  class t104["AnimatedGIFView"] {
+    <<struct>>
+    image
+    animates
+    makeNSView()
+    updateNSView()
+  }
+  class t105["VideoPlayerView"] {
+    <<struct>>
+    url
+    behavior
+    altText
+    reduceMotion
+    playback
+    body
+  }
+  class t106["ResolvedMediaView"] {
+    <<struct>>
+    ref
+    presentation
+    isAnswerRevealed
+    store
+    reduceMotion
+    resolvedURL
+    resolutionError
+    body
+    mediaBody()
+  }
+  class t107["ResolvedMediaView.ResolutionTaskID"] {
+    <<struct>>
+    reference
+    shouldResolve
+  }
+  class t108["InitialLibraryPayload"] {
+    <<struct>>
+    library
+    mediaStore
+    snapshot
+    vocabularyRootURL
+  }
+  class t109["NeoAnki2App"] {
+    <<struct>>
+    appDelegate
+    itemsModel
+    decksModel
+    schedulingModel
+    library
+    vocabularyLibraryModel
+    apiControlModel
+    bootstrapError
+    syncService
+    syncStatusModel
+    scenePhase
+    cloudSyncEnabled
+    testConfiguration
+    testGeneration
+    isBootstrapping
+    testControlMonitor
+    initialLibraryTask
+    init()
+    body
+    bootstrap()
+    updateCloudSync()
+    prepareLibrary()
+    activeTestingEnvironment
+    initialTestingRoute
+    installUITestControlIfNeeded()
+    applyUITestCommand()
+  }
+  class t110["DeckBuilderRegistry"] {
+    <<extension>>
+    production
+  }
+  class t111["PortableDeckExportFile"] {
+    <<enum>>
+    write()
+  }
+  class t112["PortableDeckImportChoice"] {
+    <<enum>>
+  }
+  class t113["PortableDeckImportSelection"] {
+    <<enum>>
+    isValid()
+    choose()
+  }
+  class t114["UTType"] {
+    <<extension>>
+    neoDeck
+    neoAnkiSource
+  }
+  class t115["PortableDeckTransferNotice"] {
+    <<struct>>
+    id
+    title
+    message
+    __()
+  }
+  class t116["PortableDeckTransferModel"] {
+    <<class>>
+    isBusy
+    conflictingSource
+    notice
+    importOperation
+    authoredImportOperation
+    exportOperation
+    scopedAccess
+    init()
+    init()
+    importDeck()
+    resolveConflict()
+    cancelConflict()
+    testingForceBusy
+    exportDeck()
+  }
+  class t117["PortableDeckTransferModel.ImportOperation"] {
+    <<typealias>>
+  }
+  class t118["PortableDeckTransferModel.AuthoredImportOperation"] {
+    <<typealias>>
+  }
+  class t119["PortableDeckTransferModel.ExportOperation"] {
+    <<typealias>>
+  }
+  class t120["ReviewRating"] {
+    <<extension>>
+    gradeAccessibilityIdentifier
+  }
+  class t121["TextViewHolder"] {
+    <<class>>
+    textView
+    lastSelectedRange
+  }
+  class t122["SafePasteTextView"] {
+    <<class>>
+    paste()
+  }
+  class t123["UndoAttributedString"] {
+    <<class>>
+    value
+    init()
+  }
+  class t124["RichTextFieldEditor"] {
+    <<struct>>
+    label
+    spans
+    accessibilityIdentifier
+    isFocused
+    textViewHolder
+    selectionFormatting
+    linkDraft
+    isLinkEditorPresented
+    isLinkFieldFocused
+    body
+    formattingToolbar
+    formatButtonID()
+    normalizedLinkDraft
+    setTextColor()
+    setTextSize()
+    controlState()
+    menuImage()
+    sizeMenuImage()
+    colorMenuImage()
+    refreshSelectionFormatting()
+  }
+  class t125["FormatControlState"] {
+    <<enum>>
+  }
+  class t126["FormatButton"] {
+    <<struct>>
+    title
+    systemImage
+    state
+    accessibilityIdentifier
+    action
+    body
+  }
+  class t127["RichTextEditorRepresentable"] {
+    <<struct>>
+    isEnabled
+    label
+    spans
+    accessibilityIdentifier
+    textViewHolder
+    isFocused
+    selectionFormatting
+    makeCoordinator()
+    makeNSView()
+    updateNSView()
+  }
+  class t128["RichTextEditorRepresentable.Coordinator"] {
+    <<class>>
+    spans
+    textView
+    isUpdatingFromView
+    isProgrammaticUpdate
+    textViewHolder
+    isFocused
+    selectionFormatting
+    init()
+    textDidChange()
+    textViewDidChangeSelection()
+    textDidBeginEditing()
+    textDidEndEditing()
+    textView()
+    setAttributedString()
+    publishSpans()
+    sanitizeContentsIfNeeded()
+  }
+  class t129["RichTextFocusNavigation"] {
+    <<enum>>
+    direction()
+  }
+  class t130["RichTextFocusNavigation.Direction"] {
+    <<enum>>
+  }
+  class t131["RichTextEditing"] {
+    <<enum>>
+    selectionState()
+    synchronizeTypingAttributes()
+    resetTypingAttributes()
+    toggleStyle()
+    setTextColor()
+    setTextSize()
+    setLink()
+    clearFormatting()
+    sanitizedAttributedString()
+    sanitizedSelection()
+    selectionState()
+    rangeIsValid()
+    styleIsActive()
+    applyStyle()
+    applyFormatting()
+    applyFormatting()
+    registerUndo()
+    resolvedRange()
+    span()
+    attributes()
+  }
+  class t132["RichTextEditing.SelectionState"] {
+    <<struct>>
+    activeStyles
+    mixedStyles
+    textColor
+    textColorIsMixed
+    textSize
+    textSizeIsMixed
+    link
+    linkIsMixed
+    empty
+    accessibilitySummary
+  }
+  class t133["Span.TextColor"] {
+    <<extension>>
+    displayName
+  }
+  class t134["SavedResponsesView"] {
+    <<struct>>
+    model
+    player
+    responseToDelete
+    init()
+    body
+    navigationSubtitle
+    responseRow()
+    play()
+    duration()
+  }
+  class t135["SavedResponsePlayer"] {
+    <<class>>
+    playingID
+    errorMessage
+    audioPlayer
+    toggle()
+    stop()
+    audioPlayerDidFinishPlaying()
+  }
+  class t136["SchedulingCommands"] {
+    <<struct>>
+    model
+    body
+  }
+  class t137["SchedulingModel"] {
+    <<class>>
+    rolloverMinutes
+    isLoadingSettings
+    isSavingSettings
+    isShowingSettings
+    settingsError
+    library
+    init()
+    openSettings()
+    loadSettings()
+    saveRolloverMinutes()
+    requestAutomaticMaintenance()
+  }
+  class t138["SchedulingSettingsView"] {
+    <<struct>>
+    dismiss
+    model
+    onSaved
+    dismissal
+    rolloverTime
+    init()
+    body
+    pendingMinutes
+    save()
+    date()
+  }
+  class t139["ScopeHomeUpcoming"] {
+    <<enum>>
+    days()
+  }
+  class t140["ScopeHomeUpcoming.Day"] {
+    <<struct>>
+    id
+    date
+    count
+  }
+  class t141["ScopeHomeView"] {
+    <<struct>>
+    scenePhase
+    statistics
+    itemsModel
+    scope
+    onStudy
+    onBrowse
+    onBrowseItemsNeedingAttention
+    onAddItem
+    summary
+    init()
+    body
+    home
+    todaySection
+    upcomingSection
+    dueSection
+    dueHeadline
+    nextDueSentence
+    leechCallout
+    leechMessage()
+    reviewAffectedItemsButton
+    emptyState
+  }
+  class t142["SpanFormatting"] {
+    <<enum>>
+    defaultTypingAttributes
+    attributedString()
+    swiftUIAttributedString()
+    spans()
+    plainText()
+    mergeAdjacent()
+    testingDescription()
+    attributes()
+    adaptiveTextColors
+    nsColor()
+    contrastSafeTextColor()
+    contrastRatio()
+    relativeLuminance()
+    sizeMultiplier()
+    font()
+    styles()
+    textColor()
+    textSize()
+    link()
+  }
+  class t143["StudyCommandHandlers"] {
+    <<struct>>
+    startStudy
+    endSession
+    editCurrentCard
+    grade
+    undoLastGrade
+    canStartStudy
+    canEndSession
+    canEditCurrentCard
+    canGrade
+    canUndoLastGrade
+    canUseSpace()
+    useSpace()
+  }
+  class t144["StudyPrimaryActionHandler"] {
+    <<struct>>
+    action
+    isEnabled
+    invoke()
+  }
+  class t145["StudyPrimaryActionHandlerKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t146["StudyPrimaryActionHandlerKey.Value"] {
+    <<typealias>>
+  }
+  class t147["StudyCommandHandlersKey"] {
+    <<struct>>
+    defaultValue
+  }
+  class t148["StudyCommandHandlersKey.Value"] {
+    <<typealias>>
+  }
+  class t149["FocusedValues"] {
+    <<extension>>
+    studyCommandHandlers
+    studyPrimaryActionHandler
+  }
+  class t150["StudyCommands"] {
+    <<struct>>
+    handlers
+    primaryAction
+    usesPassFailGrades
+    body
+    gradingMode
+  }
+  class t151["StudyCompositionView"] {
+    <<struct>>
+    template
+    item
+    isAnswerRevealed
+    mediaStore
+    occlusionGroup
+    clozeGroup
+    response
+    evaluation
+    components
+    effectiveLayout
+    body
+    hasVisibleVisualMedia
+    wireframe
+    richTextPointSize()
+  }
+  class t152["StudyCardViewport"] {
+    <<struct>>
+    fitsMedia
+    card
+    body
+  }
+  class t153["PendingGradeUndo"] {
+    <<typealias>>
+  }
+  class t154["StudyStartTiming"] {
+    <<typealias>>
+  }
+  class t155["StudyModel"] {
+    <<class>>
+    session
+    library
+    init()
+    queue
+    currentCard
+    index
+    isAnswerRevealed
+    isLoading
+    isPreparingQueue
+    isGrading
+    isCompletingSubmission
+    isFinished
+    didFailToLoad
+    pendingGradeUndo
+    typedAnswer
+    reviewResponse
+    answerEvaluation
+    choiceOptions
+    selectedChoice
+    arrangedItems
+    selectedArrangementIndex
+    interactionMessage
+    reviewedCount
+    completedSubmissionCount
+    reviewedCardIDs
+    reviewedItemIDs
+    lastStartTiming
+    learningTime
+    errorMessage
+    scopeLabel
+    remainingCardCount
+    remainingLabel
+    headerLabel
+    cardsReviewed
+    completionSummary
+    canUndoLastGrade
+    startSession()
+    revealAnswer()
+    updateTypedAnswer()
+    submitTypedAnswer()
+    selectChoice()
+    submitChoice()
+    selectArrangementItem()
+    moveSelectedArrangementItem()
+    submitArrangement()
+    completeRecording()
+    performPrimaryAction()
+    dismissGradeUndo()
+    pauseReviewTiming()
+    resumeReviewTiming()
+    grade()
+    undoLastGrade()
+    reloadCurrentItem()
+    skipCurrentCard()
+    completeAudioSubmission()
+  }
+  class t156["MacStudyErrorMapper"] {
+    <<struct>>
+    map()
+  }
+  class t157["RecordingPermissionProviding"] {
+    <<protocol>>
+    requestPermission()
+  }
+  class t158["AudioRecording"] {
+    <<protocol>>
+    url
+    start()
+    stop()
+  }
+  class t159["AudioPlayback"] {
+    <<protocol>>
+    play()
+    stop()
+  }
+  class t160["StudyAudioFactory"] {
+    <<protocol>>
+    makeRecorder()
+    makeSubmissionRecorder()
+    makePlayer()
+  }
+  class t161["StudyAudioFactory"] {
+    <<extension>>
+    makeSubmissionRecorder()
+  }
+  class t162["SystemRecordingPermission"] {
+    <<struct>>
+    requestPermission()
+  }
+  class t163["AVRecorderBox"] {
+    <<class>>
+    recorder
+    url
+    init()
+    start()
+    stop()
+  }
+  class t164["AVPlayerBox"] {
+    <<class>>
+    player
+    onFinish
+    init()
+    play()
+    stop()
+    audioPlayerDidFinishPlaying()
+  }
+  class t165["SystemStudyAudioFactory"] {
+    <<struct>>
+    makeRecorder()
+    makeSubmissionRecorder()
+    makePlayer()
+  }
+  class t166["StudyRecordingController"] {
+    <<class>>
+    state
+    recorder
+    player
+    recordingURL
+    elapsedSeconds
+    capturedAt
+    responseID
+    permission
+    audioFactory
+    temporaryDirectory
+    elapsedTimer
+    recordingStartedAt
+    isPersistentSubmission
+    init()
+    hasRecording
+    isReadyForComparison
+    start()
+    stop()
+    togglePlayback()
+    reset()
+    submissionDraft()
+    stopPlayback()
+    discardRecording()
+    startElapsedTimer()
+    updateElapsed()
+    playbackFinished()
+  }
+  class t167["StudyRecordingController.State"] {
+    <<enum>>
+  }
+  class t168["RecordingError"] {
+    <<enum>>
+  }
+  class t169["StudySettingsView"] {
+    <<struct>>
+    usesPassFailGrades
+    body
+  }
+  class t170["StudySupport"] {
+    <<enum>>
+    isSupportedInteraction()
+    acceptedAnswers()
+    evaluate()
+    hasReferenceAudio()
+    choiceOptions()
+    arrangement()
+    isCorrectArrangement()
+  }
+  class t171["AnswerEvaluation"] {
+    <<typealias>>
+  }
+  class t172["Arrangement"] {
+    <<typealias>>
+  }
+  class t173["StudyView"] {
+    <<struct>>
+    reduceMotion
+    usesPassFailGrades
+    model
+    itemsModel
+    decksModel
+    scope
+    mediaStore
+    endSessionTrigger
+    isEditingCard
+    onSessionStatistics
+    onEndSession
+    typedAnswerFocused
+    showGradeGuide
+    showDeleteDraftConfirm
+    recording
+    answerAccessibilityFocused
+    recordingErrorAccessibilityFocused
+    body
+    studyContent
+    cardEditor
+    primaryActionHandler
+    canUseRecordingShortcut
+    canShowAnswer
+    canGrade
+    supportsRevealWithoutChecking
+    canRevealWithoutChecking
+    canSkip
+    loadingView
+    emptyDueView
+    loadFailureView
+    finishedView
+    activeCardView()
+    studyHeader
+    studyCardContent()
+    studyResponseRegion()
+    interactionResponse()
+    audioSubmissionResponse
+    evaluationFeedback
+    recordingResponse
+    revealedRecordingPlayback
+    arrangementResponse
+    studyFooter()
+    audioSubmissionFooter()
+    audioSubmissionActionsMenu
+    recordingStudyFooter
+    recordingActionsMenu
+    revealWithoutChecking()
+    saveAudioSubmission()
+    gradeButtons
+    gradeUndoFeedback()
+    gradingMode
+    endSession()
+    skipCurrentCard()
+    primaryActionTitle()
+    recordingDurationText
+    recordingHasError
+    audioSubmissionStatusText
+    recordingStatusText
+    recordingStatusIcon
+    revealedRecordingStatusText
+  }
+  class t174["ArrangementSelectionShortcut"] {
+    <<struct>>
+    index
+    isEnabled
+    action
+    body()
+  }
+  class t175["StudyWindowActivity"] {
+    <<struct>>
+    tracker
+    makeNSView()
+    updateNSView()
+    dismantleNSView()
+  }
+  class t176["StudyWindowActivityView"] {
+    <<class>>
+    tracker
+    observers
+    sleepObservers
+    init()
+    init()
+    viewDidMoveToWindow()
+    stop()
+  }
+  class t177["StudyLearningTimeModifier"] {
+    <<struct>>
+    tracker
+    isEditing
+    recordingActive
+    scenePhase
+    recordingActivityID
+    body()
+    lifecycle()
+  }
+  class t178["PendingItemTypeUnlock"] {
+    <<struct>>
+    itemTypeID
+    itemTypeName
+    impact
+  }
+  class t179["TemplatesView"] {
+    <<struct>>
+    model
+    isTemplateEditorPresented
+    onTemplatesChanged
+    expandedIncludedGroupIDs
+    definitionToRepair
+    pendingUnlock
+    pendingSelectionID
+    showDiscardForSelection
+    showDuplicatePrompt
+    duplicateName
+    showDeleteConfirmation
+    actionError
+    isWorking
+    init()
+    body
+    selection
+    hasUnsavedStudioChanges
+    itemTypesNavigator
+    itemTypeRow()
+    includedGroupButton()
+    detail
+    selectedItemTypeOverview()
+    overviewSection()
+    deleteDialogTitle
+    prepareDeleteSelectedItemType()
+    deleteSelectedItemType()
+    repair()
+    prepareUnlock()
+    unlockItemType()
+    duplicateSelectedItemType()
+    unlockImpactMessage()
+    cardSetupCount()
+    fieldCount()
+  }
+  class t180["FieldType"] {
+    <<extension>>
+    studioDisplayName
+  }
+  class t181["Interaction"] {
+    <<extension>>
+    studioAnswerMethodName
+  }
+  class t182["UITestRoute"] {
+    <<enum>>
+  }
+  class t183["UITestRuntimeConfiguration"] {
+    <<struct>>
+    sequence
+    databaseDirectory
+    scenario
+    initialRoute
+    environment
+  }
+  class t184["UITestCommand"] {
+    <<struct>>
+    sessionID
+    sequence
+    action
+    databaseDirectory
+    scenario
+    initialRoute
+    path
+    enabled
+    environment
+  }
+  class t185["UITestCommand.Action"] {
+    <<enum>>
+  }
+  class t186["UITestAcknowledgement"] {
+    <<struct>>
+    sessionID
+    sequence
+    state
+    scenario
+    route
+    message
+  }
+  class t187["UITestAcknowledgement.State"] {
+    <<enum>>
+  }
+  class t188["UITestControlMonitor"] {
+    <<class>>
+    observer
+    handler
+    directory
+    sessionID
+    lastSequence
+    start()
+    processPendingCommand()
+  }
+  class t189["UITestControlMonitor.Handler"] {
+    <<typealias>>
+  }
+  class t190["UITestScenarioSeederError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t191["UITestScenarioSeeder"] {
+    <<enum>>
+    seedIfRequested()
+    seed()
+    seedDeckIncludedItemTypes()
+    seedRiskyItemTypeEdit()
+    seedSpokenResponseItemType()
+    importIncludedDeck()
+    seedTextInteraction()
+    seedAudioSubmission()
+    seedCloze()
+    seedReverseStudy()
+    seedBasicItem()
+    seedLibraryBrowse()
+    seedSchedulingHistory()
+    seedImageMissingDescription()
+    seedDeckWithDueItems()
+    seedDeckScoping()
+    seedPortableExportSource()
+    seedTypeConflictLocal()
+    seedCorruptedItemType()
+    seedImportWithMedia()
+    seedAlternateImportType()
+    seedAuthoringFieldTypes()
+    createAuthoringItemType()
+  }
+  class t192["UserFacingError"] {
+    <<enum>>
+    message()
+    importMessage()
+    databaseMessage()
+    mediaMessage()
+    article()
+    clozeMessage()
+    importMessage()
+    safeImportMessage()
+  }
+  class t193["VocabularyLibraryNotice"] {
+    <<struct>>
+    id
+    title
+    message
+    __()
+  }
+  class t194["VocabularyLibraryError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t195["VocabularyLibraryModel"] {
+    <<class>>
+    installedPacks
+    isLoading
+    isImporting
+    notice
+    rootURL
+    sync
+    init()
+    load()
+    importPack()
+  }
+  class t196["VocabularyPacksView"] {
+    <<struct>>
+    model
+    onImport
+    onDone
+    body
+  }
+  t54 <|-- t3
+  t54 <|-- t9
+  t54 <|-- t18
+  t54 <|-- t23
+  t54 <|-- t27
+  t54 <|-- t28
+  t54 <|-- t30
+  t54 <|-- t33
+  t54 <|-- t34
+  t54 <|-- t35
+  t54 <|-- t38
+  t54 <|-- t39
+  t54 <|-- t51
+  t54 <|-- t55
+  t54 <|-- t62
+  t63 <|-- t64
+  t67 <|-- t68
+  t54 <|-- t70
+  t54 <|-- t73
+  t54 <|-- t77
+  t54 <|-- t78
+  t54 <|-- t87
+  t54 <|-- t92
+  t54 <|-- t94
+  t54 <|-- t95
+  t54 <|-- t101
+  t54 <|-- t102
+  t54 <|-- t105
+  t54 <|-- t106
+  t54 <|-- t124
+  t54 <|-- t126
+  t54 <|-- t134
+  t54 <|-- t138
+  t54 <|-- t141
+  t54 <|-- t151
+  t54 <|-- t152
+  t157 <|-- t162
+  t158 <|-- t163
+  t159 <|-- t164
+  t54 <|-- t169
+  t54 <|-- t173
+  t54 <|-- t179
+  t54 <|-- t196

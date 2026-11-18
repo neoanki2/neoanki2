@@ -1,5 +1,6 @@
 import AppKit
 import NeoAnkiCore
+import NeoAnkiTextEditing
 import SwiftUI
 
 struct ClozeFieldEditor: View {
@@ -236,11 +237,6 @@ private struct ClozeTextEditor: NSViewRepresentable {
         textView.allowsUndo = true
         textView.textColor = .textColor
         textView.backgroundColor = .textBackgroundColor
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainerInset = NSSize(width: 5, height: 5)
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.font = NSFont.preferredFont(forTextStyle: .body)
@@ -248,10 +244,8 @@ private struct ClozeTextEditor: NSViewRepresentable {
         textView.setAccessibilityLabel(accessibilityLabel)
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
 
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
+        let scrollView = NativeTextEditorPolicy.makeScrollView(for: textView, inset: NSSize(width: 5, height: 5))
         scrollView.borderType = .bezelBorder
-        scrollView.documentView = textView
         return scrollView
     }
 

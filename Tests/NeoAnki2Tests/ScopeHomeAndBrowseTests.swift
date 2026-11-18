@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiCore
+import NeoAnkiApplication
 import Testing
 import SQLite3
 
@@ -40,6 +41,7 @@ private func addItem(
     #expect(model.scopeSummary == .empty)
 
     #expect(await addItem(model, front: "France", back: "Paris"))
+    await model.awaitReadModels()
 
     #expect(model.scopeSummary.itemCount == 1)
     #expect(model.scopeSummary.cardCount == 1)
@@ -76,6 +78,7 @@ private func addItem(
     await model.load(scope: .deck(deck.id, name: deck.name))
 
     #expect(await addItem(model, front: "France", back: "Paris", deckID: deck.id))
+    await model.awaitReadModels()
     #expect(model.scopeSummary.dueNow == 0)
     #expect(model.scopeSummary.newCount == 1)
     #expect(model.scopeSummary.availableNewCount == 0)
@@ -94,6 +97,7 @@ private func addItem(
 
     await model.load(scope: .deck(deck.id, name: "Geography"))
     _ = await addItem(model, front: "France", back: "Paris", deckID: deck.id)
+    await model.awaitReadModels()
 
     #expect(model.scopeSummary.itemCount == 1)
     #expect(model.items.count == 1)
@@ -332,6 +336,7 @@ private func addItem(
     #expect(moved == 2)
     let inDeck = try await store.listItems(scope: .deck(deck.id, includeDescendants: false))
     #expect(inDeck.count == 2)
+    await model.awaitReadModels()
     #expect(model.scopeSummary.itemCount == 2)
 }
 
@@ -360,6 +365,7 @@ private func addItem(
 
     #expect(deleted == 2)
     #expect(model.items.map(\.title) == ["Peru"])
+    await model.awaitReadModels()
     #expect(model.scopeSummary.itemCount == 1)
     #expect(model.scopeSummary.dueNow == 1)
 }
@@ -376,6 +382,7 @@ private func addItem(
     await model.load()
     #expect(await addItem(model, front: "France", back: "Paris", deckID: deck.id))
     #expect(await addItem(model, front: "Japan", back: "Tokyo"))
+    await model.awaitReadModels()
     await decksModel.load()
 
     let coldItems = ItemsModel(store: store, mediaStore: await store.media)
@@ -577,7 +584,135 @@ private func addItem(
         BuiltInItemTypes.frontFieldID: [Span("New question")],
         BuiltInItemTypes.backFieldID: [Span("Answer")],
     ]))
+    await model.awaitReadModels()
     #expect(model.scopeSummary.cardCount == 2)
     #expect(model.maturityUnavailable)
     #expect(model.errorMessage != nil)
+}
+
+@Test @MainActor func committedRefreshDoesNotPublishOverANewerScope() async throws {
+    let (_, _, store) = try await makeModels()
+    let deck = try await store.createDeck(Deck(name: "Empty scope"))
+    let library = SQLiteLibraryRepository(store: store)
+    let heldReads = HeldSummaryReads(library: library)
+    let model = ItemsModel(library: library, mediaStore: nil,
+        reads: NativeLibraryReadCoordinator(library: heldReads))
+    await model.load()
+    await heldReads.holdNextSummary()
+    #expect(await addItem(model, front: "France", back: "Paris"))
+    await heldReads.waitUntilHeld()
+
+    await model.load(scope: .deck(deck.id, name: deck.name))
+    #expect(model.scopeSummary.itemCount == 0)
+    await heldReads.release()
+    await model.awaitReadModels()
+
+    #expect(model.scopeSummary.itemCount == 0)
+    #expect(model.scopeSummary.dueNow == 0)
+    #expect(model.items.isEmpty)
+}
+
+@Test @MainActor func deletePublishesCommittedRemovalBeforeOptionalRefresh() async throws {
+    let (_, _, store) = try await makeModels()
+    let library = SQLiteLibraryRepository(store: store)
+    let heldReads = HeldSummaryReads(library: library)
+    let model = ItemsModel(library: library, mediaStore: nil,
+        reads: NativeLibraryReadCoordinator(library: heldReads))
+    await model.load()
+    #expect(await addItem(model, front: "France", back: "Paris"))
+    await model.awaitReadModels()
+    let id = try #require(model.items.first?.id)
+    await heldReads.holdNextSummary()
+
+    #expect(await model.deleteItem(id: id))
+    #expect(model.items.isEmpty)
+    await heldReads.waitUntilHeld()
+    #expect(try await store.fetchItem(id: id) == nil)
+    await heldReads.release()
+    await model.awaitReadModels()
+    #expect(model.scopeSummary.itemCount == 0)
+}
+
+@Test @MainActor func movePublishesDestinationMembershipIncludingDescendants() async throws {
+    let (model, _, store) = try await makeModels()
+    let root = try await store.createDeck(Deck(name: "Root"))
+    let child = try await store.createDeck(Deck(name: "Child", parentID: root.id))
+    let outside = try await store.createDeck(Deck(name: "Outside"))
+    let scope = StudyScope.deck(root.id, name: root.name)
+    await model.load(scope: scope)
+    #expect(await addItem(model, front: "France", back: "Paris", deckID: root.id))
+    let id = try #require(model.items.first?.id)
+
+    #expect(await model.moveItem(id: id, to: child.id, scope: scope))
+    #expect(model.items.map(\.id) == [id])
+    #expect(model.items.first?.deckID == child.id)
+    await model.awaitReadModels()
+    #expect(model.scopeSummary.itemCount == 1)
+
+    #expect(await model.moveItem(id: id, to: outside.id, scope: scope))
+    #expect(model.items.isEmpty)
+    await model.awaitReadModels()
+    #expect(model.scopeSummary.itemCount == 0)
+}
+
+@Test @MainActor func deletingUnassignedPreservesAssignedRowsInAllDecks() async throws {
+    let (model, _, store) = try await makeModels()
+    let deck = try await store.createDeck(Deck(name: "Assigned"))
+    await model.load()
+    #expect(await addItem(model, front: "Unassigned", back: "Answer"))
+    #expect(await addItem(model, front: "Assigned", back: "Answer", deckID: deck.id))
+
+    #expect(await model.deleteAllUnassigned(scope: .allDecks) == 1)
+    #expect(model.items.map(\.title) == ["Assigned"])
+    await model.awaitReadModels()
+    #expect(model.scopeSummary.itemCount == 1)
+}
+
+/// Holds a completed read rather than sleeping, so tests control publication
+/// order independently from the real SQLite command boundary.
+private actor HeldSummaryReads: LibraryBrowsing {
+    let library: SQLiteLibraryRepository
+    private var holdNext = false
+    private var held = false
+    private var entered: [CheckedContinuation<Void, Never>] = []
+    private var releaseRead: CheckedContinuation<Void, Never>?
+
+    init(library: SQLiteLibraryRepository) { self.library = library }
+    func holdNextSummary() { holdNext = true }
+    func waitUntilHeld() async {
+        guard !held else { return }
+        await withCheckedContinuation { entered.append($0) }
+    }
+    func release() { releaseRead?.resume(); releaseRead = nil; held = false }
+    func scopeSummary(scope: DeckScope, asOf: Date) async throws -> ScopeSummary {
+        let result = try await library.scopeSummary(scope: scope, asOf: asOf)
+        if holdNext {
+            holdNext = false
+            held = true
+            let waiting = entered
+            entered.removeAll()
+            waiting.forEach { $0.resume() }
+            await withCheckedContinuation { releaseRead = $0 }
+        }
+        return result
+    }
+    func libraryID() async throws -> UUID { try await library.libraryID() }
+    func loadItemTypes() async throws -> ItemTypeLoadResult { try await library.loadItemTypes() }
+    func loadItemTypeCatalog() async throws -> ItemTypeCatalog { try await library.loadItemTypeCatalog() }
+    func authoringItemTypes(for deckID: UUID?) async throws -> AuthoringItemTypes {
+        try await library.authoringItemTypes(for: deckID)
+    }
+    func effectiveItemTypePolicy(for deckID: UUID) async throws -> DeckItemTypePolicy? {
+        try await library.effectiveItemTypePolicy(for: deckID)
+    }
+    func items(scope: DeckScope, sort: ItemSortOrder, search: String) async throws -> [SavedItemSummary] {
+        try await library.items(scope: scope, sort: sort, search: search)
+    }
+    func item(id: UUID) async throws -> (item: Item, itemType: ItemType)? { try await library.item(id: id) }
+    func itemBrowseSchedules(itemIDs: [UUID]) async throws -> [UUID: ItemBrowseSchedule] {
+        try await library.itemBrowseSchedules(itemIDs: itemIDs)
+    }
+    func itemRecordsPage(offset: Int, limit: Int) async throws -> [LibraryItemRecord] {
+        try await library.itemRecordsPage(offset: offset, limit: limit)
+    }
 }

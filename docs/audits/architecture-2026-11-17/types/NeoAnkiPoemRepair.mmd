@@ -1,0 +1,30 @@
+classDiagram
+direction LR
+  class t0["DeckPlan"] {
+    <<struct>>
+    deck
+    originals
+    preview
+    openingCards
+  }
+  class t1["LocalAPI"] {
+    <<struct>>
+    baseURL
+    token
+    request()
+    all()
+    decoder
+  }
+  class t2["RepairError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t3["PoemRepairCommand"] {
+    <<enum>>
+    main()
+    run()
+    auditSnapshot()
+    plan()
+    itemObject()
+    apply()
+  }

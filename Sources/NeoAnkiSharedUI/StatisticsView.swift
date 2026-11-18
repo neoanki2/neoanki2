@@ -32,6 +32,7 @@ public struct StatisticsView: View {
     @State private var visibleReviews = 100
     @State private var customPace = false
     @State private var customRetention = false
+    public init(model: StatisticsFeatureModel) { _model = State(initialValue: model) }
     public init(library: any LibraryRepository, scope: DeckScope = .allDecks, sessionID: UUID? = nil) {
         _model = State(
             initialValue: StatisticsFeatureModel(library: library, scope: scope, sessionID: sessionID))

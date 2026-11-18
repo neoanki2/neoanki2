@@ -626,6 +626,55 @@ final class MobileDeckUITests: NeoAnki2MobileUITestCase {
 
 @MainActor
 final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
+    func testSaveFromStudyEditorDismissesAndPersistsTheCorrection() throws {
+        let nonce = ProcessInfo.processInfo.environment["NEOANKI_EDITOR_GATE_NONCE"] ?? UUID().uuidString
+        let original = "Original study question " + nonce.uppercased()
+        let app = launchApp(environment: ["NEOANKI_TEST_HOLD_EDIT_BADGE": "1", "NEOANKI_EDITOR_GATE_NONCE": nonce])
+        open("Create", in: app)
+        app.buttons["New Item"].tap()
+        let front = app.textFields["add-card-field-front"]
+        XCTAssertTrue(front.waitUntilExists(timeout: 5))
+        front.tap(); front.typeText(original)
+        let back = app.textFields["add-card-field-back"]
+        focusAuthoringField(back, in: app); back.typeText("Original answer")
+        app.buttons["add-card-keyboard-done"].tap()
+        app.buttons["add-card-save"].tap()
+        open("Home", in: app)
+        XCTAssertTrue(waitUntil(timeout: 10) { app.buttons["Study"].exists && app.buttons["Study"].isEnabled })
+        app.buttons["Study"].tap()
+        XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 15))
+        app.buttons["More"].tap()
+        app.buttons["Edit Current Item"].tap()
+        let editor = app.navigationBars["Edit Item"]
+        XCTAssertTrue(editor.waitUntilExists(timeout: 5))
+        let answerField = app.descendants(matching: .any)["edit-card-field-back"]
+        XCTAssertTrue(answerField.waitUntilExists(timeout: 5))
+        answerField.tap()
+        answerField.typeText("corrected")
+        let corrected = try XCTUnwrap(answerField.value as? String)
+        XCTAssertTrue(corrected.contains("corrected"))
+        XCTAssertNotEqual(corrected, "Original answer")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(editor.waitUntilGone(timeout: 10), "Save must dismiss the nested editor and return to study")
+        XCTAssertTrue(app.buttons["Show Answer"].waitUntilExists(timeout: 5))
+        app.buttons["Show Answer"].tap()
+        XCTAssertTrue(app.staticTexts[corrected].waitUntilExists(timeout: 5))
+        app.buttons["More"].tap()
+        app.buttons["Edit Current Item"].tap()
+        XCTAssertTrue(editor.waitUntilExists(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["edit-card-field-back"].value as? String, corrected)
+        app.buttons["Cancel"].tap()
+        app.buttons["endStudySession"].tap()
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-NeoAnkiUITestingReset" }
+        app.launch()
+        open("Library", in: app)
+        let saved = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", original)).firstMatch
+        XCTAssertTrue(saved.waitUntilExists(timeout: 10))
+        saved.tap()
+        XCTAssertTrue(app.staticTexts[corrected].waitUntilExists(timeout: 5))
+    }
+
     func testCreateBrowseAndStudyBasicCardJourney() throws {
         let app = launchApp()
         open("Create", in: app)

@@ -442,6 +442,7 @@ extension FastFunctionalJourneyTests {
         startStudy(in: app)
 
         let primary = app.buttons.identified("primaryStudyAction")
+        XCTAssertFalse(app.buttons.identified("revealAndSelfGrade").exists)
         primary.click()
         XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitUntilExists(timeout: 3))
 
@@ -469,6 +470,7 @@ extension FastFunctionalJourneyTests {
         let app = launchApp(scenario: "study-choose")
         startStudy(in: app)
 
+        XCTAssertFalse(app.buttons.identified("revealAndSelfGrade").exists)
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["studyInteractionMessage"].waitUntilExists(timeout: 3))
 
@@ -486,6 +488,7 @@ extension FastFunctionalJourneyTests {
         startStudy(in: app)
 
         XCTAssertTrue(app.buttons.identified("arrangementItem0").waitUntilExists(timeout: 3))
+        XCTAssertFalse(app.buttons.identified("revealAndSelfGrade").exists)
         triggerPrimaryStudyAction(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["answerIncorrect"].waitUntilExists(timeout: 3))
     }
@@ -509,7 +512,9 @@ extension FastFunctionalJourneyTests {
 
         XCTAssertTrue(app.buttons.identified("startRecording").waitUntilExists(timeout: 3))
         XCTAssertFalse(app.buttons.identified("primaryStudyAction").exists)
-        app.buttons.identified("revealAndSelfGrade").click()
+        XCTAssertFalse(app.buttons.identified("revealAndSelfGrade").exists)
+        openStudyActions(in: app)
+        app.menuItems.identified("revealAndSelfGrade").click()
         XCTAssertTrue(app.buttons.identified("gradeGood").waitUntilExists(timeout: 3))
     }
 

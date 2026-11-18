@@ -191,6 +191,7 @@ func importContextualDeck(
     #expect(updated)
     #expect(model.items.first?.title == "Japan")
     #expect(model.items.first?.subtitle == "Tokyo")
+    await model.awaitReadModels()
     #expect(model.dueCount == 1)
     let stored = try #require(try await store.fetchItem(id: itemID)?.item)
     #expect(stored.value(for: frontID) == .text("Japan"))
@@ -386,6 +387,7 @@ func importContextualDeck(
     ])
     #expect(saved == true)
     #expect(model.items.count == 1)
+    await model.awaitReadModels()
     #expect(model.dueCount == 1)
 
     let itemID = try #require(model.items.first?.id)
@@ -393,6 +395,7 @@ func importContextualDeck(
 
     #expect(deleted == true)
     #expect(model.items.isEmpty)
+    await model.awaitReadModels()
     #expect(model.dueCount == 0)
     #expect(model.errorMessage == nil)
 }

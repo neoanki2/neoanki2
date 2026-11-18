@@ -82,5 +82,6 @@ import Testing
     #expect(await model.deleteItem(id: itemID))
     #expect(try await store.mediaAsset(hash: first.assetHash) == nil)
     #expect(try await store.mediaAsset(hash: second.assetHash) == nil)
+    await model.awaitReadModels()
     #expect(model.dueCount == 0)
 }

@@ -10,13 +10,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ItemTypesMobileView: View {
+    @Environment(\.mobileUITestFixtures) private var fixtures
     @Bindable var model: MobileAppModel
     @State private var studioModel: ItemTypesFeatureModel?
 
     init(model: MobileAppModel) {
         self.model = model
-        _studioModel = State(initialValue: model.itemTypeStudioLibrary.map {
-            let studio = ItemTypesFeatureModel(library: $0)
+        _studioModel = State(initialValue: model.features.makeItemTypesModel().map { studio in
             if case let .deck(deckID, _) = model.selectedScope { studio.creationDeckID = deckID }
             return studio
         })
@@ -28,9 +28,7 @@ struct ItemTypesMobileView: View {
                 model: studioModel,
                 reloadLibrary: { try await model.reload() },
                 prepareCatalog: {
-                    try? await MobileItemTypeStudioUITestSeeder.seedIfRequested(
-                        library: model.library
-                    )
+                    try? await fixtures?.prepareStudio()
                 }
             )
         } else {
@@ -132,15 +130,15 @@ struct TransferToolsView: View {
                 .task(id: importDeckID) {
                     let deckID = importDeckID
                     do {
-                        let choices = try await model.library.authoringItemTypes(for: deckID)
+                        let choices = try await model.authoringChoices(for: deckID)
                         guard deckID == importDeckID else { return }
                         importTypes = choices.itemTypes
                         if !importTypes.contains(where: { $0.id == importTypeID }) { importTypeID = choices.automaticItemTypeID }
                     } catch { errorMessage = error.localizedDescription }
                 }
                 .sheet(isPresented: $showImportTypeChooser) {
-                    ItemTypeChooserView(library: model.library, deckID: importDeckID) { type in
-                        importTypes = (try? await model.library.authoringItemTypes(for: importDeckID).itemTypes) ?? []
+                    ItemTypeChooserView(model: model.features.makeTypeChooser(deckID: importDeckID)) { type in
+                        importTypes = (try? await model.authoringChoices(for: importDeckID).itemTypes) ?? []
                         importTypeID = type.id
                     }
                 }

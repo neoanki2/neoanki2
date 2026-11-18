@@ -20,7 +20,7 @@ struct ScopeHomeView: View {
     private var summary: ScopeSummary { itemsModel.scopeSummary }
 
     init(
-        itemsModel: ItemsModel, library: any LibraryRepository, scope: StudyScope,
+        itemsModel: ItemsModel, statistics: StatisticsFeatureModel, scope: StudyScope,
         onStudy: @escaping () -> Void, onBrowse: @escaping () -> Void,
         onBrowseItemsNeedingAttention: @escaping () -> Void, onAddItem: @escaping () -> Void
     ) {
@@ -30,7 +30,7 @@ struct ScopeHomeView: View {
         self.onBrowse = onBrowse
         self.onBrowseItemsNeedingAttention = onBrowseItemsNeedingAttention
         self.onAddItem = onAddItem
-        let model = StatisticsFeatureModel(library: library, scope: scope.filter)
+        let model = statistics
         model.query.period = .today
         _statistics = State(initialValue: model)
     }

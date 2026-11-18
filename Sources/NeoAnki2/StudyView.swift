@@ -1,8 +1,6 @@
 import NeoAnkiCore
 import NeoAnkiApplication
 import NeoAnkiSharedUI
-import PoemDeckBuilder
-import ProseDeckBuilder
 import NeoAnkiTextEditing
 import SwiftUI
 
@@ -86,6 +84,9 @@ struct StudyView: View {
             if canGrade { Task { await model.grade(.good) } }
             else { primaryActionHandler.invoke() }
         }
+        .editingShortcut(.rightArrow, modifiers: [], isEnabled: canRevealWithoutChecking) {
+            revealWithoutChecking()
+        }
         .editingShortcut("e", modifiers: .command, isEnabled: model.currentCard != nil && !isEditingCard && !model.isGrading && !model.isPreparingQueue) {
             isEditingCard = true
         }
@@ -109,34 +110,14 @@ struct StudyView: View {
     @ViewBuilder
     private var cardEditor: some View {
         if let card = model.currentCard {
-            if card.itemType.name == "Poem Line",
-               let deckID = card.item.deckID,
-               let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
-                PoemDeckEditorView(
-                    library: itemsModel.library,
-                    deckID: deckID,
-                    itemTypeID: card.itemType.id,
-                    deckName: deckName,
+            if let deckID = card.item.deckID,
+               let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name,
+               let context = GeneratedDeckEditorContext(item: card.item, itemType: card.itemType, deckName: deckName) {
+                GeneratedDeckEditorView(editing: itemsModel.generatedDeckEditing, context: context,
                     onSaved: {
                         isEditingCard = false
                         Task { await model.reloadCurrentItem() }
-                    },
-                    onCancel: { isEditingCard = false }
-                )
-            } else if card.itemType.name == "Prose Unit",
-                      let deckID = card.item.deckID,
-                      let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
-                ProseDeckEditorView(
-                    library: itemsModel.library,
-                    deckID: deckID,
-                    itemTypeID: card.itemType.id,
-                    deckName: deckName,
-                    onSaved: {
-                        isEditingCard = false
-                        Task { await model.reloadCurrentItem() }
-                    },
-                    onCancel: { isEditingCard = false }
-                )
+                    }, onCancel: { isEditingCard = false })
             } else {
                 NavigationStack {
                     AddItemView(
@@ -179,27 +160,16 @@ struct StudyView: View {
             && recording.state != .requestingPermission
     }
 
-    private var canShowAnswer: Bool {
-        guard model.currentCard != nil else { return false }
-        return !model.isAnswerRevealed
-            && !model.isLoading
-            && !model.isFinished
+    private var canShowAnswer: Bool { model.canShowAnswer }
+    private var canGrade: Bool { model.canGrade }
+    private var supportsRevealWithoutChecking: Bool { model.supportsRevealWithoutChecking }
+
+    private var canRevealWithoutChecking: Bool {
+        supportsRevealWithoutChecking && canShowAnswer && !isEditingCard
+            && recording.state != .recording && recording.state != .requestingPermission
     }
 
-    private var canGrade: Bool {
-        guard model.currentCard != nil else { return false }
-        return model.isAnswerRevealed
-            && !model.isGrading
-            && !model.isPreparingQueue
-    }
-
-    private var canSkip: Bool {
-        model.currentCard != nil
-            && !model.isGrading
-            && !model.isCompletingSubmission
-            && !model.isPreparingQueue
-            && !isEditingCard
-    }
+    private var canSkip: Bool { model.canSkip && !isEditingCard }
 
     private var loadingView: some View {
         VStack(spacing: DesignSystem.Spacing.sm) {
@@ -343,6 +313,15 @@ struct StudyView: View {
             .accessibilityIdentifier("skipStudyCard")
 
             Menu {
+                if supportsRevealWithoutChecking && !model.isAnswerRevealed {
+                    Button("Reveal & Self-Grade", action: revealWithoutChecking)
+                        .disabled(!canRevealWithoutChecking)
+                        .help("Reveal without checking (Right Arrow)")
+                        .accessibilityIdentifier("revealAndSelfGrade")
+
+                    Divider()
+                }
+
                 Button("Edit Card", systemImage: "square.and.pencil") {
                     isEditingCard = true
                 }
@@ -358,7 +337,7 @@ struct StudyView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("Edit the current card or open grade help")
+            .help("More study actions")
             .accessibilityIdentifier("studyActionsMenu")
             .popover(isPresented: $showGradeGuide, arrowEdge: .top) {
                 GradeGuideView(gradingMode: gradingMode)
@@ -634,23 +613,15 @@ struct StudyView: View {
             } else if card.template.interaction == .record {
                 recordingStudyFooter
             } else {
-                HStack(spacing: DesignSystem.Spacing.sm) {
-                    Button(primaryActionTitle(for: card.template.interaction)) {
-                        StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                            model.performPrimaryAction()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
-                    .accessibilityIdentifier("primaryStudyAction")
-
-                    if card.template.interaction != .reveal,
-                       card.template.interaction != .cloze,
-                       card.template.interaction != .imageOcclusion {
-                        revealAndSelfGradeButton
+                Button(primaryActionTitle(for: card.template.interaction)) {
+                    StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+                        model.performPrimaryAction()
                     }
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier("primaryStudyAction")
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -764,8 +735,6 @@ struct StudyView: View {
                     .controlSize(.large)
                     .accessibilityIdentifier("startRecording")
                 }
-
-                revealAndSelfGradeButton
             }
         }
     }
@@ -793,22 +762,11 @@ struct StudyView: View {
         .accessibilityIdentifier("recordingActions")
     }
 
-    private var revealAndSelfGradeButton: some View {
-        Button("Reveal & Self-Grade") {
-            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
-                model.revealAnswer()
-            }
+    private func revealWithoutChecking() {
+        guard canRevealWithoutChecking else { return }
+        StudyAnimation.revealAnswer(reduceMotion: reduceMotion) {
+            model.revealAnswer()
         }
-        .controlSize(.large)
-        .editingShortcut(.rightArrow, modifiers: [], isEnabled: !isEditingCard && recording.state != .recording && recording.state != .requestingPermission) {
-            StudyAnimation.revealAnswer(reduceMotion: reduceMotion) { model.revealAnswer() }
-        }
-        .help("Reveal without checking (Right Arrow)")
-        .disabled(
-            recording.state == .recording
-                || recording.state == .requestingPermission
-        )
-        .accessibilityIdentifier("revealAndSelfGrade")
     }
 
     private func saveAudioSubmission(for card: DueCard) {

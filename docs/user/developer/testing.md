@@ -41,6 +41,65 @@ dedicated scripts under `Scripts/`. The [unified release process](../../RELEASIN
 selects relevant headless checks; UI journeys are additional targeted evidence,
 not a ceremony required for every release.
 
+### Card-editing contracts
+
+Run the editing contracts independently of a device or production library:
+
+```bash
+swift test --filter 'ItemEditing|NativeItemEditorHydration|GeneratedDeckEditing|CardEditingRegression'
+(cd NeoAnkiCore && swift test --filter ClozeEditingInvariantTests)
+```
+
+The suites cover every field kind's hydration, required-value validation,
+discard detection, Unicode cloze edits, save/reopen round trips, preservation of
+unmodified fields and scheduling history, invalid saves and SQLite write
+failures, generated-deck snapshot conflicts and atomicity, and mid-study reloads.
+Native Mac tests exercise the actual text adapter and the full bridge-card
+editor in an offscreen `NSHostingView`; they never create a window or open the
+user's library. The offscreen opening test verifies that the real appearance
+callback ran before checking native text values.
+
+These tests do not establish that an installed app's sheet presentation,
+focus behavior, iOS bindings, or media pickers work. Do not equate a passing
+hydration test with reproduction or resolution of an empty-editor report.
+Regression assertions remain enabled when they expose defects; do not replace
+them with assertions of the broken behavior or disable them to make CI green.
+
+`NativeCommandCompletionTests` suspends badges, reminders, and widgets across
+create, edit, move, delete, deck, and import commands. `LatestAsyncWorkTests`
+checks serial execution and bounded pending work. Editor tests check shared
+draft conversion, validation parity, save transitions, and actual glyph ink;
+study tests check retired cards, deferred repairs, deletion, and stale reads.
+Gated reload tests verify that automatic refresh retains explicit browse demand
+and that a commit invalidates an older snapshot before it reaches the screen.
+Tests that need derived summaries await `awaitReadModels()`. Tests of OS
+publication explicitly await `awaitDevicePublication()`; that barrier does not
+belong on a Save completion path.
+
+Qualify that the editor contracts actually reject known defects:
+
+```bash
+python3 Scripts/check-editor-test-sensitivity.py --output .build/editor-sensitivity
+python3 Scripts/run-editor-save-ui.py --output .build/editor-save-ui
+# Also qualify the disabled-fixture defect with real Simulator verification:
+python3 Scripts/check-editor-test-sensitivity.py --with-simulator --output .build/editor-sensitivity-ui
+```
+
+The sensitivity campaign builds an isolated snapshot including dirty and
+untracked source. It never mutates the working checkout. A passing executed
+baseline is required; only the expected behavioral assertion detects a mutant.
+Compilation errors, timeouts, skipped/missing tests, and infrastructure failures
+are inconclusive failures. Headless qualification covers document sizing,
+binding replacement, and putting OS publication back on command completion.
+CI qualifies relevant changed contracts without restoring broad UI journeys.
+
+The focused iOS runner uses one uniquely named disposable Simulator and always
+deletes it. Its save-from-study journey checks dismissal, refreshed content,
+reopening, and persistence after relaunch. Independently validated nonce-scoped
+armed/held receipts must match the persisted fixture item. An inactive fixture
+cannot earn a pass merely because tapping Save worked under normal conditions.
+The fixture is Simulator-only and requires the explicit UI-test reset argument.
+
 ### Study sessions and performance
 
 Session behavior is tested in `NeoAnkiFeaturesTests/StudySessionContractTests`;

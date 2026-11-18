@@ -1,0 +1,1443 @@
+{
+  "cLanguageStandard" : null,
+  "cxxLanguageStandard" : null,
+  "defaultLocalization" : null,
+  "dependencies" : [
+    {
+      "fileSystem" : [
+        {
+          "identity" : "neoankicore",
+          "path" : "/Users/yanzay/projects/yanzay/neoanki2/NeoAnkiCore",
+          "productFilter" : null,
+          "traits" : [
+            {
+              "name" : "default"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "name" : "NeoAnki2",
+  "packageKind" : {
+    "root" : [
+      "/Users/yanzay/projects/yanzay/neoanki2"
+    ]
+  },
+  "pkgConfig" : null,
+  "platforms" : [
+    {
+      "options" : [
+
+      ],
+      "platformName" : "macos",
+      "version" : "14.0"
+    },
+    {
+      "options" : [
+
+      ],
+      "platformName" : "ios",
+      "version" : "17.0"
+    }
+  ],
+  "products" : [
+    {
+      "name" : "NeoAnki2",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnki2"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "NeoAnkiFeatures",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiFeatures"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiMobile",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiMobile"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiAPI",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiAPI"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiApplication",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiApplication"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiSharedUI",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiSharedUI"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiCloudSync",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiCloudSync"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiDeckBuilderKit",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiDeckBuilderKit"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiDeckBuilderCore",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiDeckBuilderCore"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiVocabularyKit",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiVocabularyKit"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "NeoAnkiVocabularyCLI",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiVocabularyCLI"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "neoanki-vocab",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "neoanki-vocab"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "neoanki-api-reference",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiAPIReferenceGenerator"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "neoanki-template-migrator",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiTemplateMigrator"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "neoanki-poem-repair",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiPoemRepair"
+      ],
+      "type" : {
+        "executable" : null
+      }
+    },
+    {
+      "name" : "NeoAnkiTemplateMigration",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "NeoAnkiTemplateMigration"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "PoemDeckBuilder",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "PoemDeckBuilder"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    },
+    {
+      "name" : "ProseDeckBuilder",
+      "settings" : [
+
+      ],
+      "targets" : [
+        "ProseDeckBuilder"
+      ],
+      "type" : {
+        "library" : [
+          "automatic"
+        ]
+      }
+    }
+  ],
+  "providers" : null,
+  "swiftLanguageVersions" : null,
+  "targets" : [
+    {
+      "dependencies" : [
+
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiTextEditing",
+      "packageAccess" : true,
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiTextEditing",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiTextEditingTests",
+      "packageAccess" : true,
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiFeatures",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiFeatures",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiFeatures",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiSharedUI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiDeckBuilderKit",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "PoemDeckBuilder",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "ProseDeckBuilder",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiMobile",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiIOS",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiTextEditing",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiFeatures",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiSharedUI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiCloudSync",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiAPI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiDeckBuilderKit",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "PoemDeckBuilder",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "ProseDeckBuilder",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnki2",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnki2",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "executable"
+    },
+    {
+      "dependencies" : [
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiApplication",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiApplication",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiTextEditing",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiFeatures",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiSharedUI",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiSharedUI",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiCloudSync",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiCloudSync",
+      "resources" : [
+
+      ],
+      "settings" : [
+        {
+          "condition" : {
+            "platformNames" : [
+              "macos"
+            ]
+          },
+          "kind" : {
+            "linkedFramework" : {
+              "_0" : "Security"
+            }
+          },
+          "tool" : "linker"
+        }
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiDeckBuilderCore",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiDeckBuilderKit",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiDeckBuilderKit",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiDeckBuilderCore",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiDeckBuilderCore",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiAPI",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiAPI",
+      "resources" : [
+
+      ],
+      "settings" : [
+        {
+          "kind" : {
+            "linkedFramework" : {
+              "_0" : "Network"
+            }
+          },
+          "tool" : "linker"
+        },
+        {
+          "kind" : {
+            "linkedFramework" : {
+              "_0" : "Security"
+            }
+          },
+          "tool" : "linker"
+        }
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiVocabularyKit",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiVocabularyKit",
+      "resources" : [
+
+      ],
+      "settings" : [
+        {
+          "kind" : {
+            "linkedLibrary" : {
+              "_0" : "sqlite3"
+            }
+          },
+          "tool" : "linker"
+        }
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiVocabularyCLI",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiVocabularyCLI",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiVocabularyCLI",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "neoanki-vocab",
+      "packageAccess" : true,
+      "path" : "Sources/neoanki-vocab",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "executable"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiAPI",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiAPIReferenceGenerator",
+      "packageAccess" : true,
+      "path" : "Tools/NeoAnkiAPIReferenceGenerator",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "executable"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiAPI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "neoanki-chrome-fixture",
+      "packageAccess" : true,
+      "path" : "Tools/ChromeCompanionFixture",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "executable"
+    },
+    {
+      "dependencies" : [
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiTemplateMigration",
+      "packageAccess" : true,
+      "path" : "Sources/NeoAnkiTemplateMigration",
+      "resources" : [
+
+      ],
+      "settings" : [
+        {
+          "kind" : {
+            "linkedLibrary" : {
+              "_0" : "sqlite3"
+            }
+          },
+          "tool" : "linker"
+        }
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiTemplateMigration",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiTemplateMigrator",
+      "packageAccess" : true,
+      "path" : "Tools/NeoAnkiTemplateMigrator",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "executable"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiAPI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "PoemDeckBuilder",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiPoemRepair",
+      "packageAccess" : true,
+      "path" : "Tools/NeoAnkiPoemRepair",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "executable"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiTextEditing",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiDeckBuilderKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "PoemDeckBuilder",
+      "packageAccess" : true,
+      "path" : "Sources/PoemDeckBuilder",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiTextEditing",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiDeckBuilderKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "ProseDeckBuilder",
+      "packageAccess" : true,
+      "path" : "Sources/ProseDeckBuilder",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiFeatures",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiCloudSync",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiTestSupport",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiFeaturesTests",
+      "packageAccess" : true,
+      "path" : "Tests/NeoAnkiFeaturesTests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiCloudSync",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiTestSupport",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiApplicationTests",
+      "packageAccess" : true,
+      "path" : "Tests/NeoAnkiApplicationTests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnki2",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiMobile",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiFeatures",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiSharedUI",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiTestSupport",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiDeckBuilderKit",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "PoemDeckBuilder",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "ProseDeckBuilder",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiTemplateMigration",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnki2Tests",
+      "packageAccess" : true,
+      "path" : "Tests/NeoAnki2Tests",
+      "resources" : [
+
+      ],
+      "settings" : [
+        {
+          "kind" : {
+            "linkedLibrary" : {
+              "_0" : "sqlite3"
+            }
+          },
+          "tool" : "linker"
+        }
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiAPI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiTestSupport",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiAPITests",
+      "packageAccess" : true,
+      "path" : "Tests/NeoAnkiAPITests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "PoemDeckBuilder",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "PoemDeckBuilderTests",
+      "packageAccess" : true,
+      "path" : "Tests/PoemDeckBuilderTests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "ProseDeckBuilder",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiApplication",
+            null
+          ]
+        },
+        {
+          "product" : [
+            "NeoAnkiCore",
+            "NeoAnkiCore",
+            null,
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "ProseDeckBuilderTests",
+      "packageAccess" : true,
+      "path" : "Tests/ProseDeckBuilderTests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiVocabularyKitTests",
+      "packageAccess" : true,
+      "path" : "Tests/NeoAnkiVocabularyKitTests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    },
+    {
+      "dependencies" : [
+        {
+          "byName" : [
+            "NeoAnkiVocabularyCLI",
+            null
+          ]
+        },
+        {
+          "byName" : [
+            "NeoAnkiVocabularyKit",
+            null
+          ]
+        }
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "NeoAnkiVocabularyCLITests",
+      "packageAccess" : true,
+      "path" : "Tests/NeoAnkiVocabularyCLITests",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "test"
+    }
+  ],
+  "toolsVersion" : {
+    "_version" : "6.0.0"
+  },
+  "traits" : [
+
+  ]
+}

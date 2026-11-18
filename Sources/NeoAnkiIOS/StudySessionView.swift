@@ -5,8 +5,6 @@ import NeoAnkiCore
 import NeoAnkiApplication
 import NeoAnkiFeatures
 import NeoAnkiSharedUI
-import PoemDeckBuilder
-import ProseDeckBuilder
 import SwiftUI
 
 #if os(iOS)
@@ -99,7 +97,7 @@ struct StudySessionView: View {
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
                         Menu("More", systemImage: "ellipsis.circle") {
                             Button("Skip", systemImage: "forward") { skipCurrentCard() }
-                                .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
+                                .disabled(!session.canSkip)
                                 .accessibilityHint("Moves this card to the end without grading it")
                                 .accessibilityIdentifier("skipStudyCard")
                             Button("Read Full Card", systemImage: "doc.text") { showsFullContent = true }
@@ -155,13 +153,9 @@ struct StudySessionView: View {
         }
         .sheet(isPresented: $isEditing) {
             if let loadedItem {
-                if loadedItem.itemType.name == "Poem Line",
-                   let deckID = loadedItem.item.deckID {
-                    PoemDeckEditorView(
-                        library: model.library,
-                        deckID: deckID,
-                        itemTypeID: loadedItem.itemType.id,
-                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Poem",
+                if let context = GeneratedDeckEditorContext(item: loadedItem.item, itemType: loadedItem.itemType,
+                    deckName: model.decks.first(where: { $0.id == loadedItem.item.deckID })?.name) {
+                    GeneratedDeckEditorView(editing: model.features.generatedDeckEditing, context: context,
                         onSaved: {
                             isEditing = false
                             Task {
@@ -169,26 +163,7 @@ struct StudySessionView: View {
                                 self.loadedItem = try? await model.item(id: loadedItem.item.id)
                                 await session.reloadCurrentItem()
                             }
-                        },
-                        onCancel: { isEditing = false }
-                    )
-                } else if loadedItem.itemType.name == "Prose Unit",
-                          let deckID = loadedItem.item.deckID {
-                    ProseDeckEditorView(
-                        library: model.library,
-                        deckID: deckID,
-                        itemTypeID: loadedItem.itemType.id,
-                        deckName: model.decks.first(where: { $0.id == deckID })?.name ?? "Prose",
-                        onSaved: {
-                            isEditing = false
-                            Task {
-                                await model.refresh()
-                                self.loadedItem = try? await model.item(id: loadedItem.item.id)
-                                await session.reloadCurrentItem()
-                            }
-                        },
-                        onCancel: { isEditing = false }
-                    )
+                        }, onCancel: { isEditing = false })
                 } else {
                     ItemEditMobileView(model: model, loaded: loadedItem) { updated in
                         self.loadedItem = updated
@@ -425,7 +400,7 @@ struct StudySessionView: View {
                 .overlay { RoundedRectangle(cornerRadius: 12).stroke(.primary.opacity(0.45), lineWidth: 1) }
         }
         .buttonStyle(.plain)
-        .disabled(session.isGrading)
+        .disabled(!session.canGrade)
         .accessibilityHint(choice.guidance)
     }
 

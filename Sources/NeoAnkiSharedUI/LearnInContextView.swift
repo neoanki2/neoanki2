@@ -37,11 +37,17 @@ public struct LearnInContextView: View {
     private let language: String?
     private let meaning: String?
 
+    public init(model: LearnInContextModel, deckID: UUID? = nil,
+                expression: String = "", language: String? = nil, meaning: String? = nil) {
+        _model = State(initialValue: model)
+        self.deckID = deckID; self.expression = expression; self.language = language; self.meaning = meaning
+    }
+
     public init(library: any LibraryRepository, rootURL: URL, deckID: UUID? = nil,
                 expression: String = "", language: String? = nil, meaning: String? = nil,
                 onSaved: @escaping @MainActor () async -> Void = {}) {
-        _model = State(initialValue: LearnInContextModel(library: library, rootURL: rootURL, onSaved: onSaved))
-        self.deckID = deckID; self.expression = expression; self.language = language; self.meaning = meaning
+        self.init(model: LearnInContextModel(library: library, rootURL: rootURL, onSaved: onSaved),
+                  deckID: deckID, expression: expression, language: language, meaning: meaning)
     }
 
     public var body: some View {

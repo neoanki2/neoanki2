@@ -351,6 +351,62 @@ See [`AUTHORED_DECK_FORMAT.md`]({{ '/AUTHORED_DECK_FORMAT/' | relative_url }}) a
 
 ### Study resolution
 
+`StudySessionState` in `NeoAnkiApplication` owns the native queue, deferred
+repair rounds, review/submission counters and undo transitions. It is a plain
+Sendable value with no UI, observation, clock or persistence dependency. The
+observable `StudyFeatureModel` owns that value once and publishes projections;
+Mac `StudyModel` only adapts presentation names. Both shells use the same action
+availability. Persistence completes before a successful grade/undo changes the
+session state, and deferred repairs reuse edited content with persisted memory.
+
+`LibraryFeatureModel`, `WordCaptureModel` and `LearnInContextModel` keep their
+repositories private. `LibraryFeatureFactory` creates child features and exposes
+named application operations instead of returning repository capabilities.
+`ItemTypeAuthoring` resolves current deck policy for inheritance, default and
+removal operations; shared chooser/deck-settings feature models own loading,
+mutation and refresh behavior. Views bind their state and invoke actions.
+`GeneratedDeckEditing` shares source-editor loading and atomic reconciliation;
+`NativeDeckCreation` shares typed creation and legacy bundle placement. Test
+scenarios receive an explicit fixture service from the iOS composition root.
+
+Native command completion stops at the durable write and receipt confirmation.
+`LatestAsyncWork` keeps read refresh and device publication in separate bounded
+workers, each with one active operation and one replaceable pending request.
+`LibraryFeatureModel.reload()` applies read models without waiting for OS
+publication. Commands enqueue optional refresh synchronously; explicit
+`awaitReadModels()` and `awaitDevicePublication()` barriers serve callers that
+actually need those different readiness conditions. Overlapping reloads retain
+their requested data and scope in a separate read lane; automatic home refresh
+cannot discard an explicit browse request. A commit during a read invalidates
+that snapshot before publication. OS writes remain serial;
+cancelling an operation is never treated as proof that its write stopped.
+
+Ordinary Mac and iOS card editors share `ItemEditorDraft`, the
+`ItemEditorSnapshot` codec, and `EditorSaveOperation`. Identity, untouched field
+representations, language metadata, cloze rebasing, validation, duplicate-save
+exclusion, and failed-draft retention therefore have one implementation. Native
+views own focus, media pickers, and presentation. Save failures remain separate
+from warnings about refreshing an already committed change. Owner notification
+callbacks are optional effects; destination setup callbacks remain essential
+work and are not detached indiscriminately.
+
+All Mac authoring text views use `NativeTextEditorPolicy` in
+`NeoAnkiTextEditing`. Each document owns its text system, grows vertically,
+wraps to the viewport, and rebinds to the current draft. Render contracts check
+actual foreground glyphs inside equal-size viewports, rather than relying on
+accessible values or bitmap inequality caused by changing document dimensions.
+
+After an edit, study reads `ItemCardSnapshot` atomically through
+`LibraryStudyItemSnapshotReading`. The snapshot includes future-due cards.
+`StudySessionState` removes retired cards from the unreviewed suffix and deferred
+repairs, preserves the historical prefix and counters, and invalidates undo for
+a retired card. Surviving cards receive current content; new siblings wait for
+the next session's eligibility policy. Read generations prevent an old editor
+request or delayed error from changing a restarted session or a later attempt.
+Compatibility repositories without the snapshot capability can prune invalid
+generation coordinates from the current item/type, but cannot detect an
+external replacement of an ID with the same coordinates.
+
 `StudyFeatureModel` is the single native study-session coordinator. Both app
 shells use its progressive loading, interaction validation, grading, deferred
 repair rounds, skip/undo, and completion state. The Mac `StudyModel` only adapts

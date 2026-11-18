@@ -1,35 +1,33 @@
 import NeoAnkiApplication
 import NeoAnkiCore
+import NeoAnkiFeatures
 import SwiftUI
 
 /// Explicit discovery is the only authoring surface that crosses deck boundaries.
 public struct ItemTypeChooserView: View {
     @Environment(\.dismiss) private var dismiss
-    let library: any LibraryBrowsing & LibraryItemTypeManaging
-    let deckID: UUID?
+    @State private var model: ItemTypeChooserFeatureModel
     let onSelected: (ItemType) async -> Void
-    @State private var catalog: ItemTypeCatalog?
-    @State private var query = ""
-    @State private var name = ""
-    @State private var error: String?
-    @State private var isWorking = false
 
+    public init(model: ItemTypeChooserFeatureModel, onSelected: @escaping (ItemType) async -> Void) {
+        _model = State(initialValue: model); self.onSelected = onSelected
+    }
     public init(library: any LibraryBrowsing & LibraryItemTypeManaging, deckID: UUID?, onSelected: @escaping (ItemType) async -> Void) {
-        self.library = library; self.deckID = deckID; self.onSelected = onSelected
+        self.init(model: ItemTypeChooserFeatureModel(authoring: .init(library: library), deckID: deckID), onSelected: onSelected)
     }
     public var body: some View {
         NavigationStack {
             List {
-                if let catalog {
+                if let catalog = model.catalog {
                     Section("Available everywhere") {
-                        ForEach(catalog.itemTypes.filter(matches)) { type in
+                        ForEach(catalog.itemTypes.filter(model.matches)) { type in
                             Button(type.name) { choose(type) }
                         }
                     }
-                    if deckID != nil {
+                    if model.deckID != nil {
                         Section("From another deck") {
                             ForEach(catalog.includedWithDecks) { group in
-                                ForEach(group.itemTypes.filter { matches($0) && !catalog.itemTypes.contains($0) }) { type in
+                                ForEach(group.itemTypes.filter { model.matches($0) && !catalog.itemTypes.contains($0) }) { type in
                                     HStack {
                                         Button { choose(type) } label: {
                                             VStack(alignment: .leading) {
@@ -48,113 +46,90 @@ public struct ItemTypeChooserView: View {
                         }
                         if !catalog.needsOrganization.isEmpty {
                             Section("Needs Organization") {
-                                ForEach(catalog.needsOrganization.filter(matches)) { type in
+                                ForEach(catalog.needsOrganization.filter(model.matches)) { type in
                                     Button(type.name) { choose(type) }
                                 }
                             }
                         }
                     }
-                    Section(deckID == nil ? "Create shared type" : "Create for this deck") {
-                        TextField("Item type name", text: $name)
+                    Section(model.deckID == nil ? "Create shared type" : "Create for this deck") {
+                        TextField("Item type name", text: $model.name)
                         Button("Create Item Type") { create() }
-                            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(model.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         Text("Starts with Front and Back. Edit its fields and Card setups from Item Types.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } else { ProgressView("Loading item types…") }
-                if let error { Text(error).foregroundStyle(.red) }
+                if let error = model.error { Text(error).foregroundStyle(.red) }
             }
-            .searchable(text: $query, prompt: "Find an item type")
+            .searchable(text: $model.query, prompt: "Find an item type")
             .navigationTitle("Use Another Type")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isWorking) } }
-            .disabled(isWorking)
-            .interactiveDismissDisabled(isWorking)
-            .task {
-                do { catalog = try await library.loadItemTypeCatalog() }
-                catch { self.error = error.localizedDescription }
-            }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(model.isWorking) } }
+            .disabled(model.isWorking)
+            .interactiveDismissDisabled(model.isWorking)
+            .task { await model.load() }
         }
         #if os(macOS)
         .frame(minWidth: 440, idealWidth: 520, minHeight: 420)
         #endif
     }
-    private func matches(_ type: ItemType) -> Bool { query.isEmpty || type.name.localizedCaseInsensitiveContains(query) }
     private func choose(_ type: ItemType, copy: Bool = false) {
-        isWorking = true
         Task {
-            defer { isWorking = false }
-            do {
-                let selected: ItemType
-                if copy { selected = try await library.createItemType(type.duplicated(), deckID: deckID, availableEverywhere: false) }
-                else {
-                    selected = type
-                    if let deckID { try await library.attachItemType(id: type.id, to: deckID) }
-                }
-                await onSelected(selected)
+            if await model.choose(type, independentCopy: copy, onSelected: onSelected) != nil {
                 dismiss()
-            } catch { self.error = error.localizedDescription }
+            }
         }
     }
     private func create() {
-        isWorking = true
         Task {
-            defer { isWorking = false }
-            do {
-                let type = try await library.createItemType(BuiltInItemTypes.basic.duplicated(name: name.trimmingCharacters(in: .whitespacesAndNewlines)), deckID: deckID, availableEverywhere: deckID == nil)
-                await onSelected(type); dismiss()
-            } catch { self.error = error.localizedDescription }
+            if await model.create(onSelected: onSelected) != nil { dismiss() }
         }
     }
 }
 
 /// Shared deck configuration. Definitions remain linked until explicitly copied.
 public struct DeckItemTypesView: View {
-    let library: any LibraryBrowsing & LibraryItemTypeManaging & LibraryDeckManaging
-    let deckID: UUID
+    @State private var model: DeckItemTypesFeatureModel
     let refreshToken: Int
     let onEdit: (ItemType) -> Void
-    let onChanged: () async -> Void
-    @State private var choices: AuthoringItemTypes?
-    @State private var sourceDeckName = ""
-    @State private var affectedDeckCounts: [UUID: Int] = [:]
-    @State private var hasParent = false
-    @State private var inherits = false
-    @State private var catalog: ItemTypeCatalog?
     @State private var showChooser = false
-    @State private var error: String?
-    @State private var isWorking = false
 
+    public init(model: DeckItemTypesFeatureModel, refreshToken: Int = 0, onEdit: @escaping (ItemType) -> Void = { _ in }) {
+        _model = State(initialValue: model); self.refreshToken = refreshToken; self.onEdit = onEdit
+    }
     public init(library: any LibraryBrowsing & LibraryItemTypeManaging & LibraryDeckManaging, deckID: UUID, refreshToken: Int = 0, onEdit: @escaping (ItemType) -> Void = { _ in }, onChanged: @escaping () async -> Void = {}) {
-        self.library = library; self.deckID = deckID; self.refreshToken = refreshToken; self.onEdit = onEdit; self.onChanged = onChanged
+        self.init(model: DeckItemTypesFeatureModel(authoring: .init(library: library), decks: library,
+            safeguards: library as? any LibraryItemTypeEditingSafeguarding, deckID: deckID, onChanged: onChanged),
+            refreshToken: refreshToken, onEdit: onEdit)
     }
     public var body: some View {
         List {
-            if hasParent {
-                Toggle("Use parent’s types", isOn: Binding(get: { inherits }, set: { value in
-                    change { try await library.setDeckItemTypes(.init(deckID: deckID, inherits: value, itemTypeIDs: value ? [] : (choices?.itemTypes.map(\.id) ?? []), defaultItemTypeID: value ? nil : choices?.defaultItemTypeID)) }
+            if model.hasParent {
+                Toggle("Use parent’s types", isOn: Binding(get: { model.inherits }, set: { value in
+                    Task { await model.setInheritance(value) }
                 }))
             }
-            if let choices {
-                if let source = choices.sourceDeckID, source != deckID {
-                    Text("Inherited from \(sourceDeckName)").font(.caption).foregroundStyle(.secondary)
+            if let choices = model.choices {
+                if let source = choices.sourceDeckID, source != model.deckID {
+                    Text("Inherited from \(model.sourceDeckName)").font(.caption).foregroundStyle(.secondary)
                 }
                 Section(choices.usesSharedFallback ? "Available everywhere" : "This deck") {
                     ForEach(choices.itemTypes) { type in
                         VStack(alignment: .leading, spacing: 6) {
                             Button(type.name) { onEdit(type) }
-                            let count = affectedDeckCounts[type.id] ?? 1
+                            let count = model.affectedDeckCounts[type.id] ?? 1
                             if count > 1 { Text("Available in \(count) decks").font(.caption).foregroundStyle(.secondary) }
                             HStack {
                                 if choices.defaultItemTypeID == type.id { Label("Default", systemImage: "checkmark").font(.caption) }
-                                else { Button("Set Default") { change { try await library.setDeckItemTypes(.init(deckID: deckID, itemTypeIDs: choices.itemTypes.map(\.id), defaultItemTypeID: type.id)) } }.font(.caption) }
+                                else { Button("Set Default") { Task { await model.setDefault(type.id) } }.font(.caption) }
                                 Spacer()
                                 if !choices.usesSharedFallback {
                                     Button("Remove from This Deck", role: .destructive) {
-                                        change { try await library.setDeckItemTypes(.init(deckID: deckID, itemTypeIDs: attachedIDs.filter { $0 != type.id }, defaultItemTypeID: choices.defaultItemTypeID == type.id ? nil : choices.defaultItemTypeID)) }
+                                        Task { await model.remove(type.id) }
                                     }.font(.caption)
                                 }
                                 Menu("More") {
-                                    Button("Make Available Everywhere") { change { try await library.setItemTypeAvailability(id: type.id, availableEverywhere: true) } }
+                                    Button("Make Available Everywhere") { Task { await model.makeAvailableEverywhere(type.id) } }
                                 }
                             }
                         }.padding(.vertical, 4)
@@ -164,36 +139,13 @@ public struct DeckItemTypesView: View {
                 Text("Removing a type changes what you can add. Existing items keep their fields and study history.")
                     .font(.caption).foregroundStyle(.secondary)
             } else { ProgressView() }
-            if let error { Text(error).foregroundStyle(.red) }
+            if let error = model.error { Text(error).foregroundStyle(.red) }
         }
         .navigationTitle("Item Types")
-        .disabled(isWorking)
-        .task(id: refreshToken) { await reload() }
+        .disabled(model.isWorking)
+        .task(id: refreshToken) { await model.reload() }
         .sheet(isPresented: $showChooser) {
-            ItemTypeChooserView(library: library, deckID: deckID) { _ in await reload(); await onChanged() }
+            ItemTypeChooserView(model: model.makeChooser()) { _ in await model.didChooseType() }
         }
-    }
-    private var attachedIDs: [UUID] { choices?.usesSharedFallback == false ? (choices?.itemTypes.map(\.id) ?? []) : [] }
-    private func change(_ action: @escaping () async throws -> Void) {
-        isWorking = true
-        Task {
-            defer { isWorking = false }
-            do { try await action(); await reload(); await onChanged() }
-            catch { self.error = error.localizedDescription }
-        }
-    }
-    private func reload() async {
-        do {
-            choices = try await library.authoringItemTypes(for: deckID)
-            catalog = try await library.loadItemTypeCatalog()
-            if let source = choices?.sourceDeckID { sourceDeckName = try await library.deck(id: source).name }
-            if let safeguarding = library as? any LibraryItemTypeEditingSafeguarding {
-                for type in choices?.itemTypes ?? [] {
-                    affectedDeckCounts[type.id] = try await safeguarding.itemTypeEditingImpact(id: type.id).deckPaths.count
-                }
-            }
-            hasParent = try await library.deck(id: deckID).parentID != nil
-            inherits = choices?.sourceDeckID != deckID
-        } catch { self.error = error.localizedDescription }
     }
 }

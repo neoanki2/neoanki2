@@ -1,5 +1,6 @@
 import Foundation
 import NeoAnkiCore
+import NeoAnkiApplication
 import Testing
 
 @testable import NeoAnki2
@@ -37,7 +38,7 @@ private final class ProbeFlag: @unchecked Sendable {
 }
 
 @MainActor
-private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
+private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL, ItemStore) {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-import-model-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -45,11 +46,11 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     try await store.bootstrap()
     let itemsModel = ItemsModel(store: store, mediaStore: await store.media)
     await itemsModel.load()
-    return (ImportModel(itemsModel: itemsModel), itemsModel, directory)
+    return (ImportModel(itemsModel: itemsModel, library: SQLiteLibraryRepository(store: store)), itemsModel, directory, store)
 }
 
 @Test @MainActor func importModelImportsJSONAndRefreshesLibrary() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, _) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("items.json")
     try """
     {
@@ -84,11 +85,12 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelFailureLeavesExistingLibraryAndDueCountUnchanged() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, store) = try await makeImportModel()
     #expect(await itemsModel.addItem(fieldSpans: [
         BuiltInItemTypes.frontFieldID: [Span("Existing")],
         BuiltInItemTypes.backFieldID: [Span("Card")],
     ]))
+    await itemsModel.awaitReadModels()
     let originalItems = itemsModel.items
     let originalDueCount = itemsModel.dueCount
     let fileURL = directory.appendingPathComponent("invalid-items.json")
@@ -109,11 +111,11 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(model.errorMessage != nil)
     #expect(itemsModel.items == originalItems)
     #expect(itemsModel.dueCount == originalDueCount)
-    #expect(try await itemsModel.store.listItems().count == 1)
+    #expect(try await store.listItems().count == 1)
 }
 
 @Test @MainActor func importModelRequiresItemTypeAndImportsCSV() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, _) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("items.csv")
     try "Front,Back\nAlpha,Beta\n".write(to: fileURL, atomically: true, encoding: .utf8)
 
@@ -129,7 +131,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelMakesDuplicateBehaviorExplicitInState() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, _) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("duplicates.json")
     try """
     {
@@ -165,9 +167,9 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelKeepsDeckScopedBrowseMembershipStable() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, store) = try await makeImportModel()
     let deck = Deck(name: "Selected deck")
-    _ = try await itemsModel.store.createDeck(deck)
+    _ = try await store.createDeck(deck)
     let scope = StudyScope.deck(deck.id, name: deck.name)
     await itemsModel.load(scope: scope)
     let fileURL = directory.appendingPathComponent("unassigned.json")
@@ -188,11 +190,11 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 
     await itemsModel.load(scope: scope)
     #expect(itemsModel.items.isEmpty)
-    #expect(try await itemsModel.store.listItems().count == 1)
+    #expect(try await store.listItems().count == 1)
 }
 
 @Test @MainActor func importModelPreservesActiveBrowseSort() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, _) = try await makeImportModel()
     #expect(await itemsModel.addItem(fieldSpans: [
         BuiltInItemTypes.frontFieldID: [Span("Zulu")],
         BuiltInItemTypes.backFieldID: [Span("Existing")],
@@ -219,9 +221,9 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelHoldsFileAndDirectoryScopesForRelativeMedia() async throws {
-    let (_, itemsModel, directory) = try await makeImportModel()
+    let (_, itemsModel, directory, store) = try await makeImportModel()
     let spy = ScopedAccessSpy()
-    let model = ImportModel(itemsModel: itemsModel, scopedAccess: spy)
+    let model = ImportModel(itemsModel: itemsModel, library: SQLiteLibraryRepository(store: store), scopedAccess: spy)
     let fileURL = directory.appendingPathComponent("relative.json")
     try """
     {
@@ -243,7 +245,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelPropagatesBaseDirectoryForMediaPaths() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
+    let (model, itemsModel, directory, store) = try await makeImportModel()
     let image = FieldDef(name: "Image", type: .image, isRequired: true)
     let caption = FieldDef(name: "Caption", type: .text, isRequired: true)
     let template = Template(
@@ -258,7 +260,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
         fields: [image, caption],
         templates: [template]
     )
-    _ = try await itemsModel.store.createItemType(itemType)
+    _ = try await store.createItemType(itemType)
     await itemsModel.load()
 
     let pngData = Data([
@@ -286,7 +288,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
     #expect(await model.importSelected(scope: .allDecks))
 
     let summary = try #require(itemsModel.items.first(where: { $0.itemTypeID == itemType.id }))
-    let imported = try #require(try await itemsModel.store.fetchItem(id: summary.id)?.item)
+    let imported = try #require(try await store.fetchItem(id: summary.id)?.item)
     guard case let .media(ref)? = imported.value(for: image.id) else {
         Issue.record("Expected imported media value.")
         return
@@ -297,7 +299,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelRejectsUnsupportedFileExtension() async throws {
-    let (model, _, directory) = try await makeImportModel()
+    let (model, _, directory, _) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("items.txt")
 
     #expect(await model.selectFile(fileURL) == false)
@@ -306,7 +308,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func oversizedSelectionRejectsBeforeRelativeMediaProbe() async throws {
-    let (_, itemsModel, directory) = try await makeImportModel()
+    let (_, itemsModel, directory, store) = try await makeImportModel()
     let fileURL = directory.appendingPathComponent("oversized.json")
     try Data(repeating: 0x20, count: ImportLimits.maxPayloadBytes + 1).write(to: fileURL)
     let probe = ProbeFlag()
@@ -314,7 +316,7 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
         probe.markInvoked()
         return true
     }
-    let model = ImportModel(itemsModel: itemsModel, fileInspector: inspector)
+    let model = ImportModel(itemsModel: itemsModel, library: SQLiteLibraryRepository(store: store), fileInspector: inspector)
 
     #expect(await model.selectFile(fileURL) == false)
     #expect(probe.wasInvoked == false)
@@ -323,8 +325,8 @@ private func makeImportModel() async throws -> (ImportModel, ItemsModel, URL) {
 }
 
 @Test @MainActor func importModelPlacesRowsAndRefreshesTheDestinationBrowser() async throws {
-    let (model, itemsModel, directory) = try await makeImportModel()
-    let deck = try await itemsModel.store.createDeck(Deck(name: "Destination"))
+    let (model, itemsModel, directory, store) = try await makeImportModel()
+    let deck = try await store.createDeck(Deck(name: "Destination"))
     let scope = StudyScope.deck(deck.id, name: deck.name)
     await itemsModel.load(scope: scope)
     model.destinationDeckID = deck.id

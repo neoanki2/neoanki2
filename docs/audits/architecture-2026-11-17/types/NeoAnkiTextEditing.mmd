@@ -1,0 +1,176 @@
+classDiagram
+direction LR
+  class t0["DraftDismissal"] {
+    <<class>>
+    id
+    confirmsDiscard
+    pendingAction
+    init()
+    request()
+    discard()
+    keepEditing()
+  }
+  class t1["DraftNavigationGuard"] {
+    <<struct>>
+    id
+    isDirty
+    isBusy
+    request
+    init()
+  }
+  class t2["DraftNavigationGuardKey"] {
+    <<struct>>
+    defaultValue
+    reduce()
+  }
+  class t3["View"] {
+    <<extension>>
+    protectDraft()
+    onDraftNavigationGuardChange()
+  }
+  class t4["DraftNavigationGuard"] {
+    <<extension>>
+    __()
+  }
+  class t5["DraftProtectionModifier"] {
+    <<struct>>
+    isDirty
+    isBusy
+    dismissal
+    body()
+  }
+  class t6["EditingUndoContext"] {
+    <<struct>>
+    canUndo
+    canRedo
+    undo
+    redo
+    init()
+  }
+  class t7["View"] {
+    <<extension>>
+    editingShortcut()
+    editingUndoContext()
+  }
+  class t8["EditingCommandPolicy"] {
+    <<enum>>
+    undoOwner()
+    permitsShortcut()
+    deliversReturnToEditor()
+  }
+  class t9["EditingCommandPolicy.UndoOwner"] {
+    <<enum>>
+  }
+  class t10["EditingShortcut"] {
+    <<struct>>
+    key
+    modifiers
+    enabled
+    action
+    matches()
+  }
+  class t11["EditingAnchor"] {
+    <<struct>>
+    isEnabled
+    shortcut
+    undoContext
+    makeNSView()
+    updateNSView()
+    dismantleNSView()
+  }
+  class t12["EditingAnchorView"] {
+    <<class>>
+    shortcut
+    undoContext
+    acceptsFirstResponder
+    hitTest()
+  }
+  class t13["EditingRouter"] {
+    <<class>>
+    shared
+    entries
+    monitor
+    observers
+    canUndo
+    canRedo
+    init()
+    register()
+    unregister()
+    textOwnsFocus()
+    context()
+    refresh()
+    performUndo()
+    performUndo()
+    route()
+  }
+  class t14["EditingRouter.Entry"] {
+    <<struct>>
+    view
+  }
+  class t15["NativeEditingCommands"] {
+    <<struct>>
+    router
+    init()
+    body
+  }
+  class t16["PlainTextEditorSession"] {
+    <<class>>
+    init()
+    isFocused
+    focus()
+    scrollView
+  }
+  class t17["PlainTextEditorSessions"] {
+    <<class>>
+    sessions
+    init()
+    session()
+    retain()
+  }
+  class t18["PlainTextEditor"] {
+    <<struct>>
+    text
+    session
+    label
+    identifier
+    init()
+    body
+  }
+  class t19["NotificationObservations"] {
+    <<class>>
+    tokens
+  }
+  class t20["PlainTextView"] {
+    <<class>>
+    history
+    historyObservers
+    ownedStorage
+    undoManager
+    init()
+    init()
+    observeHistory()
+  }
+  class t21["NativePlainTextEditor"] {
+    <<struct>>
+    isEnabled
+    text
+    session
+    label
+    identifier
+    makeCoordinator()
+    makeNSView()
+    makeNativeScrollView()
+    updateNSView()
+    updateNativeView()
+    dismantleNSView()
+  }
+  class t22["NativePlainTextEditor.Coordinator"] {
+    <<class>>
+    parent
+    isSynchronizing
+    init()
+    textDidChange()
+    textDidBeginEditing()
+    textDidEndEditing()
+    textView()
+  }

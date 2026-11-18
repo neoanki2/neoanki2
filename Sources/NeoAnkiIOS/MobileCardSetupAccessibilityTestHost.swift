@@ -8,6 +8,7 @@ import SwiftUI
 /// matrix. The application exposes it only behind an explicit UI-test launch
 /// argument; normal launches continue through the adaptive mobile shell.
 public struct MobileCardSetupAccessibilityTestHost: View {
+    @Environment(\.mobileUITestFixtures) private var fixtures
     @State private var libraryModel: LibraryFeatureModel
     @State private var studioModel: ItemTypesFeatureModel?
     @State private var isPreparing = false
@@ -69,13 +70,10 @@ public struct MobileCardSetupAccessibilityTestHost: View {
 
         await libraryModel.bootstrap(startSync: false)
         do {
-            try await MobileItemTypeStudioUITestSeeder.seedIfRequested(
-                library: libraryModel.library
-            )
-            guard let studioLibrary = libraryModel.itemTypeStudioLibrary else {
+            try await fixtures?.prepareStudio()
+            guard let preparedModel = libraryModel.features.makeItemTypesModel() else {
                 throw MobileCardSetupAccessibilityTestHostError.studioUnavailable
             }
-            let preparedModel = ItemTypesFeatureModel(library: studioLibrary)
             await preparedModel.load()
             preparedModel.selectItemType(id: MobileItemTypeStudioUITestSeeder.legacyItemTypeID)
             guard preparedModel.beginEditingSelectedItemType() else {

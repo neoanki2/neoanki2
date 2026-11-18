@@ -136,13 +136,6 @@ struct NativePlainTextEditor: NSViewRepresentable {
             view.isSelectable = true
             view.importsGraphics = false
             view.allowsUndo = true
-            view.isVerticallyResizable = true
-            view.isHorizontallyResizable = false
-            view.minSize = .zero
-            view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-            view.autoresizingMask = [.width]
-            view.textContainer?.widthTracksTextView = true
-            view.textContainerInset = NSSize(width: 12, height: 12)
             view.font = .preferredFont(forTextStyle: .body)
             view.textColor = .textColor
             view.backgroundColor = .textBackgroundColor
@@ -153,12 +146,7 @@ struct NativePlainTextEditor: NSViewRepresentable {
             view.usesFindBar = true
             view.isIncrementalSearchingEnabled = true
             view.string = text
-            scroll = NSScrollView()
-            scroll.hasVerticalScroller = true
-            scroll.autohidesScrollers = true
-            scroll.drawsBackground = true
-            scroll.backgroundColor = .textBackgroundColor
-            scroll.documentView = view
+            scroll = NativeTextEditorPolicy.makeScrollView(for: view, inset: NSSize(width: 12, height: 12))
             session.scrollView = scroll
         }
         return scroll

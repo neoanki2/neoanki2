@@ -1,0 +1,3591 @@
+classDiagram
+direction LR
+  class t0["AuthoredDeckLimits"] {
+    <<struct>>
+    maximumSourceBytes
+    maximumTotalSourceBytes
+    maximumLineBytes
+    maximumParts
+    portable
+    init()
+    _default_
+  }
+  class t1["AuthoredDeckDiagnostic"] {
+    <<struct>>
+    file
+    line
+    code
+    message
+    init()
+    errorDescription
+  }
+  class t2["AuthoredDeckError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t3["AuthoredDeck"] {
+    <<enum>>
+    fileExtension
+    manifestName
+    validate()
+    importDeck()
+    importDeck()
+    importItems()
+    stageMedia()
+  }
+  class t4["AuthoredDeckPackage"] {
+    <<struct>>
+    rootDeckID
+    decks
+    itemTypes
+    items
+    media
+    usesIncludedItemTypes
+    itemTypePolicies
+  }
+  class t5["LoadedAuthoredDeck"] {
+    <<struct>>
+    package
+    diagnostics
+  }
+  class t6["SourceLocation"] {
+    <<struct>>
+    file
+    line
+  }
+  class t7["ManifestRecord"] {
+    <<struct>>
+    version
+    root
+    parts
+    location
+  }
+  class t8["DeckRecord"] {
+    <<struct>>
+    key
+    name
+    parent
+    itemTypes
+    defaultType
+    location
+  }
+  class t9["TypeRecord"] {
+    <<struct>>
+    key
+    name
+    fields
+    templates
+    location
+  }
+  class t10["FieldRecord"] {
+    <<struct>>
+    key
+    name
+    kind
+    required
+  }
+  class t11["TemplateRecord"] {
+    <<struct>>
+    name
+    layout
+    components
+    prompt
+    answer
+    interaction
+    skill
+    condition
+  }
+  class t12["ComponentRecord"] {
+    <<struct>>
+    region
+    purpose
+    slot
+  }
+  class t13["SlotRecord"] {
+    <<struct>>
+    source
+    reveal
+    media
+  }
+  class t14["SlotRecord.Source"] {
+    <<enum>>
+  }
+  class t15["ConditionRecord"] {
+    <<enum>>
+  }
+  class t16["ItemRecord"] {
+    <<struct>>
+    type
+    deck
+    fields
+    tags
+    location
+  }
+  class t17["AuthoredDeckLoader"] {
+    <<struct>>
+    bundleURL
+    limits
+    fileManager
+    init()
+    load()
+    validatedBundleRoot()
+    resolveSourcePath()
+    discoveredItemParts()
+    rejectSymlinkComponents()
+    readRecords()
+    decodeManifest()
+    decodeDeck()
+    decodeType()
+    decodeTemplate()
+    decodeComponent()
+    decodeSlot()
+    decodeCondition()
+    decodeItem()
+  }
+  class t18["AuthoredDeckLoader.RawRecord"] {
+    <<struct>>
+    object
+    location
+  }
+  class t19["AuthoredDeckCompiler"] {
+    <<struct>>
+    root
+    manifest
+    types
+    decks
+    items
+    limits
+    compile()
+    compileTemplate()
+    compileSlot()
+    compileCondition()
+    compileValue()
+    resolveMediaPath()
+    rejectMediaSymlinkComponents()
+    describeMedia()
+    failure()
+  }
+  class t20["DecodeFailure"] {
+    <<struct>>
+    code
+    message
+    init()
+    diagnostic()
+  }
+  class t21["ParsedCloze"] {
+    <<struct>>
+    text
+    blanks
+  }
+  class t22["ConfinedFileDescriptor"] {
+    <<struct>>
+    hash
+    byteSize
+    prefix
+  }
+  class t23["JSONDuplicateKeyDetector"] {
+    <<struct>>
+    bytes
+    index
+    duplicate
+    firstDuplicate()
+    init()
+    parseValue()
+    parseObject()
+    parseArray()
+    parseString()
+    parsePrimitive()
+    skipWhitespace()
+    consume()
+  }
+  class t24["JSONDuplicateKeyDetector.ScanError"] {
+    <<enum>>
+  }
+  class t25["PreparedAuthoredDeck"] {
+    <<struct>>
+    package
+    draft
+    limits
+    contentHash
+    itemCount
+  }
+  class t26["AuthoredDeck"] {
+    <<extension>>
+    prepare()
+    write()
+    importPrepared()
+  }
+  class t27["AuthoredDeckDraft"] {
+    <<struct>>
+    key
+    title
+    definition
+    items
+    init()
+    partName
+    writeRecords()
+  }
+  class t28["AuthoredDeckDraft.Field"] {
+    <<struct>>
+    id
+    name
+    type
+    required
+    init()
+  }
+  class t29["AuthoredDeckDraft.Slot"] {
+    <<struct>>
+    field
+    reveal
+    init()
+  }
+  class t30["AuthoredDeckDraft.Component"] {
+    <<struct>>
+    region
+    purpose
+    field
+    reveal
+    init()
+  }
+  class t31["AuthoredDeckDraft.CardTemplate"] {
+    <<struct>>
+    name
+    layout
+    components
+    prompt
+    answer
+    slot()
+    interaction
+    skill
+    init()
+    encode()
+  }
+  class t32["AuthoredDeckDraft.CardTemplate.CodingKeys"] {
+    <<enum>>
+  }
+  class t33["AuthoredDeckDraft.Definition"] {
+    <<struct>>
+    kind
+    id
+    name
+    fields
+    templates
+    init()
+  }
+  class t34["AuthoredDeckDraft.TextItem"] {
+    <<struct>>
+    fields
+    tags
+    init()
+  }
+  class t35["ItemStore"] {
+    <<extension>>
+    importAuthoredDeck()
+  }
+  class t36["ClozeSpanRebaser"] {
+    <<enum>>
+    rebase()
+    adding()
+    commonPrefixCount()
+    commonSuffixCount()
+  }
+  class t37["ClozeSpanRebaser.Result"] {
+    <<struct>>
+    spans
+    invalidated
+    init()
+  }
+  class t38["ClozeValidationError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t39["ClozeValidation"] {
+    <<enum>>
+    validate()
+    sanitize()
+    displayText()
+    spanOrder()
+  }
+  class t40["ContentNumberRendering"] {
+    <<enum>>
+    invalidNumber
+    string()
+  }
+  class t41["ContentValue"] {
+    <<enum>>
+    isEmpty
+  }
+  class t42["Span"] {
+    <<struct>>
+    text
+    styles
+    textColor
+    textSize
+    link
+    init()
+    init()
+    encode()
+    hasFormatting
+    hasSameFormatting()
+    normalized()
+  }
+  class t43["Span.CodingKeys"] {
+    <<enum>>
+  }
+  class t44["Span.Style"] {
+    <<enum>>
+  }
+  class t45["Span.TextColor"] {
+    <<enum>>
+  }
+  class t46["Span.TextSize"] {
+    <<enum>>
+  }
+  class t47["RichTextValidation"] {
+    <<enum>>
+    maximumLinkBytes
+    isValidLink()
+  }
+  class t48["ClozeSpan"] {
+    <<struct>>
+    group
+    start
+    length
+    hint
+    init()
+    init()
+  }
+  class t49["ClozeSpan.CodingKeys"] {
+    <<enum>>
+  }
+  class t50["ContentVisibilityRendering"] {
+    <<enum>>
+  }
+  class t51["ContentVisibilityDecision"] {
+    <<struct>>
+    rendering
+    shouldResolveMedia
+    init()
+  }
+  class t52["ContentVisibilityPolicy"] {
+    <<enum>>
+    decision()
+    isMedia()
+  }
+  class t53["ImageOcclusionMode"] {
+    <<enum>>
+  }
+  class t54["OcclusionRect"] {
+    <<struct>>
+    x
+    y
+    width
+    height
+    init()
+    isValid
+    subtracting()
+  }
+  class t55["ImageOcclusionMask"] {
+    <<struct>>
+    id
+    group
+    rect
+    answerText
+    init()
+    encode()
+  }
+  class t56["ImageOcclusionMask.CodingKeys"] {
+    <<enum>>
+  }
+  class t57["ImageOcclusionContent"] {
+    <<struct>>
+    image
+    mode
+    masks
+    nextGroup
+    init()
+    groups
+    displayGroup()
+    addMask()
+    ungroup()
+    coveredRects()
+    revealedAnswerText()
+  }
+  class t58["ImageOcclusionValidation"] {
+    <<enum>>
+    validateTransition()
+    validate()
+  }
+  class t59["ContentValue"] {
+    <<extension>>
+    mediaReference
+    replacingMediaReference()
+  }
+  class t60["MediaRef"] {
+    <<struct>>
+    id
+    kind
+    assetHash
+    fileExtension
+    durationMs
+    altText
+    reservationID
+    init()
+    attachingReservation()
+    init()
+    encode()
+    isValidStoredReference
+    __()
+  }
+  class t61["MediaRef.CodingKeys"] {
+    <<enum>>
+  }
+  class t62["MediaKind"] {
+    <<enum>>
+  }
+  class t63["FieldType"] {
+    <<extension>>
+    mediaKind
+  }
+  class t64["BuiltInItemTypes"] {
+    <<enum>>
+    basicID
+    frontFieldID
+    backFieldID
+    clozeID
+    clozeTextFieldID
+    clozeContextFieldID
+    clozeTemplateID
+    basic
+    cloze
+    all
+    isBuiltIn()
+  }
+  class t65["ItemBulkAction"] {
+    <<enum>>
+  }
+  class t66["ItemBulkOperation"] {
+    <<struct>>
+    operationID
+    action
+    init()
+  }
+  class t67["ItemBulkOperationResult"] {
+    <<struct>>
+    operationID
+    action
+    itemID
+    cardIDs
+    init()
+  }
+  class t68["OrderedDeckItemReconciliation"] {
+    <<struct>>
+    deckID
+    expectedItems
+    orderedItemIDs
+    expectedItemIDs
+    init()
+  }
+  class t69["ItemBulkOperationError"] {
+    <<struct>>
+    operationID
+    pointer
+    detail
+    errorDescription
+  }
+  class t70["ItemBulkDatabaseMutation"] {
+    <<enum>>
+  }
+  class t71["BulkCardIdentity"] {
+    <<struct>>
+    templateID
+    occlusionGroup
+    clozeGroup
+  }
+  class t72["ItemStore"] {
+    <<extension>>
+    deleteItemsAtomically()
+    deleteUnchangedUnreviewedItems()
+    reconcileOrderedDeckItems()
+    reconcileItemTypeAndItems()
+    executeItemBulk()
+    planBulkItem()
+  }
+  class t73["CardScope"] {
+    <<enum>>
+  }
+  class t74["ItemCardState"] {
+    <<struct>>
+    cardCount
+    dueAt
+    phase
+    lapses
+    needsAttention
+    scheduleSummary
+  }
+  class t75["CardScheduleTotals"] {
+    <<struct>>
+    cardCount
+    dueNow
+    newCount
+    availableNewCount
+    hiddenNewCount
+    learningCount
+    relearningCount
+    reviewCount
+    leechCount
+    nextDueAt
+  }
+  class t76["IdempotencyClaim"] {
+    <<enum>>
+  }
+  class t77["ItemStore"] {
+    <<extension>>
+    idempotencyClaim()
+    claimIdempotency()
+    completeIdempotency()
+    pruneIdempotencyRecords()
+  }
+  class t78["ItemMoveSelection"] {
+    <<struct>>
+    itemID
+    expectedDeckID
+    init()
+  }
+  class t79["ItemStore"] {
+    <<extension>>
+    moveItems()
+  }
+  class t80["FSRSFoldCandidate"] {
+    <<struct>>
+    fold
+    parameters
+  }
+  class t81["FSRSGradualTuningStep"] {
+    <<struct>>
+    parameters
+    fraction
+    workload
+    metrics
+  }
+  class t82["ItemStore"] {
+    <<extension>>
+    requestAutomaticSchedulingMaintenance()
+    runAutomaticSchedulingMaintenance()
+    performAutomaticSchedulingMaintenance()
+    runAutomaticFSRSOptimization()
+    optimizationLogs()
+    evaluateActiveFSRSProbation()
+    optimizationLogPrefix()
+    heldOptimizationRun()
+    promotionObservations()
+    candidateInvariants()
+    workloadProjection()
+    workloadShare()
+    gradualTuningStep()
+    optimizationInputFingerprint()
+    persistedPromotionMetrics()
+    promotionLogChronological()
+    promotionChronological()
+  }
+  class t83["ItemStore"] {
+    <<extension>>
+    defaultItemType()
+    itemType()
+    createItemType()
+    listItemTypes()
+    loadItemTypes()
+    loadItemTypeCatalog()
+    effectiveItemTypePolicy()
+    authoringItemTypes()
+    createItemType()
+    attachItemType()
+    setDeckItemTypes()
+    setItemTypeAvailability()
+    duplicateItemType()
+    repairItemTypeDefinition()
+    countItems()
+    itemTypeEditingImpact()
+    unlockItemType()
+    itemTypeSchemaChangeImpact()
+    prepareItemTypeUpdateAuthorization()
+    deleteItemType()
+    updateItemType()
+    updateItemType()
+  }
+  class t84["ItemStore"] {
+    <<extension>>
+    recordLearningTimeAliases()
+    learningTimeItemAliases()
+    recordLearningTime()
+    learningTimeSegments()
+    learningTimeNotifications()
+    learningTimeSummary()
+  }
+  class t85["ItemStore"] {
+    <<extension>>
+    schedulingHealthSnapshot()
+    schedulerPreset()
+    saveSchedulerPreset()
+    saveFSRSParameterSet()
+    fsrsParameterSets()
+    schedulerCohorts()
+    saveFSRSOptimizationRun()
+    fsrsOptimizationRuns()
+    restoreDefaultScheduling()
+    rollbackScheduling()
+    beginSchedulerMigration()
+    completeSchedulerMigration()
+    rollbackSchedulerMigration()
+  }
+  class t86["ItemStore"] {
+    <<extension>>
+    ensureVersionedSchedulingBootstrap()
+    activeSchedulingContext()
+    activeSchedulingContext()
+    migrateLegacyCardSchedulingIfNeeded()
+    cardReplayedForActiveScheduling()
+    cardRequiresReplay()
+    prepareSchedulingReview()
+    detailedReviewPreviews()
+    previewSchedulingContext()
+    replayMemory()
+  }
+  class t87["ItemStore.ActiveSchedulingContext"] {
+    <<struct>>
+    preset
+    cohort
+    parameterSet
+    parameters
+  }
+  class t88["ItemStore.PreparedSchedulingReview"] {
+    <<struct>>
+    card
+    memoryBefore
+    memoryAfter
+    audit
+  }
+  class t89["ItemStore"] {
+    <<extension>>
+    studyAvailability()
+  }
+  class t90["ItemStore"] {
+    <<extension>>
+    testingCorruptItemTypeDefinition()
+  }
+  class t91["QuarantinedItemTypeDefinition"] {
+    <<struct>>
+    persistedID
+    name
+    id
+    repairableID
+    init()
+  }
+  class t92["ItemTypeLoadResult"] {
+    <<struct>>
+    itemTypes
+    corruptions
+    init()
+  }
+  class t93["ColdLibrarySnapshot"] {
+    <<struct>>
+    itemTypes
+    items
+    deckSummaries
+    allDecksSummary
+    unassignedSummary
+    selectedScopeSummary
+  }
+  class t94["ColdLibraryHomeSnapshot"] {
+    <<struct>>
+    itemTypes
+    deckSummaries
+    allDecksSummary
+    unassignedSummary
+    selectedScopeSummary
+    init()
+  }
+  class t95["SavedItemSummary"] {
+    <<struct>>
+    id
+    itemTypeID
+    itemTypeName
+    title
+    subtitle
+    cardCount
+    deckID
+    createdAt
+    schedule
+    init()
+  }
+  class t96["ReviewSubmission"] {
+    <<struct>>
+    memory
+    reviewLogID
+    init()
+  }
+  class t97["FieldType"] {
+    <<extension>>
+    requiresStructuredImportValue
+  }
+  class t98["ItemStore"] {
+    <<actor>>
+    studyDayRolloverMetadataKey
+    studyDayRolloverMetadataKeyForSync
+    optimizationAttemptMetadataPrefix
+    database
+    schedulerOverride
+    profileID
+    fsrsParameters
+    mediaStore
+    localAPITransferStateFile
+    itemListCache
+    scopeSummaryCache
+    deckSummariesCache
+    starterItemTypes
+    externalMutationInProgress
+    externalMutationWaiters
+    automaticMaintenanceTask
+    automaticMaintenanceIsRunning
+    acquireExternalMutationSlot()
+    releaseExternalMutationSlot()
+    init()
+    media
+    localAPITransferStateURL()
+    createValidationDatabaseSnapshot()
+    libraryID()
+    bootstrap()
+    createDeck()
+    deck()
+    listDecks()
+    studyDayRolloverMinutes()
+    setStudyDayRolloverMinutes()
+    studyDayKey()
+    cardMaturityStatus()
+    cardMaturityStatuses()
+    cardMaturityDetails()
+    deckSummaries()
+    deckTreeSummaries()
+    deckTreeSummaries()
+    fetchItemBrowseSchedules()
+    acknowledgeRepeatedLapses()
+    updateDeck()
+    moveDeck()
+    deleteDeck()
+    resetDeckProgress()
+    deleteAllUnassignedItems()
+    updateItemDeck()
+    createItem()
+    listItems()
+    listItems()
+    coldLibrarySnapshot()
+    coldLibraryHomeSnapshot()
+    fetchDueCards()
+    isNewStudyCardEligible()
+    fetchDueCards()
+    fetchItem()
+    validateItem()
+    renameTag()
+    removeTag()
+    updateItem()
+    deleteItem()
+    mediaAsset()
+    collectMediaGarbage()
+    dueCount()
+    dueCount()
+    scopeSummary()
+    resolveCardScope()
+    fetchCardStates()
+    browsableRows()
+    validatedItemTypeMap()
+    unassignedDueCount()
+    unassignedItemCount()
+    submitReview()
+    submitReviewWithReceipt()
+    revertReview()
+    validateDeckLimit()
+    reviewLogCount()
+    rawReviewLogCount()
+    activeReviewLogCount()
+    card()
+    reviewLog()
+    applySynchronizedCard()
+    applySynchronizedReview()
+    schedulingParameters()
+    optimizeScheduling()
+    optimizeSchedulingIfNeeded()
+    lastOptimizationAttempt()
+    recordOptimizationAttempt()
+    optimizationAttemptMetadataKey
+    importItems()
+    importItemSummaries()
+    newMediaDescriptors()
+    mediaReferences()
+    mediaIdentity()
+    mapImportRow()
+    contentValue()
+    resolveImportPath()
+    summaries()
+    hydrateDueCards()
+    validate()
+    validateContent()
+    value()
+    normalizedTags()
+    normalizedTagForLookup()
+    normalizedTag()
+  }
+  class t99["ItemStore.CachedItemList"] {
+    <<struct>>
+    token
+    items
+  }
+  class t100["ItemStore.CachedScopeSummary"] {
+    <<struct>>
+    token
+    summary
+    calculatedAt
+    validUntil
+    isValid()
+  }
+  class t101["ItemStore.CachedDeckSummaries"] {
+    <<struct>>
+    token
+    summaries
+    calculatedAt
+    validUntil
+    isValid()
+  }
+  class t102["ItemStore.OptimizationAttemptRecord"] {
+    <<struct>>
+    reviewLogCount
+    attemptedAt
+    init()
+    init()
+    storedValue
+  }
+  class t103["LibraryResourceKind"] {
+    <<enum>>
+  }
+  class t104["LibraryChangeOrigin"] {
+    <<enum>>
+  }
+  class t105["LibraryChange"] {
+    <<struct>>
+    id
+    cursor
+    transactionID
+    sequence
+    eventType
+    resourceType
+    resourceID
+    revision
+    isTombstone
+    occurredAt
+    resourceKind
+    init()
+  }
+  class t106["LibraryResourceRevision"] {
+    <<struct>>
+    resourceType
+    resourceID
+    revision
+    updatedAt
+    isDeleted
+    init()
+  }
+  class t107["ItemStore"] {
+    <<extension>>
+    currentChangeCursor()
+    libraryChangeNotifications()
+    oldestChangeCursor()
+    libraryChanges()
+    resourceRevision()
+    resourceRevisionSnapshot()
+    recordSyncItemTypeAlias()
+    syncItemTypeAliases()
+    pruneLibraryChanges()
+  }
+  class t108["MaturityReadError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t109["MaturityReadStatistics"] {
+    <<struct>>
+    decodedCards
+    decodedReviews
+    aggregateRebuilds
+  }
+  class t110["MaturityTotals"] {
+    <<struct>>
+    directCounts
+    summary()
+  }
+  class t111["MaturityProjection"] {
+    <<struct>>
+    token
+    cursor
+    isComplete
+    entries
+    directCounts
+    remove()
+    put()
+  }
+  class t112["MaturityProjection.Entry"] {
+    <<struct>>
+    itemID
+    deckID
+    detail
+    init()
+  }
+  class t113["ItemStore"] {
+    <<extension>>
+    maturityReadStatistics()
+  }
+  class t114["NativeCommandReceipt"] {
+    <<struct>>
+    commandID
+    committedAt
+    affectedCount
+    resultData
+  }
+  class t115["NativeCommandContext"] {
+    <<struct>>
+    id
+    requestHash
+    expectedCount
+    clientID
+    route
+    current
+    init()
+  }
+  class t116["NativeCommandAlreadyCommitted"] {
+    <<struct>>
+    receipt
+  }
+  class t117["ItemStore"] {
+    <<extension>>
+    nativeCommandReceipt()
+  }
+  class t118["SQLiteDatabase"] {
+    <<extension>>
+    nativeCommandReceipt()
+    recordNativeCommand()
+  }
+  class t119["LibraryItemRecord"] {
+    <<struct>>
+    item
+    createdAt
+    updatedAt
+    cardIDs
+    id
+    init()
+  }
+  class t120["ReservedMediaAsset"] {
+    <<struct>>
+    reference
+    reservationID
+    reservationExpiresAt
+    byteSize
+  }
+  class t121["DeckDeletionPolicy"] {
+    <<enum>>
+  }
+  class t122["DeckDeletionImpact"] {
+    <<struct>>
+    deckCount
+    itemCount
+    cardCount
+    reviewLogCount
+    mediaReferenceCount
+    studyResponseCount
+    init()
+  }
+  class t123["DeckResetImpact"] {
+    <<struct>>
+    deckCount
+    cardCount
+    reviewLogCount
+  }
+  class t124["SynchronizedReviewRecord"] {
+    <<struct>>
+    log
+    memoryBefore
+    introductionContext
+    init()
+  }
+  class t125["SynchronizedReviewRecord.IntroductionContext"] {
+    <<struct>>
+    deckID
+    studyDay
+    init()
+  }
+  class t126["SynchronizedItemRecord"] {
+    <<struct>>
+    item
+    createdAt
+    updatedAt
+    init()
+  }
+  class t127["ReviewRevertRecord"] {
+    <<struct>>
+    id
+    reviewLogID
+    revertedAt
+    init()
+  }
+  class t128["ItemTypeMembershipRecord"] {
+    <<enum>>
+    id
+  }
+  class t129["SchedulingSettingsRecord"] {
+    <<enum>>
+    id
+  }
+  class t130["PortableItemTypeMappingRecord"] {
+    <<struct>>
+    originLibraryID
+    originTypeID
+    schemaDigest
+    localTypeID
+    id
+    init()
+  }
+  class t131["SynchronizedLibraryMutation"] {
+    <<enum>>
+  }
+  class t132["ItemStore"] {
+    <<extension>>
+    recordLibraryAlias()
+    libraryAliases()
+    deckDeletionImpact()
+    commitDeckDeletion()
+    deckResetImpact()
+    reserveMedia()
+    mediaBytes()
+    synchronizedReviewRecord()
+    synchronizedItemRecord()
+    reviewRevertRecord()
+    itemTypeMembershipRecord()
+    schedulingSettingsRecord()
+    portableItemTypeMappingRecord()
+    applySynchronizedBatch()
+    itemRecord()
+    itemRecords()
+    itemRecordsPage()
+    cards()
+    hydratedCard()
+    reviewPreviews()
+    reviewPreviewDetails()
+    setCardSuspended()
+    resetCardProgress()
+  }
+  class t133["SQLiteDatabase"] {
+    <<extension>>
+    maturityStatuses()
+    maturityDetails()
+    maturityTotals()
+    maturityCardSQL
+    readMaturityEvidence()
+    readMaturityEntries()
+    refreshMaturityProjection()
+  }
+  class t134["SchedulerWeightEnvelope"] {
+    <<struct>>
+    weights
+  }
+  class t135["DatabaseError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t136["PersistedItem"] {
+    <<struct>>
+    item
+    createdAt
+    updatedAt
+  }
+  class t137["DatabaseCacheToken"] {
+    <<struct>>
+    localRevision
+    dataVersion
+  }
+  class t138["SingleNewCardLimiter"] {
+    <<struct>>
+    deckIDs
+    remainingCapacity
+  }
+  class t139["MultipleNewCardLimiters"] {
+    <<struct>>
+    depths
+  }
+  class t140["NewCardLimitShape"] {
+    <<enum>>
+  }
+  class t141["SQLiteDatabase"] {
+    <<actor>>
+    handle
+    databaseURL
+    statisticsCache
+    encoder
+    decoder
+    learningTimeObservers
+    maturityProjection
+    maturityStatistics
+    localRevision
+    changeTrackingReady
+    changeObservers
+    lastNotifiedChangeCursor
+    init()
+    studyRelationsReady
+    refreshStudyRelationsIfNeeded()
+    studyRelations()
+    isNewStudyCardEligible()
+    isOrderedWork()
+    usableStudyCardSQL()
+    newFamilyEligibilitySQL()
+    cacheToken()
+    backup()
+    migrate()
+    migrateSchedulerCohortsV28()
+    ensureTemplateDefinitionFormat()
+    storedDefinitionsUseCompositionFormat()
+    backfillResourceRevisions()
+    backfillExtendedSyncResourceRevisions()
+    getOrCreateLibraryID()
+    recordLibraryAlias()
+    fetchLibraryAliases()
+    libraryID()
+    recordSyncItemTypeAlias()
+    syncItemTypeAliases()
+    metadataValue()
+    setMetadataValue()
+    currentChangeCursor()
+    libraryChangeNotifications()
+    removeChangeObserver()
+    publishCommittedChanges()
+    oldestChangeCursor()
+    fetchLibraryChanges()
+    fetchResourceRevision()
+    fetchResourceRevisionSnapshot()
+    pruneLibraryChanges()
+    claimIdempotency()
+    idempotencyClaim()
+    completeIdempotency()
+    pruneIdempotencyRecords()
+    portableDeckLibrarySnapshot()
+    lookupPortableItemTypeMapping()
+    lookupPortableItemTypeMapping()
+    persistPortableItemTypeMapping()
+    portableItemTypeMappings()
+    portableItemTypeOrigin()
+    allPortableItemTypeMappings()
+    seedStarterItemTypesIfNeeded()
+    fetchItemType()
+    fetchValidatedItemType()
+    fetchItemType()
+    insertItemType()
+    insertLibraryItemType()
+    markItemTypeAsLibrary()
+    fetchLibraryItemTypeIDs()
+    fetchIncludedItemTypeOwners()
+    fetchDeckItemTypePolicyEntries()
+    updateItemType()
+    updateItemTypeAndSyncCards()
+    prepareItemTypeUpdateAuthorization()
+    updateItemTypeAndSyncCards()
+    fetchItemTypesWithCorruption()
+    fetchAllItemTypes()
+    repairItemTypeDefinition()
+    quarantinedDefinitionCount()
+    replaceItemTypeDefinition()
+    insertDeck()
+    nextDeckSortPosition()
+    fetchDeck()
+    fetchAllDecks()
+    fetchDeckSortPositions()
+    moveDeck()
+    siblingDeckIDs()
+    writeDeckSortPositions()
+    updateDeck()
+    deleteDeck()
+    reparentChildDecks()
+    countItems()
+    countUnassignedItems()
+    countItems()
+    countItemsGroupedByDeck()
+    countDueCardsGroupedByDeck()
+    moveItems()
+    updateItemDeck()
+    updateItemTags()
+    updateCardsDeck()
+    fetchItems()
+    fetchItems()
+    fetchUnassignedItems()
+    fetchDueCards()
+    fetchUnassignedDueCards()
+    countDueCards()
+    countDueCards()
+    countUnassignedDueCards()
+    insertItemWithCards()
+    insertItemWithCardsWithoutTransaction()
+    insertItemsWithCards()
+    importPortableDeck()
+    updateItemWithMedia()
+    updateItemWithMediaWithoutTransaction()
+    applyItemBulk()
+    applyItemTypeAndItemReconciliation()
+    deleteUnchangedUnreviewedItems()
+    deleteItemWithMedia()
+    deleteItemWithMediaWithoutTransaction()
+    deactivateReviewHistory()
+    deleteReviewHistory()
+    insertItem()
+    insertCards()
+    upsertSynchronizedCard()
+    fetchCard()
+    fetchAllCards()
+    supportsVersionedCardReplay()
+    setCardSuspended()
+    resetCardProgress()
+    fetchDueCards()
+    countDueCards()
+    nextUnsuspendedCardDue()
+    fetchItemCardStates()
+    fetchItemCardStates()
+    fetchItemCardStatesUnassigned()
+    fetchItemCardStates()
+    fetchItemCardState()
+    acknowledgeRepeatedLapses()
+    foldItemCardStates()
+    cardScheduleTotals()
+    countItems()
+    eligibleDueCardsCTE()
+    dueEligibilityQueryPlan()
+    studyQueueQueryPlan()
+    countDueCardsSnapshotDiagnostic()
+    newCardLimitShape()
+    multipleLimiterEligibleDueCardsCTE()
+    singleLimiterEligibleDueCardsCTE()
+    scopeClause()
+    updateCardMemory()
+    updateCardSchedulingMemory()
+    resetCardSchedulingMemory()
+    setCardSchedulingHistoryOrigin()
+    insertReviewLog()
+    insertSynchronizedReviewIfMissing()
+    fetchActiveReviewLogs()
+    fetchActiveReviewLogs()
+    fetchLatestActiveReviewTimingPolicy()
+    fetchReviewLog()
+    fetchSchedulerParameters()
+    saveSchedulerParameters()
+    insertFSRSParameterSet()
+    fetchFSRSParameterSet()
+    fetchFSRSParameterSets()
+    fetchSchedulerCohort()
+    fetchSchedulerCohorts()
+    ensureSchedulerCardHistory()
+    fetchSchedulerCardHistory()
+    fetchSchedulerCardHistories()
+    markSchedulerCohortsDirty()
+    nextDirtySchedulerCohort()
+    markStaleSchedulerCohortsDirty()
+    finishSchedulerCohortMaintenance()
+    activateFSRSParameterSet()
+    fetchSchedulerPreset()
+    saveSchedulerPreset()
+    activateFSRSParameterSet()
+    insertFSRSOptimizationRun()
+    persistFSRSOptimizationOutcome()
+    persistFSRSProbationRollback()
+    fetchFSRSOptimizationRuns()
+    schedulerHealthSnapshot()
+    quarantineLegacySchedulerParameters()
+    fetchLatestSchedulerMigration()
+    beginSchedulerMigration()
+    completeSchedulerMigration()
+    rollbackSchedulerMigration()
+    reconcileReviewedCardScheduling()
+    reconcileReviewedCardScheduling()
+    persistReview()
+    insertStudySession()
+    fetchStudySession()
+    reserveNextStudyCard()
+    fetchStudyQueueCards()
+    anyStudyWorkSQL
+    studyWorkGateQueryPlan()
+    studyQueueHeadWorkDiagnostic()
+    studyQueueHeadSnapshotDiagnostic()
+    studyQueueStatement()
+    fetchStudyQueueCards()
+    studyQueueLimitSQL()
+    releaseStudyCard()
+    endStudySession()
+    persistReservedReview()
+    touchStudySession()
+    decodeStudySession()
+    revertReview()
+    countRawReviewLogs()
+    countActiveReviewLogs()
+    countActiveReviewLogs()
+    fetchItem()
+    fetchItems()
+    countCards()
+    fetchItems()
+    fetchItemsPage()
+    fetchBrowseRows()
+    fetchItems()
+    countItems()
+    itemTypeEditingImpact()
+    deleteItemType()
+    deleteItemTypeWithoutTransaction()
+    fetchCards()
+    deleteCards()
+    deleteCard()
+    deleteItem()
+    fetchMediaAsset()
+    registerMediaAsset()
+    completeStudyResponse()
+    fetchStudyResponse()
+    fetchStudyResponse()
+    fetchStudyResponses()
+    deleteStudyResponse()
+    countStudyResponses()
+    countStudyResponses()
+    countStudyResponses()
+    studyResponseIDs()
+    countStudyResponses()
+    ordinaryMediaReferenceCount()
+    isStudyResponseMediaHash()
+    studyResponseSelectSQL
+    fetchStudyResponse()
+    decodeStudyResponse()
+    reserveMediaAsset()
+    mediaReservationExpiresAt()
+    cancelMediaReservation()
+    rollbackMediaReservations()
+    removeExpiredMediaReservations()
+    releaseMediaReservations()
+    fetchOrphanedMediaAssets()
+    fetchUnreferencedMediaAssets()
+    collectMediaAssetIfOrphaned()
+    deleteMediaAssetIfOrphaned()
+    updateCardSkill()
+    generatedCardRetirementPlan()
+    itemTypeSchemaImpactState()
+    reconcileCards()
+    nextReviewSequence()
+    syncCards()
+    mediaReferenceCounts()
+    reconcileMediaReferenceCounts()
+    mediaReservationIDs()
+    applyMediaReferenceDeltas()
+    mediaReservationCount()
+    consumeMediaReservations()
+    validateMediaAdoption()
+    decodeMediaAsset()
+    isValidMediaHash()
+    migrateNotesToItemsSchemaIfNeeded()
+    backfillMediaReferenceCounts()
+    migrateReviewHistorySchemaIfNeeded()
+    migrateReviewSequenceSchemaIfNeeded()
+    migrateMediaReferenceSchemaIfNeeded()
+    tableExists()
+    columnExists()
+    backfillCardDueDates()
+    backfillCardScheduleColumns()
+    migrateLegacyMediaReferences()
+    convertLegacyMediaObject()
+    convertedLegacyMedia()
+    securelyConvertLegacyFile()
+    readLegacyMedia()
+    sha256Hex()
+    isValidSHA256Digest()
+    decodeCard()
+    decodeSchedulerPreset()
+    decodeSchedulerCohort()
+    decodeSchedulerCardHistory()
+    decodeFSRSParameterSet()
+    decodeFSRSOptimizationRun()
+    decodePersistedItem()
+    schemaVersion()
+    updateItemDeckSync()
+    moveItems()
+    deleteAllUnassignedItems()
+    deleteDeckRecursively()
+    applyDeckDeletion()
+    resetDeckProgress()
+    reconcileOrphanedIncludedItemTypes()
+    deckDeletionOrder()
+    deckDepth()
+    backfillBrowseProjection()
+    cardsSupportScheduleAggregates()
+    refreshBrowseProjection()
+    upsertBrowseProjection()
+    upsertBrowseProjectionWithoutCards()
+    fetchSynchronizedReviewRecord()
+    fetchReviewRevertRecord()
+    fetchItemTypeMembershipRecord()
+    fetchSchedulingSettingsRecord()
+    fetchPortableItemTypeMappingRecord()
+    applySynchronizedBatch()
+    persistSynchronizedReviewIntroduction()
+    restoreMissingLegacyReviewIntroductions()
+    applySynchronizedTombstone()
+    validateSynchronizedItem()
+    inTransaction()
+    inReadTransaction()
+    executeTransactionControl()
+    execute()
+    prepareStatement()
+    executePrepared()
+    query()
+    forEachRow()
+    bind()
+    readRow()
+    encode()
+    payload()
+    decode()
+    errorMessage()
+  }
+  class t142["SQLiteDatabase.ActiveReviewTimingPolicy"] {
+    <<struct>>
+    hasReview
+    version
+  }
+  class t143["SQLiteDatabase.CardIdentity"] {
+    <<struct>>
+    templateID
+    clozeGroup
+    occlusionGroup
+  }
+  class t144["SQLiteDatabase.GeneratedCardRetirementPlan"] {
+    <<struct>>
+    cardIDs
+  }
+  class t145["SQLiteDatabase.Binding"] {
+    <<enum>>
+  }
+  class t146["SQLiteDatabase"] {
+    <<extension>>
+    fetchTypeSettings()
+    fetchDeckTypeSettings()
+    saveTypeSettings()
+    saveDeckTypeSettings()
+    createScopedType()
+    attachType()
+    attachTypeInTransaction()
+    resolvedTypePolicy()
+    organizeLegacyItemTypes()
+  }
+  class t147["SQLiteDatabase"] {
+    <<extension>>
+    learningTimeNotifications()
+    removeLearningTimeObserver()
+    insertLearningTime()
+    learningTimeSegments()
+    learningTimeSummary()
+  }
+  class t148["SQLiteDatabase"] {
+    <<extension>>
+    recordLearningTimeAliases()
+    learningTimeItemAliases()
+  }
+  class t149["Schema"] {
+    <<enum>>
+    version
+    learningTimeStatements
+    studyRelationStatements
+    createStatements
+    schedulerPersistenceStatements
+    apiStateStatements
+    apiChangeTrackingStatements
+    migrationV31Statements
+    scopeChangeTrackingStatements
+    syncChangeTrackingStatements()
+    syncResourceChangeTrackingStatements
+    migrationV21StateStatements
+    apiChangeTrackingStatements()
+    sqliteUUIDExpression
+    trackedTableStatements()
+    compoundTrackedTableStatements()
+    conditionalTrackedTableStatements()
+    trackedTriggerStatement()
+    browseProjectionStatements
+    migrationV8Statements
+    migrationV9Statements
+    migrationV10Statements
+    migrationV11Statements
+    migrationV12Statements
+    migrationV13Statements
+    migrationV14Statements
+    migrationV16Statements
+    migrationV17Statements
+    migrationV18Statements
+    migrationV19Statements
+    migrationV20Statements
+    migrationV15Statements
+    migrationV5Statements
+    migrationV6Statements
+    migrationV4Statements
+    migrationV7Statements
+    migrationV23Statements
+    migrationV24Statements
+    migrationV25Statements
+    migrationV26Statements
+    migrationV27Statements
+    migrationV28Statements
+    migrationV2Statements
+  }
+  class t150["StudySessionState"] {
+    <<enum>>
+  }
+  class t151["StudySessionRecord"] {
+    <<struct>>
+    id
+    clientID
+    scope
+    state
+    revision
+    currentCardID
+    createdAt
+    lastActivityAt
+    init()
+  }
+  class t152["StoredStudyScope"] {
+    <<struct>>
+    kind
+    deckID
+    includeDescendants
+    init()
+    scope
+  }
+  class t153["StoredStudyScope.Kind"] {
+    <<enum>>
+  }
+  class t154["ItemStore"] {
+    <<extension>>
+    createStudySession()
+    studySession()
+    reserveNextStudyCard()
+    skipReservedStudyCard()
+    endStudySession()
+    submitReservedReview()
+  }
+  class t155["ImportRow"] {
+    <<struct>>
+    fieldValues
+    structuredFields
+    tags
+    init()
+  }
+  class t156["ImportPayload"] {
+    <<struct>>
+    itemTypeName
+    rows
+    init()
+  }
+  class t157["ImportError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t158["ImportContext"] {
+    <<struct>>
+    baseDirectory
+    init()
+  }
+  class t159["ImportAdapter"] {
+    <<protocol>>
+    supportsStructuredFields
+    parse()
+  }
+  class t160["ImportAdapter"] {
+    <<extension>>
+    supportsStructuredFields
+  }
+  class t161["JSONImportAdapter"] {
+    <<struct>>
+    init()
+    parse()
+  }
+  class t162["JSONImportAdapter.Payload"] {
+    <<struct>>
+    itemType
+    rows
+  }
+  class t163["JSONImportAdapter.Payload.Row"] {
+    <<struct>>
+    values
+    structured
+    tags
+    init()
+  }
+  class t164["JSONImportAdapter.DynamicKey"] {
+    <<struct>>
+    stringValue
+    intValue
+    init()
+    init()
+  }
+  class t165["CSVImportAdapter"] {
+    <<struct>>
+    itemTypeName
+    supportsStructuredFields
+    init()
+    parse()
+    parseRecords()
+  }
+  class t166["CSVImportAdapter.CSVState"] {
+    <<enum>>
+  }
+  class t167["ImportLimits"] {
+    <<enum>>
+    maxPayloadBytes
+    maxRows
+    maxFieldsPerRow
+    maxFieldStringBytes
+    maxFieldStringLength
+    validatePayloadSize()
+    validateRowCount()
+    validateDecodedPayload()
+    validateFieldString()
+    validateBase64EncodedSize()
+  }
+  class t168["StructuredFieldValue"] {
+    <<enum>>
+    init()
+  }
+  class t169["StructuredFieldValue.CodingKeys"] {
+    <<enum>>
+  }
+  class t170["MediaAsset"] {
+    <<struct>>
+    hash
+    kind
+    byteSize
+    fileExtension
+    createdAt
+    refCount
+    init()
+  }
+  class t171["MediaAssetDescriptor"] {
+    <<struct>>
+    hash
+    kind
+    byteSize
+    fileExtension
+  }
+  class t172["MediaStore"] {
+    <<actor>>
+    reservationLifetime
+    rootDirectory
+    metadataDatabase
+    init()
+    defaultRoot()
+    mediaDirectory
+    ingest()
+    ingest()
+    ingest()
+    ingest()
+    ingestVerifiedPortableFile()
+    ingest()
+    ingest()
+    store()
+    attachMetadataDatabase()
+    resolve()
+    descriptor()
+    removeOrphan()
+    collectOrphan()
+    discardDraftReference()
+    rollbackReservations()
+    releaseReservations()
+    removeAssetFile()
+    readFile()
+    verifyFile()
+    copyFileInChunks()
+    isContained()
+    assetURL()
+    containedExistingURL()
+    canonicalExtension()
+    sha256Hex()
+  }
+  class t173["String"] {
+    <<extension>>
+    nilIfEmpty
+  }
+  class t174["MediaError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t175["MediaValidation"] {
+    <<enum>>
+    maxBytes()
+    allowedExtensions()
+    defaultExtension()
+    validate()
+    validatedExtension()
+    detectedFormat()
+    inferredExtension()
+    canonicalExtension()
+    matchesMagicBytes()
+    isMPEG1LayerAudio()
+    isADTS()
+    isISOBaseMedia()
+    hasPrefix()
+    hasBytes()
+    asciiString()
+    hasPrefix()
+  }
+  class t176["MediaValidation.DetectedFormat"] {
+    <<struct>>
+    kind
+    fileExtension
+    init()
+  }
+  class t177["Card"] {
+    <<struct>>
+    id
+    itemID
+    templateID
+    skill
+    memory
+    memoryModelVersion
+    memoryParameterSetID
+    schedulingHistoryOrigin
+    isSuspended
+    deckID
+    occlusionGroup
+    clozeGroup
+    init()
+    isDue()
+    init()
+  }
+  class t178["Card.CodingKeys"] {
+    <<enum>>
+  }
+  class t179["CardGenerator"] {
+    <<enum>>
+    cards()
+    deterministicCardID()
+    shouldGenerate()
+    evaluate()
+    occlusionGroups()
+    clozeGroups()
+  }
+  class t180["CardMaturityStatus"] {
+    <<enum>>
+    minimumSpacedRecallDays
+    maintainingStabilityDays
+    evaluate()
+    evaluate()
+  }
+  class t181["CardMaturityEvidence"] {
+    <<struct>>
+    spacedSuccesses
+    previousReviewAt
+    observe()
+  }
+  class t182["CardMaturityDetail"] {
+    <<struct>>
+    id
+    templateID
+    occlusionGroup
+    clozeGroup
+    status
+    init()
+  }
+  class t183["MaturitySummary"] {
+    <<struct>>
+    activeCardCount
+    maintainingCardCount
+    notStartedCardCount
+    init()
+    empty
+    status
+    adding()
+    one()
+  }
+  class t184["MaturitySummary.Status"] {
+    <<enum>>
+  }
+  class t185["Deck"] {
+    <<struct>>
+    id
+    name
+    parentID
+    newCardsPerDay
+    init()
+  }
+  class t186["DeckMoveDestination"] {
+    <<enum>>
+  }
+  class t187["DeckScope"] {
+    <<enum>>
+  }
+  class t188["DeckSummary"] {
+    <<struct>>
+    id
+    name
+    parentID
+    newCardsPerDay
+    sortPosition
+    itemCount
+    dueCount
+    maturity
+    init()
+  }
+  class t189["DeckNode"] {
+    <<struct>>
+    summary
+    children
+    id
+    init()
+  }
+  class t190["DeckTree"] {
+    <<enum>>
+    build()
+    areInDisplayOrder()
+    descendantIDs()
+    wouldCreateCycle()
+  }
+  class t191["DueCard"] {
+    <<struct>>
+    id
+    card
+    item
+    itemType
+    template
+    studyRelation
+    init()
+  }
+  class t192["Item"] {
+    <<struct>>
+    id
+    itemTypeID
+    fields
+    tags
+    deckID
+    init()
+    value()
+    isFieldEmpty()
+  }
+  class t193["FieldValue"] {
+    <<struct>>
+    fieldID
+    value
+    init()
+  }
+  class t194["ItemBrowsing"] {
+    <<enum>>
+    arrange()
+    filter()
+    matches()
+    contains()
+    isOrdered()
+  }
+  class t195["ItemDisplay"] {
+    <<enum>>
+    title()
+    subtitle()
+    plainText()
+    mediaKindLabel()
+    plainText()
+  }
+  class t196["FieldDef"] {
+    <<extension>>
+    supportsTextInput
+    supportsMediaInput
+    isTextLike
+    contentValue()
+    contentValue()
+    contentValue()
+    contentValue()
+    mergeAdjacent()
+  }
+  class t197["ItemScheduleSummary"] {
+    <<struct>>
+    dueAt
+    phase
+    lapses
+    needsAttention
+    init()
+    isDue()
+    isLeech
+  }
+  class t198["ItemBrowseSchedule"] {
+    <<struct>>
+    cardCount
+    schedule
+    init()
+  }
+  class t199["ItemSortOrder"] {
+    <<enum>>
+  }
+  class t200["LearningTimeSegment"] {
+    <<struct>>
+    id
+    sessionID
+    deviceID
+    sourceLibraryID
+    itemID
+    cardID
+    startedAt
+    endedAt
+    durationMilliseconds
+    init()
+  }
+  class t201["LearningTimePeriod"] {
+    <<enum>>
+    id
+    title
+    range()
+  }
+  class t202["LearningTimeDeckTotal"] {
+    <<struct>>
+    id
+    name
+    parentID
+    directMilliseconds
+    totalMilliseconds
+  }
+  class t203["LearningTimeSummary"] {
+    <<struct>>
+    range
+    totalMilliseconds
+    directMilliseconds
+    descendantMilliseconds
+    unassignedMilliseconds
+    deletedMilliseconds
+    pendingMilliseconds
+    decks
+    trackingStartedAt
+  }
+  class t204["LearningTimeStoredSegment"] {
+    <<struct>>
+    sequence
+    segment
+  }
+  class t205["LearningTimeItemAlias"] {
+    <<struct>>
+    sourceLibraryID
+    originalItemID
+    resolvedItemID
+    id
+    init()
+  }
+  class t206["ScopeSummary"] {
+    <<struct>>
+    itemCount
+    cardCount
+    dueNow
+    newCount
+    availableNewCount
+    hiddenNewCount
+    learningCount
+    relearningCount
+    reviewCount
+    maturity
+    leechCount
+    nextDueAt
+    nextNewCardsAt
+    leechThreshold
+    init()
+    empty
+    inLearningCount
+    hasItems
+    hasDueCards
+    nextStudyAt
+  }
+  class t207["ResolvedSlot"] {
+    <<struct>>
+    value
+    presentation
+    init()
+  }
+  class t208["ResolvedTemplateComponent"] {
+    <<struct>>
+    id
+    region
+    purpose
+    value
+    presentation
+    init()
+  }
+  class t209["SideContent"] {
+    <<enum>>
+    resolvedComponents()
+    values()
+    resolvedSlots()
+    values()
+    contentValue()
+  }
+  class t210["StudyAvailability"] {
+    <<struct>>
+    dueNow
+    nextStudyAt
+    init()
+  }
+  class t211["DeckImportOrdering"] {
+    <<enum>>
+    parentFirst()
+  }
+  class t212["ItemStore"] {
+    <<extension>>
+    portableDeckSnapshot()
+    importPortableDeck()
+  }
+  class t213["PortableDeckLimits"] {
+    <<struct>>
+    maximumFileBytes
+    maximumDecks
+    maximumItemTypes
+    maximumItems
+    maximumFieldsPerType
+    maximumTemplatesPerType
+    maximumTagsPerItem
+    maximumMediaAssets
+    maximumTotalMediaBytes
+    init()
+    _default_
+  }
+  class t214["PortableDeckError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t215["PortableDeckImportResult"] {
+    <<struct>>
+    deckIDs
+    itemCount
+    createdItemTypeCount
+    reusedItemTypeCount
+    init()
+  }
+  class t216["PortableDeckTypeConflictResolution"] {
+    <<enum>>
+  }
+  class t217["PortableDeckTypeResolver"] {
+    <<protocol>>
+    origin()
+    digest()
+  }
+  class t218["DefaultPortableDeckTypeResolver"] {
+    <<struct>>
+    init()
+    origin()
+    digest()
+  }
+  class t219["PortableDeckPersistedItem"] {
+    <<struct>>
+    item
+    createdAt
+    updatedAt
+  }
+  class t220["PortableDeckTypeRecord"] {
+    <<struct>>
+    itemType
+    originLibraryID
+    originTypeID
+    digest
+  }
+  class t221["PortableDeckMediaRecord"] {
+    <<struct>>
+    descriptor
+    fileURL
+  }
+  class t222["PortableDeckPackage"] {
+    <<struct>>
+    formatVersion
+    sourceLibraryID
+    rootDeckID
+    decks
+    types
+    items
+    media
+    itemTypePolicies
+    deckTypeSettings
+  }
+  class t223["PortableDeckImportPlan"] {
+    <<struct>>
+    attachmentDeckID
+    itemTypes
+    libraryItemTypeIDs
+    decks
+    items
+    mappings
+    includedItemTypes
+    itemTypePolicies
+    deckTypeSettings
+    rootPlacement
+    expectedItemTypes
+  }
+  class t224["PortableDeckImportPlan.RootPlacement"] {
+    <<struct>>
+    rootID
+    parentID
+  }
+  class t225["PortableDeckLibrarySnapshot"] {
+    <<struct>>
+    libraryID
+    decks
+    items
+    itemTypes
+    mappings
+    includedItemTypes
+    itemTypePolicies
+    deckTypeSettings
+  }
+  class t226["PortableDeckTypeMapping"] {
+    <<struct>>
+    originLibraryID
+    originTypeID
+    digest
+    localTypeID
+  }
+  class t227["PortableDeck"] {
+    <<enum>>
+    fileExtension
+    applicationID
+    version
+    supportedVersions
+    export()
+    importDeck()
+  }
+  class t228["PortableDeckDatabase"] {
+    <<class>>
+    handle
+    writeStatementCache
+    init()
+    create()
+    read()
+    close()
+    write()
+    validateHeaderAndIntegrity()
+    configureImportLimits()
+    validateExactColumns()
+    writeMediaBlob()
+    stageMediaBlob()
+    timestamp()
+    parseTimestamp()
+    mimeType()
+    readPackage()
+    validateDeckTree()
+    validateMediaReferences()
+    enforceCount()
+    scalarInteger()
+    execute()
+    query()
+    forEachRow()
+    prepare()
+    bind()
+    sqliteError()
+  }
+  class t229["Value"] {
+    <<enum>>
+  }
+  class t230["Row"] {
+    <<struct>>
+    values
+    init()
+    text()
+    blob()
+    integer()
+    double()
+    uuid()
+  }
+  class t231["PortableJSON"] {
+    <<enum>>
+    maximumJSONBytes
+    maximumTextBytes
+    styleOrder
+    encodeSide()
+    decodeSide()
+    encodeComponents()
+    decodeComponents()
+    encodeSkill()
+    decodeSkill()
+    encodeCondition()
+    decodeCondition()
+    encodeContent()
+    decodeContent()
+    conditionObject()
+    decodeConditionObject()
+    object()
+    encode()
+    dictionary()
+    integer()
+    required()
+    validateText()
+    invalid()
+  }
+  class t232["Data"] {
+    <<extension>>
+    init()
+    hex
+  }
+  class t233["CanonicalItemType"] {
+    <<struct>>
+    name
+    fields
+    templates
+    init()
+  }
+  class t234["CanonicalField"] {
+    <<struct>>
+    name
+    type
+    isRequired
+    init()
+  }
+  class t235["CanonicalField.CodingKeys"] {
+    <<enum>>
+  }
+  class t236["CanonicalTemplate"] {
+    <<struct>>
+    name
+    layout
+    components
+    interaction
+    skill
+    generateWhen
+    init()
+  }
+  class t237["CanonicalComponent"] {
+    <<struct>>
+    region
+    purpose
+    source
+    presentation
+    init()
+  }
+  class t238["CanonicalSide"] {
+    <<struct>>
+    slots
+    init()
+    init()
+    encode()
+  }
+  class t239["CanonicalSlot"] {
+    <<struct>>
+    source
+    presentation
+    init()
+  }
+  class t240["CanonicalSlotSource"] {
+    <<enum>>
+    init()
+    encode()
+  }
+  class t241["CanonicalSlotSource.CodingKeys"] {
+    <<enum>>
+  }
+  class t242["CanonicalSlotCondition"] {
+    <<enum>>
+    init()
+    encode()
+  }
+  class t243["CanonicalSlotCondition.CodingKeys"] {
+    <<enum>>
+  }
+  class t244["PortableItemTypeIdentityError"] {
+    <<enum>>
+  }
+  class t245["PortableItemTypeIdentity"] {
+    <<enum>>
+    canonicalRepresentation()
+    canonicalData()
+    schemaDigest()
+    canonicalSide()
+    canonicalSource()
+    canonicalCondition()
+    ordinal()
+    normalized()
+  }
+  class t246["ItemType"] {
+    <<extension>>
+    portableSchemaDigest()
+  }
+  class t247["FSRSOptimizationError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t248["FSRSOptimizationResult"] {
+    <<struct>>
+    parameters
+    previousLoss
+    optimizedLoss
+    observationCount
+    improved
+    init()
+  }
+  class t249["FSRSOptimizationSchedule"] {
+    <<struct>>
+    defaultMinimumReviewLogs
+    defaultMinimumNewReviewLogs
+    defaultGrowthFraction
+    defaultStaleInterval
+    minimumReviewLogs
+    minimumNewReviewLogs
+    growthFraction
+    staleInterval
+    init()
+    needsOptimization()
+  }
+  class t250["FSRSOptimizationSchedule.Attempt"] {
+    <<struct>>
+    reviewLogCount
+    attemptedAt
+    init()
+  }
+  class t251["FSRSOptimizer"] {
+    <<struct>>
+    defaultMinimumObservations
+    minimumReviewsPerCardForOutcome
+    minimumObservations
+    passes
+    regularization
+    init()
+    optimize()
+    logLoss()
+    evaluation()
+    examples()
+  }
+  class t252["FSRSPromotionObservation"] {
+    <<struct>>
+    id
+    cardID
+    reviewedAt
+    sequence
+    studyDay
+    elapsedDays
+    recalled
+    activeProbability
+    defaultProbability
+    candidateProbability
+    init()
+  }
+  class t253["FSRSPromotionThresholds"] {
+    <<struct>>
+    minimumTargets
+    minimumCards
+    minimumFailures
+    minimumStudyDays
+    minimumTargetsPerPopulatedBucket
+    minimumPopulatedBuckets
+    minimumValidationTargets
+    minimumValidationFailures
+    bootstrapSamples
+    init()
+  }
+  class t254["FSRSElapsedBucket"] {
+    <<enum>>
+    init()
+  }
+  class t255["FSRSPromotionEligibility"] {
+    <<struct>>
+    eligible
+    targetCount
+    distinctCardCount
+    failureCount
+    studyDayCount
+    bucketCounts
+    validationTargetCount
+    validationFailureCount
+    unmetRequirements
+  }
+  class t256["FSRSRefitTrigger"] {
+    <<enum>>
+  }
+  class t257["FSRSRefitContext"] {
+    <<struct>>
+    lastCompletedAt
+    newTargetCount
+    newFailureCount
+    newDistinctCardCount
+    rollingCalibrationError
+    relativeLogLossRegression
+    init()
+  }
+  class t258["FSRSChronologicalFold"] {
+    <<struct>>
+    trainingIndices
+    validationIndices
+  }
+  class t259["FSRSPredictiveMetrics"] {
+    <<struct>>
+    logLoss
+    brierScore
+    rmseBins
+    nearTargetCalibrationError
+    sliceLogLoss
+    invalid
+  }
+  class t260["FSRSPromotionMetrics"] {
+    <<struct>>
+    active
+    defaults
+    empiricalBaseRate
+    candidate
+    logLossRegressionUpper95
+  }
+  class t261["FSRSCandidateInvariants"] {
+    <<struct>>
+    finiteParameters
+    withinCanonicalBounds
+    coupledConstraintsSatisfied
+    monotonicInitialStability
+    orderedPassingIntervals
+    deterministicReplay
+    init()
+    allSatisfied
+  }
+  class t262["FSRSWorkloadProjection"] {
+    <<struct>>
+    p05GoodIntervalRatio
+    p95GoodIntervalRatio
+    estimatedReviewLoadChange
+    init()
+    isFinite
+  }
+  class t263["FSRSGradualTuningPolicy"] {
+    <<struct>>
+    maximumStepFraction
+    minimumStepFraction
+    minimumP05IntervalRatio
+    maximumP95IntervalRatio
+    maximumAbsoluteEstimatedWorkloadChange
+    init()
+    candidateFractions
+    interpolatedParameters()
+    accepts()
+  }
+  class t264["FSRSPromotionDisposition"] {
+    <<enum>>
+    allowsActivation
+  }
+  class t265["FSRSProbationDisposition"] {
+    <<enum>>
+  }
+  class t266["FSRSProbationEvidence"] {
+    <<struct>>
+    elapsedDays
+    observedTargets
+    studyDays
+    candidateMinusPreviousLogLoss
+    onTimeRecallRate
+    desiredRetention
+    reviewTimeRatio
+    lapseImproved
+    invariantOrReplayFailure
+    init()
+  }
+  class t267["FSRSPromotionPolicy"] {
+    <<struct>>
+    thresholds
+    bootstrapSeed
+    init()
+    eligibility()
+    refitTrigger()
+    chronologicalFolds()
+    metrics()
+    disposition()
+    gradualStepDisposition()
+    failedRun()
+    probationDisposition()
+    chronologicalFoldCount()
+    bootstrapUpper95()
+    elapsedObservations()
+    chronological()
+    predictiveMetrics()
+    logLoss()
+  }
+  class t268["PromotionRNG"] {
+    <<struct>>
+    state
+    next()
+  }
+  class t269["FSRSScheduler"] {
+    <<struct>>
+    memoryModelIdentifier
+    elapsedPolicyIdentifier
+    intervalPolicyIdentifier
+    params
+    engine
+    init()
+    schedule()
+    retrievability()
+    intervalDays()
+    rawIntervalDays()
+    retrievability()
+    elapsedModelDays()
+    fuzz()
+  }
+  class t270["FSRSScheduler.Parameters"] {
+    <<struct>>
+    modelVersion
+    defaultRequestRetention
+    defaultMaximumInterval
+    minimumInterval
+    weights
+    requestRetention
+    maximumInterval
+    enableFuzz
+    init()
+    defaultWeights
+    weightBounds
+    sanitizedWeights()
+    init()
+  }
+  class t271["FSRSScheduler.Parameters.WeightBound"] {
+    <<struct>>
+    lower
+    upper
+    init()
+  }
+  class t272["FSRSScheduler.Parameters.CodingKeys"] {
+    <<enum>>
+  }
+  class t273["LearningScheduler"] {
+    <<struct>>
+    policyIdentifier
+    fsrs
+    init()
+    schedule()
+    enterRepairRound()
+    graduate()
+  }
+  class t274["MemoryState"] {
+    <<struct>>
+    stability
+    difficulty
+    due
+    lastReview
+    reps
+    lapses
+    phase
+    stepIndex
+    init()
+    new()
+    isDue()
+    init()
+  }
+  class t275["MemoryState.CodingKeys"] {
+    <<enum>>
+  }
+  class t276["Phase"] {
+    <<enum>>
+  }
+  class t277["ReviewIntervalVariation"] {
+    <<enum>>
+    policyIdentifier
+    fraction
+    apply()
+  }
+  class t278["ReviewLog"] {
+    <<struct>>
+    id
+    cardID
+    reviewedAt
+    rating
+    elapsedDays
+    scheduledDays
+    phaseBefore
+    durationMs
+    sequence
+    schedulingAudit
+    init()
+    withSequence()
+    init()
+  }
+  class t279["ReviewLog.CodingKeys"] {
+    <<enum>>
+  }
+  class t280["ReviewRating"] {
+    <<enum>>
+  }
+  class t281["Scheduler"] {
+    <<protocol>>
+    schedule()
+  }
+  class t282["SchedulerPersistenceConstants"] {
+    <<enum>>
+    sharedPresetID
+    populationDefaultParameterSetID
+    globalCohortID
+    sharedPresetName
+    desiredRetention
+    maximumIntervalDays
+    memoryModelVersion
+    upstreamCommit
+    sourceChecksum
+    optimizerParityVerified
+    fixtureChecksum
+    timingPolicyVersion
+    intervalPolicyVersion
+    cohortPolicyVersion
+    cardKindCohortID()
+    parameterSetID()
+  }
+  class t283["ReviewWorkloadTimingPolicy"] {
+    <<enum>>
+    maximumStoredMilliseconds
+    minimumUsableMilliseconds
+    maximumUsableMilliseconds
+    clamped()
+    isUsable()
+  }
+  class t284["SchedulerCohortKind"] {
+    <<enum>>
+  }
+  class t285["SchedulerCohort"] {
+    <<struct>>
+    id
+    kind
+    canonicalSignature
+    parentCohortID
+    activeParameterSetID
+    isDirty
+    dirtyRevision
+    lastAttemptAt
+    lastMaintenanceAt
+    createdAt
+    updatedAt
+    init()
+  }
+  class t286["SchedulerCardHistory"] {
+    <<struct>>
+    cardID
+    cohortID
+    itemTypeIDAtAssignment
+    templateIDAtAssignment
+    historyOrigin
+    updatedAt
+  }
+  class t287["SchedulerPreset"] {
+    <<struct>>
+    id
+    name
+    desiredRetention
+    maximumIntervalDays
+    automaticOptimizationEnabled
+    activeParameterSetID
+    createdAt
+    updatedAt
+    init()
+  }
+  class t288["FSRSParameterSource"] {
+    <<enum>>
+  }
+  class t289["FSRSParameterSet"] {
+    <<struct>>
+    id
+    weights
+    modelVersion
+    upstreamCommit
+    sourceChecksum
+    fixtureChecksum
+    scope
+    cohortID
+    source
+    inputFingerprint
+    trainingCutoff
+    metrics
+    previousParameterSetID
+    createdAt
+    init()
+  }
+  class t290["FSRSOptimizationDecision"] {
+    <<enum>>
+  }
+  class t291["FSRSOptimizationRun"] {
+    <<struct>>
+    id
+    presetID
+    cohortID
+    startedAt
+    completedAt
+    trainingCutoff
+    inputFingerprint
+    eligibleTargetCount
+    distinctCardCount
+    failureCount
+    studyDayCount
+    excludedCounts
+    foldCount
+    metrics
+    decision
+    reason
+    candidateParameterSetID
+    init()
+  }
+  class t292["ReviewSchedulingAudit"] {
+    <<struct>>
+    presetID
+    deckIDAtReview
+    cohortID
+    itemTypeIDAtReview
+    templateIDAtReview
+    skillAtReview
+    contentKindVersion
+    elapsedSeconds
+    elapsedModelDays
+    parameterSetID
+    memoryAfter
+    predictedRetrievability
+    rawIntervalDays
+    operationalIntervalSeconds
+    modelVersion
+    timingPolicyVersion
+    intervalPolicyVersion
+    finalDueAt
+    constraintReason
+    init()
+  }
+  class t293["ReviewSchedulePreviewDetail"] {
+    <<struct>>
+    rating
+    memoryBefore
+    memoryAfter
+    predictedRetrievability
+    rawIntervalDays
+    operationalIntervalSeconds
+    desiredRetention
+    maximumIntervalDays
+    presetID
+    cohortID
+    parameterSetID
+    modelVersion
+    timingPolicyVersion
+    intervalPolicyVersion
+    finalDueAt
+    constraintReason
+    init()
+  }
+  class t294["SchedulerMigrationStatus"] {
+    <<enum>>
+  }
+  class t295["CardSchedulingSnapshot"] {
+    <<struct>>
+    cardID
+    memory
+    memoryModelVersion
+    memoryParameterSetID
+    schedulingHistoryOrigin
+    init()
+  }
+  class t296["SchedulerMigrationRecord"] {
+    <<struct>>
+    id
+    fromModelVersion
+    toModelVersion
+    status
+    startedAt
+    completedAt
+    replayedCardCount
+    resetCardCount
+    failureReason
+    init()
+  }
+  class t297["SchedulingHealthSnapshot"] {
+    <<struct>>
+    preset
+    activeParameterSet
+    lastOptimizationRun
+    rollbackParameterSetIDs
+    legacyParametersQuarantined
+    optimizerParityVerified
+    latestMigration
+    cohortCount
+    personalizedCohortCount
+    inheritedCohortCount
+    pendingMaintenance
+    lastMaintenanceAt
+    activeModelVersion
+    activeSource
+    desiredRetention
+    automaticOptimizationEnabled
+    rollbackAvailable
+    init()
+  }
+  class t298["StudyDay"] {
+    <<enum>>
+    defaultRolloverMinutes
+    validRolloverMinutes
+    key()
+    start()
+    nextRollover()
+    normalized()
+  }
+  class t299["FieldDef"] {
+    <<struct>>
+    id
+    name
+    type
+    isRequired
+    init()
+  }
+  class t300["FieldType"] {
+    <<enum>>
+  }
+  class t301["ItemDraftContent"] {
+    <<struct>>
+    text
+    media
+    mediaDescriptions
+    occlusions
+    clozeBlanks
+    init()
+  }
+  class t302["ItemDraftValidationIssue"] {
+    <<enum>>
+  }
+  class t303["ItemDraftValidation"] {
+    <<enum>>
+    issues()
+    canSave()
+  }
+  class t304["ItemType"] {
+    <<struct>>
+    id
+    name
+    fields
+    templates
+    init()
+    field()
+    field()
+  }
+  class t305["IncludedItemTypeOwner"] {
+    <<struct>>
+    rootDeckID
+    itemTypeID
+    ordinal
+    init()
+  }
+  class t306["DeckItemTypePolicyEntry"] {
+    <<struct>>
+    deckID
+    itemTypeID
+    ordinal
+    isDefault
+    init()
+  }
+  class t307["DeckItemTypePolicy"] {
+    <<struct>>
+    sourceDeckID
+    itemTypes
+    defaultItemTypeID
+    init()
+    automaticItemTypeID
+  }
+  class t308["ItemTypeEditingImpact"] {
+    <<struct>>
+    itemCount
+    deckCount
+    unassignedItemCount
+    deckPaths
+    init()
+  }
+  class t309["ItemTypeSchemaChangeImpact"] {
+    <<struct>>
+    affectedItemCount
+    removedPopulatedFields
+    typeChangedPopulatedFields
+    init()
+    requiresConfirmation
+  }
+  class t310["IncludedItemTypeGroup"] {
+    <<struct>>
+    rootDeck
+    deckPath
+    itemTypes
+    id
+    init()
+  }
+  class t311["ItemTypeCatalog"] {
+    <<struct>>
+    needsOrganization
+    readOnlyIDs
+    itemTypes
+    includedWithDecks
+    corruptions
+    init()
+    allItemTypes
+  }
+  class t312["ItemType"] {
+    <<extension>>
+    duplicated()
+  }
+  class t313["ItemTypeSettings"] {
+    <<struct>>
+    itemTypeID
+    isShared
+    isEditable
+    init()
+  }
+  class t314["DeckItemTypeSettings"] {
+    <<struct>>
+    deckID
+    inherits
+    itemTypeIDs
+    defaultItemTypeID
+    init()
+  }
+  class t315["AuthoringItemTypes"] {
+    <<struct>>
+    deckID
+    sourceDeckID
+    itemTypes
+    defaultItemTypeID
+    usesSharedFallback
+    init()
+    automaticItemTypeID
+  }
+  class t316["ItemTypeUpdateAuthorization"] {
+    <<struct>>
+    expectedOriginal
+    expectedGeneratedCardRetirementIDs
+    expectedStudyResponseDeletionIDs
+    expectedSchemaImpactState
+    schemaChangeImpact
+    expectedStudyResponseDeletionCount
+    expectedGeneratedCardRetirementCount
+    init()
+  }
+  class t317["ItemTypeSchemaImpactState"] {
+    <<struct>>
+    relevantFieldIDs
+    items
+    init()
+    none
+  }
+  class t318["ItemTypeSchemaImpactState.ItemState"] {
+    <<struct>>
+    itemID
+    fieldValues
+    init()
+  }
+  class t319["ItemTypeUpdateError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t320["ItemTypeSchemaChangeImpact"] {
+    <<extension>>
+    none
+  }
+  class t321["ItemTypeValidation"] {
+    <<enum>>
+    validate()
+    validateAudioSubmissionTemplate()
+    validateMediaBehaviors()
+    validateComposition()
+    isVisual()
+    validateClozeTemplate()
+    validateName()
+    validateFields()
+    validateFieldRemoval()
+    fieldIDsReferenced()
+    fieldIDs()
+    generateWhenFieldIDs()
+  }
+  class t322["TemplateBuilder"] {
+    <<enum>>
+    makeRevealTemplate()
+    deriveSkill()
+    modality()
+  }
+  class t323["ItemTypeBuilder"] {
+    <<enum>>
+    makeItemType()
+    updatedItemType()
+    normalizeFields()
+  }
+  class t324["Skill"] {
+    <<struct>>
+    input
+    output
+    operation
+    init()
+  }
+  class t325["Modality"] {
+    <<enum>>
+  }
+  class t326["Operation"] {
+    <<enum>>
+  }
+  class t327["Template"] {
+    <<struct>>
+    id
+    name
+    layout
+    components
+    interaction
+    skill
+    generateWhen
+    init()
+    init()
+    prompt
+    answer
+  }
+  class t328["CardLayoutID"] {
+    <<enum>>
+  }
+  class t329["ComponentRegion"] {
+    <<enum>>
+  }
+  class t330["ComponentPurpose"] {
+    <<enum>>
+  }
+  class t331["TemplateComponent"] {
+    <<struct>>
+    id
+    region
+    purpose
+    source
+    presentation
+    init()
+  }
+  class t332["TemplateComposition"] {
+    <<struct>>
+    layout
+    components
+    init()
+  }
+  class t333["TemplateCompositionMigration"] {
+    <<enum>>
+    map()
+    isUsableQuestion()
+    visualSource()
+  }
+  class t334["Side"] {
+    <<struct>>
+    slots
+    init()
+  }
+  class t335["Slot"] {
+    <<struct>>
+    source
+    presentation
+    init()
+  }
+  class t336["SlotSource"] {
+    <<enum>>
+  }
+  class t337["Presentation"] {
+    <<struct>>
+    reveal
+    media
+    init()
+  }
+  class t338["RevealMode"] {
+    <<enum>>
+  }
+  class t339["MediaBehavior"] {
+    <<enum>>
+    supported()
+    isSupported()
+  }
+  class t340["Interaction"] {
+    <<enum>>
+  }
+  class t341["SlotCondition"] {
+    <<enum>>
+  }
+  class t342["StatisticsSection"] {
+    <<enum>>
+    id
+  }
+  class t343["StatisticsPeriod"] {
+    <<enum>>
+    id
+    days
+  }
+  class t344["StatisticsQuery"] {
+    <<struct>>
+    scope
+    period
+    customStart
+    customEnd
+    itemTypeID
+    templateID
+    skill
+    interaction
+    sessionID
+    studyTimeAttribution
+    heatmapYear
+    init()
+    __()
+    range()
+  }
+  class t345["StatisticsEvent"] {
+    <<struct>>
+    storage
+    update()
+    id
+    kind
+    occurredAt
+    cardID
+    sourceLibraryID
+    itemID
+    deckID
+    itemTypeID
+    templateID
+    skill
+    interaction
+    log
+    memoryBefore
+    memoryAfter
+    suspended
+    sessionID
+    deviceID
+    promptMilliseconds
+    answerMilliseconds
+    checkedCorrect
+    init()
+    init()
+    encode()
+    __()
+  }
+  class t346["StatisticsEvent.Payload"] {
+    <<struct>>
+    id
+    kind
+    occurredAt
+    cardID
+    sourceLibraryID
+    itemID
+    deckID
+    itemTypeID
+    templateID
+    skill
+    interaction
+    log
+    memoryBefore
+    memoryAfter
+    suspended
+    sessionID
+    deviceID
+    promptMilliseconds
+    answerMilliseconds
+    checkedCorrect
+  }
+  class t347["StatisticsEvent.Storage"] {
+    <<class>>
+    payload
+    init()
+  }
+  class t348["StatisticsStoredEvent"] {
+    <<struct>>
+    sequence
+    event
+  }
+  class t349["StatisticsCard"] {
+    <<struct>>
+    card
+    itemTypeID
+    interaction
+    maintaining
+    parameters
+    newCardsPerDay
+    forecastParameters
+    forecastMemory
+    orderedWork
+  }
+  class t350["StatisticsIntroduction"] {
+    <<struct>>
+    cardID
+    deckID
+    studyDay
+  }
+  class t351["StatisticsSource"] {
+    <<struct>>
+    introductions
+    events
+    segments
+    cards
+    decks
+    itemDecks
+    liveItems
+    deletedItems
+    aliases
+    trackingStartedAt
+    rollover
+    itemTypeNames
+    templateNames
+  }
+  class t352["StatisticsCoverage"] {
+    <<struct>>
+    historyStartedAt
+    progressStartedAt
+    timeStartedAt
+    unknownReviewCount
+    pendingMilliseconds
+  }
+  class t353["StatisticsPoint"] {
+    <<struct>>
+    id
+    date
+    intervalEnd
+    series
+    value
+    count
+    init()
+  }
+  class t354["StatisticsBin"] {
+    <<struct>>
+    id
+    label
+    value
+    count
+    cardIDs
+    init()
+  }
+  class t355["StatisticsReview"] {
+    <<class>>
+    id
+    log
+    itemID
+    deckName
+    skill
+    interaction
+    sessionID
+    before
+    after
+    promptMilliseconds
+    answerMilliseconds
+    checkedCorrect
+    init()
+  }
+  class t356["StatisticsSession"] {
+    <<struct>>
+    id
+    date
+    milliseconds
+    reviews
+    cards
+    items
+    submissions
+  }
+  class t357["StatisticsSnapshot"] {
+    <<struct>>
+    todayIntroductions
+    range
+    asOf
+    reviews
+    attentionReviews
+    reviewCount
+    distinctCards
+    distinctItems
+    activeMilliseconds
+    previousReviews
+    previousMilliseconds
+    currentStreak
+    longestStreak
+    activeDays
+    recallPassed
+    recallTotal
+    recallLower
+    recallUpper
+    durationMedian
+    durationP90
+    excludedDurations
+    estimatedRemembered
+    daily
+    heatmap
+    timeHeatmap
+    recall
+    progress
+    cohorts
+    hours
+    phases
+    grades
+    stability
+    difficulty
+    retrievability
+    intervals
+    lapses
+    durations
+    backlog
+    calibration
+    latenessRecall
+    intervalRecall
+    skillComparisons
+    methodComparisons
+    milestoneDurations
+    comparisons
+    due
+    sessions
+    cards
+    coverage
+    itemTypeNames
+    templateNames
+    decks
+    skills
+    interactions
+    observedRecall
+    csv
+  }
+  class t358["StatisticsReviewContext"] {
+    <<struct>>
+    sessionID
+    deviceID
+    promptMilliseconds
+    answerMilliseconds
+    checkedCorrect
+    init()
+  }
+  class t359["StatisticsCapture"] {
+    <<enum>>
+    context
+  }
+  class t360["StatisticsExport"] {
+    <<enum>>
+    escape()
+    points()
+    bins()
+    forecast()
+  }
+  class t361["StatisticsRecallKey"] {
+    <<struct>>
+    cardID
+    day
+  }
+  class t362["StatisticsEngine"] {
+    <<enum>>
+    quantile()
+    wilson()
+    snapshot()
+    skillName()
+    progressHistory()
+  }
+  class t363["StatisticsForecastRequest"] {
+    <<struct>>
+    days
+    newCardsPerDay
+    desiredRetention
+    seed
+    init()
+  }
+  class t364["StatisticsForecastPoint"] {
+    <<struct>>
+    id
+    date
+    median
+    lower
+    upper
+    minutes
+    backlog
+    remembered
+  }
+  class t365["StatisticsForecast"] {
+    <<struct>>
+    points
+    usesGradeHistory
+    durationSamples
+    runs
+    assumptions
+  }
+  class t366["StatisticsSimulator"] {
+    <<enum>>
+    simulate()
+  }
+  class t367["StatisticsSimulator.Random"] {
+    <<struct>>
+    state
+    next()
+  }
+  class t368["Schema"] {
+    <<extension>>
+    statisticsStatements
+    statisticsTriggerStatements
+  }
+  class t369["StatisticsDatabaseCache"] {
+    <<struct>>
+    eventSequence
+    segmentSequence
+    events
+    segments
+  }
+  class t370["SQLiteDatabase"] {
+    <<extension>>
+    saveStatisticsEvents()
+    inStatisticsTransaction()
+    recordStatisticsReview()
+    backfillStatisticsPage()
+    prepareStatisticsEvidence()
+    statisticsEvents()
+    statisticsRevision()
+    statisticsSource()
+  }
+  class t371["ItemStore"] {
+    <<extension>>
+    statisticsRevision()
+    statisticsSource()
+    statisticsEvents()
+    recordStatisticsEvents()
+  }
+  class t372["ItemStore"] {
+    <<extension>>
+    completeAudioSubmission()
+    studyResponse()
+    studyResponses()
+    deleteStudyResponse()
+    studyResponseMediaBytes()
+    ordinaryMediaReferenceCount()
+    isStudyResponseMediaHash()
+    studyResponseCount()
+    studyResponseCount()
+    studyResponseCount()
+  }
+  class t373["PoemDeckItemRecord"] {
+    <<struct>>
+    item
+    itemType
+    createdAt
+    init()
+  }
+  class t374["PoemDeckReconciliationError"] {
+    <<enum>>
+    errorDescription
+  }
+  class t375["PoemSequenceResolver"] {
+    <<enum>>
+    openingTag
+    openingPrompt
+    resolve()
+    field()
+    requiredTextField()
+    text()
+    normalize()
+    normalizeAnswer()
+    normalizeMultiline()
+    requiredLast()
+  }
+  class t376["PoemSequenceResolver.Sequence"] {
+    <<struct>>
+    openingRecord
+    orderedRecords
+    sourceLines
+    startsStanza
+  }
+  class t377["StudyCardRelation"] {
+    <<struct>>
+    family
+    work
+    ordinal
+    init()
+    family()
+    normalized()
+  }
+  class t378["StudyQueueOrdering"] {
+    <<enum>>
+    preferredInterveningCards
+    orderWorks()
+    orderWorks()
+    separateRelated()
+    relatedCardIndex()
+    refreshRelation()
+    family()
+  }
+  class t379["StudyResponse"] {
+    <<struct>>
+    id
+    cardID
+    itemID
+    mediaHash
+    fileExtension
+    byteSize
+    durationMilliseconds
+    capturedAt
+    submittedAt
+    sourceTitle
+    init()
+  }
+  class t380["StudyResponseQuery"] {
+    <<struct>>
+    cardID
+    itemID
+    tag
+    createdAfter
+    submittedBefore
+    submittedBeforeID
+    limit
+    init()
+  }
+  class t381["StudyResponseDraft"] {
+    <<struct>>
+    id
+    cardID
+    fileURL
+    durationMilliseconds
+    capturedAt
+    init()
+  }
+  class t382["AnswerEvaluation"] {
+    <<enum>>
+  }
+  class t383["Arrangement"] {
+    <<struct>>
+    expected
+    initial
+    init()
+  }
+  class t384["StudyResponseEvaluator"] {
+    <<enum>>
+    acceptedAnswers()
+    evaluate()
+    hasReferenceAudio()
+    choiceOptions()
+    arrangement()
+    isCorrectArrangement()
+    textRepresentations()
+    normalized()
+    trimmed()
+    unique()
+    deterministicallyReordered()
+  }
+  t173 <|-- t32
+  t173 <|-- t43
+  t173 <|-- t44
+  t173 <|-- t45
+  t173 <|-- t46
+  t173 <|-- t49
+  t173 <|-- t53
+  t173 <|-- t56
+  t173 <|-- t61
+  t173 <|-- t62
+  t173 <|-- t103
+  t173 <|-- t104
+  t173 <|-- t121
+  t173 <|-- t150
+  t173 <|-- t153
+  t173 <|-- t169
+  t173 <|-- t178
+  t173 <|-- t180
+  t173 <|-- t184
+  t173 <|-- t199
+  t173 <|-- t201
+  t217 <|-- t218
+  t173 <|-- t235
+  t173 <|-- t241
+  t173 <|-- t243
+  t173 <|-- t254
+  t173 <|-- t256
+  t281 <|-- t269
+  t173 <|-- t272
+  t281 <|-- t273
+  t173 <|-- t275
+  t173 <|-- t276
+  t173 <|-- t279
+  t173 <|-- t284
+  t173 <|-- t288
+  t173 <|-- t290
+  t173 <|-- t294
+  t173 <|-- t300
+  t173 <|-- t325
+  t173 <|-- t326
+  t173 <|-- t328
+  t173 <|-- t329
+  t173 <|-- t330
+  t173 <|-- t338
+  t173 <|-- t339
+  t173 <|-- t340
+  t173 <|-- t342
+  t173 <|-- t343

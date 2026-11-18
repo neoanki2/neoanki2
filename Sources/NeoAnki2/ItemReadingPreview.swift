@@ -1,7 +1,5 @@
 import NeoAnkiCore
 import NeoAnkiSharedUI
-import PoemDeckBuilder
-import ProseDeckBuilder
 import SwiftUI
 
 /// Renders item field content in the study reading column typography.
@@ -192,40 +190,14 @@ struct ItemDetailView: View {
         }
         .sheet(isPresented: $isEditing) {
             if let item, let itemType {
-                if itemType.name == "Poem Line",
-                   let deckID = item.deckID,
-                   let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
-                    PoemDeckEditorView(
-                        library: model.library,
-                        deckID: deckID,
-                        itemTypeID: itemType.id,
-                        deckName: deckName,
+                if let deckID = item.deckID,
+                   let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name,
+                   let context = GeneratedDeckEditorContext(item: item, itemType: itemType, deckName: deckName) {
+                    GeneratedDeckEditorView(editing: model.generatedDeckEditing, context: context,
                         onSaved: {
                             isEditing = false
-                            Task {
-                                await load()
-                                onSaved()
-                            }
-                        },
-                        onCancel: { isEditing = false }
-                    )
-                } else if itemType.name == "Prose Unit",
-                          let deckID = item.deckID,
-                          let deckName = decksModel.summaries.first(where: { $0.id == deckID })?.name {
-                    ProseDeckEditorView(
-                        library: model.library,
-                        deckID: deckID,
-                        itemTypeID: itemType.id,
-                        deckName: deckName,
-                        onSaved: {
-                            isEditing = false
-                            Task {
-                                await load()
-                                onSaved()
-                            }
-                        },
-                        onCancel: { isEditing = false }
-                    )
+                            Task { await load(); onSaved() }
+                        }, onCancel: { isEditing = false })
                 } else {
                     NavigationStack {
                         AddItemView(
@@ -275,11 +247,11 @@ struct ItemDetailView: View {
         errorMessage = nil
 
         do {
-            if let loaded = try await model.library.item(id: summary.id) {
+            if let loaded = try await model.item(id: summary.id) {
                 item = loaded.item
                 itemType = loaded.itemType
                 do {
-                    cardMaturityDetails = try await model.library.cardMaturityDetails(itemID: summary.id)
+                    cardMaturityDetails = try await model.cardMaturityDetails(itemID: summary.id)
                     maturityIssue = nil
                 } catch { maturityIssue = "Maturity is unavailable. " + error.localizedDescription }
                 selectedDeckID = loaded.item.deckID

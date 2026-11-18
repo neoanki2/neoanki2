@@ -1,0 +1,276 @@
+classDiagram
+direction LR
+  class t0["Analytic"] {
+    <<enum>>
+    minimumProbability
+    maximumProbability
+    clampGradient()
+    add()
+    binaryCrossEntropy()
+    curve()
+    backwardCurve()
+    initialDifficulty()
+    forwardStep()
+    backwardSuccess()
+    backwardFailure()
+    backwardShort()
+    backwardDifficulty()
+    backwardInitial()
+    backwardStep()
+    prefixLossAndGradient()
+    cardLossAndGradient()
+  }
+  class t1["Analytic.CurveCache"] {
+    <<struct>>
+    t, stability, decay, factor, base, retrievability
+  }
+  class t2["Analytic.StepCache"] {
+    <<struct>>
+    stateS, stateD, lastS, lastD, deltaT, rating, retrievability
+    failureRaw, failureFloor
+    failureUsedFloor
+    shortRaw, shortValue
+    shortRawActive, useShort, useFailure, initSelected, padding
+    preClampS, meanPreClampD
+    initRating
+  }
+  class t3["Analytic.State"] {
+    <<struct>>
+    stability, difficulty
+  }
+  class t4["Analytic.Runtime"] {
+    <<struct>>
+    weights
+    curveDecay, curveFactor
+    curveDFactorDDecay
+    expW8
+    expW8Double
+    failureFloorDivisor
+    easyD
+    easyDDouble
+    exp3W5Double
+    init()
+  }
+  class t5["TrainingExample"] {
+    <<struct>>
+    cardID
+    item
+    order
+    init()
+  }
+  class t6["PreparedDataset"] {
+    <<struct>>
+    initialization
+    training
+    excludedOutliers
+    supervisedTargetCount
+    distinctCardCount
+  }
+  class t7["DatasetBuilder"] {
+    <<enum>>
+    examples()
+    prepare()
+    initialIntervalBucket()
+  }
+  class t8["DatasetBuilder.PairKey"] {
+    <<struct>>
+    rating
+    deltaT
+  }
+  class t9["DatasetEligibility"] {
+    <<struct>>
+    targetCount
+    distinctCardCount
+    failureCount
+    eligibleForFullOptimization
+    init()
+  }
+  class t10["ModelEvaluation"] {
+    <<struct>>
+    logLoss
+    brierScore
+    rmseBins
+    observationCount
+  }
+  class t11["FSRS"] {
+    <<extension>>
+    evaluate()
+    geometricBin()
+  }
+  class t12["StabilityInitializer"] {
+    <<enum>>
+    initialize()
+    smoothAndFill()
+    loss()
+  }
+  class t13["StabilityInitializer.Aggregate"] {
+    <<struct>>
+    successes
+    count
+  }
+  class t14["FSRSError"] {
+    <<enum>>
+  }
+  class t15["Rating"] {
+    <<enum>>
+  }
+  class t16["MemoryState"] {
+    <<struct>>
+    stability
+    difficulty
+    init()
+  }
+  class t17["ItemState"] {
+    <<struct>>
+    memory
+    interval
+  }
+  class t18["NextStates"] {
+    <<struct>>
+    again
+    hard
+    good
+    easy
+    subscript()
+  }
+  class t19["Review"] {
+    <<struct>>
+    rating
+    deltaT
+    init()
+  }
+  class t20["Item"] {
+    <<struct>>
+    reviews
+    init()
+    longTermReviewCount
+  }
+  class t21["Parameters"] {
+    <<struct>>
+    count
+    defaults
+    values
+    init()
+    population
+  }
+  class t22["ParameterClipper"] {
+    <<enum>>
+    stabilityMinimum
+    stabilityMaximum
+    initialStabilityMaximum
+    difficultyMinimum
+    difficultyMaximum
+    clip()
+    isValid()
+    hasMonotonicInitialStability()
+  }
+  class t23["FSRS"] {
+    <<struct>>
+    parameters
+    init()
+    retrievability()
+    nextInterval()
+    nextStates()
+    memoryState()
+    historicalMemoryStates()
+    powerForgettingCurve()
+    initialStability()
+    initialDifficulty()
+    step()
+  }
+  class t24["TrainingConfiguration"] {
+    <<struct>>
+    epochs
+    batchSize
+    seed
+    learningRate
+    maximumSequenceLength
+    regularizationGamma
+    init()
+  }
+  class t25["OptimizationStage"] {
+    <<enum>>
+  }
+  class t26["OptimizationResult"] {
+    <<struct>>
+    parameters
+    stage
+    dataset
+    evaluation
+  }
+  class t27["Optimizer"] {
+    <<struct>>
+    configuration
+    init()
+    computeParameters()
+    makeResult()
+  }
+  class t28["WeightedExample"] {
+    <<struct>>
+    example
+    weight
+  }
+  class t29["HostBatch"] {
+    <<struct>>
+    sequenceLength, batchSize, realBatchSize
+    columnLengths
+    times, ratings, labels, weights
+  }
+  class t30["Adam"] {
+    <<struct>>
+    first
+    second
+    time
+    step()
+  }
+  class t31["CosineAnnealing"] {
+    <<struct>>
+    maximum, initialRate
+    stepCount
+    currentRate
+    init()
+    step()
+  }
+  class t32["RandCompatibleRandom"] {
+    <<struct>>
+    key
+    counter
+    stream
+    buffer
+    bufferIndex
+    init()
+    init()
+    nextUInt32()
+    nextUInt64()
+    shuffle()
+    randomRange()
+    refill()
+    decodeKey()
+    quarter()
+  }
+  class t33["IncreasingUniform"] {
+    <<struct>>
+    n
+    chunk
+    remaining
+    init()
+    next()
+    bound()
+  }
+  class t34["UInt32"] {
+    <<extension>>
+    rotateLeft()
+    rotateRight()
+  }
+  class t35["FSRSReference"] {
+    <<enum>>
+    modelIdentifier
+    upstreamCommit
+    upstreamVersion
+    gitArchiveSHA256
+    githubTarballSHA256
+    sourceArchiveSHA256
+    license
+    optimizerParityVerified
+  }
+  t34 <|-- t15

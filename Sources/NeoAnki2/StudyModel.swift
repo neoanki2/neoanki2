@@ -12,18 +12,20 @@ typealias StudyStartTiming = StudySessionStartTiming
 @MainActor @Observable
 final class StudyModel {
     let session: StudyFeatureModel
-    let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
 
     init(
         library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses,
         remainingQueueLoadGate: (@Sendable () async -> Void)? = nil
     ) {
-        self.library = library
         session = StudyFeatureModel(library: library, scope: .allDecks, title: "All Decks",
                                     errorMapper: MacStudyErrorMapper())
         session.remainingQueueLoadGate = remainingQueueLoadGate
     }
 
+    var canShowAnswer: Bool { session.canShowAnswer }
+    var canGrade: Bool { session.canGrade }
+    var canSkip: Bool { session.canSkip }
+    var supportsRevealWithoutChecking: Bool { session.supportsRevealWithoutChecking }
     var queue: [DueCard] { session.queue }
     var currentCard: DueCard? { session.currentCard }
     var index: Int { session.index }

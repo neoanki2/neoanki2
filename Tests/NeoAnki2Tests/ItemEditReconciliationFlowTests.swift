@@ -46,6 +46,7 @@ import Testing
         ]
     ))
     #expect(model.items.first?.cardCount == 2)
+    await model.awaitReadModels()
     #expect(model.dueCount == 0)
     let afterEdit = try await store.fetchDueCards()
     #expect(afterEdit.isEmpty)

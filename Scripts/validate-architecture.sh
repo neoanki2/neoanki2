@@ -67,6 +67,23 @@ reject_matches "Shared features and mobile UI must use repository capabilities."
 reject_matches "The composition root must construct SQLiteLibraryRepository, not ItemStore." \
   "ItemStore" "$ROOT/Sources/NeoAnki2/NeoAnki2App.swift"
 
+reject_matches "Feature models must not publicly vend a library capability; expose actions or child features." \
+  "^[[:space:]]*(public|package)[[:space:]]+(let|var)[[:space:]]+library[[:space:]]*:" \
+  "$ROOT/Sources/NeoAnkiFeatures"
+
+reject_matches "Presentation must not reach through a feature model to its repository." \
+  "\\b(model|itemsModel|decksModel|libraryModel)\\.library\\b" \
+  "$ROOT/Sources/NeoAnki2" "$ROOT/Sources/NeoAnkiIOS" "$ROOT/Sources/NeoAnkiSharedUI"
+
+reject_matches "Scrolling text documents must be installed by NativeTextEditorPolicy." \
+  '\.(documentView|isVerticallyResizable|isHorizontallyResizable|widthTracksTextView)[[:space:]]*=' \
+  "$ROOT/Sources/NeoAnki2" "$ROOT/Sources/NeoAnkiTextEditing" \
+  --glob '!NativeTextEditorPolicy.swift'
+
+reject_matches "Native text editors must own their text system, not transplant a scrolling factory document." \
+  'scrollableTextView[[:space:]]*\(' \
+  "$ROOT/Sources/NeoAnki2" "$ROOT/Sources/NeoAnkiTextEditing"
+
 if [ "$FAILURES" -ne 0 ]; then
   exit 1
 fi

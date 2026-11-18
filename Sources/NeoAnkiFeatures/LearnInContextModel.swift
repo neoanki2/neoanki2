@@ -46,7 +46,7 @@ private struct ContextAuthoringPreferences: Codable {
     public private(set) var lastSavedIDs: [UUID] = []
     public private(set) var lastSavedItems: [Item] = []
     public private(set) var sourceLibrary: ContextSourceLibrary?
-    public let library: any LibraryRepository
+    private let library: any LibraryRepository
     private let rootURL: URL
     private let generator: any ContextGenerating
     private let speech: any ContextSpeechSynthesizing
@@ -54,7 +54,7 @@ private struct ContextAuthoringPreferences: Codable {
     private var draftURL: URL?
     private var packs: [InstalledVocabularyPack] = []
     private var work: Task<Void, Never>?
-    private var refreshTask: Task<Void, Never>?
+    private var refreshWorker: LatestAsyncWork<Void>?
     private var generation = 0
     private var speechCache: [String: ContextSpeechAsset] = [:]
     private var speechPreparation: Task<ContextSpeechAsset, any Error>?
@@ -481,10 +481,10 @@ private struct ContextAuthoringPreferences: Codable {
     public func report(_ error: any Error) { errorMessage = error.localizedDescription }
 
     private func notifyCommittedChange() {
-        let previous = refreshTask, notify = onSaved
-        // Device publication can await a system notification-permission dialog. It is not part
-        // of the committed library transaction and must not keep authoring or Undo disabled.
-        refreshTask = Task { await previous?.value; await notify() }
+        if refreshWorker == nil {
+            refreshWorker = LatestAsyncWork { [weak self] (_: Void) in await self?.onSaved() }
+        }
+        refreshWorker?.request(())
     }
 
     private func storeMedia(_ data: Data, kind: MediaKind, fileExtension: String, sentence: String) async throws -> MediaRef {

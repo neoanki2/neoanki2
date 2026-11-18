@@ -3,6 +3,7 @@ import NeoAnkiApplication
 import NeoAnkiCore
 import NeoAnkiFeatures
 import NeoAnkiTestSupport
+import Observation
 import Testing
 
 private actor ReviewPublicationGate: AppIconBadgePublishing {
@@ -35,6 +36,51 @@ private actor ReviewWidgetPublisher: WidgetSnapshotPublishing {
     func publish(_ snapshot: DueWidgetSnapshot) { snapshots.append(snapshot) }
 }
 
+@Test @MainActor func editingFromStudyFinishesBeforeDevicePublication() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("edit-save-gate-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
+    try await library.bootstrap()
+    let item = Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Before")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+    ])
+    _ = try await library.createItem(item)
+    let badge = ReviewPublicationGate()
+    let model = LibraryFeatureModel(library: library, badgePublisher: badge)
+    await model.bootstrap(startSync: false)
+    await model.awaitDevicePublication()
+    await model.beginStudy(scope: .allDecks, title: "Editing")
+    var edited = item
+    edited.fields[0].value = .text("After")
+    await badge.holdNextPublication()
+    var saveReturned = false
+    let save = Task {
+        try await model.updateItem(edited)
+        saveReturned = true
+    }
+    await badge.waitUntilHeld()
+    while model.lastCommandReceipt == nil {
+        await withCheckedContinuation { continuation in
+            withObservationTracking { _ = model.lastCommandReceipt } onChange: { continuation.resume() }
+        }
+    }
+    #expect(try await library.item(id: item.id)?.item == edited)
+    #expect(saveReturned, "EDITOR_COMMIT_BOUNDARY: a committed card edit must not wait for OS badge publication")
+    if saveReturned {
+        // A second edit must also commit while the previous device update is
+        // suspended. The background refresher coalesces the outstanding work.
+        edited.fields[0].value = .text("A later correction")
+        try await model.updateItem(edited)
+        #expect(try await library.item(id: item.id)?.item == edited)
+        #expect(model.activeStudy?.completion.reviews == 0)
+    }
+    await badge.release()
+    try await save.value
+    #expect(model.lastCommandReceipt != nil)
+    await model.awaitDevicePublication()
+}
+
 @Test(arguments: [false, true]) @MainActor
 func reviewSavingFinishesBeforeDevicePublication(duringRefresh: Bool) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("review-save-gate-\(UUID())")
@@ -53,6 +99,7 @@ func reviewSavingFinishesBeforeDevicePublication(duringRefresh: Bool) async thro
     let widget = ReviewWidgetPublisher()
     let model = LibraryFeatureModel(library: library, widgetPublisher: widget, badgePublisher: badge)
     await model.bootstrap()
+    await model.awaitDevicePublication()
     await model.beginStudy(scope: .allDecks, title: "All Decks")
     let study = try #require(model.activeStudy)
     let first = try #require(study.currentCard?.id)
@@ -81,6 +128,8 @@ func reviewSavingFinishesBeforeDevicePublication(duringRefresh: Bool) async thro
     await grade.value
     await refresh?.value
     await model.endStudy()
+    await model.awaitReadModels()
+    await model.awaitDevicePublication()
     #expect(model.allDecksSummary.dueNow == 2)
     #expect(model.allDecksSummary.cardCount == 3)
     #expect(await badge.counts.last == 2)
@@ -114,6 +163,7 @@ func reviewSavingFinishesBeforeDevicePublication(duringRefresh: Bool) async thro
     let widget = ReviewWidgetPublisher()
     let model = LibraryFeatureModel(library: library, widgetPublisher: widget, badgePublisher: badge)
     await model.bootstrap()
+    await model.awaitDevicePublication()
     await model.beginStudy(scope: .allDecks, title: "All Decks")
     let study = try #require(model.activeStudy)
     for sample in 0..<5 {

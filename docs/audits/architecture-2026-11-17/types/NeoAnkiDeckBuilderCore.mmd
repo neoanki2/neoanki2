@@ -1,0 +1,49 @@
+classDiagram
+direction LR
+  class t0["DeckBuilderDescriptor"] {
+    <<struct>>
+    id
+    title
+    subtitle
+    systemImage
+    init()
+  }
+  class t1["DeckBuilderDeckOption"] {
+    <<struct>>
+    id
+    name
+    init()
+  }
+  class t2["DeckBuilderHostContext"] {
+    <<struct>>
+    rootDecks
+    init()
+  }
+  class t3["GeneratedDeckBundle"] {
+    <<struct>>
+    bundleURL
+    destinationDeckID
+    cleanupOperation
+    init()
+    placed()
+    cleanup()
+  }
+  class t4["DeckBuildWorkspaceProviding"] {
+    <<protocol>>
+    makeWorkspace()
+  }
+  class t5["SystemDeckBuildWorkspaceProvider"] {
+    <<struct>>
+    init()
+    makeWorkspace()
+  }
+  class t6["GeneratedDeckCreation"] {
+    <<struct>>
+    prepared
+    parentDeckID
+    command
+    init()
+    materialize()
+    preparing()
+  }
+  t4 <|-- t5

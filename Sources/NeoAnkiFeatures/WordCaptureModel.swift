@@ -48,7 +48,7 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
     public private(set) var focusGeneration = 0
     public private(set) var manualEntry = false
     public let lookup: DictionaryLookupModel
-    public let library: any LibraryRepository
+    private let library: any LibraryRepository
     private let rootURL: URL
     private let configurationStore: any VocabularyDeckConfigurationStoring
     private let onSaved: @MainActor () async -> Void
@@ -58,6 +58,7 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
     private var chosenFormID: String?
     private var selectedRequestKey: String?
     private var requestGeneration = 0
+    @ObservationIgnored private var savedNotificationWorker: LatestAsyncWork<Void>?
 
     public init(library: any LibraryRepository, rootURL: URL,
                 configurationStore: (any VocabularyDeckConfigurationStoring)? = nil,
@@ -67,6 +68,10 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
         self.configurationStore = configurationStore ?? FileVocabularyDeckConfigurationStore(
             rootURL: rootURL.appendingPathComponent(".word-capture", isDirectory: true))
         self.onSaved = onSaved
+    }
+
+    public func makeTypeChooser() -> ItemTypeChooserFeatureModel {
+        .init(authoring: .init(library: library), deckID: deckID)
     }
 
     public var configuration: VocabularyDeckConfiguration? {
@@ -399,10 +404,24 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
             selectedEntry = nil; chosenSenseID = nil; chosenFormID = nil; manualEntry = false
             lookup.invalidate(); draftID = UUID()
             successMessage = "Added \(addedWord) to \(destination)."
-            await onSaved()
             isSaving = false
             focusGeneration += 1
+            notifySaved()
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Optional owner refresh is independent of the already committed capture.
+    private func notifySaved() {
+        if savedNotificationWorker == nil {
+            savedNotificationWorker = LatestAsyncWork { [weak self] (_: Void) in
+                await self?.onSaved()
+            }
+        }
+        savedNotificationWorker?.request(())
+    }
+
+    public func awaitSavedNotifications() async {
+        await savedNotificationWorker?.waitUntilSettled()
     }
 
     public func importDictionary(from source: URL) async {

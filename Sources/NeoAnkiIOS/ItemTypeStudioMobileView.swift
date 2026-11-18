@@ -88,6 +88,13 @@ struct ItemTypeStudioCatalogMobileView: View {
 
     private var catalog: some View {
         List {
+            if let warning = model.refreshWarning {
+                Section {
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("item-type-studio.refresh-warning")
+                }
+            }
             if !model.itemTypes.isEmpty {
                 Section(model.destinationDeckID == nil ? "Available Everywhere" : "This Deck") {
                     ForEach(model.itemTypes) { itemType in
@@ -198,7 +205,7 @@ struct ItemTypeStudioCatalogMobileView: View {
     private func repair(_ corruption: QuarantinedItemTypeDefinition) async {
         do {
             _ = try await model.repairDefinition(corruption)
-            try await reloadLibrary()
+            model.requestOwnerRefresh { try await reloadLibrary() }
         } catch {
             errorMessage = MobileAppModel.message(for: error)
         }
@@ -260,6 +267,15 @@ struct ItemTypeStudioMobileView: View {
 
     var body: some View {
         studioNavigation
+        .safeAreaInset(edge: .top) {
+            if let warning = model.refreshWarning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .padding()
+                    .accessibilityIdentifier("item-type-studio.refresh-warning")
+            }
+        }
         .navigationDestination(item: $fieldRoute) { route in
             if let draftBinding, let field = draftBinding.wrappedValue.fields.first(where: { $0.id == route.fieldID }) {
                 fieldEditor(field, draft: draftBinding)
@@ -744,7 +760,7 @@ struct ItemTypeStudioMobileView: View {
         defer { isWorking = false }
         do {
             let saved = try await model.commitSave(preparation)
-            try await reloadLibrary()
+            model.requestOwnerRefresh { try await reloadLibrary() }
             // Persistence can suspend while the user continues editing. The
             // feature model rebases those newer edits onto the saved snapshot;
             // close only the exact clean draft that was just saved.
@@ -881,7 +897,7 @@ struct ItemTypeStudioMobileView: View {
         do {
             _ = try await model.unlockItemType(id: requestedID)
             _ = model.beginEditingSelectedItemType()
-            try await reloadLibrary()
+            model.requestOwnerRefresh { try await reloadLibrary() }
         } catch {
             present(error, title: "Could Not Unlock Item Type")
         }
@@ -894,7 +910,7 @@ struct ItemTypeStudioMobileView: View {
             let originalName = model.selectedItemType?.name ?? "Item Type"
             _ = try await model.duplicateSelectedIncludedItemType(name: "\(originalName) Copy")
             _ = model.beginEditingSelectedItemType()
-            try await reloadLibrary()
+            model.requestOwnerRefresh { try await reloadLibrary() }
         } catch {
             present(error, title: "Could Not Duplicate Item Type")
         }
@@ -919,7 +935,7 @@ struct ItemTypeStudioMobileView: View {
         defer { isWorking = false }
         do {
             try await model.deleteSelectedItemType()
-            try await reloadLibrary()
+            model.requestOwnerRefresh { try await reloadLibrary() }
             dismiss()
         } catch {
             present(error, title: "Could Not Delete Item Type")

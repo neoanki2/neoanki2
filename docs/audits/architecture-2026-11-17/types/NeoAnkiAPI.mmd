@@ -1,0 +1,1408 @@
+classDiagram
+direction LR
+  class t0["APIScope"] {
+    <<enum>>
+  }
+  class t1["APIClientGrant"] {
+    <<struct>>
+    id
+    displayName
+    origin
+    scopes
+    createdAt
+    revision
+  }
+  class t2["StoredAPIClientGrant"] {
+    <<struct>>
+    grant
+    tokenHash
+  }
+  class t3["APICredentialPersistence"] {
+    <<protocol>>
+    load()
+    save()
+  }
+  class t4["InMemoryAPICredentialPersistence"] {
+    <<actor>>
+    data
+    init()
+    load()
+    save()
+  }
+  class t5["VerifierFileAPICredentialPersistence"] {
+    <<actor>>
+    fileName
+    maximumByteCount
+    fileURL
+    init()
+    load()
+    save()
+    preparePrivateDirectory()
+  }
+  class t6["APIAuthorizationError"] {
+    <<enum>>
+  }
+  class t7["APICrypto"] {
+    <<enum>>
+    sha256Hex()
+    hmacSHA256Hex()
+    randomToken()
+  }
+  class t8["APIAuthorizationStore"] {
+    <<actor>>
+    persistence
+    grantsByHash
+    init()
+    issueGrant()
+    authenticate()
+    revoke()
+    listGrants()
+    loadGrants()
+    persist()
+  }
+  class t9["APIPairingRequest"] {
+    <<struct>>
+    displayName
+    origin
+    requestedScopes
+    init()
+  }
+  class t10["APIPairingApprover"] {
+    <<protocol>>
+    approve()
+    cancel()
+  }
+  class t11["APIPairingApprover"] {
+    <<extension>>
+    cancel()
+  }
+  class t12["DenyAPIPairingApprover"] {
+    <<struct>>
+    init()
+    approve()
+  }
+  class t13["APIHealth"] {
+    <<struct>>
+    status
+  }
+  class t14["APIMeta"] {
+    <<struct>>
+    apiVersion
+    applicationVersion
+    serverInstanceId
+    pairingAvailable
+    capabilities
+  }
+  class t15["PairingInput"] {
+    <<struct>>
+    displayName
+    requestedScopes
+    origin
+  }
+  class t16["APIPairingResult"] {
+    <<struct>>
+    client
+    token
+  }
+  class t17["APIClient"] {
+    <<struct>>
+    id
+    displayName
+    origin
+    scopes
+    createdAt
+    revision
+    init()
+  }
+  class t18["APIDeck"] {
+    <<struct>>
+    id
+    revision
+    name
+    parentId
+    newCardsPerDay
+    directItemCount
+    recursiveItemCount
+    dueCount
+    maturity
+    childIds
+  }
+  class t19["APIMaturity"] {
+    <<struct>>
+    status
+    activeCardCount
+    maintainingCardCount
+    notStartedCardCount
+    init()
+  }
+  class t20["CreateDeckInput"] {
+    <<struct>>
+    id
+    name
+    parentId
+    newCardsPerDay
+  }
+  class t21["OptionalPatch"] {
+    <<enum>>
+    init()
+  }
+  class t22["UpdateDeckInput"] {
+    <<struct>>
+    name
+    parentId
+    newCardsPerDay
+    init()
+  }
+  class t23["UpdateDeckInput.CodingKeys"] {
+    <<enum>>
+  }
+  class t24["CreateDeckDeletionPlanInput"] {
+    <<struct>>
+    deckId
+    policy
+  }
+  class t25["CommitDeckDeletionPlanInput"] {
+    <<struct>>
+    confirm
+  }
+  class t26["APIDeckDeletionPlan"] {
+    <<struct>>
+    id
+    revision
+    deckId
+    policy
+    impact
+    deckRevision
+    dependencyChangeCursor
+    expiresAt
+  }
+  class t27["CreateDeckResetPlanInput"] {
+    <<struct>>
+    deckId
+  }
+  class t28["CommitDeckResetPlanInput"] {
+    <<struct>>
+    confirm
+  }
+  class t29["APIDeckResetPlan"] {
+    <<struct>>
+    id
+    revision
+    deckId
+    impact
+    deckRevision
+    dependencyChangeCursor
+    expiresAt
+  }
+  class t30["APIPlanCommitResult"] {
+    <<struct>>
+    planId
+    committed
+    impact
+  }
+  class t31["APIStudyScopeKind"] {
+    <<enum>>
+  }
+  class t32["APIStudyScopeInput"] {
+    <<struct>>
+    kind
+    deckId
+    includeDescendants
+  }
+  class t33["CreateStudySessionInput"] {
+    <<struct>>
+    scope
+  }
+  class t34["APIStudyScope"] {
+    <<struct>>
+    kind
+    deckId
+    includeDescendants
+    init()
+  }
+  class t35["APIStudySession"] {
+    <<struct>>
+    id
+    revision
+    scope
+    state
+    currentCardId
+    createdAt
+    lastActivityAt
+    init()
+  }
+  class t36["APIMemory"] {
+    <<struct>>
+    stabilityDays
+    difficulty
+    dueAt
+    lastReviewedAt
+    repetitions
+    lapses
+    phase
+    stepIndex
+    init()
+  }
+  class t37["APIResolvedSlot"] {
+    <<struct>>
+    value
+    presentation
+    init()
+  }
+  class t38["APIResolvedComponent"] {
+    <<struct>>
+    id
+    region
+    purpose
+    value
+    presentation
+    init()
+  }
+  class t39["APIStudyCard"] {
+    <<struct>>
+    id
+    revision
+    itemId
+    templateId
+    deckId
+    occlusionGroup
+    clozeGroup
+    interaction
+    layout
+    components
+    prompt
+    answer
+    memory
+    init()
+  }
+  class t40["SkipStudyCardInput"] {
+    <<struct>>
+    cardId
+  }
+  class t41["APIReviewRating"] {
+    <<enum>>
+    domain
+  }
+  class t42["SubmitReviewInput"] {
+    <<struct>>
+    sessionId
+    cardId
+    rating
+    durationMs
+  }
+  class t43["APIReviewResult"] {
+    <<struct>>
+    reviewLogId
+    revision
+    previousPhase
+    resultingPhase
+    memory
+    changeCursor
+  }
+  class t44["RevertReviewInput"] {
+    <<struct>>
+    confirm
+  }
+  class t45["APIContentValue"] {
+    <<struct>>
+    type
+    text
+    lang
+    spans
+    mediaId
+    kind
+    sha256
+    fileExtension
+    durationMs
+    altText
+    reservationId
+    occlusionMode
+    masks
+    nextGroup
+    blanks
+    number
+    init()
+    domain()
+  }
+  class t46["APIFieldValue"] {
+    <<struct>>
+    fieldId
+    value
+    init()
+  }
+  class t47["APIItem"] {
+    <<struct>>
+    id
+    revision
+    itemTypeId
+    deckId
+    fields
+    tags
+    createdAt
+    updatedAt
+    cardIds
+    domain()
+    init()
+  }
+  class t48["CreateItemInput"] {
+    <<struct>>
+    id
+    itemTypeId
+    deckId
+    fields
+    tags
+  }
+  class t49["PutItemInput"] {
+    <<struct>>
+    itemTypeId
+    deckId
+    fields
+    tags
+  }
+  class t50["DuplicateCheckInput"] {
+    <<struct>>
+  }
+  class t51["APIDuplicateCandidate"] {
+    <<struct>>
+    itemId
+    reasonCodes
+  }
+  class t52["APIDuplicateCheckResult"] {
+    <<struct>>
+    candidates
+  }
+  class t53["BulkItemOperationInput"] {
+    <<struct>>
+    operationId
+    action
+    item
+    itemId
+  }
+  class t54["OrderedItemsInput"] {
+    <<struct>>
+    deckId
+    expectedItems
+    orderedItemIds
+  }
+  class t55["BulkItemsInput"] {
+    <<struct>>
+    atomic
+    dryRun
+    operations
+    order
+  }
+  class t56["APIBulkItemResult"] {
+    <<struct>>
+    operationId
+    action
+    itemId
+    cardIds
+    init()
+  }
+  class t57["APIBulkItemImpact"] {
+    <<struct>>
+    createdItemCount
+    replacedItemCount
+    deletedItemCount
+    resultingCardCount
+  }
+  class t58["APIBulkItemsResult"] {
+    <<struct>>
+    dryRun
+    results
+    impact
+  }
+  class t59["APICard"] {
+    <<struct>>
+    id
+    revision
+    itemId
+    templateId
+    deckId
+    occlusionGroup
+    clozeGroup
+    skill
+    isSuspended
+    maturityStatus
+    memory
+    init()
+  }
+  class t60["PatchCardInput"] {
+    <<struct>>
+    isSuspended
+  }
+  class t61["ResetCardInput"] {
+    <<struct>>
+    confirm
+  }
+  class t62["APIRatingPreview"] {
+    <<struct>>
+    rating
+    reviewedAt
+    intervalSeconds
+    rawIntervalDays
+    operationalIntervalSeconds
+    memoryBefore
+    memoryAfter
+    memory
+    predictedRetrievability
+    presetId
+    cohortId
+    parameterSetId
+    modelVersion
+    timingPolicyVersion
+    intervalPolicyVersion
+    finalDueAt
+    constraintReason
+    init()
+  }
+  class t63["APISchedulingExplanation"] {
+    <<struct>>
+    cardId
+    reviewedAt
+    elapsedSeconds
+    elapsedModelDays
+    previousMemory
+    desiredRetention
+    modelIdentifier
+    elapsedTimePolicy
+    intervalPolicy
+    presetId
+    cohortId
+    parameterSetId
+    ratings
+  }
+  class t64["APISchedulingHealth"] {
+    <<struct>>
+    modelIdentifier
+    desiredRetention
+    maximumIntervalDays
+    automaticOptimizationEnabled
+    parameterCount
+    parameterSource
+    activeParameterSetId
+    activeParameterSource
+    optimizerParityVerified
+    optimizerStatus
+    personalizationStatus
+    lastOptimizationDecision
+    lastOptimizationReason
+    lastOptimizationCompletedAt
+    migrationStatus
+    legacyParametersQuarantined
+    cohortCount
+    personalizedCohortCount
+    inheritedCohortCount
+    pendingMaintenance
+    lastMaintenanceAt
+    init()
+  }
+  class t65["APIFSRSParameterSet"] {
+    <<struct>>
+    id
+    isActive
+    weights
+    modelVersion
+    upstreamCommit
+    sourceChecksum
+    fixtureChecksum
+    scope
+    cohortId
+    source
+    inputFingerprint
+    trainingCutoff
+    metrics
+    previousParameterSetId
+    createdAt
+    init()
+  }
+  class t66["APIFSRSOptimizationRun"] {
+    <<struct>>
+    id
+    presetId
+    cohortId
+    startedAt
+    completedAt
+    trainingCutoff
+    inputFingerprint
+    eligibleTargetCount
+    distinctCardCount
+    failureCount
+    studyDayCount
+    excludedCounts
+    foldCount
+    metrics
+    decision
+    reason
+    candidateParameterSetId
+    init()
+  }
+  class t67["APITag"] {
+    <<struct>>
+    id
+    name
+    itemCount
+    revision
+  }
+  class t68["RenameTagInput"] {
+    <<struct>>
+    from
+    to
+  }
+  class t69["APIFieldDefinition"] {
+    <<struct>>
+    id
+    name
+    type
+    isRequired
+    init()
+    domain()
+  }
+  class t70["APISkill"] {
+    <<struct>>
+    input
+    output
+    operation
+    init()
+    domain()
+  }
+  class t71["APISlotSource"] {
+    <<struct>>
+    kind
+    fieldId
+    text
+    init()
+    domain()
+  }
+  class t72["APIPresentation"] {
+    <<struct>>
+    reveal
+    media
+    init()
+    domain()
+  }
+  class t73["APISlot"] {
+    <<struct>>
+    source
+    presentation
+    init()
+    domain()
+  }
+  class t74["APITemplateComponent"] {
+    <<struct>>
+    id
+    region
+    purpose
+    source
+    presentation
+    init()
+    domain()
+  }
+  class t75["APICondition"] {
+    <<struct>>
+    kind
+    fieldId
+    conditions
+    init()
+    domain()
+  }
+  class t76["APITemplateDefinition"] {
+    <<struct>>
+    id
+    name
+    layout
+    components
+    prompt
+    answer
+    interaction
+    skill
+    generateWhen
+    init()
+    domain()
+  }
+  class t77["APIItemType"] {
+    <<struct>>
+    id
+    revision
+    name
+    fields
+    templates
+    provenance
+    itemCount
+    domain()
+    init()
+  }
+  class t78["DeckItemTypePolicyInput"] {
+    <<struct>>
+    inherits
+    itemTypeIds
+    defaultItemTypeId
+  }
+  class t79["ItemTypeAvailabilityInput"] {
+    <<struct>>
+    availableEverywhere
+  }
+  class t80["ItemTypeInput"] {
+    <<struct>>
+    deckId
+    availableEverywhere
+    id
+    name
+    fields
+    templates
+  }
+  class t81["DuplicateItemTypeInput"] {
+    <<struct>>
+    name
+  }
+  class t82["APIImpactSummary"] {
+    <<struct>>
+    affectedItemCount
+    affectedCardCount
+    affectedStudyResponseCount
+  }
+  class t83["APIItemTypePolicy"] {
+    <<struct>>
+    sourceDeckId
+    defaultItemTypeId
+    itemTypeIds
+  }
+  class t84["APIMediaReservation"] {
+    <<struct>>
+    assetHash
+    kind
+    fileExtension
+    byteSize
+    reservationId
+    reservationExpiresAt
+    init()
+  }
+  class t85["APIMediaMetadata"] {
+    <<struct>>
+    assetHash
+    kind
+    fileExtension
+    byteSize
+    referenceCount
+    init()
+  }
+  class t86["APIChange"] {
+    <<struct>>
+    id
+    cursor
+    transactionId
+    sequence
+    type
+    resourceType
+    resourceId
+    revision
+    tombstone
+    occurredAt
+    init()
+  }
+  class t87["APIStudyResponse"] {
+    <<struct>>
+    id
+    revision
+    cardId
+    itemId
+    assetHash
+    contentType
+    fileExtension
+    byteSize
+    durationMs
+    capturedAt
+    submittedAt
+    sourceTitle
+    init()
+  }
+  class t88["APIImportFormat"] {
+    <<enum>>
+  }
+  class t89["APIImportFileDeclarationInput"] {
+    <<struct>>
+    relativePath
+    byteSize
+    sha256
+  }
+  class t90["CreateImportJobInput"] {
+    <<struct>>
+    format
+    itemTypeId
+    csvItemTypeName
+    destinationDeckId
+    files
+  }
+  class t91["CommitImportJobInput"] {
+    <<struct>>
+    planToken
+  }
+  class t92["APIImportFile"] {
+    <<struct>>
+    id
+    relativePath
+    byteSize
+    sha256
+    uploaded
+  }
+  class t93["APITransferReport"] {
+    <<struct>>
+    itemCount
+    deckCount
+    createdItemTypeCount
+    reusedItemTypeCount
+    warnings
+  }
+  class t94["APIImportJob"] {
+    <<struct>>
+    id
+    revision
+    format
+    state
+    files
+    report
+    planToken
+    createdAt
+    updatedAt
+  }
+  class t95["CreateExportJobInput"] {
+    <<struct>>
+    format
+    deckId
+  }
+  class t96["APIExportJob"] {
+    <<struct>>
+    id
+    revision
+    format
+    deckId
+    state
+    byteSize
+    sha256
+    createdAt
+    updatedAt
+  }
+  class t97["APICursor"] {
+    <<struct>>
+    route
+    offset
+    libraryId
+    encoded()
+    decode()
+  }
+  class t98["APIStudyResponseCursor"] {
+    <<struct>>
+    route
+    submittedBefore
+    submittedBeforeId
+    libraryId
+    encoded()
+    decode()
+  }
+  class t99["SignedAPICursor"] {
+    <<struct>>
+    payload
+    signature
+  }
+  class t100["SignedStudyResponseCursor"] {
+    <<struct>>
+    payload
+    signature
+  }
+  class t101["APIEndpointGroup"] {
+    <<enum>>
+    slug
+  }
+  class t102["APIEndpointAuthorization"] {
+    <<enum>>
+    requiredScope
+    isProtected
+  }
+  class t103["APIEndpointHandler"] {
+    <<enum>>
+    additionalDescription
+  }
+  class t104["APIEndpointParameter"] {
+    <<struct>>
+    name
+    location
+    isRequired
+    description
+  }
+  class t105["APIEndpointDefinition"] {
+    <<struct>>
+    pathTemplate
+    method
+    handler
+    group
+    summary
+    description
+    requiredScope
+    parameters
+    acceptsRequestBody
+    successStatus
+    requestSchema
+    responseSchema
+    successHeaders
+    errorResponses
+    operationID
+    queryParameters
+    matches()
+  }
+  class t106["NeoAnkiLocalAPIServer"] {
+    <<actor>>
+    service
+    configuration
+    queue
+    connections
+    listener
+    init()
+    start()
+    stop()
+    isRunning
+    listeningPort
+    activeConnectionCount
+  }
+  class t107["NeoAnkiLocalAPIServer.Configuration"] {
+    <<struct>>
+    host
+    port
+    maximumRequestBytes
+    init()
+  }
+  class t108["APIHTTPServerError"] {
+    <<enum>>
+  }
+  class t109["ListenerStartup"] {
+    <<class>>
+    lock
+    continuation
+    init()
+    succeed()
+    fail()
+    finish()
+  }
+  class t110["HTTPConnectionHandler"] {
+    <<class>>
+    connection
+    service
+    maximumRequestBytes
+    registry
+    queue
+    buffer
+    expectedBytes
+    streamRequest
+    streamLastWrite
+    init()
+    start()
+    receive()
+    send()
+    beginEventStream()
+    updateStreamCursor()
+    scheduleEventPoll()
+    processEventPoll()
+    finish()
+    sendTransportProblem()
+  }
+  class t111["HTTPConnectionRegistry"] {
+    <<class>>
+    lock
+    values
+    insert()
+    remove()
+    cancelAll()
+    count
+  }
+  class t112["HTTP1ParseError"] {
+    <<enum>>
+    status
+    code
+    detail
+  }
+  class t113["HTTP1RequestParser"] {
+    <<enum>>
+    separator
+    criticalHeaders
+    expectedTotalBytes()
+    parse()
+    parseHead()
+    isLoopback()
+  }
+  class t114["HTTPStatus"] {
+    <<enum>>
+    reason()
+  }
+  class t115["APIOpenAPI"] {
+    <<enum>>
+    document
+    contractDigest
+    endpoints
+    endpoint()
+    documentedMethods()
+    documentedQueryParameters()
+    acceptsRequestBody()
+    reference()
+    responses()
+    schemas
+  }
+  class t116["APIFieldProblem"] {
+    <<struct>>
+    pointer
+    code
+  }
+  class t117["APIProblem"] {
+    <<struct>>
+    type
+    title
+    status
+    code
+    detail
+    requestId
+    errors
+    requiredScope
+    impact
+    impactToken
+    init()
+  }
+  class t118["APIServiceError"] {
+    <<enum>>
+    validation()
+    notFound()
+    from()
+  }
+  class t119["APIHTTPMethod"] {
+    <<enum>>
+  }
+  class t120["APIRequest"] {
+    <<struct>>
+    method
+    path
+    query
+    headers
+    body
+    isLoopback
+    init()
+    header()
+  }
+  class t121["APIResponse"] {
+    <<struct>>
+    status
+    headers
+    body
+    init()
+    json()
+  }
+  class t122["APIJSON"] {
+    <<enum>>
+    encoder
+    decoder
+    decodeStrict()
+    canonicalRequestHash()
+  }
+  class t123["EmptyResponse"] {
+    <<struct>>
+  }
+  class t124["APIPageInfo"] {
+    <<struct>>
+    nextCursor
+    limit
+  }
+  class t125["APICollection"] {
+    <<struct>>
+    data
+    page
+  }
+  class t126["APIVocabularyProvenance"] {
+    <<struct>>
+    sourceId
+    sourceName
+    recordId
+    attribution
+    license
+    sourceUrl
+    init()
+  }
+  class t127["APIVocabularyPack"] {
+    <<struct>>
+    id
+    revision
+    title
+    summary
+    languages
+    capabilities
+    provenance
+    entryCount
+    databaseSha256
+    mediaFileCount
+    mediaByteCount
+    init()
+  }
+  class t128["APIVocabularyPackCollection"] {
+    <<struct>>
+    data
+  }
+  class t129["APIVocabularyEntryCollection"] {
+    <<struct>>
+    data
+  }
+  class t130["VocabularyImportFileInput"] {
+    <<struct>>
+    id
+    path
+    byteSize
+    sha256
+  }
+  class t131["CreateVocabularyImportInput"] {
+    <<struct>>
+    files
+  }
+  class t132["APIVocabularyImportFile"] {
+    <<struct>>
+    id
+    path
+    byteSize
+    sha256
+    uploaded
+  }
+  class t133["APIVocabularyImportJob"] {
+    <<struct>>
+    id
+    revision
+    state
+    files
+    pack
+    createdAt
+    updatedAt
+  }
+  class t134["VocabularyMediaPayload"] {
+    <<struct>>
+    bytes
+    byteCount
+    sha256
+    fileExtension
+  }
+  class t135["APIVocabularyLibrary"] {
+    <<actor>>
+    maximumInstalledPacks
+    maximumDeclaredFiles
+    maximumFileBytes
+    maximumTotalBytes
+    maximumIdentifierBytes
+    rootURL
+    stagingRootURL
+    jobLifetime
+    openPack
+    jobs
+    jobsLoaded
+    installedPackCache
+    init()
+    listPacks()
+    pack()
+    deletePack()
+    search()
+    entry()
+    media()
+    createImport()
+    importJob()
+    upload()
+    validateImport()
+    commitImport()
+    deleteImport()
+    installedPacks()
+    validatedInstalledPack()
+    packTreeFingerprint()
+    validateDeclarations()
+    validateDeclaredPath()
+    validateIdentifier()
+    validateQueryValue()
+    loadJobsIfNeeded()
+    purgeExpiredJobs()
+    persist()
+    ensurePrivateDirectory()
+    jobDirectory()
+    packageDirectory()
+    vocabularyValidationError()
+    installedLibraryInvalid()
+    resourceConflict()
+  }
+  class t136["APIVocabularyLibrary.PackOpener"] {
+    <<typealias>>
+  }
+  class t137["APIVocabularyLibrary.InstalledPack"] {
+    <<struct>>
+    packageURL
+    pack
+    representation
+    fingerprint
+  }
+  class t138["APIVocabularyLibrary.PackTreeFingerprint"] {
+    <<struct>>
+    entryCount
+    metadataDigest
+  }
+  class t139["NeoAnkiAPIService"] {
+    <<extension>>
+    listVocabularyPacks()
+    getVocabularyPack()
+    deleteVocabularyPack()
+    searchVocabularyEntries()
+    getVocabularyEntry()
+    vocabularyMedia()
+    createVocabularyImport()
+    getVocabularyImport()
+    uploadVocabularyImportFile()
+    validateVocabularyImport()
+    commitVocabularyImport()
+    deleteVocabularyImport()
+    decodeVocabularyPathSegment()
+    singleVocabularyQuery()
+    validateVocabularyImportShape()
+    vocabularyContentType()
+    encodedVocabularyPathSegment()
+  }
+  class t140["APIFaultPoint"] {
+    <<enum>>
+  }
+  class t141["APIFaultInjector"] {
+    <<protocol>>
+    simulatesProcessExit()
+  }
+  class t142["NoAPIFaultInjector"] {
+    <<struct>>
+    init()
+    simulatesProcessExit()
+  }
+  class t143["SimulatedAPIProcessExit"] {
+    <<struct>>
+  }
+  class t144["NeoAnkiAPIService"] {
+    <<actor>>
+    maximumJSONBodyBytes
+    maximumStagedImportBytes
+    store
+    authorization
+    pairingApprover
+    applicationVersion
+    authority
+    vocabularyLibrary
+    pairingRequestLifetime
+    transferJobLifetime
+    faultInjector
+    serverInstanceID
+    cursorSecret
+    pairingAttempts
+    pairingPromptActive
+    impactAuthorizations
+    deckDeletionPlans
+    deckResetPlans
+    importJobs
+    exportJobs
+    transferStateLoaded
+    init()
+    handle()
+    handle()
+    route()
+    genericallyIdempotentResponse()
+    optionalIdempotencyKey()
+    shouldUseGenericIdempotency()
+    pair()
+    preflight()
+    authenticate()
+    listDecks()
+    getDeck()
+    createDeck()
+    updateDeck()
+    createDeckDeletionPlan()
+    commitDeckDeletionPlan()
+    createDeckResetPlan()
+    commitDeckResetPlan()
+    validatePlan()
+    listStudyResponses()
+    getStudyResponse()
+    deleteStudyResponse()
+    studyResponseContent()
+    studyResponseRepresentation()
+    listChanges()
+    listEvents()
+    visibleChanges()
+    canReadChange()
+    validateRetainedCursor()
+    createStudySession()
+    getStudySession()
+    nextStudyCard()
+    skipStudyCard()
+    endStudySession()
+    submitReview()
+    recoverReview()
+    replayReviewResponse()
+    revertReview()
+    ownedStudySession()
+    validateNestedObject()
+    rejectUnknownMembers()
+    validateItemInputShape()
+    validateItemObjectShape()
+    validateBulkItemInputShape()
+    validateImportManifestShape()
+    validateItemTypeInputShape()
+    validateSlots()
+    validateConditionShape()
+    studyConflict()
+    listItems()
+    createItem()
+    validateItem()
+    bulkItems()
+    getItem()
+    updateItem()
+    deleteItem()
+    decodeCreateItem()
+    item()
+    itemRepresentation()
+    duplicateChecks()
+    listTags()
+    renameTag()
+    removeTag()
+    listCards()
+    getCard()
+    cardContent()
+    cardReviewPreview()
+    cardSchedulingExplanation()
+    schedulingHealth()
+    schedulingParameterSets()
+    schedulingOptimizationRuns()
+    patchCard()
+    resetCard()
+    requiredIdempotencyKey()
+    boolQuery()
+    parseDate()
+    collectionRouteKey()
+    encodedCursor()
+    decodeCursor()
+    listItemTypes()
+    createItemType()
+    validateItemType()
+    getItemType()
+    updateItemType()
+    deleteItemType()
+    duplicateItemType()
+    deckItemTypePolicy()
+    decodeItemTypeInput()
+    domainItemType()
+    itemTypeRepresentation()
+    itemTypeImpact()
+    requireStudyResponseDeletionConfirmation()
+    createImportJob()
+    putImportFile()
+    validateImportJob()
+    inspectImport()
+    commitImportJob()
+    completeRecoveredImport()
+    performImport()
+    createExportJob()
+    performExport()
+    completeExportCreation()
+    getImportJob()
+    deleteImportJob()
+    getExportJob()
+    getExportContent()
+    deleteExportJob()
+    ensureTransferStateLoaded()
+    persistTransferState()
+    withTransferValidationStore()
+    importRepresentation()
+    exportRepresentation()
+    validateImportRelativePath()
+    resolvedImportType()
+    validateSimpleImportRows()
+    transferReport()
+    withStagedImport()
+    withStagedImport()
+    uploadMedia()
+    downloadMedia()
+    mediaMetadata()
+    validateMediaHash()
+    deckRepresentations()
+    revision()
+    require()
+    require()
+    requireChangeRead()
+    requireIfMatch()
+    requireIfMatch()
+    etag()
+    etag()
+    pageLimit()
+    changeLimit()
+    validateQuery()
+    rejectUndocumentedBody()
+    validateDeckName()
+    parseUUID()
+    validateOriginSyntax()
+    resourceID()
+    replayDeckResponse()
+    invalidCursor()
+    unauthorized()
+    problemResponse()
+    addCommonHeaders()
+    approvedCORSOrigin()
+  }
+  class t145["NeoAnkiAPIService.ImpactAuthorization"] {
+    <<struct>>
+    resourceID
+    requestHash
+    changeCursor
+    expiresAt
+  }
+  class t146["NeoAnkiAPIService.DeckDeletionPlanRecord"] {
+    <<struct>>
+    representation
+    deckID
+    deckRevision
+  }
+  class t147["NeoAnkiAPIService.DeckResetPlanRecord"] {
+    <<struct>>
+    representation
+    deckID
+    deckRevision
+  }
+  class t148["NeoAnkiAPIService.ImportFileRecord"] {
+    <<struct>>
+    id
+    relativePath
+    byteSize
+    sha256
+    data
+  }
+  class t149["NeoAnkiAPIService.ImportJobRecord"] {
+    <<struct>>
+    id
+    revision
+    format
+    itemTypeID
+    csvItemTypeName
+    destinationDeckID
+    state
+    files
+    report
+    planToken
+    dependencyCursor
+    committedChangeCursor
+    createdAt
+    updatedAt
+  }
+  class t150["NeoAnkiAPIService.ExportJobRecord"] {
+    <<struct>>
+    id
+    revision
+    deckID
+    state
+    bytes
+    createdAt
+    updatedAt
+  }
+  class t151["NeoAnkiAPIService.TransferState"] {
+    <<struct>>
+    imports
+    exports
+  }
+  t3 <|-- t4
+  t3 <|-- t5
+  t141 <|-- t142
