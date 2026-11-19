@@ -1,7 +1,6 @@
-name: Documentation
+name: Publish documentation
 
 on:
-  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
@@ -35,11 +34,6 @@ jobs:
           persist-credentials: false
       - name: Validate feature coverage and links
         run: swift Scripts/validate-docs.swift --require-screenshots
-      - name: Check changed features have documentation updates
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: origin/${{ github.base_ref }}
-        run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "$BASE_REF"
       - name: Check direct main changes have documentation updates
         if: github.event_name == 'push'
         env:
@@ -51,43 +45,9 @@ jobs:
           BASE_REF: ${{ inputs.base_ref }}
         run: swift Scripts/validate-docs.swift --require-screenshots --base-ref "$BASE_REF"
 
-  validate-api:
-    name: API reference and contract
-    runs-on: macos-26-intel
-    timeout-minutes: 15
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Check generated API reference
-        run: swift run neoanki-api-reference check
-      - name: Test endpoint registry and OpenAPI contract
-        run: swift test --filter NeoAnkiAPITests --parallel
-
-  validate:
-    name: Documentation and screenshot gate
-    if: always()
-    needs: [validate-content, validate-api]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require documentation content and API validation
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          if echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' >/dev/null; then
-            exit 0
-          fi
-          echo "Documentation content or API validation did not succeed." >&2
-          exit 1
-
   build:
     name: Build documentation site
-    needs: validate
+    needs: validate-content
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

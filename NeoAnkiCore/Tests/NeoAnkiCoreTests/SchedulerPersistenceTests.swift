@@ -65,51 +65,6 @@ private func parameterSet(
     )
 }
 
-private func seedEligibleOptimizationHistory(
-    in store: ItemStore,
-    start: Date
-) async throws -> Date {
-    let template = try await createSchedulerPersistenceCard(in: store, now: start)
-    let deltas = [1, 5, 40, 2]
-    var latest = start
-    for cardIndex in 0 ..< 100 {
-        let cardID = cardIndex == 0 ? template.id : UUID()
-        if cardIndex != 0 {
-            try await store.applySynchronizedCard(Card(
-                id: cardID,
-                itemID: template.itemID,
-                templateID: template.templateID,
-                skill: template.skill,
-                memory: .new(due: start)
-            ))
-        }
-        var reviewedAt = start.addingTimeInterval(Double(cardIndex % 40) * 86_400)
-        try await store.applySynchronizedReview(ReviewLog(
-            cardID: cardID,
-            reviewedAt: reviewedAt,
-            rating: .good,
-            elapsedDays: 0,
-            scheduledDays: 0,
-            phaseBefore: .new,
-            durationMs: 500
-        ))
-        for (targetIndex, delta) in deltas.enumerated() {
-            reviewedAt = reviewedAt.addingTimeInterval(Double(delta) * 86_400)
-            latest = max(latest, reviewedAt)
-            try await store.applySynchronizedReview(ReviewLog(
-                cardID: cardID,
-                reviewedAt: reviewedAt,
-                rating: targetIndex.isMultiple(of: 3) ? .again : .good,
-                elapsedDays: Double(delta),
-                scheduledDays: Double(delta),
-                phaseBefore: .review,
-                durationMs: 500
-            ))
-        }
-    }
-    return latest
-}
-
 @Test func versionedSchedulerRecordsDriveHealthAndRecovery() async throws {
     let store = try await schedulerPersistenceStore()
     let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -517,9 +472,11 @@ private func seedEligibleOptimizationHistory(
 
 @Test func parityFailureIsHeldWithoutActivationAndPersistsAcrossCadence() async throws {
     let fixture = try await schedulerPersistenceStoreWithURL()
+    defer { try? FileManager.default.removeItem(at: fixture.url.deletingLastPathComponent()) }
     let store = fixture.store
     let start = Date(timeIntervalSince1970: 1_700_000_000)
-    let now = try await seedEligibleOptimizationHistory(in: store, start: start)
+    let card = try await createOptimizationFixtureCard(in: store, start: start)
+    let now = try await seedEligibleOptimizationHistory(in: store, card: card, start: start)
     let activeBefore = try #require(
         try await store.schedulingHealthSnapshot().activeParameterSet?.id
     )

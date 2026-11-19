@@ -1,8 +1,22 @@
+import AppKit
 import Foundation
 import NeoAnkiCore
 import Testing
 
 @testable import NeoAnki2
+
+// The loader's keying can be verified independently of NSCache's eviction policy.
+private final class RetainedThumbnailCache: NSCache<NSString, NSImage> {
+    private var images: [String: NSImage] = [:]
+
+    override func object(forKey key: NSString) -> NSImage? {
+        images[key as String]
+    }
+
+    override func setObject(_ image: NSImage, forKey key: NSString, cost: Int) {
+        images[key as String] = image
+    }
+}
 
 @Test @MainActor func mediaImageLoaderLoadsThumbnailOffTheRenderPath() async throws {
     let png = try #require(Data(base64Encoded:
@@ -40,14 +54,15 @@ import Testing
     try png.write(to: url, options: .atomic)
     defer { try? FileManager.default.removeItem(at: url) }
 
+    let loader = MediaImageLoader(cache: RetainedThumbnailCache())
     let first = try #require(
-        await MediaImageLoader.shared.image(for: url, kind: .image, maxPixelSize: 64)
+        await loader.image(for: url, kind: .image, maxPixelSize: 64)
     )
     let cached = try #require(
-        await MediaImageLoader.shared.image(for: url, kind: .image, maxPixelSize: 64)
+        await loader.image(for: url, kind: .image, maxPixelSize: 64)
     )
     let otherSize = try #require(
-        await MediaImageLoader.shared.image(for: url, kind: .image, maxPixelSize: 128)
+        await loader.image(for: url, kind: .image, maxPixelSize: 128)
     )
 
     #expect(first === cached)

@@ -11,8 +11,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     PerformanceScale.require(flow: flow)
 }
 
-@Test func perfStudyEligibilityOperationsAtScale() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfStudyEligibilityOperationsAtScale() async throws {
+    let scale = try #require(requirePerformanceScale())
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "family-eligibility-\(UUID())")
     defer { try? FileManager.default.removeItem(at: directory) }
     let now = Date.now
@@ -40,8 +41,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfBootstrapFreshLibrary() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfBootstrapFreshLibrary() async throws {
+    let scale = try #require(requirePerformanceScale())
 
     _ = try await PerformanceHarness.measure(flow: "bootstrap-fresh-library", metadata: ["item_count": "0"]) {
         let (store, directory) = try await PerformanceFixtures.makeStore(label: "bootstrap")
@@ -52,8 +54,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     _ = scale
 }
 
-@Test func perfBulkJSONImport() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfBulkJSONImport() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "json-import")
@@ -73,8 +76,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     #expect(measurement.metadata["imported_items"] == "\(itemCount)")
 }
 
-@Test func perfBulkCSVImport() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfBulkCSVImport() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "csv-import")
@@ -93,8 +97,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfListItemsAtScale() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfListItemsAtScale() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "list-items")
@@ -111,8 +116,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfFetchDueCardsAtScale() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfFetchDueCardsAtScale() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "fetch-due")
@@ -129,8 +135,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfStudyGradeLoop() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfStudyGradeLoop() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let studyCount = scale.studyLoopItemCount
 
@@ -153,8 +160,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfDeckSwitchCoreQueries() async throws {
-    guard let scale = requirePerformanceScale(flow: "deck-switch-core") else { return }
+@Test(.enabled(if: requirePerformanceScale(flow: "deck-switch-core") != nil))
+func perfDeckSwitchCoreQueries() async throws {
+    let scale = try #require(requirePerformanceScale(flow: "deck-switch-core"))
     let itemCount = scale.itemCount
     let deckCount = scale.deckCount
     let switchCount = scale.deckSwitchMeasureCount
@@ -191,8 +199,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfDeckSwitchLeafCore() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfDeckSwitchLeafCore() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
     let deckCount = scale.deckCount
 
@@ -232,8 +241,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfScopeSummaryAtScale() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfScopeSummaryAtScale() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "scope-summary")
@@ -253,8 +263,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfDeckSummariesWithNestedDecks() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfDeckSummariesWithNestedDecks() async throws {
+    let scale = try #require(requirePerformanceScale())
     let deckCount = scale.deckCount
     let itemCount = scale.itemCount
 
@@ -286,8 +297,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfItemBrowseFilter() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfItemBrowseFilter() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "browse-filter")
@@ -305,8 +317,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfFSRSOptimizeFromReviewHistory() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfFSRSOptimizeFromReviewHistory() async throws {
+    let scale = try #require(requirePerformanceScale())
     let fsrsCount = scale.fsrsLibraryItemCount
     let libraryCount = max(scale.itemCount, fsrsCount)
 
@@ -341,9 +354,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfPortableDeckExportImport() async throws {
-    guard let scale = requirePerformanceScale() else { return }
-    guard scale.includesPortableDeckTransfer else { return }
+@Test(.enabled(if: requirePerformanceScale()?.includesPortableDeckTransfer == true))
+func perfPortableDeckExportImport() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let directory = FileManager.default.temporaryDirectory
@@ -392,8 +405,8 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfAuthoredDeckImport() async throws {
-    guard requirePerformanceScale() != nil else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfAuthoredDeckImport() async throws {
 
     let bundle = PerformanceFixtures.exampleAuthoredDeckURL(name: "Biology")
     guard FileManager.default.fileExists(atPath: bundle.path) else {
@@ -414,8 +427,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfRevertReviewBatch() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfRevertReviewBatch() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let batchSize = scale.batchSampleSize
 
@@ -442,8 +456,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfUpdateItemsSample() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfUpdateItemsSample() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
     let updateCount = scale.batchSampleSize
 
@@ -472,8 +487,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfPortableDeckStressImport() async throws {
-    guard let scale = requirePerformanceScale(), scale == .stress else { return }
+@Test(.enabled(if: requirePerformanceScale() == .stress))
+func perfPortableDeckStressImport() async throws {
+    let scale = try #require(requirePerformanceScale())
 
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("portable-stress-\(UUID().uuidString)", isDirectory: true)

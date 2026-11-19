@@ -64,8 +64,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     ))
 }
 
-@Test @MainActor func perfItemsModelLoadAtScale() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemsModelLoadAtScale() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "items-load")
@@ -89,8 +90,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfItemsModelSearchRefresh() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemsModelSearchRefresh() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "items-search")
@@ -122,8 +124,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfDecksModelLoadWithNestedDecks() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfDecksModelLoadWithNestedDecks() async throws {
+    let scale = try #require(requirePerformanceScale())
     let deckCount = scale.deckCount
     let itemCount = scale.itemCount
 
@@ -148,8 +151,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfDeckSwitchItemsModelLoad() async throws {
-    guard let scale = requirePerformanceScale(flow: "deck-switch-items-model-load") else { return }
+@Test(.enabled(if: requirePerformanceScale(flow: "deck-switch-items-model-load") != nil))
+@MainActor func perfDeckSwitchItemsModelLoad() async throws {
+    let scale = try #require(requirePerformanceScale(flow: "deck-switch-items-model-load"))
     let itemCount = scale.itemCount
     let deckCount = scale.deckCount
     let switchCount = scale.deckSwitchMeasureCount
@@ -183,8 +187,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfStudyModelFullSession() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfStudyModelFullSession() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let studyCount = scale.studyLoopItemCount
 
@@ -217,8 +222,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfStudyModelTypedInteractionEvaluation() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfStudyModelTypedInteractionEvaluation() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let sampleCount = scale.interactionSampleSize
 
@@ -250,8 +256,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfImportModelJSONImport() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfImportModelJSONImport() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "import-model")
@@ -292,8 +299,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfImportModelRepeatedSmallFiles() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfImportModelRepeatedSmallFiles() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
     let fileCount = 8
     let rowsPerFile = min(100, max(1, itemCount))
@@ -336,8 +344,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfSchedulingModelOptimize() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfSchedulingModelOptimize() async throws {
+    let scale = try #require(requirePerformanceScale())
     let fsrsCount = scale.fsrsLibraryItemCount
     let libraryCount = max(scale.itemCount, fsrsCount)
 
@@ -374,8 +383,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfItemTypesFeatureLoad() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemTypesFeatureLoad() async throws {
+    let scale = try #require(requirePerformanceScale())
     _ = scale
 
     let (store, directory) = try await makeAppStore(label: "item-types-load")
@@ -393,8 +403,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfCardSetupDraftProjectionValidationLayoutAndSerialization() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfCardSetupDraftProjectionValidationLayoutAndSerialization() async throws {
+    let scale = try #require(requirePerformanceScale())
     // Keep the fast baseline meaningfully larger than a typical real type;
     // slow scales cap memory while still exercising thousands of mappings.
     let componentCount = max(2_500, min(scale.itemCount, 5_000))
@@ -464,8 +475,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     #expect(interactionMeasurement.durationSeconds < 0.1)
 }
 
-@Test @MainActor func perfStudySupportInteractionPaths() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfStudySupportInteractionPaths() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let sampleCount = scale.interactionSampleSize
 
@@ -495,8 +507,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfItemEditorStateBuildAtScale() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemEditorStateBuildAtScale() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let sampleCount = scale.batchSampleSize
 
@@ -522,9 +535,9 @@ private func makeLargeCardSetupDraft(componentCount: Int) -> ItemTypeStudioDraft
     }
 }
 
-@Test @MainActor func perfPortableDeckTransferDirectOperations() async throws {
-    guard let scale = requirePerformanceScale() else { return }
-    guard scale.includesPortableDeckTransfer else { return }
+@Test(.enabled(if: requirePerformanceScale()?.includesPortableDeckTransfer == true))
+@MainActor func perfPortableDeckTransferDirectOperations() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "portable-transfer")

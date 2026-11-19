@@ -21,8 +21,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     return (store, directory)
 }
 
-@Test @MainActor func perfRefreshLibraryComposite() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfRefreshLibraryComposite() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "refresh-library")
@@ -47,8 +48,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfRefreshCountsApp() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfRefreshCountsApp() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "refresh-counts-app")
@@ -72,8 +74,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfStudySessionStartScoped() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfStudySessionStartScoped() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "study-start-scoped")
@@ -96,8 +99,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfStudyUndoInSession() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfStudyUndoInSession() async throws {
+    let scale = try #require(requirePerformanceScale())
     let sampleCount = min(scale.batchSampleSize, 100)
 
     let (store, directory) = try await makeAppStore(label: "study-undo")
@@ -124,8 +128,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfItemsModelAddItemBatch() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemsModelAddItemBatch() async throws {
+    let scale = try #require(requirePerformanceScale())
     let createCount = min(scale.batchSampleSize, 50)
     let itemCount = scale.itemCount
 
@@ -154,8 +159,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfItemsModelUpdateItemApp() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemsModelUpdateItemApp() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let updateCount = scale.batchSampleSize
 
@@ -189,8 +195,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfItemsModelDeleteItemsBatch() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemsModelDeleteItemsBatch() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let deleteCount = scale.batchSampleSize
 
@@ -216,8 +223,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfUnassignedScopeSwitchApp() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfUnassignedScopeSwitchApp() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "switch-unassigned-app")
@@ -238,8 +246,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfImportModelCSVImport() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfImportModelCSVImport() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "import-csv-model")
@@ -274,9 +283,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfPortableDeckTransferModelPath() async throws {
-    guard let scale = requirePerformanceScale() else { return }
-    guard scale.includesPortableDeckTransfer else { return }
+@Test(.enabled(if: requirePerformanceScale()?.includesPortableDeckTransfer == true))
+@MainActor func perfPortableDeckTransferModelPath() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await makeAppStore(label: "portable-model")
@@ -312,8 +321,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfDeckCRUDApp() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfDeckCRUDApp() async throws {
+    let scale = try #require(requirePerformanceScale())
     _ = scale
 
     let (store, directory) = try await makeAppStore(label: "deck-crud-app")
@@ -335,8 +345,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfStudyChoiceInteractionSession() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfStudyChoiceInteractionSession() async throws {
+    let scale = try #require(requirePerformanceScale())
     let sampleCount = scale.interactionSampleSize
 
     let (store, directory) = try await makeAppStore(label: "study-choice")
@@ -370,8 +381,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfPostStudyRefreshLibrary() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfPostStudyRefreshLibrary() async throws {
+    let scale = try #require(requirePerformanceScale())
     let studyCount = min(scale.studyLoopItemCount, 200)
 
     let (store, directory) = try await makeAppStore(label: "post-study-refresh")
@@ -400,8 +412,8 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfItemTypesFeatureCreateItemType() async throws {
-    guard requirePerformanceScale() != nil else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfItemTypesFeatureCreateItemType() async throws {
 
     let (store, directory) = try await makeAppStore(label: "item-type-create")
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -422,8 +434,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfMoveItemBetweenDecks() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+@MainActor func perfMoveItemBetweenDecks() async throws {
+    let scale = try #require(requirePerformanceScale())
     let sampleCount = min(scale.batchSampleSize, 100)
 
     let (store, directory) = try await makeAppStore(label: "move-item")
@@ -450,9 +463,9 @@ private func makeAppStore(label: String) async throws -> (store: ItemStore, dire
     }
 }
 
-@Test @MainActor func perfMultiSubtreeDeckSwitchAppStress() async throws {
-    guard let scale = requirePerformanceScale(flow: "multi-subtree-deck-switch-app-stress") else { return }
-    guard scale == .stress else { return }
+@Test(.enabled(if: requirePerformanceScale(flow: "multi-subtree-deck-switch-app-stress") == .stress))
+@MainActor func perfMultiSubtreeDeckSwitchAppStress() async throws {
+    let scale = try #require(requirePerformanceScale(flow: "multi-subtree-deck-switch-app-stress"))
     let itemCount = scale.itemCount
     let switchCount = scale.deckSwitchMeasureCount
 

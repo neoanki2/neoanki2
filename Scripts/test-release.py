@@ -36,17 +36,37 @@ def package_graph():
 
 
 class PlanningTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        fixture = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(fixture.cleanup)
+        cls.fixture = Path(fixture.name)
+
+        def git(*args):
+            return subprocess.check_output(['git', *args], cwd=cls.fixture, text=True).strip()
+
+        git('init', '-q', '-b', 'main')
+        git('config', 'user.name', 'Release tests')
+        git('config', 'user.email', 'release@example.test')
+        for name in ['Sources/NeoAnki2/App.swift', 'Sources/NeoAnkiIOS/Home.swift', 'Sources/Shared/Library.swift',
+                     'Sources/MacOnly/API.swift', 'Sources/CloudSync/Sync.swift', 'Sources/CLIOnly/main.swift',
+                     'NeoAnkiCore/Sources/Core/Item.swift', 'NeoAnkiCore/Sources/CoreCLI/main.swift',
+                     'Platforms/iOS/Info.plist', 'Packaging/Info.plist', 'README.md']:
+            file = cls.fixture / name
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text('before')
+        git('add', '.')
+        git('commit', '-qm', 'baseline')
+        cls.fixture_revision = git('rev-parse', 'HEAD')
+
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
-        self.root=Path(self.temp.name)
-        self.git('init','-q','-b','main');self.git('config','user.name','Release tests');self.git('config','user.email','release@example.test')
-        for name in ['Sources/NeoAnki2/App.swift','Sources/NeoAnkiIOS/Home.swift','Sources/Shared/Library.swift',
-                     'Sources/MacOnly/API.swift','Sources/CloudSync/Sync.swift','Sources/CLIOnly/main.swift',
-                     'NeoAnkiCore/Sources/Core/Item.swift','NeoAnkiCore/Sources/CoreCLI/main.swift',
-                     'Platforms/iOS/Info.plist','Packaging/Info.plist','README.md']:
-            self.write(name,'before')
-        self.git('add','.');self.git('commit','-qm','baseline')
-        self.rev=self.git('rev-parse','HEAD');self.inputs=package_graph()
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        # Each case can mutate working files, branches, and Git history independently.
+        self.root = Path(temporary.name) / 'source'
+        shutil.copytree(self.fixture, self.root)
+        self.rev = self.fixture_revision
+        self.inputs = package_graph()
         self.baseline={'version':'1.0.319','channels':{c:{'revision':self.rev,'version':'1.0.319','build':'319'} for c in ['ios','mac','homebrew']}}
     def git(self,*args):return subprocess.check_output(['git',*args],cwd=self.root,text=True).strip()
     def write(self,name,value):

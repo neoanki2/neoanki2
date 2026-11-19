@@ -25,12 +25,11 @@ Mac App Store, and Homebrew with one shared version. iOS-only changes leave Mac
 alone; Mac-only changes publish both Mac distributions. See
 [the release procedure](docs/RELEASING.md) for preview and resume commands.
 
-For development on macOS 14+ with a Swift 6 Xcode toolchain, clone the
-repository and run the supported headless loop:
+For development on macOS 14+ with a Swift 6 Xcode toolchain and Node.js,
+clone the repository and run the PR test gate:
 
 ```bash
-swift build
-./Scripts/test-fast.sh
+./Scripts/test-unit.sh
 ```
 
 The [Developer Guide](https://neoanki2.github.io/user/developer/) covers
@@ -96,6 +95,6 @@ Documentation is versioned with the source in [`docs/`](docs/):
 - [`docs/LLM_DECK_AUTHORING.md`](docs/LLM_DECK_AUTHORING.md) — coding-agent deck authoring workflow
 - [`docs/PRODUCT.md`](docs/PRODUCT.md) — product context for design and UX work
 
-The supported headless contributor loop is `swift build` followed by
-`./Scripts/test-fast.sh`; see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
-contract-generation commands required by API changes.
+The broader headless check is `./Scripts/test-fast.sh`. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the contract-generation commands
+required by API changes.

@@ -1,8 +1,6 @@
 name: Documentation external links
 
 on:
-  schedule:
-    - cron: '37 6 * * 1'
   workflow_dispatch:
 
 permissions:

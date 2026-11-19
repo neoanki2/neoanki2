@@ -3,7 +3,8 @@
 ## Supported headless workflow
 
 - Build: `swift build`
-- Fast verification: `./Scripts/test-fast.sh`
+- PR unit-test gate: `./Scripts/test-unit.sh`
+- Broader headless verification: `./Scripts/test-fast.sh`
 - API contracts: `swift test --filter NeoAnkiAPITests --parallel`
 - API reference freshness: `swift run neoanki-api-reference check`
 - Documentation: `swift Scripts/validate-docs.swift`

@@ -10,22 +10,34 @@ permalink: /user/developer/testing/
 
 ## Fast contributor loop
 
-From the repository root, run:
+Run the same tests as the pull-request **CI Gate** from the repository root:
 
 ```bash
-./Scripts/test-fast.sh
+./Scripts/test-unit.sh
 ```
 
-This runs NeoAnkiCore unit and flow tests, app-model tests, application and sync
-policy tests, architecture-boundary checks, Spotlight-safe Xcode path checks,
-release-workflow reconciliation tests, the generated API-reference check, and
-documentation validation.
+App, Core, tooling, and Chrome companion tests run in parallel. The Chrome
+suite uses Node's built-in test runner and needs no npm install. Pass a lane name such as
+`./Scripts/test-unit.sh app` to run it on its own. A full local run prints the
+log directory and shows diagnostics from any failed lane.
 
-Headless test suites, shared-platform builds, and the unsigned iOS archive run
-as independent jobs. Relevant sync and editor mutation campaigns each run in
-a separate qualification job with their own cold-build budget; the protected
-CI gate requires every selected campaign to pass. Native XCTest UI journeys
-do not run automatically in CI.
+Local Swift builds are incremental. CI keys compiled products by each package's
+sources, tests, manifests, runner script, compiler, SDK, architecture, and
+workspace. Only an exact cache hit skips compilation. Every run executes tests.
+
+The Core lane runs `NeoAnkiCoreTests` and `NeoAnkiFSRSTests`. The app lane runs
+root-package unit and model suites, including the four focused visible-sync
+regressions. The generated fault and three-device sync campaigns, `NeoAnkiFlowTests`,
+architecture scans, mutation qualification, shared-platform builds, and unsigned
+iOS archives are available through **Extended validation**
+(`.github/workflows/validation.yml`) and the existing local scripts.
+Use `./Scripts/test-fast.sh` for the broader local headless run, including
+Core flows, the sync campaigns, generated API freshness, and documentation
+validation. Performance benchmarks and native XCTest UI journeys are opt-in.
+
+Strict documentation/API freshness checks run before release pushes. Documentation
+publishing runs separately after every merge into `main`, including code-only
+merges; it does not launch another Swift API-test build or block PR acceptance.
 
 ## Focused suites
 
@@ -37,7 +49,7 @@ swift test --filter NeoAnki2Tests --parallel
 (cd NeoAnkiCore && swift test --parallel)
 ```
 
-Use the narrowest relevant suite while iterating, then run `test-fast.sh`
+Use the narrowest relevant suite while iterating, then run `test-unit.sh`
 before proposing a change. UI and performance workflows are slower and have
 dedicated scripts under `Scripts/`. The [unified release process](../../RELEASING.md)
 selects relevant headless checks; UI journeys are additional targeted evidence,
@@ -93,11 +105,10 @@ baseline is required; only the expected behavioral assertion detects a mutant.
 Compilation errors, timeouts, skipped/missing tests, and infrastructure failures
 are inconclusive failures. Headless qualification covers document sizing,
 binding replacement, and putting OS publication back on command completion.
-CI qualifies relevant changed contracts without restoring broad UI journeys.
-The campaigns run alongside ordinary test jobs, each with a separate 25-minute
-budget. Combining them previously exhausted that budget during a second cold
-Swift compilation after the app tests had passed. Compilation failures and
-timeouts still fail qualification; no assertion failures are retried or ignored.
+Run relevant qualification locally before a release push or through manual
+Extended validation. Its campaigns have independent cold-build budgets; they do
+not run in the unit-only PR lane. Compilation failures and timeouts still fail
+qualification; no assertion failures are retried or ignored.
 
 The focused iOS runner uses one uniquely named disposable Simulator and always
 deletes it. Its save-from-study journey checks dismissal, refreshed content,
@@ -176,7 +187,8 @@ aliases, edit/delete conflict recovery, corrupt payloads/assets, durable inboxes
 and upload queues, legacy metadata, stopping in-flight sync, acknowledgment races,
 and merge permutation/idempotence properties.
 
-These tests run in the normal application test lane of `test-fast.sh`. They do
+The full state-machine campaign runs in `test-fast.sh` and `test-sync.sh`.
+The PR gate includes the focused regressions. These checks do
 not touch the installed apps, user library, iPhone, Apple account, or live iCloud
 container. They verify the repository and transport decisions headlessly;
 Apple provisioning, push delivery, and SDK/server integration remain platform
@@ -251,17 +263,17 @@ fresh persistence IDs and anchors relative card schedules to the current date.
 It does not freeze arbitrary Swift executor interleavings or automatically
 shrink a failing scenario.
 
-The normal root-package CI lane runs these contracts. A nightly headless job
-runs 64 generated scenarios with 40 operations each, split across four
-independent shards to keep wall time bounded. Each shard rotates its initial
-seed from the workflow run ID. Its artifact contains the campaign log and
-replayable scenario evidence. This campaign uses no Apple account, installed
+Run these integration contracts locally or through manual Extended validation.
+The **Sync stress** workflow is also manual: it runs 64 generated scenarios with
+40 operations each, split across four shards. Each shard derives its initial
+seed from the workflow run ID unless one is supplied. Its artifact contains the
+campaign log and replayable scenario evidence. This campaign uses no Apple account, installed
 app, physical phone, or production library.
 
 #### Verify that the tests reject broken implementations
 
-When the contract harness changes, CI also qualifies it against deliberate
-mutations in an isolated checkout:
+When the contract harness changes, qualify it locally or with manual Extended
+validation against deliberate mutations in an isolated checkout:
 
 ```bash
 python3 Scripts/check-sync-test-sensitivity.py --list
@@ -286,11 +298,11 @@ separate from the card-library contracts.
 
 ## CI reliability and optional UI investigations
 
-Required Mac CI jobs use `macos-26-intel` with Xcode 26.6. Hosted ARM jobs failed before
-runner acquisition during capacity shortages; the Intel image runs the same
-headless contracts, shared builds, and unsigned iOS archive checks. Native Mac
-tests therefore execute on Intel in CI, while the iOS app build and device
-archive still target ARM64. Local Apple Silicon verification remains separate.
+Required Swift unit-test jobs use `macos-26-intel` with Xcode 26.6. Hosted ARM
+jobs previously failed before runner acquisition during capacity shortages.
+Native Mac unit tests therefore execute on Intel; local Apple Silicon
+verification remains separate. Manual platform validation and release archives
+retain the iOS ARM64 and universal Mac build checks.
 The [official image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md)
 lists the pinned Xcode installation.
 
@@ -317,11 +329,13 @@ Inactive derivatives and signs remain exact; loss parity, independent finite
 differences, and optimizer parity retain their separate checks. This fixture
 tolerance is not an error bound for arbitrary review histories.
 
-Automatic CI runs all root-package Swift tests and all NeoAnkiCore tests,
-architecture and release contracts, documentation checks, shared macOS/iOS
-builds, and the unsigned iOS app/widget archive. Performance benchmarks remain
-opt-in. No native XCTest UI test, screenshot capture, or screenshot-promotion
-workflow runs automatically. The launch smoke test was deleted: it slept for two
+Automatic PR CI runs the unit/model suites, isolated tooling tests, and Chrome unit tests.
+Broader integration/flow tests, platform builds, archives, mutation campaigns,
+architecture scans, and external-link checks are local or manually dispatched.
+This removes continuous PR coverage of those integration and packaging behaviors;
+they remain part of targeted pre-push verification or release preparation.
+No native XCTest UI test, screenshot capture, or screenshot-promotion workflow
+runs automatically. The launch smoke test was deleted: it slept for two
 seconds and accepted both normal exit and a crash, providing no readiness check.
 The obsolete test of the retired release orchestrator was also deleted; the
 current controller is covered by `Scripts/test-release.py`.
@@ -386,11 +400,13 @@ swift run neoanki-api-reference check
 swift Scripts/validate-docs.swift --require-screenshots
 ```
 
-The protected **Documentation and screenshot gate** must pass before `main`
-can advance. See [maintaining documentation](../documentation/) for generation
+Run these checks locally before release pushes; **CI Gate** is the required
+unit-test gate. The former **Documentation and screenshot gate** is retired from
+PR acceptance. See [maintaining documentation](../documentation/) for generation
 and screenshot ownership.
 
-That workflow also builds and crawls the Jekyll output, then runs
+The separate documentation publication workflow builds and crawls Jekyll output
+after every merge into `main`, then runs
 `Scripts/check-docs-responsive.mjs` in headless Chromium at 375, 768, and 1024
 pixels. It checks keyboard navigation, contained code blocks, and the absence
 of page-level horizontal overflow.

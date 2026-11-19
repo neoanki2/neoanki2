@@ -1,8 +1,6 @@
 name: Sync stress
 
 on:
-  schedule:
-    - cron: '19 5 * * *'
   workflow_dispatch:
     inputs:
       seed:

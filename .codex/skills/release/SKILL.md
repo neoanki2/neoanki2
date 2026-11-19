@@ -8,10 +8,12 @@ description: Merge release changes into main, publish affected NeoAnki2 apps to 
 Every release must come from `main`. Merge first, then build and publish from
 the resulting `main` revision:
 
-1. Preserve and commit the requested local changes, include relevant existing
-   release work, and create or update its PRs using authenticated `gh`. Complete
-   required checks and merge the changes into `main`. Confirm that GitHub reports
-   the PRs as `MERGED`; an auto-merge request or an open PR is insufficient.
+1. Preserve and commit the requested local changes, including relevant existing
+   release work. Complete the local pre-push checks below before publishing the
+   branch or any PR update through authenticated `gh`. Push one validated batch,
+   then create or update its PR. Complete required GitHub checks and merge into
+   `main`. Confirm that GitHub reports the PR as `MERGED`; an auto-merge request
+   or an open PR is insufficient.
 2. Update a clean local `main` checkout to the remote `main` revision containing
    those changes. Preserve unrelated working-tree changes when switching or use
    an isolated checkout. Record the resulting `main` SHA as the release source;
@@ -33,6 +35,55 @@ Artifacts, release tags, and receipts must identify the recorded `main` revision
 If required checks or branch protection block merging, stop before these release
 phases and report the concrete blocker. Do not publish while auto-merge is queued
 or bypass branch protection to proceed.
+
+## Local checks before every push
+
+Resolve the latest target `main` revision through authenticated `gh` and make
+that exact commit available locally. Record it as `release_base_sha`; do not use
+a stale tracking ref. Preserve unrelated edits or use an isolated checkout.
+Commit the intended changes locally before validating: the strict documentation
+comparison examines `BASE...HEAD`, not uncommitted edits.
+
+Run these checks against the complete candidate before the first push and before
+pushing corrections to a failed PR:
+
+```bash
+git diff --check "${release_base_sha}...HEAD"
+swift Scripts/validate-docs.swift --require-screenshots --base-ref "$release_base_sha"
+```
+
+- For application or Swift changes, run `./Scripts/test-fast.sh`. It covers Core,
+  root-package tests, API-reference freshness, architecture, and tooling contracts.
+  For docs-, skill-, or tooling-only changes, run the relevant validators/tests
+  instead of rebuilding unaffected apps. The strict documentation comparison
+  above remains required; the fast suite's ordinary docs check does not replace it.
+- GitHub's `.github/workflows/test.yml` is unit-only. Keep broader checks local
+  before pushing: use the relevant campaign path filters in the manual
+  `.github/workflows/validation.yml` to select additional headless checks, such
+  as `Scripts/check-editor-test-sensitivity.py` or
+  `Scripts/check-sync-test-sensitivity.py`, with fresh evidence directories.
+  Do not add Simulator campaigns, screenshots, or physical acceptance checks.
+  When CI orchestration changes, validate the workflow and budget for cold builds;
+  local warm timings do not prove it fits. Keep platform builds, archives, and
+  mutation campaigns out of automatic unit-test CI.
+- For changed scheduling/cache or asynchronous behavior, ensure the relevant
+  regression coverage uses explicit clock boundaries and observable operation
+  gates. Include it in the selected checks; do not repeat suites already covered
+  by a passing fast run or use retries to make timing-dependent failures disappear.
+
+Keep the candidate HEAD, base SHA, commands, outcomes, and original logs under
+`.build/release-prepush/`. Reuse passing evidence only when the relevant source,
+build inputs, and toolchain are unchanged. After a fix, recommit and rerun affected
+checks. A failure blocks the push until its cause is corrected; never rerun an
+unchanged failed check just to obtain green. Before pushing, verify that HEAD
+still matches the checked candidate and that no intended edits remain uncommitted.
+Local checks do not replace required GitHub unit-test CI or the controller's
+validation of the merged release source. When retiring a required check, reconcile
+its GitHub branch-protection context through `gh` without weakening other rules;
+the unit-only workflow retains the **CI Gate** context. Do not dispatch the retired
+Documentation PR gate or manual extended validation just to satisfy old check names.
+
+## Publish from merged main
 
 Starting the command on `main` is insufficient if the controller then creates a
 release branch and publishes its unmerged snapshot. If its implementation or
