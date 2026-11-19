@@ -21,9 +21,11 @@ policy tests, architecture-boundary checks, Spotlight-safe Xcode path checks,
 release-workflow reconciliation tests, the generated API-reference check, and
 documentation validation.
 
-The fast headless lane is designed to finish inside five minutes on a fresh CI
-runner. The protected gate also includes shared-platform builds and an unsigned iOS
-archive. Native XCTest UI journeys do not run automatically in CI.
+Headless test suites, shared-platform builds, and the unsigned iOS archive run
+as independent jobs. Relevant sync and editor mutation campaigns each run in
+a separate qualification job with their own cold-build budget; the protected
+CI gate requires every selected campaign to pass. Native XCTest UI journeys
+do not run automatically in CI.
 
 ## Focused suites
 
@@ -92,6 +94,10 @@ Compilation errors, timeouts, skipped/missing tests, and infrastructure failures
 are inconclusive failures. Headless qualification covers document sizing,
 binding replacement, and putting OS publication back on command completion.
 CI qualifies relevant changed contracts without restoring broad UI journeys.
+The campaigns run alongside ordinary test jobs, each with a separate 25-minute
+budget. Combining them previously exhausted that budget during a second cold
+Swift compilation after the app tests had passed. Compilation failures and
+timeouts still fail qualification; no assertion failures are retried or ignored.
 
 The focused iOS runner uses one uniquely named disposable Simulator and always
 deletes it. Its save-from-study journey checks dismissal, refreshed content,
