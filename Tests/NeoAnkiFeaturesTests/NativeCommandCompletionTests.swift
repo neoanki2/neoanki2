@@ -129,12 +129,23 @@ actor HeldNativeLibraryReads: LibraryBrowsing, LibraryNativeReadSupporting, Libr
 }
 
 @Suite @MainActor struct NativeCommandCompletionTests {
+    enum Command: String, CaseIterable {
+        case create, edit, delete, move, deck, importItems
+
+        var expectedItemCount: Int {
+            switch self {
+            case .delete: 0
+            case .create, .importItems: 2
+            case .edit, .move, .deck: 1
+            }
+        }
+    }
+
     @Test(arguments: [false, true])
     func explicitBrowseReadSurvivesACommittedCommandsQueuedHomeRefresh(obsoleteReadFails: Bool) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("reload-demand-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
-        try await repository.bootstrap()
         let controlledReads = HeldNativeLibraryReads(base: repository)
         let model = LibraryFeatureModel(library: repository, reads: NativeLibraryReadCoordinator(library: controlledReads))
         await model.bootstrap(startSync: false)
@@ -208,14 +219,14 @@ actor HeldNativeLibraryReads: LibraryBrowsing, LibraryNativeReadSupporting, Libr
         #expect(!model.isRefreshing)
     }
 
-    @Test(arguments: ["create", "edit", "delete", "move", "deck", "import"], OptionalPublicationGate.Site.allCases)
-    func nativeCommandsAcknowledgeCommitWhileOptionalEffectsAreHeld(command: String, site: OptionalPublicationGate.Site) async throws {
+    @Test(arguments: Command.allCases, OptionalPublicationGate.Site.allCases)
+    func nativeCommandsAcknowledgeCommitWhileOptionalEffectsAreHeld(command: Command, site: OptionalPublicationGate.Site) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("command-boundary-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
         try await repository.bootstrap()
         let first = try await repository.createDeck(Deck(name: "First"))
-        let second = try await repository.createDeck(Deck(name: "Second"))
+        let destination = command == .move ? try await repository.createDeck(Deck(name: "Second")) : nil
         let item = Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
             .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Original")),
             .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
@@ -225,22 +236,22 @@ actor HeldNativeLibraryReads: LibraryBrowsing, LibraryNativeReadSupporting, Libr
         let model = LibraryFeatureModel(library: repository, notifier: effects, widgetPublisher: effects, badgePublisher: effects)
         await model.bootstrap(startSync: false)
         await model.awaitDevicePublication()
-        let rows = try await model.loadBrowse(scope: .allDecks)
+        let rows = command == .move ? try await model.loadBrowse(scope: .allDecks) : []
         await effects.arm()
         var returned = false
         let operation = Task {
             switch command {
-            case "create":
+            case .create:
                 try await model.createItem(itemType: BuiltInItemTypes.basic, deckID: first.id, values: [
                     BuiltInItemTypes.frontFieldID: .text("Created"), BuiltInItemTypes.backFieldID: .text("Answer"),
                 ])
-            case "edit":
+            case .edit:
                 var edited = item; edited.fields[0].value = .text("Corrected")
                 try await model.updateItem(edited)
-            case "delete": try await model.deleteItems([item.id])
-            case "move": try await model.moveItems([item.id], to: second.id, rows: rows)
-            case "deck": try await model.createDeck(name: "Created deck", parentID: nil, newCardsPerDay: nil)
-            default:
+            case .delete: try await model.deleteItems([item.id])
+            case .move: try await model.moveItems([item.id], to: try #require(destination).id, rows: rows)
+            case .deck: try await model.createDeck(name: "Created deck", parentID: nil, newCardsPerDay: nil)
+            case .importItems:
                 _ = try await model.importJSON(Data(#"{"itemType":"Basic","rows":[{"Front":"Imported","Back":"Answer"}]}"#.utf8), itemTypeID: nil, deckID: first.id)
             }
             returned = true
@@ -253,12 +264,12 @@ actor HeldNativeLibraryReads: LibraryBrowsing, LibraryNativeReadSupporting, Libr
                 withObservationTracking { _ = model.lastCommandReceipt } onChange: { continuation.resume() }
             }
         }
-        #expect(returned, "EDITOR_COMMIT_BOUNDARY: \(command) acknowledgement must not wait for \(site.rawValue)")
+        #expect(returned, "EDITOR_COMMIT_BOUNDARY: \(command.rawValue) acknowledgement must not wait for \(site.rawValue)")
         // Read readiness remains available while the independent OS worker is held.
         await model.refresh()
         await model.awaitReadModels()
         #expect(!model.isRefreshing)
-        #expect(model.allDecksSummary.itemCount == (command == "delete" ? 0 : ["create", "import"].contains(command) ? 2 : 1))
+        #expect(model.allDecksSummary.itemCount == command.expectedItemCount)
         if returned {
             try await model.createDeck(name: "Another command", parentID: nil, newCardsPerDay: nil)
             await model.awaitReadModels()

@@ -7,8 +7,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     PerformanceScale.require(flow: flow)
 }
 
-@Test func perfFetchDueCardsScoped() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfFetchDueCardsScoped() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "fetch-due-scoped")
@@ -28,8 +29,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfScopeSummaryUnassigned() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfScopeSummaryUnassigned() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = min(scale.itemCount, 500)
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "scope-unassigned")
@@ -46,8 +48,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfUnassignedScopeSwitchCore() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfUnassignedScopeSwitchCore() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "switch-unassigned")
@@ -65,8 +68,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfFetchItemDetailBatch() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfFetchItemDetailBatch() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
     let sampleCount = scale.batchSampleSize
 
@@ -89,8 +93,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfCreateItemCore() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfCreateItemCore() async throws {
+    let scale = try #require(requirePerformanceScale())
     let createCount = min(scale.batchSampleSize, 50)
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "create-item")
@@ -116,8 +121,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfDeleteItemsSample() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfDeleteItemsSample() async throws {
+    let scale = try #require(requirePerformanceScale())
     let libraryCount = scale.itemCount
     let deleteCount = scale.batchSampleSize
 
@@ -141,8 +147,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfDeckCRUDCore() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfDeckCRUDCore() async throws {
+    let scale = try #require(requirePerformanceScale())
     _ = scale
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "deck-crud")
@@ -159,8 +166,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfRefreshCountsCore() async throws {
-    guard let scale = requirePerformanceScale() else { return }
+@Test(.enabled(if: requirePerformanceScale() != nil))
+func perfRefreshCountsCore() async throws {
+    let scale = try #require(requirePerformanceScale())
     let itemCount = scale.itemCount
 
     let (store, directory) = try await PerformanceFixtures.makeStore(label: "refresh-counts")
@@ -180,9 +188,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfMultiSubtreeDeckSwitchStress() async throws {
-    guard let scale = requirePerformanceScale(flow: "multi-subtree-deck-switch-stress") else { return }
-    guard scale == .stress else { return }
+@Test(.enabled(if: requirePerformanceScale(flow: "multi-subtree-deck-switch-stress") == .stress))
+func perfMultiSubtreeDeckSwitchStress() async throws {
+    let scale = try #require(requirePerformanceScale(flow: "multi-subtree-deck-switch-stress"))
     let itemCount = scale.itemCount
     let switchCount = scale.deckSwitchMeasureCount
 
@@ -222,9 +230,9 @@ private func requirePerformanceScale(flow: String? = nil) -> PerformanceScale? {
     }
 }
 
-@Test func perfMultiDeckPortableExportStress() async throws {
-    guard let scale = requirePerformanceScale(flow: "multi-deck-portable-export-stress") else { return }
-    guard scale == .stress else { return }
+@Test(.enabled(if: requirePerformanceScale(flow: "multi-deck-portable-export-stress") == .stress))
+func perfMultiDeckPortableExportStress() async throws {
+    let scale = try #require(requirePerformanceScale(flow: "multi-deck-portable-export-stress"))
     let itemCount = scale.itemCount
     let exportCount = min(5, scale.deckSubtreeCount)
 

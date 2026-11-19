@@ -520,10 +520,12 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
 
 @Test func optimizationPersistsThroughStoreAPIAndReopen() async throws {
     let databaseURL = tempDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: databaseURL.deletingLastPathComponent()) }
     let store = try ItemStore(databaseURL: databaseURL, profileID: "learner-b")
     try await store.bootstrap()
     let start = Date(timeIntervalSince1970: 1_700_000_000)
-    _ = try await seedEligibleOptimizationHistory(in: store, start: start)
+    let card = try await createOptimizationFixtureCard(in: store, start: start)
+    _ = try await seedEligibleOptimizationHistory(in: store, card: card, start: start)
 
     let result = try await store.optimizeScheduling(minimumObservations: 400)
     let health = try await store.schedulingHealthSnapshot()
@@ -552,21 +554,11 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
 
 @Test func automaticOptimizationContinuesOnlyWhenHistoryChanges() async throws {
     let databaseURL = tempDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: databaseURL.deletingLastPathComponent()) }
     let store = try ItemStore(databaseURL: databaseURL)
     try await store.bootstrap()
-    let itemType = try await store.defaultItemType()
     let start = Date(timeIntervalSince1970: 1_700_000_000)
-    _ = try await store.createItem(
-        Item(
-            itemTypeID: itemType.id,
-            fields: [
-                FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Front")),
-                FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Back")),
-            ]
-        ),
-        now: start
-    )
-    let card = try #require(await store.fetchDueCards(asOf: start).first).card
+    let card = try await createOptimizationFixtureCard(in: store, start: start)
 
     // Too little history to fit: the automatic path must not touch parameters
     // and must not record an attempt it never made.
@@ -575,8 +567,7 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     #expect(await store.schedulingParameters() == untuned)
     #expect(try await store.lastOptimizationAttempt() == nil)
 
-    _ = card // The initial no-history gate is intentionally exercised above.
-    let end = try await seedEligibleOptimizationHistory(in: store, start: start)
+    let end = try await seedEligibleOptimizationHistory(in: store, card: card, start: start)
 
     let result = try #require(try await store.optimizeSchedulingIfNeeded(now: end))
     #expect(result.observationCount >= 400)
@@ -610,60 +601,6 @@ private func executeTestSQL(_ sql: String, at url: URL) throws {
     let otherProfile = try ItemStore(databaseURL: databaseURL, profileID: "learner-c")
     try await otherProfile.bootstrap()
     #expect(try await otherProfile.lastOptimizationAttempt() == nil)
-}
-
-private func seedEligibleOptimizationHistory(
-    in store: ItemStore,
-    start: Date
-) async throws -> Date {
-    let itemType = try await store.defaultItemType()
-    try await store.createItem(Item(
-        itemTypeID: itemType.id,
-        fields: [
-            FieldValue(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Optimizer front")),
-            FieldValue(fieldID: BuiltInItemTypes.backFieldID, value: .text("Optimizer back")),
-        ]
-    ), now: start)
-    let template = try #require(try await store.fetchDueCards(asOf: start).first?.card)
-    let database = await store.database
-    let deltas = [1, 5, 40, 2]
-    var latest = start
-    for cardIndex in 0 ..< 100 {
-        let cardID = cardIndex == 0 ? template.id : UUID()
-        if cardIndex != 0 {
-            try await database.upsertSynchronizedCard(Card(
-                id: cardID,
-                itemID: template.itemID,
-                templateID: template.templateID,
-                skill: template.skill,
-                memory: .new(due: start)
-            ))
-        }
-        var reviewedAt = start.addingTimeInterval(Double(cardIndex % 40) * 86_400)
-        try await database.insertReviewLog(ReviewLog(
-            cardID: cardID,
-            reviewedAt: reviewedAt,
-            rating: .good,
-            elapsedDays: 0,
-            scheduledDays: 0,
-            phaseBefore: .new,
-            durationMs: 1_000
-        ), memoryBefore: .new(due: start))
-        for (targetIndex, delta) in deltas.enumerated() {
-            reviewedAt = reviewedAt.addingTimeInterval(Double(delta) * 86_400)
-            latest = max(latest, reviewedAt)
-            try await database.insertReviewLog(ReviewLog(
-                cardID: cardID,
-                reviewedAt: reviewedAt,
-                rating: targetIndex.isMultiple(of: 3) ? .again : .good,
-                elapsedDays: Double(delta),
-                scheduledDays: Double(delta),
-                phaseBefore: .review,
-                durationMs: 1_000
-            ), memoryBefore: .new(due: start))
-        }
-    }
-    return latest
 }
 
 private func createLegacyNoteDatabase(at url: URL) throws {

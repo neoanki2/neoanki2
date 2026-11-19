@@ -14,10 +14,10 @@ usage() {
 Usage: Scripts/reconcile-release-workflows.sh \
   --repo OWNER/REPO --pr NUMBER --head SHA --branch BRANCH --base SHA
 
-Reconciles checks after the documentation screenshot bot promotes a new pull-
-request revision. Known GitHub Actions bot runs that require approval are
-approved for the exact PR head. If automatic Documentation or Test runs do not
-exist, exact-head workflow_dispatch fallbacks are started instead.
+Reconciles unit-test checks for the exact pull-request revision. Known GitHub
+Actions bot Test runs that require approval are approved for that head. A missing
+automatic Test run can be dispatched; documentation publication and manual
+validation are not PR requirements. --base remains accepted for older callers.
 EOF
 }
 
@@ -52,8 +52,6 @@ for command in gh jq; do
 done
 
 KNOWN_PATHS_JQ='[
-  ".github/workflows/docs-screenshots.yml",
-  ".github/workflows/docs-pages.yml",
   ".github/workflows/test.yml"
 ]'
 
@@ -121,11 +119,8 @@ for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   TEST_PRESENT="$(jq -r '
     any(.[]; .path == ".github/workflows/test.yml")
   ' <<<"$RUNS_JSON")"
-  DOCS_PRESENT="$(jq -r '
-    any(.[]; .path == ".github/workflows/docs-pages.yml")
-  ' <<<"$RUNS_JSON")"
-  if [ "$TEST_PRESENT" = "true" ] && [ "$DOCS_PRESENT" = "true" ]; then
-    echo "Exact-head Documentation and Test workflows are present."
+  if [ "$TEST_PRESENT" = "true" ]; then
+    echo "The exact-head unit-test workflow is present."
     exit 0
   fi
 
@@ -143,15 +138,6 @@ fi
 TEST_PRESENT="$(jq -r '
   any(.[]; .path == ".github/workflows/test.yml")
 ' <<<"$RUNS_JSON")"
-DOCS_PRESENT="$(jq -r '
-  any(.[]; .path == ".github/workflows/docs-pages.yml")
-' <<<"$RUNS_JSON")"
-
-if [ "$DOCS_PRESENT" != "true" ]; then
-  echo "Dispatching missing exact-head Documentation workflow for $HEAD_SHA."
-  gh workflow run docs-pages.yml --repo "$REPOSITORY" --ref "$PR_BRANCH" \
-    -f "base_ref=$BASE_SHA"
-fi
 if [ "$TEST_PRESENT" != "true" ]; then
   echo "Dispatching missing exact-head Test workflow for $HEAD_SHA."
   gh workflow run test.yml --repo "$REPOSITORY" --ref "$PR_BRANCH"

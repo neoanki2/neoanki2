@@ -60,7 +60,7 @@ run_reconcile() {
       --repo neoanki2/neoanki2 \
       --pr 70 \
       --head abc123 \
-      --branch codex/example \
+      --branch performance/example \
       --base def456
 }
 
@@ -83,26 +83,14 @@ echo "==> Approves only known bot workflows for the exact PR head"
 : > "$MOCK_LOG"
 export MOCK_HEAD=abc123
 export RELEASE_RECONCILE_MAX_ATTEMPTS=2
-SCREENSHOT_ACTION_REQUIRED="$(known_run 11 .github/workflows/docs-screenshots.yml '"action_required"')"
-DOCS_ACTION_REQUIRED="$(known_run 12 .github/workflows/docs-pages.yml '"action_required"')"
 TEST_ACTION_REQUIRED="$(known_run 13 .github/workflows/test.yml '"action_required"')"
-MOCK_RUNS="$(jq -cn \
-  --argjson screenshots "$SCREENSHOT_ACTION_REQUIRED" \
-  --argjson docs "$DOCS_ACTION_REQUIRED" \
-  --argjson test "$TEST_ACTION_REQUIRED" \
-  '{workflow_runs:[$screenshots,$docs,$test]}')"
+MOCK_RUNS="$(jq -cn --argjson test "$TEST_ACTION_REQUIRED" '{workflow_runs:[$test]}')"
 export MOCK_RUNS
-SCREENSHOT_APPROVED="$(known_run 11 .github/workflows/docs-screenshots.yml null)"
-DOCS_APPROVED="$(known_run 12 .github/workflows/docs-pages.yml null)"
 TEST_APPROVED="$(known_run 13 .github/workflows/test.yml null)"
-MOCK_RUNS_AFTER_APPROVAL="$(jq -cn \
-  --argjson screenshots "$SCREENSHOT_APPROVED" \
-  --argjson docs "$DOCS_APPROVED" \
-  --argjson test "$TEST_APPROVED" \
-  '{workflow_runs:[$screenshots,$docs,$test]}')"
+MOCK_RUNS_AFTER_APPROVAL="$(jq -cn --argjson test "$TEST_APPROVED" '{workflow_runs:[$test]}')"
 export MOCK_RUNS_AFTER_APPROVAL
 run_reconcile >/dev/null
-test "$(grep -c '/approve' "$MOCK_LOG")" -eq 3
+test "$(grep -c '/approve' "$MOCK_LOG")" -eq 1
 assert_log_absent '^workflow run'
 
 echo "==> Dispatches exact-head fallbacks only when automatic runs are absent"
@@ -111,8 +99,16 @@ export RELEASE_RECONCILE_MAX_ATTEMPTS=1
 export MOCK_RUNS='{"workflow_runs":[]}'
 unset MOCK_RUNS_AFTER_APPROVAL
 run_reconcile >/dev/null
-grep -q '^workflow run docs-pages.yml .*base_ref=def456' "$MOCK_LOG"
 grep -q '^workflow run test.yml ' "$MOCK_LOG"
+assert_log_absent '^workflow run docs-pages.yml'
+assert_log_absent '^workflow run validation.yml'
+
+echo "==> Existing unit-test workflow needs no documentation fallback"
+: > "$MOCK_LOG"
+export MOCK_RUNS="$(jq -cn --argjson test "$TEST_APPROVED" '{workflow_runs:[$test]}')"
+run_reconcile >/dev/null
+assert_log_absent '^workflow run'
+
 
 echo "==> Refuses to approve an unrecognized action-required workflow"
 : > "$MOCK_LOG"

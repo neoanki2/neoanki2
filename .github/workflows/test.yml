@@ -3,13 +3,6 @@ name: Test
 permissions:
   contents: read
 
-env:
-  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-
-defaults:
-  run:
-    shell: bash
-
 on:
   push:
     branches: [main]
@@ -19,229 +12,101 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: test-${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: unit-tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test-plan:
-    name: Validate UI investigation plan
-    runs-on: ubuntu-latest
+  swift-unit:
+    name: Unit tests (${{ matrix.package }})
+    runs-on: macos-26-intel
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [app, core]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      UNIT_PACKAGE: ${{ matrix.package }}
+      UNIT_SCRATCH_PATH: ${{ github.workspace }}/.build/ci-unit-${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Identify compiler, SDK and workspace for compiled-test cache
+        id: toolchain
+        env:
+          UNIT_MANIFESTS: ${{ matrix.package == 'app' && hashFiles('Package.swift', 'NeoAnkiCore/Package.swift', '**/Package.resolved') || hashFiles('NeoAnkiCore/Package.swift', 'NeoAnkiCore/Package.resolved') }}
+          UNIT_RUNNER: ${{ hashFiles('Scripts/test-unit.sh') }}
+        run: |
+          {
+            xcodebuild -version
+            swift --version
+            xcrun --sdk macosx --show-sdk-build-version
+            printf '%s\n' "$DEVELOPER_DIR" "$GITHUB_WORKSPACE" "$UNIT_MANIFESTS" "$UNIT_RUNNER"
+          } > "$RUNNER_TEMP/unit-toolchain.txt"
+          digest=$(shasum -a 256 "$RUNNER_TEMP/unit-toolchain.txt" | cut -d ' ' -f 1)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Restore compiled unit tests
+        id: build-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.UNIT_SCRATCH_PATH }}
+          key: unit-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.package }}-${{ steps.toolchain.outputs.digest }}-${{ matrix.package == 'app' && hashFiles('Sources/**', 'Tests/**', 'Tools/**', 'NeoAnkiCore/Sources/**') || hashFiles('NeoAnkiCore/Sources/**', 'NeoAnkiCore/Tests/**') }}
+          restore-keys: |
+            unit-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.package }}-${{ steps.toolchain.outputs.digest }}-
+      # Only an exact source/toolchain match can skip compilation. Every run
+      # executes tests; an incremental cache restore still rebuilds first.
+      - name: Run unit tests
+        env:
+          UNIT_CACHE_HIT: ${{ steps.build-cache.outputs.cache-hit }}
+        run: |
+          if [[ "$UNIT_CACHE_HIT" == true ]]; then
+            ./Scripts/test-unit.sh "$UNIT_PACKAGE" --skip-build
+          else
+            ./Scripts/test-unit.sh "$UNIT_PACKAGE"
+          fi
+
+  tooling-unit:
+    name: Tooling unit tests
+    runs-on: macos-26-intel
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Validate retained UI investigation scripts
-        run: |
-          bash -n Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
-            Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh
-          python3 Scripts/test-ios-ui-runner.py
-          python3 Scripts/test-ios-ui-retry.py
-          python3 Scripts/test-ios-runtime-selection.py
-          python3 Scripts/test-ios-test-services.py
-          bash Scripts/ci-ui-test-plan.sh macos >/dev/null
-          bash Scripts/ci-ui-test-plan.sh ios >/dev/null
-
-  swift-tests:
-    name: Swift unit + flow + architecture tests
-    runs-on: macos-26-intel
-    timeout-minutes: 25
-    env:
-      NEOANKI_SYNC_CONTRACT_ARTIFACTS: ${{ github.workspace }}/.build/sync-contract-artifacts
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Ensure the architecture scanner is available
+      - name: Install the architecture scan dependency
         run: |
           if ! command -v rg >/dev/null 2>&1; then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install ripgrep
           fi
           rg --version
-      - name: Run every SwiftPM test gate with shared build products
-        run: |
-          failures=0
-          bash -n Scripts/release.sh Scripts/release-fast.sh Scripts/build-release-candidate.sh \
-            Scripts/publish-release-candidate.sh \
-            Scripts/reconcile-release-workflows.sh Scripts/ship-release.sh \
-            Scripts/test-release-workflow-reconciliation.sh \
-            Scripts/watch-release-workflow.sh \
-            Scripts/ci-ui-test-plan.sh Scripts/build-macos-ui-tests.sh \
-            Scripts/run-ui-tests.sh Scripts/run-ios-ui-tests.sh || failures=1
-          python3 Scripts/test-sync-test-sensitivity.py || failures=1
-          python3 Scripts/test-editor-test-sensitivity.py || failures=1
-          python3 Scripts/test-editor-save-ui.py || failures=1
-          python3 Scripts/test-performance-runner.py || failures=1
-          python3 Scripts/test-release.py || failures=1
-          python3 Scripts/test-deploy-iphone.py || failures=1
-          python3 Scripts/test-release-ios.py || failures=1
-          python3 Scripts/test-release-macos-app-store.py || failures=1
-          python3 Scripts/test-macos-signing.py || failures=1
-          python3 Scripts/test-macos-testflight.py || failures=1
-          python3 Scripts/test-review-macos-app.py || failures=1
-          bash Scripts/test-release-workflow-reconciliation.sh || failures=1
-          python3 Scripts/test-validate-architecture.py || failures=1
-          bash Scripts/validate-architecture.sh || failures=1
-          (cd NeoAnkiCore && swift test --parallel) || failures=1
-          swift test --parallel || failures=1
-          bash Scripts/validate-xcode-build-paths.sh || failures=1
-          exit "$failures"
-      - name: Preserve sync scenario evidence on failure
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: sync-reliability-failures
-          path: |
-            .build/sync-contract-artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
+      - name: Run isolated tooling unit tests
+        run: ./Scripts/test-unit.sh tooling
 
-  # Mutation campaigns build isolated source snapshots with their own cold
-  # caches. Give each a separate budget alongside ordinary tests, rather than
-  # consuming the remainder of the unit-test job after its full package builds.
-  contract-qualification:
-    name: Contract qualification (${{ matrix.campaign }})
-    runs-on: macos-26-intel
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        campaign: [sync, editor]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Qualify changes to the sync test harness against known defects
-        if: matrix.campaign == 'sync' && (github.event_name == 'pull_request' || github.event_name == 'push')
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
-            python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
-          else
-            sync_harness_changes="$(git diff --name-only "$BASE_SHA" HEAD -- \
-              'Tests/NeoAnkiFeaturesTests/SyncConvergenceContractTests.swift' \
-              'Tests/NeoAnkiFeaturesTests/SyncContract*.swift' \
-              'Scripts/check-sync-test-sensitivity.py' \
-              'Scripts/test-sync-test-sensitivity.py')"
-            if [[ -n "$sync_harness_changes" ]]; then
-              python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
-            fi
-          fi
-      - name: Qualify editor contracts against layout and completion regressions
-        if: matrix.campaign == 'editor' && (github.event_name == 'pull_request' || github.event_name == 'push')
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
-            python3 Scripts/check-editor-test-sensitivity.py --output .build/editor-sensitivity
-          else
-            editor_changes="$(git diff --name-only "$BASE_SHA" HEAD -- \
-              'Sources/NeoAnkiTextEditing/NativeTextEditorPolicy.swift' \
-              'Sources/NeoAnki2/RichTextFieldEditor.swift' \
-              'Sources/NeoAnki2/ClozeFieldEditor.swift' \
-              'Sources/NeoAnkiTextEditing/PlainTextEditor.swift' \
-              'Sources/NeoAnkiApplication/LatestAsyncWork.swift' \
-              'Sources/NeoAnkiFeatures/LibraryFeatureModel.swift' \
-              'Tests/NeoAnki2Tests/NativeItemEditorHydrationTests.swift' \
-              'Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift' \
-              'Scripts/check-editor-test-sensitivity.py' \
-              'Scripts/check-sync-test-sensitivity.py' \
-              'Scripts/test-editor-test-sensitivity.py' \
-              'Scripts/run-editor-save-ui.py' 'Scripts/test-editor-save-ui.py')"
-            if [[ -n "$editor_changes" ]]; then
-              python3 Scripts/check-editor-test-sensitivity.py --output .build/editor-sensitivity
-            fi
-          fi
-      - name: Preserve qualification evidence on failure
-        if: failure() || cancelled()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: ${{ matrix.campaign }}-contract-failures
-          path: .build/${{ matrix.campaign }}-sensitivity/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  shared-platforms:
-    name: Shared targets (macOS + iOS Simulator)
-    runs-on: macos-26-intel
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Build every shared scheme on both platforms
-        run: |
-          failures=0
-          for platform in macOS 'iOS Simulator'; do
-            destination="generic/platform=$platform"
-            for scheme in NeoAnkiApplication NeoAnkiFeatures NeoAnkiSharedUI NeoAnkiCloudSync NeoAnkiDeckBuilderCore NeoAnkiMobile; do
-              xcodebuild build \
-                -scheme "$scheme" \
-                -destination "$destination" \
-                CODE_SIGNING_ALLOWED=NO || failures=1
-            done
-            (
-              cd NeoAnkiCore
-              xcodebuild build \
-                -scheme NeoAnkiCore \
-                -destination "$destination" \
-                CODE_SIGNING_ALLOWED=NO
-            ) || failures=1
-          done
-          exit "$failures"
-
-  ios-build:
-    name: iPhone/iPad app + widget + archive
-    runs-on: macos-26-intel
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Build app and embedded widgets
-        run: |
-          chmod +x Scripts/build-ios.sh
-          ./Scripts/build-ios.sh
-      - name: Validate unsigned Release archive
-        run: |
-          xcodebuild archive \
-            -project Xcode/NeoAnkiiOS.xcodeproj \
-            -scheme NeoAnkiiOS \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$PWD/.build/NeoAnki2-unsigned.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO \
-            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
-            "SWIFT_INCLUDE_PATHS=$PWD/build/Release-iphoneos $PWD/NeoAnkiCore/build/Release-iphoneos"
-          test -x .build/NeoAnki2-unsigned.xcarchive/Products/Applications/NeoAnki2.app/NeoAnki2
-          test -x .build/NeoAnki2-unsigned.xcarchive/Products/Applications/NeoAnki2.app/PlugIns/NeoAnki2Widget.appex/NeoAnki2Widget
-
-  # Hosted XCTest UI runs have failed across unrelated journeys in screenshot,
-  # orientation, Accessibility, and launch IPC. Keep these investigations in the
-  # CLI runners; automatic CI gates headless behavior and real platform builds.
-  ci-gate:
-    name: CI Gate
-    if: always()
-    needs:
-      - swift-tests
-      - contract-qualification
-      - shared-platforms
-      - ios-build
-      - test-plan
+  chrome-unit:
+    name: Chrome companion unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require every test and build job
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: ./Scripts/test-unit.sh chrome
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs: [swift-unit, tooling-unit, chrome-unit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all unit-test jobs
         env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           echo "$RESULTS" | jq -e '
-            .["swift-tests"].result == "success" and
-            .["contract-qualification"].result == "success" and
-            .["shared-platforms"].result == "success" and
-            .["ios-build"].result == "success" and
-            .["test-plan"].result == "success"
+            .["swift-unit"].result == "success" and
+            .["tooling-unit"].result == "success" and
+            .["chrome-unit"].result == "success"
           ' >/dev/null

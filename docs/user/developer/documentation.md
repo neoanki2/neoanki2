@@ -35,8 +35,9 @@ production-backed test.
 
 Screenshot capture and promotion are explicit investigations using
 `Scripts/capture-doc-screenshots.sh` and `Scripts/promote-doc-screenshots.sh`.
-They do not run in CI or commit automatically to pull-request branches. CI checks
-committed screenshot integrity; source freshness is checked only with
+They do not run in CI or commit automatically to pull-request branches. Pre-push
+and documentation-publication checks verify committed screenshot integrity;
+source freshness is checked only with
 `swift Scripts/validate-docs.swift --require-screenshots --check-screenshot-freshness`.
 Follow the full
 [screenshot and claims procedure]({{ '/user/maintaining-documentation/' | relative_url }})
@@ -51,14 +52,18 @@ navigation unless it is explicitly marked as an archived audit.
 
 ## Publication
 
-The required documentation workflow builds and crawls the site, then dispatches
-the canonical `neoanki2.github.io` workflow with the validated `main` revision.
+Every merge into `main` triggers documentation publication, including merges
+that only change application code. The workflow validates, builds, and crawls
+the site, then dispatches the canonical `neoanki2.github.io` workflow with that
+merged revision. This keeps the published source revision current without adding
+documentation work to pull-request acceptance.
 Its post-deployment smoke test waits for that exact SHA in the footer and checks
 `/api/`, `/api/decks/`, and byte-identical `/api/openapi.json`. The root-site
 repository retains its hourly recovery deployment. Configure the
 `ROOT_DOCS_DISPATCH_TOKEN` repository secret with workflow access to the root
 site; a missing token fails publication instead of silently leaving stale docs.
 
-Generic external-link checks run on a schedule so transient network failures do
-not block pull requests. Repository-local GitHub targets remain deterministic
-and merge-blocking.
+Generic external-link checks are manually dispatched so transient network
+failures do not consume the unit-test CI lane. Validate repository-local GitHub
+targets during pre-push documentation checks. Publication runs after changes
+reach `main`, separately from the required unit-test gate.

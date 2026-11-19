@@ -7,9 +7,10 @@ import NeoAnkiCore
 final class MediaImageLoader {
     static let shared = MediaImageLoader()
 
-    private let cache = NSCache<NSString, NSImage>()
+    private let cache: NSCache<NSString, NSImage>
 
-    private init() {
+    init(cache: NSCache<NSString, NSImage> = NSCache()) {
+        self.cache = cache
         cache.countLimit = 32
         cache.totalCostLimit = 96 * 1_024 * 1_024
     }

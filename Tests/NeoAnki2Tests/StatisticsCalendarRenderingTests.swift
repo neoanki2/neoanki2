@@ -16,53 +16,51 @@ private func calendarFixture(series: String, active: Bool) throws -> [Statistics
     }
 }
 
-@Test("Calendar full context renders labels, square cells, and continuous intensity")
-func statisticsCalendarRendersDailyCells() async throws {
-    for series in ["Reviews", "Active minutes"] {
-        for active in [true, false] {
-            for width in [659.0, 1_000.0] {
-                for scheme in [ColorScheme.dark, .light] {
-                    let points = try calendarFixture(series: series, active: active)
-                    // Only SwiftUI capture needs the main actor. CPU-heavy pixel
-                    // analysis must leave concurrent UI-model/sync tests free to run.
-                    let image = try await MainActor.run {
-                        let renderer = ImageRenderer(
-                            content:
-                                StatisticsHeatmap(points: points)
-                                .frame(width: width).accentColor(.blue)
-                                .padding(24)
-                                .environment(\.colorScheme, scheme)
-                                .background(scheme == .dark ? Color(white: 0.2) : .white))
-                        renderer.scale = 2
-                        let image = try #require(renderer.cgImage)
-                        if let directory = ProcessInfo.processInfo.environment["NEOANKI_CALENDAR_RENDER_DIR"]
-                        {
-                            let output = URL(fileURLWithPath: directory, isDirectory: true)
-                            try FileManager.default.createDirectory(
-                                at: output, withIntermediateDirectories: true)
-                            let png = try #require(
-                                NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
-                            try png.write(
-                                to: output.appendingPathComponent(
-                                    "\(series)-\(active)-\(Int(width))-\(scheme).png"))
-                        }
-                        return image
-                    }
-                    // Inspect complete rendered cell components, not just the
-                    // presence of some blue pixels in an isolated plot.
-                    let components = try calendarCellComponents(image)
-                    #expect(components.count == 365, "Every day must be visible in the full-year layout")
-                    #expect(
-                        components.allSatisfy { $0.aspect >= 0.75 && $0.aspect <= 1.3 },
-                        "Daily cells must stay approximately square")
-                    if active {
-                        #expect(
-                            Set(components.map(\.color)).count >= 8,
-                            "Different daily values must have different intensities")
-                    }
-                }
-            }
+private let calendarAppearances = [true, false].flatMap { active in
+    [659.0, 1_000.0].flatMap { width in
+        [ColorScheme.dark, .light].map { (active: active, width: width, scheme: $0) }
+    }
+}
+
+@Test("Calendar full context renders labels, square cells, and continuous intensity",
+      arguments: ["Reviews", "Active minutes"], calendarAppearances)
+func statisticsCalendarRendersDailyCells(
+    series: String, appearance: (active: Bool, width: Double, scheme: ColorScheme)
+) async throws {
+    let (active, width, scheme) = appearance
+    let points = try calendarFixture(series: series, active: active)
+    // Keep the capture on the main actor and let the test runner analyze
+    // each image concurrently.
+    let image = try await MainActor.run {
+        let renderer = ImageRenderer(
+            content:
+                StatisticsHeatmap(points: points)
+                .frame(width: width).accentColor(.blue)
+                .padding(24)
+                .environment(\.colorScheme, scheme)
+                .background(scheme == .dark ? Color(white: 0.2) : .white))
+        renderer.scale = 2
+        let image = try #require(renderer.cgImage)
+        if let directory = ProcessInfo.processInfo.environment["NEOANKI_CALENDAR_RENDER_DIR"] {
+            let output = URL(fileURLWithPath: directory, isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: output, withIntermediateDirectories: true)
+            let png = try #require(
+                NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+            try png.write(
+                to: output.appendingPathComponent("\(series)-\(active)-\(Int(width))-\(scheme).png"))
         }
+        return image
+    }
+    let components = try calendarCellComponents(image)
+    #expect(components.count == 365, "Every day must be visible in the full-year layout")
+    #expect(
+        components.allSatisfy { $0.aspect >= 0.75 && $0.aspect <= 1.3 },
+        "Daily cells must stay approximately square")
+    if active {
+        #expect(
+            Set(components.map(\.color)).count >= 8,
+            "Different daily values must have different intensities")
     }
 }
 
@@ -89,8 +87,16 @@ private func calendarCellComponents(_ image: CGImage) throws -> [CalendarCellCom
     }
     var seen = [Bool](repeating: false, count: width * height)
     var result: [CalendarCellComponent] = []
+    var queue: [Int] = []
+    func visit(_ index: Int) {
+        if !seen[index] && blue(index) {
+            seen[index] = true
+            queue.append(index)
+        }
+    }
     for index in seen.indices where !seen[index] && blue(index) {
-        var queue = [index]
+        queue.removeAll(keepingCapacity: true)
+        queue.append(index)
         var cursor = 0
         seen[index] = true
         var minX = width
@@ -106,15 +112,10 @@ private func calendarCellComponents(_ image: CGImage) throws -> [CalendarCellCom
             maxX = max(maxX, x)
             minY = min(minY, y)
             maxY = max(maxY, y)
-            for next in [
-                x > 0 ? current - 1 : -1, x + 1 < width ? current + 1 : -1,
-                y > 0 ? current - width : -1, y + 1 < height ? current + width : -1,
-            ] {
-                if next >= 0 && !seen[next] && blue(next) {
-                    seen[next] = true
-                    queue.append(next)
-                }
-            }
+            if x > 0 { visit(current - 1) }
+            if x + 1 < width { visit(current + 1) }
+            if y > 0 { visit(current - width) }
+            if y + 1 < height { visit(current + width) }
         }
         let w = maxX - minX + 1
         let h = maxY - minY + 1
