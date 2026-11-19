@@ -151,7 +151,9 @@ While editing an existing item:
 - Choose **Keep Editing** to return to the form.
 - Choose **Discard Changes** to restore the saved item and close the editor.
 
-Saving closes the form and refreshes the current library scope.
+Saving closes the form and refreshes the current library scope. On iPhone and
+iPad, local due counts update separately from the broader library and maturity
+summary, so those later updates do not hold the Study action.
 
 ## Add a word quickly
 

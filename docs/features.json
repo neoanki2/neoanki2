@@ -82,7 +82,7 @@
       "name": "First launch and local library",
       "article": "user/getting-started.md",
       "sources": ["Sources/NeoAnki2/NeoAnki2App.swift", "Sources/NeoAnki2/AppDatabase.swift", "Sources/NeoAnki2/MacCloudSyncSettings.swift"],
-      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/MacStoreProductionReviewJourneyTests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppStartupPerformanceTests.swift"],
+      "tests": ["UITests/NeoAnki2UITests/LibraryUITests.swift", "UITests/NeoAnki2UITests/MacStoreProductionReviewJourneyTests.swift", "Tests/NeoAnki2Tests/AppDatabaseTests.swift", "Tests/NeoAnki2Tests/AppStartupPerformanceTests.swift", "Tests/NeoAnkiFeaturesTests/LibraryLifecycleTests.swift"],
       "screenshot": "assets/screenshots/library-empty.png"
     },
     {
@@ -120,6 +120,13 @@
       "article": "user/iphone-ipad.md",
       "sources": ["Sources/NeoAnkiFeatures/SavedResponsesFeatureModel.swift", "Sources/NeoAnkiIOS/SavedResponsesMobileView.swift"],
       "tests": ["Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyResponseTests.swift"]
+    },
+    {
+      "id": "mobile-due-counts",
+      "name": "Keep mobile due counts current without waiting for sync",
+      "article": "user/iphone-ipad.md",
+      "sources": ["Sources/NeoAnkiFeatures/LibraryDueCountsModel.swift", "Sources/NeoAnkiFeatures/LibraryFeatureModel.swift", "Sources/NeoAnkiIOS/MobileRootView.swift", "Sources/NeoAnkiApplication/LibraryStudyAvailability.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Models/LibraryDueSnapshot.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase+DueSnapshot.swift"],
+      "tests": ["Tests/NeoAnkiFeaturesTests/LibraryDueCountsTests.swift", "Tests/NeoAnkiFeaturesTests/ForegroundDuePerformanceTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/LibraryDueSnapshotTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/DueSnapshotPerformanceTests.swift"]
     },
     {
       "id": "cloudkit-sync",
@@ -494,12 +501,14 @@
         "Sources/NeoAnkiSharedUI/StatisticsCalendarPlot.swift",
         "Sources/NeoAnkiApplication/LibraryStatistics.swift",
         "Sources/NeoAnkiFeatures/StatisticsFeatureModel.swift",
+        "Sources/NeoAnkiFeatures/StatisticsWorkspace.swift",
         "Sources/NeoAnkiCloudSync/StatisticsSyncService.swift"
       ],
       "tests": [
         "NeoAnkiCore/Tests/NeoAnkiCoreTests/StatisticsTests.swift",
         "Tests/NeoAnkiApplicationTests/StatisticsSyncTests.swift",
         "Tests/NeoAnkiFeaturesTests/StatisticsFeatureTests.swift",
+        "Tests/NeoAnkiFeaturesTests/StatisticsNavigationPerformanceTests.swift",
         "Tests/NeoAnki2Tests/StatisticsCalendarRenderingTests.swift",
         "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"
       ]

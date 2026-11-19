@@ -58,3 +58,5 @@ The repository-level `CONTRIBUTING.md`, `README.md`, and `AGENTS.md` are short
 entry points. This guide is the maintained source of contributor instructions.
 
 - [Native command/read coordination and maturity ADR]({{ '/adr/0002-native-library-commands-and-maturity/' | relative_url }})
+- [Mobile due-count freshness and performance evidence]({{ '/audits/mobile-due-counts-2026-11-19/' | relative_url }})
+- [Mac statistics navigation performance evidence]({{ '/audits/mac-statistics-navigation-2026-11-19/' | relative_url }})

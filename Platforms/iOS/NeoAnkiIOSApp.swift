@@ -118,15 +118,17 @@ struct NeoAnkiIOSApp: App {
                 NeoAnkiMobileScene(model: model, vocabularyRootURL: MobilePaths().vocabularyPacksURL, packCloudTransport: packCloudTransport, fixtures: fixtures)
             }
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase, initial: true) { _, phase in
             if phase == .active {
+                model.dueCounts.setForeground(true)
                 Task {
                     guard model.loadState == .ready else { return }
                     await model.refresh()
                     if model.syncEnabled { await model.synchronize() }
                 }
-            } else if phase == .background {
-                IOSBackgroundRefresh.shared.schedule()
+            } else {
+                model.dueCounts.setForeground(false)
+                if phase == .background { IOSBackgroundRefresh.shared.schedule() }
             }
         }
         .onChange(of: model.syncEnabled, initial: true) { _, enabled in
@@ -161,6 +163,7 @@ final class IOSCloudSyncAppDelegate: NSObject, UIApplicationDelegate {
         Self.logger.notice("Received library change notification")
         Task {
             if model.loadState != .ready { await model.bootstrap() }
+            guard model.loadState == .ready else { completionHandler(.failed); return }
             guard model.syncEnabled else { completionHandler(.noData); return }
             await model.synchronize()
             switch model.syncStatus {

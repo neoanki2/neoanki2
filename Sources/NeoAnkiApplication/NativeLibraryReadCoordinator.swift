@@ -80,6 +80,7 @@ public actor NativeLibraryReadCoordinator {
             let rows = demand.contains(.browse) ? try await library.items(scope: scope, sort: sort, search: "") : nil
             let catalog = demand.contains(.catalog) ? try await library.loadItemTypeCatalog() : nil
             let after = try await journal?.currentChangeCursor()
+            try Task.checkCancellation()
             guard before == after else { continue }
             return NativeLibrarySnapshot(scope: scope, sort: sort, asOf: asOf, sourceRevision: after,
                 home: home, summary: summary, items: rows, catalog: catalog, maturityIssue: issue)

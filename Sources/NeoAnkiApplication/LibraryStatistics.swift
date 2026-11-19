@@ -2,6 +2,8 @@ import Foundation
 import NeoAnkiCore
 
 public protocol LibraryStatistics: Sendable {
+    /// Opaque revision covering evidence, library structure, and scheduling
+    /// inputs. Return an empty string when reliable validation is unavailable.
     func statisticsRevision() async throws -> String
     func statisticsSource() async throws -> StatisticsSource
     func statisticsEvents(after cursor: Int64, limit: Int) async throws -> [StatisticsStoredEvent]
@@ -9,7 +11,9 @@ public protocol LibraryStatistics: Sendable {
 }
 
 extension LibraryStatistics {
-    public func statisticsRevision() async throws -> String { UUID().uuidString }
+    /// An empty token means revision validation is unavailable; callers must
+    /// reload rather than caching a successful read indefinitely.
+    public func statisticsRevision() async throws -> String { "" }
 }
 extension SQLiteLibraryRepository: LibraryStatistics {
     public func statisticsRevision() async throws -> String { try await store.statisticsRevision() }

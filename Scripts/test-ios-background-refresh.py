@@ -62,12 +62,21 @@ final class BGAppRefreshTaskRequest {
 }
 
 @MainActor final class LibraryFeatureModel {
+    enum LoadState { case loading, ready, failed }
+    var loadState = LoadState.loading
+    var failBootstrap = false
+    var bootstrapCount = 0
     var syncEnabled = true
     var refreshCount = 0
     var syncCount = 0
     var holdRefresh = false
     var refreshContinuation: CheckedContinuation<Void, Never>?
+    func bootstrap() async {
+        bootstrapCount += 1
+        loadState = failBootstrap ? .failed : .ready
+    }
     func refresh() async {
+        precondition(loadState == .ready, "Background refresh must initialize the library first")
         refreshCount += 1
         if holdRefresh {
             await withCheckedContinuation { refreshContinuation = $0 }
@@ -81,7 +90,9 @@ HARNESS = r"""
 @main struct Regression {
     @MainActor static func main() async throws {
         let expires = CommandLine.arguments.contains("expire")
+        let fails = CommandLine.arguments.contains("fail-startup")
         let model = LibraryFeatureModel()
+        model.failBootstrap = fails
         model.holdRefresh = expires
         IOSBackgroundRefresh.shared.register(model: model)
         let task = BGAppRefreshTask()
@@ -108,9 +119,10 @@ HARNESS = r"""
             if !task.completions.isEmpty { break }
             try await Task.sleep(for: .milliseconds(1))
         }
-        precondition(model.refreshCount == 1)
-        precondition(model.syncCount == (expires ? 0 : 1))
-        precondition(task.completions == [!expires])
+        precondition(model.bootstrapCount == 1)
+        precondition(model.refreshCount == (fails ? 0 : 1))
+        precondition(model.syncCount == (expires || fails ? 0 : 1))
+        precondition(task.completions == [!expires && !fails])
         print(expires ? "expired refresh completed unsuccessfully" : "refresh and sync completed")
     }
 }
@@ -151,11 +163,14 @@ class BackgroundRefreshRegressionTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_scheduler_launch_respects_main_actor(self):
+    def test_cold_background_launch_opens_library_on_main_actor(self):
         self.run_scenario()
 
     def test_background_expiration_cancels_before_sync(self):
         self.run_scenario("expire")
+
+    def test_initial_open_failure_does_not_start_refresh_or_sync(self):
+        self.run_scenario("fail-startup")
 
 
 if __name__ == "__main__":

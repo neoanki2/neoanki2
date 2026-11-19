@@ -28,6 +28,7 @@ public enum ItemDraftError: LocalizedError, Sendable, Equatable {
 /// table/editor behavior remain in their presentation adapters.
 @MainActor @Observable
 public final class LibraryFeatureModel {
+    public let dueCounts: LibraryDueCountsModel
     public private(set) var loadState: FeatureLoadState = .loading
     public private(set) var allDecksSummary: ScopeSummary = .empty
     public private(set) var unassignedSummary: ScopeSummary = .empty
@@ -84,7 +85,6 @@ public final class LibraryFeatureModel {
     @ObservationIgnored private var bootstrapTask: Task<Void, Never>?
     @ObservationIgnored private var studyMutationRevision: UInt64 = 0
     @ObservationIgnored private var refreshWorker: LatestAsyncWork<Void>?
-    @ObservationIgnored private var studyAvailabilityWorker: LatestAsyncWork<Void>?
     @ObservationIgnored private var publicationWorker: LatestAsyncWork<DevicePublicationRequest>?
 
     private struct DevicePublicationRequest: Sendable {
@@ -95,9 +95,9 @@ public final class LibraryFeatureModel {
 
     deinit {
         libraryChangesTask?.cancel(); syncChangesTask?.cancel(); bootstrapTask?.cancel()
-        let workers = (refreshWorker, studyAvailabilityWorker, publicationWorker)
+        let workers = (refreshWorker, publicationWorker)
         Task { @MainActor in
-            workers.0?.cancel(); workers.1?.cancel(); workers.2?.cancel()
+            workers.0?.cancel(); workers.1?.cancel()
         }
     }
 
@@ -124,6 +124,7 @@ public final class LibraryFeatureModel {
         reads: NativeLibraryReadCoordinator? = nil
     ) {
         self.library = library
+        self.dueCounts = LibraryDueCountsModel(library: library)
         self.features = LibraryFeatureFactory(library: library)
         self.reads = reads ?? NativeLibraryReadCoordinator(library: library)
         self.syncService = syncService
@@ -132,6 +133,11 @@ public final class LibraryFeatureModel {
         self.badgePublisher = badgePublisher
         self.settingsStore = settingsStore
         self.errorMapper = errorMapper
+        dueCounts.onSnapshot = { [weak self] snapshot in
+            self?.requestDevicePublication(asOf: snapshot.calculatedAt,
+                availability: StudyAvailability(dueNow: snapshot.total, nextStudyAt: snapshot.nextStudyAt),
+                dueSnapshot: snapshot)
+        }
     }
 
     public func authoringChoices(for deckID: UUID?) async throws -> AuthoringItemTypes {
@@ -165,6 +171,9 @@ public final class LibraryFeatureModel {
 
     public func bootstrap(startSync: Bool? = nil) async {
         if let bootstrapTask { await bootstrapTask.value; return }
+        // Scenes and background launches share the model's lifetime. Reappearing
+        // views must not reopen a ready library or tear down its child tasks.
+        guard loadState != .ready else { return }
         let task = Task<Void, Never> { [weak self] in
             await self?.performBootstrap(startSync: startSync)
         }
@@ -181,18 +190,25 @@ public final class LibraryFeatureModel {
                 reminderSettings = await settingsStore.loadReminderSettings()
             }
             try await library.bootstrap()
+            // Observe commits before either initial projection: scheduling
+            // maintenance may finish while the broader Home read is opening.
+            await observeLibraryChanges()
+            await dueCounts.open()
             mediaStore = await library.mediaStore()
             try await reload(demand: [.home, .catalog])
             loadState = .ready
-            await observeLibraryChanges()
-            if startSync ?? syncEnabled {
-                await observeSyncChanges()
-                await syncService.start()
-                await refreshSyncStatus()
-                try await reload(demand: [.home, .catalog])
-            }
+            requestDevicePublication(asOf: .now)
         } catch {
             loadState = .failed(errorMapper.map(error))
+            return
+        }
+        // Opening local data is complete. Sync and subsequent projections must
+        // not turn a usable library into an initial-open failure.
+        if startSync ?? syncEnabled {
+            await observeSyncChanges()
+            await syncService.start()
+            await refreshSyncStatus()
+            await refresh()
         }
     }
 
@@ -203,6 +219,7 @@ public final class LibraryFeatureModel {
             for await _ in stream {
                 guard !Task.isCancelled, let self else { return }
                 libraryRevision &+= 1
+                dueCounts.invalidate()
                 requestReadRefresh()
             }
         }
@@ -213,26 +230,34 @@ public final class LibraryFeatureModel {
         browseGeneration &+= 1
         let generation = browseGeneration
         let snapshot = try await reads.load(scope: scope, demand: [.browse], asOf: .now)
+        try Task.checkCancellation()
         if generation == browseGeneration, browseScope == scope { items = snapshot.items ?? [] }
         return snapshot.items ?? []
     }
 
     public func reload(asOf now: Date = .now,
         demand: Set<NativeLibraryReadDemand> = [.home, .browse, .catalog]) async throws {
+        try Task.checkCancellation()
         let selection = selectedScope
         let scope = demand.contains(.browse) ? (browseScope ?? selectedScope) : selectedScope
         let sort = sortOrder
         await acquireReload()
         defer { releaseReload() }
+        try Task.checkCancellation()
         guard selection == selectedScope, sort == sortOrder else { return }
         var snapshotTime = now
         while true {
+            try Task.checkCancellation()
             let revision = studyMutationRevision
             let committedRevision = libraryRevision
             let data: NativeLibrarySnapshot
             do {
                 data = try await reads.load(scope: scope, sort: sort, demand: demand, asOf: snapshotTime)
             } catch {
+                // A canceled operation is finished, even if a concurrent commit
+                // also made its snapshot obsolete. Never reissue canceled work.
+                try Task.checkCancellation()
+                if error is CancellationError { throw error }
                 guard selection == selectedScope, sort == sortOrder else { return }
                 if revision != studyMutationRevision || committedRevision != libraryRevision {
                     snapshotTime = max(snapshotTime, .now)
@@ -240,6 +265,7 @@ public final class LibraryFeatureModel {
                 }
                 throw error
             }
+            try Task.checkCancellation()
             guard selection == selectedScope, sort == sortOrder else { return }
             guard revision == studyMutationRevision, committedRevision == libraryRevision else {
                 snapshotTime = max(snapshotTime, .now)
@@ -293,8 +319,16 @@ public final class LibraryFeatureModel {
     }
 
     public func refresh(asOf now: Date = .now) async {
+        // Only bootstrap owns initial readiness; background callers must open
+        // the library before asking for a refresh.
+        guard loadState == .ready, !Task.isCancelled else { return }
+        await dueCounts.refresh(asOf: now)
         do { try await reload(asOf: now, demand: browseScope != nil ? [.home, .browse, .catalog] : [.home, .catalog]) }
-        catch { loadState = .failed(errorMapper.map(error)) }
+        catch is CancellationError { /* Normal end of view/background work. */ }
+        catch {
+            guard !Task.isCancelled else { return }
+            recoveryMessage = "Could not refresh your library: " + errorMapper.map(error).message
+        }
     }
 
     /// Publish a committed authoring change; outbound sync observes its journal.
@@ -308,11 +342,11 @@ public final class LibraryFeatureModel {
     /// Waits for requested read models, independently of badge/widget services.
     public func awaitReadModels() async {
         while true {
+            await dueCounts.waitUntilSettled()
             await refreshWorker?.waitUntilSettled()
-            await studyAvailabilityWorker?.waitUntilSettled()
             // A second worker can enqueue a read while the first await yields.
             // Drain that request even if its task has not started reload yet.
-            if refreshWorker?.isRunning == true || studyAvailabilityWorker?.isRunning == true { continue }
+            if refreshWorker?.isRunning == true || dueCounts.isRefreshing { continue }
             guard isRefreshing else { return }
             await withCheckedContinuation { readWaiters.append($0) }
         }
@@ -326,7 +360,7 @@ public final class LibraryFeatureModel {
     }
 
     public func synchronize() async {
-        guard syncEnabled else { return }
+        guard loadState == .ready, syncEnabled, !Task.isCancelled else { return }
         await syncService.synchronizeAndWait()
         await refreshSyncStatus()
         await refresh()
@@ -663,18 +697,14 @@ public final class LibraryFeatureModel {
     /// refresh and OS publication are independent optional effects.
     private func didMutate() {
         libraryRevision &+= 1
+        dueCounts.invalidate()
         requestReadRefresh()
     }
 
     private func requestReadRefresh() {
         if refreshWorker == nil {
             refreshWorker = LatestAsyncWork { [weak self] (_: Void) in
-                guard let self else { return }
-                do {
-                    try await reload(demand: browseScope != nil ? [.home, .browse, .catalog] : [.home, .catalog])
-                } catch {
-                    recoveryMessage = "Saved. Refresh could not finish: \(error.localizedDescription)"
-                }
+                await self?.refresh()
             }
         }
         refreshWorker?.request(())
@@ -692,18 +722,7 @@ public final class LibraryFeatureModel {
     private func studyDidMutate() async {
         studyMutationRevision &+= 1
         libraryRevision &+= 1
-        if studyAvailabilityWorker == nil {
-            studyAvailabilityWorker = LatestAsyncWork { [weak self] (_: Void) in
-                guard let self else { return }
-                let revision = studyMutationRevision
-                let libraryReadRevision = libraryRevision
-                let now = Date.now
-                guard let availability = try? await studyAvailability(scope: .allDecks, asOf: now),
-                      revision == studyMutationRevision, libraryReadRevision == libraryRevision else { return }
-                requestDevicePublication(asOf: now, availability: availability)
-            }
-        }
-        studyAvailabilityWorker?.request(())
+        dueCounts.invalidate()
     }
 
     private func studyAvailability(scope: DeckScope, asOf now: Date) async throws -> StudyAvailability {
@@ -714,15 +733,22 @@ public final class LibraryFeatureModel {
         return StudyAvailability(dueNow: summary.dueNow, nextStudyAt: summary.nextStudyAt)
     }
 
-    private func requestDevicePublication(asOf now: Date, availability: StudyAvailability? = nil) {
+    private func requestDevicePublication(asOf now: Date, availability: StudyAvailability? = nil,
+                                          dueSnapshot: LibraryDueSnapshot? = nil) {
+        guard loadState == .ready, dueSnapshot != nil || dueCounts.state == .ready else { return }
         if publicationWorker == nil {
             publicationWorker = LatestAsyncWork { [weak self] request in
                 await self?.performDeviceStatePublication(request)
             }
         }
-        publicationWorker?.request(DevicePublicationRequest(asOf: now,
-            availability: availability ?? StudyAvailability(dueNow: allDecksSummary.dueNow,
-                nextStudyAt: allDecksSummary.nextStudyAt), decks: Array(decks.prefix(12))))
+        let latest = dueCounts.state == .ready ? dueCounts.snapshot : nil
+        let due = dueSnapshot ?? latest
+        // Broad refreshes may finish with an earlier as-of time. They must not
+        // enqueue old counts after the independent fast projection published.
+        publicationWorker?.request(DevicePublicationRequest(asOf: due?.calculatedAt ?? now,
+            availability: due.map { StudyAvailability(dueNow: $0.total, nextStudyAt: $0.nextStudyAt) }
+                ?? availability ?? StudyAvailability(dueNow: allDecksSummary.dueNow,
+                    nextStudyAt: allDecksSummary.nextStudyAt), decks: Array(decks.prefix(12))))
     }
 
     private func performDeviceStatePublication(_ request: DevicePublicationRequest) async {

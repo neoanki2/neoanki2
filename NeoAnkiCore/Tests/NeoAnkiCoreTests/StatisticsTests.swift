@@ -357,6 +357,35 @@ private func statsReview(
     #expect(try await store.statisticsRevision() == revision)
 }
 
+@Test func statisticsRevisionIncludesUnjournaledSchedulerChangesAndExternalCommits() async throws {
+    let (store, folder, _, _) = try await statsFixture()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    _ = try await store.statisticsSource()
+    let revision = try await store.statisticsRevision()
+    let preset = try await store.schedulerPreset()
+    func settingRetention(_ retention: Double) -> SchedulerPreset {
+        .init(id: preset.id, name: preset.name, desiredRetention: retention,
+              maximumIntervalDays: preset.maximumIntervalDays,
+              automaticOptimizationEnabled: preset.automaticOptimizationEnabled,
+              activeParameterSetID: preset.activeParameterSetID,
+              createdAt: preset.createdAt, updatedAt: preset.updatedAt)
+    }
+    try await store.saveSchedulerPreset(settingRetention(0.85))
+    let localRevision = try await store.statisticsRevision()
+    #expect(localRevision != revision)
+    #expect(try await store.statisticsSource().cards.allSatisfy { $0.parameters.requestRetention == 0.85 })
+    #expect(try await store.statisticsRevision() == localRevision)
+
+    let writer = try SQLiteDatabase(path: folder.appendingPathComponent("library.sqlite"), createIfMissing: false)
+    let journal = try await writer.currentChangeCursor()
+    try await writer.saveSchedulerPreset(settingRetention(0.95))
+    #expect(try await writer.currentChangeCursor() == journal)
+    let externalRevision = try await store.statisticsRevision()
+    #expect(externalRevision != localRevision)
+    #expect(try await store.statisticsSource().cards.allSatisfy { $0.parameters.requestRetention == 0.95 })
+    #expect(try await store.statisticsRevision() == externalRevision)
+}
+
 @Test func statisticsMillionReviewBenchmark() throws {
     guard ProcessInfo.processInfo.environment["NEOANKI_RUN_STATISTICS_BENCHMARK"] == "1" else { return }
     var source = emptyStatsSource()

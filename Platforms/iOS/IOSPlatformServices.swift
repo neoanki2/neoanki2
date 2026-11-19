@@ -290,6 +290,11 @@ actor MobileSyncRecoveryUITestService: SyncService {
         schedule()
         let work = Task { [weak self] in
             guard let model = self?.model else { task.setTaskCompleted(success: false); return }
+            guard !Task.isCancelled else { task.setTaskCompleted(success: false); return }
+            await model.bootstrap()
+            guard model.loadState == .ready, !Task.isCancelled else {
+                task.setTaskCompleted(success: false); return
+            }
             await model.refresh()
             guard !Task.isCancelled else { task.setTaskCompleted(success: false); return }
             if model.syncEnabled { await model.synchronize() }

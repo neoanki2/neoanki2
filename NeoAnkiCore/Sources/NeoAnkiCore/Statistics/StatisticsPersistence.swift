@@ -201,6 +201,9 @@ extension SQLiteDatabase {
 
     func prepareStatisticsEvidence() throws {
         while try backfillStatisticsPage() {}
+        // A warm read must not open a write transaction or advance cache
+        // revisions merely to delete an already empty evidence queue.
+        guard !(try query("SELECT 1 FROM statistics_changes LIMIT 1;")).isEmpty else { return }
         try inStatisticsTransaction {
             for row in try query("SELECT * FROM statistics_changes ORDER BY sequence;") {
                 guard let eventID = row["event_id"] as? String, let kind = row["kind"] as? String,
@@ -239,12 +242,11 @@ extension SQLiteDatabase {
     }
 
     func statisticsRevision() throws -> String {
-        let tables = ["statistics_events", "statistics_changes", "learning_time_segments"]
-        let values = try tables.map { table in
-            (try query("SELECT COALESCE(MAX(sequence),0) AS value FROM \(table);").first?["value"] as? Int64)
-                ?? 0
-        }
-        return "\(try currentChangeCursor()):\(values)"
+        // Statistics also depend on presets, cohorts, and learned parameters
+        // that do not all participate in the API/evidence journals. Observe
+        // every local write and commits from other connections in O(1).
+        let token = try cacheToken()
+        return "\(token.localRevision):\(token.dataVersion)"
     }
 
     func statisticsSource() throws -> StatisticsSource {

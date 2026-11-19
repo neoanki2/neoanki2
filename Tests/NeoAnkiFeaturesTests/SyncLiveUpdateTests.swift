@@ -58,3 +58,43 @@ private actor StartupSyncService: SyncService {
     #expect(await service.starts == 1)
     #expect(model.loadState == .ready)
 }
+
+@MainActor
+@Test func cancelledSceneWaiterDoesNotCancelStartupOrReopenOnReappearance() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
+    let service = StartupSyncService()
+    let model = LibraryFeatureModel(library: repository, syncService: service)
+    let scene = Task { await model.bootstrap(startSync: true) }
+    await service.waitUntilStarted()
+    scene.cancel()
+    await service.finish()
+    await scene.value
+    await model.bootstrap(startSync: true)
+    #expect(await service.starts == 1)
+    #expect(model.loadState == .ready)
+    #expect(model.recoveryMessage == nil)
+}
+
+@MainActor
+@Test func postSyncReadFailureCannotInvalidateSuccessfulLocalStartup() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
+    let reads = HeldNativeLibraryReads(base: repository)
+    let service = StartupSyncService()
+    let model = LibraryFeatureModel(library: repository, syncService: service,
+        reads: NativeLibraryReadCoordinator(library: reads))
+    let scene = Task { await model.bootstrap(startSync: true) }
+    await service.waitUntilStarted()
+    #expect(model.loadState == .ready)
+    let gate = await reads.arm(offsets: [1], firstFails: true)[0]
+    await service.finish()
+    await reads.waitUntilHeld(gate)
+    await reads.release(gate)
+    await scene.value
+    #expect(model.loadState == .ready)
+    #expect(model.recoveryMessage?.contains("Obsolete held home read failed") == true)
+    #expect(await reads.readCount == gate)
+}

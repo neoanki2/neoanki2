@@ -96,7 +96,9 @@ changed words are bold and underlined. Answer-only notes open under
 The saving indicator covers the local review and next-card preparation. Badges,
 reminders, widgets, and iCloud updates continue separately after the review is
 saved, so they do not hold the next card's controls. Leaving study refreshes the
-Home due counts; progress history is available in Statistics.
+Home due counts; progress history is available in Statistics. On iPhone and
+iPad, returning later checks local availability before showing a confirmed
+empty queue, even when no other device has been used.
 
 After a session adds usable review evidence, an eligible profile continues
 tuning its scheduling model silently. This maintenance does not reorder the

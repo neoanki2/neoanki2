@@ -18,7 +18,10 @@ learning time, progress, streaks, and workload charts. Select a deck using the
 scope filter in that screen. Reports use one shared screen across all Apple platforms;
 Mac home pairs due counts and Study with today's distinct reviewed-card count,
 recorded study time, and scheduled cards for today and the next six study days. Detailed
-reports remain in Statistics. See [Statistics](../statistics/).
+reports remain in Statistics. On Mac, returning to either screen restores its
+loaded report and filters while changed data refreshes. On iPhone and iPad,
+returning to the app checks local due counts before reporting that nothing is due.
+See [Statistics](../statistics/).
 
 NeoAnki2 is a native, local-first spaced-repetition app for Mac, iPhone, and
 iPad. Homebrew is the recommended Mac installation because it verifies the

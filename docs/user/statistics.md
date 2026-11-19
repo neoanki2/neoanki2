@@ -8,6 +8,9 @@ parent: User guide
 # Statistics
 
 Open **Statistics** from the Mac or iPad sidebar or the iPhone tab bar.
+On Mac, switching between All Decks and Statistics restores the loaded reports
+and their filters. Changed data refreshes in the background without replacing a
+loaded report with a full-screen spinner.
 Mac, iPhone, and iPad use the same screen and calculations.
 Session completion offers **View Session Statistics**, filtered to that session.
 Home and deck screens retain due counts and study actions; reports live here.

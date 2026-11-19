@@ -41,6 +41,9 @@ public struct LibraryFeatureFactory {
     public func makeStatistics(scope: DeckScope = .allDecks, sessionID: UUID? = nil) -> StatisticsFeatureModel {
         .init(library: library, scope: scope, sessionID: sessionID)
     }
+    public func makeStatisticsWorkspace() -> StatisticsWorkspace {
+        .init(library: library)
+    }
     public func makeWordCapture(rootURL: URL, onSaved: @escaping @MainActor () async -> Void = {}) -> WordCaptureModel {
         .init(library: library, rootURL: rootURL, onSaved: onSaved)
     }
