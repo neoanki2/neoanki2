@@ -30,8 +30,6 @@ public struct StatisticsView: View {
     @State private var selectedCardGroup: StatisticsCardGroup?
     @State private var selectedReview: StatisticsReview?
     @State private var visibleReviews = 100
-    @State private var customPace = false
-    @State private var customRetention = false
     public init(model: StatisticsFeatureModel) { _model = State(initialValue: model) }
     public init(library: any LibraryRepository, scope: DeckScope = .allDecks, sessionID: UUID? = nil) {
         _model = State(
@@ -97,9 +95,9 @@ public struct StatisticsView: View {
             selectedInterval = nil
             selectedGrade = nil
             visibleReviews = 100
-            Task { await model.refresh() }
+            Task { await model.refresh(force: false) }
         }
-        .onDisappear { model.cancelForecast() }
+        .onDisappear { if model.isForecasting { model.cancelForecast() } }
         .sheet(item: $selectedCardGroup) { group in StatisticsCardInspector(group: group) }
         .sheet(item: $selectedReview) { review in reviewDetail(review) }
     }
@@ -362,20 +360,20 @@ public struct StatisticsView: View {
                 Text("30 days").tag(30)
                 Text("90 days").tag(90)
             }.pickerStyle(.segmented)
-            Toggle("Choose new-card pace", isOn: $customPace).onChange(of: customPace) { _, enabled in
-                model.forecastRequest.newCardsPerDay = enabled ? 10 : nil
-            }
-            if customPace {
+            Toggle("Choose new-card pace", isOn: Binding(
+                get: { model.forecastRequest.newCardsPerDay != nil },
+                set: { model.forecastRequest.newCardsPerDay = $0 ? 10 : nil }))
+            if model.forecastRequest.newCardsPerDay != nil {
                 Stepper(
                     "New cards per day: \(model.forecastRequest.newCardsPerDay ?? 10)",
                     value: Binding(
                         get: { model.forecastRequest.newCardsPerDay ?? 10 },
                         set: { model.forecastRequest.newCardsPerDay = $0 }), in: 0...1000)
             }
-            Toggle("Choose desired retention", isOn: $customRetention).onChange(of: customRetention) {
-                _, enabled in model.forecastRequest.desiredRetention = enabled ? 0.9 : nil
-            }
-            if customRetention {
+            Toggle("Choose desired retention", isOn: Binding(
+                get: { model.forecastRequest.desiredRetention != nil },
+                set: { model.forecastRequest.desiredRetention = $0 ? 0.9 : nil }))
+            if model.forecastRequest.desiredRetention != nil {
                 Slider(
                     value: Binding(
                         get: { model.forecastRequest.desiredRetention ?? 0.9 },

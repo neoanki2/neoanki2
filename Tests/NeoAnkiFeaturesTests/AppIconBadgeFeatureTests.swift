@@ -184,14 +184,14 @@ private actor BadgeOnlyNotificationScheduler: NotificationSchedulingService {
     await publisher.suspendNextPublication()
     let refresh = Task { await model.refresh() }
     await publisher.waitUntilSuspended()
-    #expect(!model.isRefreshing)
-    #expect(model.allDecksSummary.dueNow == 1)
+    // Fast availability publishes independently of the broader Home refresh.
+    // Starting study must work even if that broader refresh is still active.
+    #expect(model.dueCounts.count(for: .allDecks) == 1)
     await model.beginStudy(scope: .allDecks, title: "All Decks")
     #expect(model.activeStudy?.currentCard != nil)
     #expect(model.activeStudy?.isLoading == false)
     #expect(model.activeStudy?.error == nil)
     #expect(!model.isStartingStudy)
-    #expect(!model.isRefreshing)
     await publisher.resumePublication()
     await refresh.value
     await model.awaitDevicePublication()

@@ -43,15 +43,33 @@ actor OptionalPublicationGate: AppIconBadgePublishing, NotificationSchedulingSer
 /// Holds completed home reads at publication, including an obsolete failure.
 /// Writes still go through the real SQLite repository; only the read projection
 /// is controlled, so a commit can occur while an older snapshot is suspended.
-private actor HeldNativeLibraryReads: LibraryBrowsing, LibraryNativeReadSupporting {
+actor HeldNativeLibraryReads: LibraryBrowsing, LibraryNativeReadSupporting, LibraryChangePersisting {
     let base: SQLiteLibraryRepository
+    private let observesChanges: Bool
     private var homeReadCount = 0
     private var heldIndices: Set<Int> = []
     private var failingIndices: Set<Int> = []
     private var held: [Int: CheckedContinuation<Void, Never>] = [:]
     private var observers: [Int: CheckedContinuation<Void, Never>] = [:]
+    var readCount: Int { homeReadCount }
 
-    init(base: SQLiteLibraryRepository) { self.base = base }
+    init(base: SQLiteLibraryRepository, observesChanges: Bool = false) {
+        self.base = base; self.observesChanges = observesChanges
+    }
+
+    func changeNotifications() async -> AsyncStream<Int64> {
+        if observesChanges { return await base.changeNotifications() }
+        return AsyncStream { $0.finish() }
+    }
+    func currentChangeCursor() async throws -> Int64 {
+        if observesChanges { return try await base.currentChangeCursor() }
+        return 0
+    }
+    func changes(after cursor: Int64, limit: Int) async throws -> [LibraryChange] {
+        try await base.changes(after: cursor, limit: limit)
+    }
+    func createBackup(at destination: URL) async throws { try await base.createBackup(at: destination) }
+    func verifyBackup(at destination: URL) async throws { try await base.verifyBackup(at: destination) }
 
     func arm(offsets: [Int], firstFails: Bool = false) -> [Int] {
         let indices = offsets.map { homeReadCount + $0 }

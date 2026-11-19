@@ -94,8 +94,24 @@ public struct MobileRootView: View {
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
         .task(id: model.syncEnabled) { vocabularyLibrary.sync.setEnabled(model.syncEnabled) }
+        .task(id: model.syncEnabled && scenePhase == .active) {
+            guard model.syncEnabled, scenePhase == .active else { return }
+            // SyncService currently exposes status as a query. Preserve its
+            // status indicator without coupling it to full-library polling.
+            while !Task.isCancelled {
+                await model.refreshSyncStatus()
+                do { try await Task.sleep(for: .seconds(10)) }
+                catch { return }
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await vocabularyLibrary.sync.refresh() } }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            model.dueCounts.invalidate()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
+            model.dueCounts.invalidate()
         }
         .task {
             await model.bootstrap()
@@ -112,16 +128,8 @@ public struct MobileRootView: View {
                 catch { fixtureError = MobileAppModel.message(for: error) }
                 fixturesReady = true
             }
-            // Cards also become due with sync disabled. Refresh their count
-            // and the app icon while this screen is idle.
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(10)) }
-                catch { return }
-                if model.syncEnabled {
-                    await model.refreshSyncStatus()
-                }
-                await model.refresh()
-            }
+            // Availability owns a foreground-only timer for the next due time
+            // or study-day boundary; no full-library polling is needed.
         }
     }
 
@@ -426,6 +434,9 @@ private struct HomeView: View {
                 Section {
                     DueNowCard(
                         summary: model.allDecksSummary,
+                        dueCount: model.dueCounts.count(for: .allDecks),
+                        loadState: model.dueCounts.state,
+                        retry: { Task { await model.dueCounts.refresh() } },
                         // Background count refreshes do not prevent study.
                         // Only starting a session must disable this action.
                         isWorking: model.isStartingStudy,
@@ -444,7 +455,7 @@ private struct HomeView: View {
                             title: "All Decks",
                             subtitle: "Everything in your library",
                             itemCount: model.allDecksSummary.itemCount,
-                            dueCount: model.allDecksSummary.dueNow
+                            dueCount: model.dueCounts.count(for: .allDecks), loadState: model.dueCounts.state
                         )
                     }
 
@@ -454,7 +465,7 @@ private struct HomeView: View {
                                 title: deck.name,
                                 subtitle: deck.parentID == nil ? "Deck" : "Nested deck",
                                 itemCount: deck.itemCount,
-                                dueCount: deck.dueCount
+                                dueCount: model.dueCounts.deckCount(deck.id), loadState: model.dueCounts.state
                             )
                         }
                     }
@@ -464,7 +475,7 @@ private struct HomeView: View {
                             title: "Unassigned",
                             subtitle: "Cards without a deck",
                             itemCount: model.unassignedSummary.itemCount,
-                            dueCount: model.unassignedSummary.dueNow
+                            dueCount: model.dueCounts.count(for: .unassigned), loadState: model.dueCounts.state
                         )
                     }
                 } header: {
@@ -485,6 +496,7 @@ private struct HomeView: View {
                 if case let .scope(scope) = route { path = NavigationPath([MobileScope(scope)]) }
             }
             .task {
+                model.dueCounts.selectScope(nil)
                 if case let .scope(scope) = model.route { path = NavigationPath([MobileScope(scope)]) }
             }
         }
@@ -499,24 +511,35 @@ private struct HomeView: View {
 
 private struct DueNowCard: View {
     let summary: ScopeSummary
+    let dueCount: Int?
+    let loadState: DueCountLoadState
+    let retry: () -> Void
     let isWorking: Bool
     let action: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(summary.hasDueCards ? "\(summary.dueNow) \(summary.dueNow == 1 ? "card" : "cards") due" : "You're caught up")
-                .font(.title2.weight(.semibold))
-            if summary.hasDueCards {
-                Text("A little practice goes a long way.").foregroundStyle(.secondary)
-                Button(action: action) {
-                    Label("Study", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity, minHeight: 44)
+            if case .failed = loadState {
+                Text("Could Not Check Due Cards").font(.headline)
+                Button("Try Again", action: retry).frame(minHeight: 44)
+            } else if let dueCount {
+                Text(dueCount > 0 ? "\(dueCount) \(dueCount == 1 ? "card" : "cards") due" : "You're caught up")
+                    .font(.title2.weight(.semibold))
+                if dueCount > 0 {
+                    Text("A little practice goes a long way.").foregroundStyle(.secondary)
+                    Button(action: action) {
+                        Label("Study", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
+                    .disabled(isWorking)
+                } else {
+                    Text(summary.itemCount == 0 ? "Add your first item to begin." : "Come back when your next cards are due.")
+                        .foregroundStyle(.primary)
                 }
-                .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
-                .disabled(isWorking)
             } else {
-                Text(summary.itemCount == 0 ? "Add your first item to begin." : "Come back when your next cards are due.")
-                    .foregroundStyle(.primary)
+                ProgressView("Checking due cards…")
+                    .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
             }
         }
         .padding(20)
@@ -528,7 +551,8 @@ private struct ScopeRow: View {
     let title: String
     let subtitle: String
     let itemCount: Int
-    let dueCount: Int
+    let dueCount: Int?
+    let loadState: DueCountLoadState
 
     var body: some View {
         HStack(spacing: 12) {
@@ -540,13 +564,19 @@ private struct ScopeRow: View {
                     .foregroundStyle(.primary)
             }
             Spacer(minLength: 8)
-            if dueCount > 0 {
+            if let dueCount, dueCount > 0 {
                 Text(dueCount, format: .number)
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .background(.tint.opacity(0.14), in: Capsule())
                     .accessibilityLabel("\(dueCount) due")
+            } else if dueCount == nil {
+                if case .failed = loadState {
+                    Text("—").accessibilityLabel("Due count unavailable")
+                } else {
+                    ProgressView().accessibilityLabel("Checking due cards")
+                }
             }
         }
         .padding(.vertical, 4)
@@ -569,6 +599,9 @@ private struct ScopeDetailView: View {
                 Section {
                     DueNowCard(
                         summary: summary,
+                        dueCount: model.dueCounts.count(for: scope.filter),
+                        loadState: model.dueCounts.state,
+                        retry: { Task { await model.dueCounts.refresh() } },
                         isWorking: model.isStartingStudy,
                         action: startStudy
                     )
@@ -587,7 +620,8 @@ private struct ScopeDetailView: View {
                     Section("Decks") {
                         ForEach(model.decks.filter { $0.parentID == id }) { deck in
                             NavigationLink(value: MobileScope.deck(deck.id)) {
-                                ScopeRow(title: deck.name, subtitle: "Deck", itemCount: deck.itemCount, dueCount: deck.dueCount)
+                                ScopeRow(title: deck.name, subtitle: "Deck", itemCount: deck.itemCount,
+                                         dueCount: model.dueCounts.deckCount(deck.id), loadState: model.dueCounts.state)
                             }
                         }
                     }
@@ -610,7 +644,14 @@ private struct ScopeDetailView: View {
                     }
             }
         }
-        .task { await load() }
+        .task {
+            model.dueCounts.selectScope(scope.filter)
+            await load()
+        }
+        .onAppear { model.dueCounts.selectScope(scope.filter) }
+        .onDisappear {
+            if model.dueCounts.activeScope == scope.filter { model.dueCounts.selectScope(nil) }
+        }
         .onChange(of: model.allDecksSummary) { _, _ in Task { await load() } }
         .onChange(of: model.activeStudy?.id) { _, id in if id == nil { Task { await load() } } }
     }

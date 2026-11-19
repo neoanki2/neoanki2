@@ -30,9 +30,7 @@ struct ScopeHomeView: View {
         self.onBrowse = onBrowse
         self.onBrowseItemsNeedingAttention = onBrowseItemsNeedingAttention
         self.onAddItem = onAddItem
-        let model = statistics
-        model.query.period = .today
-        _statistics = State(initialValue: model)
+        _statistics = State(initialValue: statistics)
     }
 
     var body: some View {

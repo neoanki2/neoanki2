@@ -53,6 +53,7 @@ struct ContentView: View {
     /// the grade keys are unmodified, so they would otherwise land in a field.
     @State private var isEditingStudyCard = false
     @State private var statisticsSessionID: UUID?
+    @State private var statisticsWorkspace: StatisticsWorkspace
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var importModel: ImportModel?
     @State private var isChoosingImportFile = false
@@ -181,6 +182,7 @@ struct ContentView: View {
         self.schedulingModel = schedulingModel
         self.vocabularyLibraryModel = vocabularyLibraryModel
         self.features = LibraryFeatureFactory(library: library)
+        _statisticsWorkspace = State(initialValue: features.makeStatisticsWorkspace())
         self.makeStudyModel = { StudyModel(library: library) }
         self.makeImportModel = { ImportModel(itemsModel: itemsModel, library: library) }
         self.loadHome = { try await library.coldHomeSnapshot(scope: $0, asOf: $1) }
@@ -205,6 +207,7 @@ struct ContentView: View {
         self.schedulingModel = schedulingModel
         self.vocabularyLibraryModel = vocabularyLibraryModel
         self.features = LibraryFeatureFactory(library: library)
+        _statisticsWorkspace = State(initialValue: features.makeStatisticsWorkspace())
         self.makeStudyModel = { StudyModel(library: library) }
         self.makeImportModel = { ImportModel(itemsModel: itemsModel, library: library) }
         self.loadHome = { try await library.coldHomeSnapshot(scope: $0, asOf: $1) }
@@ -632,7 +635,7 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         if case let .statistics(scope) = appSession.route {
-            StatisticsView(model: features.makeStatistics(scope: scope, sessionID: statisticsSessionID))
+            StatisticsView(model: statisticsWorkspace.report(scope: scope, sessionID: statisticsSessionID))
                 .id(scope)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -711,7 +714,7 @@ struct ContentView: View {
         } else {
             ScopeHomeView(
                 itemsModel: itemsModel,
-                statistics: features.makeStatistics(scope: decksModel.studyScope.filter),
+                statistics: statisticsWorkspace.home(scope: decksModel.studyScope.filter),
                 scope: decksModel.studyScope,
                 onStudy: { startStudy() },
                 onBrowse: { openBrowse() },

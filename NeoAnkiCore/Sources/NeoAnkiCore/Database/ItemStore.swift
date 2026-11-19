@@ -152,6 +152,8 @@ public actor ItemStore {
     }
 
     let database: SQLiteDatabase
+    private let databaseURL: URL
+    private var availabilityDatabaseTask: Task<SQLiteDatabase, Error>?
     let schedulerOverride: (any Scheduler)?
     let profileID: String
     var fsrsParameters = FSRSScheduler.Parameters()
@@ -201,6 +203,7 @@ public actor ItemStore {
             .appendingPathComponent(".neoanki-api", isDirectory: true)
             .appendingPathComponent("transfers.plist", isDirectory: false)
         database = try SQLiteDatabase(path: databaseURL)
+        self.databaseURL = databaseURL
         schedulerOverride = scheduler
         self.profileID = profileID.isEmpty ? "default" : profileID
         self.starterItemTypes = starterItemTypes
@@ -901,6 +904,34 @@ public actor ItemStore {
 
     public func dueCount(asOf now: Date = .now) async throws -> Int {
         try await dueCount(scope: .allDecks, asOf: now)
+    }
+
+    /// A separate connection keeps foreground counts independent of a running
+    /// content or maturity query on the main database actor.
+    public func dueSnapshot(activeScope: DeckScope? = nil, asOf now: Date = .now) async throws -> LibraryDueSnapshot {
+        try Task.checkCancellation()
+        if availabilityDatabaseTask == nil {
+            let url = databaseURL
+            availabilityDatabaseTask = Task {
+                let reader = try SQLiteDatabase(path: url, createIfMissing: false)
+                try await reader.prepareDueReader()
+                return reader
+            }
+        }
+        let reader: SQLiteDatabase
+        do { reader = try await availabilityDatabaseTask!.value }
+        catch { availabilityDatabaseTask = nil; throw error }
+        // Content edits dirty the family/template projection. Repair it on the
+        // sole writer, then acquire a fresh read snapshot. Only this explicit
+        // readiness condition is retried; SQLite failures propagate unchanged.
+        for _ in 0..<3 {
+            do { return try await reader.dueSnapshot(activeScope: activeScope, asOf: now) }
+            catch is DueProjectionNeedsRefresh {
+                try Task.checkCancellation()
+                try await database.refreshStudyRelationsIfNeeded()
+            }
+        }
+        throw DatabaseError.queryFailed("The library is changing. Try checking due cards again when the edit finishes.")
     }
 
     /// Everything the scope home needs in one snapshot, so the sidebar and the
