@@ -77,6 +77,29 @@ import Testing
         #expect(await reader.dueSnapshotReadCount == 3)
     }
 
+    @Test func fractionalDueBoundaryUsesTheSameEpochPrecisionAsSQLite() async throws {
+        let (store, root) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Date's reference epoch has finer precision here than SQLite's Unix
+        // seconds. Persisting this value rounds the deadline upward by one ULP.
+        let due = Date(timeIntervalSinceReferenceDate: Double(816_692_800).nextUp.nextUp.nextUp)
+        let persisted = Date(timeIntervalSince1970: due.timeIntervalSince1970)
+        #expect(due < persisted)
+        let deck = try await store.createDeck(Deck(name: "Fractional boundary"))
+        _ = try await store.createItem(item("Fractional boundary", deck: deck.id), now: due)
+        let earlier = due.addingTimeInterval(-1)
+        #expect(try await store.dueCount(asOf: earlier) == 0)
+        #expect(try await store.deckSummaries(asOf: earlier).first?.dueCount == 0)
+        let before = try await store.dueSnapshot(asOf: earlier)
+        #expect(before.total == 0)
+        #expect(before.validUntil == persisted)
+        let arrived = try await store.dueSnapshot(asOf: due)
+        #expect(arrived.total == 1)
+        #expect(arrived.calculatedAt == due)
+        #expect(try await store.dueCount(asOf: due) == 1)
+        #expect(try await store.deckSummaries(asOf: due).first?.dueCount == 1)
+    }
+
     @Test func observesOtherConnectionsWithoutNotificationsAndExpiresAtRollover() async throws {
         let (store, root) = try await fixture()
         defer { try? FileManager.default.removeItem(at: root) }

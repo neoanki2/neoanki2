@@ -34,6 +34,10 @@ that the query-only reader rejects writes while the writer and backup connection
 remain usable.
 
 Cache expiration and the next actual study opportunity are separate values.
+All due-count cache windows compare Unix seconds, matching SQLite's eligibility
+queries. A deterministic fractional-second regression covers deadlines that
+round upward when converted from persisted Unix seconds to Swift's reference
+epoch; that conversion must not extend a cached zero past the due boundary.
 Widgets retain their scoped family counts and actual next-study time; conservative
 cache rollover must not become a fabricated “Next” date. Device publication is
 asynchronous and does not gate visible counts or review commits. No schema,

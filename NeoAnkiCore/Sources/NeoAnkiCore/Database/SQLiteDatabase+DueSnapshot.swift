@@ -9,8 +9,13 @@ struct CachedLibraryDueSnapshot {
     let snapshot: LibraryDueSnapshot
 
     func isValid(token current: DatabaseCacheToken, asOf now: Date, calendar currentCalendar: Calendar) -> Bool {
-        token == current && calendar == currentCalendar
-            && now >= snapshot.calculatedAt && now < snapshot.validUntil
+        // Compare in the same epoch/precision used by SQLite's due_at filter.
+        // Converting a persisted Unix deadline back to Date can round it one
+        // reference-epoch ULP above the original scheduling instant.
+        let instant = now.timeIntervalSince1970
+        return token == current && calendar == currentCalendar
+            && instant >= snapshot.calculatedAt.timeIntervalSince1970
+            && instant < snapshot.validUntil.timeIntervalSince1970
     }
 }
 

@@ -135,8 +135,9 @@ public actor ItemStore {
 
         func isValid(token currentToken: DatabaseCacheToken, asOf now: Date) -> Bool {
             guard token == currentToken else { return false }
-            guard now >= calculatedAt else { return false }
-            return validUntil.map { now < $0 } ?? true
+            let instant = now.timeIntervalSince1970
+            guard instant >= calculatedAt.timeIntervalSince1970 else { return false }
+            return validUntil.map { instant < $0.timeIntervalSince1970 } ?? true
         }
     }
 
@@ -147,7 +148,10 @@ public actor ItemStore {
         let validUntil: Date
 
         func isValid(token currentToken: DatabaseCacheToken, asOf now: Date) -> Bool {
-            token == currentToken && now >= calculatedAt && now < validUntil
+            // Match SQLite's Unix-second scheduling comparisons, including
+            // deadlines that round when converted to Date's reference epoch.
+            token == currentToken && now.timeIntervalSince1970 >= calculatedAt.timeIntervalSince1970
+                && now.timeIntervalSince1970 < validUntil.timeIntervalSince1970
         }
     }
 
