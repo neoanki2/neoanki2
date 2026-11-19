@@ -9,7 +9,10 @@ parent: User Guide
 # Scheduling
 
 Deck due counts and daily new-card limits remain separate from maturity. A
-maturity-unavailable warning does not reset schedules or prevent study. Renaming
+maturity-unavailable warning does not reset schedules or prevent study.
+On iPhone and iPad, due counts are checked again on return to the app and when
+a due date or study-day boundary arrives while it is open, including when you
+practice entirely offline on that device. Renaming
 a deck does not recalculate review evidence; grading, undo, suspension, and
 progress reset update the affected maturity values.
 

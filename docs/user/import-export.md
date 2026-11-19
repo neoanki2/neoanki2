@@ -33,7 +33,9 @@ Automatic repair of synced schedules uses reviews already saved in your library.
 It does not import review history from portable or authored deck files.
 Imported independent cards use the normal introduction rules: generated siblings
 share one new introduction per study day, so the saved card count can exceed
-today's eligible-new count. Imported context metadata preserves grouping by
+today's eligible-new count. A completed import refreshes local due availability
+without waiting for badge, reminder, widget, or iCloud publication. Imported
+context metadata preserves grouping by
 language and expression across creation batches.
 
 <nav class="local-toc" aria-label="On this page" markdown="1">

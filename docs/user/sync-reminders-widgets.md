@@ -15,6 +15,9 @@ change is already stored; refresh to retry badge, reminder, or widget
 publication rather than creating or importing the same content again. Saving
 an item does not wait for those device updates or for iCloud to finish. The
 local change remains usable while its counts and device indicators catch up.
+On iPhone and iPad, returning to the app checks local due counts before waiting
+for iCloud. Badge, reminder, and widget publication continues separately from
+the visible count refresh.
 
 Statistics also has an independent private iCloud zone for content-free review,
 undo, lifecycle, and session evidence. Idempotent event identities prevent

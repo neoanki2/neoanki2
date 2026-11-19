@@ -44,7 +44,9 @@ their review history without replacing their Card setups or suspension settings.
 Due counts, including the app icon badge, count generated cards rather than
 items. An item with multiple Card setups can therefore contribute more than
 one due card. After saving a definition, library refreshes update those counts
-to reflect the cards that are currently eligible for study.
+to reflect the cards that are currently eligible for study. Saved changes to
+Card setups also invalidate previously loaded due counts; returning to the app
+checks the current generated cards before confirming an empty queue.
 New cards generated from the same item share one introduction per study day;
 learned cards retain their individual due dates. See [Study queue
 order](../studying/#study-queue-order) for related-card deferrals.

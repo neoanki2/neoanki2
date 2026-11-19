@@ -199,9 +199,10 @@ before saving.
 
 ## Read the scope home
 
-On iPhone and iPad, library and maturity summaries refresh after authoring and
-study changes. A count refresh keeps the current study content available; wait
-for the refreshed summary when comparing totals after a change.
+On iPhone and iPad, due counts refresh after authoring and study changes and
+when returning to the app. While local availability is being checked, an old
+zero is not presented as confirmation that nothing is due. Library and maturity
+summaries can finish separately without holding the visible due count.
 
 Choosing a scope opens its home, which answers one question: is there anything
 to study right now?
