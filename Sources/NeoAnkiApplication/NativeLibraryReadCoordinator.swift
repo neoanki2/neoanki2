@@ -6,6 +6,21 @@ public protocol LibraryNativeReadSupporting: Sendable {
     func nativeScopeSummary(scope: DeckScope, asOf: Date) async throws -> (ScopeSummary, String?)
 }
 
+package protocol NativeLibraryProjectionTracking: Sendable {
+    func projectionRevision() async throws -> Int64
+    func projectionChanges() async -> AsyncStream<Int64>
+}
+
+extension SQLiteLibraryRepository: NativeLibraryProjectionTracking {
+    package func projectionRevision() async throws -> Int64 {
+        try await store.currentLibraryProjectionRevision()
+    }
+
+    package func projectionChanges() async -> AsyncStream<Int64> {
+        await store.libraryChangeNotifications(includeMedia: false)
+    }
+}
+
 extension SQLiteLibraryRepository: LibraryNativeReadSupporting {
     public func nativeHomeSnapshot(scope: DeckScope, asOf: Date) async throws -> (ColdLibraryHomeSnapshot, String?) {
         do { return (try await store.coldLibraryHomeSnapshot(scope: scope, asOf: asOf), nil) }
@@ -43,18 +58,27 @@ public actor NativeLibraryReadCoordinator {
     public init(library: any LibraryBrowsing) { self.library = library }
 
     public func invalidations() async -> AsyncStream<Int64> {
+        if let tracker = library as? any NativeLibraryProjectionTracking {
+            return await tracker.projectionChanges()
+        }
         guard let journal = library as? any LibraryChangePersisting else { return AsyncStream { $0.finish() } }
         return await journal.changeNotifications()
     }
 
+    private func revision() async throws -> Int64? {
+        if let tracker = library as? any NativeLibraryProjectionTracking {
+            return try await tracker.projectionRevision()
+        }
+        return try await (library as? any LibraryChangePersisting)?.currentChangeCursor()
+    }
+
     public func load(scope: DeckScope, sort: ItemSortOrder = .createdAscending,
         demand: Set<NativeLibraryReadDemand>, asOf: Date) async throws -> NativeLibrarySnapshot {
-        let journal = library as? any LibraryChangePersisting
         // A snapshot spanning an awaited mutation is retried before publication.
         // Bound the work during continuous imports; callers can retain old data.
         for _ in 0..<3 {
             try Task.checkCancellation()
-            let before = try await journal?.currentChangeCursor()
+            let before = try await revision()
             var home: ColdLibraryHomeSnapshot?
             var summary: ScopeSummary?
             var issue: String?
@@ -79,7 +103,7 @@ public actor NativeLibraryReadCoordinator {
             }
             let rows = demand.contains(.browse) ? try await library.items(scope: scope, sort: sort, search: "") : nil
             let catalog = demand.contains(.catalog) ? try await library.loadItemTypeCatalog() : nil
-            let after = try await journal?.currentChangeCursor()
+            let after = try await revision()
             try Task.checkCancellation()
             guard before == after else { continue }
             return NativeLibrarySnapshot(scope: scope, sort: sort, asOf: asOf, sourceRevision: after,

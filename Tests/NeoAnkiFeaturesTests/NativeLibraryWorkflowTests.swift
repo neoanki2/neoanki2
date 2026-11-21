@@ -74,6 +74,40 @@ private actor FailingNativeBadgePublisher: AppIconBadgePublishing {
         #expect(snapshot.sourceRevision != nil)
         #expect(snapshot.scope == .unassigned)
     }
+    @Test(.timeLimit(.minutes(2)))
+    func mediaWritesKeepProjectionRevisionWhileMediaStillReachesSync() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("native-media-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = try SQLiteLibraryRepository(databaseURL: root.appendingPathComponent("library.sqlite"))
+        try await repository.bootstrap()
+        let reads = NativeLibraryReadCoordinator(library: repository)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let initial = try await reads.load(scope: .allDecks, demand: [], asOf: now)
+        let journalBaseline = try await repository.currentChangeCursor()
+        let syncStream = await repository.changeNotifications()
+        let projectionStream = await reads.invalidations()
+        var syncEvents = syncStream.makeAsyncIterator()
+        var projectionEvents = projectionStream.makeAsyncIterator()
+
+        for sample in UInt8(0)..<8 {
+            let png = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, sample])
+            _ = try await repository.reserveMedia(data: png, kind: .image, altText: "Fixture", asOf: now)
+        }
+        let syncedMediaCursor = try #require(await syncEvents.next())
+        #expect(syncedMediaCursor > journalBaseline)
+        let mediaEvents = try await repository.changes(after: journalBaseline, limit: 100)
+        #expect(mediaEvents.count == 8)
+        #expect(mediaEvents.allSatisfy { $0.resourceType == "media" })
+        let afterMedia = try await reads.load(scope: .allDecks, demand: [], asOf: now)
+        #expect(afterMedia.sourceRevision == initial.sourceRevision)
+
+        _ = try await repository.createDeck(Deck(name: "Course"))
+        let deckCursor = try await repository.currentChangeCursor()
+        #expect(await projectionEvents.next() == deckCursor)
+        let afterDeck = try await reads.load(scope: .allDecks, demand: [], asOf: now)
+        #expect(afterDeck.sourceRevision == deckCursor)
+    }
+
     @Test func damagedMaturityDoesNotPreventNativeBrowsingOrStudy() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("native-recovery-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
