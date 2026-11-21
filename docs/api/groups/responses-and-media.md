@@ -2,7 +2,7 @@
 title: Responses and media
 description: Generated NeoAnki local API operations for responses and media.
 audience: api
-contract_digest: sha256:7bd306e708940318713d663caec75fe2ab8590ac1a07ca6cf90c72220f981f38
+contract_digest: sha256:0b4f0520c008b125d949842d387f953839e741f17b6222b61b2d1033b318df39
 parent: Local API reference
 permalink: /api/responses-and-media/
 ---
@@ -13,7 +13,7 @@ permalink: /api/responses-and-media/
 
 ## `POST /v1/media`
 
-Upload media through the loopback-only NeoAnki API.
+Upload media through the loopback-only NeoAnki API. Media bytes must match the declared kind. An M4A or M4B major brand identifies M4A audio even when generic MP4 brands are listed for compatibility.
 
 - **Operation ID:** `uploadMedia`
 - **Authorization:** Bearer token with `media.write`
@@ -221,6 +221,6 @@ curl --request HEAD \
   --header 'Authorization: Bearer <token>'
 ```
 
-Contract digest: `sha256:7bd306e708940318713d663caec75fe2ab8590ac1a07ca6cf90c72220f981f38`.
+Contract digest: `sha256:0b4f0520c008b125d949842d387f953839e741f17b6222b61b2d1033b318df39`.
 
 _Generated from the runtime endpoint registry; do not edit by hand._

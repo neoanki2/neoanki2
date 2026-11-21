@@ -251,6 +251,7 @@ import Testing
         ("video", "mov", iso("qt  ")),
         ("video", "m4v", iso("M4V ")),
         ("video", "mp4", iso("isom")),
+        ("audio", "m4a", iso("M4A ", compatible: "isom")),
     ]
     for (index, fixture) in fixtures.enumerated() {
         let uploaded = await api.handle(APIRequest(
@@ -295,7 +296,7 @@ import Testing
     let beforeHostile = try await store.currentChangeCursor()
     #expect(await rejected("wrong-magic", kind: "image", bytes: Data("not-media".utf8)).status == 422)
     #expect(await rejected("kind-mismatch", kind: "audio", bytes: fixtures[5].bytes).status == 422)
-    #expect(await rejected("ambiguous", kind: "audio", bytes: iso("M4A ", compatible: "isom")).status == 422)
+    #expect(await rejected("ambiguous", kind: "audio", bytes: iso("isom", compatible: "M4A ")).status == 422)
     #expect(try await store.currentChangeCursor() == beforeHostile)
 
     for (index, kind) in [MediaKind.audio, .image, .gif, .video].enumerated() {

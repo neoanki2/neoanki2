@@ -90,6 +90,8 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
             "Image occlusion cards expose occlusionGroup alongside structured masks; render masks until answer reveal and conceal answerText before reveal."
         case .bulkItems:
             "Optional order atomically reconciles one generated deck against complete expected item snapshots. Both dry runs and commits reject stale snapshots; only New-card introduction times are reordered."
+        case .uploadMedia:
+            "Media bytes must match the declared kind. An M4A or M4B major brand identifies M4A audio even when generic MP4 brands are listed for compatibility."
         default:
             nil
         }

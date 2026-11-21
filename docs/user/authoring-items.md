@@ -210,6 +210,7 @@ Select an item row to open its detail view.
 
 The preview displays non-empty fields in item-type order. The first two fields
 receive prompt-and-answer emphasis; later fields include their field names.
+On iPhone and iPad, field names label the reading sections.
 Below the preview, NeoAnki2 shows the generated card count, item type, and
 each card's maturity status. These statuses describe long-term recall and do
 not reveal a card's answer before study.
