@@ -53,7 +53,8 @@ On iPhone, five labeled tabs stay available at the bottom:
 - **Home** shows All Decks, Unassigned, individual deck scopes, current due
   counts and the primary Study action.
 - **Library** browses, searches, selects, moves, edits, and deletes items.
-  Item details show the maturity of each generated card.
+  Item details show populated fields followed by the maturity of each generated
+  card. Open a synced course's lesson item here to read its text and play its audio.
 - **Create** adds items and decks, manages item types and Card setups, transfers
   files, opens deck builders, and manages offline vocabulary packs.
 - **Statistics** explores activity, memory, sessions, and read-only workload scenarios.

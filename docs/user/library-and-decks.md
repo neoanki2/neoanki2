@@ -253,6 +253,10 @@ the surviving card identities.
 
 ## Browse and search items
 
+A course lesson can have reading and media fields without study cards. Open the
+lesson from Browse to see its content. Maturity appears when the item generates
+cards.
+
 If item detail reports that an image cannot be read, see
 [media troubleshooting](../troubleshooting/#item-and-media-errors).
 The library stores image files alongside the database, so back them up together.
