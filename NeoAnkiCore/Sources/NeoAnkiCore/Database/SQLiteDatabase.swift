@@ -138,7 +138,7 @@ actor SQLiteDatabase {
     var maturityStatistics = MaturityReadStatistics()
     private var localRevision: UInt64 = 0
     private var changeTrackingReady = false
-    private var changeObservers: [UUID: AsyncStream<Int64>.Continuation] = [:]
+    private var changeObservers: [UUID: (continuation: AsyncStream<Int64>.Continuation, includeMedia: Bool)] = [:]
     private var lastNotifiedChangeCursor: Int64 = 0
     var dueSnapshotCache: CachedLibraryDueSnapshot?
     var dueSnapshotReadCount = 0
@@ -164,7 +164,7 @@ actor SQLiteDatabase {
     }
 
     deinit {
-        for observer in changeObservers.values { observer.finish() }
+        for observer in changeObservers.values { observer.continuation.finish() }
         if let handle {
             sqlite3_close(handle)
         }
@@ -1075,11 +1075,11 @@ actor SQLiteDatabase {
             .first?["cursor"] as? Int64 ?? 0
     }
 
-    func libraryChangeNotifications() -> AsyncStream<Int64> {
+    func libraryChangeNotifications(includeMedia: Bool = true) -> AsyncStream<Int64> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<Int64>.makeStream(bufferingPolicy: .bufferingNewest(1))
         lastNotifiedChangeCursor = (try? currentChangeCursor()) ?? lastNotifiedChangeCursor
-        changeObservers[id] = continuation
+        changeObservers[id] = (continuation, includeMedia)
         continuation.onTermination = { [weak self] _ in
             Task { await self?.removeChangeObserver(id) }
         }
@@ -1088,12 +1088,36 @@ actor SQLiteDatabase {
 
     private func removeChangeObserver(_ id: UUID) { changeObservers[id] = nil }
 
+    /// File arrival and reservation updates do not change the library's
+    /// item, deck, or scheduling projections.
+    func latestNonMediaChange(after cursor: Int64 = 0) throws -> Int64? {
+        try query(
+            """
+            SELECT cursor FROM api_changes
+            WHERE cursor > ? AND resource_type != ?
+            ORDER BY cursor DESC LIMIT 1;
+            """,
+            bindings: [.int(cursor), .text(LibraryResourceKind.media.rawValue)]
+        ).first?["cursor"] as? Int64
+    }
+
     private func publishCommittedChanges() {
         guard !changeObservers.isEmpty, changeTrackingReady, let handle,
               sqlite3_get_autocommit(handle) != 0,
               let cursor = try? currentChangeCursor(), cursor > lastNotifiedChangeCursor else { return }
+        let contentCursor: Int64?
+        if changeObservers.values.contains(where: { !$0.includeMedia }) {
+            do { contentCursor = try latestNonMediaChange(after: lastNotifiedChangeCursor) }
+            catch { contentCursor = cursor }
+        } else {
+            contentCursor = nil
+        }
         lastNotifiedChangeCursor = cursor
-        for observer in changeObservers.values { observer.yield(cursor) }
+        for observer in changeObservers.values {
+            if let event = observer.includeMedia ? cursor : contentCursor {
+                observer.continuation.yield(event)
+            }
+        }
     }
 
     func oldestChangeCursor() throws -> Int64? {

@@ -199,10 +199,11 @@ before saving.
 
 ## Read the scope home
 
-On iPhone and iPad, due counts refresh after authoring and study changes and
-when returning to the app. While local availability is being checked, an old
-zero is not presented as confirmation that nothing is due. Library and maturity
-summaries can finish separately without holding the visible due count.
+On iPhone and iPad, returning to the app checks current availability before
+showing whether you are caught up. During ordinary refreshes, the last due
+count stays visible until its replacement is ready. Incoming attachments
+refresh availability when their course items or schedules are saved. Library
+and maturity summaries can finish separately from the due count.
 
 Choosing a scope opens its home, which answers one question: is there anything
 to study right now?

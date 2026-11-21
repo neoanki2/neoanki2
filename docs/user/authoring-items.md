@@ -84,6 +84,7 @@ when no voice is installed.
 Initial dictionary, voice, and system-model installation is separate from offline
 authoring. Accepted items and media follow existing sync and export settings.
 Unfinished drafts remain device-local and are restored when you reopen the flow.
+The Study queue updates when the receiving library saves the example and its cards.
 
 An example that includes video opens playback controls below the preview.
 

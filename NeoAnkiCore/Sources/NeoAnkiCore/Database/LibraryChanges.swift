@@ -99,8 +99,12 @@ public extension ItemStore {
     }
 
     /// Emits only after a journal change commits, including implicit writes.
-    func libraryChangeNotifications() async -> AsyncStream<Int64> {
-        await database.libraryChangeNotifications()
+    func libraryChangeNotifications(includeMedia: Bool = true) async -> AsyncStream<Int64> {
+        await database.libraryChangeNotifications(includeMedia: includeMedia)
+    }
+
+    func currentLibraryProjectionRevision() async throws -> Int64 {
+        try await database.latestNonMediaChange() ?? 0
     }
 
     /// The oldest retained event cursor, or nil when the change log is empty.

@@ -105,6 +105,37 @@ private actor DueWidgetRecorder: WidgetSnapshotPublishing {
         #expect(counts.count(for: .allDecks) == 32)
     }
 
+    @Test func repeatedRefreshesKeepPublishedCountsVisible() async throws {
+        let (root, repository) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let reader = HeldDueReader()
+        let counts = LibraryDueCountsModel(library: repository, reader: reader)
+        let firstDeck = DeckScope.deck(UUID())
+        counts.selectScope(firstDeck)
+        await reader.configure(value: 57)
+        await counts.open()
+
+        await reader.configure(value: 57, hold: true)
+        counts.invalidate()
+        await reader.waitUntilHeld()
+        for _ in 0..<10 {
+            counts.invalidate()
+            #expect(counts.state == .checking)
+            #expect(counts.count(for: .allDecks) == 57)
+            #expect(counts.count(for: firstDeck) == 57)
+        }
+
+        let secondDeck = DeckScope.deck(UUID())
+        counts.selectScope(secondDeck)
+        #expect(counts.count(for: secondDeck) == nil)
+        #expect(counts.count(for: .allDecks) == 57)
+        await reader.configure(value: 58)
+        await reader.release()
+        await counts.waitUntilSettled()
+        #expect(counts.count(for: secondDeck) == 58)
+        #expect(await reader.calls == 3)
+    }
+
     @Test func schedulesTheKnownBoundaryAndStopsWhenBackgrounded() async throws {
         let (root, repository) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }

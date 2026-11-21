@@ -17,6 +17,7 @@ public final class LibraryDueCountsModel {
     public private(set) var snapshot: LibraryDueSnapshot?
     public private(set) var activeScope: DeckScope?
     public private(set) var revision: UInt64 = 0
+    private var showsPublishedCounts = false
     @ObservationIgnored var onSnapshot: (@MainActor (LibraryDueSnapshot) -> Void)?
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let reader: (any LibraryDueSnapshotReading)?
@@ -52,6 +53,7 @@ public final class LibraryDueCountsModel {
         boundaryTask = nil
         // This happens synchronously with the lifecycle callback, before a
         // restored zero can be presented as a current scheduling result.
+        showsPublishedCounts = false
         if active { invalidate() }
         else { state = .checking }
     }
@@ -63,16 +65,18 @@ public final class LibraryDueCountsModel {
     }
 
     public func count(for scope: DeckScope) -> Int? {
-        guard state == .ready else { return nil }
+        guard showsPublishedCounts else { return nil }
         return snapshot?.count(for: scope)
     }
 
     public func deckCount(_ id: UUID) -> Int? {
-        guard state == .ready else { return nil }
+        guard showsPublishedCounts else { return nil }
         return snapshot?.decks[id] ?? 0
     }
 
     public func invalidate(asOf now: Date = .now) {
+        // Rechecking counts does not remove a published result from the view.
+        // Consumers that publish to the OS still require a fresh snapshot.
         state = .checking
         generation &+= 1
         boundaryTask?.cancel()
@@ -116,6 +120,7 @@ public final class LibraryDueCountsModel {
                 return
             }
             snapshot = result
+            showsPublishedCounts = true
             state = .ready
             revision &+= 1
             onSnapshot?(result)
@@ -124,6 +129,7 @@ public final class LibraryDueCountsModel {
             // Shutdown never turns the last successful result into zero.
         } catch {
             guard requestedGeneration == generation else { return }
+            showsPublishedCounts = false
             state = .failed(error.localizedDescription)
         }
     }
