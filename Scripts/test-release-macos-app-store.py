@@ -17,6 +17,22 @@ spec.loader.exec_module(mac)
 
 
 class MacStoreTests(unittest.TestCase):
+    def test_mac_packages_associate_authored_decks_with_the_app(self):
+        for path in ("Packaging/Info.plist", "Packaging/AppStore/Info.plist"):
+            with self.subTest(path=path):
+                plist = plistlib.loads((mac.ROOT / path).read_bytes())
+                authored = next(
+                    entry for entry in plist["UTExportedTypeDeclarations"]
+                    if "neoanki" in entry["UTTypeTagSpecification"]["public.filename-extension"]
+                )
+                self.assertIn("com.apple.package", authored["UTTypeConformsTo"])
+                document = next(
+                    entry for entry in plist["CFBundleDocumentTypes"]
+                    if authored["UTTypeIdentifier"] in entry["LSItemContentTypes"]
+                )
+                self.assertEqual(document["CFBundleTypeRole"], "Viewer")
+                self.assertEqual(document["LSHandlerRank"], "Owner")
+
     def profile(self):
         return {"ExpirationDate": dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=1),
                 "TeamIdentifier": [mac.TEAM], "Platform": ["OSX"], "DeveloperCertificates": [b"certificate"],

@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import Foundation
 import NeoAnkiCore
 import NeoAnkiSharedUI
@@ -6,6 +7,16 @@ import Testing
 @testable import NeoAnki2
 
 @Suite struct ContextReviewMediaRegressionTests {
+    @Test @MainActor func macPlaybackUsesTheNativeAVKitView() {
+        let player = AVPlayer()
+        let native = MacMediaPlayerView(player: player).makePlayerView()
+        #expect(native.player === player)
+        #expect(native.controlsStyle == .inline)
+
+        MacMediaPlayerView.dismantleNSView(native, coordinator: ())
+        #expect(native.player == nil)
+    }
+
     @Test @MainActor func movingBetweenContextCardsReplacesAndStopsThePreviousRecording() throws {
         for kind in [MediaKind.audio, .video] {
             let first = FileManager.default.temporaryDirectory.appendingPathComponent("first-context-\(UUID()).caf")

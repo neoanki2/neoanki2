@@ -1,4 +1,4 @@
-import AVKit
+import AVFoundation
 import AppKit
 import NeoAnkiCore
 import NeoAnkiSharedUI
@@ -90,7 +90,7 @@ struct AudioPlayerView: View {
                     .buttonStyle(.bordered)
                     .accessibilityLabel(playButtonAccessibilityLabel)
                 } else {
-                    VideoPlayer(player: player)
+                    MacMediaPlayerView(player: player)
                         .frame(height: 44)
                         .accessibilityLabel(altText ?? "Audio")
                 }
@@ -263,7 +263,7 @@ struct VideoPlayerView: View {
     var body: some View {
         Group {
             if let player = playback.player {
-                VideoPlayer(player: player)
+                MacMediaPlayerView(player: player)
                     .frame(maxWidth: DesignSystem.readingColumnMaxWidth, maxHeight: 240)
             } else {
                 ProgressView().frame(height: 120)

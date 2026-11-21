@@ -42,6 +42,7 @@ struct NeoAnki2App: App {
     @State private var bootstrapError: String?
     @State private var syncService: OfflineFirstSyncService?
     @State private var syncStatusModel = MacCloudSyncStatusModel()
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppPreferences.cloudSyncEnabled) private var cloudSyncEnabled = false
 #if DEBUG
@@ -95,7 +96,7 @@ struct NeoAnki2App: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "library") {
             ZStack {
                 if let itemsModel, let decksModel, let schedulingModel, let vocabularyLibraryModel,
                    let library {
@@ -144,6 +145,7 @@ struct NeoAnki2App: App {
                     : isFunctionalUITestRun ? functionalUITestContentHeight : nil
             )
             .textFieldStyle(.roundedBorder)
+            .environment(appDelegate.authoredDeckOpenRequests)
             .task {
                 // The loading view disappears as models are assigned. Keep
                 // startup on the stable root so that it cannot cancel sync.
@@ -192,6 +194,12 @@ struct NeoAnki2App: App {
                 ? .contentSize
                 : .automatic
         )
+        .onChange(of: appDelegate.authoredDeckOpenRequests.next, initial: true) { _, source in
+            guard source != nil, !NSApplication.shared.windows.contains(where: {
+                $0.canBecomeMain && ($0.isVisible || $0.isMiniaturized)
+            }) else { return }
+            openWindow(id: "library")
+        }
         .commands {
             TextEditingCommands()
             NativeEditingCommands()

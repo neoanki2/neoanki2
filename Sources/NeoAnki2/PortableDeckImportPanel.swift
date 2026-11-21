@@ -1,6 +1,42 @@
 import AppKit
 import NeoAnkiCore
+import Observation
 import UniformTypeIdentifiers
+
+/// Finder can deliver deck URLs before the library window has finished starting.
+@MainActor
+@Observable
+final class AuthoredDeckOpenRequests {
+    private var pending: [URL] = []
+    private var active: URL?
+
+    var next: URL? { active == nil ? pending.first : nil }
+
+    func enqueue(_ urls: [URL]) {
+        for url in urls where url.isFileURL && url.pathExtension.lowercased() == AuthoredDeck.fileExtension {
+            let path = url.standardizedFileURL
+            guard active?.standardizedFileURL != path,
+                  !pending.contains(where: { $0.standardizedFileURL == path }) else { continue }
+            pending.append(url)
+        }
+    }
+
+    func claimNext() -> URL? {
+        guard let next else { return nil }
+        active = pending.removeFirst()
+        return next
+    }
+
+    func finish(_ source: URL) {
+        if active == source { active = nil }
+    }
+
+    func release(_ source: URL) {
+        guard active == source else { return }
+        pending.insert(source, at: 0)
+        active = nil
+    }
+}
 
 enum PortableDeckImportChoice: Equatable {
     case cancelled

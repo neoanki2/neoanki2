@@ -58,8 +58,8 @@ extension ItemStore {
         importedItems.reserveCapacity(package.items.count)
         // Authored item declaration order is the only sequence available to
         // builders. Give each item a distinct, already-due timestamp so browse
-        // and first-study ordering survive UUID-backed persistence.
-        let orderingStep: TimeInterval = 0.000_001
+        // and first-study ordering survive portable export's millisecond timestamps.
+        let orderingStep: TimeInterval = 0.001
         let firstCreatedAt = now.addingTimeInterval(
             -Double(max(package.items.count - 1, 0)) * orderingStep
         )

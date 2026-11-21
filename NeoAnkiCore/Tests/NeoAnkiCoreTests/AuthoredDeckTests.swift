@@ -43,6 +43,43 @@ private let authoredV3Manifest =
 private let authoredV3RootDeck =
     #"{"kind":"deck","id":"root","name":"Authored","itemTypes":["Study"],"defaultType":"Study"}"#
 
+@Test func authoredCourseStudyOrderSurvivesPortableRoundTrip() async throws {
+    let directory = try authoredTestDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let firstLesson = #"{"kind":"deck","id":"first","parent":"root","name":"First Lesson"}"#
+    let secondLesson = #"{"kind":"deck","id":"second","parent":"root","name":"Second Lesson"}"#
+    let positions = (1 ... 6).map { "Vocabulary \($0)" }
+    let rows = positions.enumerated().map { index, word in
+        let deck = index < 3 ? "first" : "second"
+        return #"{"kind":"item","deck":"\#(deck)","type":"Study","fields":{"front":{"text":"\#(word)"},"back":{"rich":[{"text":"Definition"}]}}}"#
+    }
+    let bundle = try authoredBundle(
+        in: directory,
+        manifestRecords: [authoredManifest, authoredDeck, firstLesson, secondLesson, authoredType],
+        itemRecords: rows
+    )
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let source = try ItemStore(databaseURL: directory.appendingPathComponent("source.sqlite"))
+    try await source.bootstrap()
+    let authored = try await AuthoredDeck.importDeck(from: bundle, into: source, now: now)
+    let sourceID = try #require(authored.deckIDs.first)
+    let transport = directory.appendingPathComponent("course.neodeck")
+    try await PortableDeck.export(deckID: sourceID, from: source, to: transport)
+
+    let target = try ItemStore(databaseURL: directory.appendingPathComponent("target.sqlite"))
+    try await target.bootstrap()
+    let importedAt = now.addingTimeInterval(60)
+    let imported = try await PortableDeck.importDeck(from: transport, into: target, now: importedAt)
+    let targetID = try #require(imported.deckIDs.first)
+    let due = try await target.fetchDueCards(scope: .deck(targetID, includeDescendants: true), asOf: importedAt)
+    let prompts = due.map { entry in
+        entry.itemType.field(named: "Front").flatMap { entry.item.value(for: $0.id) }
+    }
+    #expect(prompts == positions.map { .text($0) })
+    #expect(Set(due.map(\.card.memory.due)).count == positions.count)
+    #expect(due.allSatisfy { $0.card.memory.phase == .new })
+}
+
 @Test func documentedAuthoredDeckExampleRemainsValid() {
     let repositoryRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

@@ -293,6 +293,9 @@ Cloze. Creating a type asks where it belongs. **Make Available Everywhere** is a
 explicit action; unlocking an imported definition does not change its availability.
 Imported definitions start protected until you unlock or duplicate them.
 
+An imported course can include an item type for lessons alongside a vocabulary
+type. A lesson item with no eligible Card setup is available in **Browse**.
+
 Existing libraries are organized automatically using imported ownership and item
 usage. Types used in several decks retain one linked identity. Unused types and
 types used only by unassigned items appear under **Needs Organization**, where you

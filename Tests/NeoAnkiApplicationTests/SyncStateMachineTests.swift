@@ -127,7 +127,7 @@ private struct SyncDevice {
 
     static func make(
         at directory: URL, cloud: TestCloud, seed: UInt64,
-        recoveryPollInterval: Duration = .seconds(10)
+        timing: SyncTiming = .continuous
     ) async throws -> SyncDevice {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let repository = try SQLiteLibraryRepository(databaseURL: directory.appendingPathComponent("library.sqlite"))
@@ -136,7 +136,7 @@ private struct SyncDevice {
         let transport = FaultTransport(cloud: cloud, seed: seed, metadata: metadata)
         let service = OfflineFirstSyncService(repository: repository,
             adapter: SQLiteLibrarySyncAdapter(repository: repository), transport: transport,
-            metadataStore: metadata, recoveryPollInterval: recoveryPollInterval,
+            metadataStore: metadata, timing: timing,
             backupURL: { directory.appendingPathComponent("backup.sqlite") })
         return SyncDevice(directory: directory, repository: repository, metadata: metadata,
             service: service, transport: transport)
@@ -254,55 +254,52 @@ struct SyncStateMachineTests {
         #expect(await mac.service.issues().isEmpty)
     }
 
-    @Test func committedPhoneReviewUploadsAndRefreshesMacWithRecoveryPollingDeferred() async throws {
+    @Test(.timeLimit(.minutes(3)))
+    func committedPhoneReviewUploadsAndRefreshesMacWithRecoveryPollingDeferred() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let cloud = TestCloud()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        // Only repository notifications can wake the sender. The virtual
+        // debounce releases them without depending on the runner's timer.
+        let timing = SyncTiming(now: { now }, sleep: { _, reason in
+            if reason == .recoveryPoll { throw CancellationError() }
+            try Task.checkCancellation()
+        })
         let phone = try await SyncDevice.make(at: root.appendingPathComponent("phone"), cloud: cloud,
-            seed: 201, recoveryPollInterval: .seconds(3_600))
+            seed: 201, timing: timing)
         let mac = try await SyncDevice.make(at: root.appendingPathComponent("mac"), cloud: cloud,
-            seed: 202, recoveryPollInterval: .seconds(3_600))
+            seed: 202, timing: timing)
         defer { Task { await phone.service.stop(); await mac.service.stop() } }
-        let now = Date.now
         let type = try #require(try await phone.repository.loadItemTypes().itemTypes.first)
         let item = textItem(id: UUID(), type: type, text: "Push review", deckID: nil)
         _ = try await phone.repository.createItem(item, asOf: now)
         await phone.service.start()
         await mac.service.start()
-        await phone.service.synchronize()
+        await phone.service.synchronizeAndWait()
         let card = try #require(try await phone.repository.cards().first { $0.itemID == item.id })
         let pushes = await cloud.pushes.stream()
         let receiver = Task {
             for await _ in pushes {
                 guard !Task.isCancelled else { return }
-                await mac.service.synchronize()
+                await mac.service.synchronizeAndWait()
             }
         }
         defer { receiver.cancel() }
         let applied = await mac.service.libraryChanges()
-        let started = ContinuousClock.now
         let review = try await phone.repository.submitReview(
             cardID: card.id, rating: .easy, asOf: now, durationMilliseconds: 700
         )
         // No explicit phone send or Mac fetch here: a committed local journal
         // wakes the sender and the cloud notification wakes the receiver.
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                for await _ in applied {
-                    if (try? await mac.repository.reviewLog(id: review.reviewLogID)) != nil { return }
-                }
-                throw CancellationError()
+        var receivedReview = false
+        for await _ in applied {
+            if (try? await mac.repository.reviewLog(id: review.reviewLogID)) != nil {
+                receivedReview = true
+                break
             }
-            group.addTask {
-                try await Task.sleep(for: .seconds(60))
-                throw CancellationError()
-            }
-            defer { group.cancelAll() }
-            try await group.next()
         }
-        // The watchdog only bounds a broken test. Deferring both recovery
-        // polls proves event-driven delivery even on a contended CI runner.
-        print("Review-to-commit latency in push fixture: \(started.duration(to: .now))")
+        try #require(receivedReview, "The Mac never committed the review delivered by a push.")
         #expect(try await mac.repository.reviewLog(id: review.reviewLogID) == phone.repository.reviewLog(id: review.reviewLogID))
         #expect(try await mac.repository.card(id: card.id) == phone.repository.card(id: card.id))
         #expect(try await mac.repository.scopeSummary(scope: .allDecks, asOf: now)

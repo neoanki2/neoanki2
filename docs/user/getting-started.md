@@ -161,6 +161,9 @@ changes update counts as they arrive. iPhone and iPad can also receive a silent
 sync notification before their first screen appears; startup and the screen
 share the same library initialization.
 
+On Mac, double-click an authored `.neoanki` deck in Finder to open its import
+preview. Confirm the destination from the preview before adding it to the library.
+
 Do not stop at the empty screen: the [five-minute first study
 session](../first-study-session/) creates one Basic item, reviews its generated
 card, and confirms the scheduler recorded the result.

@@ -27,6 +27,7 @@ enum ContentLayoutPolicy {
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(AuthoredDeckOpenRequests.self) private var authoredDeckOpenRequests
     @Bindable var itemsModel: ItemsModel
     @Bindable var decksModel: DecksModel
     @Bindable var schedulingModel: SchedulingModel
@@ -60,6 +61,7 @@ struct ContentView: View {
     @State private var importNotice: ImportNotice?
     @State private var isCreatingGeneratedDeck = false
     @State private var portableDeckTransfer: PortableDeckTransferModel
+    @State private var finderDeckSource: URL?
     private let features: LibraryFeatureFactory
     private let makeStudyModel: () -> StudyModel
     private let makeImportModel: () -> ImportModel
@@ -265,6 +267,17 @@ struct ContentView: View {
                 AppStartupTrace.mark("home_ready")
             }
         }
+        .onChange(of: nextFinderDeckSource, initial: true) { _, source in
+            if source != nil {
+                finderDeckSource = authoredDeckOpenRequests.claimNext()
+            }
+        }
+        .onDisappear {
+            if let source = finderDeckSource {
+                finderDeckSource = nil
+                authoredDeckOpenRequests.release(source)
+            }
+        }
         .environment(\.vocabularyPackRootURL, vocabularyLibraryModel.rootURL)
         .task {
             await refreshLibrary()
@@ -371,6 +384,25 @@ struct ContentView: View {
                 message: Text(notice.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .alert(
+            "Import Authored Deck?",
+            isPresented: Binding(get: { finderDeckSource != nil }, set: { _ in }),
+            presenting: finderDeckSource
+        ) { source in
+            Button("Cancel", role: .cancel) {
+                finderDeckSource = nil
+                authoredDeckOpenRequests.finish(source)
+            }
+            Button("Import Deck") {
+                finderDeckSource = nil
+                Task {
+                    defer { authoredDeckOpenRequests.finish(source) }
+                    await importSelectedDeck(from: source)
+                }
+            }
+        } message: { source in
+            Text("Add “\(source.lastPathComponent)” to your library? Importing the same deck again creates a copy.")
         }
         .alert(item: $vocabularyLibraryModel.notice) { notice in
             Alert(
@@ -540,6 +572,8 @@ struct ContentView: View {
     private var canTransferPortableDeck: Bool {
         !portableDeckTransfer.isBusy
             && !testingForcePortableBusy
+            && !isCreatingGeneratedDeck
+            && finderDeckSource == nil
             && !itemsModel.isLoading
             && !decksModel.isLoading
             && !isStudying
@@ -549,6 +583,20 @@ struct ContentView: View {
             && !isShowingDeckBuilder
             && !isShowingVocabularyPacks
             && !isAddingFromVocabulary
+    }
+
+    private var nextFinderDeckSource: URL? {
+        guard canTransferPortableDeck,
+              scenePhase == .active,
+              appSession.presentation == nil,
+              !isChoosingImportFile,
+              !schedulingModel.isShowingSettings,
+              !vocabularyLibraryModel.isImporting,
+              importNotice == nil,
+              portableDeckTransfer.notice == nil,
+              portableDeckTransfer.conflictingSource == nil,
+              vocabularyLibraryModel.notice == nil else { return nil }
+        return authoredDeckOpenRequests.next
     }
 
     private var canUseVocabularyUI: Bool {
@@ -898,28 +946,13 @@ struct ContentView: View {
                 message: "Choose a .neoanki folder or a .neodeck file."
             )
         case let .selected(source):
-            handlePortableDeckFile(.success([source]))
+            Task { await importSelectedDeck(from: source) }
         }
     }
 
-    private func handlePortableDeckFile(_ result: Result<[URL], Error>) {
-        switch result {
-        case let .success(urls):
-            guard let source = urls.first else { return }
-            Task {
-                guard let imported = await portableDeckTransfer.importDeck(from: source) else {
-                    return
-                }
-                await refreshAfterPortableDeckImport(imported)
-            }
-        case let .failure(error):
-            if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
-                return
-            }
-            portableDeckTransfer.notice = PortableDeckTransferNotice(
-                title: "Could Not Open Deck",
-                message: "NeoAnki2 couldn’t open the selected deck. Try choosing it again."
-            )
+    private func importSelectedDeck(from source: URL) async {
+        if let imported = await portableDeckTransfer.importDeck(from: source) {
+            await refreshAfterPortableDeckImport(imported)
         }
     }
 

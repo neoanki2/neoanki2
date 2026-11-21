@@ -184,6 +184,9 @@ The app checks actual image contents, so a misleading filename does not prevent
 a decodable image from attaching. Other media and deck imports retain their
 extension and file-signature checks.
 
+M4A recordings remain audio when their container also lists generic MP4
+compatibility. The same validation applies when downloading them from iCloud.
+
 Stored attachment size limits are:
 
 - Audio: 20 MB

@@ -155,6 +155,9 @@ Incoming media is stored before its accompanying items are committed. If an
 image arrives in a later sync batch, it is associated with the items already
 referencing it and retained during cleanup.
 
+A deck imported on Mac can appear on iPhone and iPad through iCloud. Large
+courses may spend time downloading and verifying media before the deck appears.
+
 Card schedules are checked against their saved review history when sync commits
 and when a library opens. A delayed card snapshot cannot replace a newer grade;
 previously affected libraries repair their due counts automatically. Review

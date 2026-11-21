@@ -739,14 +739,16 @@ private struct ItemDetailView: View {
             if let loaded {
                 List {
                     ForEach(ContextExamplePreset.authoringFields(in: loaded.itemType)) { field in
-                        Section(field.name) {
-                            MobileContentValueView(
-                                value: loaded.item.value(for: field.id) ?? .empty,
-                                mediaStore: model.mediaStore,
-                                isAnswerRevealed: true
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .multilineTextAlignment(.leading)
+                        if let value = loaded.item.value(for: field.id), !value.isEmpty {
+                            Section(field.name) {
+                                MobileContentValueView(
+                                    value: value,
+                                    mediaStore: model.mediaStore,
+                                    isAnswerRevealed: true
+                                )
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .multilineTextAlignment(.leading)
+                            }
                         }
                     }
                     if let maturityIssue { Section("Card maturity") { Text(maturityIssue) } }

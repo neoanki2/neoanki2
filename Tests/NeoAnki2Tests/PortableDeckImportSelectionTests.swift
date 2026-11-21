@@ -4,6 +4,39 @@ import Testing
 
 @testable import NeoAnki2
 
+@MainActor
+@Test func finderAuthoredDeckRequestsWaitForAWindowAndDeduplicatePendingOpens() {
+    let requests = AuthoredDeckOpenRequests()
+    let first = URL(fileURLWithPath: "/tmp/First.NEOANKI", isDirectory: true)
+    let second = URL(fileURLWithPath: "/tmp/Second.neoanki", isDirectory: true)
+    let portable = URL(fileURLWithPath: "/tmp/Skip.neodeck")
+    let remote = URL(string: "https://example.com/Skip.neoanki")!
+
+    requests.enqueue([portable, remote, first, first, second])
+    #expect(requests.next == first)
+    #expect(requests.claimNext() == first)
+    requests.enqueue([first, second])
+    #expect(requests.claimNext() == nil)
+
+    requests.finish(first)
+    #expect(requests.claimNext() == second)
+    requests.finish(second)
+    #expect(requests.next == nil)
+}
+
+@MainActor
+@Test func finderAuthoredDeckRequestCanReturnToTheQueueWhenItsWindowCloses() {
+    let requests = AuthoredDeckOpenRequests()
+    let source = URL(fileURLWithPath: "/tmp/Examples.neoanki", isDirectory: true)
+
+    requests.enqueue([source])
+    #expect(requests.claimNext() == source)
+    requests.release(source)
+    #expect(requests.claimNext() == source)
+    requests.finish(source)
+    #expect(requests.next == nil)
+}
+
 @Test func portableDeckImportSelectionAcceptsNeoankiDirectory() throws {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("neoanki2-import-selection-\(UUID().uuidString)", isDirectory: true)

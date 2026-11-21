@@ -3980,6 +3980,8 @@ actor SQLiteDatabase {
     ) -> (sql: String, bindings: [Binding]) {
         let deckValues = Array(repeating: "(?)", count: limiter.deckIDs.count)
             .joined(separator: ", ")
+        // Uncorrelated membership tests let SQLite build each lookup once.
+        // A correlated EXISTS can rerun the ordered top-K query for every due card.
         return (
             """
             WITH limited_decks(deck_id) AS (
@@ -4009,16 +4011,8 @@ actor SQLiteDatabase {
                   AND (
                       cards.phase != 'new'
                       OR cards.deck_id IS NULL
-                      OR NOT EXISTS (
-                          SELECT 1
-                          FROM limited_decks
-                          WHERE limited_decks.deck_id = cards.deck_id
-                      )
-                      OR EXISTS (
-                          SELECT 1
-                          FROM allowed_new
-                          WHERE allowed_new.id = cards.id
-                      )
+                      OR cards.deck_id NOT IN (SELECT deck_id FROM limited_decks)
+                      OR cards.id IN (SELECT id FROM allowed_new)
                   )
             )
             """,
