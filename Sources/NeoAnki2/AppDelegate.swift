@@ -9,8 +9,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// so the fixed study action footer can never sit on the display edge.
     private static let windowBottomClearance: CGFloat = 16
     private var windowPresentations: [ObjectIdentifier: WindowFramePolicy.Presentation] = [:]
+    let authoredDeckOpenRequests = AuthoredDeckOpenRequests()
     var synchronizeCloudChanges: (@MainActor () async -> Void)?
     private static let cloudPushLogger = Logger(subsystem: "com.neoanki2.app", category: "CloudSyncPush")
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        authoredDeckOpenRequests.enqueue(urls)
+    }
 
     func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Self.cloudPushLogger.notice("Registered for remote change notifications")

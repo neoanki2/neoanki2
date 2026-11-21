@@ -413,6 +413,13 @@ extension ItemStore {
 
             let result = PortableDeckImportResult(deckIDs: [importedRootDeckID], itemCount: package.items.count,
                 createdItemTypeCount: createdTypes.count, reusedItemTypeCount: reusedCount)
+            // Start with fresh, already-due cards in source creation order.
+            // The stable sort keeps the transfer's row order when timestamps tie.
+            let orderedItems = package.items.sorted { $0.createdAt < $1.createdAt }
+            let initialDueDates = Dictionary(uniqueKeysWithValues: orderedItems.enumerated().map { index, record in
+                let due = now.addingTimeInterval(Double(index + 1 - orderedItems.count) / 1_000)
+                return (record.item.id, due)
+            })
             try await database.importPortableDeck(
                 .init(
                     itemTypes: createdTypes,
@@ -435,7 +442,7 @@ extension ItemStore {
                         return .init(deckID: deckID, inherits: value.inherits, itemTypeIDs: value.itemTypeIDs.compactMap { typeMap[$0]?.id }, defaultItemTypeID: value.defaultItemTypeID.flatMap { typeMap[$0]?.id })
                     }
                 ),
-                now: now, result: result
+                now: now, initialDueDates: initialDueDates, result: result
             )
             // The import has committed; cleanup cannot turn it into a failed
             // operation and invite a duplicate import on retry.

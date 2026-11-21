@@ -350,6 +350,9 @@ does not leave a partial deck behind.
 
 ### Authored `.neoanki`
 
+On Mac, you can also double-click a `.neoanki` bundle in Finder and confirm
+the import in NeoAnki2.
+
 Authored batches imported into an existing deck preserve its default and extend
 its attachments.
 

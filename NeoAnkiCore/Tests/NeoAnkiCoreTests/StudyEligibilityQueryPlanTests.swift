@@ -79,7 +79,7 @@ func familyEligibilityUsesFamilyAndItemIndexes(limited: Bool) async throws {
     #expect(!scopedDeck.contains { $0.contains("TEMP B-TREE") })
 }
 
-@Test func singleLimitedDeckUsesBoundedActiveNewIndex() async throws {
+@Test func singleLimitedDeckUsesUncorrelatedAdmissionLists() async throws {
     let url = studyQueryPlanDatabaseURL()
     let database = try SQLiteDatabase(path: url)
     try await database.migrate()
@@ -91,8 +91,36 @@ func familyEligibilityUsesFamilyAndItemIndexes(limited: Bool) async throws {
         studyDay: "2027-01-15"
     )
 
-    #expect(plan.contains { $0.contains("allowed_new") })
+    #expect(plan.filter { $0.hasPrefix("LIST SUBQUERY") }.count >= 2)
+    #expect(!plan.contains { $0.contains("deck_ancestry") })
     #expect(!plan.contains { $0.contains("new_positions") })
+}
+
+@Test func largeLimitedCourseComputesItsAdmissionListOnce() async throws {
+    let url = studyQueryPlanDatabaseURL()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let store = try ItemStore(databaseURL: url)
+    try await store.bootstrap()
+    let root = try await store.createDeck(Deck(name: "Course", newCardsPerDay: 1))
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    var scope: Set<UUID> = [root.id]
+    var first: UUID?
+    for index in 0..<413 {
+        let lesson = try await store.createDeck(Deck(name: "Lesson \(index)", parentID: root.id))
+        scope.insert(lesson.id)
+        let due = now.addingTimeInterval(Double(index - 413))
+        let item = try await store.createItem(studyQueryPlanItem("Word \(index)", deckID: lesson.id), now: due)
+        if index == 0 { first = item.id }
+    }
+    let work = try await store.database.studyQueueHeadWorkDiagnostic(
+        scope: .decks(scope), asOf: now, studyDay: "2027-01-15"
+    )
+    #expect(work.rows == 1)
+    #expect(work.instructions < 500_000)
+    let course = DeckScope.deck(root.id, includeDescendants: true)
+    #expect(try await store.dueCount(scope: course, asOf: now) == 1)
+    let queue = try await store.fetchDueCards(scope: course, asOf: now, limit: 1)
+    #expect(queue.first?.item.id == first)
 }
 
 @Test func ancestorLimitKeepsScopedDeckOnRankedEligibilityPlan() async throws {

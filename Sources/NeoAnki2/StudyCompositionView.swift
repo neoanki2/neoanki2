@@ -21,7 +21,7 @@ struct StudyCompositionView: View {
     }
 
     var body: some View {
-        StudyCardViewport(fitsMedia: hasVisibleVisualMedia) {
+        StudyCardViewport(fitsMedia: fitsVisualPromptInViewport) {
             wireframe
         }
         .frame(maxWidth: 820)
@@ -30,16 +30,19 @@ struct StudyCompositionView: View {
         .padding(.vertical, DesignSystem.Spacing.lg)
     }
 
-    private var hasVisibleVisualMedia: Bool {
-        CardWireframeDescriptor.descriptor(for: effectiveLayout)
+    private var fitsVisualPromptInViewport: Bool {
+        let visible = CardWireframeDescriptor.descriptor(for: effectiveLayout)
             .renderedComponents(from: components, answerRevealed: isAnswerRevealed)
-            .contains { rendered in
-                switch rendered.component.value {
-                case .imageOcclusion: true
-                case let .media(ref): ref.kind != .audio
-                default: false
-                }
+        // Occlusion needs its entire coordinate space on screen. An ordinary
+        // image can share the scrolling reader with text at its natural size.
+        if template.interaction == .imageOcclusion { return true }
+        return !visible.isEmpty && visible.allSatisfy { rendered in
+            switch rendered.component.value {
+            case .imageOcclusion: true
+            case let .media(ref): ref.kind != .audio
+            default: false
             }
+        }
     }
 
     private var wireframe: some View {
@@ -78,8 +81,8 @@ struct StudyCompositionView: View {
     }
 }
 
-/// Images need a finite height proposal to aspect-fit. Measuring the entire
-/// card with fixedSize first instead gives tall diagrams their natural height.
+/// An image-only prompt fits in the viewport. A mixed card has to keep its
+/// text at full height so the reader can scroll past the available space.
 struct StudyCardViewport<Card: View>: View {
     let fitsMedia: Bool
     @ViewBuilder let card: Card

@@ -207,7 +207,11 @@ private struct ContextInlinePlayback: View {
                 Text(sourceLabel).font(.caption).foregroundStyle(.secondary)
             }
             if example.mediaKind == .video, let player {
+                #if os(macOS)
+                MacMediaPlayerView(player: player).frame(height: 200)
+                #else
                 VideoPlayer(player: player).frame(height: 200)
+                #endif
             }
         }
         .onChange(of: playback.requestID) { _, value in if value != requestID { task?.cancel(); player?.pause() } }

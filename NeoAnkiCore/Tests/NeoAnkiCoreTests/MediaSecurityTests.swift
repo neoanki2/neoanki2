@@ -150,3 +150,12 @@ private let pngHeader = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         try MediaValidation.detectedFormat(data: ambiguousISO)
     }
 }
+
+@Test func m4aMajorBrandTakesPrecedenceOverGenericMP4Compatibility() throws {
+    let data = Data([0, 0, 0, 28] + Array("ftypM4A ".utf8) + [0, 0, 2, 0]
+        + Array("M4A isomiso2".utf8))
+    #expect(try MediaValidation.inferredExtension(data: data, expectedKind: .audio) == "m4a")
+    #expect(throws: MediaError.unsupportedFormat(.video)) {
+        try MediaValidation.validate(data: data, kind: .video, fileExtension: "mp4")
+    }
+}

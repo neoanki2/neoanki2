@@ -138,6 +138,8 @@ public enum MediaValidation {
         fileExtension == "jpeg" ? "jpg" : fileExtension
     }
 
+    private static let mpeg4AudioBrands: Set<String> = ["M4A ", "M4B "]
+
     private static func matchesMagicBytes(
         _ data: Data,
         kind: MediaKind,
@@ -156,7 +158,7 @@ public enum MediaValidation {
         case (.audio, "caf"):
             return hasPrefix(bytes, ascii: "caff")
         case (.audio, "m4a"):
-            return isISOBaseMedia(bytes, brands: ["M4A ", "M4B "])
+            return isISOBaseMedia(bytes, brands: mpeg4AudioBrands)
         case (.image, "png"):
             return hasPrefix(bytes, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         case (.image, "jpg"), (.image, "jpeg"):
@@ -204,8 +206,11 @@ public enum MediaValidation {
             return false
         }
 
-        if let majorBrand = asciiString(bytes, at: 8), brands.contains(majorBrand) {
-            return true
+        if let majorBrand = asciiString(bytes, at: 8) {
+            if brands.contains(majorBrand) { return true }
+            // AAC in an M4A container often lists generic MP4 compatibility
+            // brands like isom and iso2. The explicit audio major brand takes precedence.
+            if mpeg4AudioBrands.contains(majorBrand) { return false }
         }
 
         var offset = 16

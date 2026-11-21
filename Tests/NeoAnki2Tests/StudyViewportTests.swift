@@ -63,6 +63,53 @@ private func descendant(_ name: String, in view: NSView) -> NSView? {
     #expect(descriptor.renderedComponents(from: [question, explanation], answerRevealed: true).map(\.id) == [question.id, explanation.id])
 }
 
+@Test("A revealed card with an image and long notes scrolls without moving the grades")
+@MainActor func studyMixedAnswerScrollsAtFullHeight() throws {
+    let symbol = UUID(), details = UUID(), diagram = UUID()
+    let template = Template(name: "Character", layout: .focus, components: [
+        TemplateComponent(region: .primary, purpose: .question, source: .field(symbol)),
+        TemplateComponent(region: .supporting, purpose: .supporting, source: .field(details),
+                          presentation: Presentation(reveal: .hiddenUntilAnswer)),
+        TemplateComponent(region: .media, purpose: .supporting, source: .field(diagram),
+                          presentation: Presentation(reveal: .hiddenUntilAnswer)),
+    ], interaction: .reveal, skill: Skill(input: .text, output: .text, operation: .recall))
+    let notes = (1 ... 30).map { "Line \($0) of the revealed explanation." }.joined(separator: "\n")
+    let item = Item(itemTypeID: UUID(), fields: [
+        FieldValue(fieldID: symbol, value: .text("丶", lang: "ja")),
+        FieldValue(fieldID: details, value: .rich([Span("Meaning\n", styles: [.bold]), Span(notes)])),
+        FieldValue(fieldID: diagram, value: .media(MediaRef(
+            kind: .image, assetHash: String(repeating: "a", count: 64), fileExtension: "png"
+        ))),
+    ])
+
+    func findScrollView(in view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView { return scroll }
+        return view.subviews.lazy.compactMap { findScrollView(in: $0) }.first
+    }
+
+    for revealed in [false, true] {
+        let host = NSHostingView(rootView:
+            AdaptiveStudyStage(layout: .focus) {
+                StudyStageContent(spacing: 16) {
+                    StudyCompositionView(template: template, item: item, isAnswerRevealed: revealed,
+                                         mediaStore: nil, clozeGroup: nil)
+                } response: { EmptyView() }
+            } footer: { StudyControlProbe(name: "footer", height: 60) }
+        )
+        host.frame = CGRect(x: 0, y: 0, width: 800, height: 500)
+        host.layoutSubtreeIfNeeded()
+        let footer = try #require(descendant("footer", in: host))
+        let footerFrame = host.convert(footer.bounds, from: footer)
+        #expect(footerFrame.minY >= -1 && footerFrame.maxY <= host.bounds.height + 1)
+        if revealed {
+            let scroll = try #require(findScrollView(in: host))
+            #expect(scroll.documentVisibleRect.height > 0)
+        } else {
+            #expect(findScrollView(in: host) == nil)
+        }
+    }
+}
+
 @Test(.enabled(if: ProcessInfo.processInfo.environment["NEOANKI_LAYOUT_FIXTURES"] != nil))
 @MainActor func realAuthoredCardsRenderOffscreenBeforeAndAfterReveal() throws {
     let directory = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["NEOANKI_LAYOUT_FIXTURES"]))
