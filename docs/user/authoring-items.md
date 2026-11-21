@@ -85,6 +85,8 @@ Initial dictionary, voice, and system-model installation is separate from offlin
 authoring. Accepted items and media follow existing sync and export settings.
 Unfinished drafts remain device-local and are restored when you reopen the flow.
 
+An example that includes video opens playback controls below the preview.
+
 All accepted examples and enabled Card setups are saved, but only one new
 related card is introduced per study day. Language and expression identify
 related context examples across separate batches and decks; adding the same

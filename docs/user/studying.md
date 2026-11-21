@@ -140,6 +140,9 @@ undoing a review restores the corresponding eligibility.
 Home due counts and the study queue use these same eligibility rules, including
 after grading or undoing a review.
 
+New cards from a deck export start in creation order. Reviews still take
+priority, and daily limits apply across each selected deck and its subdecks.
+
 **Poetry and prose builder cards keep their existing scheduling.** Only eligible
 cards enter the session: no future-due, suspended, or daily-limit-excluded parts
 are added. Included parts appear in source order even when their due times or

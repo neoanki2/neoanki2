@@ -70,6 +70,7 @@ The app adds these commands to the standard macOS menu bar.
   selects one, and **Command-Return** adds a valid word without closing the sheet.
 - **Import…** opens a JSON or CSV file.
 - **Import Deck…** opens a `.neodeck` file or `.neoanki` bundle.
+  You can also open an authored `.neoanki` bundle from Finder to start its import preview.
 - **Import Vocabulary Pack…** validates and installs a local `.neovocab`
   directory.
 - **Export Deck…** exports the selected real deck as `.neodeck`.

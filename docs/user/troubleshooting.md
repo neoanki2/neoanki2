@@ -15,6 +15,9 @@ retry the failed display or device update; repeating the import can create
 another deliberate batch. If the save status could not be confirmed, refresh and
 inspect the library before repeating the operation.
 
+If a deck is visible on the Mac and still missing on your iPhone, check
+**iCloud Sync** status on both devices before importing it again.
+
 A maturity-unavailable message means review evidence could not be read. Your
 stored content is preserved, and browsing and study remain available. Keep a
 backup before attempting any repair. A rejected selection move means at least
