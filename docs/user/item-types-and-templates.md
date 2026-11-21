@@ -54,6 +54,7 @@ order](../studying/#study-queue-order) for related-card deferrals.
 Saved item-type definitions use the same [iCloud sync](../sync-reminders-widgets/)
 path as items and reviews. Committed edits start an upload after a short debounce;
 offline edits remain queued until a connection is available.
+The picker refreshes when a definition or a deck's type assignments change.
 
 [![The Item Types manager]({{ site.baseurl }}/assets/screenshots/item-types.png)]({{ site.baseurl }}/assets/screenshots/item-types.png)
 

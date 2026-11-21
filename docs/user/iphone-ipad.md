@@ -66,11 +66,11 @@ a persistent sidebar with the selected destination in the detail area. Rotate
 the device freely: compact layouts use tabs and regular layouts use the split
 view. System Back controls return through nested screens.
 
-When you return to the app, Home and deck screens check due counts directly
-from your phone's library before waiting for iCloud or broader statistics.
-While a saved count is being checked, the app shows **Checking due cards…**
-instead of claiming you are caught up. Counts also update when the next cards
-become due while the app is open. If a check fails, choose **Try Again**.
+When you return to the app, Home and deck screens check your local library
+for due cards. **Checking due cards…** appears while the first count is loading.
+The displayed count stays visible during later refreshes, including while
+iCloud downloads media. Counts also update when the next cards become due
+while the app is open. If a check fails, choose **Try Again**.
 
 The Home Screen app icon shows the due-card count across All Decks, even when
 you are browsing a single deck. NeoAnki2 asks for badge permission when cards

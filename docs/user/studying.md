@@ -75,6 +75,9 @@ Mac, iPhone, and iPad use the same session behavior. Loading failures do not
 count as completed sessions or erase saved reviews. On iPhone and iPad, **Try
 Again** reloads a failed session; **End** returns to the library.
 
+The Home count can stay visible while iCloud finishes saving a change. When
+you start Study, the session checks current eligibility for the selected scope.
+
 A session moves through a small set of states:
 
 1. **Loading** fetches the due queue for the selected scope.
