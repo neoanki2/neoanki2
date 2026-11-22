@@ -33,6 +33,11 @@ library.
 
 ## Choose a scope
 
+Choose the Japanese Academy course deck to follow its complete lesson
+sequence. Choosing a chapter or lesson starts Study within that part of the
+course. You can reopen any reading from the Library with the items in its
+lesson deck.
+
 Use one of the three kinds of sidebar row:
 
 - **All Decks** shows every item, including items that have no deck.

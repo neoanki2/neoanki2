@@ -239,6 +239,10 @@ references it.
 
 ## Preview and study media
 
+In a Japanese Academy lesson, the reader shows the saved text and media blocks
+in field order. Tap a lesson’s audio control to listen while keeping your
+place in the reading.
+
 The authoring form previews images and GIFs. Its compact preview represents
 audio and video with their media label. Item detail resolves the saved content
 in the native reading preview.

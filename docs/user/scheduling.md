@@ -85,6 +85,10 @@ of using a duplicate statistics link on Home.
 
 ## Limit new cards per day
 
+In Japanese Academy, reading a lesson leaves the daily new-card allowance
+available for vocabulary. Previously introduced cards remain eligible for
+reviews on their normal schedule.
+
 To pace unfamiliar material, Control-click a deck, choose **Deck Settings…**,
 and turn on **Limit new cards per day**. Existing decks are unlimited until you
 set a limit. A limit of **0** pauses new cards in that deck and its subdecks

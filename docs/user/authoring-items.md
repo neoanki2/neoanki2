@@ -221,6 +221,10 @@ part of the edit sheet.
 
 ## Edit an item
 
+Edit a Japanese Academy lesson from its item detail in the Library. Keep the
+reading and its vocabulary in the same lesson deck so Study can put the
+reading before the associated new cards.
+
 1. Open item detail.
 2. Choose **Edit**.
 3. Change field content.

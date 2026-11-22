@@ -447,6 +447,10 @@ public final class LibraryFeatureModel {
         return data.summary ?? .empty
     }
 
+    package func hasStandaloneCourseLesson(in scope: DeckScope) async -> Bool {
+        (try? await (library as? any LibraryCourseStudying)?.hasStandaloneCourseLesson(in: scope)) == true
+    }
+
     public func beginStudy(scope: DeckScope, title: String) async {
         guard !isStartingStudy else { return }
         isStartingStudy = true

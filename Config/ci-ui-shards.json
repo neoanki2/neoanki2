@@ -156,7 +156,8 @@
         "NeoAnki2MobileUITests/MobileVisualRedesignUITests/testManagementScreenInventory",
         "NeoAnki2MobileUITests/MobileVisualRedesignUITests/testStudyAndStudioScreenInventory",
         "NeoAnki2MobileUITests/MobileAppStoreScreenshotUITests/testCaptureAppStoreScreenshots",
-        "NeoAnki2MobileUITests/MobileStudyModesRedesignUITests/testTypedAnswerComparisonKeepsSubmittedAnswer"
+        "NeoAnki2MobileUITests/MobileStudyModesRedesignUITests/testTypedAnswerComparisonKeepsSubmittedAnswer",
+        "NeoAnki2MobileUITests/MobileStudyModesRedesignUITests/testJapaneseAcademyStudyAlternatesLessonsAndVocabulary"
       ]
     },
     {

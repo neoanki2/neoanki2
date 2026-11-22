@@ -268,10 +268,10 @@
     },
     {
       "id": "study-queue-ordering",
-      "name": "Prioritize due learned cards before new material",
+      "name": "Review due cards and introduce new material in order",
       "article": "user/studying.md",
-      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Study/StudyCardRelation.swift"],
-      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/RelatedQueueOrderingTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueuePerformanceTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Tests/NeoAnkiFeaturesTests/StudyRepairFeatureTests.swift", "Tests/NeoAnkiFeaturesTests/ContextReviewOrderingRegressionTests.swift"]
+      "sources": ["NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift", "Sources/NeoAnki2/StudyModel.swift", "Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Study/StudyCardRelation.swift", "NeoAnkiCore/Sources/NeoAnkiCore/Database/StudyCourseLessons.swift", "Sources/NeoAnkiApplication/CourseStudyPath.swift", "Sources/NeoAnkiSharedUI/StudyLessonReader.swift"],
+      "tests": ["NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueueOrderingTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/RelatedQueueOrderingTests.swift", "NeoAnkiCore/Tests/NeoAnkiCoreTests/StudyQueuePerformanceTests.swift", "Tests/NeoAnki2Tests/StudyModelTests.swift", "Tests/NeoAnkiFeaturesTests/StudySessionContractTests.swift", "Tests/NeoAnkiFeaturesTests/StudyRepairFeatureTests.swift", "Tests/NeoAnkiFeaturesTests/ContextReviewOrderingRegressionTests.swift", "Tests/NeoAnkiFeaturesTests/CourseStudyPathTests.swift", "Platforms/iOSUITests/NeoAnki2MobileUITests.swift"]
     },
     {
       "id": "study-reveal",

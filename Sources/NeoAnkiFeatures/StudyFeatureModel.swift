@@ -101,6 +101,8 @@ public final class StudyFeatureModel: Identifiable {
     public private(set) var sessionScope: DeckScope = .allDecks
     public let learningTime: LearningTimeTracker
     private var reviewTiming = ReviewTimingTracker()
+    private var coursePath = CourseStudyPath() { didSet { updateLearningTime() } }
+    public private(set) var isCompletingLesson = false { didSet { updateLearningTime() } }
     private var expectedQueueCount = 0
     private var startGeneration: UInt64 = 0
     private var itemReloadGeneration: UInt64 = 0
@@ -134,7 +136,7 @@ public final class StudyFeatureModel: Identifiable {
 
     public var isComplete: Bool { isFinished && !didFailToLoad && !isLoading && !isPreparingQueue }
     public var remainingCount: Int { remainingCardCount }
-    public var canUndo: Bool { pendingGradeUndo != nil && !isGrading && !isCompletingSubmission && !isPreparingQueue }
+    public var canUndo: Bool { pendingGradeUndo != nil && !isGrading && !isCompletingSubmission && !isPreparingQueue && !isCompletingLesson }
 
     /// Native shells share action availability. Platform adapters add only
     /// local restrictions such as an open editor or microphone permission.
@@ -144,7 +146,8 @@ public final class StudyFeatureModel: Identifiable {
             && !isCompletingSubmission && !isPreparingQueue
     }
     public var canSkip: Bool {
-        currentCard != nil && !isLoading && !isGrading && !isCompletingSubmission && !isPreparingQueue
+        guard let card = currentCard, !isLoading, !isGrading, !isCompletingSubmission, !isPreparingQueue else { return false }
+        return !coursePath.isNewVocabulary(card)
     }
     public var supportsRevealWithoutChecking: Bool {
         switch currentCard?.template.interaction {
@@ -157,9 +160,42 @@ public final class StudyFeatureModel: Identifiable {
     public func skip() async { await skipCurrentCard() }
     public func dismissError() { error = nil }
 
+    public var currentLesson: StudyCourseLesson? {
+        guard !isFinished, !isLoading else { return nil }
+        return nextLesson
+    }
+
+    private var nextLesson: StudyCourseLesson? {
+        coursePath.nextLesson(before: sessionState.currentCard, in: sessionScope)
+    }
+
     public var currentCard: DueCard? {
-        guard !isFinished, queue.indices.contains(index) else { return nil }
-        return queue[index]
+        guard !isFinished, currentLesson == nil else { return nil }
+        return sessionState.currentCard
+    }
+
+    public func loadLesson(_ id: UUID) async throws -> StudyLessonContent {
+        guard let record = try await library.item(id: id) else { throw DatabaseError.itemNotFound(id) }
+        return try StudyLessonContent(item: record.item, type: record.itemType)
+    }
+
+    public func completeLesson(_ id: UUID) async {
+        guard currentLesson?.id == id, !isCompletingLesson, !isPreparingQueue, !isGrading,
+              let courses = library as? any LibraryCourseStudying else { return }
+        let generation = startGeneration
+        isCompletingLesson = true
+        defer { isCompletingLesson = false }
+        do {
+            try await courses.markStudyCourseLessonRead(id, asOf: clock())
+            guard generation == startGeneration else { return }
+            coursePath.markRead(id)
+            error = nil
+            isFinished = sessionState.currentCard == nil && nextLesson == nil
+            prepareCurrentInteraction()
+            resetAttemptTiming()
+        } catch {
+            self.error = errorMapper.map(error)
+        }
     }
 
     public var remainingCardCount: Int {
@@ -177,7 +213,7 @@ public final class StudyFeatureModel: Identifiable {
 
     public func start(scope: DeckScope, title: String) async {
         let start = ContinuousClock.now
-        guard !isGrading, !isCompletingSubmission else { return }
+        guard !isGrading, !isCompletingSubmission, !isCompletingLesson else { return }
         let sessionNow = clock()
         var timing = StudySessionStartTiming()
         startGeneration &+= 1
@@ -187,6 +223,7 @@ public final class StudyFeatureModel: Identifiable {
         isPreparingQueue = false
         expectedQueueCount = 0
         sessionState.reset()
+        coursePath = CourseStudyPath()
         prepareCurrentInteraction()
         error = nil
         isFinished = false
@@ -205,12 +242,19 @@ public final class StudyFeatureModel: Identifiable {
             timing.dueCountSeconds = countStart.elapsedSeconds
             guard startIsCurrent(generation) else { return }
 
+            if let courses = library as? any LibraryCourseStudying {
+                let lessons = try await courses.studyCourseLessons(in: scope)
+                guard startIsCurrent(generation) else { return }
+                coursePath = CourseStudyPath(lessons: lessons)
+            }
+
             if dueCount == 0 {
                 let publicationStart = ContinuousClock.now
                 sessionState.load([])
-                isFinished = true
-                prepareCurrentInteraction()
+                isFinished = nextLesson == nil
                 isLoading = false
+                prepareCurrentInteraction()
+                updateLearningTime()
                 timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
                 timing.firstReadySeconds = start.elapsedSeconds
                 timing.totalSeconds = timing.firstReadySeconds
@@ -255,6 +299,7 @@ public final class StudyFeatureModel: Identifiable {
             prepareCurrentInteraction()
             resetAttemptTiming()
             isLoading = false
+            updateLearningTime()
             timing.headPublicationSeconds = headPublicationStart.elapsedSeconds
             timing.firstReadySeconds = start.elapsedSeconds
             lastStartTiming = timing
@@ -465,6 +510,7 @@ public final class StudyFeatureModel: Identifiable {
                 durationMilliseconds: reviewTiming.elapsedMilliseconds()
             )
             }
+            coursePath.updateIntroductions(for: card, change: 1)
             sessionState.recordGrade(submission, for: card, rating: rating)
             isAnswerRevealed = false
             await advanceSession()
@@ -479,7 +525,7 @@ public final class StudyFeatureModel: Identifiable {
     public func undoLastGrade() async {
         learningTime.interaction()
         guard !isGrading, !isCompletingSubmission, !isLoading, !isPreparingQueue else { return }
-        guard let undo = pendingGradeUndo else { return }
+        guard !isCompletingLesson, let undo = pendingGradeUndo else { return }
 
         isGrading = true
         defer { isGrading = false }
@@ -487,6 +533,7 @@ public final class StudyFeatureModel: Identifiable {
         do {
             try await library.revertReview(id: undo.reviewLogID, asOf: clock())
             sessionState.undoGrade(undo)
+            if let card = sessionState.currentCard { coursePath.updateIntroductions(for: card, change: -1) }
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
@@ -503,9 +550,9 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     private func updateLearningTime() {
-        learningTime.setBusy(isLoading || isGrading || isCompletingSubmission)
+        learningTime.setBusy(isLoading || isGrading || isCompletingSubmission || isCompletingLesson)
         let card = currentCard
-        learningTime.setCard(itemID: card?.item.id, cardID: card?.id)
+        learningTime.setCard(itemID: currentLesson?.id ?? card?.item.id, cardID: card?.id)
     }
 
     public func pauseReviewTiming() { reviewTiming.pause(); learningTime.setActive(false) }
@@ -565,10 +612,9 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func skipCurrentCard() async {
-        guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission else { return }
+        guard canSkip else { return }
         error = nil
         sessionState.dismissUndo()
-        guard queue.indices.contains(index) else { return }
 
         sessionState.skip()
         isAnswerRevealed = false
@@ -626,13 +672,13 @@ public final class StudyFeatureModel: Identifiable {
             isPreparingQueue = true
             do {
                 let eligible = try await library.isNewStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
-                guard generation == startGeneration, currentCard?.id == cardID, index == position else { return }
+                guard generation == startGeneration, sessionState.currentCard?.id == cardID, index == position else { return }
                 isPreparingQueue = false
                 guard !Task.isCancelled else { return }
                 if eligible { break }
                 sessionState.discardCurrent()
             } catch {
-                guard generation == startGeneration, currentCard?.id == cardID, index == position else { return }
+                guard generation == startGeneration, sessionState.currentCard?.id == cardID, index == position else { return }
                 isPreparingQueue = false
                 guard !Task.isCancelled else { return }
                 self.error = errorMapper.map(error)
@@ -654,8 +700,9 @@ public final class StudyFeatureModel: Identifiable {
             return
         }
 
-        isFinished = true
+        isFinished = nextLesson == nil
         prepareCurrentInteraction()
+        updateLearningTime()
     }
 
     private func loadCompleteQueue(
@@ -675,10 +722,11 @@ public final class StudyFeatureModel: Identifiable {
 
         let publicationStart = ContinuousClock.now
         sessionState.load(completeQueue)
-        isFinished = queue.isEmpty
+        isFinished = queue.isEmpty && nextLesson == nil
         prepareCurrentInteraction()
         if !queue.isEmpty { resetAttemptTiming() }
         isLoading = false
+        updateLearningTime()
         timing.remainingPublicationSeconds = publicationStart.elapsedSeconds
         timing.firstReadySeconds = start.elapsedSeconds
         timing.totalSeconds = timing.firstReadySeconds

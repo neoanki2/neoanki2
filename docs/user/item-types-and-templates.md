@@ -278,6 +278,11 @@ builder cards retain their scheduling and use source order among eligible parts.
 
 ## Use item types included with decks
 
+Japanese Academy includes separate lesson and vocabulary item types. The
+lesson’s populated title keeps its reading in the course path with zero
+scheduled cards. The vocabulary type generates the word-and-sentence cards you
+review.
+
 Custom item types belong to decks. Open a deck's settings and choose **Manage
 Item Types** to create a type, attach an existing definition, choose a default,
 or remove an attachment. Subdecks inherit their parent's choices until you turn

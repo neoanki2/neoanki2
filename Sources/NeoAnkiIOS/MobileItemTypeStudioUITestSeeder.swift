@@ -168,6 +168,10 @@ enum MobileRedesignUITestSeeder {
             try await seedAnswerReview(library: library)
             return
         }
+        if process.environment["NEOANKI_TEST_COURSE_STUDY"] == "1" {
+            try await seedCourseStudy(library: library)
+            return
+        }
         try await seed(library: library)
     }
 
@@ -198,6 +202,45 @@ enum MobileRedesignUITestSeeder {
             FieldValue(fieldID: prompt.id, value: .text("They canceled meeting.")),
             FieldValue(fieldID: answer.id, value: .text("They canceled the meeting.")),
         ], deckID: deck.id))
+    }
+
+    private static func seedCourseStudy(library: any LibraryRepository) async throws {
+        guard try await library.items(scope: .allDecks, sort: .createdAscending, search: "").isEmpty else { return }
+        let course = try await library.createDeck(Deck(name: "Japanese Academy - Level 1"))
+        let chapter = try await library.createDeck(Deck(name: "Chapter", parentID: course.id))
+        let title = FieldDef(name: "Lesson", type: .text, isRequired: true)
+        let reading = FieldDef(name: "Reading 01", type: .richText, isRequired: true)
+        let lesson = ItemType(name: "Japanese Academy Lesson", fields: [title, reading], templates: [
+            Template(name: "Lesson reader", prompt: Side(slots: [.init(source: .field(title.id))]),
+                answer: Side(slots: [.init(source: .field(reading.id))]), interaction: .reveal,
+                skill: Skill(input: .text, output: .text, operation: .recall), generateWhen: .fieldEmpty(title.id))
+        ])
+        _ = try await library.createItemType(lesson)
+        let word = FieldDef(name: "Word", type: .text, isRequired: true)
+        let sentence = FieldDef(name: "Sentence", type: .text, isRequired: true)
+        let answer = FieldDef(name: "Translation", type: .text, isRequired: true)
+        let vocabulary = ItemType(name: "Japanese Academy Vocabulary", fields: [word, sentence, answer], templates: [
+            Template(name: "Word and sentence", layout: .focus, components: [
+                .init(region: .primary, purpose: .question, source: .field(word.id)),
+                .init(region: .secondary, purpose: .question, source: .field(sentence.id)),
+                .init(region: .secondary, purpose: .expectedAnswer, source: .field(answer.id),
+                    presentation: Presentation(reveal: .hiddenUntilAnswer)),
+            ], interaction: .reveal, skill: Skill(input: .text, output: .text, operation: .recall))
+        ])
+        _ = try await library.createItemType(vocabulary)
+        for number in 1...2 {
+            let deck = try await library.createDeck(Deck(name: "Unit \(number)", parentID: chapter.id))
+            _ = try await library.createItem(Item(itemTypeID: lesson.id, fields: [
+                .init(fieldID: title.id, value: .text(number == 1 ? "Lesson 1.1: Nouns" : "Lesson 1.2: Particles")),
+                .init(fieldID: reading.id, value: .rich([Span(number == 1 ? "Lesson reading about nouns." : "Lesson reading about particles.")])),
+            ], tags: ["lesson:1.\(number)", "migaku:unit-\(number)"], deckID: deck.id))
+            _ = try await library.createItem(Item(itemTypeID: vocabulary.id, fields: [
+                .init(fieldID: word.id, value: .text(number == 1 ? "学校" : "公園", lang: "ja")),
+                .init(fieldID: sentence.id, value: .text(number == 1 ? "学校です。" : "公園です。", lang: "ja")),
+                .init(fieldID: answer.id, value: .text(number == 1 ? "It is a school." : "It is a park.")),
+            ], tags: ["lesson:1.\(number)", "migaku:word-\(number)"], deckID: deck.id),
+                asOf: .now.addingTimeInterval(Double(number - 10)))
+        }
     }
 
     // Repository-only setup is also exercised headlessly on macOS, so a new
