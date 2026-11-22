@@ -1330,6 +1330,36 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
         let tree = XCTAttachment(string: app.debugDescription); tree.name = name + "-tree"; tree.lifetime = .keepAlways; add(tree)
     }
+    func testJapaneseAcademyStudyAlternatesLessonsAndVocabulary() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign", "NEOANKI_TEST_COURSE_STUDY": "1"])
+        scrollToAndTap(app.staticTexts["Japanese Academy - Level 1"], in: app)
+        scrollToAndTap(app.buttons["Study"], in: app)
+        let title = app.staticTexts["studyLessonTitle"]
+        let next = app.buttons["continueStudyLesson"]
+        XCTAssertTrue(title.waitUntilExists(timeout: 10))
+        XCTAssertEqual(title.label, "Lesson 1.1: Nouns")
+        XCTAssertTrue(app.staticTexts["Lesson reading about nouns."].exists)
+        XCTAssertFalse(app.buttons["Show Answer"].exists)
+        capture("japanese-academy-lesson", app)
+        XCTAssertTrue(waitUntil(timeout: 5) { next.exists && next.isEnabled })
+        next.tap()
+
+        XCTAssertTrue(app.staticTexts["学校"].waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.staticTexts["学校です。"].exists)
+        XCTAssertFalse(app.staticTexts["It is a school."].exists)
+        XCTAssertFalse(app.staticTexts["Lesson reading about nouns."].exists)
+        capture("japanese-academy-vocabulary", app)
+        app.buttons["Show Answer"].tap()
+        XCTAssertTrue(app.staticTexts["It is a school."].waitUntilExists(timeout: 5))
+        app.buttons["Easy"].tap()
+        XCTAssertTrue(title.waitUntilExists(timeout: 5))
+        XCTAssertEqual(title.label, "Lesson 1.2: Particles")
+        XCTAssertTrue(app.staticTexts["Lesson reading about particles."].exists)
+        XCTAssertTrue(waitUntil(timeout: 5) { next.exists && next.isEnabled })
+        next.tap()
+        XCTAssertTrue(app.staticTexts["公園"].waitUntilExists(timeout: 5))
+    }
+
     func testTypedAnswerComparisonKeepsSubmittedAnswer() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign", "NEOANKI_TEST_ANSWER_REVIEW": "1"])
         scrollToAndTap(app.staticTexts["Answer Review"], in: app)

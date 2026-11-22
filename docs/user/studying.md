@@ -54,6 +54,7 @@ NeoAnki2 builds a study session from cards that are due now in the scope selecte
 <nav class="local-toc" aria-label="On this page" markdown="1">
 **On this page**
 
+- [Japanese Academy study path](#japanese-academy-study-path)
 - [Session states](#session-states)
 - [Study queue order](#study-queue-order)
 - [Card interactions](#card-interactions)
@@ -68,6 +69,18 @@ For large libraries of independent cards, loading the first new card now reads
 in due order without sorting all new material first. Family, daily-limit, and
 ordered-work rules still apply. The first card can be readable while the rest
 of the session is preparing; grading waits until that preparation completes.
+
+## Japanese Academy study path
+
+Open **Japanese Academy - Level 1** and choose **Study**. The study session
+opens each unread lesson in the supplied course order before introducing its
+vocabulary. Read the lesson and choose **Continue** to save your place. Introductory
+and standalone lessons are included. You can also study just one chapter or lesson.
+
+Previously introduced vocabulary is reviewed when due. New vocabulary still
+follows your daily limits, and reading a lesson doesn't use a new-card slot or
+create a grade. When iCloud sync is enabled, the lesson item's reading progress
+follows it to your other devices.
 
 ## Session states
 

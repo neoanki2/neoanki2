@@ -14,6 +14,7 @@ struct ContentValueView: View {
     var isStudyContent = false
     var occlusionGroup: Int? = nil
     var clozeGroup: Int?
+    var textAlignment: TextAlignment = .center
 
     var body: some View {
         let decision = ContentRenderingPolicy.decision(
@@ -30,13 +31,13 @@ struct ContentValueView: View {
             switch value {
             case let .text(string, language):
                 Text(LanguageMetadata.attributedString(string, language: language))
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(textAlignment)
             case let .number(number):
                 Text(ContentNumberRendering.string(from: number, locale: locale))
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(textAlignment)
             case let .rich(spans):
                 Text(SpanFormatting.swiftUIAttributedString(from: spans, pointSize: richTextPointSize))
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(textAlignment)
             case let .media(ref):
                 if let mediaStore {
                     ResolvedMediaView(
@@ -53,7 +54,7 @@ struct ContentValueView: View {
                     Text("\(FieldTypeLabels.name(for: fieldType(for: ref.kind))) unavailable")
                         .font(DesignSystem.Typography.uiSecondary)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(textAlignment)
                 }
             case let .imageOcclusion(content):
                 ImageOcclusionStudyView(content: content, mediaStore: mediaStore, group: content.displayGroup(cardGroup: occlusionGroup, allowsPreview: !isStudyContent && isAnswerRevealed), revealed: isAnswerRevealed)

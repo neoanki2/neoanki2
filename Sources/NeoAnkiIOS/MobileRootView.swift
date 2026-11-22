@@ -513,6 +513,7 @@ private struct DueNowCard: View {
     let summary: ScopeSummary
     let dueCount: Int?
     let loadState: DueCountLoadState
+    var hasStandaloneLesson = false
     let retry: () -> Void
     let isWorking: Bool
     let action: () -> Void
@@ -522,17 +523,15 @@ private struct DueNowCard: View {
             if case .failed = loadState {
                 Text("Could Not Check Due Cards").font(.headline)
                 Button("Try Again", action: retry).frame(minHeight: 44)
+            } else if hasStandaloneLesson, (dueCount ?? 0) == 0 {
+                Text("Lesson ready").font(.title2.weight(.semibold))
+                studyButton
             } else if let dueCount {
                 Text(dueCount > 0 ? "\(dueCount) \(dueCount == 1 ? "card" : "cards") due" : "You're caught up")
                     .font(.title2.weight(.semibold))
                 if dueCount > 0 {
                     Text("A little practice goes a long way.").foregroundStyle(.secondary)
-                    Button(action: action) {
-                        Label("Study", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
-                    .disabled(isWorking)
+                    studyButton
                 } else {
                     Text(summary.itemCount == 0 ? "Add your first item to begin." : "Come back when your next cards are due.")
                         .foregroundStyle(.primary)
@@ -544,6 +543,15 @@ private struct DueNowCard: View {
         }
         .padding(20)
         .accessibilityElement(children: .contain)
+    }
+
+    private var studyButton: some View {
+        Button(action: action) {
+            Label("Study", systemImage: "play.fill")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint()
+        .disabled(isWorking)
     }
 }
 
@@ -581,6 +589,7 @@ private struct ScopeRow: View {
         }
         .padding(.vertical, 4)
     }
+
 }
 
 private struct ScopeDetailView: View {
@@ -589,6 +598,7 @@ private struct ScopeDetailView: View {
     @Bindable var model: MobileAppModel
     let scope: MobileScope
     @State private var summary: ScopeSummary?
+    @State private var hasStandaloneLesson = false
     @State private var errorMessage: String?
     @State private var showsDeckSettings = false
     @State private var showsAddItem = false
@@ -601,6 +611,7 @@ private struct ScopeDetailView: View {
                         summary: summary,
                         dueCount: model.dueCounts.count(for: scope.filter),
                         loadState: model.dueCounts.state,
+                        hasStandaloneLesson: hasStandaloneLesson,
                         retry: { Task { await model.dueCounts.refresh() } },
                         isWorking: model.isStartingStudy,
                         action: startStudy
@@ -659,6 +670,8 @@ private struct ScopeDetailView: View {
     private func load() async {
         do {
             summary = try await model.summary(for: scope)
+            let available = await model.hasStandaloneCourseLesson(in: scope.filter)
+            if !Task.isCancelled { hasStandaloneLesson = available }
         } catch {
             errorMessage = MobileAppModel.message(for: error)
         }

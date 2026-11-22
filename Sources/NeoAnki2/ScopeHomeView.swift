@@ -9,6 +9,7 @@ import SwiftUI
 /// start. Enumerating items is a separate, deliberate mode.
 struct ScopeHomeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @State private var hasStandaloneLesson = false
     @State private var statistics: StatisticsFeatureModel
     @Bindable var itemsModel: ItemsModel
     let scope: StudyScope
@@ -63,6 +64,11 @@ struct ScopeHomeView: View {
         }
         .background(DesignSystem.detailBackground)
         .navigationTitle(scope.label)
+        .task(id: scope.filter) {
+            hasStandaloneLesson = false
+            let available = await itemsModel.hasStandaloneCourseLesson(in: scope.filter)
+            if !Task.isCancelled { hasStandaloneLesson = available }
+        }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 // Shortcuts live on the menu commands, which is where macOS
@@ -216,7 +222,7 @@ struct ScopeHomeView: View {
                 .accessibilityLabel("\(dueHeadline) in \(scope.label)")
                 .accessibilityIdentifier("scopeHomeDueHeadline")
 
-            if summary.hasDueCards {
+            if summary.hasDueCards || hasStandaloneLesson {
                 Button("Study", systemImage: "play.fill") {
                     onStudy()
                 }
@@ -233,7 +239,7 @@ struct ScopeHomeView: View {
     }
 
     private var dueHeadline: String {
-        guard summary.hasDueCards else { return "You're caught up" }
+        guard summary.hasDueCards else { return hasStandaloneLesson ? "Lesson ready" : "You're caught up" }
         let noun = summary.dueNow == 1 ? "card" : "cards"
         return "\(summary.dueNow) \(noun) due"
     }

@@ -42,6 +42,23 @@ struct StudyView: View {
                 loadFailureView
             } else if model.isFinished {
                 finishedView
+            } else if let lesson = model.session.currentLesson {
+                VStack(spacing: 0) {
+                    studyHeader
+                    Divider()
+                    StudyLessonReader(load: { try await model.session.loadLesson(lesson.id) },
+                        canContinue: !model.session.isCompletingLesson && !model.isPreparingQueue && !model.isGrading,
+                        saveError: model.errorMessage,
+                        onContinue: { Task { await model.session.completeLesson(lesson.id) } }
+                    ) { value in
+                        ContentValueView(value: value, presentation: Presentation(media: .playOnTap),
+                            richTextPointSize: DesignSystem.Typography.richTextPointSize, mediaStore: mediaStore,
+                            textAlignment: .leading)
+                            .font(DesignSystem.Typography.uiBody)
+                    }
+                    .id(lesson.id)
+                }
+                .onExitCommand { endSession() }
             } else if let card = model.currentCard {
                 activeCardView(card)
             } else {
@@ -302,45 +319,47 @@ struct StudyView: View {
                 gradeUndoFeedback(for: undo)
             }
 
-            Button("Skip", systemImage: "forward") {
-                skipCurrentCard()
-            }
-            .buttonStyle(.borderless)
-            .fixedSize()
-            .help("Move this card to the end of the current session queue")
-            .disabled(!canSkip)
-            .accessibilityHint("Moves this card to the end without grading it")
-            .accessibilityIdentifier("skipStudyCard")
-
-            Menu {
-                if supportsRevealWithoutChecking && !model.isAnswerRevealed {
-                    Button("Reveal & Self-Grade", action: revealWithoutChecking)
-                        .disabled(!canRevealWithoutChecking)
-                        .help("Reveal without checking (Right Arrow)")
-                        .accessibilityIdentifier("revealAndSelfGrade")
-
-                    Divider()
+            if model.currentCard != nil {
+                Button("Skip", systemImage: "forward") {
+                    skipCurrentCard()
                 }
+                .buttonStyle(.borderless)
+                .fixedSize()
+                .help("Move this card to the end of the current session queue")
+                .disabled(!canSkip)
+                .accessibilityHint("Moves this card to the end without grading it")
+                .accessibilityIdentifier("skipStudyCard")
 
-                Button("Edit Card", systemImage: "square.and.pencil") {
-                    isEditingCard = true
-                }
-                .disabled(model.isGrading || model.isPreparingQueue)
-                .accessibilityIdentifier("editStudyCard")
+                Menu {
+                    if supportsRevealWithoutChecking && !model.isAnswerRevealed {
+                        Button("Reveal & Self-Grade", action: revealWithoutChecking)
+                            .disabled(!canRevealWithoutChecking)
+                            .help("Reveal without checking (Right Arrow)")
+                            .accessibilityIdentifier("revealAndSelfGrade")
 
-                Button("Grade Help", systemImage: "questionmark.circle") {
-                    showGradeGuide = true
+                        Divider()
+                    }
+
+                    Button("Edit Card", systemImage: "square.and.pencil") {
+                        isEditingCard = true
+                    }
+                    .disabled(model.isGrading || model.isPreparingQueue)
+                    .accessibilityIdentifier("editStudyCard")
+
+                    Button("Grade Help", systemImage: "questionmark.circle") {
+                        showGradeGuide = true
+                    }
+                    .accessibilityIdentifier("gradeHelp")
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
                 }
-                .accessibilityIdentifier("gradeHelp")
-            } label: {
-                Label("More", systemImage: "ellipsis.circle")
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .help("More study actions")
-            .accessibilityIdentifier("studyActionsMenu")
-            .popover(isPresented: $showGradeGuide, arrowEdge: .top) {
-                GradeGuideView(gradingMode: gradingMode)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("More study actions")
+                .accessibilityIdentifier("studyActionsMenu")
+                .popover(isPresented: $showGradeGuide, arrowEdge: .top) {
+                    GradeGuideView(gradingMode: gradingMode)
+                }
             }
 
             Button("End Session", systemImage: "stop.fill") {
@@ -349,6 +368,7 @@ struct StudyView: View {
             .buttonStyle(.borderless)
             .fixedSize()
             .help("End this study session")
+            .disabled(model.session.isCompletingLesson)
             .accessibilityIdentifier("endStudySession")
         }
         .padding(.horizontal, DesignSystem.Spacing.studyHorizontal)
@@ -835,6 +855,7 @@ struct StudyView: View {
     }
 
     private func endSession() {
+        guard !model.session.isCompletingLesson else { return }
         recording.reset()
         onEndSession()
     }

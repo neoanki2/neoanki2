@@ -75,11 +75,21 @@ struct StudySessionView: View {
                         Button { dismiss() } label: { Text("Done").frame(maxWidth: .infinity, minHeight: 44) }
                             .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().padding(16).background(.bar)
                     }
+                } else if let lesson = session.currentLesson {
+                    StudyLessonReader(load: { try await session.loadLesson(lesson.id) },
+                        canContinue: !session.isCompletingLesson && !session.isPreparingQueue && !session.isGrading,
+                        onContinue: { Task { await session.completeLesson(lesson.id) } }
+                    ) { value in
+                        MobileContentValueView(value: value, mediaStore: session.mediaStore, mediaBehavior: .playOnTap)
+                            .font(.body)
+                    }
+                    .id(lesson.id)
                 } else if let card = session.currentCard {
                     studyCard(card)
                 }
             }
-            .navigationTitle(session.isComplete || session.didFailToLoad ? session.title : "\(session.remainingCount) left")
+            .navigationTitle(session.currentLesson != nil ? "Lesson" : session.isComplete || session.didFailToLoad
+                ? session.title : "\(session.remainingCount) left")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -89,10 +99,10 @@ struct StudySessionView: View {
                         recorder.cleanup()
                         dismiss()
                     }
-                    .disabled(session.isGrading || session.isCompletingSubmission || session.isPreparingQueue)
+                    .disabled(session.isGrading || session.isCompletingSubmission || session.isCompletingLesson || session.isPreparingQueue)
                     .accessibilityIdentifier("endStudySession")
                 }
-                if !session.isComplete && !session.didFailToLoad && !session.isLoading {
+                if session.currentCard != nil {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
                         Menu("More", systemImage: "ellipsis.circle") {
@@ -120,7 +130,7 @@ struct StudySessionView: View {
         }
 
         .tint(SharedDesignSystem.mobileTint(for: colorScheme))
-        .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission)
+        .interactiveDismissDisabled(session.isGrading || session.isCompletingSubmission || session.isCompletingLesson)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 session.resumeReviewTiming()

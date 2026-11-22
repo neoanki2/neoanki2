@@ -116,6 +116,10 @@ final class ItemsModel {
         await searchTask?.value
     }
 
+    func hasStandaloneCourseLesson(in scope: DeckScope) async -> Bool {
+        (try? await (library as? any LibraryCourseStudying)?.hasStandaloneCourseLesson(in: scope)) == true
+    }
+
     private let library: any LibraryBrowsing & LibraryItemMutating & LibraryItemTypeManaging
         & LibraryStudyResponses & LibraryCoordinatedItemEditing
     let mediaStore: MediaStore?
