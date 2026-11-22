@@ -81,6 +81,11 @@ and background-refresh details.
 
 ## Study
 
+Open **Japanese Academy - Level 1** and tap **Study** to read lessons and
+practice the vocabulary that follows each one. Lesson text, images, and audio
+scroll in the study area while **Continue** stays visible. An unread
+introductory lesson can be studied even when its deck has zero due cards.
+
 Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:
 Reveal, Type Answer, Choose, Arrange, Record, Audio Submission, and Cloze.

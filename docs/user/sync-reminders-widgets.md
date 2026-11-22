@@ -151,6 +151,10 @@ later refresh; opening the app remains the way to request a current summary.
 
 ## What syncs
 
+Choosing **Continue** on a Japanese Academy lesson saves its reading progress
+on the lesson item. Devices using the same iCloud library can pick up at the
+next unread lesson after that update syncs.
+
 Incoming media is stored before its accompanying items are committed. If an
 image arrives in a later sync batch, it is associated with the items already
 referencing it and retained during cleanup.

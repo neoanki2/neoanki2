@@ -154,6 +154,10 @@ typing a number into an answer does not grade the card.
 
 ### Study
 
+In a Japanese Academy lesson, the heading introduces the reading blocks.
+**Continue** stays in the study footer, and Return activates it on Mac once
+the lesson is ready.
+
 - **Space** or **Return:** reveal the answer or run the current interaction's
   primary check action. After reveal, **Space** grades Good.
 - **Right Arrow:** reveal without automatic checking and self-grade on typed,
