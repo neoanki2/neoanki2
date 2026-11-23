@@ -41,6 +41,10 @@ public struct StudySessionState: Sendable {
         for card in cards where card.id != headID { queue.append(card) }
     }
 
+    public mutating func appendDueCards(_ cards: [DueCard]) {
+        queue.append(contentsOf: cards)
+    }
+
     public mutating func recordGrade(_ submission: ReviewSubmission, for card: DueCard, rating: ReviewRating) {
         let needsRepair = submission.memory.phase == .learning || submission.memory.phase == .relearning
         if needsRepair {
@@ -68,9 +72,12 @@ public struct StudySessionState: Sendable {
     public mutating func undoGrade(_ undo: StudyGradeUndo) {
         if let id = undo.requeuedCardID {
             repairs.removeAll { $0.id == id }
-            if let queued = queue.indices.last(where: { $0 > undo.previousIndex && queue[$0].id == id }) {
-                queue.remove(at: queued)
-            }
+        }
+        // A later attempt can come from a repair round or a fresh due check.
+        if let queued = queue.indices.last(where: {
+            $0 > undo.previousIndex && queue[$0].id == undo.reviewedCardID
+        }) {
+            queue.remove(at: queued)
         }
         index = undo.previousIndex
         reviewedCount = undo.previousReviewedCount
@@ -97,8 +104,8 @@ public struct StudySessionState: Sendable {
         reconcile(itemID: item.id, item: item, itemType: itemType, liveCards: nil)
     }
 
-    /// Reconcile only existing session membership. New siblings are introduced
-    /// by the next session's eligibility policy, never by an editor refresh.
+    /// Reconcile existing session membership. Newly generated siblings enter
+    /// through a due-queue read.
     /// Keep the reviewed prefix in place so compensating undo indices remain
     /// valid. A retired reviewed card loses its undo affordance instead.
     public mutating func reconcile(itemID: UUID, snapshot: ItemCardSnapshot?) {

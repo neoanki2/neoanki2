@@ -361,9 +361,15 @@ public final class LibraryFeatureModel {
 
     public func synchronize() async {
         guard loadState == .ready, syncEnabled, !Task.isCancelled else { return }
+        if syncChangesTask == nil { await observeSyncChanges() }
         await syncService.synchronizeAndWait()
         await refreshSyncStatus()
         await refresh()
+    }
+
+    package func prioritizeSyncMedia(in scope: DeckScope?) async {
+        guard !Task.isCancelled else { return }
+        await syncService.prioritizeMedia(in: scope)
     }
 
     public func setSyncEnabled(_ enabled: Bool) async {
@@ -726,7 +732,7 @@ public final class LibraryFeatureModel {
     private func studyDidMutate() async {
         studyMutationRevision &+= 1
         libraryRevision &+= 1
-        dueCounts.invalidate()
+        dueCounts.invalidate(hidingPublishedCounts: true)
     }
 
     private func studyAvailability(scope: DeckScope, asOf now: Date) async throws -> StudyAvailability {

@@ -1,6 +1,6 @@
 import Foundation
 import NeoAnkiApplication
-import NeoAnkiCloudSync
+@testable import NeoAnkiCloudSync
 import NeoAnkiCore
 import Testing
 
@@ -763,14 +763,92 @@ func synchronizedFirstReviewsConsumeDailyAllowance(legacyPayload: Bool) async th
 }
 
 private actor RelocatedQueueTransport: CloudSyncTransport {
+    private(set) var uploadedMedia: [String] = []
+
     func start() async throws {}
     func stop() async {}
     func fetchPendingChanges() async throws -> [SyncRecordEnvelope] { [] }
     func enqueue(_ records: [SyncRecordEnvelope]) async throws {
         for record in records {
             if let file = record.stagedFileURL { _ = try Data(contentsOf: file) }
+            if record.resourceKind == "media" { uploadedMedia.append(record.id) }
         }
     }
+}
+
+@Test func interruptedMediaBatchResumesFromDiskAndPrioritizesTheSelectedDeck() async throws {
+    let source = try await makeSyncRepository(), destination = try await makeSyncRepository()
+    defer {
+        try? FileManager.default.removeItem(at: source.directory)
+        try? FileManager.default.removeItem(at: destination.directory)
+    }
+    let deck = Deck(name: "Selected")
+    let child = Deck(name: "Next lesson", parentID: deck.id)
+    _ = try await source.repository.createDeck(deck)
+    _ = try await source.repository.createDeck(child)
+    let type = try ItemTypeStudioDraft.newImageOcclusion().candidateItemType()
+    _ = try await source.repository.createItemType(type)
+    let signature = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    var refs: [MediaRef] = []
+    for byte in UInt8(0)..<34 {
+        refs.append(try await source.repository.reserveMedia(data: signature + Data([byte]), kind: .image,
+            altText: nil, reservationID: UUID(), asOf: .now).reference)
+    }
+    let selected = try #require(refs.last)
+    var content = ImageOcclusionContent(image: selected)
+    content.addMask(rect: .init(x: 0.1, y: 0.1, width: 0.3, height: 0.2))
+    let item = Item(itemTypeID: type.id, fields: [
+        .init(fieldID: type.fields[0].id, value: .imageOcclusion(content))
+    ], deckID: child.id)
+    _ = try await source.repository.createItem(item, asOf: .now)
+
+    let records = try await SQLiteLibrarySyncAdapter(repository: source.repository)
+        .encode(changes: source.repository.changes(after: 0, limit: 1_000), deviceID: "source")
+    let syncDirectory = destination.directory.appendingPathComponent("sync")
+    let metadata = SyncMetadataStore(directory: syncDirectory)
+    let baseline = try await destination.repository.currentChangeCursor()
+    try await metadata.save(SyncMetadata(outboundCursor: baseline,
+        didCreateInitialBackup: true, didCompleteInitialMerge: true))
+    try await metadata.receive(records)
+    let staged = try await metadata.load().stagedInbound
+    let pending = refs[32]
+    let pendingFile = try #require(staged.first { $0.id == pending.assetHash }?.stagedFileURL)
+    let bytes = try Data(contentsOf: pendingFile)
+    try (signature + Data([255])).write(to: pendingFile, options: .atomic)
+
+    let transport = RelocatedQueueTransport()
+    let backup = destination.directory.appendingPathComponent("backup.sqlite")
+    let first = OfflineFirstSyncService(repository: destination.repository,
+        adapter: SQLiteLibrarySyncAdapter(repository: destination.repository), transport: transport,
+        metadataStore: metadata, backupURL: { backup })
+    await first.prioritizeMedia(in: .deck(deck.id))
+    await first.synchronize()
+    #expect(await first.issues().map(\.kind) == [.mediaFailure])
+    #expect(try await destination.repository.item(id: item.id) == nil)
+    let installed = try #require(try await destination.repository.mediaAsset(hash: selected.assetHash))
+    #expect(try await destination.repository.mediaAsset(hash: pending.assetHash) == nil)
+    let partial = try await destination.repository.changes(after: baseline, limit: 100)
+    #expect(partial.filter { $0.resourceType == "media" }.count == 32)
+    #expect(Set(partial.map(\.transactionID)).count == 1)
+    #expect(try await metadata.load().stagedInbound == staged)
+
+    try bytes.write(to: pendingFile, options: .atomic)
+    let selectedFile = try #require(staged.first { $0.id == selected.assetHash }?.stagedFileURL)
+    try FileManager.default.removeItem(at: selectedFile)
+    let local = try await destination.repository.reserveMedia(data: signature + Data([200]), kind: .image,
+        altText: nil, reservationID: UUID(), asOf: .now).reference
+    let reopened = SyncMetadataStore(directory: syncDirectory)
+    let restarted = OfflineFirstSyncService(repository: destination.repository,
+        adapter: SQLiteLibrarySyncAdapter(repository: destination.repository), transport: transport,
+        metadataStore: reopened, backupURL: { backup })
+    await restarted.synchronize()
+    #expect(await restarted.issues().isEmpty)
+    #expect(try await reopened.load().stagedInbound.isEmpty)
+    #expect(try await destination.repository.item(id: item.id)?.item.deckID == child.id)
+    #expect(try await destination.repository.mediaAsset(hash: selected.assetHash)?.createdAt == installed.createdAt)
+    #expect(try await destination.repository.mediaBytes(hash: selected.assetHash).1 == signature + Data([33]))
+    #expect(try await destination.repository.mediaBytes(hash: pending.assetHash).1 == bytes)
+    #expect(await transport.uploadedMedia == [local.assetHash])
 }
 
 @Test func sqliteSyncAdapterRecoversReviewsBesideMediaAfterAnAppUpdate() async throws {

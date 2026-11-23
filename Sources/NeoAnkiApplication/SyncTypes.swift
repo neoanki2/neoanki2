@@ -192,6 +192,7 @@ public extension LibrarySyncAdapter {
 
 public protocol SyncService: Sendable {
     func libraryChanges() async -> AsyncStream<Void>
+    func prioritizeMedia(in scope: DeckScope?) async
     func start() async
     func synchronize() async
     func synchronizeAndWait() async
@@ -204,6 +205,7 @@ public protocol SyncService: Sendable {
 }
 
 public extension SyncService {
+    func prioritizeMedia(in scope: DeckScope?) async {}
     func synchronizeAndWait() async { await synchronize() }
     func libraryChanges() async -> AsyncStream<Void> { AsyncStream { $0.finish() } }
     func retryIssue(id: UUID) async { _ = id; await synchronize() }

@@ -101,8 +101,10 @@ A session moves through a small set of states:
    grading it or changing its schedule.
 6. **Repair** repeats every failed card after the cards already waiting.
    Consecutive failures remain unresolved and repeat in the same session.
-7. **Session Complete** offers **View Session Statistics**, **Undo Last Grade**
-   when available, and **Done**. Statistical totals live in Statistics.
+7. **Session Complete** appears after the app checks the selected scope again
+   and finds no more eligible due cards. Cards that became due during study
+   are added to the same session. The completion screen offers **View Session
+   Statistics**, **Undo Last Grade** when available, and **Done**.
 
 After checking a typed answer, choice, or arrangement, **Your answer** stays
 visible with the labeled **Answer** section. For a single plain-text answer,
@@ -166,18 +168,17 @@ New/Review phases differ. If only parts 2, 5, and 8 are eligible, they appear as
 2 → 5 → 8. Each work keeps its existing queue slots, so unrelated cards can still
 appear between its parts. Opening cards lead their poem when eligible.
 
-Source order applies separately to the initial pass and repair passes. Skip
+Source order applies separately to each pass, including repair passes. Skip
 defers a part to a later pass. The interval variation and related-card spacing
 rules for independent cards do not apply to poetry or prose builder cards.
 
 The same eligibility and ordering policies apply on Mac, iPhone/iPad, and local
 API study sessions. Stable identifiers break otherwise equal priorities.
 
-Rearranging a deck changes which ancestor scopes include its subtree. A new
-session uses the current hierarchy; a session already in progress keeps the
-queue snapshot it started with.
+Rearranging a deck changes which ancestor scopes include its subtree. New
+sessions and completion checks use the current hierarchy.
 
-The session preserves that queue while you work. If grading places a card back
+The session keeps the current pass while you work. If grading places a card back
 into Learning, it returns after the rest of the current queue rather than
 interrupting the next card. **Skip** also moves the current card to the end, but
 does not save a review or remove the card from the remaining count. Editing an
@@ -186,10 +187,10 @@ Editing an unrevealed card also refreshes its choices or arrangement. Feedback
 for an answer already revealed stays visible while its content is updated.
 
 Changing an Item Type's Card setups can likewise retire cards that no longer
-generate. A newly opened session uses the reconciled card set, while surviving
-Card setups keep their stable card identities, scheduling memory, and normal
-learned-before-new queue priority. Choosing a different static Layout alone does
-not change queue order.
+generate. New sessions and completion checks use the reconciled card set.
+Surviving Card setups keep their stable card identities, scheduling memory,
+and normal learned-before-new queue priority. Choosing a different static
+Layout alone does not change queue order.
 Card maturity is shown in the library as a separate progress signal. Becoming
 Maintaining does not move a card in this queue or alter its due time.
 

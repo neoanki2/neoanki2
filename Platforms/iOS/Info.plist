@@ -18,8 +18,8 @@
 <key>NSCameraUsageDescription</key><string>Capture images or video to add to study items.</string>
 <key>NSMicrophoneUsageDescription</key><string>Record answers and add audio to study items.</string>
 <key>NSPhotoLibraryUsageDescription</key><string>Choose images, GIFs, and videos for study items.</string>
-<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.neoanki2.ios.refresh</string></array>
-<key>UIBackgroundModes</key><array><string>fetch</string><string>remote-notification</string></array>
+<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.neoanki2.ios.refresh</string><string>com.neoanki2.ios.library-processing</string></array>
+<key>UIBackgroundModes</key><array><string>fetch</string><string>remote-notification</string><string>processing</string></array>
 <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>com.neoanki2.ios</string><key>CFBundleURLSchemes</key><array><string>neoanki2</string></array></dict></array>
 <key>UTExportedTypeDeclarations</key><array>
 <dict><key>UTTypeIdentifier</key><string>com.neoanki2.neodeck</string><key>UTTypeDescription</key><string>NeoAnki Portable Deck</string><key>UTTypeConformsTo</key><array><string>com.apple.package</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>neodeck</string></array></dict></dict>

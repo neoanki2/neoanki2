@@ -237,6 +237,10 @@ Identical bytes can share one stored asset. When an item is deleted or an
 attachment is replaced, an asset is removed only after nothing in the library
 references it.
 
+iCloud downloads reuse media files already stored on the device and save
+progress during large transfers. See [Sync timing](../sync-reminders-widgets/)
+for what happens when iOS interrupts a download.
+
 ## Preview and study media
 
 In a Japanese Academy lesson, the reader shows the saved text and media blocks

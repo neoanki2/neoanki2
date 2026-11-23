@@ -130,6 +130,13 @@ Pending changes, including downloaded images, remain recoverable after an app
 update. The updated app resumes its saved queue when it next runs, preserving
 existing reviews and card schedules.
 
+Large media transfers save progress in small batches and reuse files already
+installed. On iPhone and iPad, media for the deck you have open or are studying
+gets priority. NeoAnki2 also requests background processing so transfers can
+continue when iOS grants runtime after you leave the app. If iOS interrupts
+the transfer, the next sync continues from saved progress. A newly synced deck
+appears after its required files have finished installing.
+
 Updates can arrive within a few seconds while both apps are active, but there
 is no fixed delivery-time guarantee. iOS controls background execution and can
 delay or coalesce silent notifications; opening the app performs a catch-up

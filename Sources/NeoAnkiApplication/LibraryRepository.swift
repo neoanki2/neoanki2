@@ -1006,6 +1006,14 @@ public actor SQLiteLibraryRepository:
     }
 
     public func applySynchronizedCard(_ card: Card) async throws { try await store.applySynchronizedCard(card) }
+    package func installSynchronizedMedia(_ files: [(url: URL?, reference: MediaRef, byteSize: Int)]) async throws {
+        try await store.installSynchronizedMedia(files)
+    }
+    package func synchronizedMediaHashes(deckIDs: Set<UUID>) async throws -> Set<String> {
+        try await store.synchronizedMediaHashes(deckIDs: deckIDs)
+    }
+    package func synchronizedDecks() async throws -> [Deck] { try await store.listDecks() }
+
     public func applySynchronizedReview(_ log: ReviewLog) async throws { try await store.applySynchronizedReview(log) }
     public func synchronizedReviewRecord(id: UUID) async throws -> SynchronizedReviewRecord {
         try await store.synchronizedReviewRecord(id: id)

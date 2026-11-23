@@ -74,9 +74,10 @@ public final class LibraryDueCountsModel {
         return snapshot?.decks[id] ?? 0
     }
 
-    public func invalidate(asOf now: Date = .now) {
-        // Rechecking counts does not remove a published result from the view.
-        // Consumers that publish to the OS still require a fresh snapshot.
+    public func invalidate(asOf now: Date = .now, hidingPublishedCounts: Bool = false) {
+        // Keep counts visible during routine refreshes. Study writes can make
+        // the published count misleading when the learner returns to Home.
+        if hidingPublishedCounts { showsPublishedCounts = false }
         state = .checking
         generation &+= 1
         boundaryTask?.cancel()

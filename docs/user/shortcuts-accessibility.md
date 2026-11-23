@@ -193,6 +193,8 @@ VoiceOver review. Poetry and prose parts already eligible for a session follow
 source order, including when a New part precedes a learned part. Skip defers a
 part to a later pass; failed recalls return in an ordered repair pass. The app
 keeps the displayed card fixed while preparing the rest of the session.
+After the last grade, any newly due cards appear with the usual prompt and
+answer controls.
 
 ## VoiceOver and focus
 

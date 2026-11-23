@@ -206,9 +206,11 @@ before saving.
 
 On iPhone and iPad, returning to the app checks current availability before
 showing whether you are caught up. During ordinary refreshes, the last due
-count stays visible until its replacement is ready. Incoming attachments
-refresh availability when their course items or schedules are saved. Library
-and maturity summaries can finish separately from the due count.
+count stays visible until its replacement is ready. After a study review,
+Home shows **Checking due cards…** if the updated count is still loading.
+Incoming attachments refresh availability when their course items or schedules
+are saved. Library and maturity summaries can finish separately from the due
+count.
 
 Choosing a scope opens its home, which answers one question: is there anything
 to study right now?

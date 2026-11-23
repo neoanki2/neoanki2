@@ -121,12 +121,26 @@ public actor SyncMetadataStore {
     /// Stage payloads and advance the explicit fetch cursor in the same write.
     /// A failed page (including asset staging) must leave the old cursor intact.
     func receiveZonePage(_ records: [SyncRecordEnvelope], token: Data?) throws {
-        let staged = try stageAssets(in: records)
         var metadata = try load()
         var latest: [String: SyncRecordEnvelope] = [:]
-        for record in metadata.stagedInbound + staged {
+        for record in metadata.stagedInbound {
             latest["\(record.resourceKind):\(record.id)"] = record
         }
+        let delivered = Dictionary(records.map { ("\($0.resourceKind):\($0.id)", $0) },
+            uniquingKeysWith: { _, newest in newest })
+        let recoveringMedia = metadata.issues.contains { $0.kind == .mediaFailure }
+        let unstaged = delivered.compactMap { key, record -> SyncRecordEnvelope? in
+            guard !recoveringMedia, let existing = latest[key], let asset = existing.asset,
+                  let file = existing.stagedFileURL, file.isFileURL,
+                  existing.revision == record.revision, existing.deviceID == record.deviceID,
+                  existing.order == record.order, Self.sameContent(existing, record),
+                  let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                  Int64(size) == asset.byteSize else { return record }
+            return nil
+        }
+        if unstaged.isEmpty, token == nil { return }
+        let staged = try stageAssets(in: unstaged)
+        for record in staged { latest["\(record.resourceKind):\(record.id)"] = record }
         let obsolete = (metadata.stagedInbound + staged).filter { old in
             latest["\(old.resourceKind):\(old.id)"]?.stagedFileURL != old.stagedFileURL
         }
@@ -141,7 +155,10 @@ public actor SyncMetadataStore {
         let current = try load()
         committed.engineState = current.engineState
         committed.libraryZoneChangeToken = current.libraryZoneChangeToken
-        committed.stagedInbound = current.stagedInbound.filter { !consumed.contains($0) }
+        let consumedByResource = Dictionary(grouping: consumed) { "\($0.resourceKind):\($0.id)" }
+        committed.stagedInbound = current.stagedInbound.filter { record in
+            consumedByResource["\(record.resourceKind):\(record.id)"]?.contains(record) != true
+        }
         committed.serverBaseline = current.serverBaseline
         committed.resolvedConflictCopies = mergedArchive(current, committed)
         for record in consumed { setBaseline(record, metadata: &committed) }
@@ -267,12 +284,19 @@ public actor SyncMetadataStore {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var created: [URL] = []
         do { return try records.map { record in
+            try Task.checkCancellation()
             guard let source = record.stagedFileURL, let asset = record.asset else { return record }
             // Remote hash/extension strings are untrusted path components.
             // Validation happens in the adapter; staging uses an opaque name.
             let destination = directory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.copyItem(at: source, to: destination)
             created.append(destination)
+            #if os(iOS)
+            // Like the library database, the private queue needs to remain
+            // available to background sync after the first device unlock.
+            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: destination.path)
+            #endif
             return SyncRecordEnvelope(
                 id: record.id,
                 resourceKind: record.resourceKind,

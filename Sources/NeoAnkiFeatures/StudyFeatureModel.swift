@@ -60,6 +60,7 @@ public final class StudyFeatureModel: Identifiable {
     /// load is indistinguishable from an empty one, and a session that never
     /// opened reports itself complete.
     public private(set) var didFailToLoad = false { didSet { updateLearningTime() } }
+    public private(set) var dueCheckError: UserFacingError?
     public var pendingGradeUndo: StudyGradeUndo? { sessionState.pendingGradeUndo }
     public private(set) var typedAnswer = ""
     public private(set) var answerEvaluation: AnswerEvaluation?
@@ -136,7 +137,10 @@ public final class StudyFeatureModel: Identifiable {
 
     public var isComplete: Bool { isFinished && !didFailToLoad && !isLoading && !isPreparingQueue }
     public var remainingCount: Int { remainingCardCount }
-    public var canUndo: Bool { pendingGradeUndo != nil && !isGrading && !isCompletingSubmission && !isPreparingQueue && !isCompletingLesson }
+    public var canUndo: Bool {
+        pendingGradeUndo != nil && !isLoading && !isGrading && !isCompletingSubmission && !isPreparingQueue
+            && !isCompletingLesson
+    }
 
     /// Native shells share action availability. Platform adapters add only
     /// local restrictions such as an open editor or microphone permission.
@@ -169,6 +173,15 @@ public final class StudyFeatureModel: Identifiable {
         coursePath.nextLesson(before: sessionState.currentCard, in: sessionScope)
     }
 
+    public func retryLoadingCards() async {
+        guard !isLoading, !isGrading, !isCompletingSubmission, !isCompletingLesson else { return }
+        if dueCheckError != nil {
+            await checkForMoreDueCards()
+        } else if didFailToLoad {
+            await start()
+        }
+    }
+
     public var currentCard: DueCard? {
         guard !isFinished, currentLesson == nil else { return nil }
         return sessionState.currentCard
@@ -190,7 +203,10 @@ public final class StudyFeatureModel: Identifiable {
             guard generation == startGeneration else { return }
             coursePath.markRead(id)
             error = nil
-            isFinished = sessionState.currentCard == nil && nextLesson == nil
+            if sessionState.currentCard == nil, nextLesson == nil {
+                await checkForMoreDueCards()
+                return
+            }
             prepareCurrentInteraction()
             resetAttemptTiming()
         } catch {
@@ -226,6 +242,7 @@ public final class StudyFeatureModel: Identifiable {
         coursePath = CourseStudyPath()
         prepareCurrentInteraction()
         error = nil
+        dueCheckError = nil
         isFinished = false
         isAnswerRevealed = false
         reviewTiming = ReviewTimingTracker()
@@ -534,6 +551,7 @@ public final class StudyFeatureModel: Identifiable {
             try await library.revertReview(id: undo.reviewLogID, asOf: clock())
             sessionState.undoGrade(undo)
             if let card = sessionState.currentCard { coursePath.updateIntroductions(for: card, change: -1) }
+            dueCheckError = nil
             isFinished = false
             isAnswerRevealed = true
             prepareCurrentInteraction()
@@ -700,9 +718,31 @@ public final class StudyFeatureModel: Identifiable {
             return
         }
 
-        isFinished = nextLesson == nil
-        prepareCurrentInteraction()
-        updateLearningTime()
+        await checkForMoreDueCards()
+    }
+
+    private func checkForMoreDueCards() async {
+        let generation = startGeneration
+        isLoading = true
+        dueCheckError = nil
+        do {
+            // Time, sync, or a change in eligibility can add due cards after
+            // the startup read. Check again only after the current pass and
+            // its repairs are exhausted.
+            let cards = try await library.dueCards(scope: sessionScope, asOf: clock())
+            guard generation == startGeneration else { return }
+            try Task.checkCancellation()
+            sessionState.appendDueCards(cards)
+            sessionState.separateRelated()
+            isFinished = cards.isEmpty && nextLesson == nil
+            isLoading = false
+            prepareCurrentInteraction()
+            if !isFinished { resetAttemptTiming() }
+        } catch {
+            guard generation == startGeneration else { return }
+            dueCheckError = errorMapper.map(error)
+            isLoading = false
+        }
     }
 
     private func loadCompleteQueue(

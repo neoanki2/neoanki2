@@ -48,7 +48,17 @@ private func sessionModel(
 private final class StudyStartClock: @unchecked Sendable {
     private let lock = NSLock()
     private var reads = 0
-    private let instant = Date.now.addingTimeInterval(60)
+    private var instant: Date
+
+    init(_ instant: Date = .now.addingTimeInterval(60)) {
+        self.instant = instant
+    }
+
+    func set(_ instant: Date) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.instant = instant
+    }
 
     func now() -> Date {
         lock.lock()
@@ -436,6 +446,73 @@ private actor FirstStudyQueueLoadGate {
 
     let dueCount = try await store.dueCount()
     #expect(dueCount == 0)
+}
+
+@Test @MainActor func studySessionContinuesWithCardsThatBecomeDueInItsScope() async throws {
+    let (_, store) = try await makeStudyFeatureModel()
+    let parent = try await store.createDeck(Deck(name: "Study"))
+    let child = try await store.createDeck(Deck(name: "Nested", parentID: parent.id))
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+    let newDue = start.addingTimeInterval(60)
+    let clock = StudyStartClock(start)
+    let scope = DeckScope.deck(parent.id)
+    let model = StudyFeatureModel(library: SQLiteLibraryRepository(store: store), scope: scope,
+                                  title: parent.name, clock: { clock.now() })
+
+    func addItem(_ question: String, deckID: UUID?, due: Date) async throws -> SavedItemSummary {
+        try await store.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+            .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text(question)),
+            .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+        ], deckID: deckID), now: due)
+    }
+
+    let first = try await addItem("Due at startup", deckID: parent.id, due: start)
+    let nested = try await addItem("Due during study", deckID: child.id, due: newDue)
+    _ = try await addItem("Outside the session", deckID: nil, due: newDue)
+    _ = try await addItem("Due later", deckID: child.id, due: newDue.addingTimeInterval(60))
+    await model.start()
+    #expect(model.queue.map(\.item.id) == [first.id])
+
+    clock.set(newDue)
+    model.revealAnswer()
+    await model.grade(.good)
+
+    #expect(!model.isComplete)
+    #expect(model.currentCard?.item.id == nested.id)
+    #expect(model.remainingCount == 1)
+    #expect(!model.isAnswerRevealed)
+    #expect(model.completion.reviews == 1)
+    #expect(model.canUndo)
+
+    model.revealAnswer()
+    await model.grade(.good)
+    #expect(model.isComplete)
+    #expect(model.completion.reviews == 2)
+    #expect(try await store.dueCount(scope: scope, asOf: newDue) == 0)
+    #expect(try await store.dueCount(asOf: newDue) == 1)
+}
+
+@Test @MainActor func studySessionCanReviewAScheduledCardAgainWhenItsIntervalElapses() async throws {
+    let (_, store) = try await makeStudyFeatureModel()
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+    _ = try await PerformanceFixtures.seedBasicItems(count: 2, in: store, now: start)
+    let clock = StudyStartClock(start)
+    let model = StudyFeatureModel(library: SQLiteLibraryRepository(store: store), scope: .allDecks,
+                                  title: "All Decks", clock: { clock.now() })
+    await model.start()
+    let first = try #require(model.currentCard)
+    await model.grade(.good)
+    let scheduled = try await store.card(id: first.id)
+    #expect(scheduled.memory.due > start)
+
+    clock.set(scheduled.memory.due)
+    await model.grade(.good)
+
+    #expect(model.currentCard?.id == first.id)
+    #expect(model.currentCard?.card.memory == scheduled.memory)
+    await model.grade(.good)
+    #expect(model.isComplete)
+    #expect(model.completion == .init(reviews: 3, uniqueCards: 2, uniqueItems: 2))
 }
 
 @Test @MainActor func everyInteractionKeyboardPrimaryPathReachesGradingAndCompletion() async throws {

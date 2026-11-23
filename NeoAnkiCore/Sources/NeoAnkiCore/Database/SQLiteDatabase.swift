@@ -6239,6 +6239,46 @@ actor SQLiteDatabase {
         return Date(timeIntervalSince1970: value)
     }
 
+    func commitSynchronizedMedia(
+        _ files: [(descriptor: MediaAssetDescriptor, destination: URL, bytes: Data?)], asOf now: Date
+    ) throws {
+        // Reservations protect assets until the final library transaction
+        // adopts them. Reuse the existing reservation on recovery.
+        let syncScope = "A00B4F5E-87A5-4375-B140-A682D1A86E93"
+        try inTransaction {
+            for (descriptor, destination, bytes) in files {
+                let existing = try fetchMediaAsset(hash: descriptor.hash)
+                if let existing, existing.kind != descriptor.kind || existing.byteSize != descriptor.byteSize
+                    || existing.fileExtension != descriptor.fileExtension {
+                    throw DatabaseError.invalidMediaAsset(descriptor.hash)
+                }
+                if let bytes {
+                    try bytes.write(to: destination, options: .atomic)
+                } else if existing == nil || !FileManager.default.fileExists(atPath: destination.path) {
+                    // Collection may have won while the media actor awaited
+                    // SQLite. The next attempt still has the durable source.
+                    throw DatabaseError.invalidMediaAsset(descriptor.hash)
+                }
+                let expiresAt = now.addingTimeInterval(MediaStore.reservationLifetime)
+                let reservations = try query(
+                    "SELECT expires_at FROM media_reservations WHERE hash = ? AND scope_id = ?;",
+                    bindings: [.text(descriptor.hash), .text(syncScope)]
+                )
+                if let expiry = reservations.first?["expires_at"] as? Double {
+                    if expiry <= now.timeIntervalSince1970 {
+                        try execute(
+                            "UPDATE media_reservations SET expires_at = ? WHERE hash = ? AND scope_id = ?;",
+                            bindings: [.double(expiresAt.timeIntervalSince1970), .text(descriptor.hash), .text(syncScope)]
+                        )
+                    }
+                } else {
+                    _ = try reserveMediaAsset(descriptor, reservationID: UUID(), scopeID: UUID(uuidString: syncScope),
+                        createdAt: now, expiresAt: expiresAt)
+                }
+            }
+        }
+    }
+
     func cancelMediaReservation(id: UUID, deleteNewAsset: Bool) throws -> MediaAsset? {
         try inTransaction {
             try reconcileMediaReferenceCounts()

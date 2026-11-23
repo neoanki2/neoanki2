@@ -97,6 +97,8 @@ change another card's memory. The library rebuilds this grouping for existing,
 imported, and synced content automatically; undoing a grade restores eligibility.
 Choosing a deck limits which new example can be introduced, but reviewing a
 related example in another deck still defers its new relatives for that day.
+When the study queue runs out, the session checks these rules again before
+adding newly due examples.
 
 ## Create image occlusion items
 

@@ -38,7 +38,7 @@ struct StudyView: View {
         Group {
             if model.isLoading {
                 loadingView
-            } else if model.didFailToLoad {
+            } else if model.didFailToLoad || model.dueCheckError != nil {
                 loadFailureView
             } else if model.isFinished {
                 finishedView
@@ -223,10 +223,10 @@ struct StudyView: View {
         ContentUnavailableView {
             Label("Couldn't Load Due Cards", systemImage: "exclamationmark.triangle")
         } description: {
-            Text(model.errorMessage ?? "The due cards for this scope could not be read.")
+            Text(model.dueCheckError ?? model.errorMessage ?? "The due cards for this scope could not be read.")
         } actions: {
             Button("Try Again") {
-                Task { await model.startSession(scope: scope) }
+                Task { await model.retryLoadingCards() }
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("studyRetryLoad")

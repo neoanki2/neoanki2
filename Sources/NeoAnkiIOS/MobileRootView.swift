@@ -94,6 +94,9 @@ public struct MobileRootView: View {
         .onAppear { model.concealsAnswers = concealsAnswers }
         .onChange(of: model.concealsAnswers) { _, value in concealsAnswers = value }
         .task(id: model.syncEnabled) { vocabularyLibrary.sync.setEnabled(model.syncEnabled) }
+        .task(id: model.activeStudy?.sessionScope ?? model.dueCounts.activeScope) {
+            await model.prioritizeSyncMedia(in: model.activeStudy?.sessionScope ?? model.dueCounts.activeScope)
+        }
         .task(id: model.syncEnabled && scenePhase == .active) {
             guard model.syncEnabled, scenePhase == .active else { return }
             // SyncService currently exposes status as a query. Preserve its
