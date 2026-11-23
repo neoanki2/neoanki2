@@ -33,10 +33,16 @@ public enum SQLiteLibrarySyncError: Error, LocalizedError, Sendable {
     }
 }
 
+protocol MediaSyncAdapter: LibrarySyncAdapter {
+    func prioritizeMedia(in scope: DeckScope?) async
+    func encode(changes: [LibraryChange], deviceID: String,
+                knownMedia: [String: SyncAssetDescriptor]) async throws -> [SyncRecordEnvelope]
+}
+
 /// Production bridge between the typed SQLite repository and durable sync
 /// envelopes. Domain objects are decoded and validated before repository
 /// mutation; assets are staged and content-address verified before ingestion.
-public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
+public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
     private let repository: SQLiteLibraryRepository
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -44,6 +50,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
     private var statisticsAliases: [StatisticsEvent] = []
     private var learningTimeAliases: [LearningTimeItemAlias] = []
     private var conflictCopies: [SyncConflictCopy] = []
+    private var mediaPriority: DeckScope?
 
     public init(repository: SQLiteLibraryRepository) {
         self.repository = repository
@@ -54,12 +61,24 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         try await encode(changes: changes, deviceID: deviceID, consumeEchoes: true)
     }
 
+    func prioritizeMedia(in scope: DeckScope?) {
+        if case .deck = scope { mediaPriority = scope }
+        else { mediaPriority = nil }
+    }
+
+    func encode(changes: [LibraryChange], deviceID: String,
+                knownMedia: [String: SyncAssetDescriptor]) async throws -> [SyncRecordEnvelope] {
+        try await encode(changes: changes, deviceID: deviceID, consumeEchoes: true, knownMedia: knownMedia)
+    }
+
     private func encode(
-        changes: [LibraryChange], deviceID: String, consumeEchoes: Bool
+        changes: [LibraryChange], deviceID: String, consumeEchoes: Bool,
+        knownMedia: [String: SyncAssetDescriptor] = [:]
     ) async throws -> [SyncRecordEnvelope] {
         var records: [SyncRecordEnvelope] = []
         records.reserveCapacity(changes.count)
         for change in changes {
+            try Task.checkCancellation()
             let echoKey = key(kind: change.resourceType, id: change.resourceID)
             guard let kind = LibraryResourceKind(rawValue: change.resourceType) else {
                 throw SQLiteLibrarySyncError.unknownResourceKind(change.resourceType)
@@ -83,6 +102,15 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                     isTombstone: true,
                     payload: Data()
                 ))
+                continue
+            }
+            if consumeEchoes, kind == .media,
+               let known = knownMedia[change.resourceID] ?? echoedResources[echoKey]?.asset,
+               let asset = try await repository.mediaAsset(hash: change.resourceID),
+               known.hash == asset.hash, known.signature == asset.hash,
+               known.byteSize == asset.byteSize, known.contentType == contentType(for: asset.kind),
+               known.fileExtension == asset.fileExtension {
+                echoedResources.removeValue(forKey: echoKey)
                 continue
             }
             let encoded = try await payload(kind: kind, id: change.resourceID)
@@ -115,13 +143,10 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             records, against: [], canonicalLibraryID: try await repository.libraryID(),
             sourceLibraryID: nil, knownAliases: [], typeRemap: aliases, dropAliasedTypes: false
         )
-        // Validate all assets before any domain row commits. A corrupt media
-        // envelope must not leave the accompanying item/deck partially applied.
-        for record in records where record.resourceKind == LibraryResourceKind.media.rawValue && !record.isTombstone {
-            try validateAsset(record)
-        }
         var mutations: [SynchronizedLibraryMutation] = []
-        var media: [(SyncPayload, SyncRecordEnvelope)] = []
+        var media: [(url: URL?, reference: MediaRef, byteSize: Int)] = []
+        var incomingItems: [Item] = []
+        var incomingDecks: [Deck] = []
         for record in dependencyOrdered(records) {
             guard let kind = LibraryResourceKind(rawValue: record.resourceKind) else {
                 throw SQLiteLibrarySyncError.unknownResourceKind(record.resourceKind)
@@ -136,22 +161,34 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
                 switch payload {
                 case .library:
                     break
-                case let .deck(value): mutations.append(.deck(value))
+                case let .deck(value):
+                    mutations.append(.deck(value))
+                    incomingDecks.append(value)
                 case let .itemType(value):
                     try ItemTypeValidation.validate(value)
                     mutations.append(.itemType(value))
-                case let .item(value): mutations.append(.item(value.item, createdAt: value.createdAt, updatedAt: value.updatedAt))
+                case let .item(value):
+                    mutations.append(.item(value.item, createdAt: value.createdAt, updatedAt: value.updatedAt))
+                    incomingItems.append(value.item)
                 case let .card(value): mutations.append(.card(value))
                 case let .review(value): mutations.append(.review(value))
                 case let .reviewRevert(value): mutations.append(.reviewRevert(value))
                 case let .itemTypeMembership(value): mutations.append(.itemTypeMembership(value))
                 case let .schedulingSettings(value): mutations.append(.schedulingSettings(value))
                 case let .portableTypeMapping(value): mutations.append(.portableTypeMapping(value))
-                case .metadata: media.append((payload, record))
+                case .metadata:
+                    guard let asset = record.asset, asset.hash == record.id, asset.signature == asset.hash,
+                          let size = Int(exactly: asset.byteSize), size >= 0,
+                          let kind = MediaKind(rawValue: asset.contentType) else {
+                        throw SQLiteLibrarySyncError.invalidAsset(record.id)
+                    }
+                    media.append((record.stagedFileURL, MediaRef(kind: kind, assetHash: asset.hash,
+                        fileExtension: asset.fileExtension), size))
                 }
             }
         }
-        for (payload, envelope) in media { try await apply(payload, envelope: envelope) }
+        try await installMedia(media, items: incomingItems, decks: incomingDecks)
+        try Task.checkCancellation()
         // Materialize incoming files before synchronized items reference them.
         // The repository reconciles reference counts in the same transaction
         // as the item batch, so subsequent orphan collection cannot delete
@@ -160,6 +197,53 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         for record in records {
             echoedResources[key(kind: record.resourceKind, id: record.id)] = record
         }
+    }
+
+    private func installMedia(
+        _ media: [(url: URL?, reference: MediaRef, byteSize: Int)], items: [Item], decks: [Deck]
+    ) async throws {
+        var remaining = media[...]
+        var orderedFor: DeckScope?
+        while !remaining.isEmpty {
+            try Task.checkCancellation()
+            if let scope = mediaPriority, scope != orderedFor {
+                let hashes = try await priorityMediaHashes(scope: scope, items: items, decks: decks)
+                remaining = (remaining.filter { hashes.contains($0.reference.assetHash) }
+                    + remaining.filter { !hashes.contains($0.reference.assetHash) })[...]
+                orderedFor = scope
+            }
+            // Bound memory and SQLite lock time. Still allow one large video
+            // to make progress on its own.
+            var size = 0
+            let batch = remaining.prefix(32).prefix { file in
+                guard size == 0 || file.byteSize <= 16 * 1024 * 1024 - size else { return false }
+                size += file.byteSize
+                return true
+            }
+            do {
+                try await repository.installSynchronizedMedia(Array(batch))
+            } catch DatabaseError.invalidMediaAsset(let hash) {
+                throw SQLiteLibrarySyncError.invalidAsset(hash)
+            }
+            remaining = remaining.dropFirst(batch.count)
+        }
+    }
+
+    private func priorityMediaHashes(scope: DeckScope, items: [Item], decks: [Deck]) async throws -> Set<String> {
+        guard case let .deck(id, includeDescendants) = scope else { return [] }
+        var deckIDs: Set<UUID> = [id]
+        if includeDescendants {
+            var summaries = Dictionary(uniqueKeysWithValues: try await repository.synchronizedDecks().map { ($0.id, $0) })
+            for deck in decks {
+                summaries[deck.id] = deck
+            }
+            deckIDs = DeckTree.descendantIDs(of: id, in: summaries.values.map {
+                DeckSummary(id: $0.id, name: $0.name, parentID: $0.parentID, itemCount: 0, dueCount: 0)
+            })
+        }
+        let incoming = items.lazy.filter { $0.deckID.map(deckIDs.contains) ?? false }
+            .flatMap { $0.fields.compactMap { $0.value.mediaReference?.assetHash } }
+        return try await repository.synchronizedMediaHashes(deckIDs: deckIDs).union(incoming)
     }
 
     public func initialMerge(remote: [SyncRecordEnvelope], deviceID: String) async throws -> [SyncRecordEnvelope] {
@@ -483,25 +567,6 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
         guard kind == expected.0, record.id == expected.1 else { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
     }
 
-    private func validateAsset(_ envelope: SyncRecordEnvelope) throws {
-        guard let descriptor = envelope.asset, let url = envelope.stagedFileURL,
-              descriptor.hash == envelope.id, descriptor.byteSize >= 0 else {
-            throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
-        }
-        guard let kind = MediaKind(rawValue: descriptor.contentType) else {
-            throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
-        }
-        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-        do {
-            try MediaValidation.validate(data: data, kind: kind, fileExtension: descriptor.fileExtension)
-            _ = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
-        } catch { throw SQLiteLibrarySyncError.invalidAsset(envelope.id) }
-        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard data.count == descriptor.byteSize, digest == descriptor.hash, digest == descriptor.signature else {
-            throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
-        }
-    }
-
     private func deterministicID(
         sourceLibraryID: UUID,
         resourceKind: String,
@@ -607,7 +672,7 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("neoanki-sync-\(UUID().uuidString)")
                 .appendingPathExtension(asset.fileExtension)
-            try bytes.write(to: url, options: [.atomic, .completeFileProtection])
+            try bytes.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             let descriptor = SyncAssetDescriptor(
                 hash: asset.hash,
                 byteSize: Int64(asset.byteSize),
@@ -622,54 +687,6 @@ public actor SQLiteLibrarySyncAdapter: LibrarySyncAdapter {
             return (.schedulingSettings(try await repository.schedulingSettingsRecord(id: id)), nil, nil)
         case .portableTypeMapping:
             return (.portableTypeMapping(try await repository.portableItemTypeMappingRecord(id: id)), nil, nil)
-        }
-    }
-
-    private func apply(_ payload: SyncPayload, envelope: SyncRecordEnvelope) async throws {
-        switch payload {
-        case .library:
-            break // Library identity is aliased during merge, never overwritten.
-        case let .deck(deck):
-            if (try? await repository.deck(id: deck.id)) != nil { _ = try await repository.updateDeck(deck) }
-            else { _ = try await repository.createDeck(deck) }
-        case let .itemType(type):
-            try ItemTypeValidation.validate(type)
-            if try await repository.loadItemTypes().itemTypes.contains(where: { $0.id == type.id }) {
-                _ = try await repository.updateItemType(type, asOf: .now)
-            } else { _ = try await repository.createItemType(type) }
-        case let .item(record):
-            guard try await repository.loadItemTypes().itemTypes.contains(where: { $0.id == record.item.itemTypeID }) else {
-                throw SQLiteLibrarySyncError.invalidPayload(envelope.id)
-            }
-            try await repository.applySynchronizedBatch([.item(record.item, createdAt: record.createdAt, updatedAt: record.updatedAt)])
-        case let .card(card):
-            try await repository.applySynchronizedCard(card)
-        case let .review(record):
-            try await repository.applySynchronizedBatch([.review(record)])
-        case let .reviewRevert(record):
-            try await repository.applySynchronizedBatch([.reviewRevert(record)])
-        case let .itemTypeMembership(record):
-            try await repository.applySynchronizedBatch([.itemTypeMembership(record)])
-        case let .schedulingSettings(record):
-            try await repository.applySynchronizedBatch([.schedulingSettings(record)])
-        case let .portableTypeMapping(record):
-            try await repository.applySynchronizedBatch([.portableTypeMapping(record)])
-        case .metadata:
-            if let descriptor = envelope.asset, let url = envelope.stagedFileURL {
-                let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-                let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-                guard data.count == descriptor.byteSize, digest == descriptor.hash, digest == descriptor.signature else {
-                    throw SQLiteLibrarySyncError.invalidAsset(envelope.id)
-                }
-                let kind: MediaKind = switch descriptor.contentType {
-                case "audio": .audio
-                case "video": .video
-                case "gif": .gif
-                default: .image
-                }
-                let reserved = try await repository.reserveMedia(data: data, kind: kind, altText: nil, reservationID: UUID(), asOf: .now)
-                guard reserved.reference.assetHash == descriptor.hash else { throw SQLiteLibrarySyncError.invalidAsset(envelope.id) }
-            }
         }
     }
 

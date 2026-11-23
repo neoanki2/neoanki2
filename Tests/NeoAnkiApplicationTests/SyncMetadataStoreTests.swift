@@ -156,6 +156,29 @@ struct SyncMetadataStoreTests {
         #expect(FileManager.default.fileExists(atPath: source.path))
     }
 
+    @Test func repeatedDeliveryReusesTheDurableStagedFile() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let source = root.appendingPathComponent("transient.png")
+        let bytes = Data("asset".utf8)
+        try bytes.write(to: source)
+        let descriptor = SyncAssetDescriptor(hash: "hash", byteSize: 5, signature: "hash",
+            fileExtension: "png", contentType: "image")
+        let store = SyncMetadataStore(directory: root.appendingPathComponent("sync"))
+        let record = envelope(file: source, asset: descriptor)
+        try await store.receive([record])
+        let staged = try #require(try await store.load().stagedInbound.first?.stagedFileURL)
+        try FileManager.default.removeItem(at: source)
+
+        let token = Data([1])
+        try await store.receiveZonePage([record], token: token)
+        let replayed = try await store.load()
+        #expect(replayed.libraryZoneChangeToken == token)
+        #expect(replayed.stagedInbound.first?.stagedFileURL == staged)
+        #expect(try Data(contentsOf: staged) == bytes)
+    }
+
     @Test func outboundAssetsSurviveDeletionOfTheTransientSource() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

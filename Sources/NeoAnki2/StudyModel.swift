@@ -36,6 +36,7 @@ final class StudyModel {
     var isCompletingSubmission: Bool { session.isCompletingSubmission }
     var isFinished: Bool { session.isFinished }
     var didFailToLoad: Bool { session.didFailToLoad }
+    var dueCheckError: String? { session.dueCheckError?.message }
     var pendingGradeUndo: PendingGradeUndo? { session.pendingGradeUndo }
     var typedAnswer: String { session.typedAnswer }
     var reviewResponse: String? { session.reviewResponse }
@@ -87,6 +88,7 @@ final class StudyModel {
     func startSession(scope: StudyScope = .allDecks) async {
         await session.start(scope: scope.filter, title: scope.label)
     }
+    func retryLoadingCards() async { await session.retryLoadingCards() }
     func revealAnswer() { session.revealAnswer() }
     func updateTypedAnswer(_ answer: String) { session.updateTypedAnswer(answer) }
     func submitTypedAnswer() { session.submitTypedAnswer() }

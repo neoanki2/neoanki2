@@ -162,6 +162,8 @@ actor MobileSyncCoordinator: SyncService {
     private var fallbackStatus: SyncStatus = .offline
     private let libraryChangeEvents = SyncLibraryChanges()
     private var changesMonitor: Task<Void, Never>?
+    private var mediaPriority: DeckScope?
+    private var lifecycle = 0
 
     init(repository: SQLiteLibraryRepository, paths: MobilePaths) {
         self.repository = repository
@@ -170,6 +172,7 @@ actor MobileSyncCoordinator: SyncService {
 
     func start() async {
         if let service { await service.start(); return }
+        let generation = lifecycle
         do {
             let metadata = SyncMetadataStore(directory: paths.syncMetadataDirectory)
             let transport = try await CKSyncEngineTransport.make(metadataStore: metadata)
@@ -185,8 +188,12 @@ actor MobileSyncCoordinator: SyncService {
                     directory: paths.syncMetadataDirectory.appendingPathComponent("Statistics", isDirectory: true)),
                 backupURL: { [paths] in paths.backupURL }
             )
+            guard generation == lifecycle, !Task.isCancelled else { return }
+            if let existing = self.service { await existing.synchronizeAndWait(); return }
             self.service = service
+            await service.prioritizeMedia(in: mediaPriority)
             let changes = await service.libraryChanges()
+            guard generation == lifecycle else { return }
             changesMonitor = Task { [libraryChangeEvents] in
                 for await _ in changes {
                     guard !Task.isCancelled else { return }
@@ -194,16 +201,27 @@ actor MobileSyncCoordinator: SyncService {
                 }
             }
             await service.start()
-        } catch { fallbackStatus = .accountUnavailable }
+        } catch {
+            if generation == lifecycle, !Task.isCancelled { fallbackStatus = .accountUnavailable }
+        }
     }
     func synchronize() async { await service?.synchronize() }
-    func synchronizeAndWait() async { await service?.synchronizeAndWait() }
+    func synchronizeAndWait() async {
+        if let service { await service.synchronizeAndWait() }
+        else { await start() }
+    }
+    func prioritizeMedia(in scope: DeckScope?) async {
+        mediaPriority = scope
+        await service?.prioritizeMedia(in: scope)
+    }
     func stop() async {
-        await service?.stop()
+        lifecycle += 1
+        let previous = service
         changesMonitor?.cancel()
         changesMonitor = nil
         service = nil
         fallbackStatus = .offline
+        await previous?.stop()
     }
     func libraryChanges() async -> AsyncStream<Void> { await libraryChangeEvents.stream() }
     func status() async -> SyncStatus { if let service { return await service.status() }; return fallbackStatus }
@@ -269,16 +287,34 @@ actor MobileSyncRecoveryUITestService: SyncService {
 }
 
 @MainActor final class IOSBackgroundRefresh {
+    @MainActor private final class Completion {
+        private var task: BGTask?
+
+        init(_ task: BGTask) { self.task = task }
+
+        func finish(success: Bool) {
+            guard let task else { return }
+            self.task = nil
+            task.expirationHandler = nil
+            task.setTaskCompleted(success: success)
+        }
+    }
+
     static let shared = IOSBackgroundRefresh()
     private let identifier = "com.neoanki2.ios.refresh"
+    private let processingIdentifier = "com.neoanki2.ios.library-processing"
     private weak var model: LibraryFeatureModel?
     func register(model: LibraryFeatureModel) {
         self.model = model
         // Swift inherits this callback's MainActor isolation. A nil queue makes
         // BGTaskScheduler invoke it off-main and traps before the handler runs.
         BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { [weak self] task in
-            guard let refresh = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
-            self?.handle(refresh)
+            guard let self else { task.setTaskCompleted(success: false); return }
+            self.handle(task, processing: false)
+        }
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: processingIdentifier, using: .main) { [weak self] task in
+            guard let self else { task.setTaskCompleted(success: false); return }
+            self.handle(task, processing: true)
         }
     }
     func schedule() {
@@ -286,22 +322,36 @@ actor MobileSyncRecoveryUITestService: SyncService {
         request.earliestBeginDate = .now.addingTimeInterval(60 * 60)
         try? BGTaskScheduler.shared.submit(request)
     }
-    private func handle(_ task: BGAppRefreshTask) {
-        schedule()
+    func scheduleLibraryProcessing() {
+        let request = BGProcessingTaskRequest(identifier: processingIdentifier)
+        request.requiresNetworkConnectivity = true
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    private func handle(_ task: BGTask, processing: Bool) {
+        if !processing { schedule() }
+        let completion = Completion(task)
         let work = Task { [weak self] in
-            guard let model = self?.model else { task.setTaskCompleted(success: false); return }
-            guard !Task.isCancelled else { task.setTaskCompleted(success: false); return }
-            await model.bootstrap()
+            guard let model = self?.model, !Task.isCancelled else { completion.finish(success: false); return }
+            await model.bootstrap(startSync: false)
             guard model.loadState == .ready, !Task.isCancelled else {
-                task.setTaskCompleted(success: false); return
+                completion.finish(success: false); return
             }
-            await model.refresh()
-            guard !Task.isCancelled else { task.setTaskCompleted(success: false); return }
-            if model.syncEnabled { await model.synchronize() }
-            task.setTaskCompleted(success: !Task.isCancelled)
+            if model.syncEnabled {
+                if !processing { self?.scheduleLibraryProcessing() }
+                await model.synchronize()
+                if model.syncStatus == .syncing { self?.scheduleLibraryProcessing() }
+            } else if !processing {
+                await model.refresh()
+            }
+            completion.finish(success: !Task.isCancelled)
         }
-        // The system can also expire a task off-main. Capturing only the
-        // Sendable work handle avoids inheriting MainActor on this callback.
-        task.expirationHandler = { @Sendable in work.cancel() }
+        task.expirationHandler = { @Sendable [weak self] in
+            work.cancel()
+            Task { @MainActor in
+                if processing, self?.model?.syncEnabled == true { self?.scheduleLibraryProcessing() }
+                completion.finish(success: false)
+            }
+        }
     }
 }

@@ -297,6 +297,20 @@ public extension ItemStore {
         return (asset, try Data(contentsOf: url))
     }
 
+    /// Installs a bounded batch from the durable sync inbox. The caller keeps
+    /// the source files until the associated library records commit.
+    func installSynchronizedMedia(
+        _ files: [(url: URL?, reference: MediaRef, byteSize: Int)]
+    ) async throws {
+        guard let mediaStore else { throw DatabaseError.invalidMediaAsset("Media storage is unavailable.") }
+        try await mediaStore.installSynchronizedMedia(files, database: database)
+    }
+
+    func synchronizedMediaHashes(deckIDs: Set<UUID>) async throws -> Set<String> {
+        let items = try await database.fetchItems(deckIDs: deckIDs)
+        return Set(items.flatMap { $0.item.fields.compactMap { $0.value.mediaReference?.assetHash } })
+    }
+
     func synchronizedReviewRecord(id: UUID) async throws -> SynchronizedReviewRecord {
         guard let record = try await database.fetchSynchronizedReviewRecord(id: id) else {
             throw DatabaseError.reviewLogNotFound(id)

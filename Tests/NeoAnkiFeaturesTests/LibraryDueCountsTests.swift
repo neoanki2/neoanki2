@@ -136,6 +136,25 @@ private actor DueWidgetRecorder: WidgetSnapshotPublishing {
         #expect(await reader.calls == 3)
     }
 
+    @Test func invalidatingAfterStudyHidesTheOldCountUntilTheReadFinishes() async throws {
+        let (root, repository) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let reader = HeldDueReader()
+        let counts = LibraryDueCountsModel(library: repository, reader: reader)
+        await reader.configure(value: 2)
+        await counts.open()
+        #expect(counts.count(for: .allDecks) == 2)
+
+        await reader.configure(value: 0, hold: true)
+        counts.invalidate(hidingPublishedCounts: true)
+        await reader.waitUntilHeld()
+        #expect(counts.state == .checking)
+        #expect(counts.count(for: .allDecks) == nil)
+        await reader.release()
+        await counts.waitUntilSettled()
+        #expect(counts.count(for: .allDecks) == 0)
+    }
+
     @Test func schedulesTheKnownBoundaryAndStopsWhenBackgrounded() async throws {
         let (root, repository) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }

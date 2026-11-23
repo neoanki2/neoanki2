@@ -128,7 +128,10 @@ struct NeoAnkiIOSApp: App {
                 }
             } else {
                 model.dueCounts.setForeground(false)
-                if phase == .background { IOSBackgroundRefresh.shared.schedule() }
+                if phase == .background {
+                    IOSBackgroundRefresh.shared.schedule()
+                    if model.syncEnabled { IOSBackgroundRefresh.shared.scheduleLibraryProcessing() }
+                }
             }
         }
         .onChange(of: model.syncEnabled, initial: true) { _, enabled in
@@ -162,9 +165,10 @@ final class IOSCloudSyncAppDelegate: NSObject, UIApplicationDelegate {
               let model = Self.model else { completionHandler(.noData); return }
         Self.logger.notice("Received library change notification")
         Task {
-            if model.loadState != .ready { await model.bootstrap() }
+            if model.loadState != .ready { await model.bootstrap(startSync: false) }
             guard model.loadState == .ready else { completionHandler(.failed); return }
             guard model.syncEnabled else { completionHandler(.noData); return }
+            IOSBackgroundRefresh.shared.scheduleLibraryProcessing()
             await model.synchronize()
             switch model.syncStatus {
             case .current: completionHandler(.newData)

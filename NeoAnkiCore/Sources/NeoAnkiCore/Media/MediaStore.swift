@@ -339,6 +339,54 @@ public actor MediaStore {
         metadataDatabase = database
     }
 
+    func installSynchronizedMedia(
+        _ files: [(url: URL?, reference: MediaRef, byteSize: Int)],
+        database: SQLiteDatabase
+    ) async throws {
+        var prepared: [(descriptor: MediaAssetDescriptor, destination: URL, bytes: Data?)] = []
+        for (source, reference, size) in files {
+            try Task.checkCancellation()
+            let hash = reference.assetHash
+            let kind = reference.kind
+            guard reference.isValidStoredReference, (0...MediaValidation.maxBytes(for: kind)).contains(size) else {
+                throw DatabaseError.invalidMediaAsset(hash)
+            }
+            let existing = try await database.fetchMediaAsset(hash: hash)
+            if let existing, existing.kind != kind || existing.byteSize != size {
+                throw DatabaseError.invalidMediaAsset(hash)
+            }
+
+            var bytes: Data?
+            var fileExtension = existing?.fileExtension ?? reference.fileExtension
+            let knownFile = try assetURL(hash: hash, fileExtension: fileExtension, kind: kind)
+            let local = FileManager.default.fileExists(atPath: knownFile.path)
+                ? try containedExistingURL(knownFile).resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                : nil
+            if existing == nil || local?.isRegularFile != true || local?.fileSize != size {
+                guard let source, source.isFileURL else { throw DatabaseError.invalidMediaAsset(hash) }
+                let values = try source.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+                guard values.isRegularFile == true, values.fileSize == size else {
+                    throw DatabaseError.invalidMediaAsset(hash)
+                }
+                let data = try Data(contentsOf: source, options: [.mappedIfSafe])
+                guard data.count == size, Self.sha256Hex(data) == hash else {
+                    throw DatabaseError.invalidMediaAsset(hash)
+                }
+                do {
+                    try MediaValidation.validate(data: data, kind: kind, fileExtension: reference.fileExtension)
+                    let inferred = try MediaValidation.inferredExtension(data: data, expectedKind: kind)
+                    fileExtension = existing?.fileExtension ?? inferred
+                } catch { throw DatabaseError.invalidMediaAsset(hash) }
+                bytes = data
+            }
+            let destination = try assetURL(hash: hash, fileExtension: fileExtension, kind: kind)
+            let descriptor = MediaAssetDescriptor(hash: hash, kind: kind, byteSize: size, fileExtension: fileExtension)
+            prepared.append((descriptor, destination, bytes))
+        }
+        try Task.checkCancellation()
+        try await database.commitSynchronizedMedia(prepared, asOf: .now)
+    }
+
     /// Resolves a ref to a file URL inside the sandbox. Rejects paths outside mediaDirectory.
     public func resolve(_ ref: MediaRef) throws -> URL {
         guard ref.isValidStoredReference else {

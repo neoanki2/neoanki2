@@ -107,8 +107,9 @@ the remaining queued cards generated from it. For a generated poem line, Edit
 opens the whole poem so line order and its generated cards stay in sync.
 For an ordinary item, **Save** shows progress and returns to study after the
 change is stored. Removing a cloze group removes its retired card from the
-remaining session; newly generated cards wait for the next session. A failed
-save keeps the editor and your correction available to retry.
+remaining session. Newly generated cards can join the session when it checks
+for more due cards at the end of the queue. A failed save keeps the editor
+and your correction available to retry.
 **End** leaves immediately;
 completion reports reviews and saved submissions separately.
 

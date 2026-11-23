@@ -49,13 +49,16 @@ struct StudySessionView: View {
     private var sessionContent: some View {
         NavigationStack {
             Group {
-                if session.didFailToLoad {
+                if session.didFailToLoad || session.dueCheckError != nil {
                     ContentUnavailableView {
-                        Label("Could Not Start Session", systemImage: "exclamationmark.triangle")
+                        Label(
+                            session.didFailToLoad ? "Could Not Start Session" : "Could Not Check Due Cards",
+                            systemImage: "exclamationmark.triangle"
+                        )
                     } description: {
-                        Text(session.error?.message ?? "Your library could not be loaded. Try again.")
+                        Text(session.dueCheckError?.message ?? session.error?.message ?? "Your library could not be loaded. Try again.")
                     } actions: {
-                        Button("Try Again") { Task { await session.start() } }
+                        Button("Try Again") { Task { await session.retryLoadingCards() } }
                     }
                 } else if session.isLoading {
                     ProgressView("Preparing study session…")
@@ -88,8 +91,8 @@ struct StudySessionView: View {
                     studyCard(card)
                 }
             }
-            .navigationTitle(session.currentLesson != nil ? "Lesson" : session.isComplete || session.didFailToLoad
-                ? session.title : "\(session.remainingCount) left")
+            .navigationTitle(session.currentLesson != nil ? "Lesson" :
+                session.currentCard == nil ? session.title : "\(session.remainingCount) left")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -102,7 +105,7 @@ struct StudySessionView: View {
                     .disabled(session.isGrading || session.isCompletingSubmission || session.isCompletingLesson || session.isPreparingQueue)
                     .accessibilityIdentifier("endStudySession")
                 }
-                if session.currentCard != nil {
+                if session.currentCard != nil && !session.isLoading {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Undo", systemImage: "arrow.uturn.backward") { Task { await session.undoLastGrade() } }.disabled(!session.canUndo)
                         Menu("More", systemImage: "ellipsis.circle") {

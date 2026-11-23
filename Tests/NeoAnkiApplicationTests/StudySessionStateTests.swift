@@ -53,6 +53,22 @@ private func sessionCard(_ question: String) -> DueCard {
         #expect(state.currentCard?.id == second.id)
     }
 
+    @Test func undoRemovesTheReviewedCardsNewQueueEntry() throws {
+        let first = sessionCard("First"), second = sessionCard("Second")
+        var state = StudySessionState()
+        state.load([first])
+        state.recordGrade(.init(memory: .init(phase: .review), reviewLogID: UUID()), for: first, rating: .good)
+        let undo = try #require(state.pendingGradeUndo)
+        state.appendDueCards([second, first])
+
+        state.undoGrade(undo)
+
+        #expect(state.currentCard?.id == first.id)
+        #expect(state.queue.map(\.id) == [first.id, second.id])
+        #expect(state.reviewedCount == 0)
+        #expect(state.remainingCount == 2)
+    }
+
     @Test func fullQueuePreservesThePublishedHeadAndResetClearsAllHistory() {
         let first = sessionCard("Published"), second = sessionCard("Remaining")
         var state = StudySessionState()

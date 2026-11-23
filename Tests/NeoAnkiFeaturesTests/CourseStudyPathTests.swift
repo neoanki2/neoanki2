@@ -107,7 +107,8 @@ private struct CourseFixture {
     #expect(try await reopened.studyCourseLessons(in: scope).last?.isRead == false)
 }
 
-@Test @MainActor func japaneseAcademyStandaloneLessonIsStudyableWithZeroDueCards() async throws {
+@Test(arguments: [false, true])
+@MainActor func japaneseAcademyStandaloneLessonIsStudyableWithZeroDueCards(addDueCard: Bool) async throws {
     let fixture = try await CourseFixture.make()
     defer { try? FileManager.default.removeItem(at: fixture.root) }
     let deckID = try #require(fixture.lessons[0].deckID)
@@ -118,8 +119,18 @@ private struct CourseFixture {
     let study = StudyFeatureModel(library: library, scope: scope, title: "Lesson", clock: { fixture.now })
     await study.start()
     #expect(study.currentLesson?.id == fixture.lessons[0].id)
+    let item = Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+        .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question")),
+        .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer")),
+    ], deckID: deckID)
+    if addDueCard { _ = try await library.createItem(item, asOf: fixture.now) }
     await study.completeLesson(fixture.lessons[0].id)
+    if addDueCard {
+        #expect(study.currentCard?.item.id == item.id)
+        #expect(!study.isComplete)
+        await study.grade(.easy)
+    }
     #expect(study.isComplete)
-    #expect(study.reviewedCount == 0)
+    #expect(study.reviewedCount == (addDueCard ? 1 : 0))
     #expect(try await !library.hasStandaloneCourseLesson(in: scope))
 }

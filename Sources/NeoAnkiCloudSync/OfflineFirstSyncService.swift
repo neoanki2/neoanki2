@@ -194,6 +194,7 @@ public actor OfflineFirstSyncService: SyncService {
                 let beforeMergeCursor = try await repository.currentChangeCursor()
                 let firstMerge = metadata.didCompleteInitialMerge != true
                 try await consumeIncoming(recovered, metadata: &metadata)
+                try checkLifecycle(generation)
                 if firstMerge { metadata.outboundCursor = beforeMergeCursor }
                 metadata.stagedInbound = []
                 metadata.issues = currentIssues
@@ -257,6 +258,10 @@ public actor OfflineFirstSyncService: SyncService {
 
     public func libraryChanges() async -> AsyncStream<Void> { await libraryChangeEvents.stream() }
 
+    public func prioritizeMedia(in scope: DeckScope?) async {
+        await (adapter as? any MediaSyncAdapter)?.prioritizeMedia(in: scope)
+    }
+
     private func scheduleLocalSync(after cursor: Int64) {
         localSyncTask?.cancel()
         let generation = lifecycle
@@ -285,6 +290,7 @@ public actor OfflineFirstSyncService: SyncService {
         var latest: [String: LibraryChange] = [:]
         var cursor = metadata.outboundCursor
         while true {
+            try Task.checkCancellation()
             let page = try await repository.changes(after: cursor, limit: 1_000)
             guard let last = page.last else { break }
             for change in page { latest["\(change.resourceType):\(change.resourceID)"] = change }
@@ -292,7 +298,23 @@ public actor OfflineFirstSyncService: SyncService {
             if page.count < 1_000 { break }
         }
         let changes = latest.values.sorted { $0.cursor < $1.cursor }
-        let outbound = try await adapter.encode(changes: changes, deviceID: metadata.deviceID)
+        let outbound: [SyncRecordEnvelope]
+        if let mediaAdapter = adapter as? any MediaSyncAdapter {
+            // An interrupted receive may have committed media without
+            // acknowledging the inbox yet. Recognize those content-addressed
+            // files after a restart, before opening or staging uploads.
+            let mediaKind = LibraryResourceKind.media.rawValue
+            let staged = Dictionary(metadata.stagedInbound.filter { $0.resourceKind == mediaKind }
+                .map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+            var knownMedia: [String: SyncAssetDescriptor] = [:]
+            for change in changes where change.resourceType == mediaKind && !change.isTombstone {
+                let record = staged[change.resourceID] ?? metadata.serverBaseline?["\(mediaKind):\(change.resourceID)"]
+                if let record, !record.isTombstone { knownMedia[change.resourceID] = record.asset }
+            }
+            outbound = try await mediaAdapter.encode(changes: changes, deviceID: metadata.deviceID, knownMedia: knownMedia)
+        } else {
+            outbound = try await adapter.encode(changes: changes, deviceID: metadata.deviceID)
+        }
         metadata.pendingOutbound = (metadata.pendingOutbound ?? []) + (try await metadataStore.stageOutbound(outbound))
         metadata.outboundCursor = cursor
         try await metadataStore.save(metadata)

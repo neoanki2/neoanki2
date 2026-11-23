@@ -203,7 +203,8 @@ These states are informational:
 - **You're caught up / Nothing Due Right Now:** there is nothing due in the
   current scope. The scope home names the time the next card returns; this is
   not a scheduling error.
-- **Session Complete:** all due cards loaded for that session were handled.
+- **Session Complete:** the app checked the session's scope again and found
+  no more eligible due cards.
 
 While Item Type Studio is open, the outer Item Types list and its **Done**
 button are intentionally hidden so the card canvas can use the full window.
