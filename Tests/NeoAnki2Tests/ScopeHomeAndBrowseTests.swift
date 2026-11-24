@@ -47,6 +47,7 @@ private func addItem(
     #expect(model.scopeSummary.cardCount == 1)
     #expect(model.scopeSummary.dueNow == 1)
     #expect(model.scopeSummary.newCount == 1)
+    #expect(model.scopeSummary(for: .allDecks)?.maturity.notStartedCardCount == 1)
     #expect(model.scopeSummary.hasDueCards)
     #expect(model.dueCount == 1)
 }
@@ -125,11 +126,13 @@ private func addItem(
     let reload = Task { await model.load(scope: .deck(deck.id, name: deck.name)) }
     await heldReads.waitUntilHeld()
     #expect(!model.isLoading)
+    #expect(model.scopeSummary(for: .deck(deck.id)) == nil)
     await heldReads.release()
     await reload.value
 
     #expect(model.items.count == 1)
     #expect(model.scopeSummary.dueNow == 1)
+    #expect(model.scopeSummary(for: .deck(deck.id))?.cardCount == 1)
 }
 
 /// Cards fall due on a schedule, so the headline has to advance on its own.
