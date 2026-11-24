@@ -225,6 +225,12 @@ struct StudySessionView: View {
                 .accessibilityFocused($answerFocused)
             }
             .scrollDismissesKeyboard(.interactively)
+            .playingAcademyCardAudio(
+                card,
+                answerRevealed: session.isAnswerRevealed,
+                store: session.mediaStore,
+                allowsAutoplay: scenePhase == .active && !isEditing && !showsFullContent
+            )
             .id(card.id)
         } footer: {
             studyActions
@@ -699,19 +705,17 @@ private struct MobileResolvedMediaView: View {
     let behavior: MediaBehavior
     let isAnswerRevealed: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.academyCardAudioReplay) private var academyCardAudioReplay
     @State private var image: UIImage?
+    @State private var academyAudioURL: URL?
     @State private var player: AVPlayer?
+    @State private var audioIsPlaying = false
+    @State private var audioReachedEnd = false
     @State private var failed = false
     @State private var loopObserver: NSObjectProtocol?
 
     private var description: String {
         ReviewMediaAccessibility.description(for: reference, isAnswerRevealed: isAnswerRevealed)
-    }
-    private var accessibilityDescription: String {
-        if failed { return "Media unavailable" }
-        if image == nil && player == nil { return "Loading media" }
-        guard reference.kind == .audio, behavior == .playOnTap else { return description }
-        return description == "Audio" ? "Play audio" : "Play audio, \(description)"
     }
     private struct LoadConfiguration: Equatable {
         let reference: MediaRef
@@ -722,21 +726,14 @@ private struct MobileResolvedMediaView: View {
     var body: some View {
         Group {
             if let image {
-                if reference.kind == .gif {
-                    MobileAnimatedImage(image: image).scaledToFit().frame(maxHeight: 420)
-                } else {
-                    Image(uiImage: image)
-                        .resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 420)
-                }
+                imageContent(image).accessibilityLabel(description)
+            } else if let academyAudioURL, let academyCardAudioReplay {
+                CardAudioButton(description: description) { try academyCardAudioReplay(academyAudioURL) }
             } else if let player {
-                if reference.kind == .audio, behavior == .playOnTap {
-                    Button {
-                        player.seek(to: .zero); player.play()
-                    } label: {
-                        Label("Play Audio", systemImage: "play.fill").frame(minHeight: 44)
-                    }.buttonStyle(.bordered).accessibilityLabel("Play audio")
+                if reference.kind == .audio {
+                    audioControls(player)
                 } else {
-                    VideoPlayer(player: player).frame(minHeight: reference.kind == .audio ? 64 : 220)
+                    VideoPlayer(player: player).frame(minHeight: 220).accessibilityLabel(description)
                 }
             } else if failed {
                 Label("Media unavailable", systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
@@ -744,24 +741,57 @@ private struct MobileResolvedMediaView: View {
                 ProgressView().accessibilityLabel("Loading media")
             }
         }
-        .accessibilityLabel(accessibilityDescription)
         .trackingLearningTimePlayback(player)
         .task(id: LoadConfiguration(reference: reference, behavior: behavior, reduceMotion: reduceMotion)) { await load() }
         .onDisappear { reset() }
+    }
+
+    @ViewBuilder
+    private func imageContent(_ image: UIImage) -> some View {
+        if reference.kind == .gif {
+            MobileAnimatedImage(image: image).scaledToFit().frame(maxHeight: 420)
+        } else {
+            Image(uiImage: image)
+                .resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: 420)
+        }
+    }
+
+    private func audioControls(_ player: AVPlayer) -> some View {
+        let canPause = behavior != .playOnTap && audioIsPlaying
+        return CardAudioButton(description: description, pause: canPause ? { player.pause() } : nil) {
+            try CardAudioSession.preparePlayback()
+            if behavior == .playOnTap || audioReachedEnd {
+                player.seek(to: .zero)
+                audioReachedEnd = false
+            }
+            player.play()
+        }
+        .onReceive(player.publisher(for: \.timeControlStatus).receive(on: RunLoop.main)) { status in
+            audioIsPlaying = status != .paused
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: player.currentItem)
+                .receive(on: RunLoop.main)
+        ) { _ in
+            if behavior != .loop { audioReachedEnd = true }
+        }
     }
 
     private func reset() {
         if let loopObserver { NotificationCenter.default.removeObserver(loopObserver) }
         loopObserver = nil
         player?.pause(); player?.replaceCurrentItem(with: nil); player = nil
-        image = nil; failed = false
+        image = nil; academyAudioURL = nil; failed = false
+        audioIsPlaying = false; audioReachedEnd = false
     }
 
     private func load() async {
         reset()
         guard let store else { failed = true; return }
         do {
-            let resolved = try await store.resolveSynchronized(reference) { @MainActor in failed = true }
+            let resolved = try await store.resolveSynchronized(reference) { @MainActor in
+                if !Task.isCancelled { failed = true }
+            }
             try Task.checkCancellation()
             failed = false
             switch reference.kind {
@@ -770,9 +800,16 @@ private struct MobileResolvedMediaView: View {
                 try Task.checkCancellation()
                 image = loaded; failed = loaded == nil
             case .audio, .video:
+                if reference.kind == .audio, academyCardAudioReplay != nil, behavior != .loop {
+                    academyAudioURL = resolved
+                    return
+                }
                 let next = AVPlayer(url: resolved)
                 player = next
-                if !reduceMotion, behavior == .autoplay || behavior == .loop { next.play() }
+                if !reduceMotion, behavior == .autoplay || behavior == .loop {
+                    if reference.kind == .audio { try CardAudioSession.preparePlayback() }
+                    next.play()
+                }
                 if behavior == .loop {
                     loopObserver = NotificationCenter.default.addObserver(
                         forName: .AVPlayerItemDidPlayToEndTime, object: next.currentItem, queue: .main

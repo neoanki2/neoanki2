@@ -99,7 +99,8 @@ parent deck to 20, at most 20 new cards total are available from that parent and
 all of its subdecks that study day. A subdeck can add a stricter limit of its
 own; cards in that subdeck must fit both allowances. Unassigned cards remain
 unlimited. The scope home's due count includes only new cards currently eligible
-under these limits. On Mac, **Coming up** shows current due dates of introduced
+under these limits. Its **New** breakdown count includes active new cards
+deferred by the daily limit. On Mac, **Coming up** shows current due dates of introduced
 cards for today and the next six study days. **Today** includes overdue cards
 and intraday reviews scheduled for later today. It excludes unintroduced cards, so changing
 an introduction limit need not change those bars. The chart uses the configured

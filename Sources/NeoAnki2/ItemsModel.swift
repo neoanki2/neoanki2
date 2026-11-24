@@ -24,6 +24,7 @@ final class ItemsModel {
     /// The one scheduling snapshot for the selected scope. Everything the app
     /// says about what is due comes from here, so no two surfaces can disagree.
     private(set) var scopeSummary: ScopeSummary = .empty
+    private var loadedSummaryScope: DeckScope?
     private(set) var maturityUnavailable = false
     /// True only until the pane first has something to show. Later reloads
     /// revise what is on screen in place; a progress view where the numbers
@@ -59,6 +60,16 @@ final class ItemsModel {
     }
 
     var dueCount: Int { scopeSummary.dueNow }
+
+    func scopeSummary(for scope: DeckScope) -> ScopeSummary? {
+        guard loadedSummaryScope == scope else { return nil }
+        return scopeSummary
+    }
+
+    private func applyScopeSummary(_ summary: ScopeSummary, for scope: DeckScope) {
+        if scopeSummary != summary { scopeSummary = summary }
+        if loadedSummaryScope != scope { loadedSummaryScope = scope }
+    }
 
     /// Items after the browse search, kept separate from `items` so a search
     /// never invalidates a selection or a lookup by identifier. Stored rather
@@ -213,7 +224,7 @@ final class ItemsModel {
                 loadedItemsScope = scope.filter
                 browseDataInvalidated = false
             }
-            if let summary = snapshot.summary { scopeSummary = summary }
+            if let summary = snapshot.summary { applyScopeSummary(summary, for: scope.filter) }
             maturityUnavailable = snapshot.maturityIssue != nil
             errorMessage = snapshot.maturityIssue.map { "Maturity is unavailable. " + $0 } ?? itemTypeWarning
             hasLoaded = true
@@ -238,7 +249,7 @@ final class ItemsModel {
         // for the same reason `load` does: this path also runs when only the
         // sidebar is uninitialized, and a chosen column order has to survive it.
         items = snapshot.items.sorted(using: tableSort)
-        scopeSummary = snapshot.selectedScopeSummary
+        applyScopeSummary(snapshot.selectedScopeSummary, for: scope.filter)
         hasLoaded = true
         loadedItemsScope = scope.filter
         browseDataInvalidated = false
@@ -255,7 +266,7 @@ final class ItemsModel {
         items = []
         loadedItemsScope = nil
         browseDataInvalidated = true
-        scopeSummary = snapshot.selectedScopeSummary
+        applyScopeSummary(snapshot.selectedScopeSummary, for: scope.filter)
         hasLoaded = true
         isLoading = false
     }
@@ -315,12 +326,14 @@ final class ItemsModel {
         case .deck:
             await load(scope: scope, asOf: now)
         }
+        guard scope.filter == currentScopeFilter() else { return }
+        let generation = loadGeneration
         do {
-            scopeSummary = try await library.scopeSummary(
-                scope: currentScopeFilter(),
-                asOf: now
-            )
+            let summary = try await library.scopeSummary(scope: scope.filter, asOf: now)
+            guard generation == loadGeneration else { return }
+            applyScopeSummary(summary, for: scope.filter)
         } catch {
+            guard generation == loadGeneration else { return }
             errorMessage = UserFacingError.message(from: error)
         }
     }
@@ -613,7 +626,7 @@ final class ItemsModel {
                 loadedItemsScope = request.scope
                 browseDataInvalidated = false
             }
-            if let summary = snapshot.summary { scopeSummary = summary }
+            if let summary = snapshot.summary { applyScopeSummary(summary, for: request.scope) }
             maturityUnavailable = snapshot.maturityIssue != nil
             errorMessage = snapshot.maturityIssue.map { "Maturity is unavailable. " + $0 } ?? itemTypeWarning
         } catch {
@@ -677,9 +690,7 @@ final class ItemsModel {
         else { return }
 
         guard generation == loadGeneration, scope == currentScopeFilter() else { return }
-        if scopeSummary != summary {
-            scopeSummary = summary
-        }
+        applyScopeSummary(summary, for: scope)
     }
 
     /// Sync can change row content and schedules as well as the headline. Keep

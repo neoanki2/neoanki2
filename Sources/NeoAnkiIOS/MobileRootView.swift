@@ -624,6 +624,9 @@ private struct ScopeDetailView: View {
                 }
 
                 Section {
+                    ScopeCardCountsView(summary: summary)
+                }
+                Section {
                     if case let .deck(id) = scope {
                         Button("Add Word", systemImage: "character.book.closed") { openWordCapture(id) }
                             .accessibilityIdentifier("deck-add-word")
@@ -646,7 +649,7 @@ private struct ScopeDetailView: View {
                 ProgressView("Loading…").frame(maxWidth: .infinity)
             }
         }
-        .sheet(isPresented: $showsAddItem, onDismiss: { Task { await load() } }) {
+        .sheet(isPresented: $showsAddItem) {
             AddItemView(model: model, deckID: { if case let .deck(id) = scope { return id }; return nil }())
         }
         .navigationTitle(model.scopeTitle(scope))
@@ -658,25 +661,26 @@ private struct ScopeDetailView: View {
                     }
             }
         }
-        .task {
-            model.dueCounts.selectScope(scope.filter)
+        .task(id: model.activeStudy == nil ? model.libraryRevision : nil) {
+            guard model.activeStudy == nil else { return }
             await load()
         }
         .onAppear { model.dueCounts.selectScope(scope.filter) }
         .onDisappear {
             if model.dueCounts.activeScope == scope.filter { model.dueCounts.selectScope(nil) }
         }
-        .onChange(of: model.allDecksSummary) { _, _ in Task { await load() } }
-        .onChange(of: model.activeStudy?.id) { _, id in if id == nil { Task { await load() } } }
     }
 
     private func load() async {
         do {
-            summary = try await model.summary(for: scope)
+            let loadedSummary = try await model.summary(for: scope)
+            try Task.checkCancellation()
+            summary = loadedSummary
+            errorMessage = nil
             let available = await model.hasStandaloneCourseLesson(in: scope.filter)
             if !Task.isCancelled { hasStandaloneLesson = available }
         } catch {
-            errorMessage = MobileAppModel.message(for: error)
+            if !Task.isCancelled { errorMessage = MobileAppModel.message(for: error) }
         }
     }
 

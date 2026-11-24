@@ -285,6 +285,7 @@ struct ResolvedMediaView: View {
     let store: MediaStore?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.academyCardAudioReplay) private var academyCardAudioReplay
     @State private var resolvedURL: URL?
     @State private var resolutionError: String?
 
@@ -335,12 +336,12 @@ struct ResolvedMediaView: View {
     private func mediaBody(url: URL) -> some View {
         switch ref.kind {
         case .audio:
-            AudioPlayerView(
-                url: url,
-                behavior: presentation.media,
-                altText: ReviewMediaAccessibility.description(for: ref, isAnswerRevealed: isAnswerRevealed),
-                reduceMotion: reduceMotion
-            )
+            let description = ReviewMediaAccessibility.description(for: ref, isAnswerRevealed: isAnswerRevealed)
+            if let academyCardAudioReplay, presentation.media != .loop {
+                CardAudioButton(description: description) { try academyCardAudioReplay(url) }
+            } else {
+                AudioPlayerView(url: url, behavior: presentation.media, altText: description, reduceMotion: reduceMotion)
+            }
         case .image, .gif:
             ImageMediaView(
                 url: url,

@@ -55,7 +55,14 @@ struct ScopeHomeView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("scopeHomeLoading")
                 } else if summary.itemCount == 0 {
-                    emptyState
+                    VStack(alignment: .leading, spacing: 0) {
+                        cardCounts
+                            .frame(maxWidth: DesignSystem.readingColumnMaxWidth, alignment: .leading)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, DesignSystem.Spacing.xl)
+                            .padding(.top, DesignSystem.Spacing.xl * 2)
+                        emptyState
+                    }
                 } else {
                     home
                 }
@@ -95,19 +102,20 @@ struct ScopeHomeView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.xl * 2) {
-                    if geometry.size.width >= 520 {
-                        HStack(alignment: .center, spacing: DesignSystem.Spacing.xl) {
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                        if geometry.size.width >= 520 {
+                            HStack(alignment: .center, spacing: DesignSystem.Spacing.xl) {
+                                dueSection
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                todaySection
+                                    .padding(.leading, DesignSystem.Spacing.lg)
+                                    .overlay(alignment: .leading) { Divider() }
+                            }
+                        } else {
                             dueSection
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            todaySection
-                                .padding(.leading, DesignSystem.Spacing.lg)
-                                .overlay(alignment: .leading) { Divider() }
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-                            dueSection
                             todaySection
                         }
+                        cardCounts
                     }
                     upcomingSection
                     if summary.leechCount > 0 {
@@ -124,6 +132,13 @@ struct ScopeHomeView: View {
         .task { await statistics.observe() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await statistics.refresh(force: false) } }
+        }
+    }
+
+    @ViewBuilder
+    private var cardCounts: some View {
+        if let summary = itemsModel.scopeSummary(for: scope.filter) {
+            ScopeCardCountsView(summary: summary)
         }
     }
 

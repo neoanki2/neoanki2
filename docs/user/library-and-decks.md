@@ -217,6 +217,9 @@ to study right now?
 
 - The **due count** leads, with **Study** beside it. Studying is one click from
   the moment you pick a scope.
+- Below the study controls, the overview shows total cards and the counts
+  for **New**, **Learning**, and **Mature**. A parent deck includes its
+  subdecks. Suspended cards appear separately and count toward the total.
 - On Mac, **Today so far** shows distinct cards reviewed and recorded study time
   in the selected scope. **Coming up** shows current scheduled card counts for
   today and the next six study days, including days with no scheduled cards.
@@ -240,12 +243,14 @@ to study right now?
 - Use the **Browse** toolbar button or Library menu to open browse mode. Home
   omits duplicate Browse and Statistics links.
 
-The scope home never shows an item's answer. Card counts, maturity breakdowns,
-and historical progress are available in **Statistics → Memory**, alongside
-activity and learning-time reports.
+The scope home never shows an item's answer. Open **Statistics → Memory** for
+historical progress and a more detailed breakdown.
 
-Maturity describes demonstrated long-term recall, not the scheduler phase shown
-under Cards or in Browse. A card qualifies after two Good or Easy recalls that
+The overview's **New** count covers active cards waiting for their first
+review, including cards whose progress you reset. **Learning** covers active
+cards you have started that have yet to reach **Mature**, the same status
+called **Maintaining** in Statistics. Maturity describes demonstrated
+long-term recall. A card qualifies after two Good or Easy recalls that
 each follow a gap of at least seven days since the previous review, and when
 its estimated stability reaches 30 days. An Again clears that evidence; Hard
 preserves it unless stability falls below 30 days. New cards are Not started,

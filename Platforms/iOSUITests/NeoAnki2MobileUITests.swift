@@ -603,6 +603,8 @@ final class MobileDeckUITests: NeoAnki2MobileUITestCase {
         open("Home", in: app)
         XCTAssertTrue(app.staticTexts["Reading"].waitUntilExists(timeout: 5))
         app.staticTexts["Reading"].tap()
+        let counts = app.descendants(matching: .any)["scopeHomeCardStates"]
+        XCTAssertTrue(counts.waitUntil(timeout: 5) { $0.exists && $0.label.contains("0 total cards") })
         app.buttons["Deck Settings"].tap()
         let editor = app.textFields["Name"]
         XCTAssertTrue(editor.waitUntilExists(timeout: 3))
@@ -715,6 +717,12 @@ final class MobileCardJourneyUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts["Session Complete"].waitUntilExists(timeout: 15))
         app.buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Home"].waitUntilExists(timeout: 5))
+        scrollToAndTap(app.staticTexts["All Decks"], in: app)
+        let counts = app.descendants(matching: .any)["scopeHomeCardStates"]
+        XCTAssertTrue(counts.waitUntil(timeout: 5) { $0.exists && $0.label.contains("1 learning") })
+        XCTAssertTrue(counts.label.contains("1 total card"))
+        XCTAssertTrue(counts.label.contains("0 new"))
+        XCTAssertTrue(counts.label.contains("0 mature"))
     }
 }
 

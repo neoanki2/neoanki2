@@ -87,7 +87,7 @@ extension FastFunctionalJourneyTests {
                 relaunched.descendants(matching: .any)["scopeHomeDueHeadline"]
                     .waitUntilExists(timeout: 5)
             )
-            XCTAssertFalse(relaunched.descendants(matching: .any)["scopeHomeCardStates"].exists)
+            XCTAssertTrue(relaunched.descendants(matching: .any)["scopeHomeCardStates"].waitUntilExists(timeout: 5))
             XCTAssertFalse(relaunched.buttons["viewStatistics"].exists)
             XCTAssertTrue(relaunched.buttons.identified("studyButton").isEnabled)
             XCTAssertFalse(relaunched.descendants(matching: .any)["scopeHomeBrowseLink"].exists)
