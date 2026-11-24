@@ -333,7 +333,9 @@ private actor PausedLibraryOperations: IncrementalLibraryTransport {
     }
 }
 
-@Test(.timeLimit(.minutes(1)), arguments: [false, true])
+// The transport handshakes determine readiness. This watchdog also covers
+// SQLite fixture creation, which competes with the parallel app suite in CI.
+@Test(.timeLimit(.minutes(3)), arguments: [false, true])
 func libraryReviewsApplyWhileUploadMediaAndStatisticsAreSuspended(missingDependency: Bool) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
