@@ -29,18 +29,20 @@ run_swift() {
   if [[ "$skip_build" == --skip-build ]]; then
     build_flags=(--skip-build)
   fi
-  swift test --parallel "${build_flags[@]}" \
+  swift test "${build_flags[@]}" \
     --package-path "$path" --scratch-path "$build_root/ci-unit-$package" \
     --filter "$filter" "$@"
 }
 
 app() {
   # Keep the focused sync regressions. The two generated campaigns run in extended validation.
-  run_swift app . . --skip 'generatedFaultCampaign|randomizedThreeDeviceConvergence'
+  run_swift app . . --parallel --skip 'generatedFaultCampaign|randomizedThreeDeviceConvergence'
 }
 
 core() {
-  run_swift core NeoAnkiCore 'NeoAnkiCoreTests|NeoAnkiFSRSTests'
+  # Keep database-heavy fixtures from competing for a hosted runner's disk.
+  # The individual tests still exercise concurrency within their fixtures.
+  run_swift core NeoAnkiCore 'NeoAnkiCoreTests|NeoAnkiFSRSTests' --no-parallel
 }
 
 chrome() {
