@@ -82,6 +82,10 @@ follows your daily limits, and reading a lesson doesn't use a new-card slot or
 create a grade. When iCloud sync is enabled, the lesson item's reading progress
 follows it to your other devices.
 
+Revealing a Japanese Academy vocabulary answer plays the word and sentence
+recordings in order. Use **Play Audio** to replay either recording. With
+**Reduce Motion** enabled, use the same controls to start playback manually.
+
 ## Session states
 
 Mac, iPhone, and iPad use the same session behavior. Loading failures do not

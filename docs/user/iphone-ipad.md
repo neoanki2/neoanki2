@@ -16,8 +16,9 @@ expected answer after checking; explanations remain under **Explanation**.
 
 The **Statistics** tab on iPhone and sidebar destination on iPad open the same
 reports as Mac: Overview, Activity, Memory, and Workload. Its scope filter selects
-a deck; **View Session Statistics** opens a completed session's details. Home
-keeps due counts and study actions rather than repeating statistical totals.
+a deck; **View Session Statistics** opens a completed session's details. Tap a
+deck in Home to see its total, new, learning, and mature card counts below the
+study controls.
 Home and deck screens omit duplicate Statistics and Browse links; use the
 Statistics and Library destinations instead. Tracking remains automatic. See [Statistics](../statistics/) and
 [Learning time](../learning-time/) for definitions and recording rules.
@@ -85,6 +86,8 @@ Open **Japanese Academy - Level 1** and tap **Study** to read lessons and
 practice the vocabulary that follows each one. Lesson text, images, and audio
 scroll in the study area while **Continue** stays visible. An unread
 introductory lesson can be studied even when its deck has zero due cards.
+When you reveal a vocabulary answer, the word and sentence recordings play
+in order. Tap **Play Audio** on either recording to replay it.
 
 Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:

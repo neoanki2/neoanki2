@@ -284,7 +284,8 @@ for more eligible cards at the end of the queue.
 Japanese Academy includes separate lesson and vocabulary item types. The
 lesson’s populated title keeps its reading in the course path with zero
 scheduled cards. The vocabulary type generates the word-and-sentence cards you
-review.
+review. The included vocabulary setup reveals the word and sentence recordings
+with the answer and offers a separate replay control for each.
 
 Custom item types belong to decks. Open a deck's settings and choose **Manage
 Item Types** to create a type, attach an existing definition, choose a default,

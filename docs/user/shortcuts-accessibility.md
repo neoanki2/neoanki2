@@ -203,6 +203,9 @@ include counts, item rows include title, summary, card count, and item type, and
 study progress is labeled as progress. Choice and arrange controls announce
 their position and selected state.
 
+On deck overviews, VoiceOver reads the total and the labeled card counts
+together. The breakdown reflows into a column when space is limited.
+
 The active study stage follows the preset's semantic region order and omits
 concealed answer regions from VoiceOver until reveal. Its fixed regions reserve
 space for response and status content before the stable grading footer; the
