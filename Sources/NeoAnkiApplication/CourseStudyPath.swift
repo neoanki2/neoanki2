@@ -56,6 +56,11 @@ public struct CourseStudyPath: Sendable {
 
     public func isNewVocabulary(_ card: DueCard) -> Bool { unitIndex(for: card) != nil }
 
+    package static func isAcademyVocabulary(_ card: DueCard) -> Bool {
+        card.itemType.name == AcademyStudyFormat.vocabularyType
+            && card.item.tags.contains { $0.hasPrefix(AcademyStudyFormat.sourceTagPrefix) }
+    }
+
     public mutating func markRead(_ id: UUID) {
         guard let index = lessons.firstIndex(where: { $0.id == id }) else { return }
         lessons[index].isRead = true
@@ -67,8 +72,7 @@ public struct CourseStudyPath: Sendable {
     }
 
     private func unitIndex(for card: DueCard) -> Int? {
-        guard card.card.memory.phase == .new, card.itemType.name == AcademyStudyFormat.vocabularyType,
-              card.item.tags.contains(where: { $0.hasPrefix(AcademyStudyFormat.sourceTagPrefix) }),
+        guard card.card.memory.phase == .new, Self.isAcademyVocabulary(card),
               let deck = card.item.deckID else { return nil }
         return unitIndexes[deck]
     }

@@ -386,6 +386,12 @@ struct StudyView: View {
                 occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
                 response: model.reviewResponse, evaluation: model.answerEvaluation
             )
+            .playingAcademyCardAudio(
+                card,
+                answerRevealed: model.isAnswerRevealed,
+                store: mediaStore,
+                allowsAutoplay: !isEditingCard
+            )
             .id(card.id)
             .accessibilityIdentifier(model.isAnswerRevealed ? "studyAnswer" : "studyPrompt")
             .frame(maxWidth: .infinity)

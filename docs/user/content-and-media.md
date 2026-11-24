@@ -247,7 +247,10 @@ for what happens when iOS interrupts a download.
 
 In a Japanese Academy lesson, the reader shows the saved text and media blocks
 in field order. Tap a lesson’s audio control to listen while keeping your
-place in the reading.
+place in the reading. On Japanese Academy vocabulary cards, the word and
+sentence recordings play in order when you reveal the answer on Mac, iPhone,
+and iPad. Use **Play Audio** to replay either clip. On iPhone, card audio can
+play in Silent mode.
 
 The authoring form previews images and GIFs. Its compact preview represents
 audio and video with their media label. Item detail resolves the saved content
