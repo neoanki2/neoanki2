@@ -5,6 +5,7 @@ import NeoAnkiCloudSync
 import PoemDeckBuilder
 import ProseDeckBuilder
 import NeoAnkiTextEditing
+import OSLog
 import SwiftUI
 
 private struct InitialLibraryPayload: Sendable {
@@ -153,8 +154,10 @@ struct NeoAnki2App: App {
                 installUITestControlIfNeeded()
             }
             .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
-                Task { await syncService?.synchronize() }
+                Task { await syncService?.setForeground(phase == .active) }
+            }
+            .onChange(of: decksModel?.selectedDeckID) { _, deckID in
+                Task { await syncService?.prioritizeMedia(in: deckID.map { .deck($0) }) }
             }
             .preferredColorScheme(documentationScreenshotColorScheme)
             .alert(
@@ -343,12 +346,15 @@ struct NeoAnki2App: App {
                 backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
             )
             syncService = service
-            appDelegate.synchronizeCloudChanges = { [weak service] in await service?.synchronize() }
+            await service.setForeground(NSApp.isActive)
+            await service.prioritizeMedia(in: decksModel?.selectedDeckID.map { .deck($0) })
+            appDelegate.synchronizeCloudChanges = { [weak service] scope in _ = await service?.receiveRemoteChanges(scope) }
             NSApplication.shared.registerForRemoteNotifications()
             await syncStatusModel.observe(service) {
                 let now = Date.now
                 await decksModel?.refreshCounts(asOf: now)
                 await itemsModel?.refreshAfterSync(asOf: now)
+                Logger(subsystem: "com.neoanki2.sync", category: "Latency").info("Mac library projections refreshed")
             }
             await service.start()
             await syncStatusModel.refresh()

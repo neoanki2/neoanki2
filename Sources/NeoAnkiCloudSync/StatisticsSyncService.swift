@@ -37,7 +37,8 @@ public actor StatisticsSyncService {
         await transport.stop()
     }
 
-    public func synchronize() async throws {
+    @discardableResult
+    public func synchronize() async throws -> Bool {
         let generation = lifecycle
         if !started {
             try await transport.start()
@@ -58,9 +59,11 @@ public actor StatisticsSyncService {
             guard value.id == record.id else { throw SQLiteLibrarySyncError.invalidPayload(record.id) }
             events.append(value)
         }
-        try await repository.recordStatisticsEvents(events)
-        try check(generation)
-        metadata = try await metadataStore.completeIncoming(staged, metadata: metadata)
+        if !staged.isEmpty {
+            try await repository.recordStatisticsEvents(events)
+            try check(generation)
+            metadata = try await metadataStore.completeIncoming(staged, metadata: metadata)
+        }
         if let pending = metadata.pendingOutbound, !pending.isEmpty {
             try await send(pending, generation: generation)
             metadata = try await metadataStore.load()
@@ -81,6 +84,7 @@ public actor StatisticsSyncService {
             metadata.outboundCursor = last.sequence
             try await metadataStore.save(metadata)
         }
+        return !staged.isEmpty
     }
 
     private func send(_ records: [SyncRecordEnvelope], generation: Int) async throws {

@@ -231,8 +231,11 @@ struct MediaPreviewView: View {
             loadedImage = nil
             imageLoadFailed = false
             do {
-                let url = try await store.resolve(ref)
+                let url = try await store.resolveSynchronized(ref) { @MainActor in
+                    resolutionError = UserFacingError.message(from: MediaError.readFailed)
+                }
                 guard !Task.isCancelled else { return }
+                resolutionError = nil
                 resolvedURL = url
             } catch {
                 guard !Task.isCancelled else { return }

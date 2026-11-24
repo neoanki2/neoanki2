@@ -56,7 +56,7 @@ struct OcclusionImage: View {
             bitmap = nil; failed = false
             do {
                 guard let store else { failed = true; return }
-                let url = try await store.resolve(reference)
+                let url = try await store.resolveSynchronized(reference) { @MainActor in failed = true }
                 let loaded = await Task.detached(priority: .userInitiated) { () -> OcclusionBitmap? in
                     OcclusionBitmap.load(url: url)
                 }.value

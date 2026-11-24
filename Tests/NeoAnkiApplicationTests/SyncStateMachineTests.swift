@@ -384,6 +384,8 @@ struct SyncStateMachineTests {
         await device.transport.inject(.afterPartialSend)
         await device.service.synchronize()
         let interrupted = try await device.metadata.load()
+        let acceptedPrefix = await cloud.snapshot().values.filter { $0.record.resourceKind == "deck" }
+        #expect((1..<9).contains(acceptedPrefix.count))
         #expect(interrupted.pendingOutbound?.count == 9)
         #expect(interrupted.outboundCursor == (try await device.repository.currentChangeCursor()))
         #expect(await device.service.status() == .offline)

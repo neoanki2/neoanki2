@@ -273,6 +273,11 @@ confirm that every other device has caught up. Compare the same deck scope on
 both devices at approximately the same time, because scheduled cards can become
 due even when no new reviews are submitted.
 
+When both apps are active, reviews, undos, and library edits update automatically.
+Opening the app starts a catch-up check immediately. Large attachments can arrive
+after the cards that reference them. A locked iPhone updates when iOS grants the
+app background time.
+
 ## Troubleshoot iCloud
 
 If one device is behind, inspect its sync status even if the other device says

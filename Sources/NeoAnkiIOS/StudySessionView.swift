@@ -761,8 +761,9 @@ private struct MobileResolvedMediaView: View {
         reset()
         guard let store else { failed = true; return }
         do {
-            let resolved = try await store.resolve(reference)
+            let resolved = try await store.resolveSynchronized(reference) { @MainActor in failed = true }
             try Task.checkCancellation()
+            failed = false
             switch reference.kind {
             case .image, .gif:
                 let loaded = UIImage(data: try Data(contentsOf: resolved, options: [.mappedIfSafe]))

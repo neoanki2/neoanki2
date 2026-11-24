@@ -26,6 +26,8 @@ public enum LibraryChangeOrigin: String, Codable, Sendable {
     case importTransfer
 }
 
+public struct SynchronizedSnapshotChanged: Error {}
+
 /// One durable notification emitted after a library resource mutation.
 /// Payloads intentionally identify resources without copying user content;
 /// consumers load the current representation after receiving the event.

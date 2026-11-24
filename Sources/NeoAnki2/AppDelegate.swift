@@ -10,7 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let windowBottomClearance: CGFloat = 16
     private var windowPresentations: [ObjectIdentifier: WindowFramePolicy.Presentation] = [:]
     let authoredDeckOpenRequests = AuthoredDeckOpenRequests()
-    var synchronizeCloudChanges: (@MainActor () async -> Void)?
+    var synchronizeCloudChanges: (@MainActor (SyncRemoteScope) async -> Void)?
     private static let cloudPushLogger = Logger(subsystem: "com.neoanki2.app", category: "CloudSyncPush")
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -26,9 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
-        guard CKSyncEngineTransport.isLibraryNotification(userInfo) else { return }
+        guard let scope = CKSyncEngineTransport.notificationScope(userInfo) else { return }
         Self.cloudPushLogger.notice("Received library change notification")
-        Task { await synchronizeCloudChanges?() }
+        Task { await synchronizeCloudChanges?(scope) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

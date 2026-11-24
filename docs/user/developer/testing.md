@@ -270,6 +270,50 @@ seed from the workflow run ID unless one is supplied. Its artifact contains the
 campaign log and replayable scenario evidence. This campaign uses no Apple account, installed
 app, physical phone, or production library.
 
+#### Backlogs and forward progress
+
+An iPhone once showed 61 due cards while the Mac showed one. The iPhone had
+received the Mac's reviews, but sync was still processing an outbox of 213
+conflicting card records. Processing each conflict rewrote the roughly 48 MB
+sync metadata file. The existing generated contracts varied delivery and
+restart behavior, with one to three reviews per step. Those tests could verify
+the final state while missing work that grew with every record in the queue.
+
+The PR suite now covers this at the production outbound-preparation and sync
+service boundary. Two temporary SQLite libraries start with 61 due cards.
+The receiver starts with a saved outbox of 213 card conflicts and a durable
+inbox containing the sender's reviews. One sync cycle must leave exactly the
+same due card eligible on both replicas, preserve every review and conflict
+copy, clear both queues, and complete within eight atomic metadata writes.
+The write budget counts actual persistence calls, so a faster runner cannot
+hide per-record writes. The test supplies server records in memory and runs
+without CloudKit access.
+
+Use the following coverage targets when extending the sync suite.
+
+| Layer | Cases and assertions | When to run |
+| --- | --- | --- |
+| Deterministic work and recovery contracts | Combine staged reviews with pending conflicts, media transfers, and other queued work. Test just below, at, and just above the 200-ID CloudKit lookup and 1,000-entry journal-page boundaries, and test large baselines independently of backlog size. Count metadata writes, bytes serialized, requests, and apply transactions. Interrupt after staging an inbox page, after committing SQLite, and before acknowledging the outbox. A restart must preserve pending work and finish with exact IDs, correct due projections, and a quiet journal. | Keep the incident replay and inexpensive boundary cases in the PR gate. Run large synthetic baselines in extended validation. |
+| Stateful fuzzing | Extend the existing replayable contracts with burst sizes, conflicting edits on multiple replicas, overlapping reviews and undos, and changes to deck limits and study-day rollover. Generate overlapping offline actions before attempting recovery. Vary queue age and size independently of sequence length. Compose lost pushes, duplicate pages, partial acknowledgments, expired tokens, rate limits, failed writes, and restarts. After the last fault is removed, drive the normal push or poll path and require progress within a defined number of recovery cycles. | Use fixed seeds for regressions and rotating seeds in the existing Sync stress workflow. Add a scheduled run if regular background coverage is needed. |
+| Platform acceptance | Exercise signed builds with a disposable library and test iCloud account when changing CloudKit callbacks, subscriptions, or background processing. Check that a review reaches the receiver's SQLite library and changes the visible due count automatically after foregrounding or a supported background wake. Record the delivered, applied, and visible milestones separately. | Run focused acceptance for affected platform integrations. Keep the PR gate headless. |
+
+For generated tests, keep an independent ledger of committed review and undo
+identities, expected schedules from successful local operations, and due-card
+IDs at a shared observation time. Assert those on every replica. An empty
+inbox or matching counts alone can miss lost reviews, duplicate reviews, or
+different cards reaching the same count. Assert durability at each injected
+failure and progress once delivery resumes. Use wall-clock limits only as
+watchdogs in correctness tests. Measure latency, CPU, and disk use separately
+on a reference device.
+
+Keep a reproducible trace for each failure with its seed, operations, injected
+faults, queue sizes, and expected and observed progress. Reduce the trace to a
+small synthetic regression and qualify it by demonstrating that it rejects the
+old behavior. For a backlog, useful mutations include writing each conflict
+individually, dropping a staged review, and suppressing the post-commit
+availability refresh. Each tests a different failure mode with a distinct
+assertion.
+
 #### Verify that the tests reject broken implementations
 
 When the contract harness changes, qualify it locally or with manual Extended
@@ -278,6 +322,8 @@ validation against deliberate mutations in an isolated checkout:
 ```bash
 python3 Scripts/check-sync-test-sensitivity.py --list
 python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
+python3 Scripts/check-sync-test-sensitivity.py \
+  --mutant persist-upload-conflicts-one-at-a-time --mutant archive-card-conflicts-one-at-a-time
 ```
 
 The original implementation must pass first. Each mutation must then produce
@@ -295,6 +341,17 @@ The visible-summary path exercises the shared receiving feature model; native
 shell wiring retains its separate tests. Dictionary-pack transfers and the
 learning-time zone also retain their separate suites. Those limits remain
 separate from the card-library contracts.
+
+For foreground latency acceptance, use already-synced signed Mac and iPhone
+builds with a disposable library and test iCloud account. Record timestamped
+`com.neoanki2.sync` logs at Info level. Match the sender's SQLite journal commit
+and CloudKit acknowledgment with the receiver's zone response, SQLite apply, and
+published projection. Use sequential operations and aligned device clocks to
+pair the samples. Record at least 50 edits, grades, and undos in each direction,
+including while media transfers are running. Check 5 seconds at p95 for ordinary
+foreground changes and 8 seconds at p95 with receiving push delivery suppressed.
+Capture empty foreground checks, CloudKit retry-after responses, and idle iPhone
+energy on the same reference device.
 
 ## CI reliability and optional UI investigations
 

@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import OSLog
 import SQLite3
 
 private struct SchedulerWeightEnvelope: Decodable {
@@ -1113,6 +1114,7 @@ actor SQLiteDatabase {
             contentCursor = nil
         }
         lastNotifiedChangeCursor = cursor
+        Logger(subsystem: "com.neoanki2.sync", category: "Latency").info("SQLite journal committed cursor=\(cursor)")
         for observer in changeObservers.values {
             if let event = observer.includeMedia ? cursor : contentCursor {
                 observer.continuation.yield(event)
@@ -7907,8 +7909,11 @@ actor SQLiteDatabase {
         )
     }
 
-    func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) throws {
+    func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation], expectedChangeCursor: Int64? = nil) throws -> Int64? {
         try inTransaction {
+            if let expectedChangeCursor, try currentChangeCursor() != expectedChangeCursor {
+                throw SynchronizedSnapshotChanged()
+            }
             // CloudKit records arrive in arbitrary order, and journal updates
             // can put a parent after its child. Validate references against the
             // complete atomic batch rather than each intermediate statement.
@@ -8001,7 +8006,12 @@ actor SQLiteDatabase {
                     try applySynchronizedTombstone(kind: kind, id: id)
                 }
             }
-            try reconcileMediaReferenceCounts()
+            if expectedChangeCursor == nil || mutations.contains(where: { mutation in
+                switch mutation {
+                case .item, .tombstone(.item, _), .tombstone(.card, _): true
+                default: false
+                }
+            }) { try reconcileMediaReferenceCounts() }
             var schedulingCardIDs = Set<UUID>()
             for mutation in mutations {
                 switch mutation {
@@ -8021,6 +8031,7 @@ actor SQLiteDatabase {
             for cardID in schedulingCardIDs {
                 try reconcileReviewedCardScheduling(cardID: cardID)
             }
+            return expectedChangeCursor == nil ? nil : try currentChangeCursor()
         }
     }
 

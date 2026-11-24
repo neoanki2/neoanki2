@@ -2,6 +2,7 @@ import Foundation
 import NeoAnkiApplication
 import NeoAnkiCore
 import Observation
+import OSLog
 
 public enum DueCountLoadState: Sendable, Equatable {
     case checking
@@ -124,6 +125,7 @@ public final class LibraryDueCountsModel {
             showsPublishedCounts = true
             state = .ready
             revision &+= 1
+            Logger(subsystem: "com.neoanki2.sync", category: "Latency").info("iPhone due-count projection published revision=\(result.sourceRevision)")
             onSnapshot?(result)
             scheduleBoundary(result.validUntil)
         } catch is CancellationError {

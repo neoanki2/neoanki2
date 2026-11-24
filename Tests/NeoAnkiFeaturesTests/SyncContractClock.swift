@@ -117,13 +117,13 @@ final class SyncContractClock: @unchecked Sendable {
             $0.deviceID == deviceID && (reason == nil || $0.reason == reason)
         }.sorted { $0.number < $1.number }
     }
-    func localRequest(deviceID: String, cursor: Int64) async throws -> Request {
+    func localRequest(deviceID: String) async throws -> Request {
         try await syncContractWatch("SYNC_CONTRACT_AUTOMATIC_SEND") {
             let changes = await self.events.stream()
             var iterator = changes.makeAsyncIterator()
             while !Task.isCancelled {
                 if let request = self.pending(deviceID, reason: nil).last(where: {
-                    if case let .localChange(recorded) = $0.reason { return recorded >= cursor }
+                    if case .localChange = $0.reason { return true }
                     return false
                 }) { return request }
                 guard await iterator.next() != nil else { break }
@@ -141,6 +141,9 @@ final class SyncContractClock: @unchecked Sendable {
             }
             throw CancellationError()
         }
+    }
+    func hasPoll(deviceID: String) -> Bool {
+        !pending(deviceID, reason: .recoveryPoll).isEmpty
     }
     func waitForCompletion(deviceID: String, after count: Int) async throws {
         try await syncContractWatch("SYNC_CONTRACT_CYCLE_COMPLETION") {

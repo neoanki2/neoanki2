@@ -17,14 +17,23 @@ actor LibraryZoneChangeFetcher {
         self.metadataStore = metadataStore
     }
 
-    func fetch(page: @Sendable (Data?) async throws -> Page) async throws -> [SyncRecordEnvelope] {
+    func fetch(
+        persistEmptyFinalPage: Bool = true,
+        collectRecords: Bool = true,
+        didStagePage: @Sendable () async throws -> Void = {},
+        page: @Sendable (Data?) async throws -> Page
+    ) async throws -> [SyncRecordEnvelope] {
         var token = try await metadataStore.load().libraryZoneChangeToken
         var received: [SyncRecordEnvelope] = []
         while true {
             try Task.checkCancellation()
             let result = try await page(token)
-            try await metadataStore.receiveZonePage(result.records, token: result.token)
-            received += result.records
+            try Task.checkCancellation()
+            if persistEmptyFinalPage || !result.records.isEmpty || result.moreComing || token == nil {
+                try await metadataStore.receiveZonePage(result.records, token: result.token)
+            }
+            if !result.records.isEmpty { try await didStagePage() }
+            if collectRecords { received += result.records }
             token = result.token
             if !result.moreComing { return received }
         }

@@ -319,8 +319,11 @@ struct ResolvedMediaView: View {
             resolutionError = nil
             guard let store else { return }
             do {
-                let url = try await store.resolve(ref)
+                let url = try await store.resolveSynchronized(ref) { @MainActor in
+                    resolutionError = UserFacingError.message(from: MediaError.readFailed)
+                }
                 try Task.checkCancellation()
+                resolutionError = nil
                 resolvedURL = url
             } catch {
                 if !Task.isCancelled { resolutionError = UserFacingError.message(from: error) }

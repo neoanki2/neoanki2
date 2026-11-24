@@ -279,8 +279,10 @@ before removing unused files and repairs stale counts left by older clients.
 - **Media file couldn't be read / invalid location:** confirm the source still
   exists and choose it again. Import only from locations macOS allows the app
   to access.
-- **Image unavailable / preview unavailable:** the managed media may be missing
-  or unreadable. Restore the complete database-and-media backup together.
+- **Image unavailable / preview unavailable:** a recently synced item may
+  still be waiting for its file. Keep the app open and check iCloud Sync for
+  transfer issues. When restoring missing local media from a backup, restore
+  the complete database and media together.
 
 Supported authored media is documented in the
 [authored deck format]({{ site.baseurl }}/AUTHORED_DECK_FORMAT/). Active content such as

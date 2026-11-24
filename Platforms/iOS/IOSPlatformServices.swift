@@ -163,6 +163,7 @@ actor MobileSyncCoordinator: SyncService {
     private let libraryChangeEvents = SyncLibraryChanges()
     private var changesMonitor: Task<Void, Never>?
     private var mediaPriority: DeckScope?
+    private var foreground = false
     private var lifecycle = 0
 
     init(repository: SQLiteLibraryRepository, paths: MobilePaths) {
@@ -171,7 +172,11 @@ actor MobileSyncCoordinator: SyncService {
     }
 
     func start() async {
-        if let service { await service.start(); return }
+        await prepareService()?.start()
+    }
+
+    private func prepareService() async -> (any SyncService)? {
+        if let service { return service }
         let generation = lifecycle
         do {
             let metadata = SyncMetadataStore(directory: paths.syncMetadataDirectory)
@@ -188,27 +193,36 @@ actor MobileSyncCoordinator: SyncService {
                     directory: paths.syncMetadataDirectory.appendingPathComponent("Statistics", isDirectory: true)),
                 backupURL: { [paths] in paths.backupURL }
             )
-            guard generation == lifecycle, !Task.isCancelled else { return }
-            if let existing = self.service { await existing.synchronizeAndWait(); return }
-            self.service = service
+            guard generation == lifecycle, !Task.isCancelled else { return nil }
             await service.prioritizeMedia(in: mediaPriority)
             let changes = await service.libraryChanges()
-            guard generation == lifecycle else { return }
+            guard generation == lifecycle else { return nil }
+            if let existing = self.service { return existing }
+            self.service = service
             changesMonitor = Task { [libraryChangeEvents] in
                 for await _ in changes {
                     guard !Task.isCancelled else { return }
                     await libraryChangeEvents.publish()
                 }
             }
-            await service.start()
+            await service.setForeground(foreground)
+            return generation == lifecycle ? service : nil
         } catch {
             if generation == lifecycle, !Task.isCancelled { fallbackStatus = .accountUnavailable }
+            return nil
         }
     }
     func synchronize() async { await service?.synchronize() }
     func synchronizeAndWait() async {
         if let service { await service.synchronizeAndWait() }
         else { await start() }
+    }
+    func setForeground(_ foreground: Bool) async {
+        self.foreground = foreground
+        await service?.setForeground(foreground)
+    }
+    func receiveRemoteChanges(_ scope: SyncRemoteScope) async -> SyncRemoteResult {
+        await prepareService()?.receiveRemoteChanges(scope) ?? .failed
     }
     func prioritizeMedia(in scope: DeckScope?) async {
         mediaPriority = scope

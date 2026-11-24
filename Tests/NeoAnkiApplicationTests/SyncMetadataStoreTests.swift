@@ -4,6 +4,28 @@ import NeoAnkiApplication
 import Testing
 
 struct SyncMetadataStoreTests {
+    @Test func exactUploadReceiptKeepsAnEditQueuedDuringTheSend() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let existing = SyncRecordEnvelope(id: "deck", resourceKind: "deck", revision: 1, deviceID: "mac",
+            order: 1, isTombstone: false, payload: Data([1]))
+        let later = SyncRecordEnvelope(id: "deck", resourceKind: "deck", revision: 2, deviceID: "mac",
+            order: 2, isTombstone: false, payload: Data([2]))
+        let store = SyncMetadataStore(directory: root)
+        try await store.appendOutgoing([existing], cursor: 1)
+        try await store.beginUpload([existing])
+        await store.beginZoneRead()
+        try await store.appendOutgoing([later], cursor: 2)
+        try await store.finishOutgoing([existing])
+        await store.endUpload([existing])
+        try await store.receiveZonePage([existing], token: Data([1]))
+        await store.endZoneRead()
+
+        let resumed = try await SyncMetadataStore(directory: root).load()
+        #expect(resumed.pendingOutbound == [later])
+        #expect(resumed.inboundNeedingConfirmation == [existing.syncKey])
+        #expect(resumed.libraryZoneChangeToken == Data([1]))
+    }
     @Test func onlySupportedMutableContentAdvertisesConflictRestoration() {
         for kind in ["card", "review", "reviewRevert", "media", "schedulingSettings", "library"] {
             let copy = SyncConflictCopy(resourceKind: kind, originalResourceID: "id", sourceDeviceID: "test",
@@ -75,7 +97,7 @@ struct SyncMetadataStoreTests {
         #expect(issues.first?.conflictCopy?.payload == local.payload)
         let store = SyncMetadataStore(directory: root)
         let stale = try await store.load()
-        _ = try await store.completeConflict(#require(issues.first))
+        _ = try await store.completeConflicts([#require(issues.first)])
         #expect(try await store.load().resolvedConflictCopies?.first?.payload == local.payload)
         try await store.preserveConflict(local: local, server: server)
         #expect(try await store.load().issues.isEmpty)
@@ -93,11 +115,60 @@ struct SyncMetadataStoreTests {
         try await store.preserveConflict(local: envelope(id: "first"), server: envelope(id: "first", payload: "server"))
         let first = try #require(try await store.load().issues.first)
         try await store.preserveConflict(local: envelope(id: "second"), server: envelope(id: "second", payload: "server"))
-        let completed = try await store.completeConflict(first)
+        let completed = try await store.completeConflicts([first])
         #expect(completed.issues.count == 1)
         #expect(completed.issues.first?.resourceID == "second")
         #expect(completed.resolvedConflictCopies?.count == 1)
         #expect(completed.resolvedConflictCopies?.first?.originalResourceID == "first")
+    }
+
+    @Test func conflictBatchStagesServerChangesAndPreservesLosingCopiesAcrossRestart() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SyncMetadataStore(directory: root)
+        let review = SyncRecordEnvelope(id: "review", resourceKind: "review", revision: 1,
+            deviceID: "mac", order: 1, isTombstone: false, payload: Data("review".utf8))
+        let token = Data([1])
+        try await store.receiveZonePage([review], token: token)
+        let conflicts: [SyncMetadataStore.Conflict] = (1...213).map { index in
+            let id = "record-\(index)"
+            return (local: envelope(id: id), server: envelope(id: id, payload: "from server"))
+        }
+        try await store.receiveConflicts(conflicts + conflicts)
+
+        let restarted = SyncMetadataStore(directory: root)
+        let recovered = try await restarted.load()
+        #expect(recovered.libraryZoneChangeToken == token)
+        #expect(Set(recovered.stagedInbound.map(\.id)) == Set(conflicts.map { $0.server.id } + [review.id]))
+        #expect(recovered.issues.count == conflicts.count)
+        #expect(recovered.issues.allSatisfy { $0.conflictCopy?.payload == Data("original".utf8) })
+
+        let completed = try await restarted.completeConflicts(recovered.issues)
+        #expect(completed.resolvedConflictCopies?.count == conflicts.count)
+        #expect(completed.issues.isEmpty)
+        try await restarted.receiveConflicts(conflicts)
+        #expect(try await restarted.load().issues.isEmpty)
+    }
+
+    @Test func conflictBatchDoesNotCommitCopiesIfServerAssetStagingFails() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SyncMetadataStore(directory: root)
+        let delivered = envelope(id: "unrelated")
+        try await store.receive([delivered])
+        let asset = SyncAssetDescriptor(hash: "hash", byteSize: 5, signature: "hash",
+            fileExtension: "png", contentType: "image")
+        let broken = envelope(id: "second", payload: "from server",
+            file: root.appendingPathComponent("missing.png"), asset: asset)
+        await #expect(throws: (any Error).self) {
+            try await store.receiveConflicts([
+                (local: envelope(id: "first"), server: envelope(id: "first", payload: "from server")),
+                (local: envelope(id: "second"), server: broken)
+            ])
+        }
+        let recovered = try await store.load()
+        #expect(recovered.issues.isEmpty)
+        #expect(recovered.stagedInbound == [delivered])
     }
 
     @Test func legacyMetadataWithoutNewFieldsStillDecodes() async throws {

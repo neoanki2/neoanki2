@@ -156,8 +156,9 @@ appear after the library finishes opening. An unprovisioned build clears a
 previously saved iCloud opt-in instead of attempting to initialize a container
 that its signature cannot access.
 
-With iCloud enabled, the local library opens while sync catches up. Incoming
-changes update counts as they arrive. iPhone and iPad can also receive a silent
+With iCloud enabled, the local library opens while sync catches up. Opening or
+returning to the app starts an immediate check, and incoming changes update
+counts as they arrive. iPhone and iPad can also receive a silent
 sync notification before their first screen appears; startup and the screen
 share the same library initialization.
 

@@ -3,6 +3,36 @@ import Foundation
 
 /// Content-addressed media storage scoped to a sandbox directory.
 public actor MediaStore {
+    private var syncObservers: [String: [UUID: AsyncStream<Void>.Continuation]] = [:]
+
+    /// A view can stay on the same card while its file arrives separately.
+    public func resolveSynchronized(_ reference: MediaRef, onWaiting: @Sendable () async -> Void) async throws -> URL {
+        var changes = synchronizedAvailabilityChanges(for: reference).makeAsyncIterator()
+        while true {
+            try Task.checkCancellation()
+            do { return try resolve(reference) }
+            catch MediaError.readFailed {
+                await onWaiting()
+                guard await changes.next() != nil else { throw CancellationError() }
+            }
+        }
+    }
+
+    private func synchronizedAvailabilityChanges(for reference: MediaRef) -> AsyncStream<Void> {
+        let hash = reference.assetHash
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        syncObservers[hash, default: [:]][id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeSyncObserver(hash: hash, id: id) }
+        }
+        return stream
+    }
+
+    private func removeSyncObserver(hash: String, id: UUID) {
+        syncObservers[hash]?[id] = nil
+        if syncObservers[hash]?.isEmpty == true { syncObservers[hash] = nil }
+    }
     static let reservationLifetime: TimeInterval = 24 * 60 * 60
     public let rootDirectory: URL
     private var metadataDatabase: SQLiteDatabase?
@@ -385,6 +415,11 @@ public actor MediaStore {
         }
         try Task.checkCancellation()
         try await database.commitSynchronizedMedia(prepared, asOf: .now)
+        for file in prepared {
+            if let observers = syncObservers[file.descriptor.hash] {
+                for observer in observers.values { observer.yield(()) }
+            }
+        }
     }
 
     /// Resolves a ref to a file URL inside the sandbox. Rejects paths outside mediaDirectory.

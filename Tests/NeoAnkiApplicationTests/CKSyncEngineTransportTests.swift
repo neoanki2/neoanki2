@@ -48,13 +48,14 @@ struct CKSyncEngineTransportTests {
         #expect(CKSyncEngineTransport.conflictingVersion(local: local, baseline: baseline, server: baseline, knownAbsent: false) == nil)
     }
 
-    @Test func anOlderAcknowledgementCannotDiscardANewerQueuedEdit() async {
+    @Test(arguments: [false, true])
+    func anOlderAcknowledgementCannotDiscardANewerQueuedEdit(sameContent: Bool) async {
         let buffers = TransportBuffers()
         let id = CKRecord.ID(recordName: "deck__test")
         let old = SyncRecordEnvelope(id: "test", resourceKind: "deck", revision: 1,
             deviceID: "device", order: 1, isTombstone: false, payload: Data("old".utf8))
         let new = SyncRecordEnvelope(id: "test", resourceKind: "deck", revision: 2,
-            deviceID: "device", order: 2, isTombstone: false, payload: Data("new".utf8))
+            deviceID: "device", order: 2, isTombstone: false, payload: sameContent ? old.payload : Data("new".utf8))
         await buffers.enqueue(new, id: id)
         await buffers.acknowledge([CKSyncEngineTransport.record(from: old, id: id)], deleted: [])
         #expect(await buffers.envelope(for: id) == new)
@@ -73,16 +74,16 @@ struct CKSyncEngineTransportTests {
         #expect(await buffers.envelope(for: id) == new)
     }
 
-    @Test func completeInitialFetchIdentifiesAbsentRecordsWithoutExtraLookups() async {
+    @Test func explicitLookupMarksAbsenceWithoutAssumingAnUnreadKeyIsMissing() async {
         let buffers = TransportBuffers()
         let id = CKRecord.ID(recordName: "item__new")
         #expect(!(await buffers.isAbsent(id)))
-        await buffers.completedInitialFetch()
+        await buffers.forget([id])
         #expect(await buffers.isAbsent(id))
         await buffers.remember([CKRecord(recordType: "LibraryResource", recordID: id)])
         #expect(!(await buffers.isAbsent(id)))
-        await buffers.forget([id])
-        #expect(await buffers.isAbsent(id))
+        await buffers.discardVersions([id])
+        #expect(!(await buffers.isAbsent(id)))
     }
 
     @Test func unchangedContentDoesNotRequireUploadButEditsAndDeletesDo() {

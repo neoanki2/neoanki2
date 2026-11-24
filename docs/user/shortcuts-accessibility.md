@@ -269,7 +269,9 @@ generic media label when no description is provided.
 Descriptions for audio and video are optional but recommended; they appear as
 supporting text and accessibility labels. A play-on-tap audio control includes
 the description in its label. If answer media is hidden until reveal, its
-description is not announced before the answer.
+description is not announced before the answer. If a revealed iCloud attachment
+is still transferring, the view shows its unavailable state and refreshes when
+the file arrives.
 
 ## Keyboard and assistive-technology tips
 

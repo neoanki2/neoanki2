@@ -192,6 +192,8 @@ public extension LibrarySyncAdapter {
 
 public protocol SyncService: Sendable {
     func libraryChanges() async -> AsyncStream<Void>
+    func setForeground(_ foreground: Bool) async
+    func receiveRemoteChanges(_ scope: SyncRemoteScope) async -> SyncRemoteResult
     func prioritizeMedia(in scope: DeckScope?) async
     func start() async
     func synchronize() async
@@ -204,7 +206,20 @@ public protocol SyncService: Sendable {
     func restoreConflictCopy(forIssueID id: UUID) async throws
 }
 
+public enum SyncRemoteScope: Sendable {
+    case library, statistics, learningTime
+}
+
+public enum SyncRemoteResult: Sendable {
+    case changed, noData, failed
+}
+
 public extension SyncService {
+    func setForeground(_ foreground: Bool) async {}
+    func receiveRemoteChanges(_ scope: SyncRemoteScope) async -> SyncRemoteResult {
+        await synchronizeAndWait()
+        return .noData
+    }
     func prioritizeMedia(in scope: DeckScope?) async {}
     func synchronizeAndWait() async { await synchronize() }
     func libraryChanges() async -> AsyncStream<Void> { AsyncStream { $0.finish() } }
