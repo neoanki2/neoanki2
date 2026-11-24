@@ -122,6 +122,7 @@ jobs:
             python3 Scripts/check-sync-test-sensitivity.py --output .build/sync-sensitivity
           else
             sync_harness_changes="$(git diff --name-only "$BASE_SHA" HEAD -- \
+              'Tests/NeoAnkiApplicationTests/LibraryZoneChangeFetcherTests.swift' \
               'Tests/NeoAnkiFeaturesTests/SyncConvergenceContractTests.swift' \
               'Tests/NeoAnkiFeaturesTests/SyncContract*.swift' \
               'Scripts/check-sync-test-sensitivity.py' \

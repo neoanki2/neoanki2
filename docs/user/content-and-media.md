@@ -186,6 +186,8 @@ extension and file-signature checks.
 
 M4A recordings remain audio when their container also lists generic MP4
 compatibility. The same validation applies when downloading them from iCloud.
+A synced item can appear before its attachment. An open media preview or image
+occlusion card refreshes automatically when the verified file arrives.
 
 Stored attachment size limits are:
 

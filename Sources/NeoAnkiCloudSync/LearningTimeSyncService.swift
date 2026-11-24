@@ -24,7 +24,10 @@ public actor LearningTimeSyncService {
     }
     public func stop() async { lifecycle += 1; started = false; await transport.stop() }
 
-    public func synchronize() async throws {
+    func committedChanges() async -> AsyncStream<Void> { await repository.learningTimeNotifications() }
+
+    @discardableResult
+    public func synchronize() async throws -> Bool {
         let generation = lifecycle
         if !started { try await transport.start(); try check(generation); started = true }
         let incoming = try await transport.fetchPendingChanges()
@@ -50,10 +53,12 @@ public actor LearningTimeSyncService {
         }
         // Events may arrive before their items. Aggregation waits for a live item
         // or explicit tombstone; an absent dependency never means deletion.
-        try await repository.recordLearningTimeAliases(aliases)
-        try await repository.recordLearningTime(segments)
-        try check(generation)
-        metadata = try await metadataStore.completeIncoming(staged, metadata: metadata)
+        if !staged.isEmpty {
+            try await repository.recordLearningTimeAliases(aliases)
+            try await repository.recordLearningTime(segments)
+            try check(generation)
+            metadata = try await metadataStore.completeIncoming(staged, metadata: metadata)
+        }
         if let pending = metadata.pendingOutbound, !pending.isEmpty {
             try await send(pending, generation: generation)
             metadata = try await metadataStore.load()
@@ -80,6 +85,7 @@ public actor LearningTimeSyncService {
             metadata.outboundCursor = last.sequence
             try await metadataStore.save(metadata)
         }
+        return !staged.isEmpty
     }
 
     private func send(_ records: [SyncRecordEnvelope], generation: Int) async throws {

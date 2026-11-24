@@ -119,12 +119,12 @@ struct NeoAnkiIOSApp: App {
             }
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
+            Task { await model.setSyncForeground(phase == .active) }
             if phase == .active {
                 model.dueCounts.setForeground(true)
                 Task {
                     guard model.loadState == .ready else { return }
                     await model.refresh()
-                    if model.syncEnabled { await model.synchronize() }
                 }
             } else {
                 model.dueCounts.setForeground(false)
@@ -161,7 +161,7 @@ final class IOSCloudSyncAppDelegate: NSObject, UIApplicationDelegate {
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        guard CKSyncEngineTransport.isLibraryNotification(userInfo),
+        guard let scope = CKSyncEngineTransport.notificationScope(userInfo),
               let model = Self.model else { completionHandler(.noData); return }
         Self.logger.notice("Received library change notification")
         Task {
@@ -169,11 +169,10 @@ final class IOSCloudSyncAppDelegate: NSObject, UIApplicationDelegate {
             guard model.loadState == .ready else { completionHandler(.failed); return }
             guard model.syncEnabled else { completionHandler(.noData); return }
             IOSBackgroundRefresh.shared.scheduleLibraryProcessing()
-            await model.synchronize()
-            switch model.syncStatus {
-            case .current: completionHandler(.newData)
-            case .syncing: completionHandler(.noData)
-            default: completionHandler(.failed)
+            switch await model.receiveRemoteChanges(scope) {
+            case .changed: completionHandler(.newData)
+            case .noData: completionHandler(.noData)
+            case .failed: completionHandler(.failed)
             }
         }
     }

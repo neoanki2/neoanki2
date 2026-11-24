@@ -367,6 +367,18 @@ public final class LibraryFeatureModel {
         await refresh()
     }
 
+    public func setSyncForeground(_ foreground: Bool) async {
+        await syncService.setForeground(foreground)
+    }
+
+    public func receiveRemoteChanges(_ scope: SyncRemoteScope) async -> SyncRemoteResult {
+        guard loadState == .ready, syncEnabled, !Task.isCancelled else { return .noData }
+        if syncChangesTask == nil { await observeSyncChanges() }
+        let result = await syncService.receiveRemoteChanges(scope)
+        await refreshSyncStatus()
+        return result
+    }
+
     package func prioritizeSyncMedia(in scope: DeckScope?) async {
         guard !Task.isCancelled else { return }
         await syncService.prioritizeMedia(in: scope)

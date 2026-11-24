@@ -1034,6 +1034,10 @@ public actor SQLiteLibraryRepository:
         try await store.portableItemTypeMappingRecord(id: id)
     }
     public func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) async throws {
+        _ = try await applySynchronizedBatch(mutations, expectedChangeCursor: nil)
+    }
+
+    package func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation], expectedChangeCursor: Int64?) async throws -> Int64? {
         for mutation in mutations {
             switch mutation {
             case let .itemType(type): try ItemTypeValidation.validate(type)
@@ -1044,7 +1048,7 @@ public actor SQLiteLibraryRepository:
             default: break
             }
         }
-        try await store.applySynchronizedBatch(mutations)
+        return try await store.applySynchronizedBatch(mutations, expectedChangeCursor: expectedChangeCursor)
     }
 
     public func verifyBackup(at destination: URL) async throws {

@@ -1,6 +1,7 @@
 import CloudKit
 import Foundation
 import NeoAnkiApplication
+import NeoAnkiCore
 
 public struct SyncMetadata: Codable, Sendable {
     public var engineState: CKSyncEngine.State.Serialization?
@@ -17,6 +18,9 @@ public struct SyncMetadata: Codable, Sendable {
     public var resolvedConflictCopies: [SyncConflictCopy]?
     public var didCreateInitialBackup: Bool?
     public var didCompleteInitialMerge: Bool?
+    /// The receive may have overlapped an upload of this key. Recheck the
+    /// current server value before applying the staged version.
+    var inboundNeedingConfirmation: Set<String>?
 
     public init(
         engineState: CKSyncEngine.State.Serialization? = nil,
@@ -47,25 +51,52 @@ public struct SyncMetadata: Codable, Sendable {
 
 /// Stores engine state and sync bookkeeping beside, never inside, domain tables.
 public actor SyncMetadataStore {
+    typealias Conflict = (local: SyncRecordEnvelope?, server: SyncRecordEnvelope)
+
     private let fileURL: URL
     private let stagedAssetDirectory: URL
     private let outboundAssetDirectory: URL
+    private let writeMetadata: @Sendable (Data, URL) throws -> Void
     private let encoder = PropertyListEncoder()
     private let decoder = PropertyListDecoder()
+    private struct FileVersion: Equatable {
+        let inode: UInt64
+        let modified: Date
+        let size: UInt64
+    }
+    private var cached: (version: FileVersion, metadata: SyncMetadata)?
+    private var activeUploads: Set<String> = []
+    private var uploadsDuringRead: Set<String> = []
+    private var readingZone = false
 
     public init(directory: URL) {
+        self.init(directory: directory, writeMetadata: { data, url in
+            try data.write(to: url, options: .atomic)
+        })
+    }
+
+    init(directory: URL, writeMetadata: @escaping @Sendable (Data, URL) throws -> Void) {
         fileURL = directory.appendingPathComponent("cloud-sync-metadata.plist", isDirectory: false)
         stagedAssetDirectory = directory.appendingPathComponent("inbound-assets", isDirectory: true)
         outboundAssetDirectory = directory.appendingPathComponent("outbound-assets", isDirectory: true)
+        self.writeMetadata = writeMetadata
     }
 
     public func load() throws -> SyncMetadata {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+        let attributes: [FileAttributeKey: Any]
+        do { attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path) }
+        catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
             return SyncMetadata()
         }
+        let version: FileVersion? = if let inode = attributes[.systemFileNumber] as? NSNumber,
+            let modified = attributes[.modificationDate] as? Date, let size = attributes[.size] as? NSNumber {
+            FileVersion(inode: inode.uint64Value, modified: modified, size: size.uint64Value)
+        } else { nil }
+        if let cached, version == cached.version { return cached.metadata }
         var metadata = try decoder.decode(SyncMetadata.self, from: Data(contentsOf: fileURL))
         metadata.stagedInbound = metadata.stagedInbound.map(resolveAssetLocation)
         metadata.pendingOutbound = metadata.pendingOutbound?.map(resolveAssetLocation)
+        cached = version.map { ($0, metadata) }
         return metadata
     }
 
@@ -86,17 +117,26 @@ public actor SyncMetadataStore {
         try persist(metadata)
     }
 
-    /// Finish a single conflict against the latest metadata so a concurrent
-    /// transport callback cannot lose another newly preserved conflict.
-    func completeConflict(_ issue: SyncIssue) throws -> SyncMetadata {
+    /// Finish conflicts against the latest metadata so a concurrent transport
+    /// callback cannot lose another newly preserved conflict.
+    func completeConflicts(_ issues: [SyncIssue]) throws -> SyncMetadata {
         var metadata = try load()
-        guard let copy = issue.conflictCopy else { return metadata }
-        var archive = metadata.resolvedConflictCopies ?? []
-        if !archive.contains(where: { $0.id == copy.id }) { archive.append(copy) }
-        metadata.resolvedConflictCopies = archive
-        metadata.issues.removeAll { $0.id == issue.id }
+        let resolved = issues.filter { $0.conflictCopy != nil }
+        guard !resolved.isEmpty else { return metadata }
+        archiveConflicts(resolved, in: &metadata)
         try persist(metadata)
         return metadata
+    }
+
+    private func archiveConflicts(_ resolved: [SyncIssue], in metadata: inout SyncMetadata) {
+        let resolvedIDs = Set(resolved.map(\.id))
+        var archive = metadata.resolvedConflictCopies ?? []
+        var archivedIDs = Set(archive.map(\.id))
+        for copy in resolved.compactMap(\.conflictCopy) where archivedIDs.insert(copy.id).inserted {
+            archive.append(copy)
+        }
+        metadata.resolvedConflictCopies = archive
+        metadata.issues.removeAll { resolvedIDs.contains($0.id) }
     }
 
     func saveEngineState(_ state: CKSyncEngine.State.Serialization) throws {
@@ -121,15 +161,133 @@ public actor SyncMetadataStore {
     /// Stage payloads and advance the explicit fetch cursor in the same write.
     /// A failed page (including asset staging) must leave the old cursor intact.
     func receiveZonePage(_ records: [SyncRecordEnvelope], token: Data?) throws {
+        try receive(records, token: token, conflicts: [])
+    }
+
+    func beginZoneRead() {
+        readingZone = true
+        uploadsDuringRead = activeUploads
+    }
+
+    func endZoneRead() {
+        readingZone = false
+        uploadsDuringRead.removeAll()
+    }
+
+    func beginUpload(_ records: [SyncRecordEnvelope]) throws {
+        let keys = Set(records.map(\.syncKey))
         var metadata = try load()
+        let overlap = keys.intersection(metadata.stagedInbound.map(\.syncKey))
+        if !overlap.isEmpty {
+            metadata.inboundNeedingConfirmation = (metadata.inboundNeedingConfirmation ?? []).union(overlap)
+            try persist(metadata)
+        }
+        activeUploads.formUnion(keys)
+        if readingZone { uploadsDuringRead.formUnion(keys) }
+    }
+
+    func endUpload(_ records: [SyncRecordEnvelope]) {
+        activeUploads.subtract(records.map(\.syncKey))
+    }
+
+    func confirmIncoming(_ original: [SyncRecordEnvelope], current: [SyncRecordEnvelope]) throws {
+        var metadata = try load()
+        let confirmed = Dictionary(current.map { ($0.syncKey, $0) }, uniquingKeysWith: { _, latest in latest })
+        let originals = Dictionary(original.map { ($0.syncKey, $0) }, uniquingKeysWith: { _, latest in latest })
+        let replaced = metadata.stagedInbound.filter { originals[$0.syncKey] == $0 && !activeUploads.contains($0.syncKey) }
+        guard !replaced.isEmpty else { return }
+        let replacing = Set(replaced.map(\.syncKey))
+        metadata.stagedInbound = metadata.stagedInbound.map { record in
+            guard replacing.contains(record.syncKey), let newer = confirmed[record.syncKey] else { return record }
+            return record.isSameVersion(as: newer) ? record : newer
+        }
+        metadata.inboundNeedingConfirmation?.subtract(replaced.map(\.syncKey))
+        try persist(metadata)
+        removeStagedAssets(in: replaced.filter { old in
+            confirmed[old.syncKey].map { !old.isSameVersion(as: $0) } ?? false
+        })
+    }
+
+    func appendOutgoing(_ records: [SyncRecordEnvelope], cursor: Int64) throws {
+        var metadata = try load()
+        guard cursor > metadata.outboundCursor else { return }
+        let staged = try stageOutbound(records)
+        metadata.pendingOutbound = (metadata.pendingOutbound ?? []) + staged
+        metadata.outboundCursor = cursor
+        do { try persist(metadata) }
+        catch { removeStagedAssets(in: staged); throw error }
+    }
+
+    func finishOutgoing(_ records: [SyncRecordEnvelope]) throws {
+        guard !records.isEmpty else { return }
+        var metadata = try load()
+        let sent = Dictionary(grouping: records, by: \.syncKey)
+        let previousCount = metadata.pendingOutbound?.count
+        metadata.pendingOutbound?.removeAll { sent[$0.syncKey]?.contains($0) == true }
+        if previousCount != metadata.pendingOutbound?.count { try persist(metadata) }
+        removeStagedAssets(in: records)
+    }
+
+    func finishApplying(_ records: [SyncRecordEnvelope], journalCursor: Int64? = nil) throws {
+        guard !records.isEmpty else { return }
+        var metadata = try load()
+        if let journalCursor { metadata.outboundCursor = max(journalCursor, metadata.outboundCursor) }
+        let applied = Dictionary(records.map { ($0.syncKey, $0) }, uniquingKeysWith: { _, latest in latest })
+        let completed = Set(metadata.stagedInbound.filter { applied[$0.syncKey] == $0 }.map(\.syncKey))
+        let archived = metadata.issues.filter { issue in
+            guard let copy = issue.conflictCopy, !copy.isRestorable,
+                  LibraryResourceKind(rawValue: copy.resourceKind) != nil else { return false }
+            return completed.contains("\(copy.resourceKind):\(copy.originalResourceID)")
+        }
+        if !archived.isEmpty { archiveConflicts(archived, in: &metadata) }
+        _ = try completeIncoming(records, metadata: metadata)
+    }
+
+    func stageDownloadedMedia(_ downloaded: SyncRecordEnvelope,
+                              replacing original: SyncRecordEnvelope) throws -> SyncRecordEnvelope? {
+        var metadata = try load()
+        guard let index = metadata.stagedInbound.firstIndex(of: original) else { return nil }
+        guard let staged = try stageAssets(in: [downloaded]).first else { return nil }
+        metadata.stagedInbound[index] = staged
+        do { try persist(metadata) }
+        catch { removeStagedAssets(in: [staged]); throw error }
+        return staged
+    }
+
+    func updateIssues(_ update: @Sendable (inout [SyncIssue]) -> Void) throws -> [SyncIssue] {
+        var metadata = try load()
+        let before = metadata.issues
+        update(&metadata.issues)
+        if before != metadata.issues { try persist(metadata) }
+        return metadata.issues
+    }
+
+    /// Persist the losing copies and stage their server replacements together
+    /// before the transport removes any corresponding outgoing records.
+    func receiveConflicts(_ conflicts: [Conflict]) throws {
+        guard !conflicts.isEmpty else { return }
+        try receive(conflicts.map(\.server), token: nil, conflicts: conflicts)
+    }
+
+    private func receive(_ records: [SyncRecordEnvelope], token: Data?, conflicts: [Conflict]) throws {
+        var metadata = try load()
+        let issueCount = metadata.issues.count
+        recordConflicts(conflicts, metadata: &metadata)
         var latest: [String: SyncRecordEnvelope] = [:]
         for record in metadata.stagedInbound {
             latest["\(record.resourceKind):\(record.id)"] = record
         }
         let delivered = Dictionary(records.map { ("\($0.resourceKind):\($0.id)", $0) },
             uniquingKeysWith: { _, newest in newest })
+        if token != nil {
+            let overlap = activeUploads.union(uploadsDuringRead).intersection(delivered.keys)
+            if !overlap.isEmpty {
+                metadata.inboundNeedingConfirmation = (metadata.inboundNeedingConfirmation ?? []).union(overlap)
+            }
+        }
         let recoveringMedia = metadata.issues.contains { $0.kind == .mediaFailure }
         let unstaged = delivered.compactMap { key, record -> SyncRecordEnvelope? in
+            if record.asset == nil, latest[key] == record { return nil }
             guard !recoveringMedia, let existing = latest[key], let asset = existing.asset,
                   let file = existing.stagedFileURL, file.isFileURL,
                   existing.revision == record.revision, existing.deviceID == record.deviceID,
@@ -138,8 +296,8 @@ public actor SyncMetadataStore {
                   Int64(size) == asset.byteSize else { return record }
             return nil
         }
-        if unstaged.isEmpty, token == nil { return }
-        let staged = try stageAssets(in: unstaged)
+        if unstaged.isEmpty, token == nil, metadata.issues.count == issueCount { return }
+        let staged = unstaged.isEmpty ? [] : try stageAssets(in: unstaged)
         for record in staged { latest["\(record.resourceKind):\(record.id)"] = record }
         let obsolete = (metadata.stagedInbound + staged).filter { old in
             latest["\(old.resourceKind):\(old.id)"]?.stagedFileURL != old.stagedFileURL
@@ -160,6 +318,9 @@ public actor SyncMetadataStore {
             consumedByResource["\(record.resourceKind):\(record.id)"]?.contains(record) != true
         }
         committed.serverBaseline = current.serverBaseline
+        committed.inboundNeedingConfirmation = current.inboundNeedingConfirmation
+        let remaining = Set(committed.stagedInbound.map(\.syncKey))
+        committed.inboundNeedingConfirmation = committed.inboundNeedingConfirmation?.intersection(remaining)
         committed.resolvedConflictCopies = mergedArchive(current, committed)
         for record in consumed { setBaseline(record, metadata: &committed) }
         try persist(committed)
@@ -171,10 +332,16 @@ public actor SyncMetadataStore {
         try stageAssets(in: records, directory: outboundAssetDirectory)
     }
 
-    func acknowledge(_ records: [SyncRecordEnvelope]) throws {
+    func acknowledge(_ records: [SyncRecordEnvelope], outgoing: [SyncRecordEnvelope] = []) throws {
+        guard !records.isEmpty else { return }
         var metadata = try load()
         for record in records { setBaseline(record, metadata: &metadata) }
+        if !outgoing.isEmpty {
+            let sent = Dictionary(grouping: outgoing, by: \.syncKey)
+            metadata.pendingOutbound?.removeAll { sent[$0.syncKey]?.contains($0) == true }
+        }
         try persist(metadata)
+        removeStagedAssets(in: outgoing)
     }
 
     private func setBaseline(_ record: SyncRecordEnvelope, metadata: inout SyncMetadata) {
@@ -192,25 +359,35 @@ public actor SyncMetadataStore {
     }
 
     func preserveConflict(local: SyncRecordEnvelope, server: SyncRecordEnvelope) throws {
-        guard !Self.sameContent(local, server) else { return }
         var metadata = try load()
-        // Retries/restarts preserve one copy of each losing version.
-        let preserved = metadata.issues.compactMap(\.conflictCopy) + (metadata.resolvedConflictCopies ?? [])
-        guard !preserved.contains(where: {
-            $0.originalResourceID == local.id
-                && $0.resourceKind == local.resourceKind
-                && $0.payload == local.payload
-                && $0.wasTombstone == local.isTombstone
-        }) else { return }
-        let kind: SyncIssueKind = local.isTombstone || server.isTombstone ? .deleteVersusEdit
-            : local.resourceKind == "deck" ? .deckConflict
-            : local.resourceKind == "itemType" ? .itemTypeConflict : .itemConflict
-        let copy = SyncConflictCopy(resourceKind: local.resourceKind, originalResourceID: local.id,
-            sourceDeviceID: local.deviceID, payload: local.payload,
-            wasTombstone: local.isTombstone, acceptedWasTombstone: server.isTombstone)
-        metadata.issues.append(SyncIssue(kind: kind, resourceID: local.id,
-            summary: "A change from another device was accepted. Your prior version is preserved.", conflictCopy: copy))
+        let issueCount = metadata.issues.count
+        recordConflicts([(local, server)], metadata: &metadata)
+        guard metadata.issues.count != issueCount else { return }
         try persist(metadata)
+    }
+
+    private func recordConflicts(_ conflicts: [Conflict], metadata: inout SyncMetadata) {
+        guard !conflicts.isEmpty else { return }
+        // Retries and duplicate deliveries preserve one copy of each losing version.
+        var preserved = Dictionary(grouping:
+            metadata.issues.compactMap(\.conflictCopy) + (metadata.resolvedConflictCopies ?? []),
+            by: \.originalResourceID)
+        for (local, server) in conflicts {
+            guard let local, !Self.sameContent(local, server),
+                  preserved[local.id]?.contains(where: {
+                      $0.resourceKind == local.resourceKind && $0.payload == local.payload
+                          && $0.wasTombstone == local.isTombstone
+                  }) != true else { continue }
+            let kind: SyncIssueKind = local.isTombstone || server.isTombstone ? .deleteVersusEdit
+                : local.resourceKind == "deck" ? .deckConflict
+                : local.resourceKind == "itemType" ? .itemTypeConflict : .itemConflict
+            let copy = SyncConflictCopy(resourceKind: local.resourceKind, originalResourceID: local.id,
+                sourceDeviceID: local.deviceID, payload: local.payload,
+                wasTombstone: local.isTombstone, acceptedWasTombstone: server.isTombstone)
+            metadata.issues.append(SyncIssue(kind: kind, resourceID: local.id,
+                summary: "A change from another device was accepted. Your prior version is preserved.", conflictCopy: copy))
+            preserved[local.id, default: []].append(copy)
+        }
     }
 
     private func persist(_ metadata: SyncMetadata) throws {
@@ -221,8 +398,8 @@ public actor SyncMetadataStore {
         // owned filenames, never the installation-specific absolute sandbox URL.
         stored.stagedInbound = stored.stagedInbound.map(relativeAssetLocation)
         stored.pendingOutbound = stored.pendingOutbound?.map(relativeAssetLocation)
-        let data = try encoder.encode(stored)
-        try data.write(to: fileURL, options: .atomic)
+        try writeMetadata(encoder.encode(stored), fileURL)
+        cached = nil
     }
 
     /// Recognizes only opaque files created by this store, including absolute
@@ -322,5 +499,15 @@ public actor SyncMetadataStore {
             else { continue }
             try? FileManager.default.removeItem(at: url)
         }
+    }
+}
+
+extension SyncRecordEnvelope {
+    var syncKey: String { "\(resourceKind):\(id)" }
+    var isMedia: Bool { resourceKind == LibraryResourceKind.media.rawValue }
+
+    func isSameVersion(as other: Self) -> Bool {
+        revision == other.revision && deviceID == other.deviceID && order == other.order
+            && SyncMetadataStore.sameContent(self, other)
     }
 }

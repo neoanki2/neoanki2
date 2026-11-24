@@ -230,7 +230,9 @@ Use portable export rather than trying to edit those files directly.
 
 Optional iCloud sync transfers library structure, items, scheduling state,
 review history, and shared media through the user's private CloudKit database.
-Local saves start syncing after a short debounce. Silent iCloud notifications
+Local saves start syncing within a short upload window. With the app active,
+reviews and due counts can update while iCloud finishes downloading attachments.
+Silent iCloud notifications
 can fetch incoming changes in the foreground or during permitted background
 execution, and received reviews refresh Home counts and the app icon badge.
 iOS can delay background delivery; reopening the app performs a catch-up sync.

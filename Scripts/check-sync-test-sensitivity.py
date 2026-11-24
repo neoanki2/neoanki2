@@ -28,6 +28,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 SUITE = "SyncConvergenceContractTests"
 SERVICE = "Sources/NeoAnkiCloudSync/OfflineFirstSyncService.swift"
+TRANSPORT = "Sources/NeoAnkiCloudSync/CKSyncEngineTransport.swift"
 METADATA = "Sources/NeoAnkiCloudSync/SyncMetadataStore.swift"
 ADAPTER = "Sources/NeoAnkiCloudSync/SQLiteLibrarySyncAdapter.swift"
 DATABASE = "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase.swift"
@@ -47,6 +48,7 @@ class Mutant:
     test: str
     markers: tuple[str, ...]
     edits: tuple[Edit, ...]
+    suite: str = SUITE
 
     @property
     def marker(self) -> str:
@@ -66,8 +68,12 @@ MUTANTS = (
                     "        // Mutant: persist absolute queued asset URLs.\n"))),
     Mutant("nested-type-deletion", "Reintroduce a nested transaction inside a synchronized type deletion.",
            "relocatedMixedBatchPreservesReviewsAndMedia", ("SYNC_CONTRACT_DATA", "SYNC_CONTRACT_ASSET_RELOCATION"), (
-               Edit(DATABASE, "try deleteItemTypeWithoutTransaction(id: uuid)",
-                    "try deleteItemType(id: uuid)"),)),
+               Edit(DATABASE,
+                    "            if let uuid = UUID(uuidString: id), try countItems(itemTypeID: uuid) == 0 { try deleteItemTypeWithoutTransaction(id: uuid) }",
+                    "            if let uuid = UUID(uuidString: id), try countItems(itemTypeID: uuid) == 0 {\n"
+                    "                try execute(\"BEGIN IMMEDIATE TRANSACTION;\")\n"
+                    "                try deleteItemTypeWithoutTransaction(id: uuid)\n"
+                    "            }"),)),
     Mutant("dropped-review-apply", "Acknowledge an inbound review without applying its immutable history.",
            "relocatedMixedBatchPreservesReviewsAndMedia", ("SYNC_CONTRACT_DATA", "SYNC_CONTRACT_VISIBLE"), (
                Edit(ADAPTER, "case let .review(value): mutations.append(.review(value))",
@@ -78,11 +84,26 @@ MUTANTS = (
                     "if cursor == Int64.min { await self?.scheduleLocalSync(after: cursor) }"),)),
     Mutant("missing-library-publication", "Commit remote data without notifying visible library models.",
            "automaticReviewUpdatesVisibleSummaryWithoutRecoveryPoll", ("SYNC_CONTRACT_VISIBLE",), (
-               Edit(SERVICE, "if !recovered.isEmpty { await libraryChangeEvents.publish() }",
-                    "// Mutant: omit committed inbound library-change publication."),)),
+               Edit(SERVICE, "        if changed > 0 {\n            appliedGenerations[.download, default: 0] += 1\n"
+                    "            await libraryChangeEvents.publish()",
+                    "        if changed > 0 {\n            appliedGenerations[.download, default: 0] += 1\n"
+                    "            // Mutant: omit committed inbound library-change publication."),)),
     Mutant("debounce-sixty-seconds", "Delay automatic local uploads for sixty seconds.",
            "automaticReviewUpdatesVisibleSummaryWithoutRecoveryPoll", ("SYNC_CONTRACT_DEBOUNCE",), (
-               Edit(SERVICE, ".milliseconds(600)", ".seconds(60)"),)),
+               Edit(SERVICE, ".milliseconds(250)", ".seconds(60)"),)),
+    Mutant("persist-upload-conflicts-one-at-a-time", "Rewrite metadata for each conflict before receiving reviews.",
+           "downloadedReviewsApplyWithinTheConflictBacklogWriteBudget", ("SYNC_CONFLICT_WRITE_BUDGET",), (
+               Edit(TRANSPORT, "        try await metadataStore.receiveConflicts(conflicts)\n"
+                    "        return (changes, matchedIDs)",
+                    "        for conflict in conflicts { try await metadataStore.receiveConflicts([conflict]) }\n"
+                    "        return (changes, matchedIDs)"),), suite="LibraryZoneChangeFetcherTests"),
+    Mutant("archive-card-conflicts-one-at-a-time", "Rewrite metadata for each archived card conflict.",
+           "downloadedReviewsApplyWithinTheConflictBacklogWriteBudget", ("SYNC_CONFLICT_WRITE_BUDGET",), (
+               Edit(METADATA, "        if !archived.isEmpty { archiveConflicts(archived, in: &metadata) }",
+                    "        for issue in archived {\n"
+                    "            archiveConflicts([issue], in: &metadata)\n"
+                    "            try persist(metadata)\n        }"),),
+           suite="LibraryZoneChangeFetcherTests"),
 )
 BY_NAME = {mutant.name: mutant for mutant in MUTANTS}
 
@@ -313,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     selected = [mutant for mutant in MUTANTS if not args.mutant or mutant.name in args.mutant]
     if args.list:
         for mutant in selected:
-            print(mutant.name + "\t" + mutant.description + "\t" + SUITE + "/" + mutant.test)
+            print(mutant.name + "\t" + mutant.description + "\t" + mutant.suite + "/" + mutant.test)
         return 0
     if args.timeout_seconds <= 0:
         parser.error("--timeout-seconds must be positive")
@@ -342,7 +363,8 @@ def main(argv: list[str] | None = None) -> int:
         report["snapshot"] = snapshot(source, output)
         baseline_dir = output / "baseline"
         baseline_dir.mkdir()
-        baseline = run_tests(source, cache, baseline_dir, SUITE, args.timeout_seconds)
+        baseline_filter = "|".join(sorted({mutant.suite for mutant in selected}))
+        baseline = run_tests(source, cache, baseline_dir, baseline_filter, args.timeout_seconds)
         status, reason = classify(baseline, (baseline_dir / "test.log").read_text(errors="replace"),
                                   None, {mutant.test for mutant in selected})
         baseline.update(status=status, reason=reason)
@@ -360,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
             originals: dict[Path, bytes] = {}
             try:
                 originals = apply_mutant(source, mutant, destination)
-                result.update(run_tests(source, cache, destination, SUITE + "/" + mutant.test,
+                result.update(run_tests(source, cache, destination, mutant.suite + "/" + mutant.test,
                                         args.timeout_seconds))
                 status, reason = classify(result, (destination / "test.log").read_text(errors="replace"),
                                           mutant, {mutant.test})

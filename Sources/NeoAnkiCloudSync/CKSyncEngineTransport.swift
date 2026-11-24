@@ -1,6 +1,8 @@
 import CloudKit
 import Foundation
 import NeoAnkiApplication
+import OSLog
+import os
 #if os(macOS)
 import Security
 #endif
@@ -18,12 +20,17 @@ public enum CKSyncEngineTransportError: Error, Equatable, LocalizedError, Sendab
     }
 }
 
+protocol IncrementalLibraryTransport: CloudSyncTransport {
+    func fetchLibraryChanges(didStagePage: @escaping @Sendable () async throws -> Void) async throws
+    func confirmLibraryChanges(_ records: [SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope]
+    func fetchMediaAsset(_ record: SyncRecordEnvelope) async throws -> SyncRecordEnvelope?
+    func enqueueMedia(_ record: SyncRecordEnvelope) async throws
+}
+
 actor TransportBuffers {
     var outgoing: [CKRecord.ID: SyncRecordEnvelope] = [:]
-    var incoming: [SyncRecordEnvelope] = []
     private var serverRecords: [CKRecord.ID: CKRecord] = [:]
     private var absentRecords: Set<CKRecord.ID> = []
-    private var hasCompleteSnapshot = false
     private var deliveryFailure: (any Error)?
 
     func remember(_ records: [CKRecord]) {
@@ -45,9 +52,8 @@ actor TransportBuffers {
     }
 
     func isAbsent(_ id: CKRecord.ID) -> Bool {
-        absentRecords.contains(id) || (hasCompleteSnapshot && serverRecords[id] == nil)
+        absentRecords.contains(id)
     }
-    func completedInitialFetch() { hasCompleteSnapshot = true }
 
     func enqueue(_ envelope: SyncRecordEnvelope, id: CKRecord.ID) {
         outgoing[id] = envelope
@@ -66,6 +72,17 @@ actor TransportBuffers {
     }
 
     func hasPending(_ ids: [CKRecord.ID]) -> Bool { ids.contains { outgoing[$0] != nil } }
+
+    func acceptedOutgoing(_ records: [CKRecord], deleted: [CKRecord.ID]) -> [SyncRecordEnvelope] {
+        let saved = records.compactMap { record -> SyncRecordEnvelope? in
+            guard let pending = outgoing[record.recordID], CKSyncEngineTransport.confirmsUpload(pending, record: record) else { return nil }
+            return pending
+        }
+        return saved + deleted.compactMap { id in
+            guard let pending = outgoing[id], pending.isTombstone else { return nil }
+            return pending
+        }
+    }
     func failDelivery(_ error: any Error) { deliveryFailure = error }
     func hasDeliveryFailure() -> Bool { deliveryFailure != nil }
     func takeDeliveryFailure() -> (any Error)? {
@@ -74,24 +91,25 @@ actor TransportBuffers {
     }
 
     func acknowledge(_ records: [CKRecord], deleted: [CKRecord.ID]) {
-        for record in records {
-            guard let pending = outgoing[record.recordID], CKSyncEngineTransport.matchesServer(pending, record: record) else { continue }
-            remove([record.recordID])
+        let saved = records.filter { record in
+            guard let pending = outgoing[record.recordID] else { return false }
+            return CKSyncEngineTransport.confirmsUpload(pending, record: record)
         }
-        for id in deleted where outgoing[id]?.isTombstone == true { remove([id]) }
+        remove(saved.map(\.recordID) + deleted.filter { outgoing[$0]?.isTombstone == true })
     }
 
-    func appendIncoming(_ values: [SyncRecordEnvelope]) { incoming.append(contentsOf: values) }
-
-    func drainIncoming() -> [SyncRecordEnvelope] {
-        defer { incoming.removeAll() }
-        return incoming
+    func discardVersions(_ ids: [CKRecord.ID]) {
+        for id in ids { serverRecords[id] = nil }
+        absentRecords.subtract(ids)
     }
 }
 
 /// Private-database transport for NeoAnki's fixed custom library zone.
 /// Local SQLite remains authoritative; this type only moves durable envelopes.
-public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
+public actor CKSyncEngineTransport: IncrementalLibraryTransport, CKSyncEngineDelegate {
+    static let latencyLog = Logger(subsystem: "com.neoanki2.sync", category: "Latency")
+    static let libraryMetadataKeys = ["resourceID", "resourceKind", "revision", "deviceID", "order", "payload",
+        "assetHash", "assetByteSize", "assetSignature", "assetExtension", "assetContentType"]
     public static let containerIdentifier = "iCloud.com.neoanki2.app"
     public static let zoneName = "NeoAnkiLibrary"
     public static let librarySubscriptionID = "neoanki-library-changes-v1"
@@ -109,10 +127,19 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
     }
 
     public static func isLibraryNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        notificationScope(userInfo) != nil
+    }
+
+    public static func notificationScope(_ userInfo: [AnyHashable: Any]) -> SyncRemoteScope? {
         guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
               notification.notificationType == .recordZone,
-              [librarySubscriptionID, learningTimeSubscriptionID, statisticsSubscriptionID].contains(notification.subscriptionID ?? "") else { return false }
-        return notification.containerIdentifier == nil || notification.containerIdentifier == containerIdentifier
+              notification.containerIdentifier == nil || notification.containerIdentifier == containerIdentifier else { return nil }
+        switch notification.subscriptionID {
+        case librarySubscriptionID: return .library
+        case statisticsSubscriptionID: return .statistics
+        case learningTimeSubscriptionID: return .learningTime
+        default: return nil
+        }
     }
     private static let containerIdentifiersEntitlement =
         "com.apple.developer.icloud-container-identifiers"
@@ -206,33 +233,29 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         } catch let error as CKError where error.code == .unknownItem {
             _ = try await database.save(Self.librarySubscription(zoneID: zoneID, subscriptionID: subscriptionID))
         }
-        try await fetchLibraryZoneChanges()
     }
 
     public func stop() async {
-        await activeEngine?.cancelOperations()
+        let previous = activeEngine
         // An invalidated CloudKit client can keep returning internalError on
         // every operation. Release the engine and its database/container so the
         // next start builds a new client from the durable checkpoint.
         activeEngine = nil
         activeContainer = nil
+        await previous?.cancelOperations()
         _ = await buffers.takeDeliveryFailure()
     }
 
     public func enqueue(_ records: [SyncRecordEnvelope]) async throws {
-        // A serialized engine token does not contain CKRecord system fields.
-        // Fetch uncached records after restart so ordinary edits can update
-        // existing records with their change tags rather than inserting again.
-        var missing: [CKRecord.ID] = []
-        for envelope in records {
-            let id = recordID(for: envelope)
-            if await buffers.serverRecord(for: id) == nil, !(await buffers.isAbsent(id)) { missing.append(id) }
-        }
+        // The receiver can advance independently. Fetch current change tags
+        // for this batch before deciding whether edits can be sent safely.
+        let ids = records.map { Self.recordID(for: $0, in: zoneID) }
         let database = container.privateCloudDatabase
-        for offset in stride(from: 0, to: missing.count, by: 200) {
-            let batch = Array(missing[offset..<min(offset + 200, missing.count)])
-            let results = try await database.records(for: batch)
-            for (id, result) in results {
+        for offset in stride(from: 0, to: ids.count, by: 200) {
+            let batch = Array(ids[offset..<min(offset + 200, ids.count)])
+            let results = try await database.records(for: batch, desiredKeys: Self.libraryMetadataKeys)
+            for id in batch {
+                guard let result = results[id] else { throw CKSyncEngineTransportError.unacknowledgedUpload }
                 switch result {
                 case let .success(record): await buffers.remember([record])
                 case let .failure(error):
@@ -241,90 +264,220 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
                 }
             }
         }
-        let baseline = try await metadataStore.load().serverBaseline ?? [:]
-        var changes: [CKSyncEngine.PendingRecordZoneChange] = []
-        for envelope in records {
-            let id = recordID(for: envelope)
-            let server = await buffers.serverRecord(for: id).flatMap { Self.envelope(from: $0) }
-            if let prior = baseline["\(envelope.resourceKind):\(envelope.id)"],
-               let conflict = Self.conflictingVersion(local: envelope, baseline: prior,
-                    server: server, knownAbsent: await buffers.isAbsent(id)) {
-                if !SyncMetadataStore.sameContent(prior, envelope) {
-                    try await metadataStore.preserveConflict(local: envelope, server: conflict)
-                }
-                try await metadataStore.receive([conflict])
-                await buffers.appendIncoming([conflict])
-                engine.state.remove(pendingRecordZoneChanges: [.saveRecord(id), .deleteRecord(id)])
-                await buffers.remove([id])
-                continue
-            }
-            if envelope.isTombstone, await buffers.isAbsent(id) {
-                engine.state.remove(pendingRecordZoneChanges: [.deleteRecord(id)])
-                await buffers.remove([id])
-                continue
-            }
-            if let server = await buffers.serverRecord(for: id), Self.matchesServer(envelope, record: server) {
-                engine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
-                await buffers.remove([id])
-                continue
-            }
-            await buffers.enqueue(envelope, id: id)
-            changes.append(envelope.isTombstone ? .deleteRecord(id) : .saveRecord(id))
+        let (changes, matchedIDs) = try await Self.prepareOutgoing(records, in: zoneID,
+            buffers: buffers, metadataStore: metadataStore)
+        if !matchedIDs.isEmpty {
+            engine.state.remove(pendingRecordZoneChanges: matchedIDs.flatMap { [.saveRecord($0), .deleteRecord($0)] })
+            await buffers.remove(matchedIDs)
         }
-        guard !changes.isEmpty else { return }
+        guard !changes.isEmpty else { await buffers.discardVersions(ids); return }
         _ = await buffers.takeDeliveryFailure()
         engine.state.add(pendingRecordZoneChanges: changes)
         do {
-            try await engine.sendChanges(.init(scope: .zoneIDs([zoneID])))
+            let group = CKOperationGroup()
+            group.defaultConfiguration.qualityOfService = .userInitiated
+            try await engine.sendChanges(.init(scope: .recordIDs(ids), operationGroup: group))
         } catch {
             // The delegate stages server-conflict records for the merge. Those
             // resolved conflicts must not abort before incoming is consumed.
             guard Self.containsOnlyServerConflicts(error) else { throw error }
         }
         if let error = await buffers.takeDeliveryFailure() { throw error }
-        let ids = records.map { recordID(for: $0) }
         if await buffers.hasPending(ids) { throw CKSyncEngineTransportError.unacknowledgedUpload }
+        await buffers.discardVersions(ids)
+    }
+
+    /// Classify records against the fetched server versions and durably record
+    /// conflicts before changes are handed to CKSyncEngine.
+    static func prepareOutgoing(
+        _ records: [SyncRecordEnvelope], in zoneID: CKRecordZone.ID,
+        buffers: TransportBuffers, metadataStore: SyncMetadataStore
+    ) async throws -> (pending: [CKSyncEngine.PendingRecordZoneChange], matched: [CKRecord.ID]) {
+        let baseline = try await metadataStore.load().serverBaseline ?? [:]
+        var changes: [CKSyncEngine.PendingRecordZoneChange] = []
+        var conflicts: [SyncMetadataStore.Conflict] = []
+        var matchedIDs: [CKRecord.ID] = []
+        for envelope in records {
+            let id = recordID(for: envelope, in: zoneID)
+            let server = await buffers.serverRecord(for: id).flatMap { Self.envelope(from: $0) }
+            if let prior = baseline["\(envelope.resourceKind):\(envelope.id)"],
+               let conflict = Self.conflictingVersion(local: envelope, baseline: prior,
+                    server: server, knownAbsent: await buffers.isAbsent(id)) {
+                let local = SyncMetadataStore.sameContent(prior, envelope) ? nil : envelope
+                conflicts.append((local: local, server: conflict))
+                matchedIDs.append(id)
+                continue
+            }
+            if envelope.isTombstone, await buffers.isAbsent(id) {
+                matchedIDs.append(id)
+                continue
+            }
+            if let server = await buffers.serverRecord(for: id), Self.matchesServer(envelope, record: server) {
+                matchedIDs.append(id)
+                continue
+            }
+            await buffers.enqueue(envelope, id: id)
+            changes.append(envelope.isTombstone ? .deleteRecord(id) : .saveRecord(id))
+        }
+        try await metadataStore.receiveConflicts(conflicts)
+        return (changes, matchedIDs)
     }
 
     public func fetchPendingChanges() async throws -> [SyncRecordEnvelope] {
         if let error = await buffers.takeDeliveryFailure() { throw error }
-        try await fetchLibraryZoneChanges()
-        return await buffers.drainIncoming()
+        return try await fetchZoneChanges(desiredKeys: nil)
     }
 
-    private func fetchLibraryZoneChanges() async throws {
+    func fetchLibraryChanges(didStagePage: @escaping @Sendable () async throws -> Void) async throws {
+        _ = try await fetchZoneChanges(desiredKeys: Self.libraryMetadataKeys, didStagePage: didStagePage)
+    }
+
+    func confirmLibraryChanges(_ records: [SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope] {
+        let database = container.privateCloudDatabase
+        var confirmed: [SyncRecordEnvelope] = []
+        for offset in stride(from: 0, to: records.count, by: 200) {
+            let ids = records[offset..<min(offset + 200, records.count)].map { Self.recordID(for: $0, in: zoneID) }
+            let results = try await database.records(for: ids, desiredKeys: Self.libraryMetadataKeys)
+            for id in ids {
+                guard let result = results[id] else { throw CKSyncEngineTransportError.unacknowledgedUpload }
+                switch result {
+                case let .success(record): confirmed.append(Self.receivedEnvelope(from: record))
+                case let .failure(error):
+                    guard (error as? CKError)?.code == .unknownItem, let deleted = Self.tombstone(from: id) else { throw error }
+                    confirmed.append(deleted)
+                }
+            }
+        }
+        return confirmed
+    }
+
+    func fetchMediaAsset(_ record: SyncRecordEnvelope) async throws -> SyncRecordEnvelope? {
+        let id = Self.recordID(for: record, in: zoneID)
+        let result: CKRecord
+        do { result = try await container.privateCloudDatabase.record(for: id) }
+        catch let error as CKError where error.code == .unknownItem { return nil }
+        let received = Self.receivedEnvelope(from: result)
+        guard received.isSameVersion(as: record) else { return nil }
+        return received
+    }
+
+    /// File uploads use independent CloudKit operations so an in-flight asset
+    /// cannot occupy CKSyncEngine's single library send operation.
+    func enqueueMedia(_ record: SyncRecordEnvelope) async throws {
+        let database = container.privateCloudDatabase
+        let id = Self.recordID(for: record, in: zoneID)
+        let media = TransportBuffers()
+        let found = try await database.records(for: [id], desiredKeys: Self.libraryMetadataKeys)
+        guard let result = found[id] else { throw CKSyncEngineTransportError.unacknowledgedUpload }
+        switch result {
+        case let .success(server): await media.remember([server])
+        case let .failure(error):
+            guard (error as? CKError)?.code == .unknownItem else { throw error }
+            await media.forget([id])
+        }
+        let (pending, _) = try await Self.prepareOutgoing([record], in: zoneID, buffers: media, metadataStore: metadataStore)
+        if !pending.isEmpty {
+            let saving = record.isTombstone ? [] : [Self.record(from: record, id: id, serverRecord: await media.serverRecord(for: id))]
+            let modifying = try await database.modifyRecords(saving: saving, deleting: record.isTombstone ? [id] : [],
+                savePolicy: .ifServerRecordUnchanged, atomically: false)
+            do {
+                if record.isTombstone {
+                    guard let receipt = modifying.deleteResults[id] else { throw CKSyncEngineTransportError.unacknowledgedUpload }
+                    try receipt.get()
+                    try await metadataStore.acknowledge([record])
+                } else {
+                    guard let receipt = modifying.saveResults[id] else { throw CKSyncEngineTransportError.unacknowledgedUpload }
+                    try await metadataStore.acknowledge([Self.receivedEnvelope(from: receipt.get())])
+                }
+            } catch let error as CKError where error.code == .serverRecordChanged {
+                guard let server = error.serverRecord else { throw error }
+                try await metadataStore.preserveConflict(local: record, server: Self.receivedEnvelope(from: server))
+            } catch let error as CKError where error.code == .unknownItem && record.isTombstone {
+                try await metadataStore.acknowledge([record])
+            }
+        }
+        activeEngine?.state.remove(pendingRecordZoneChanges: [.saveRecord(id), .deleteRecord(id)])
+    }
+
+    private func fetchZoneChanges(
+        desiredKeys: [CKRecord.FieldKey]?, didStagePage: @escaping @Sendable () async throws -> Void = {}
+    ) async throws -> [SyncRecordEnvelope] {
         let database = container.privateCloudDatabase
         let fetcher = LibraryZoneChangeFetcher(metadataStore: metadataStore)
-        let isFullSnapshot = try await metadataStore.load().libraryZoneChangeToken == nil
         do {
-            let received = try await fetcher.fetch { [self] data in
+            return try await fetcher.fetch(persistEmptyFinalPage: false, collectRecords: desiredKeys == nil,
+                didStagePage: didStagePage) { [self] data in
                 let token = try data.flatMap {
                     try NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
                 }
-                let page = try await database.recordZoneChanges(inZoneWith: zoneID, since: token)
-                // A per-record failure must not be hidden by advancing the page.
-                let records = try page.modificationResultsByID.values.map { try $0.get().record }
-                let deleted = page.deletions.map(\.recordID)
-                let incoming = records.map { Self.receivedEnvelope(from: $0) }
-                    + deleted.compactMap { Self.tombstone(from: $0) }
-                let tokenData = try NSKeyedArchiver.archivedData(
-                    withRootObject: page.changeToken, requiringSecureCoding: true
-                )
-                await buffers.remember(records)
-                await buffers.forget(deleted)
-                // The fetcher durably stages the page before advancing its token.
-                // The service consumes that inbox even if the process exits here.
-                return LibraryZoneChangeFetcher.Page(
-                    records: incoming, token: tokenData, moreComing: page.moreComing
-                )
+                return try await Self.readPage(database: database, zoneID: zoneID, token: token, desiredKeys: desiredKeys)
             }
-            await buffers.appendIncoming(received)
-            if isFullSnapshot { await buffers.completedInitialFetch() }
         } catch let error as CKError where error.code == .changeTokenExpired {
             try await metadataStore.resetLibraryZoneChangeToken()
             // Let the service retry from a full snapshot on its next cycle.
             throw error
         }
+    }
+
+    private struct ZonePageResponse {
+        var records: [SyncRecordEnvelope] = []
+        var error: (any Error)?
+        var checkpoint: (CKServerChangeToken, Bool)?
+    }
+
+    private static func readPage(database: CKDatabase, zoneID: CKRecordZone.ID,
+                                 token: CKServerChangeToken?, desiredKeys: [String]?) async throws -> LibraryZoneChangeFetcher.Page {
+        let configuration = CKFetchRecordZoneChangesOperation.ZoneConfiguration()
+        configuration.previousServerChangeToken = token
+        configuration.desiredKeys = desiredKeys
+        configuration.resultsLimit = 200
+        let operation = CKFetchRecordZoneChangesOperation(recordZoneIDs: [zoneID], configurationsByRecordZoneID: [zoneID: configuration])
+        operation.fetchAllChanges = false
+        operation.configuration.qualityOfService = desiredKeys == nil ? .utility : .userInitiated
+        let response = OSAllocatedUnfairLock(initialState: ZonePageResponse())
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                operation.recordWasChangedBlock = { _, result in
+                    response.withLock { page in
+                        switch result {
+                        case let .success(record): page.records.append(receivedEnvelope(from: record))
+                        case let .failure(error): page.error = error
+                        }
+                    }
+                }
+                operation.recordWithIDWasDeletedBlock = { id, _ in
+                    if let deleted = tombstone(from: id) { response.withLock { $0.records.append(deleted) } }
+                }
+                operation.recordZoneFetchResultBlock = { _, result in
+                    response.withLock { page in
+                        switch result {
+                        case let .success(checkpoint): page.checkpoint = (checkpoint.serverChangeToken, checkpoint.moreComing)
+                        case let .failure(error): page.error = error
+                        }
+                    }
+                }
+                operation.fetchRecordZoneChangesResultBlock = { result in
+                    if case let .failure(error) = result {
+                        response.withLock { if $0.error == nil { $0.error = error } }
+                    }
+                }
+                operation.completionBlock = { [weak operation] in
+                    continuation.resume(with: Result {
+                        if operation?.isCancelled == true { throw CancellationError() }
+                        return try response.withLock { page in
+                            if let error = page.error { throw error }
+                            guard let (token, more) = page.checkpoint else { throw CKError(.serverResponseLost) }
+                            let tokenData = try NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true)
+                            let count = page.records.count
+                            latencyLog.info("CloudKit zone page received records=\(count)")
+                            return LibraryZoneChangeFetcher.Page(records: page.records, token: tokenData, moreComing: more)
+                        }
+                    })
+                }
+                database.add(operation)
+            }
+        } onCancel: { operation.cancel() }
     }
 
     public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
@@ -339,61 +492,46 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
                 // untouched and the engine can refetch from its server token.
             }
         case let .fetchedRecordZoneChanges(changes):
-            await buffers.remember(changes.modifications.map(\.record))
-            await buffers.forget(changes.deletions.map(\.recordID))
             let received = changes.modifications.map { Self.receivedEnvelope(from: $0.record) }
                 + changes.deletions.compactMap { Self.tombstone(from: $0.recordID) }
             do { try await metadataStore.receive(received) }
             catch { await buffers.failDelivery(error) }
-            await buffers.appendIncoming(received)
         case let .sentRecordZoneChanges(changes):
+            Self.latencyLog.info("CloudKit write acknowledged saves=\(changes.savedRecords.count) deletes=\(changes.deletedRecordIDs.count)")
             await buffers.remember(changes.savedRecords)
             await buffers.forget(changes.deletedRecordIDs)
             do {
                 let acknowledged = changes.savedRecords.compactMap { Self.envelope(from: $0) }
                     + changes.deletedRecordIDs.compactMap { Self.tombstone(from: $0) }
-                try await metadataStore.acknowledge(acknowledged)
+                let accepted = await buffers.acceptedOutgoing(changes.savedRecords, deleted: changes.deletedRecordIDs)
+                try await metadataStore.acknowledge(acknowledged, outgoing: accepted)
             } catch { await buffers.failDelivery(error) }
             await buffers.acknowledge(changes.savedRecords, deleted: changes.deletedRecordIDs)
-            var resolvedFailures: [CKRecord.ID] = []
-            for failure in changes.failedRecordSaves where failure.error.code == .serverRecordChanged {
-                if let server = failure.error.serverRecord,
-                   let envelope = Self.envelope(from: server) {
-                    await buffers.remember([server])
-                    do {
-                        if let local = await buffers.envelope(for: server.recordID) {
-                            try await metadataStore.preserveConflict(local: local, server: envelope)
-                        }
-                        try await metadataStore.receive([envelope])
-                    }
-                    catch { await buffers.failDelivery(error) }
-                    await buffers.appendIncoming([envelope])
+            let failed = changes.failedRecordSaves.map {
+                (id: $0.record.recordID, change: CKSyncEngine.PendingRecordZoneChange.saveRecord($0.record.recordID), error: $0.error)
+            } + changes.failedRecordDeletes.map {
+                (id: $0.key, change: CKSyncEngine.PendingRecordZoneChange.deleteRecord($0.key), error: $0.value)
+            }
+            var conflicts: [SyncMetadataStore.Conflict] = []
+            var resolvedIDs: [CKRecord.ID] = []
+            var resolvedChanges: [CKSyncEngine.PendingRecordZoneChange] = []
+            for (id, change, error) in failed {
+                guard error.code == .serverRecordChanged, let server = error.serverRecord,
+                      let envelope = Self.envelope(from: server) else {
+                    await buffers.failDelivery(error)
+                    continue
                 }
-                resolvedFailures.append(failure.record.recordID)
-                syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(failure.record.recordID)])
+                await buffers.remember([server])
+                conflicts.append((local: await buffers.envelope(for: id), server: envelope))
+                resolvedIDs.append(id)
+                resolvedChanges.append(change)
             }
-            for (recordID, error) in changes.failedRecordDeletes where error.code == .serverRecordChanged {
-                if let server = error.serverRecord,
-                   let envelope = Self.envelope(from: server) {
-                    await buffers.remember([server])
-                    do {
-                        if let local = await buffers.envelope(for: server.recordID) {
-                            try await metadataStore.preserveConflict(local: local, server: envelope)
-                        }
-                        try await metadataStore.receive([envelope])
-                    }
-                    catch { await buffers.failDelivery(error) }
-                    await buffers.appendIncoming([envelope])
-                }
-                resolvedFailures.append(recordID)
-                syncEngine.state.remove(pendingRecordZoneChanges: [.deleteRecord(recordID)])
-            }
-            await buffers.remove(resolvedFailures)
-            if let failure = changes.failedRecordSaves.first(where: { $0.error.code != .serverRecordChanged }) {
-                await buffers.failDelivery(failure.error)
-            }
-            if let failure = changes.failedRecordDeletes.first(where: { $0.value.code != .serverRecordChanged }) {
-                await buffers.failDelivery(failure.value)
+            if !conflicts.isEmpty {
+                do {
+                    try await metadataStore.receiveConflicts(conflicts)
+                    syncEngine.state.remove(pendingRecordZoneChanges: resolvedChanges)
+                    await buffers.remove(resolvedIDs)
+                } catch { await buffers.failDelivery(error) }
             }
         default:
             break
@@ -447,6 +585,11 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         guard !envelope.isTombstone, let server = Self.envelope(from: record) else { return false }
         return envelope.id == server.id && envelope.resourceKind == server.resourceKind
             && envelope.payload == server.payload && envelope.asset == server.asset
+    }
+
+    static func confirmsUpload(_ envelope: SyncRecordEnvelope, record: CKRecord) -> Bool {
+        guard let received = Self.envelope(from: record) else { return false }
+        return envelope.isSameVersion(as: received)
     }
 
     static func record(
@@ -527,7 +670,7 @@ public actor CKSyncEngineTransport: CloudSyncTransport, CKSyncEngineDelegate {
         )
     }
 
-    private func recordID(for envelope: SyncRecordEnvelope) -> CKRecord.ID {
+    static func recordID(for envelope: SyncRecordEnvelope, in zoneID: CKRecordZone.ID) -> CKRecord.ID {
         CKRecord.ID(
             recordName: "\(envelope.resourceKind)__\(envelope.id)",
             zoneID: zoneID

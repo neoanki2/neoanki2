@@ -37,6 +37,13 @@ protocol MediaSyncAdapter: LibrarySyncAdapter {
     func prioritizeMedia(in scope: DeckScope?) async
     func encode(changes: [LibraryChange], deviceID: String,
                 knownMedia: [String: SyncAssetDescriptor]) async throws -> [SyncRecordEnvelope]
+    func encodeForIncrementalSync(changes: [LibraryChange], deviceID: String,
+                baseline: [String: SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope]
+    func materializeUpload(_ record: SyncRecordEnvelope) async throws -> SyncRecordEnvelope
+    func hasLocalMedia(_ record: SyncRecordEnvelope) async -> Bool
+    func reviewsWithLocalDependencies(_ records: [SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope]
+    func orderedMedia(_ records: [SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope]
+    func applyLibraryChanges(_ records: [SyncRecordEnvelope], expectedCursor: Int64) async throws -> Int64?
 }
 
 /// Production bridge between the typed SQLite repository and durable sync
@@ -71,9 +78,16 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
         try await encode(changes: changes, deviceID: deviceID, consumeEchoes: true, knownMedia: knownMedia)
     }
 
+    func encodeForIncrementalSync(changes: [LibraryChange], deviceID: String,
+                                  baseline: [String: SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope] {
+        try await encode(changes: changes, deviceID: deviceID, consumeEchoes: false,
+            baseline: baseline, deferMedia: true)
+    }
+
     private func encode(
         changes: [LibraryChange], deviceID: String, consumeEchoes: Bool,
-        knownMedia: [String: SyncAssetDescriptor] = [:]
+        knownMedia: [String: SyncAssetDescriptor] = [:], baseline: [String: SyncRecordEnvelope] = [:],
+        deferMedia: Bool = false
     ) async throws -> [SyncRecordEnvelope] {
         var records: [SyncRecordEnvelope] = []
         records.reserveCapacity(changes.count)
@@ -92,6 +106,7 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                 continue
             }
             if change.isTombstone {
+                if baseline[echoKey]?.isTombstone == true { continue }
                 if consumeEchoes, echoedResources.removeValue(forKey: echoKey)?.isTombstone == true { continue }
                 records.append(.init(
                     id: change.resourceID,
@@ -113,8 +128,12 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
                 echoedResources.removeValue(forKey: echoKey)
                 continue
             }
-            let encoded = try await payload(kind: kind, id: change.resourceID)
+            let encoded = try await payload(kind: kind, id: change.resourceID, deferMedia: deferMedia)
             let bytes = try encoder.encode(encoded.payload)
+            if let accepted = baseline[echoKey], !accepted.isTombstone, accepted.asset == encoded.asset,
+               accepted.payload == bytes || (try? decoder.decode(SyncPayload.self, from: accepted.payload)) == encoded.payload {
+                continue
+            }
             if consumeEchoes, let echo = echoedResources.removeValue(forKey: echoKey),
                !echo.isTombstone, echo.asset == encoded.asset,
                (echo.payload == bytes || (try? decoder.decode(SyncPayload.self, from: echo.payload)) == encoded.payload) {
@@ -136,8 +155,36 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
     }
 
     public func applyRemote(_ records: [SyncRecordEnvelope], origin: LibraryChangeOrigin) async throws {
-        guard !records.isEmpty else { return }
-        _ = origin
+        _ = try await applyRemote(records, expectedCursor: nil)
+    }
+
+    func applyLibraryChanges(_ records: [SyncRecordEnvelope], expectedCursor: Int64) async throws -> Int64? {
+        try await applyRemote(records, expectedCursor: expectedCursor)
+    }
+
+    func reviewsWithLocalDependencies(_ records: [SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope] {
+        var ready: [SyncRecordEnvelope] = []
+        var reviewIDs: Set<UUID> = []
+        for record in records where record.resourceKind == LibraryResourceKind.review.rawValue && !record.isTombstone {
+            guard case let .review(review)? = try? decoder.decode(SyncPayload.self, from: record.payload) else { continue }
+            do { _ = try await repository.card(id: review.log.cardID) }
+            catch DatabaseError.cardNotFound { continue }
+            reviewIDs.insert(review.log.id)
+            ready.append(record)
+        }
+        for record in records where record.resourceKind == LibraryResourceKind.reviewRevert.rawValue && !record.isTombstone {
+            guard case let .reviewRevert(revert)? = try? decoder.decode(SyncPayload.self, from: record.payload) else { continue }
+            if !reviewIDs.contains(revert.reviewLogID) {
+                do { _ = try await repository.synchronizedReviewRecord(id: revert.reviewLogID) }
+                catch DatabaseError.reviewLogNotFound { continue }
+            }
+            ready.append(record)
+        }
+        return ready
+    }
+
+    private func applyRemote(_ records: [SyncRecordEnvelope], expectedCursor: Int64?) async throws -> Int64? {
+        guard !records.isEmpty else { return expectedCursor }
         let aliases = try await repository.syncItemTypeAliases()
         let records = try normalizeRemote(
             records, against: [], canonicalLibraryID: try await repository.libraryID(),
@@ -193,10 +240,41 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
         // The repository reconciles reference counts in the same transaction
         // as the item batch, so subsequent orphan collection cannot delete
         // a newly synchronized but locally uncounted asset.
-        try await repository.applySynchronizedBatch(mutations)
-        for record in records {
-            echoedResources[key(kind: record.resourceKind, id: record.id)] = record
+        let appliedCursor = try await repository.applySynchronizedBatch(mutations, expectedChangeCursor: expectedCursor)
+        if expectedCursor == nil {
+            for record in records {
+                echoedResources[key(kind: record.resourceKind, id: record.id)] = record
+            }
         }
+        return appliedCursor
+    }
+
+    func orderedMedia(_ records: [SyncRecordEnvelope]) async throws -> [SyncRecordEnvelope] {
+        let ordered = records.sorted { ($0.order, $0.id) < ($1.order, $1.id) }
+        guard let scope = mediaPriority else { return ordered }
+        let priorities = try await priorityMediaHashes(scope: scope, items: [], decks: [])
+        return ordered.filter { priorities.contains($0.id) } + ordered.filter { !priorities.contains($0.id) }
+    }
+
+    func materializeUpload(_ record: SyncRecordEnvelope) async throws -> SyncRecordEnvelope {
+        guard !record.isTombstone, record.stagedFileURL == nil else { return record }
+        let materialized = try await payload(kind: .media, id: record.id)
+        guard materialized.asset == record.asset else {
+            if let url = materialized.fileURL { try? FileManager.default.removeItem(at: url) }
+            throw SQLiteLibrarySyncError.invalidAsset(record.id)
+        }
+        return SyncRecordEnvelope(id: record.id, resourceKind: record.resourceKind,
+            revision: record.revision, deviceID: record.deviceID, order: record.order,
+            isTombstone: false, payload: record.payload, asset: record.asset, stagedFileURL: materialized.fileURL)
+    }
+
+    func hasLocalMedia(_ record: SyncRecordEnvelope) async -> Bool {
+        guard let asset = record.asset, let kind = MediaKind(rawValue: asset.contentType),
+              let store = await repository.mediaStore() else { return false }
+        let reference = MediaRef(kind: kind, assetHash: asset.hash, fileExtension: asset.fileExtension)
+        guard let url = try? await store.resolve(reference),
+              let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return false }
+        return size == asset.byteSize
     }
 
     private func installMedia(
@@ -641,7 +719,7 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
         catch DatabaseError.itemTypeNotFound { return nil }
     }
 
-    private func payload(kind: LibraryResourceKind, id: String) async throws -> (payload: SyncPayload, asset: SyncAssetDescriptor?, fileURL: URL?) {
+    private func payload(kind: LibraryResourceKind, id: String, deferMedia: Bool = false) async throws -> (payload: SyncPayload, asset: SyncAssetDescriptor?, fileURL: URL?) {
         switch kind {
         case .library:
             return (.library(try await repository.libraryID()), nil, nil)
@@ -666,6 +744,12 @@ public actor SQLiteLibrarySyncAdapter: MediaSyncAdapter {
         case .studyResponse:
             throw SQLiteLibrarySyncError.unknownResourceKind(kind.rawValue)
         case .media:
+            if deferMedia {
+                guard let asset = try await repository.mediaAsset(hash: id) else { throw SQLiteLibrarySyncError.invalidAsset(id) }
+                return (.metadata(kind: kind.rawValue, id: id), SyncAssetDescriptor(hash: asset.hash,
+                    byteSize: Int64(asset.byteSize), signature: asset.hash, fileExtension: asset.fileExtension,
+                    contentType: contentType(for: asset.kind)), nil)
+            }
             let (asset, bytes) = try await repository.mediaBytes(hash: id)
             let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
             guard digest == asset.hash, bytes.count == asset.byteSize else { throw SQLiteLibrarySyncError.invalidAsset(id) }

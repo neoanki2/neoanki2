@@ -355,8 +355,9 @@ public extension ItemStore {
         return record
     }
 
-    func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation]) async throws {
-        try await database.applySynchronizedBatch(mutations)
+    @discardableResult
+    func applySynchronizedBatch(_ mutations: [SynchronizedLibraryMutation], expectedChangeCursor: Int64? = nil) async throws -> Int64? {
+        let appliedCursor = try await database.applySynchronizedBatch(mutations, expectedChangeCursor: expectedChangeCursor)
         var schedulingChanged = false
         for mutation in mutations {
             let cardID: UUID?
@@ -377,6 +378,7 @@ public extension ItemStore {
             }
         }
         if schedulingChanged { requestAutomaticSchedulingMaintenance() }
+        return appliedCursor
     }
     func itemRecord(id: UUID) async throws -> LibraryItemRecord {
         guard let persisted = try await database.fetchItem(id: id) else {

@@ -57,8 +57,10 @@ With iCloud sync enabled, updated Mac, iPhone, and iPad apps combine learning ti
 including offline study after it uploads. Distinct simultaneous sessions on two
 devices both contribute; repeated synchronization never duplicates a segment.
 
-Activity uses a separate private iCloud zone. Older apps continue ordinary
-library sync, but must be updated to record or display learning time. Temporarily
+Activity sync runs independently in a separate private iCloud zone. Learning-time
+totals and card due counts can therefore catch up at different times. Older apps
+continue ordinary library sync and need an update to record or display learning
+time. Temporarily
 missing synced items wait for their content or deletion record before appearing
 in a deck total; the library report labels that time as waiting for synced content. Imported decks and local API review submissions do not import
 or manufacture learning time.

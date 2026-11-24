@@ -101,7 +101,8 @@ activity. No card text, submitted answers, or recordings are copied into
 statistics evidence. Older deletion and undo records cannot always be
 separated; ambiguous legacy reviews are excluded.
 
-Statistics evidence syncs through its own private iCloud zone. Older apps keep
+Statistics evidence syncs independently through its own private iCloud zone. A
+review can update due counts before its statistics arrive. Older apps keep
 ordinary library sync but do not record every new measurement. Earlier history
 is limited to the evidence saved by those app versions. The definitions in this
 guide explain those limits; the Statistics screen has no separate explanatory

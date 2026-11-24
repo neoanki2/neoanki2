@@ -12,7 +12,7 @@ private func contractRequire(_ condition: Bool, _ marker: String, _ detail: Stri
 }
 
 struct ContractStep: Codable, Sendable {
-    enum Mode: String, Codable, Sendable { case push, lostPush, beforeSend, partialAcknowledgement, failedFetch, incomingMove, outgoingMove }
+    enum Mode: String, Codable, Sendable { case push, lostPush, foreground, beforeSend, partialAcknowledgement, failedFetch, incomingMove, outgoingMove }
     let mode: Mode
     let cardIndex: Int
     var reviewCount = 1
@@ -112,11 +112,14 @@ private final class ContractReplica {
     let service: OfflineFirstSyncService
     let model: LibraryFeatureModel
     private let observer: ContractVisibleObserver
+    private let clock: SyncContractClock
     private var pushes: Task<Void, Never>?
+    private var publications: Task<Void, Never>?
+    private(set) var inboundPublications = 0
 
     init(name: String, directory: URL, repository: SQLiteLibraryRepository,
          cloud: SyncContractCloud, clock: SyncContractClock) {
-        self.name = name; self.directory = directory; self.repository = repository
+        self.name = name; self.directory = directory; self.repository = repository; self.clock = clock
         let metadata = SyncMetadataStore(directory: directory.appendingPathComponent("sync"))
         self.metadata = metadata
         let transport = SyncContractTransport(cloud: cloud, deviceID: name, metadata: metadata)
@@ -131,6 +134,14 @@ private final class ContractReplica {
         observer = ContractVisibleObserver(model: model, events: clock.events)
     }
     func start(cloud: SyncContractCloud) async {
+        let events = await service.libraryChanges()
+        publications = Task { [weak self] in
+            for await _ in events {
+                guard !Task.isCancelled, let self else { return }
+                self.inboundPublications += 1
+                await self.clock.events.publish()
+            }
+        }
         await model.bootstrap()
         let stream = await cloud.pushes(for: name)
         pushes = Task { [service] in
@@ -144,6 +155,8 @@ private final class ContractReplica {
     }
     func stop() async {
         observer.stop()
+        publications?.cancel()
+        publications = nil
         pushes?.cancel()
         await pushes?.value
         pushes = nil
@@ -240,10 +253,13 @@ private final class ContractFixture {
 
     func run(_ step: ContractStep) async throws {
         let controlledPush = step.mode != .push
+        let baselinePublications = mac.inboundPublications
         await cloud.setPushesEnabled(!controlledPush, for: "mac")
         if step.mode == .beforeSend || step.mode == .outgoingMove { await phone.transport.inject(.beforeSend) }
         if step.mode == .partialAcknowledgement { await phone.transport.inject(.afterPartialSend) }
         let cards = ledger.cards.values.sorted { $0.id.uuidString < $1.id.uuidString }
+        let inactiveFetches = await mac.transport.fetchCount()
+        if step.mode == .foreground { await mac.service.setForeground(false) }
         if step.mode == .incomingMove {
             // The receiver is suspended while this mixed batch reaches cloud.
             // A lifecycle start below stages it before reconstructing the app.
@@ -270,8 +286,8 @@ private final class ContractFixture {
         let sourceDue = Set(try await phone.repository.dueCards(scope: .allDecks, asOf: domainTime).map(\.id))
         try contractRequire(sourceDue == ledger.dueIDs, "SYNC_CONTRACT_LEDGER", "Source does not match independent easy-review due-set ledger")
         let cursor = try await phone.repository.currentChangeCursor()
-        let debounce = try await clock.localRequest(deviceID: "phone", cursor: cursor)
-        try contractRequire(debounce.duration == .milliseconds(600), "SYNC_CONTRACT_DEBOUNCE", "Committed change must register the 600ms debounce")
+        let debounce = try await clock.localRequest(deviceID: "phone")
+        try contractRequire(debounce.duration == .milliseconds(250), "SYNC_CONTRACT_DEBOUNCE", "Committed change must register the 250ms upload window")
         clock.advance(to: debounce.deadline)
         try await waitForSender(cursor: cursor, acceptsInjectedFailure: step.mode == .beforeSend
             || step.mode == .partialAcknowledgement || step.mode == .outgoingMove)
@@ -286,7 +302,7 @@ private final class ContractFixture {
             phone = try await move(phone, legacy: step.legacyMetadata)
         } else if !(try await phone.metadata.load().pendingOutbound ?? []).isEmpty {
             let poll = try await clock.pollRequest(deviceID: "phone")
-            try contractRequire(poll.deadline - clock.elapsed() <= .seconds(10), "SYNC_CONTRACT_RECOVERY", "Sender recovery exceeds poll budget")
+            try contractRequire(poll.deadline - clock.elapsed() <= .seconds(3), "SYNC_CONTRACT_RECOVERY", "Sender recovery exceeds poll budget")
             clock.advance(to: poll.deadline)
             try await waitForSender(cursor: cursor, acceptsInjectedFailure: false)
         }
@@ -306,15 +322,31 @@ private final class ContractFixture {
                 try await clock.waitForCompletion(deviceID: "mac", after: beforeFetch)
             }
             let poll = try await clock.pollRequest(deviceID: "mac")
-            try contractRequire(poll.duration == .seconds(10), "SYNC_CONTRACT_POLL_DEADLINE", "Recovery poll interval changed")
+            try contractRequire(poll.duration == .seconds(3), "SYNC_CONTRACT_POLL_DEADLINE", "Recovery poll interval changed")
             let beforeFetch = await mac.transport.fetchCount()
             clock.advance(to: poll.deadline - .milliseconds(1))
             try contractRequire(await mac.transport.fetchCount() == beforeFetch, "SYNC_CONTRACT_POLL_DEADLINE", "Receiver fetched before its recovery timer")
             clock.advance(by: .milliseconds(1))
+        } else if step.mode == .foreground {
+            clock.advance(by: .seconds(3))
+            try contractRequire(!clock.hasPoll(deviceID: "mac"), "SYNC_CONTRACT_FOREGROUND", "Inactive receiver retained a recovery timer")
+            try contractRequire(await mac.transport.fetchCount() == inactiveFetches, "SYNC_CONTRACT_FOREGROUND", "Inactive receiver fetched without a push")
+            await mac.service.setForeground(true)
         } else if controlledPush {
             await cloud.deliverPush(to: "mac")
         }
         try await waitForReceiver()
+        if step.mode == .push || step.mode == .foreground {
+            try await syncContractWatch("SYNC_CONTRACT_VISIBLE") { @MainActor in
+                let events = await self.clock.events.stream()
+                var observer = events.makeAsyncIterator()
+                while !Task.isCancelled {
+                    if self.mac.inboundPublications > baselinePublications { return }
+                    guard await observer.next() != nil else { break }
+                }
+                throw CancellationError()
+            }
+        }
         try await verifyLedger()
         await cloud.setPushesEnabled(true, for: "mac")
         completedSteps += 1
@@ -441,6 +473,10 @@ struct SyncConvergenceContractTests {
     @Test func lostPushRecoversAtNextPollDeadline() async throws {
         try await runContract(.init(scenario: "lost-push", seed: 7,
             steps: [.init(mode: .lostPush, cardIndex: 0)]))
+    }
+    @Test func foregroundCatchesUpWithoutWaitingForTheNextPoll() async throws {
+        try await runContract(.init(scenario: "foreground", seed: 2,
+            steps: [.init(mode: .foreground, cardIndex: 0)]))
     }
     @Test(arguments: [false, true])
     func relocatedMixedBatchPreservesReviewsAndMedia(legacyMetadata: Bool) async throws {

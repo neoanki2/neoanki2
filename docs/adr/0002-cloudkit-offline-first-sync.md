@@ -31,22 +31,29 @@ legacy metadata starts with a full snapshot. Use the engine for explicit sends
 with automatic syncing disabled, so an older automatic fetch cannot overwrite a
 newer explicit delivery. Dictionary assets remain in their separate zone.
 
-A silent `CKRecordZoneSubscription` for the library zone wakes that same
-explicit reader. Both native hosts register for remote notifications and route
-only that subscription's notifications to the service. Pushes received during
-an active cycle coalesce into a follow-up cycle, so a notification cannot be
-lost behind the synchronization guard. Foreground reads and the 10-second
-recovery poll cover delayed or missing notifications. Server retry-after delays
-still take precedence over a push or local-change trigger.
+A silent `CKRecordZoneSubscription` wakes the corresponding library,
+statistics, or learning-time worker. The foreground library reader checks its
+delta token every three seconds and wakes immediately on activation or network
+recovery. It coalesces pushes during a read into one follow-up and leaves the
+durable checkpoint alone on empty checks. Server retry deadlines take priority
+over wake events. Background activity depends on system execution and push
+delivery.
 
-Committed SQLite journal changes produce buffered cursor notifications. They
-debounce local uploads by 600 milliseconds on both platforms; rolled-back or
-read-only work emits no notification. The service broadcasts inbound commits to
-each presentation after validation and repository application. Mac counts and
-already-loaded Browse rows, mobile summaries, badges, and widgets refresh from
-those events. Tests verify matching review identity, card state, and counts
-before the recovery poll, rather than treating a successful status as evidence
-that the visible data is current.
+The first committed SQLite journal change opens a 250-millisecond upload window.
+Later commits join that window without moving its deadline. A separate receiver
+stages record metadata and applies ready content while outbound requests are in
+flight. Incoming records that overlap pending edits wait for conflict handling.
+Overlapping reads verify the affected server versions before applying them. The
+SQLite apply checks the journal cursor in its transaction, and the checkpoint
+acknowledges the journal rows produced by that apply. This preserves local edits
+and suppresses remote echoes across independent workers.
+
+Incremental directory reads omit CloudKit asset bytes. The media worker keeps a
+durable backlog, prioritizes the open deck, and installs verified files as they
+become available. Library data can appear before its files, and open study views
+reload the affected media when installation finishes. Mac counts and Browse
+rows, mobile summaries, badges, and widgets update from committed library changes.
+Tests assert matching review identity, card state, and counts at the receiver.
 
 CloudKit can invalidate a long-lived client with an internal error (including
 "Client went away before operation could be validated"). The next sync cycle
