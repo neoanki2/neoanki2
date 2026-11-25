@@ -109,7 +109,8 @@ with the controls in the sidebar.
 
 Commands become available only in the relevant state. Grades are disabled until
 the answer is revealed, and every study command is disabled while the card
-editor is open.
+editor is open. In the **Study Extra Cards** picker on Mac, type a batch size
+or use the stepper, then press Return to start the session.
 The Prose Deck preview presents each cue and answer in reading order and uses
 labeled **Split here** and **Join with next unit** buttons for boundary edits.
 

@@ -252,6 +252,8 @@
       "name": "Start a scoped due-card session",
       "article": "user/studying.md",
       "sources": [
+        "Sources/NeoAnkiSharedUI/ExtraStudyAction.swift",
+        "Sources/NeoAnkiSharedUI/ExtraStudyAction.swift",
         "Sources/NeoAnkiApplication/StudySessionState.swift",
         "Sources/NeoAnki2/StudyView.swift", "Sources/NeoAnki2/StudyModel.swift",
         "Sources/NeoAnkiFeatures/StudyFeatureModel.swift",

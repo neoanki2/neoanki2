@@ -228,7 +228,10 @@ one of its cards lapses again. Choose **Done** to return to the scope home, or
 **Show All Items** to clear the filter.
 
 The Home summary is prepared while the app window opens, so its counts and
-primary study action are ready with the rest of the library view.
+primary study action are ready with the rest of the library view. When a
+selected deck is caught up, **Study Extra Cards** can open a batch of new
+cards held back by its daily limit. You can also open the picker from that
+deck’s regular session completion screen.
 
 To build a passage deck on Mac, choose **File → Build Deck… → Prose Deck**.
 The builder opens beside Poem Deck and imports the result beneath a selected

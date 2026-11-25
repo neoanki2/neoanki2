@@ -163,7 +163,10 @@ transfer is active. It is also disabled while the library is loading or no item
 types exist. An item edit sheet does not disable the menu. Deck import/export
 waits for item and deck loading but can supply its own item types.
 Newly imported JSON and CSV cards show **Not started** maturity until they have
-review history; the import itself does not count as a recall. If import reports
+review history; the import itself does not count as a recall. If the destination
+deck is caught up and its daily limit is holding new cards back, use
+[Study Extra Cards](../studying/#study-extra-new-cards) to introduce a batch.
+If import reports
 success while a badge or summary is still updating, refresh the library to
 inspect the imported items instead of importing the file again.
 
