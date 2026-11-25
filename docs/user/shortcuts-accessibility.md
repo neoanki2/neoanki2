@@ -170,6 +170,7 @@ the lesson is ready.
 - **Command-E:** edit the item behind the current card, then **Return** to save
   or **Escape** to cancel.
 - **Command-Z:** undo the most recent grade when undo is available.
+- **Return** on the Mac completion screen activates **Done**.
 - **Escape:** end the session immediately.
 - **Command-R:** start, stop, or redo a recording on Record and Audio
   Submission cards.

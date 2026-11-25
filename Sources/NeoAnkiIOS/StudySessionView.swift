@@ -42,6 +42,7 @@ struct StudySessionView: View {
         .onChange(of: recorder.isRecording || recorder.isPlaying) { _, value in
             session.learningTime.setMediaActivity(sourceID: recordingActivityID, isActive: value)
         }
+        .onChange(of: session.currentCard?.id) { _, _ in recorder.cleanup() }
         .simultaneousGesture(TapGesture().onEnded { session.learningTime.interaction() })
         .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in session.learningTime.interaction() })
     }
@@ -63,21 +64,7 @@ struct StudySessionView: View {
                 } else if session.isLoading {
                     ProgressView("Preparing study session…")
                 } else if session.isComplete {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            Image(systemName: "checkmark.circle").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
-                            Text("Session Complete").font(.title.weight(.semibold))
-                            LearningTimeSaveStatusView()
-                            Button("View Session Statistics", systemImage: "chart.bar.xaxis") {
-                                model.showStatistics(scope: session.sessionScope, sessionID: session.learningTime.sessionID)
-                                dismiss()
-                            }
-                        }.frame(maxWidth: 600, alignment: .leading).frame(maxWidth: .infinity).padding(24)
-                    }
-                    .safeAreaInset(edge: .bottom) {
-                        Button { dismiss() } label: { Text("Done").frame(maxWidth: .infinity, minHeight: 44) }
-                            .buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().padding(16).background(.bar)
-                    }
+                    completedSession
                 } else if let lesson = session.currentLesson {
                     StudyLessonReader(load: { try await session.loadLesson(lesson.id) },
                         canContinue: !session.isCompletingLesson && !session.isPreparingQueue && !session.isGrading,
@@ -97,13 +84,15 @@ struct StudySessionView: View {
             .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("End") {
-                        recorder.cleanup()
-                        dismiss()
+                if !session.isComplete {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("End") {
+                            recorder.cleanup()
+                            dismiss()
+                        }
+                        .disabled(session.isGrading || session.isCompletingSubmission || session.isCompletingLesson || session.isPreparingQueue)
+                        .accessibilityIdentifier("endStudySession")
                     }
-                    .disabled(session.isGrading || session.isCompletingSubmission || session.isCompletingLesson || session.isPreparingQueue)
-                    .accessibilityIdentifier("endStudySession")
                 }
                 if session.currentCard != nil && !session.isLoading {
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -188,6 +177,59 @@ struct StudySessionView: View {
         .onDisappear { recorder.cleanup() }
     }
 
+    private var completedSession: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Image(systemName: "checkmark.circle")
+                    .font(.largeTitle)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text("Session Complete")
+                    .font(.title.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                LearningTimeSaveStatusView()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        model.showStatistics(scope: session.sessionScope, sessionID: session.learningTime.sessionID)
+                        dismiss()
+                    } label: {
+                        Label("View Session Statistics", systemImage: "chart.bar.xaxis")
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    if session.pendingGradeUndo != nil {
+                        Button {
+                            Task { await session.undoLastGrade() }
+                        } label: {
+                            Label("Undo Last Grade", systemImage: "arrow.uturn.backward")
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .disabled(!session.canUndo)
+                        .accessibilityIdentifier("undoLastGrade")
+                    }
+                }
+                .buttonStyle(.borderless)
+            }
+            .frame(maxWidth: 600, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(24)
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button { dismiss() } label: {
+                Text("Done").frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .neoAnkiMobilePrimaryActionTint()
+            .frame(maxWidth: 600)
+            .frame(maxWidth: .infinity)
+            .padding(16)
+            .background(.bar)
+        }
+        .disabled(session.isGrading)
+    }
+
     private var errorBinding: Binding<Bool> {
         Binding(
             get: { session.error != nil },
@@ -216,6 +258,9 @@ struct StudySessionView: View {
                               session.reviewResponse == nil || evaluation == .unavailable {
                         Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
                             .font(.headline).accessibilityAddTraits(.isSummaryElement)
+                    }
+                    if card.template.interaction == .record {
+                        practiceRecordingFeedback
                     }
                 }
                 .frame(maxWidth: 600)
@@ -246,6 +291,9 @@ struct StudySessionView: View {
             if revealed {
                 typedAnswerFocused = false
                 answerFocused = true
+            } else {
+                // A repair round can present the same card again.
+                recorder.cleanup()
             }
         }
     }
@@ -284,6 +332,9 @@ struct StudySessionView: View {
                     }
                 }
             }
+        } else if session.currentCard?.template.interaction == .record {
+            recordingStudyActions
+                .disabled(session.isGrading || session.isCompletingSubmission)
         } else {
             Button {
                 session.performPrimaryAction()
@@ -297,9 +348,65 @@ struct StudySessionView: View {
     }
 
     @ViewBuilder
+    private var recordingStudyActions: some View {
+        if recorder.isRequestingPermission {
+            ProgressView("Requesting microphone access…")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        } else if recorder.isRecording {
+            recordingAction("Stop Recording", systemImage: "stop.circle") { recorder.stop() }
+        } else if recorder.hasRecording {
+            recordingAction("Compare Recording", systemImage: "arrow.right.circle") {
+                session.performPrimaryAction()
+            }
+        } else {
+            VStack(spacing: 4) {
+                recordingAction("Record Answer", systemImage: "mic") {
+                    Task { await recorder.start() }
+                }
+                Button {
+                    session.revealAnswer()
+                } label: {
+                    Text("Reveal & Self-Grade")
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+    }
+
+    private func recordingAction(_ title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .neoAnkiMobilePrimaryActionTint()
+        .controlSize(.large)
+    }
+
+    @ViewBuilder
+    private var practiceRecordingFeedback: some View {
+        if recorder.hasRecording {
+            Button {
+                recorder.togglePlayback()
+            } label: {
+                Label(recorder.isPlaying ? "Stop Playback" : "Play My Recording",
+                      systemImage: recorder.isPlaying ? "stop.fill" : "play.fill")
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+        }
+        if let message = recorder.errorMessage {
+            Text(message).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
     private func interaction(for card: DueCard) -> some View {
         switch card.template.interaction {
-        case .reveal, .cloze, .imageOcclusion:
+        case .reveal, .cloze, .imageOcclusion, .record:
             EmptyView()
         case .type:
             TextField("Type your answer", text: Binding(get: { session.typedAnswer }, set: { session.updateTypedAnswer($0) }), axis: .vertical)
@@ -331,16 +438,6 @@ struct StudySessionView: View {
                     }
                 }
             }.frame(maxWidth: 560)
-        case .record:
-            VStack(spacing: 10) {
-                Button(recorder.isRecording ? "Stop Recording" : "Record Answer", systemImage: recorder.isRecording ? "stop.circle" : "mic") {
-                    Task { if recorder.isRecording { recorder.stop(); session.performPrimaryAction() } else { await recorder.start() } }
-                }.buttonStyle(.borderedProminent).neoAnkiMobilePrimaryActionTint().controlSize(.large)
-                if recorder.hasRecording {
-                    Button { recorder.play() } label: { Label("Play My Recording", systemImage: "play").frame(minHeight: 44) }
-                }
-                if let message = recorder.errorMessage { Text(message).foregroundStyle(.secondary) }
-            }
         case .audioSubmission:
             VStack(spacing: 12) {
                 Label("Saved response", systemImage: "lock.fill")
@@ -385,7 +482,6 @@ struct StudySessionView: View {
         case .type: "Check Answer"
         case .choose: "Check Choice"
         case .arrange: "Check Order"
-        case .record: "Compare Recording"
         case .audioSubmission: "Save & Complete"
         default: "Show Answer"
         }
@@ -463,7 +559,7 @@ struct StudySessionView: View {
 }
 
 @MainActor @Observable
-private final class MobileStudyRecorder: NSObject, AVAudioRecorderDelegate {
+private final class MobileStudyRecorder: NSObject, AVAudioRecorderDelegate, AVAudioPlayerDelegate {
     private var audioRecorder: AVAudioRecorder?
     private var player: AVAudioPlayer?
     private var url: URL?
@@ -471,11 +567,14 @@ private final class MobileStudyRecorder: NSObject, AVAudioRecorderDelegate {
     private var capturedAt: Date?
     private var elapsedTask: Task<Void, Never>?
     private var isPersistentSubmission = false
+    private var permissionRequestID: UUID?
     private(set) var isRecording = false
     private(set) var isPlaying = false
     private(set) var hasRecording = false
     private(set) var elapsedSeconds: TimeInterval = 0
     private(set) var errorMessage: String?
+
+    var isRequestingPermission: Bool { permissionRequestID != nil }
 
     var durationLabel: String {
         let total = max(0, Int(elapsedSeconds.rounded(.down)))
@@ -483,7 +582,12 @@ private final class MobileStudyRecorder: NSObject, AVAudioRecorderDelegate {
     }
 
     func start(persistentSubmission: Bool = false) async {
+        guard !isRecording, !isRequestingPermission else { return }
+        let requestID = UUID()
+        permissionRequestID = requestID
         let permission = await AVAudioApplication.requestRecordPermission()
+        guard permissionRequestID == requestID else { return }
+        permissionRequestID = nil
         guard permission else {
             errorMessage = persistentSubmission
                 ? "Microphone access was denied. Allow it in Settings to record this response."
@@ -501,7 +605,11 @@ private final class MobileStudyRecorder: NSObject, AVAudioRecorderDelegate {
             if persistentSubmission { settings[AVEncoderBitRateKey] = 64_000 }
             let recorder = try AVAudioRecorder(url: url, settings: settings)
             recorder.delegate = self
-            recorder.record(forDuration: persistentSubmission ? 30 * 60 : 12 * 60 * 60)
+            guard recorder.record(forDuration: persistentSubmission ? 30 * 60 : 12 * 60 * 60) else {
+                recorder.deleteRecording()
+                errorMessage = "Couldn't start recording. Try again."
+                return
+            }
             audioRecorder = recorder
             self.url = url
             self.responseID = responseID
@@ -530,36 +638,59 @@ private final class MobileStudyRecorder: NSObject, AVAudioRecorderDelegate {
         } catch { errorMessage = error.localizedDescription }
     }
     func stop() {
-        elapsedSeconds = max(elapsedSeconds, audioRecorder?.currentTime ?? 0)
-        audioRecorder?.stop(); audioRecorder = nil; elapsedTask?.cancel(); elapsedTask = nil
-        isRecording = false; hasRecording = url != nil
+        guard let recorder = audioRecorder else { return }
+        elapsedSeconds = max(elapsedSeconds, recorder.currentTime)
+        audioRecorder = nil
+        recorder.stop()
+        elapsedTask?.cancel()
+        elapsedTask = nil
+        isRecording = false
+        hasRecording = url != nil && elapsedSeconds > 0
+        if !hasRecording { errorMessage = "No audio was recorded. Try again." }
     }
     func togglePlayback() {
         if isPlaying { player?.stop(); player = nil; isPlaying = false; return }
-        guard let url else { return }
-        do { player = try AVAudioPlayer(contentsOf: url); isPlaying = player?.play() == true }
-        catch { errorMessage = "The recording could not be played. Record it again and retry." }
+        guard hasRecording, let url else { return }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.delegate = self
+            self.player = player
+            isPlaying = player.play()
+        } catch {
+            errorMessage = "The recording could not be played."
+        }
     }
-    func play() { togglePlayback() }
     func submissionDraft(cardID: UUID) -> StudyResponseDraft? {
         guard isPersistentSubmission, !isRecording, let responseID, let url, let capturedAt, hasRecording else { return nil }
         return StudyResponseDraft(id: responseID, cardID: cardID, fileURL: url, durationMilliseconds: max(1, Int(elapsedSeconds * 1_000)), capturedAt: capturedAt)
     }
     func cleanup() {
+        permissionRequestID = nil
         audioRecorder?.stop(); player?.stop(); elapsedTask?.cancel()
+        audioRecorder = nil
+        player = nil
         if let url { try? FileManager.default.removeItem(at: url) }
         url = nil; responseID = nil; capturedAt = nil; elapsedTask = nil
         isRecording = false; isPlaying = false; hasRecording = false; elapsedSeconds = 0
         isPersistentSubmission = false
+        errorMessage = nil
     }
 
     nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, self.audioRecorder === recorder else { return }
             self.elapsedSeconds = max(self.elapsedSeconds, recorder.currentTime)
             self.audioRecorder = nil; self.elapsedTask?.cancel(); self.elapsedTask = nil
             self.isRecording = false; self.hasRecording = flag && self.url != nil
             if !flag { self.errorMessage = "The recording stopped before it could be saved. Please try again." }
+        }
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor [weak self] in
+            guard let self, self.player === player else { return }
+            self.player = nil
+            self.isPlaying = false
         }
     }
 }

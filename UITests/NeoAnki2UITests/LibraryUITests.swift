@@ -66,11 +66,14 @@ extension FastFunctionalJourneyTests {
         }
 
         runJourneyActivity("LibraryUITests.testAddItemFromEmptyState") {
+            assertSingleEmptyLibraryAddAction(in: app)
             addBasicItem(front: "Alpha", back: "Beta", in: app)
         }
 
         runJourneyActivity("LibraryUITests.testAddItemFromToolbar") {
             returnToLibrary(in: app)
+            XCTAssertTrue(app.buttons.identified("addItemToolbar").waitUntilExists(timeout: 5))
+            XCTAssertFalse(app.buttons.identified("addItemEmptyState").exists)
             openAddItem(in: app)
             enterText("France", into: field(named: "Front", in: app), app: app)
             enterText("Paris", into: field(named: "Back", in: app), app: app)
@@ -326,7 +329,13 @@ extension FastFunctionalJourneyTests {
 
     func checkLibraryUITestsAddItemFromEmptyState() throws {
         let app = launchApp()
+        assertSingleEmptyLibraryAddAction(in: app)
         addBasicItem(front: "France", back: "Paris", in: app)
+    }
+
+    private func assertSingleEmptyLibraryAddAction(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons.identified("addItemEmptyState").waitUntilExists(timeout: 5))
+        XCTAssertFalse(app.buttons.identified("addItemToolbar").exists)
     }
 
     func checkLibraryUITestsAddItemFromToolbar() throws {

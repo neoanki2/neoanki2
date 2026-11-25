@@ -210,7 +210,10 @@ enum MobileRedesignUITestSeeder {
         let chapter = try await library.createDeck(Deck(name: "Chapter", parentID: course.id))
         let title = FieldDef(name: "Lesson", type: .text, isRequired: true)
         let reading = FieldDef(name: "Reading 01", type: .richText, isRequired: true)
-        let lesson = ItemType(name: "Japanese Academy Lesson", fields: [title, reading], templates: [
+        let example = FieldDef(name: "Reading 02", type: .richText)
+        let illustration = FieldDef(name: "Illustration", type: .image)
+        let summary = FieldDef(name: "Reading 03", type: .richText)
+        let lesson = ItemType(name: "Japanese Academy Lesson", fields: [title, reading, example, illustration, summary], templates: [
             Template(name: "Lesson reader", prompt: Side(slots: [.init(source: .field(title.id))]),
                 answer: Side(slots: [.init(source: .field(reading.id))]), interaction: .reveal,
                 skill: Skill(input: .text, output: .text, operation: .recall), generateWhen: .fieldEmpty(title.id))
@@ -228,12 +231,25 @@ enum MobileRedesignUITestSeeder {
             ], interaction: .reveal, skill: Skill(input: .text, output: .text, operation: .recall))
         ])
         _ = try await library.createItemType(vocabulary)
+        let imageData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE1wAAAAASUVORK5CYII=")!
+        let image = try await library.reserveMedia(data: imageData, kind: .image,
+            altText: "Noun lesson illustration", asOf: .now).reference
         for number in 1...2 {
             let deck = try await library.createDeck(Deck(name: "Unit \(number)", parentID: chapter.id))
-            _ = try await library.createItem(Item(itemTypeID: lesson.id, fields: [
+            var lessonFields: [FieldValue] = [
                 .init(fieldID: title.id, value: .text(number == 1 ? "Lesson 1.1: Nouns" : "Lesson 1.2: Particles")),
                 .init(fieldID: reading.id, value: .rich([Span(number == 1 ? "Lesson reading about nouns." : "Lesson reading about particles.")])),
-            ], tags: ["lesson:1.\(number)", "migaku:unit-\(number)"], deckID: deck.id))
+            ]
+            if number == 1 {
+                lessonFields += [
+                    .init(fieldID: example.id, value: .rich([Span(String(repeating:
+                        "学校 means school. Japanese nouns can name a person, a place, or a thing.\n\n", count: 16))])),
+                    .init(fieldID: illustration.id, value: .media(image)),
+                    .init(fieldID: summary.id, value: .rich([Span("End of the noun lesson.")])),
+                ]
+            }
+            _ = try await library.createItem(Item(itemTypeID: lesson.id, fields: lessonFields,
+                tags: ["lesson:1.\(number)", "migaku:unit-\(number)"], deckID: deck.id))
             _ = try await library.createItem(Item(itemTypeID: vocabulary.id, fields: [
                 .init(fieldID: word.id, value: .text(number == 1 ? "学校" : "公園", lang: "ja")),
                 .init(fieldID: sentence.id, value: .text(number == 1 ? "学校です。" : "公園です。", lang: "ja")),

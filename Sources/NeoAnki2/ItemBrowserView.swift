@@ -137,11 +137,13 @@ struct ItemBrowserView: View {
                 .help(studyHelp)
                 .accessibilityIdentifier("studyButton")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Item", systemImage: "plus") {
-                    onAddItem()
+            if !itemsModel.isLoading && (!itemsModel.items.isEmpty || scope.filter == .unassigned) {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Item", systemImage: "plus") {
+                        onAddItem()
+                    }
+                    .accessibilityIdentifier("addItemToolbar")
                 }
-                .accessibilityIdentifier("addItemToolbar")
             }
             ToolbarItem(placement: .cancellationAction) {
                 Button("Done") {

@@ -122,7 +122,8 @@ the whole passage. For that goal, occasionally recite the passage independently.
 Choose **File → Import Vocabulary Pack…** and select a local `.neovocab`
 directory. NeoAnki validates it and copies it into the library's managed
 Vocabulary Packs directory. The source can then be moved or deleted. Use
-**Library → Vocabulary Packs…** to see the packs installed in this library.
+**Library → Vocabulary Packs…** to see the packs installed in this library
+or choose **Import Pack…** from that screen.
 
 With iCloud sync enabled, imported packs upload automatically. Other devices
 receive the catalog and can choose **Download** to install a pack for offline
@@ -143,8 +144,9 @@ package; lookup reads only the installed SQLite index and local media.
 
 Use **Add Word** for dictionary-assisted field filling, with remembered mappings
 for each dictionary–deck pair. The ordinary New Item form contains the selected
-item type's fields. On iPhone and iPad, install packs through
-**Create → Vocabulary Packs**. See
+item type's fields. On iPhone and iPad, open **Create → Vocabulary Packs**
+and choose **Install Pack…** when the list is empty or **Install Pack** in
+the toolbar when it has entries. See
 [Dictionary lookup](../authoring-items/#fill-fields-from-a-dictionary).
 
 ## Import JSON or CSV

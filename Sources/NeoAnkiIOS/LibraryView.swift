@@ -151,10 +151,11 @@ struct LibraryView: View {
                     Button(selecting ? "Done Selecting" : "Select Items") { selecting.toggle(); selection = [] }
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Add Item", systemImage: "plus") { isAddingItem = true }
+            if !items.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Item", systemImage: "plus") { isAddingItem = true }
+                }
             }
-
         }
         .safeAreaInset(edge: .bottom) {
             if selecting {

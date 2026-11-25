@@ -131,8 +131,9 @@ same way as cards from ordinary Item Types.
 
 A new card consumes one slot when you grade it for the first time, including
 **Again**. Ending a session before grading does not consume a slot. Undoing that
-first grade restores the slot. Learning, relearning, and review cards never
-count toward this limit.
+first grade restores the slot, including when you choose **Undo Last Grade**
+from the session completion screen. Learning, relearning, and review cards
+never count toward this limit.
 
 Choose **Study Day → Study Day Settings…** to set when a new study day begins
 in local time. The default is **4:00 AM**. The app follows the Mac's current

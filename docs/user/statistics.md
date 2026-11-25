@@ -102,8 +102,10 @@ statistics evidence. Older deletion and undo records cannot always be
 separated; ambiguous legacy reviews are excluded.
 
 Statistics evidence syncs independently through its own private iCloud zone. A
-review can update due counts before its statistics arrive. Older apps keep
-ordinary library sync but do not record every new measurement. Earlier history
+review can update due counts before its statistics arrive. When a device
+catches up, it skips uploads for reviews whose statistics already match
+iCloud. Older apps keep ordinary library sync but do not record every new
+measurement. Earlier history
 is limited to the evidence saved by those app versions. The definitions in this
 guide explain those limits; the Statistics screen has no separate explanatory
 footer.

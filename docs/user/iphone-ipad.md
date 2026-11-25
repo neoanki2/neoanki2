@@ -93,6 +93,10 @@ Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:
 Reveal, Type Answer, Choose, Arrange, Record, Audio Submission, and Cloze.
 
+On a Record card, tap **Record Answer**, then **Stop Recording**. **Compare
+Recording** appears when your recording is ready, and you can replay it while
+grading your recall. To study without recording, tap **Reveal & Self-Grade**.
+
 The first card becomes readable while the rest of the queue is validated. You
 can reveal its answer during preparation; grading and skipping become available
 after validation finishes. A failed load shows **Could Not Start Session** with
@@ -156,10 +160,11 @@ type, then fill its typed fields. The primary picker shows this deck's types;
 decks with entered content asks before attaching the type or clearing the draft.
 Visual descriptions are optional. The
 Library supports item detail, editing, multi-selection, bulk move, and bulk
-delete. In an empty library, **Add First Card** keeps a high-contrast 44-point
-target at the largest accessibility text size, including in landscape. The
-Saved Responses shortcut also keeps the local-only status readable with
-increased contrast and accessibility text sizes. Deleting items or changing
+delete. In an empty library, **Add First Item** has a 44-point touch target even
+at the largest accessibility text size in landscape. After you add an item,
+the toolbar offers **Add Item**. The Saved Responses shortcut keeps the
+local-only status readable with increased contrast and accessibility text
+sizes. Deleting items or changing
 Card setups warns before removing saved spoken responses.
 
 Use **Create → Item Types & Card Setups** to edit fields and Card setups in one

@@ -30,7 +30,9 @@ public struct StudyLessonReader<Block: View>: View {
             if let content {
                 ScrollView {
                     AdaptiveReadingColumn {
-                        LazyVStack(alignment: .leading, spacing: SharedDesignSystem.sectionSpacing) {
+                        // Lay out this lesson as one document. Lazy rows estimate offscreen
+                        // heights and defer media loading until those rows approach the viewport.
+                        VStack(alignment: .leading, spacing: SharedDesignSystem.sectionSpacing) {
                             Text(content.title)
                                 .font(.title.bold())
                                 .accessibilityAddTraits(.isHeader)

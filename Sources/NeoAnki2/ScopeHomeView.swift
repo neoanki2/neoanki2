@@ -87,11 +87,13 @@ struct ScopeHomeView: View {
                 .help("Browse and search every item in this scope")
                 .accessibilityIdentifier("browseToolbar")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Item", systemImage: "plus") {
-                    onAddItem()
+            if !itemsModel.isLoading && (summary.itemCount > 0 || scope.filter == .unassigned) {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Item", systemImage: "plus") {
+                        onAddItem()
+                    }
+                    .accessibilityIdentifier("addItemToolbar")
                 }
-                .accessibilityIdentifier("addItemToolbar")
             }
         }
     }

@@ -87,6 +87,77 @@ private func statisticsSyncFixture() async throws -> (SQLiteLibraryRepository, U
     let s = StatisticsEngine.snapshot(
         source: try await library.statisticsSource(), query: .init(), now: now.addingTimeInterval(1))
     #expect(s.reviewCount == 0)
+    #expect(await transport.sentRecords().isEmpty)
+}
+
+@Test func statisticsSyncSkipsKnownPagesAndSendsNewReviewContext() async throws {
+    let (library, folder) = try await statisticsSyncFixture()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let card = UUID()
+    let now = Date.now
+    let reviews = (0...500).map { _ in
+        let log = ReviewLog(
+            cardID: card, reviewedAt: now, rating: .good, elapsedDays: 2, scheduledDays: 2, phaseBefore: .review,
+            durationMs: 1000)
+        return StatisticsEvent(
+            id: "review:" + log.id.uuidString, kind: "review", occurredAt: now, cardID: card, log: log)
+    }
+    var enriched = try #require(reviews.last)
+    enriched.sessionID = UUID()
+    enriched.answerMilliseconds = 700
+    try await library.recordStatisticsEvents(Array(reviews.dropLast()) + [enriched])
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted]
+    let envelopes = try reviews.map {
+        SyncRecordEnvelope(
+            id: $0.id, resourceKind: "statistics", revision: 1, deviceID: "other", order: 0,
+            isTombstone: false, payload: try encoder.encode($0))
+    }
+    let transport = StatisticsTransport()
+    await transport.receive(envelopes)
+    let metadata = SyncMetadataStore(directory: folder.appendingPathComponent("stats-sync"))
+    let sync = StatisticsSyncService(repository: library, transport: transport, metadataStore: metadata)
+    try await sync.synchronize()
+
+    let sent = await transport.sentRecords()
+    #expect(sent.map(\.id) == [enriched.id])
+    let payload = try #require(sent.last?.payload)
+    #expect(try JSONDecoder().decode(StatisticsEvent.self, from: payload) == enriched)
+    let last = try #require(try await library.statisticsEvents(after: 0, limit: 1_000).last)
+    #expect(try await metadata.load().outboundCursor == last.sequence)
+}
+
+@Test func statisticsSyncDropsRetryOnceTheServerSuppliesTheSameReview() async throws {
+    let (library, folder) = try await statisticsSyncFixture()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let card = UUID()
+    let now = Date.now
+    let log = ReviewLog(
+        cardID: card, reviewedAt: now, rating: .good, elapsedDays: 2, scheduledDays: 2, phaseBefore: .review,
+        durationMs: 1000)
+    let event = StatisticsEvent(
+        id: "review:" + log.id.uuidString, kind: "review", occurredAt: now, cardID: card, log: log)
+    try await library.recordStatisticsEvents([event])
+    let transport = StatisticsTransport()
+    let directory = folder.appendingPathComponent("stats-sync")
+    let metadata = SyncMetadataStore(directory: directory)
+    let sync = StatisticsSyncService(repository: library, transport: transport, metadataStore: metadata)
+    await transport.setFailing(true)
+    await #expect(throws: StatisticsSyncFailure.self) { try await sync.synchronize() }
+    let queued = try #require(try await metadata.load().pendingOutbound?.first)
+    await sync.stop()
+
+    await transport.setFailing(false)
+    await transport.receive([queued])
+    let reopenedMetadata = SyncMetadataStore(directory: directory)
+    let restarted = StatisticsSyncService(repository: library, transport: transport, metadataStore: reopenedMetadata)
+    try await restarted.synchronize()
+
+    #expect(await transport.sentRecords().isEmpty)
+    let checkpoint = try await reopenedMetadata.load()
+    #expect(checkpoint.pendingOutbound?.isEmpty == true)
+    #expect(checkpoint.outboundCursor == queued.order)
 }
 @Test func statisticsUsesAnIndependentPrivateZone() {
     #expect(CKSyncEngineTransport.statisticsZoneName != CKSyncEngineTransport.zoneName)
