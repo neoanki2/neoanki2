@@ -342,6 +342,7 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
     public let id: UUID
     public var name: String
     public var layout: CardLayoutID
+    public var fitStudyArea: Bool
     public var interaction: Interaction
     public var learningRoute: Skill
     public var availability: CardSetupAvailabilityDraft?
@@ -355,6 +356,7 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
         id: UUID = UUID(),
         name: String,
         layout: CardLayoutID,
+        fitStudyArea: Bool = false,
         interaction: Interaction,
         learningRoute: Skill,
         availability: CardSetupAvailabilityDraft? = nil,
@@ -365,6 +367,7 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
         self.id = id
         self.name = name
         self.layout = layout
+        self.fitStudyArea = fitStudyArea
         self.interaction = interaction
         self.learningRoute = learningRoute
         self.availability = availability
@@ -377,6 +380,7 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
         id = template.id
         name = template.name
         layout = template.layout
+        fitStudyArea = template.fitStudyArea
         interaction = template.interaction
         learningRoute = template.skill
         availability = template.generateWhen.map(CardSetupAvailabilityDraft.init)
@@ -570,7 +574,8 @@ public struct CardSetupDraft: Identifiable, Equatable, Sendable {
                     throw ItemTypeStudioDraftError.incompleteAvailability(id)
                 }
                 return condition
-            }
+            },
+            fitStudyArea: fitStudyArea
         )
     }
 }

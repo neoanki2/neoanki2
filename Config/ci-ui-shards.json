@@ -212,6 +212,14 @@
       ]
     },
     {
+      "id": "phone-fit-study-area",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
+        "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable"
+      ]
+    },
+    {
       "id": "phone-builders-redesign",
       "device": "iPhone 17 Pro Max",
       "workers": 1,

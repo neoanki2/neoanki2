@@ -262,32 +262,16 @@ struct StudySessionView: View {
                 item: card.item
             )
         ) {
-            ScrollView {
-                VStack(spacing: 24) {
-                    MobileStudyCompositionView(
-                        template: card.template, item: card.item, mediaStore: session.mediaStore,
-                        isAnswerRevealed: session.isAnswerRevealed, occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
-                        response: session.reviewResponse, evaluation: session.answerEvaluation
-                    )
-                    .fixedSize(horizontal: false, vertical: true)
-                    if !session.isAnswerRevealed {
-                        interaction(for: card)
-                    } else if let evaluation = session.answerEvaluation,
-                              session.reviewResponse == nil || evaluation == .unavailable {
-                        Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
-                            .font(.headline).accessibilityAddTraits(.isSummaryElement)
+            Group {
+                if card.template.fitStudyArea && !session.isAnswerRevealed {
+                    studyCardContents(card, fitPrompt: true)
+                } else {
+                    ScrollView {
+                        studyCardContents(card, fitPrompt: false)
                     }
-                    if card.template.interaction == .record {
-                        practiceRecordingFeedback
-                    }
+                    .scrollDismissesKeyboard(.interactively)
                 }
-                .frame(maxWidth: 600)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 24)
-                .accessibilityFocused($answerFocused)
             }
-            .scrollDismissesKeyboard(.interactively)
             .playingAcademyCardAudio(
                 card,
                 answerRevealed: session.isAnswerRevealed,
@@ -314,6 +298,33 @@ struct StudySessionView: View {
                 recorder.cleanup()
             }
         }
+    }
+
+    private func studyCardContents(_ card: DueCard, fitPrompt: Bool) -> some View {
+        VStack(spacing: 24) {
+            MobileStudyCompositionView(
+                template: card.template, item: card.item, mediaStore: session.mediaStore,
+                isAnswerRevealed: session.isAnswerRevealed, occlusionGroup: card.card.occlusionGroup, clozeGroup: card.card.clozeGroup,
+                response: session.reviewResponse, evaluation: session.answerEvaluation
+            )
+            .fixedSize(horizontal: false, vertical: !fitPrompt)
+            .frame(maxHeight: fitPrompt ? .infinity : nil)
+            if !session.isAnswerRevealed {
+                interaction(for: card)
+            } else if let evaluation = session.answerEvaluation,
+                      session.reviewResponse == nil || evaluation == .unavailable {
+                Label(evaluationLabel(evaluation), systemImage: evaluation == .correct ? "checkmark.circle" : "info.circle")
+                    .font(.headline).accessibilityAddTraits(.isSummaryElement)
+            }
+            if card.template.interaction == .record {
+                practiceRecordingFeedback
+            }
+        }
+        .frame(maxWidth: 600, maxHeight: fitPrompt ? .infinity : nil)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
+        .accessibilityFocused($answerFocused)
     }
 
     @ViewBuilder

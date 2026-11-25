@@ -40,12 +40,14 @@ public struct AuthoredDeckDraft: Sendable {
         }
         public let interaction: Interaction
         public let skill: Skill
+        public let fitStudyArea: Bool
         public init(name: String, layout: CardLayoutID, components: [Component],
-                    interaction: Interaction, skill: Skill) {
+                    interaction: Interaction, skill: Skill, fitStudyArea: Bool = false) {
             self.name = name; self.layout = layout; self.components = components
             self.interaction = interaction; self.skill = skill
+            self.fitStudyArea = fitStudyArea
         }
-        private enum CodingKeys: String, CodingKey { case name, layout, components, prompt, answer, interaction, skill }
+        private enum CodingKeys: String, CodingKey { case name, layout, components, prompt, answer, interaction, skill, fitStudyArea }
         public func encode(to encoder: any Encoder) throws {
             var values = encoder.container(keyedBy: CodingKeys.self)
             try values.encode(name, forKey: .name)
@@ -55,6 +57,7 @@ public struct AuthoredDeckDraft: Sendable {
             try values.encode(answer, forKey: .answer)
             try values.encode(interaction, forKey: .interaction)
             try values.encode(skill, forKey: .skill)
+            try values.encode(fitStudyArea, forKey: .fitStudyArea)
         }
     }
     public struct Definition: Encodable, Sendable {

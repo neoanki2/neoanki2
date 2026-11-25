@@ -165,12 +165,19 @@ The initial recommendation is visible, but choosing another layout is sticky.
 Later Question or Answer changes may produce a new recommendation; they never
 silently replace your chosen layout or Learning route.
 
+For a large text prompt that should use the available Study Stage, turn on
+**Fit study area** in the Card setup's layout settings. This opt-in setting
+scales the question text to fit while keeping **Show Answer** available. It
+does not change the revealed answer's reading size, and existing Card setups
+leave it off by default. The setting is included in sync and deck transfers.
+
 Card setups control the content inside the Study Stage, not the surrounding
 session chrome. On Mac, every layout keeps the shared scope/progress header,
 its visible **End Session** control and **More** menu, a fixed response/status region, and the fixed
 primary-action or grading footer. The Study Stage reserves those regions and
 its bottom padding before giving the remaining space to the static card
-composition; it does not scroll or scale the template. Changing a layout
+composition; it does not scroll the template, and scales text only when
+**Fit study area** is enabled. Changing a layout
 therefore cannot move session actions offscreen or embed them in the authored
 card composition.
 

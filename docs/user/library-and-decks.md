@@ -8,6 +8,10 @@ parent: User Guide
 
 # Library and decks
 
+Editing and saving a Card setup updates its generated cards in place when their
+identities still match. Existing review history, scheduling, and suspension
+settings remain attached to surviving cards.
+
 Moving a selection validates every selected item and its original deck
 assignment before changing any assignments. If an item disappeared or moved
 elsewhere, refresh and select again; the whole move is rejected. Renaming a deck

@@ -157,8 +157,13 @@ private struct AcademyCardAudioModifier: ViewModifier {
 /// One queue per study card keeps clips in order and survives card layout changes.
 @MainActor final class AcademyCardAudioQueue {
     let player = AVQueuePlayer()
+    private let autoplay: Bool
     private var alreadyQueued: Set<String> = []
     private var answerWasRevealed = false
+
+    init(autoplay: Bool = true) {
+        self.autoplay = autoplay
+    }
 
     func updateReveal(_ answerRevealed: Bool) {
         // A failed card can immediately return with the same card ID.
@@ -195,21 +200,21 @@ private struct AcademyCardAudioModifier: ViewModifier {
     private func append(_ url: URL, for ref: MediaRef) {
         guard !Task.isCancelled, !alreadyQueued.contains(ref.assetHash) else { return }
         let startsPlayback = player.currentItem == nil
-        if startsPlayback {
+        if startsPlayback && autoplay {
             do { try CardAudioSession.preparePlayback() }
             catch { return }
         }
         player.insert(AVPlayerItem(url: url), after: nil)
         alreadyQueued.insert(ref.assetHash)
-        if startsPlayback { player.play() }
+        if startsPlayback && autoplay { player.play() }
     }
 
     func replay(_ url: URL, replacing references: [MediaRef]) throws {
-        try CardAudioSession.preparePlayback()
+        if autoplay { try CardAudioSession.preparePlayback() }
         alreadyQueued.formUnion(references.map(\.assetHash))
         stop()
         player.insert(AVPlayerItem(url: url), after: nil)
-        player.play()
+        if autoplay { player.play() }
     }
 
     func stop() {

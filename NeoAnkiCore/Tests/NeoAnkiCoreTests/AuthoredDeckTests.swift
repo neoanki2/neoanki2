@@ -35,13 +35,29 @@ private let authoredManifest =
 private let authoredDeck =
     #"{"kind":"deck","id":"root","name":"Authored"}"#
 private let authoredType =
-    #"{"kind":"type","id":"Study","name":"Authored Study","fields":[{"id":"front","name":"Front","type":"text","required":true},{"id":"back","name":"Back","type":"richText","required":true},{"id":"cloze","name":"Cloze","type":"cloze"},{"id":"image","name":"Image","type":"image"}],"templates":[{"name":"Forward","prompt":[{"field":"front"}],"answer":[{"field":"back"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}]}"#
+    #"{"kind":"type","id":"Study","name":"Authored Study","fields":[{"id":"front","name":"Front","type":"text","required":true},{"id":"back","name":"Back","type":"richText","required":true},{"id":"cloze","name":"Cloze","type":"cloze"},{"id":"image","name":"Image","type":"image"}],"templates":[{"name":"Forward","prompt":[{"field":"front"}],"answer":[{"field":"back"}],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"},"fitStudyArea":true}]}"#
 
 private let authoredV3Manifest =
     #"{"kind":"neoanki","version":3,"root":"root","parts":["items/items.jsonl"]}"#
 
 private let authoredV3RootDeck =
     #"{"kind":"deck","id":"root","name":"Authored","itemTypes":["Study"],"defaultType":"Study"}"#
+
+@Test func authoredTemplateExportsFitStudyAreaSetting() throws {
+    let template = AuthoredDeckDraft.CardTemplate(
+        name: "Character → keyword",
+        layout: .focus,
+        components: [
+            .init(region: .primary, purpose: .question, field: "character"),
+            .init(region: .secondary, purpose: .expectedAnswer, field: "keyword"),
+        ],
+        interaction: .reveal,
+        skill: Skill(input: .image, output: .text, operation: .recall),
+        fitStudyArea: true
+    )
+    let value = try JSONSerialization.jsonObject(with: JSONEncoder().encode(template)) as? [String: Any]
+    #expect(value?["fitStudyArea"] as? Bool == true)
+}
 
 @Test func authoredCourseStudyOrderSurvivesPortableRoundTrip() async throws {
     let directory = try authoredTestDirectory()
@@ -62,6 +78,8 @@ private let authoredV3RootDeck =
     let source = try ItemStore(databaseURL: directory.appendingPathComponent("source.sqlite"))
     try await source.bootstrap()
     let authored = try await AuthoredDeck.importDeck(from: bundle, into: source, now: now)
+    let importedTypes = try await source.listItemTypes()
+    #expect(importedTypes.first(where: { $0.name == "Authored Study" })?.templates.first?.fitStudyArea == true)
     let sourceID = try #require(authored.deckIDs.first)
     let transport = directory.appendingPathComponent("course.neodeck")
     try await PortableDeck.export(deckID: sourceID, from: source, to: transport)

@@ -111,7 +111,7 @@
       "id": "mobile-study",
       "name": "Complete native mobile study sessions",
       "article": "user/iphone-ipad.md",
-      "sources": ["Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiIOS/MobileStudyCompositionView.swift", "Sources/NeoAnkiIOS/StudySessionView.swift"],
+      "sources": ["Sources/NeoAnkiFeatures/StudyFeatureModel.swift", "Sources/NeoAnkiIOS/MobileStudyCompositionView.swift", "Sources/NeoAnkiIOS/StudySessionView.swift", "Sources/NeoAnkiIOS/MobileFitStudyAreaUITestFixture.swift"],
       "tests": ["Platforms/iOSUITests/NeoAnki2MobileUITests.swift", "Tests/NeoAnkiFeaturesTests/AudioSubmissionFeatureTests.swift", "Tests/NeoAnkiFeaturesTests/StudySaveLatencyTests.swift"]
     },
     {

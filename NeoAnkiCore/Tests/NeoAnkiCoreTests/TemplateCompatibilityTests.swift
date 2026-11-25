@@ -65,6 +65,17 @@ private func compatibilityItemType() -> ItemType {
     )
 }
 
+@Test func olderTemplateDefinitionsDefaultFitStudyAreaToOff() throws {
+    let data = Data(#"{"id":"20000000-0000-4000-8000-000000000001","name":"Old","layout":"focus","components":[],"interaction":"reveal","skill":{"input":"text","output":"text","operation":"recall"}}"#.utf8)
+    let decoded = try JSONDecoder().decode(Template.self, from: data)
+    #expect(!decoded.fitStudyArea)
+
+    var optedIn = decoded
+    optedIn.fitStudyArea = true
+    let roundTrip = try JSONDecoder().decode(Template.self, from: JSONEncoder().encode(optedIn))
+    #expect(roundTrip.fitStudyArea)
+}
+
 @Test func persistedTemplateWireShapeAndCanonicalDigestRemainStable() throws {
     let itemType = compatibilityItemType()
     let encoder = JSONEncoder()
@@ -72,9 +83,9 @@ private func compatibilityItemType() -> ItemType {
     let encoded = try encoder.encode(itemType.templates[0])
     let json = try #require(String(data: encoded, encoding: .utf8))
 
-    #expect(json == #"{"components":[{"id":"21000000-0000-4000-8000-000000000001","presentation":{"media":"default","reveal":"blurred"},"purpose":"expectedAnswer","region":"primary","source":{"field":{"_0":"10000000-0000-4000-8000-000000000002"}}},{"id":"21000000-0000-4000-8000-000000000002","presentation":{"media":"default","reveal":"always"},"purpose":"supporting","region":"label","source":{"literal":{"_0":"Listen first"}}},{"id":"21000000-0000-4000-8000-000000000003","presentation":{"media":"playOnTap","reveal":"always"},"purpose":"question","region":"media","source":{"field":{"_0":"10000000-0000-4000-8000-000000000003"}}},{"id":"21000000-0000-4000-8000-000000000004","presentation":{"media":"default","reveal":"always"},"purpose":"supporting","region":"supporting","source":{"field":{"_0":"10000000-0000-4000-8000-000000000001"}}}],"generateWhen":{"all":{"_0":[{"fieldNotEmpty":{"_0":"10000000-0000-4000-8000-000000000001"}},{"any":{"_0":[{"fieldNotEmpty":{"_0":"10000000-0000-4000-8000-000000000003"}},{"fieldEmpty":{"_0":"10000000-0000-4000-8000-000000000002"}}]}}]}},"id":"20000000-0000-4000-8000-000000000001","interaction":"type","layout":"mediaAside","name":"Unusual Card","skill":{"input":"audio","operation":"recall","output":"freeResponse"}}"#)
+#expect(json.contains(#""fitStudyArea":false"#))
     let digest = try itemType.portableSchemaDigest()
-    #expect(digest == "324214e3048d4249c1123d807f0b09a1af3f6457bccbbe15728e755e193e83d1")
+    #expect(digest == "034d81aa2558b64050e1f088d99b61cda657104ec7d9ba64083f76a40f579b2a")
 
     let decoded = try JSONDecoder().decode(Template.self, from: encoded)
     #expect(decoded == itemType.templates[0])

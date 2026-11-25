@@ -12,6 +12,9 @@ public struct MobileUITestFixtures: Sendable {
     @MainActor func prepareStudio() async throws {
         try await MobileItemTypeStudioUITestSeeder.seedIfRequested(library: library)
     }
+    @MainActor func prepareFitStudyArea() async throws {
+        try await MobileFitStudyAreaUITestFixture.seedIfRequested(library: library)
+    }
     @MainActor func prepareRedesign() async throws {
         try await MobileRedesignUITestSeeder.seedIfRequested(library: library)
     }

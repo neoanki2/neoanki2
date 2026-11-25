@@ -2057,7 +2057,7 @@ public actor NeoAnkiAPIService {
                     template,
                     allowed: [
                         "id", "name", "prompt", "answer", "interaction", "skill",
-                        "generateWhen", "layout", "components",
+                        "generateWhen", "layout", "components", "fitStudyArea",
                     ],
                     pointer: pointer
                 )

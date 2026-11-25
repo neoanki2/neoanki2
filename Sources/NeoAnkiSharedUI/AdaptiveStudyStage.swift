@@ -1,6 +1,30 @@
 import NeoAnkiCore
 import SwiftUI
 
+/// Scales a single native text prompt to the card stage's current bounds.
+/// The stage is supplied by the study shell, so this recomputes on resize and
+/// orientation changes while the footer remains outside the fitted region.
+public struct StudyAreaFittedPrompt<Content: View>: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var referencePointSize = 100.0
+    private let content: Content
+
+    public init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    public var body: some View {
+        GeometryReader { bounds in
+            content
+                .font(.system(size: max(1, referencePointSize * min(bounds.size.width, bounds.size.height) * 0.78 / 100)))
+                .lineLimit(1)
+                .minimumScaleFactor(0.05)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .layoutPriority(1)
+    }
+}
+
 /// Stable geometry for the five code-owned study compositions. Template data
 /// chooses a preset and assigns ingredients; it cannot inject arbitrary layout.
 public enum StudyStageGeometry {

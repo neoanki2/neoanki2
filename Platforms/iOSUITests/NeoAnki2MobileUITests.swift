@@ -2423,3 +2423,46 @@ final class MobileStatisticsUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.descendants(matching:.any)["statisticsScope"].exists)
     }
 }
+
+@MainActor
+final class MobileFitStudyAreaUITests: NeoAnki2MobileUITestCase {
+    private func capture(_ name: String, in app: XCUIApplication) {
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "fit-study-area-\(name)"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "fit-study-area-\(name)-tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
+    func testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable() throws {
+        let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "fit-study-area"])
+        allowBadgePermissionIfPresented(timeout: 10)
+        let prompt = app.staticTexts["日"]
+        let reveal = app.buttons["Show Answer"]
+        XCTAssertTrue(prompt.waitUntilExists(timeout: 10))
+        XCTAssertTrue(reveal.waitUntilExists(timeout: 10))
+        XCTAssertTrue(reveal.isHittable, "Show Answer must stay in the fixed study footer")
+        XCTAssertGreaterThan(prompt.frame.height, 60, "The portrait prompt should scale beyond body text")
+        capture("portrait-question", in: app)
+
+        XCUIDevice.shared.orientation = .landscapeRight
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            let size = XCUIScreen.main.screenshot().image.size
+            return size.width > size.height
+        }, "The Simulator should report the rotated landscape size")
+        XCTAssertTrue(prompt.waitUntilExists(timeout: 5))
+        XCTAssertGreaterThan(prompt.frame.height, 60, "The landscape prompt should remain prominent")
+        XCTAssertTrue(reveal.isHittable, "Show Answer must remain visible after rotation")
+        capture("landscape-question", in: app)
+
+        reveal.tap()
+        for answer in ["day; sun", "The sun crossing the horizon.", "Read as nichi or jitsu."] {
+            XCTAssertTrue(app.staticTexts[answer].waitUntilExists(timeout: 5), "Missing revealed answer text: \(answer)")
+        }
+        XCTAssertFalse(reveal.exists)
+        capture("landscape-answer", in: app)
+    }
+}

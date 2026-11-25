@@ -41,7 +41,7 @@ import Testing
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("academy-audio-\(UUID())")
     let store = try MediaStore(rootDirectory: root)
     defer { try? FileManager.default.removeItem(at: root) }
-    let playback = AcademyCardAudioQueue()
+    let playback = AcademyCardAudioQueue(autoplay: false)
     playback.player.isMuted = true
     defer { playback.reset() }
 

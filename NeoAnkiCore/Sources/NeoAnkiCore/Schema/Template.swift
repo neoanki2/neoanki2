@@ -11,6 +11,9 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
     public var interaction: Interaction
     public var skill: Skill
     public var generateWhen: SlotCondition?
+    /// When enabled, a text prompt scales to the study stage's available space.
+    /// Missing keys in older library definitions decode to `false`.
+    public var fitStudyArea: Bool
 
     public init(
         id: UUID = UUID(),
@@ -19,7 +22,8 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         components: [TemplateComponent],
         interaction: Interaction,
         skill: Skill,
-        generateWhen: SlotCondition? = nil
+        generateWhen: SlotCondition? = nil,
+        fitStudyArea: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -28,6 +32,47 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         self.interaction = interaction
         self.skill = skill
         self.generateWhen = generateWhen
+        self.fitStudyArea = fitStudyArea
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, layout, components, interaction, skill, generateWhen, fitStudyArea
+        case prompt, answer
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        interaction = try values.decode(Interaction.self, forKey: .interaction)
+        skill = try values.decode(Skill.self, forKey: .skill)
+        generateWhen = try values.decodeIfPresent(SlotCondition.self, forKey: .generateWhen)
+        fitStudyArea = try values.decodeIfPresent(Bool.self, forKey: .fitStudyArea) ?? false
+        if let decodedLayout = try values.decodeIfPresent(CardLayoutID.self, forKey: .layout),
+           let decodedComponents = try values.decodeIfPresent([TemplateComponent].self, forKey: .components) {
+            layout = decodedLayout
+            components = decodedComponents
+        } else {
+            let prompt = try values.decodeIfPresent(Side.self, forKey: .prompt) ?? Side(slots: [])
+            let answer = try values.decodeIfPresent(Side.self, forKey: .answer) ?? Side(slots: [])
+            let migrated = TemplateCompositionMigration.map(
+                prompt: prompt, answer: answer, interaction: interaction, fields: []
+            )
+            layout = migrated.layout
+            components = migrated.components
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(name, forKey: .name)
+        try values.encode(layout, forKey: .layout)
+        try values.encode(components, forKey: .components)
+        try values.encode(interaction, forKey: .interaction)
+        try values.encode(skill, forKey: .skill)
+        try values.encodeIfPresent(generateWhen, forKey: .generateWhen)
+        try values.encode(fitStudyArea, forKey: .fitStudyArea)
     }
 
     /// Source compatibility for authored builders and API v1 projections.
@@ -39,7 +84,8 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
         answer: Side,
         interaction: Interaction,
         skill: Skill,
-        generateWhen: SlotCondition? = nil
+        generateWhen: SlotCondition? = nil,
+        fitStudyArea: Bool = false
     ) {
         let composition = TemplateCompositionMigration.map(
             prompt: prompt,
@@ -54,7 +100,8 @@ public struct Template: Codable, Equatable, Sendable, Identifiable {
             components: composition.components,
             interaction: interaction,
             skill: skill,
-            generateWhen: generateWhen
+            generateWhen: generateWhen,
+            fitStudyArea: fitStudyArea
         )
     }
 

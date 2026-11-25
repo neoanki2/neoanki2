@@ -166,7 +166,8 @@ public extension ItemType {
                 skill: template.skill,
                 generateWhen: template.generateWhen.map {
                     duplicatedCondition($0, fieldMap: fieldMap)
-                }
+                },
+                fitStudyArea: template.fitStudyArea
             )
         }
         return ItemType(

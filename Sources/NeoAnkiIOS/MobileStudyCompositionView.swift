@@ -30,8 +30,8 @@ struct MobileStudyCompositionView: View {
             evaluation: evaluation,
             mobileReading: true,
             enabled: [.type, .choose, .arrange].contains(template.interaction)
-        ) { component, _ in
-            MobileContentValueView(
+        ) { component, hole in
+            let content = MobileContentValueView(
                 value: component.value,
                 mediaStore: mediaStore,
                 mediaBehavior: component.presentation.media,
@@ -41,9 +41,31 @@ struct MobileStudyCompositionView: View {
                 occlusionGroup: occlusionGroup,
                 clozeGroup: clozeGroup
             )
+            if template.fitStudyArea && !isAnswerRevealed
+                && hole == .question && component.purpose == .question,
+               case .text = component.value {
+                StudyAreaFittedPrompt { content }
+            } else {
+                content
+            }
         }
-        .cardWireframeIntrinsicSizing(referenceHeight: 240)
+        .modifier(MobileStudyContentSizing(
+            fitsPrompt: template.fitStudyArea && !isAnswerRevealed
+        ))
         .frame(maxWidth: 600)
+    }
+}
+
+private struct MobileStudyContentSizing: ViewModifier {
+    let fitsPrompt: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if fitsPrompt {
+            content
+        } else {
+            content.cardWireframeIntrinsicSizing(referenceHeight: 240)
+        }
     }
 }
 #endif

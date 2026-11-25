@@ -819,6 +819,7 @@ package enum APIOpenAPI {
                  "answer": array(reference("Slot")),
                  "layout": ["type": ["string", "null"], "enum": ["focus", "split", "mediaAside", "mediaHero", "actionStage", NSNull()]],
                  "components": ["oneOf": [array(reference("TemplateComponent")), ["type": "null"]]],
+                 "fitStudyArea": ["type": "boolean", "default": false],
                  "interaction": ["type": "string", "enum": ["reveal", "type", "choose", "record", "audioSubmission", "cloze", "imageOcclusion", "arrange"]],
                  "skill": reference("Skill"), "generateWhen": reference("Condition")]
             ),

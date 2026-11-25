@@ -9,6 +9,11 @@ permalink: /user/iphone-ipad/
 
 # iPhone and iPad
 
+The optional **Fit study area** Card setup setting keeps large text prompts
+centered and scaled to the available study space. It adapts as the phone rotates
+and leaves **Show Answer** visible; the revealed answer remains at its normal
+reading size. The setting syncs with the item type.
+
 Home loads deck totals and authoring choices before you open a scoped item
 browser. A multi-item move succeeds for the entire selection or asks you to
 refresh a changed selection. Typed answers keep your submitted text beside the

@@ -507,7 +507,8 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
                 generateWhen: .all([
                     .fieldNotEmpty(plain.id),
                     .any([.fieldNotEmpty(rich.id), .fieldEmpty(number.id)]),
-                ])
+                ]),
+                fitStudyArea: true
             ),
         ]
     )
@@ -549,6 +550,7 @@ private func portableStore(in directory: URL, name: String) async throws -> Item
     #expect(imported.item.fields.map(\.value) == expected)
     #expect(imported.item.tags == ["unicode-✓", "repeated"])
     #expect(imported.itemType.templates[0].generateWhen != nil)
+    #expect(imported.itemType.templates[0].fitStudyArea)
     #expect(
         try PortableItemTypeIdentity.canonicalRepresentation(of: imported.itemType)
             == PortableItemTypeIdentity.canonicalRepresentation(of: type)

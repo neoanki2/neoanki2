@@ -592,11 +592,13 @@ private actor BlockingPairingApprover: APIPairingApprover {
         components: components,
         interaction: .type,
         skill: Skill(input: .text, output: .freeResponse, operation: .recall),
-        generateWhen: .any([.fieldNotEmpty(frontID), .fieldEmpty(backID)])
+        generateWhen: .any([.fieldNotEmpty(frontID), .fieldEmpty(backID)]),
+        fitStudyArea: true
     )
 
     let representation = APITemplateDefinition(template)
     #expect(representation.layout == "actionStage")
+    #expect(representation.fitStudyArea == true)
     #expect(representation.components?.map(\.id) == components.map { $0.id.uuidString.lowercased() })
     #expect(representation.prompt.map(\.source.kind) == ["literal", "field"])
     #expect(representation.prompt.map(\.source.text) == ["Instruction", nil])
