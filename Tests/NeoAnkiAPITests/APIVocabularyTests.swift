@@ -530,3 +530,34 @@ private actor VocabularyPackOpenCounter {
     }
     #expect(await counter.count == 3)
 }
+
+@Test func knownWordsAndVocabularySetsUseDedicatedScopesAndReplaySafely() async throws {
+    let root = try vocabularyTestDirectory("known-words")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let (api, store, _) = try await vocabularyAPI(root: root)
+    let read = try await pair(api, scopes: ["known-words.read"])
+    let write = try await pair(api, scopes: ["known-words.write"])
+    let itemWriter = try await pair(api, scopes: ["items.write"])
+    let judge = vocabularyRequest(.post, "/v1/known-words/judgments", token: write,
+        headers: ["Content-Type": "application/json", "Idempotency-Key": "judge-gift"],
+        body: Data(#"{"term":{"language":"de","expression":"Gift"},"judgment":"known"}"#.utf8))
+    #expect(await api.handle(judge).status == 200)
+    #expect(await api.handle(judge).status == 200)
+    #expect(await api.handle(vocabularyRequest(.get, "/v1/known-words", token: write)).status == 403)
+    let german = await api.handle(vocabularyRequest(.get, "/v1/known-words", token: read, query: ["language": ["de"]]))
+    let english = await api.handle(vocabularyRequest(.get, "/v1/known-words", token: read, query: ["language": ["en"]]))
+    #expect(try (jsonObject(german)["data"] as? [[String: Any]])?.count == 1)
+    #expect(try (jsonObject(english)["data"] as? [[String: Any]])?.isEmpty == true)
+    #expect(try await store.fetchDueCards().isEmpty)
+
+    let body = Data(#"{"term":{"language":"es","expression":"sí"},"meaning":"yes","meaningLanguage":"en","sentence":"Respondió que sí.","occurrence":0}"#.utf8)
+    let create = vocabularyRequest(.post, "/v1/vocabulary-sets", token: itemWriter,
+        headers: ["Content-Type": "application/json", "Idempotency-Key": "create-si"], body: body)
+    let first = await api.handle(create)
+    let replay = await api.handle(create)
+    #expect(first.status == 201)
+    #expect(replay.status == 201)
+    #expect(first.body == replay.body)
+    #expect(try await store.countItems(itemTypeID: VocabularySet.typeID) == 1)
+    #expect(try await store.vocabularyStatuses(language: "es").first?.hasCards == true)
+}

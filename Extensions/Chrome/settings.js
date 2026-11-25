@@ -1,4 +1,4 @@
-import { apiBase, makeAPI, revokeClient, SCOPES } from './core.js';
+import { apiBase, makeAPI, revokeClient, READING_SCOPES, SCOPES } from './core.js';
 import { readState, writeState } from './storage.js';
 
 const $ = id => document.getElementById(id);
@@ -36,18 +36,20 @@ $('connection-form').addEventListener('submit', async event => {
     apiBase(port);
     const state = await readState();
     if (state.draft?.pending) throw new Error('Finish the pending card save, or check NeoAnki2 and discard its draft, before changing the connection.');
-    if (config.token && port === config.port) {
-      // Refresh an existing connection instead of accumulating new grants.
-      await makeAPI(config)('/v1/clients/current');
-    } else {
+    const meta = await makeAPI({ port })('/v1/meta');
+    const requestedScopes = meta.capabilities?.includes('vocabulary.known-words') ? [...SCOPES, ...READING_SCOPES] : SCOPES;
+    const prior = config.token && port === config.port ? await makeAPI(config)('/v1/clients/current') : null;
+    if (!prior || !requestedScopes.every(scope => prior.scopes.includes(scope))) {
       status('Approve “NeoAnki2 Chrome Companion” in NeoAnki2. Keep this tab open while you approve.');
       const paired = await makeAPI({ port })('/v1/pairings', {
         method: 'POST', timeout: 310000,
-        body: { displayName: 'NeoAnki2 Chrome Companion', requestedScopes: SCOPES, origin: location.origin },
+        body: { displayName: 'NeoAnki2 Chrome Companion', requestedScopes, origin: location.origin },
       });
+      const previousConfig = config;
       config = { port, token: paired.token, clientId: paired.client.id,
         ...(config.port === port && config.packId !== undefined ? { packId: config.packId } : {}) };
       await writeState({ config });
+      if (prior) await revokeClient(makeAPI(previousConfig)).catch(() => {});
     }
     status('Connected. You can close this tab and add a card from the toolbar.');
     await dictionaries();

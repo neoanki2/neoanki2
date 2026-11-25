@@ -80,7 +80,7 @@ public final class StudyFeatureModel: Identifiable {
     public var reviewResponse: String? {
         guard isAnswerRevealed else { return nil }
         switch currentCard?.template.interaction {
-        case .type:
+        case .type, .cloze:
             return typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : typedAnswer
         case .choose:
             return selectedChoice
@@ -439,8 +439,11 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func submitTypedAnswer() {
-        guard let card = currentCard, card.template.interaction == .type else { return }
-        let evaluation = StudyResponseEvaluator.evaluate(typedAnswer, for: card)
+        guard let card = currentCard, !isAnswerRevealed,
+              card.template.interaction == .type || VocabularySet.supportsTypedResponse(card) else { return }
+        let evaluation = VocabularySet.supportsTypedResponse(card)
+            ? VocabularySet.check(typedAnswer, for: card)
+            : StudyResponseEvaluator.evaluate(typedAnswer, for: card)
         if evaluation == .unavailable {
             recoverFromMissingAnswer()
             return
@@ -518,6 +521,8 @@ public final class StudyFeatureModel: Identifiable {
         learningTime.interaction()
         guard let interaction = currentCard?.template.interaction else { return }
         switch interaction {
+        case .cloze where currentCard.map(VocabularySet.supportsTypedResponse) == true && !typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+            submitTypedAnswer()
         case .reveal, .cloze, .imageOcclusion:
             revealAnswer()
         case .type:

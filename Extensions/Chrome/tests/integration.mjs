@@ -41,7 +41,7 @@ try {
   });
   sourceServer = http.createServer((request, response) => {
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
-    response.end('<!doctype html><html lang="en"><title>Vocabulary reading</title><p id="word">serendipity</p><p id="unicode">їжак 🦔</p><textarea id="input">selected phrase</textarea><button id="focus">Focus</button></html>');
+    response.end('<!doctype html><html lang="en"><title>Vocabulary reading</title><p id="word">serendipity</p><p id="unicode">їжак 🦔</p><p id="contextual">The novel revealed a <em>subtlety</em> she had missed.</p><textarea id="input">selected phrase</textarea><button id="focus">Focus</button></html>');
   });
   sourceServer.listen(0, '127.0.0.1'); await once(sourceServer, 'listening');
   const sourceURL = `http://127.0.0.1:${sourceServer.address().port}/watch?v=fixture`;
@@ -99,7 +99,7 @@ try {
   }), { key, property, expected });
   const grant = await apiCall(settings, '/v1/clients/current');
   assert.equal(grant.origin, origin, 'Pairing binds the actual extension origin.');
-  assert.deepEqual(grant.scopes.sort(), ['items.write', 'library.read', 'vocabulary.read']);
+  assert.deepEqual(grant.scopes.sort(), ['items.write', 'known-words.read', 'known-words.write', 'library.read', 'vocabulary.read']);
   console.log('PASS: real-origin pairing and authenticated dictionary/deck reads');
 
   const source = await context.newPage();
@@ -270,6 +270,64 @@ try {
   assert.equal(await card.locator('#save').isDisabled(), true);
   await card.close(); await context.unroute(base + '/v1/item-types?*', missingBasic);
   await discardStoredDraft();
+
+  await select('#word');
+  const reading = await popup();
+  const readingAction = type => reading.evaluate(async ({ type, sourceURL }) => {
+    const tabs = await chrome.tabs.query({});
+    const sourceTab = tabs.find(tab => tab.url?.startsWith(new URL(sourceURL).origin));
+    if (!sourceTab) throw new Error('The toolbar gesture did not grant source-tab access.');
+    const result = await chrome.runtime.sendMessage({ type, tabId: sourceTab.id, language: 'en', meaningLanguage: 'en' });
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  }, { type, sourceURL });
+  assert.equal(await source.evaluate(() => CSS.highlights.has('neoanki-unassessed')), false);
+  await readingAction('neoankiReadingStart');
+  await source.waitForFunction(() => CSS.highlights.get('neoanki-unassessed')?.size > 0);
+  const sourceCDP = await context.newCDPSession(source);
+  async function axElement(role, name) {
+    const end = Date.now() + 5000;
+    let element;
+    while (Date.now() < end && !element) {
+      const { nodes } = await sourceCDP.send('Accessibility.getFullAXTree');
+      element = nodes.find(node => node.role?.value === role && node.name?.value === name
+        && !node.properties?.some(property => property.name === 'disabled' && property.value?.value));
+      if (!element) await source.waitForFunction(() => CSS.highlights.has('neoanki-unassessed'));
+    }
+    assert.ok(element?.backendDOMNodeId, role + ': ' + name);
+    return element.backendDOMNodeId;
+  }
+  async function tap(role, name) {
+    const backendNodeId = await axElement(role, name);
+    await sourceCDP.send('DOM.focus', { backendNodeId });
+    await source.keyboard.press('Enter');
+  }
+  await source.locator('#word').evaluate(element => document.getSelection().removeAllRanges());
+  await source.locator('#word').click({ position: { x: 14, y: 10 } });
+  await tap('button', 'I know this');
+  await source.waitForFunction(() => !Array.from(CSS.highlights.get('neoanki-unassessed') || [], String).includes('serendipity'));
+  let known = (await apiCall(settings, '/v1/known-words?language=en')).data;
+  assert.equal(known.find(row => row.term.expression === 'serendipity').judgment, 'known');
+  await tap('button', 'Undo');
+  await source.waitForFunction(() => Array.from(CSS.highlights.get('neoanki-unassessed') || [], String).includes('serendipity'));
+  known = (await apiCall(settings, '/v1/known-words?language=en')).data;
+  assert.ok(!known.some(row => row.term.expression === 'serendipity' && row.judgment === 'known'));
+
+  await source.keyboard.press('Escape');
+  await source.locator('#contextual em').click();
+  await tap('button', 'Create card set');
+  await sourceCDP.send('DOM.focus', { backendNodeId: await axElement('textbox', 'Meaning') });
+  await source.keyboard.type('a fine distinction');
+  await tap('button', 'Create card set');
+  await source.waitForFunction(() => Array.from(CSS.highlights.get('neoanki-learning') || [], String).includes('subtlety'));
+  const sets = (await apiCall(settings, '/v1/items?limit=200')).data.filter(item => item.cardIds.length === 2);
+  assert.equal(sets.length, 1);
+  await source.goto(new URL('/next', sourceURL).href);
+  await source.waitForFunction(() => Array.from(CSS.highlights.get('neoanki-learning') || [], String).includes('subtlety'));
+  await readingAction('neoankiReadingStop');
+  await source.waitForFunction(() => !CSS.highlights.has('neoanki-unassessed') && !CSS.highlights.has('neoanki-learning'));
+  await reading.close();
+  console.log('PASS: opt-in Reading Mode, mark and undo, contextual Cloze set, same-origin navigation, and cleanup');
 
   await settings.evaluate(async () => { window.fixtureConfig = (await chrome.storage.local.get('config')).config; });
   await settings.locator('#disconnect').click();

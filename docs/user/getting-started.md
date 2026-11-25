@@ -208,6 +208,10 @@ The main window is a split view:
 - The detail area shows the selected scope's home, browse mode, item detail, or
   the active task.
 
+Open **Known Words** in the sidebar to see vocabulary for a specific learning
+language. Choose **Add Word** to record a word you already know or create a
+set of practice cards from an example sentence.
+
 Selecting a scope opens its home: what is due, what to study, and a link into
 browse mode. Switching scopes keeps the requested destination while counts
 refresh. Browse mode is where you search items and open one for editing;

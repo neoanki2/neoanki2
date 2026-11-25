@@ -52,6 +52,27 @@
   },
   "features": [
     {
+      "id": "known-words",
+      "name": "Track known words by learning language and practice contextual Cloze",
+      "article": "user/authoring-items.md",
+      "sources": [
+        "NeoAnkiCore/Sources/NeoAnkiCore/Study/VocabularySet.swift",
+        "NeoAnkiCore/Sources/NeoAnkiCore/Database/SQLiteDatabase+Vocabulary.swift",
+        "Sources/NeoAnkiApplication/PersonalVocabulary.swift",
+        "Sources/NeoAnkiCloudSync/VocabularyJudgmentSyncService.swift",
+        "Sources/NeoAnkiSharedUI/KnownWordsView.swift",
+        "Extensions/Chrome/reading-worker.js",
+        "Extensions/Chrome/reading-page.js"
+      ],
+      "tests": [
+        "NeoAnkiCore/Tests/NeoAnkiCoreTests/PersonalVocabularyTests.swift",
+        "Tests/NeoAnkiApplicationTests/LearningTimeSyncTests.swift",
+        "Tests/NeoAnkiAPITests/APIVocabularyTests.swift",
+        "Platforms/iOSUITests/NeoAnki2MobileUITests.swift",
+        "Extensions/Chrome/tests/integration.mjs"
+      ]
+    },
+    {
       "id": "learning-time",
       "name": "Track active learning time by deck and subdeck",
       "article": "user/learning-time.md",

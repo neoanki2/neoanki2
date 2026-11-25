@@ -138,6 +138,12 @@ public struct WordCaptureView: View {
                 .disabled(model.isLoading || model.isSaving)
                 .accessibilityLabel("Word or phrase")
                 .accessibilityIdentifier("word-capture-query")
+            if let vocabulary = model.personalVocabulary,
+               !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let draft = model.vocabularySetDraft
+                VocabularyCaptureActions(vocabulary: vocabulary, decks: model.vocabularyDecks,
+                                         term: draft.term, preset: draft) {}
+            }
         }
         .padding(.horizontal)
         .padding(.bottom, 8)

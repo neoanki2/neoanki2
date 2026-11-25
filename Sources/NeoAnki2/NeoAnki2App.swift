@@ -343,6 +343,8 @@ struct NeoAnki2App: App {
                     directory: root.appendingPathComponent("Learning Time Sync", isDirectory: true)),
                 statistics: try await StatisticsSyncService.make(repository: library,
                     directory: root.appendingPathComponent("Statistics Sync", isDirectory: true)),
+                knownWords: try await VocabularyJudgmentSyncService.make(repository: library,
+                    directory: root.appendingPathComponent("Known Words Sync", isDirectory: true)),
                 backupURL: { root.appendingPathComponent("pre-cloud-merge.sqlite") }
             )
             syncService = service

@@ -79,6 +79,15 @@ struct LibraryView: View {
         List {
             if embedsNavigation {
                 Section {
+                    if let vocabulary = model.features.personalVocabulary {
+                        NavigationLink {
+                            KnownWordsView(vocabulary: vocabulary, decks: model.features.vocabularyDecks) {
+                                await model.refresh()
+                            }
+                        } label: {
+                            Label("Known Words", systemImage: "text.book.closed")
+                        }
+                    }
                     NavigationLink { SavedResponsesMobileView(model: model.features.makeSavedResponses()) } label: {
                         Label("Saved Responses", systemImage: "waveform")
                     }

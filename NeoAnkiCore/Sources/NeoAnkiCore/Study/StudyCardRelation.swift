@@ -13,6 +13,7 @@ public struct StudyCardRelation: Equatable, Sendable {
     }
 
     public static func family(for item: Item) -> String {
+        if let term = VocabularySet.term(in: item) { return "vocabulary:\(term.id)" }
         struct Envelope: Decodable {
             struct Target: Decodable { var language: String; var expression: String }
             var format: String

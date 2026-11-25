@@ -464,9 +464,11 @@ struct StudyView: View {
     @ViewBuilder
     private func interactionResponse(for card: DueCard) -> some View {
         switch card.template.interaction {
-        case .reveal, .cloze, .imageOcclusion:
+        case .cloze where !VocabularySet.supportsTypedResponse(card):
             EmptyView()
-        case .type:
+        case .reveal, .imageOcclusion:
+            EmptyView()
+        case .type, .cloze:
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text("Your answer")
                     .font(DesignSystem.Typography.uiCaption)
@@ -479,6 +481,7 @@ struct StudyView: View {
                     )
                 )
                 .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled(VocabularySet.supportsTypedResponse(card))
                 .focused($typedAnswerFocused)
                 .onSubmit { model.submitTypedAnswer(); typedAnswerFocused = false }
                 .accessibilityIdentifier("typedAnswer")
@@ -901,6 +904,8 @@ struct StudyView: View {
 
     private func primaryActionTitle(for interaction: Interaction) -> String {
         switch interaction {
+        case .cloze where model.currentCard.map(VocabularySet.supportsTypedResponse) == true
+            && !model.typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty: "Check Answer"
         case .reveal, .cloze, .imageOcclusion: "Show Answer"
         case .type: "Check Answer"
         case .choose: "Check Choice"

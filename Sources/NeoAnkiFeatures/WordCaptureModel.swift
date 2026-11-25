@@ -70,6 +70,29 @@ public struct VocabularyContentChoice: Identifiable, Sendable, Equatable {
         self.onSaved = onSaved
     }
 
+    public var personalVocabulary: (any PersonalVocabulary)? { library as? any PersonalVocabulary }
+    public var vocabularyDecks: any LibraryDeckManaging { library }
+
+    public var vocabularySetDraft: VocabularySetDraft {
+        let sense = selectedEntry?.senses.first(where: { $0.id == chosenSenseID })
+            ?? (selectedEntry?.senses.count == 1 ? selectedEntry?.senses.first : nil)
+        let definition = sense?.definitions.first?.text
+        let language = selectedEntry?.language ?? (selectedPack?.languages.count == 1 ? selectedPack?.languages.first : nil) ?? ""
+        let examples = sense?.examples ?? []
+        let sentence = examples.first {
+            VocabularySet.occurrences(of: query, in: $0.text.value, language: language).count == 1
+        }?.text.value ?? ""
+        let production = examples.first { example in
+            guard example.text.value != sentence, !sentence.isEmpty, let form = example.target?.exactText else { return false }
+            return VocabularySet.occurrences(of: form, in: example.text.value, language: language).count == 1
+        }
+        let discriminator = selectedEntry?.senses.count == 1 && results.count == 1 ? nil : definition?.value
+        return .init(term: .init(language: language, expression: query, sense: discriminator),
+                     meaning: definition?.value ?? "", meaningLanguage: definition?.language ?? "",
+                     sentence: sentence, productionSentence: production?.text.value,
+                     productionForm: production?.target?.exactText, deckID: deckID)
+    }
+
     public func makeTypeChooser() -> ItemTypeChooserFeatureModel {
         .init(authoring: .init(library: library), deckID: deckID)
     }

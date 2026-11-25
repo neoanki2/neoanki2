@@ -100,6 +100,11 @@ The Prose Deck builder includes a **Prose Unit** type with one Reveal card per
 unit. Its stored order and separators reconstruct the passage in the whole-text
 editor; changing a unit's cue or answer retires that card and creates a new one.
 
+Creating a **Vocabulary Set** adds an item with two Card setups, one for
+recognition in context and one for Cloze production. The Cloze field stores
+the selected span from your example sentence and uses it to generate the
+production answer.
+
 ## Edit fields and Card setups together
 
 An image field can hold a selected or pasted image with no description; the

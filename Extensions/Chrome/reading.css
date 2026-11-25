@@ -1,0 +1,10 @@
+::highlight(neoanki-unassessed) {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 57%, transparent);
+}
+::highlight(neoanki-learning) {
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-color: currentColor;
+}

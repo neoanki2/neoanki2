@@ -280,6 +280,9 @@ the file arrives.
 
 ## Keyboard and assistive-technology tips
 
+- In **Known Words**, use the **Learning language** picker to change the list
+  and **Add Word** to open the form. The vocabulary form labels the learning
+  language separately from the language of the meaning.
 - Use macOS **Keyboard navigation** or VoiceOver navigation to reach toolbar,
   sidebar, form, and dialog controls.
 - If a shortcut types into a focused text field instead of acting, move focus

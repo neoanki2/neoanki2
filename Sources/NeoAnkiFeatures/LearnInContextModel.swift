@@ -96,6 +96,32 @@ private struct ContextAuthoringPreferences: Codable {
             && !draft.target.expression.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedExamples.isEmpty
             && selectedExamples.allSatisfy { ContextOccurrences.validated($0.spans, in: $0.sentence) }
     }
+    public var personalVocabulary: (any PersonalVocabulary)? { library as? any PersonalVocabulary }
+    public var vocabularyDecks: any LibraryDeckManaging { library }
+
+    public var vocabularySetDraft: VocabularySetDraft {
+        let target = draft.target
+        let first = selectedExamples.first
+        let sentence = first?.sentence ?? draft.sourceSentence
+        let expression = ([target.expression] + target.forms).first {
+            VocabularySet.occurrences(of: $0, in: sentence, language: target.language).count == 1
+        } ?? target.expression
+        let production = selectedExamples.dropFirst().first {
+            !$0.needsMeaningCheck && $0.sentence != sentence && ($0.meaning ?? target.meaning) == (first?.meaning ?? target.meaning)
+                && ($0.language ?? target.language) == (first?.language ?? target.language)
+        }
+        let productionForm = production.flatMap { example in
+            ([expression, target.expression] + target.forms).first {
+                VocabularySet.occurrences(of: $0, in: example.sentence, language: target.language).count == 1
+            }
+        }
+        return .init(term: .init(language: target.language, expression: expression,
+                                sense: target.senseID == nil ? nil : target.meaning),
+                     meaning: first?.meaning ?? target.meaning, meaningLanguage: "", sentence: sentence,
+                     productionSentence: productionForm == nil ? nil : production?.sentence,
+                     productionForm: productionForm, deckID: draft.deckID)
+    }
+
     public func start(deckID: UUID? = nil, expression: String = "", language: String? = nil, meaning: String? = nil) async {
         isLoading = true
         defer { isLoading = false }
@@ -119,6 +145,9 @@ private struct ContextAuthoringPreferences: Codable {
             activeItemType = try await library.loadItemTypeCatalog().allItemTypes.first { $0.id == ContextExamplePreset.typeID } ?? ContextExamplePreset.itemType
             if let deckID, draft.examples.isEmpty && draft.target.expression.isEmpty { draft.deckID = deckID }
             if !decks.contains(where: { $0.id == draft.deckID }) { draft.deckID = decks.first?.id }
+            if draft.target.expression.isEmpty, expression.isEmpty, let language {
+                draft.target.language = language
+            }
             if !expression.isEmpty, draft.target.expression.isEmpty {
                 draft.target = .init(expression: expression, language: language ?? draft.target.language, meaning: meaning ?? "")
                 draft.sourceSentence = ""; draft.examples = []; draft.groupID = UUID()

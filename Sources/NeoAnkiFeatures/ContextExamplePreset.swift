@@ -17,7 +17,7 @@ public enum ContextExamplePreset {
     public static let metadata = FieldDef(id: id("8109"), name: "Context provenance", type: .text)
     public static let group = FieldDef(id: id("8110"), name: "Context set", type: .text)
     public static func authoringFields(in type: ItemType) -> [FieldDef] {
-        guard type.id == typeID || (type.fields.contains { $0.name == metadata.name } && type.fields.contains { $0.name == group.name }) else { return type.fields }
+        guard type.id == typeID || (type.fields.contains { $0.name == metadata.name } && type.fields.contains { $0.name == group.name }) else { return VocabularySet.authoringFields(in: type) }
         let internalNames = Set([metadata.name, group.name, listening.name])
         return type.fields.filter { !internalNames.contains($0.name) && ![metadata.id, group.id, listening.id].contains($0.id) }
     }

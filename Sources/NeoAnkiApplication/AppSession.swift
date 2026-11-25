@@ -31,6 +31,7 @@ public enum AppRoute: Sendable, Hashable {
     case builders
     case vocabularyPacks
     case savedResponses
+    case knownWords
     case scheduling
     case syncIssues
     case settings

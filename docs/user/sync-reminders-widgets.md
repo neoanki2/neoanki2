@@ -174,6 +174,11 @@ and when a library opens. A delayed card snapshot cannot replace a newer grade;
 previously affected libraries repair their due counts automatically. Review
 undo records remain effective even if the old reviewed card arrives later.
 
+Explicit Known Words marks and removals sync through your private iCloud
+library. Words retain their learning-language scope across devices. Vocabulary
+sets sync as library items, and review-based entries are derived from the
+saved review history.
+
 Deck type attachments, defaults, inheritance overrides, explicit global
 availability, and imported editing protection sync independently of the schema.
 Unlocking a type does not make it global. Update other devices before changing

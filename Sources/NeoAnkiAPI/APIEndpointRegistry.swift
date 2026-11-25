@@ -69,6 +69,7 @@ package enum APIEndpointHandler: String, CaseIterable, Sendable {
     case listStudyResponses, getStudyResponse, deleteStudyResponse
     case downloadStudyResponse, headStudyResponse
     case uploadMedia, headMedia, downloadMedia, mediaMetadata
+    case listKnownWords, recordVocabularyJudgment, createVocabularySet
     case listVocabularyPacks, getVocabularyPack, deleteVocabularyPack
     case searchVocabularyEntries, getVocabularyEntry
     case downloadVocabularyMedia, headVocabularyMedia

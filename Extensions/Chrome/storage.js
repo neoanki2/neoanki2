@@ -3,7 +3,7 @@ export const storageReady = chrome.storage.local.setAccessLevel({ accessLevel: '
 
 export async function readState() {
   await storageReady;
-  const state = await chrome.storage.local.get(['config', 'draft', 'lastDeck']);
+  const state = await chrome.storage.local.get(['config', 'draft', 'lastDeck', 'readingLanguages']);
   return { ...state, config: { port: 8766, ...state.config } };
 }
 

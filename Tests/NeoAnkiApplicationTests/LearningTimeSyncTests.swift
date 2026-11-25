@@ -141,3 +141,37 @@ private func activitySegment(_ item: Item, source: UUID = UUID(), id: UUID = UUI
     if case .current = await service.status() {} else { Issue.record("Expected activity recovery to clear sync failure") }
     await service.stop()
 }
+
+@Test func knownWordsSyncKeepsClearsAndRetriesTheSameEvents() async throws {
+    let (local, localDirectory, _) = try await activityRepository()
+    let (remote, remoteDirectory, _) = try await activityRepository()
+    defer { try? FileManager.default.removeItem(at: localDirectory); try? FileManager.default.removeItem(at: remoteDirectory) }
+    let term = VocabularyTerm(language: "de", expression: "Gift")
+    let cursor = try await local.currentChangeCursor()
+    let mark = try await local.setVocabularyJudgment(.known, for: term, changeID: UUID())
+    let clear = try await local.setVocabularyJudgment(.reviewHistory, for: term, changeID: UUID())
+    #expect(try await local.currentChangeCursor() == cursor)
+
+    let transport = ActivityTransport()
+    let metadata = SyncMetadataStore(directory: localDirectory.appendingPathComponent("known-words-sync"))
+    let first = VocabularyJudgmentSyncService(repository: local, transport: transport, metadata: metadata)
+    await transport.setFailing(true)
+    await #expect(throws: ActivitySyncFailure.self) { try await first.synchronize() }
+    #expect(Set(try await metadata.load().pendingOutbound?.map(\.id) ?? []) == [mark.id.uuidString, clear.id.uuidString])
+    await first.stop()
+    await transport.setFailing(false)
+
+    let restarted = VocabularyJudgmentSyncService(repository: local, transport: transport, metadata: metadata)
+    try await restarted.synchronize()
+    let sent = await transport.sentRecords()
+    #expect(sent.count == 2)
+    #expect(sent.allSatisfy { $0.resourceKind == "vocabularyJudgment" })
+
+    let incoming = ActivityTransport()
+    await incoming.receive(Array(sent.reversed()) + sent)
+    let recipient = VocabularyJudgmentSyncService(repository: remote, transport: incoming,
+        metadata: SyncMetadataStore(directory: remoteDirectory.appendingPathComponent("known-words-sync")))
+    try await recipient.synchronize()
+    #expect(try await remote.vocabularyStatuses(language: "de").isEmpty)
+    #expect(await incoming.sentRecords().isEmpty)
+}

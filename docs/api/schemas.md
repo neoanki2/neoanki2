@@ -2,7 +2,7 @@
 title: API schemas
 description: Generated request and response schemas for the NeoAnki local API.
 audience: api
-contract_digest: sha256:6ff4618f78e4f51af1ae89bb6a454366e671c0926b57417d49e09257f2aa5b27
+contract_digest: sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5
 parent: Local API reference
 permalink: /api/schemas/
 ---
@@ -629,6 +629,27 @@ Type: **object**.
 - `itemTypeIds` — array of string; required
 - `sourceDeckId` — string or null; required
 
+## KnownWord {#schema-knownword}
+
+Type: **object**.
+
+### Properties
+
+- `clozeMature` — boolean; required
+- `hasCards` — boolean; required
+- `judgment` — VocabularyJudgment; optional
+- `readingMature` — boolean; required
+- `term` — VocabularyTerm; required
+
+## KnownWordCollection {#schema-knownwordcollection}
+
+Type: **object**.
+
+### Properties
+
+- `data` — array of KnownWord; required
+- `page` — PageInfo; required
+
 ## LexicalEntry {#schema-lexicalentry}
 
 Type: **object**.
@@ -1170,6 +1191,30 @@ Type: **object**.
 - `code` — string; required
 - `pointer` — string; required
 
+## VocabularyJudgment {#schema-vocabularyjudgment}
+
+Type: **string**.
+
+## VocabularyJudgmentChange {#schema-vocabularyjudgmentchange}
+
+Type: **object**.
+
+### Properties
+
+- `changedAt` — string; required
+- `id` — string; required
+- `judgment` — VocabularyJudgment; required
+- `term` — VocabularyTerm; required
+
+## VocabularyJudgmentInput {#schema-vocabularyjudgmentinput}
+
+Type: **object**.
+
+### Properties
+
+- `judgment` — VocabularyJudgment; required
+- `term` — VocabularyTerm; required
+
 ## VocabularyPack {#schema-vocabularypack}
 
 Type: **object**.
@@ -1246,6 +1291,43 @@ Type: **object**.
 - `sourceName` — string or null; optional
 - `sourceUrl` — string or null; optional
 
-Contract digest: `sha256:6ff4618f78e4f51af1ae89bb6a454366e671c0926b57417d49e09257f2aa5b27`.
+## VocabularySetInput {#schema-vocabularysetinput}
+
+Type: **object**.
+
+### Properties
+
+- `acceptedVariants` — array of string; optional
+- `deckID` — string; optional
+- `meaning` — string; required
+- `meaningLanguage` — string; required
+- `occurrence` — integer; required
+- `productionForm` — string or null; optional
+- `productionOccurrence` — integer; optional
+- `productionSentence` — string or null; optional
+- `sentence` — string; required
+- `source` — string or null; optional
+- `term` — VocabularyTerm; required
+
+## VocabularySetReceipt {#schema-vocabularysetreceipt}
+
+Type: **object**.
+
+### Properties
+
+- `cardCount` — integer; required
+- `itemId` — string; required
+
+## VocabularyTerm {#schema-vocabularyterm}
+
+Type: **object**.
+
+### Properties
+
+- `expression` — string; required
+- `language` — string; required
+- `sense` — string or null; optional
+
+Contract digest: `sha256:1be510cbd46743c222b83c8249fe93e1acd3965702b2d3bb880ca1dd755f6fb5`.
 
 _Generated from the runtime schema catalog; do not edit by hand._

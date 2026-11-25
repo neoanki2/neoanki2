@@ -32,6 +32,24 @@ syncing within a short upload window. Another active device refreshes its loaded
 Browse rows when the change arrives, even while attachments are still downloading.
 Offline edits remain queued locally.
 
+## Known Words and vocabulary card sets
+
+Open **Library → Known Words** and choose the language you’re learning. Use
+**Add Word** to record a word or phrase you already understand. You can also mark
+words while using **Add Word**, **Learn in Context**, or [Chrome Reading Mode](../chrome-companion/#use-reading-mode).
+Known Words tracks each language separately.
+
+Choose **Create Card Set** to practice a term in context. Give it a short
+meaning and a sentence containing the term. **Understand in context** asks
+what the highlighted term means. **Complete the sentence** hides the exact
+occurrence with a native Cloze blank. Recall the missing form aloud or type it
+to compare, then choose your grade. Both cards have their own review schedules.
+
+Words can become **Known · From reviews** after spaced, successful meaning
+recall. **Cloze recall** reflects production separately. Use **Remove from Known**
+to correct a reading judgment and **Use Review History** to return to the
+automatic estimate.
+
 ## Add an item
 
 1. Select the destination deck if you want the new item preassigned there.

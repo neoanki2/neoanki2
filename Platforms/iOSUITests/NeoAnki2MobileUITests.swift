@@ -584,6 +584,52 @@ final class MobileNavigationUITests: NeoAnki2MobileUITestCase {
         preview.name = "Learn in Context minimal inputs"; preview.lifetime = .keepAlways; self.add(preview)
     }
 
+    func testKnownWordsAndContextualVocabularyCapture() throws {
+        let app = launchApp(additionalArguments: ["-vocabularyLearningLanguage", "es",
+                                                   "-vocabularyMeaningLanguage", "en"])
+        open("Library", in: app)
+        let knownWords = app.staticTexts["Known Words"]
+        XCTAssertTrue(knownWords.waitUntilExists(timeout: 8))
+        knownWords.tap()
+        let add = app.buttons["known-words-add"]
+        XCTAssertTrue(add.waitUntilExists(timeout: 8))
+        add.tap()
+        let word = app.textFields["vocabulary-set-word"]
+        XCTAssertTrue(word.waitUntilExists(timeout: 8))
+        word.tap(); word.typeText("hola")
+        app.buttons["vocabulary-set-save"].tap()
+        XCTAssertTrue(app.staticTexts["hola"].waitUntilExists(timeout: 8))
+
+        add.tap()
+        XCTAssertTrue(word.waitUntilExists(timeout: 8))
+        let mode = app.buttons["Create Cards"]
+        XCTAssertTrue(mode.waitUntilExists(timeout: 8)); mode.tap()
+        XCTAssertTrue(app.navigationBars["Create Vocabulary Set"].waitUntilExists(timeout: 5))
+        word.tap(); word.typeText("laguna")
+        let sentence = app.descendants(matching: .any)["vocabulary-set-sentence"].firstMatch
+        XCTAssertTrue(sentence.waitUntilExists(timeout: 8)); sentence.tap()
+        sentence.typeText("La laguna queda cerca de la casa.")
+        let meaning = app.descendants(matching: .any)["vocabulary-set-meaning"].firstMatch
+        XCTAssertTrue(meaning.waitUntilExists(timeout: 8)); meaning.tap()
+        meaning.typeText("lagoon")
+        let save = app.buttons["vocabulary-set-save"]
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
+        XCTAssertTrue(add.waitUntilExists(timeout: 8))
+        XCTAssertFalse(app.staticTexts["laguna"].exists)
+
+        open("Home", in: app)
+        let study = app.buttons["Study"]
+        XCTAssertTrue(study.waitUntilExists(timeout: 8)); study.tap()
+        let reveal = app.buttons["Show Answer"]
+        XCTAssertTrue(reveal.waitUntilExists(timeout: 12))
+        XCTAssertTrue(app.staticTexts["La laguna queda cerca de la casa."].exists)
+        reveal.tap()
+        XCTAssertTrue(app.staticTexts["lagoon"].waitUntilExists(timeout: 5))
+        app.buttons["Good"].tap()
+        XCTAssertTrue(app.staticTexts["Session Complete"].waitUntilExists(timeout: 12))
+    }
+
     func testTopLevelProductNavigation() throws {
         let app = launchApp()
         for title in ["Home", "Library", "Create", "Statistics", "Settings"] {

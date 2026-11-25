@@ -52,6 +52,7 @@ documentation, and releases.
 - [CloudKit offline-first sync ADR]({{ '/adr/0002-cloudkit-offline-first-sync/' | relative_url }})
 - [Application library boundary ADR]({{ '/adr/0003-application-library-boundary/' | relative_url }})
 - [Persistent spoken-response proposal]({{ '/proposals/persistent-spoken-responses/' | relative_url }})
+- [Personal vocabulary and immersion research]({{ '/proposals/personal-vocabulary-and-immersion/' | relative_url }})
 - [Legacy documentation-maintenance guide]({{ '/user/maintaining-documentation/' | relative_url }})
 
 The repository-level `CONTRIBUTING.md`, `README.md`, and `AGENTS.md` are short
