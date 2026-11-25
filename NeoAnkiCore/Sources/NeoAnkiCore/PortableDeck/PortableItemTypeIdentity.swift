@@ -40,6 +40,7 @@ public struct CanonicalTemplate: Codable, Equatable, Sendable {
     public let interaction: Interaction
     public let skill: Skill
     public let generateWhen: CanonicalSlotCondition?
+    public let fitStudyArea: Bool
 
     public init(
         name: String,
@@ -47,7 +48,8 @@ public struct CanonicalTemplate: Codable, Equatable, Sendable {
         components: [CanonicalComponent],
         interaction: Interaction,
         skill: Skill,
-        generateWhen: CanonicalSlotCondition?
+        generateWhen: CanonicalSlotCondition?,
+        fitStudyArea: Bool = false
     ) {
         self.name = name
         self.layout = layout
@@ -55,6 +57,7 @@ public struct CanonicalTemplate: Codable, Equatable, Sendable {
         self.interaction = interaction
         self.skill = skill
         self.generateWhen = generateWhen
+        self.fitStudyArea = fitStudyArea
     }
 }
 
@@ -218,7 +221,8 @@ public enum PortableItemTypeIdentity {
                     skill: template.skill,
                     generateWhen: try template.generateWhen.map {
                         try canonicalCondition($0, ordinals: ordinals)
-                    }
+                    },
+                    fitStudyArea: template.fitStudyArea
                 )
             }
         )

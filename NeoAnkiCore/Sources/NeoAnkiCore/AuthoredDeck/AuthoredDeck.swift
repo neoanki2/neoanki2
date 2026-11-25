@@ -276,6 +276,7 @@ private struct TemplateRecord {
     let interaction: Interaction
     let skill: Skill
     let condition: ConditionRecord?
+    let fitStudyArea: Bool
 }
 
 private struct ComponentRecord {
@@ -725,7 +726,7 @@ private struct AuthoredDeckLoader {
         try exactKeys(
             object,
             required: ["name", "prompt", "answer", "interaction", "skill"],
-            optional: ["generateWhen", "layout", "components"]
+            optional: ["generateWhen", "layout", "components", "fitStudyArea"]
         )
         guard let interaction = Interaction(rawValue: try requiredString(object, "interaction")) else {
             throw DecodeFailure("AD121", "Template interaction is not supported.")
@@ -752,7 +753,13 @@ private struct AuthoredDeckLoader {
             answer: try objectArray(object, "answer").map(decodeSlot),
             interaction: interaction,
             skill: Skill(input: input, output: output, operation: operation),
-            condition: try object["generateWhen"].map { try decodeCondition($0, depth: 0) }
+            condition: try object["generateWhen"].map { try decodeCondition($0, depth: 0) },
+            fitStudyArea: try object["fitStudyArea"].map { raw in
+                guard let value = raw as? Bool else {
+                    throw DecodeFailure("AD128", "Template fitStudyArea must be a boolean.")
+                }
+                return value
+            } ?? false
         )
     }
 
@@ -1127,7 +1134,8 @@ private struct AuthoredDeckCompiler {
                 },
                 interaction: record.interaction,
                 skill: record.skill,
-                generateWhen: condition
+                generateWhen: condition,
+                fitStudyArea: record.fitStudyArea
             )
         }
         guard record.layout == nil, record.components == nil else {
@@ -1145,7 +1153,8 @@ private struct AuthoredDeckCompiler {
             components: composition.components,
             interaction: record.interaction,
             skill: record.skill,
-            generateWhen: condition
+            generateWhen: condition,
+            fitStudyArea: record.fitStudyArea
         )
     }
 
@@ -2076,7 +2085,8 @@ public extension AuthoredDeck {
                         ComponentRecord(region: $0.region, purpose: $0.purpose, slot: try slot($0.field, $0.reveal))
                     }, prompt: try template.prompt.map { try slot($0.field, $0.reveal ?? .always) },
                     answer: try template.answer.map { try slot($0.field, $0.reveal ?? .always) },
-                    interaction: template.interaction, skill: template.skill, condition: nil)
+                    interaction: template.interaction, skill: template.skill, condition: nil,
+                    fitStudyArea: template.fitStudyArea)
             }
             let compiler = AuthoredDeckCompiler(root: URL(fileURLWithPath: "/"),
                 manifest: ManifestRecord(version: 5, root: draft.key, parts: [draft.partName], location: manifestLocation),

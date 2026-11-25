@@ -177,7 +177,7 @@ struct PortableDeckTypeMapping: Sendable {
 public enum PortableDeck {
     public static let fileExtension = "neodeck"
     public static let applicationID: Int32 = 0x4E44454B // "NDEK"
-    public static let version = 7
+    public static let version = 8
     fileprivate static let supportedVersions = 1...version
 
     public static func export(
@@ -401,8 +401,8 @@ private final class PortableDeckDatabase {
                         """
                         INSERT INTO templates(id, item_type_id, ordinal, name, prompt_json,
                             answer_json, layout, components_json, interaction, skill_json,
-                            generate_when_json)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                            generate_when_json, fit_study_area)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                         """,
                         [
                             .text(template.id.uuidString.lowercased()),
@@ -417,6 +417,7 @@ private final class PortableDeckDatabase {
                             template.generateWhen.map {
                                 .text(try PortableJSON.encodeCondition($0, ordinals: ordinals))
                             } ?? .null,
+                            .integer(template.fitStudyArea ? 1 : 0),
                         ]
                     )
                 }
@@ -602,6 +603,13 @@ private final class PortableDeckDatabase {
             expected["templates"] = [
                 "id", "item_type_id", "ordinal", "name", "prompt_json", "answer_json",
                 "layout", "components_json", "interaction", "skill_json", "generate_when_json",
+            ]
+        }
+        if formatVersion >= 8 {
+            expected["templates"] = [
+                "id", "item_type_id", "ordinal", "name", "prompt_json", "answer_json",
+                "layout", "components_json", "interaction", "skill_json", "generate_when_json",
+                "fit_study_area",
             ]
         }
         for (table, columns) in expected {
@@ -797,6 +805,7 @@ private final class PortableDeckDatabase {
             """
             SELECT item_type_id, id, ordinal, name, prompt_json, answer_json, layout,
                 components_json, interaction, skill_json, generate_when_json
+                \(formatVersion >= 8 ? ", fit_study_area" : "")
             FROM templates ORDER BY item_type_id, ordinal;
             """ :
             """
@@ -861,7 +870,8 @@ private final class PortableDeckDatabase {
                         ),
                         interaction: interaction,
                         skill: try PortableJSON.decodeSkill(skill),
-                        generateWhen: condition
+                        generateWhen: condition,
+                        fitStudyArea: formatVersion >= 8 && templateRow.integer(11) == 1
                     )
                 }
                 let promptSide = try PortableJSON.decodeSide(prompt, fields: decodedFields)
@@ -878,7 +888,8 @@ private final class PortableDeckDatabase {
                     components: composition.components,
                     interaction: interaction,
                     skill: try PortableJSON.decodeSkill(skill),
-                    generateWhen: condition
+                        generateWhen: condition,
+                        fitStudyArea: false
                 )
             }
             let type = ItemType(
@@ -1795,7 +1806,7 @@ private let schema = [
     CREATE TABLE manifest (
         singleton INTEGER PRIMARY KEY NOT NULL CHECK (singleton = 1),
         format_name TEXT NOT NULL CHECK (format_name = 'neoanki-portable-deck'),
-        format_version INTEGER NOT NULL CHECK (format_version = 7),
+        format_version INTEGER NOT NULL CHECK (format_version = 8),
         created_at TEXT NOT NULL, exporter TEXT NOT NULL,
         source_library_id TEXT NOT NULL, root_deck_id TEXT REFERENCES decks(id) ON DELETE RESTRICT,
         content_only INTEGER NOT NULL CHECK (content_only = 1),
@@ -1849,6 +1860,7 @@ private let schema = [
         components_json TEXT NOT NULL,
         interaction TEXT NOT NULL CHECK(interaction IN ('reveal','type','choose','record','audioSubmission','cloze','imageOcclusion','arrange')),
         skill_json TEXT NOT NULL, generate_when_json TEXT,
+        fit_study_area INTEGER NOT NULL CHECK(fit_study_area IN (0,1)),
         UNIQUE(item_type_id, ordinal), UNIQUE(item_type_id, id)
     );
     """,

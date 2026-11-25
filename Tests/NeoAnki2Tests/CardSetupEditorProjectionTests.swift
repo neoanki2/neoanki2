@@ -6,6 +6,32 @@ import Testing
 
 @testable import NeoAnkiSharedUI
 
+@Test("Fit study area is an explicit template setting")
+func fitStudyAreaSettingRoundTripsThroughTheEditorDraft() throws {
+    let front = FieldDef(name: "Character", type: .text, isRequired: true)
+    let back = FieldDef(name: "Keyword", type: .text, isRequired: true)
+    let template = Template(
+        name: "Character → keyword",
+        layout: .focus,
+        components: [
+            TemplateComponent(region: .primary, purpose: .question, source: .field(front.id)),
+            TemplateComponent(region: .secondary, purpose: .expectedAnswer, source: .field(back.id)),
+        ],
+        interaction: .reveal,
+        skill: Skill(input: .image, output: .text, operation: .recall),
+        fitStudyArea: true
+    )
+    let itemType = ItemType(name: "Kanji Academy", fields: [front, back], templates: [template])
+    var draft = ItemTypeStudioDraft(itemType: itemType)
+    let setupID = try #require(draft.cardSetups.first?.id)
+
+    #expect(draft.cardSetups[0].fitStudyArea)
+    #expect(try draft.cardSetups[0].template().fitStudyArea)
+    #expect(CardSetupEditorReducer.apply(.setFitStudyArea(false), to: &draft, cardSetupID: setupID))
+    let templateAfterToggle = try draft.cardSetups[0].template()
+    #expect(!templateAfterToggle.fitStudyArea)
+}
+
 @Test("Card setup editor projection preserves order and separates noncanonical mappings")
 func cardSetupEditorProjectionPreservesLegacyMappings() {
     let front = ItemTypeFieldDraft(name: "Front", type: .text)

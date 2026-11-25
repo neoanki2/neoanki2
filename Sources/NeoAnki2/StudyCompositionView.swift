@@ -13,7 +13,7 @@ struct StudyCompositionView: View {
     var evaluation: AnswerEvaluation? = nil
 
     private var components: [ResolvedTemplateComponent] {
-        SideContent.resolvedComponents(for: template, from: item)
+        VocabularySet.studyComponents(for: template, from: item, clozeGroup: clozeGroup)
     }
 
     private var effectiveLayout: CardLayoutID {
@@ -21,7 +21,9 @@ struct StudyCompositionView: View {
     }
 
     var body: some View {
-        StudyCardViewport(fitsMedia: fitsVisualPromptInViewport) {
+        StudyCardViewport(
+            fitsMedia: fitsVisualPromptInViewport || (template.fitStudyArea && !isAnswerRevealed)
+        ) {
             wireframe
         }
         .frame(maxWidth: 820)
@@ -52,9 +54,9 @@ struct StudyCompositionView: View {
             isAnswerRevealed: isAnswerRevealed,
             response: response,
             evaluation: evaluation,
-            enabled: [.type, .choose, .arrange].contains(template.interaction)
+            enabled: [.type, .choose, .arrange].contains(template.interaction) || template.id == VocabularySet.productionID
         ) { component, hole in
-            ContentValueView(
+            let content = ContentValueView(
                 value: component.value,
                 presentation: component.presentation,
                 isAnswerRevealed: isAnswerRevealed,
@@ -64,8 +66,11 @@ struct StudyCompositionView: View {
                 occlusionGroup: occlusionGroup,
                 clozeGroup: clozeGroup
             )
-            // Inherit the wireframe's study font. A local font(nil) resets it
-            // to the small UI default, including on unrelated poetry cards.
+            if shouldFitPrompt(component, hole: hole), case .text = component.value {
+                StudyAreaFittedPrompt { content }
+            } else {
+                content
+            }
         }
     }
 
@@ -78,6 +83,14 @@ struct StudyCompositionView: View {
         case .instruction, .media, .context:
             DesignSystem.Typography.richTextPointSize
         }
+    }
+
+    private func shouldFitPrompt(
+        _ component: ResolvedTemplateComponent,
+        hole: CardWireframeHole
+    ) -> Bool {
+        template.fitStudyArea && !isAnswerRevealed
+            && hole == .question && component.purpose == .question
     }
 }
 

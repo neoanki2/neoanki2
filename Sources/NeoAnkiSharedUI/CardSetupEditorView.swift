@@ -339,6 +339,7 @@ public enum CardSetupEditorMoveDirection: Int, Equatable, Sendable {
 /// Headless-testable actions used by the shared macOS and iOS editor wiring.
 public enum CardSetupEditorAction: Equatable, Sendable {
     case chooseLayout(CardLayoutID)
+    case setFitStudyArea(Bool)
     case addComponent(source: CardSetupComponentSourceDraft, hole: CardWireframeHole)
     case changeSource(componentID: UUID, source: CardSetupComponentSourceDraft)
     case editFixedText(componentID: UUID, value: String)
@@ -373,6 +374,9 @@ public enum CardSetupEditorReducer {
         switch action {
         case let .chooseLayout(layout):
             setup.chooseLayout(layout)
+
+        case let .setFitStudyArea(enabled):
+            setup.fitStudyArea = enabled
 
         case let .addComponent(source, hole):
             let insertion = descriptor.canonicalInsertion(for: hole)
@@ -1765,6 +1769,11 @@ public struct CardSetupEditorView: View {
             }
             .accessibilityIdentifier(ItemTypeStudioAccessibilityID.layoutPicker)
             Text(setup.layout.guidance)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Toggle("Fit study area", isOn: setupBinding(index, \.fitStudyArea))
+                .accessibilityIdentifier("fitStudyAreaToggle")
+            Text("Scales a text prompt to fill the study area. Revealed answers keep their normal size.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             validationMessages(for: .layout(cardSetupID: cardSetupID))

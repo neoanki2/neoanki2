@@ -2,7 +2,7 @@
 title: Local API reference
 description: Generated endpoint and schema reference for the NeoAnki loopback automation API.
 audience: api
-contract_digest: sha256:0b4f0520c008b125d949842d387f953839e741f17b6222b61b2d1033b318df39
+contract_digest: sha256:6ff4618f78e4f51af1ae89bb6a454366e671c0926b57417d49e09257f2aa5b27
 nav_order: 3
 permalink: /api/
 ---

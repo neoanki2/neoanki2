@@ -1020,6 +1020,7 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
     public let interaction: String
     public let skill: APISkill
     public let generateWhen: APICondition?
+    public let fitStudyArea: Bool?
 
     init(_ template: Template) {
         id = template.id.uuidString.lowercased()
@@ -1031,6 +1032,7 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
         interaction = template.interaction.rawValue
         skill = APISkill(template.skill)
         generateWhen = template.generateWhen.map(APICondition.init)
+        fitStudyArea = template.fitStudyArea
     }
 
     package func domain(parseUUID: (String, String) throws -> UUID, pointer: String) throws -> Template {
@@ -1053,7 +1055,8 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
                 },
                 interaction: interaction,
                 skill: resolvedSkill,
-                generateWhen: condition
+                generateWhen: condition,
+                fitStudyArea: fitStudyArea ?? false
             )
         }
         guard layout == nil, components == nil else {
@@ -1069,7 +1072,8 @@ public struct APITemplateDefinition: Codable, Sendable, Equatable {
             answer: Side(slots: try answer.enumerated().map { try $0.element.domain(parseUUID: parseUUID, pointer: pointer + "/answer/\($0.offset)") }),
             interaction: interaction,
             skill: resolvedSkill,
-            generateWhen: condition
+            generateWhen: condition,
+            fitStudyArea: fitStudyArea ?? false
         )
     }
 }

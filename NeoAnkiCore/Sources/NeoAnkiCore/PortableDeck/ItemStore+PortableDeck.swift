@@ -510,7 +510,8 @@ private func remappedPortableType(_ source: ItemType) -> ItemType {
             },
             interaction: template.interaction,
             skill: template.skill,
-            generateWhen: template.generateWhen.map { remappedCondition($0, ids: idMap) }
+            generateWhen: template.generateWhen.map { remappedCondition($0, ids: idMap) },
+            fitStudyArea: template.fitStudyArea
         )
     }
     return ItemType(name: source.name, fields: fields, templates: templates)

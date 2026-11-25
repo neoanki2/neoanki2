@@ -122,7 +122,16 @@ public struct MobileRootView: View {
             do { try MobileImageAttachmentUITestFixture.seedIfRequested() }
             catch { fixtureError = MobileAppModel.message(for: error) }
             #endif
-            if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
+            if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "fit-study-area" {
+                do {
+                    try await fixtures?.prepareFitStudyArea()
+                    await model.refresh()
+                    await model.beginStudy(scope: .allDecks, title: "All Decks")
+                } catch {
+                    fixtureError = MobileAppModel.message(for: error)
+                    await model.refresh()
+                }
+            } else if ProcessInfo.processInfo.environment["NEOANKI_TEST_SCENARIO"] == "mobile-redesign" {
                 do { try await fixtures?.prepareRedesign(); await model.refresh() }
                 catch { fixtureError = MobileAppModel.message(for: error); await model.refresh() }
                 fixturesReady = true

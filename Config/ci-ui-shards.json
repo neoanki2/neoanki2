@@ -208,7 +208,8 @@
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testScopedBrowseSelectionAttentionAndSavedRecordingPersistence",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTransferPreviewImportAndConcealment",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testNavigationRetentionBothGradingModesUndoAndSkip",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargeTextGradesReflowWithoutBreakingLabels"
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargeTextGradesReflowWithoutBreakingLabels",
+        "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable"
       ]
     },
     {
