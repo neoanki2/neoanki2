@@ -4,7 +4,8 @@ public extension ItemStore {
     @discardableResult
     func completeAudioSubmission(
         _ draft: StudyResponseDraft,
-        submittedAt: Date = .now
+        submittedAt: Date = .now,
+        extraStudyScope: DeckScope? = nil
     ) async throws -> StudyResponse {
         guard let mediaStore else {
             throw DatabaseError.invalidMediaAsset("Media storage is unavailable.")
@@ -26,7 +27,8 @@ public extension ItemStore {
                 reservationID: reservationID,
                 durationMilliseconds: draft.durationMilliseconds,
                 capturedAt: draft.capturedAt,
-                submittedAt: submittedAt
+                submittedAt: submittedAt,
+                extraStudyScope: extraStudyScope
             )
             try? await mediaStore.releaseReservations(scopeID: reservationScope)
             return response

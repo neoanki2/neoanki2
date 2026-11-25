@@ -5,6 +5,12 @@ import Observation
 
 public typealias StudyGradeUndo = NeoAnkiApplication.StudyGradeUndo
 
+public struct ExtraStudyStartUnavailable: LocalizedError, Sendable {
+    public var errorDescription: String? {
+        "This deck’s study availability changed. Check what’s ready on the deck."
+    }
+}
+
 public struct StudySessionStartTiming: Sendable, Equatable {
     public fileprivate(set) var dueCountSeconds = 0.0
     public fileprivate(set) var itemTypeCheckSeconds = 0.0
@@ -95,6 +101,9 @@ public final class StudyFeatureModel: Identifiable {
     public private(set) var lastStartTiming = StudySessionStartTiming()
 
     private let library: any LibraryBrowsing & LibraryStudying & LibraryStudyResponses
+    private var extraLibrary: (any LibraryExtraStudying)? { library as? any LibraryExtraStudying }
+    private var extraCardLimit: Int?
+    public var isExtraStudy: Bool { extraCardLimit != nil }
     private let itemSnapshotReader: (any LibraryStudyItemSnapshotReading)?
     /// Repeats only need the newly persisted scheduling state while waiting for
     /// the current pass to finish. Item/type/template content stays canonical
@@ -160,7 +169,21 @@ public final class StudyFeatureModel: Identifiable {
         }
     }
 
-    public func start() async { await start(scope: sessionScope, title: title) }
+    public func start() async { await start(scope: sessionScope, title: title, extraCardLimit: extraCardLimit) }
+
+    public func extraStudyAvailability() async throws -> Int {
+        guard isComplete, !isExtraStudy else { return 0 }
+        return try await extraLibrary?.availableExtraStudyCardCount(scope: sessionScope, asOf: clock()) ?? 0
+    }
+
+    public func startExtraStudy(scope: DeckScope, title: String, limit: Int) async throws {
+        await start(scope: scope, title: title, extraCardLimit: limit)
+        try Task.checkCancellation()
+        if let error = error ?? dueCheckError { throw error }
+        guard !isFinished else {
+            throw ExtraStudyStartUnavailable()
+        }
+    }
     public func skip() async { await skipCurrentCard() }
     public func dismissError() { error = nil }
 
@@ -170,13 +193,19 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     private var nextLesson: StudyCourseLesson? {
-        coursePath.nextLesson(before: sessionState.currentCard, in: sessionScope)
+        if isExtraStudy, sessionState.currentCard == nil { return nil }
+        return coursePath.nextLesson(before: sessionState.currentCard, in: sessionScope)
     }
 
     public func retryLoadingCards() async {
         guard !isLoading, !isGrading, !isCompletingSubmission, !isCompletingLesson else { return }
         if dueCheckError != nil {
-            await checkForMoreDueCards()
+            if isExtraStudy {
+                dueCheckError = nil
+                await advanceSession()
+            } else {
+                await checkForMoreDueCards()
+            }
         } else if didFailToLoad {
             await start()
         }
@@ -203,6 +232,10 @@ public final class StudyFeatureModel: Identifiable {
             guard generation == startGeneration else { return }
             coursePath.markRead(id)
             error = nil
+            if isExtraStudy {
+                await advanceSession()
+                return
+            }
             if sessionState.currentCard == nil, nextLesson == nil {
                 await checkForMoreDueCards()
                 return
@@ -216,7 +249,7 @@ public final class StudyFeatureModel: Identifiable {
 
     public var remainingCardCount: Int {
         guard !isFinished else { return 0 }
-        if isPreparingQueue {
+        if isPreparingQueue && !isExtraStudy {
             return expectedQueueCount
         }
         guard queue.indices.contains(index) else { return 0 }
@@ -228,6 +261,10 @@ public final class StudyFeatureModel: Identifiable {
     }
 
     public func start(scope: DeckScope, title: String) async {
+        await start(scope: scope, title: title, extraCardLimit: nil)
+    }
+
+    private func start(scope: DeckScope, title: String, extraCardLimit: Int?) async {
         let start = ContinuousClock.now
         guard !isGrading, !isCompletingSubmission, !isCompletingLesson else { return }
         let sessionNow = clock()
@@ -249,8 +286,32 @@ public final class StudyFeatureModel: Identifiable {
         self.title = title
         sessionScope = scope
         didFailToLoad = false
+        self.extraCardLimit = extraCardLimit
 
         do {
+            if let extraCardLimit {
+                if let courses = library as? any LibraryCourseStudying {
+                    let lessons = try await courses.studyCourseLessons(in: scope)
+                    guard startIsCurrent(generation) else { return }
+                    coursePath = CourseStudyPath(lessons: lessons)
+                }
+                let cards: [DueCard]
+                if coursePath.nextLesson(before: nil, in: scope) != nil {
+                    cards = []
+                } else {
+                    cards = try await extraLibrary?.extraStudyCards(scope: scope, asOf: clock(), limit: extraCardLimit) ?? []
+                }
+                guard startIsCurrent(generation) else { return }
+                sessionState.load(cards)
+                await advanceSession()
+                guard startIsCurrent(generation) else { return }
+                isLoading = false
+                timing.firstReadySeconds = start.elapsedSeconds
+                timing.totalSeconds = timing.firstReadySeconds
+                lastStartTiming = timing
+                return
+            }
+
             let countStart = ContinuousClock.now
             let dueCount = try await library.dueCount(
                 scope: scope,
@@ -484,13 +545,19 @@ public final class StudyFeatureModel: Identifiable {
         do {
             let context=StatisticsReviewContext(sessionID:learningTime.sessionID,deviceID:learningTime.deviceID,promptMilliseconds:max(0,learningTime.sessionMilliseconds-attemptActiveStart),answerMilliseconds:0)
             _ = try await StatisticsCapture.$context.withValue(context) {
-                try await library.completeAudioSubmission(draft, submittedAt: clock())
+                if let extraLibrary, isExtraIntroduction(card) {
+                    return try await extraLibrary.completeExtraStudyAudioSubmission(draft, scope: sessionScope, asOf: clock())
+                }
+                return try await library.completeAudioSubmission(draft, submittedAt: clock())
             }
             sessionState.recordSubmission(for: card)
             isAnswerRevealed = false
             await advanceSession()
             await onMutation?()
             return true
+        } catch is ExtraStudyCardUnavailable {
+            await discardMissingCurrentCard(card.id)
+            return false
         } catch {
             self.error = errorMapper.map(error)
             return false
@@ -520,12 +587,13 @@ public final class StudyFeatureModel: Identifiable {
             let context = StatisticsReviewContext(sessionID: learningTime.sessionID, deviceID: learningTime.deviceID,
                 promptMilliseconds: max(0, answerStart - attemptActiveStart), answerMilliseconds: max(0, activeEnd - answerStart), checkedCorrect: answerEvaluation == .unavailable || answerEvaluation == nil ? nil : answerEvaluation == .correct)
             let submission = try await StatisticsCapture.$context.withValue(context) {
-                try await library.submitReview(
-                cardID: card.id,
-                rating: rating,
-                asOf: now,
-                durationMilliseconds: reviewTiming.elapsedMilliseconds()
-            )
+                let duration = reviewTiming.elapsedMilliseconds()
+                if let extraLibrary, isExtraIntroduction(card) {
+                    return try await extraLibrary.submitExtraStudyReview(cardID: card.id, scope: sessionScope,
+                                                                         rating: rating, asOf: now, durationMilliseconds: duration)
+                }
+                return try await library.submitReview(cardID: card.id, rating: rating,
+                                                      asOf: now, durationMilliseconds: duration)
             }
             coursePath.updateIntroductions(for: card, change: 1)
             sessionState.recordGrade(submission, for: card, rating: rating)
@@ -533,6 +601,8 @@ public final class StudyFeatureModel: Identifiable {
             await advanceSession()
             await onMutation?()
         } catch DatabaseError.cardNotFound(_) {
+            await discardMissingCurrentCard(card.id)
+        } catch is ExtraStudyCardUnavailable {
             await discardMissingCurrentCard(card.id)
         } catch {
             self.error = errorMapper.map(error)
@@ -557,6 +627,10 @@ public final class StudyFeatureModel: Identifiable {
             prepareCurrentInteraction()
             resetAttemptTiming()
             isAnswerRevealed = true
+            if isExtraIntroduction(sessionState.currentCard) {
+                await advanceSession()
+                if sessionState.currentCard?.id != undo.reviewedCardID { isAnswerRevealed = false }
+            }
             await onMutation?()
         } catch {
             self.error = errorMapper.map(error)
@@ -600,9 +674,19 @@ public final class StudyFeatureModel: Identifiable {
                 compatibilityItem = try await library.item(id: itemID)
                 snapshot = nil
             }
+            let stillEligible: Bool
+            if isExtraIntroduction(current), let extraLibrary {
+                stillEligible = try await extraLibrary.isExtraStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
+            } else {
+                stillEligible = true
+            }
             guard !isLoading, !isPreparingQueue, !isGrading, !isCompletingSubmission,
                   startIsCurrent(generation), itemReloadGeneration == reloadGeneration,
                   currentCard?.id == cardID, index == position else { return }
+            guard stillEligible else {
+                await discardMissingCurrentCard(cardID)
+                return
+            }
             if let compatibilityItem {
                 sessionState.refresh(item: compatibilityItem.item, itemType: compatibilityItem.itemType)
             } else {
@@ -679,17 +763,29 @@ public final class StudyFeatureModel: Identifiable {
         await advanceSession()
     }
 
+    private func isExtraIntroduction(_ card: DueCard?) -> Bool {
+        guard isExtraStudy, let card else { return false }
+        return !sessionState.reviewedCardIDs.contains(card.id)
+    }
+
     private func advanceSession() async {
         guard !isPreparingQueue else { return }
         while queue.indices.contains(index) {
             sessionState.separateRelated()
-            guard queue[index].card.memory.phase == .new, queue[index].studyRelation?.work == nil else { break }
+            let card = queue[index]
+            let isExtra = isExtraIntroduction(card)
+            guard isExtra || (card.card.memory.phase == .new && card.studyRelation?.work == nil) else { break }
             let generation = startGeneration
             let cardID = queue[index].id
             let position = index
             isPreparingQueue = true
             do {
-                let eligible = try await library.isNewStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
+                let eligible: Bool
+                if isExtra, let extraLibrary {
+                    eligible = try await extraLibrary.isExtraStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
+                } else {
+                    eligible = try await library.isNewStudyCardEligible(cardID: cardID, scope: sessionScope, asOf: clock())
+                }
                 guard generation == startGeneration, sessionState.currentCard?.id == cardID, index == position else { return }
                 isPreparingQueue = false
                 guard !Task.isCancelled else { return }
@@ -699,7 +795,11 @@ public final class StudyFeatureModel: Identifiable {
                 guard generation == startGeneration, sessionState.currentCard?.id == cardID, index == position else { return }
                 isPreparingQueue = false
                 guard !Task.isCancelled else { return }
-                self.error = errorMapper.map(error)
+                if isExtra {
+                    dueCheckError = errorMapper.map(error)
+                } else {
+                    self.error = errorMapper.map(error)
+                }
                 return
             }
         }
@@ -718,7 +818,12 @@ public final class StudyFeatureModel: Identifiable {
             return
         }
 
-        await checkForMoreDueCards()
+        if isExtraStudy {
+            isFinished = true
+            prepareCurrentInteraction()
+        } else {
+            await checkForMoreDueCards()
+        }
     }
 
     private func checkForMoreDueCards() async {

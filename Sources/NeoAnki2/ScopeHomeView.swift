@@ -14,6 +14,8 @@ struct ScopeHomeView: View {
     @Bindable var itemsModel: ItemsModel
     let scope: StudyScope
     let onStudy: () -> Void
+    let extraStudyAvailability: () async throws -> Int
+    let prepareExtraStudy: (Int) async throws -> (@MainActor () -> Void)
     let onBrowse: () -> Void
     let onBrowseItemsNeedingAttention: () -> Void
     let onAddItem: () -> Void
@@ -22,12 +24,17 @@ struct ScopeHomeView: View {
 
     init(
         itemsModel: ItemsModel, statistics: StatisticsFeatureModel, scope: StudyScope,
-        onStudy: @escaping () -> Void, onBrowse: @escaping () -> Void,
+        onStudy: @escaping () -> Void,
+        extraStudyAvailability: @escaping () async throws -> Int,
+        prepareExtraStudy: @escaping (Int) async throws -> (@MainActor () -> Void),
+        onBrowse: @escaping () -> Void,
         onBrowseItemsNeedingAttention: @escaping () -> Void, onAddItem: @escaping () -> Void
     ) {
         self.itemsModel = itemsModel
         self.scope = scope
         self.onStudy = onStudy
+        self.extraStudyAvailability = extraStudyAvailability
+        self.prepareExtraStudy = prepareExtraStudy
         self.onBrowse = onBrowse
         self.onBrowseItemsNeedingAttention = onBrowseItemsNeedingAttention
         self.onAddItem = onAddItem
@@ -251,6 +258,12 @@ struct ScopeHomeView: View {
                     .font(DesignSystem.Typography.uiBody)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("scopeHomeNextDue")
+            }
+
+            if case .deck = scope.filter {
+                ExtraStudyAction(regularStudyReady: summary.hasDueCards || hasStandaloneLesson,
+                                 availability: extraStudyAvailability, prepare: prepareExtraStudy)
+                    .buttonStyle(.bordered)
             }
         }
     }

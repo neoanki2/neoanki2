@@ -185,3 +185,109 @@ private func contextJSON(_ expression: String, language: String = "en", group: U
     let log = try await store.synchronizedReviewRecord(id: saved.reviewLogID)
     #expect(log.log.schedulingAudit?.finalDueAt == saved.memory.due)
 }
+
+@Test func extraStudyBypassesOnlyExhaustedDeckLimits() async throws {
+    let (store, url) = try await spacingFixture()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let basic = try await store.defaultItemType()
+    let parent = try await store.createDeck(Deck(name: "Parent", newCardsPerDay: 1))
+    let child = try await store.createDeck(Deck(name: "Child", parentID: parent.id))
+    let paused = try await store.createDeck(Deck(name: "Paused", parentID: parent.id, newCardsPerDay: 0))
+    let scope = DeckScope.deck(parent.id)
+    let now = spacingNow.addingTimeInterval(10)
+    let first = spacingItem(basic, front: "Regular", deck: child.id)
+    let second = spacingItem(basic, front: "Inherited cap", deck: child.id)
+    let third = spacingItem(basic, front: "Zero cap", deck: paused.id)
+    let suspended = spacingItem(basic, front: "Suspended", deck: paused.id)
+    let future = spacingItem(basic, front: "Future", deck: paused.id)
+    for (index, item) in [first, second, third, suspended].enumerated() {
+        _ = try await store.createItem(item, now: spacingNow.addingTimeInterval(Double(index)))
+    }
+    _ = try await store.createItem(future, now: now.addingTimeInterval(3600))
+    var hidden = try #require(try await store.cards().first { $0.itemID == suspended.id })
+    hidden.isSuspended = true
+    try await store.applySynchronizedCard(hidden)
+
+    #expect(try await store.extraStudyCardCount(scope: scope, asOf: now) == 0)
+    let due = try #require(try await store.fetchDueCards(scope: scope, asOf: now).first)
+    #expect(due.item.id == first.id)
+    _ = try await store.submitReview(cardID: due.id, rating: .easy, now: now)
+
+    #expect(try await store.dueCount(scope: scope, asOf: now) == 0)
+    #expect(try await store.extraStudyCardCount(scope: scope, asOf: now) == 2)
+    #expect(try await store.extraStudyCardCount(scope: .allDecks, asOf: now) == 0)
+    #expect(try await store.extraStudyCardCount(scope: .deck(parent.id, includeDescendants: false), asOf: now) == 0)
+    #expect(try await store.extraStudyCardCount(scope: .deck(child.id), asOf: now) == 1)
+    #expect(try await store.extraStudyCardCount(scope: .deck(paused.id), asOf: now) == 1)
+    let batch = try await store.fetchExtraStudyCards(scope: scope, asOf: now, limit: 1)
+    #expect(batch.map { $0.item.id } == [second.id])
+    let extra = try #require(batch.first)
+    let receipt = try await store.submitReviewWithReceipt(cardID: extra.id, rating: .easy, now: now, extraStudyScope: scope)
+    let synced = try await store.synchronizedReviewRecord(id: receipt.reviewLogID)
+    #expect(synced.introductionContext?.deckID == child.id)
+    var edited = parent
+    edited.newCardsPerDay = 2
+    _ = try await store.updateDeck(edited)
+    let candidate = spacingItem(basic, front: "Still held back", deck: child.id)
+    _ = try await store.createItem(candidate, now: now)
+    #expect(try await store.dueCount(scope: scope, asOf: now) == 0)
+    try await store.revertReview(reviewLogID: receipt.reviewLogID, now: now)
+    #expect(try await store.dueCount(scope: scope, asOf: now) == 1)
+    #expect(try await store.extraStudyCardCount(scope: scope, asOf: now) == 0)
+}
+
+@Test func extraStudyKeepsRelatedCardSpacingAndRejectsAStaleGrade() async throws {
+    let (store, url) = try await spacingFixture()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let metadata = FieldDef(name: "Context provenance", type: .text)
+    let type = try await spacingType(in: store, extra: [metadata])
+    let a = try await store.createDeck(Deck(name: "A", newCardsPerDay: 0))
+    let b = try await store.createDeck(Deck(name: "B"))
+    let scope = DeckScope.deck(a.id)
+    let now = spacingNow.addingTimeInterval(10)
+    for (index, deck) in [a, a, b].enumerated() {
+        _ = try await store.createItem(spacingItem(type, deck: deck.id, extra: [
+            .init(fieldID: metadata.id, value: .text(contextJSON("take off"))),
+        ]), now: spacingNow.addingTimeInterval(Double(index)))
+    }
+    let extra = try #require(try await store.fetchExtraStudyCards(scope: scope, asOf: now, limit: 10).first)
+    #expect(try await store.extraStudyCardCount(scope: scope, asOf: now) == 1)
+    let relative = try #require(try await store.fetchDueCards(scope: .deck(b.id), asOf: now).first)
+    _ = try await store.submitReview(cardID: relative.id, rating: .easy, now: now)
+    #expect(try await store.extraStudyCardCount(scope: scope, asOf: now) == 0)
+    #expect(try await !store.isExtraStudyCardEligible(cardID: extra.id, scope: scope, asOf: now))
+    await #expect(throws: ExtraStudyCardUnavailable.self) {
+        try await store.submitReviewWithReceipt(cardID: extra.id, rating: .easy, now: now, extraStudyScope: scope)
+    }
+    #expect(try await store.reviewLogCount(for: extra.id) == 0)
+}
+
+@Test(arguments: [false, true])
+func extraStudyAppliesWorkOrderBeforeBatchLimit(prose: Bool) async throws {
+    let (store, url) = try await spacingFixture()
+    defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+    let attribution = FieldDef(name: "Attribution", type: .text)
+    let order = FieldDef(name: "Order", type: .text)
+    let separator = FieldDef(name: "Separator", type: .text)
+    let type = try await spacingType(in: store, name: prose ? "Prose Unit" : "Poem Line",
+                                     extra: [attribution] + (prose ? [order, separator] : []))
+    let deck = try await store.createDeck(Deck(name: "Work", newCardsPerDay: 0))
+    let scope = DeckScope.deck(deck.id)
+    var ids: [UUID] = []
+    for index in 0..<3 {
+        var item = spacingItem(type, front: index == 0 ? PoemSequenceResolver.openingPrompt : "Line \(index - 1)",
+                               deck: deck.id, extra: [.init(fieldID: attribution.id, value: .text("A work"))]
+                                   + (prose ? [.init(fieldID: order.id, value: .text("\(index)"))] : []))
+        item.fields[1].value = .text("Line \(index)")
+        if !prose && index == 0 { item.tags = [PoemSequenceResolver.openingTag] }
+        _ = try await store.createItem(item, now: spacingNow.addingTimeInterval(Double(index)))
+        ids.append(item.id)
+    }
+    for var card in try await store.cards() {
+        let index = try #require(ids.firstIndex(of: card.itemID))
+        card.memory.due = spacingNow.addingTimeInterval(-Double(index))
+        try await store.applySynchronizedCard(card)
+    }
+    let batch = try await store.fetchExtraStudyCards(scope: scope, asOf: spacingNow, limit: 2)
+    #expect(batch.map(\.item.id) == Array(ids.prefix(2)))
+}

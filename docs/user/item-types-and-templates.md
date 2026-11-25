@@ -233,6 +233,9 @@ groups are preserved exactly rather than silently normalized.
 Availability is useful for optional media: for example, generate a visual card
 only when an Image field is present. With no rule, the setup normally generates
 for every valid item; Cloze still generates once per distinct blank group.
+Daily deck limits control when generated cards can enter regular study.
+An [extra study session](../studying/#study-extra-new-cards) can include cards
+held back by a daily limit once the deck is caught up.
 
 ### Learning route
 

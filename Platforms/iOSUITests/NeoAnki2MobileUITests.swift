@@ -1402,6 +1402,51 @@ final class MobileStudyModesRedesignUITests: NeoAnki2MobileUITestCase {
         XCTAssertTrue(app.staticTexts["公園"].waitUntilExists(timeout: 5))
     }
 
+    func testExtraStudyFromRegularCompletionAndDeck() throws {
+        let app = launchApp(environment: [
+            "NEOANKI_TEST_SCENARIO": "mobile-redesign",
+            "NEOANKI_TEST_EXTRA_STUDY": "1",
+        ])
+        scrollToAndTap(app.staticTexts["Extra Study"], in: app)
+        let regular = app.buttons["Study"]
+        XCTAssertTrue(regular.waitUntilExists(timeout: 10))
+        XCTAssertFalse(app.buttons["studyExtraCards"].exists)
+        regular.tap()
+        let showAnswer = app.buttons["Show Answer"]
+        XCTAssertTrue(showAnswer.waitUntilExists(timeout: 10))
+        showAnswer.tap()
+        app.buttons["Easy"].tap()
+        XCTAssertTrue(app.staticTexts["Session Complete"].waitUntilExists(timeout: 10))
+
+        let extra = app.buttons["studyExtraCards"]
+        XCTAssertTrue(extra.waitUntilExists(timeout: 10))
+        extra.tap()
+        let count = app.textFields["extraStudyCardCount"]
+        XCTAssertTrue(count.waitUntilExists(timeout: 5))
+        XCTAssertEqual(count.value as? String, "3")
+        count.tap()
+        count.typeText(XCUIKeyboardKey.delete.rawValue + "0")
+        let start = app.buttons["startExtraStudySession"]
+        XCTAssertFalse(start.isEnabled)
+        count.typeText(XCUIKeyboardKey.delete.rawValue + "1")
+        XCTAssertTrue(start.isEnabled)
+        start.tap()
+        XCTAssertTrue(app.staticTexts["Question 2"].waitUntilExists(timeout: 10))
+        showAnswer.tap()
+        app.buttons["Easy"].tap()
+        XCTAssertTrue(app.staticTexts["Extra Session Complete"].waitUntilExists(timeout: 10))
+        app.buttons["Done"].tap()
+
+        XCTAssertTrue(extra.waitUntilExists(timeout: 10))
+        XCTAssertFalse(regular.exists)
+        extra.tap()
+        XCTAssertTrue(count.waitUntilExists(timeout: 5))
+        XCTAssertEqual(count.value as? String, "2")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(count.waitUntilGone(timeout: 5))
+        XCTAssertTrue(extra.exists)
+    }
+
     func testTypedAnswerComparisonKeepsSubmittedAnswer() throws {
         let app = launchApp(environment: ["NEOANKI_TEST_SCENARIO": "mobile-redesign", "NEOANKI_TEST_ANSWER_REVIEW": "1"])
         scrollToAndTap(app.staticTexts["Answer Review"], in: app)

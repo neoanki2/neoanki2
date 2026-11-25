@@ -115,6 +115,57 @@ public protocol LibraryItemTypeStudioSaving: Sendable {
     ) async throws -> ItemType
 }
 
+public protocol LibraryExtraStudying: Sendable {
+    func extraStudyCardCount(scope: DeckScope, asOf: Date) async throws -> Int
+    func extraStudyCards(scope: DeckScope, asOf: Date, limit: Int) async throws -> [DueCard]
+    func isExtraStudyCardEligible(cardID: UUID, scope: DeckScope, asOf: Date) async throws -> Bool
+    func submitExtraStudyReview(
+        cardID: UUID, scope: DeckScope, rating: ReviewRating, asOf: Date, durationMilliseconds: Int
+    ) async throws -> ReviewSubmission
+    func completeExtraStudyAudioSubmission(
+        _ draft: StudyResponseDraft, scope: DeckScope, asOf: Date
+    ) async throws -> StudyResponse
+}
+
+public extension LibraryExtraStudying {
+    func availableExtraStudyCardCount(scope: DeckScope, asOf now: Date = .now) async throws -> Int {
+        guard case .deck = scope else { return 0 }
+        let count = try await extraStudyCardCount(scope: scope, asOf: now)
+        if count > 0, let courses = self as? any LibraryCourseStudying,
+           try await courses.hasStandaloneCourseLesson(in: scope) {
+            return 0
+        }
+        return count
+    }
+}
+
+extension SQLiteLibraryRepository: LibraryExtraStudying {
+    public func extraStudyCardCount(scope: DeckScope, asOf now: Date) async throws -> Int {
+        try await store.extraStudyCardCount(scope: scope, asOf: now)
+    }
+
+    public func extraStudyCards(scope: DeckScope, asOf now: Date, limit: Int) async throws -> [DueCard] {
+        try await store.fetchExtraStudyCards(scope: scope, asOf: now, limit: limit)
+    }
+
+    public func isExtraStudyCardEligible(cardID: UUID, scope: DeckScope, asOf now: Date) async throws -> Bool {
+        try await store.isExtraStudyCardEligible(cardID: cardID, scope: scope, asOf: now)
+    }
+
+    public func submitExtraStudyReview(
+        cardID: UUID, scope: DeckScope, rating: ReviewRating, asOf now: Date, durationMilliseconds: Int
+    ) async throws -> ReviewSubmission {
+        try await store.submitReviewWithReceipt(cardID: cardID, rating: rating, now: now,
+                                                durationMs: durationMilliseconds, extraStudyScope: scope)
+    }
+
+    public func completeExtraStudyAudioSubmission(
+        _ draft: StudyResponseDraft, scope: DeckScope, asOf now: Date
+    ) async throws -> StudyResponse {
+        try await store.completeAudioSubmission(draft, submittedAt: now, extraStudyScope: scope)
+    }
+}
+
 public protocol LibraryStudying: Sendable {
     func dueCount(scope: DeckScope, asOf: Date) async throws -> Int
     func dueCards(scope: DeckScope, asOf: Date, limit: Int?) async throws -> [DueCard]

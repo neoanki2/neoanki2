@@ -16,6 +16,7 @@ struct StudyView: View {
     /// Owned by the host so the Study menu can open the editor, and so the
     /// unmodified grade shortcuts stay disabled while it is open.
     @Binding var isEditingCard: Bool
+    let prepareExtraStudy: (Int) async throws -> (@MainActor () -> Void)
     var onSessionStatistics: () -> Void = {}
     let onEndSession: () -> Void
 
@@ -36,7 +37,7 @@ struct StudyView: View {
 
     private var studyContent: some View {
         Group {
-            if model.isLoading {
+            if model.isLoading || (model.session.isExtraStudy && model.isPreparingQueue) {
                 loadingView
             } else if model.didFailToLoad || model.dueCheckError != nil {
                 loadFailureView
@@ -69,7 +70,7 @@ struct StudyView: View {
         .background(DesignSystem.detailBackground)
 
         .task {
-            await model.startSession(scope: scope)
+            if !model.session.isExtraStudy { await model.startSession(scope: scope) }
         }
         .onChange(of: endSessionTrigger) { _, triggered in
             guard triggered else { return }
@@ -191,12 +192,12 @@ struct StudyView: View {
     private var loadingView: some View {
         VStack(spacing: DesignSystem.Spacing.sm) {
             ProgressView()
-            Text("Loading due cards…")
+            Text(model.session.isExtraStudy ? "Loading extra cards…" : "Loading due cards…")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Loading due cards")
+        .accessibilityLabel(model.session.isExtraStudy ? "Loading extra cards" : "Loading due cards")
         .accessibilityIdentifier("studyLoading")
     }
 
@@ -221,7 +222,8 @@ struct StudyView: View {
     /// scope had nothing left to study.
     private var loadFailureView: some View {
         ContentUnavailableView {
-            Label("Couldn't Load Due Cards", systemImage: "exclamationmark.triangle")
+            Label(model.session.isExtraStudy ? "Couldn't Load Extra Cards" : "Couldn't Load Due Cards",
+                  systemImage: "exclamationmark.triangle")
         } description: {
             Text(model.dueCheckError ?? model.errorMessage ?? "The due cards for this scope could not be read.")
         } actions: {
@@ -243,9 +245,9 @@ struct StudyView: View {
 
     private var finishedView: some View {
         ContentUnavailableView {
-            Label("Session Complete", systemImage: "checkmark.circle")
+            Label(model.session.isExtraStudy ? "Extra Session Complete" : "Session Complete", systemImage: "checkmark.circle")
         } description: {
-            Text("No more due cards in this session.")
+            if !model.session.isExtraStudy { Text("No more due cards in this session.") }
             LearningTimeSaveStatusView()
         } actions: {
             VStack(spacing: DesignSystem.Spacing.md) {
@@ -254,6 +256,12 @@ struct StudyView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .accessibilityIdentifier("studySessionDone")
+
+                if case .deck = scope.filter, !model.session.isExtraStudy {
+                    ExtraStudyAction(availability: { try await model.session.extraStudyAvailability() },
+                                     prepare: prepareExtraStudy)
+                        .buttonStyle(.bordered)
+                }
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: DesignSystem.Spacing.md) {

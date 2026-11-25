@@ -129,7 +129,9 @@ The setting is one shared allowance for the deck and all of its subdecks. A new
 card graded anywhere in that subtree consumes one of the parent's slots. A
 subdeck can add a stricter limit of its own; cards there must fit both limits.
 Turn the limit off to remove that deck's cap, or set it to **0** to pause new
-cards throughout its subtree while continuing scheduled learning and reviews.
+cards in regular study throughout its subtree while continuing scheduled
+learning and reviews. Once the deck is caught up, [Study Extra Cards](../studying/#study-extra-new-cards)
+can temporarily bypass a limit set on the deck or one of its ancestors.
 
 The available-new and due totals also account for related-card spacing. New
 siblings of one item, or context examples of the same language and expression,

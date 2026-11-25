@@ -93,6 +93,11 @@ Choose **Study** from All Decks, Unassigned, or a deck. The session opens full
 screen and uses the same due-card queue and seven interactions as the Mac app:
 Reveal, Type Answer, Choose, Arrange, Record, Audio Submission, and Cloze.
 
+Once a deck is caught up, tap **Study Extra Cards** on the deck or on its
+regular session completion screen. Choose the batch size, then tap
+**Start Extra Session**. The batch uses the same full-screen study controls.
+See [Study extra new cards](../studying/#study-extra-new-cards).
+
 On a Record card, tap **Record Answer**, then **Stop Recording**. **Compare
 Recording** appears when your recording is ready, and you can replay it while
 grading your recall. To study without recording, tap **Reveal & Self-Grade**.

@@ -64,9 +64,10 @@ final class StudyModel {
     }
 
     var headerLabel: String {
-        guard !scopeLabel.isEmpty else { return remainingLabel }
-        guard !remainingLabel.isEmpty else { return scopeLabel }
-        return "\(scopeLabel) · \(remainingLabel)"
+        let title = session.isExtraStudy ? "Extra Study · \(scopeLabel)" : scopeLabel
+        guard !title.isEmpty else { return remainingLabel }
+        guard !remainingLabel.isEmpty else { return title }
+        return "\(title) · \(remainingLabel)"
     }
 
     var cardsReviewed: Int {

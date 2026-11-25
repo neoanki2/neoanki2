@@ -172,6 +172,10 @@ enum MobileRedesignUITestSeeder {
             try await seedCourseStudy(library: library)
             return
         }
+        if process.environment["NEOANKI_TEST_EXTRA_STUDY"] == "1" {
+            try await seedExtraStudy(library: library)
+            return
+        }
         try await seed(library: library)
     }
 
@@ -202,6 +206,18 @@ enum MobileRedesignUITestSeeder {
             FieldValue(fieldID: prompt.id, value: .text("They canceled meeting.")),
             FieldValue(fieldID: answer.id, value: .text("They canceled the meeting.")),
         ], deckID: deck.id))
+    }
+
+    private static func seedExtraStudy(library: any LibraryRepository) async throws {
+        guard try await library.items(scope: .allDecks, sort: .createdAscending, search: "").isEmpty else { return }
+        let deck = try await library.createDeck(Deck(name: "Extra Study", newCardsPerDay: 1))
+        let now = Date.now
+        for index in 1...4 {
+            _ = try await library.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+                .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question \(index)")),
+                .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer \(index)")),
+            ], deckID: deck.id), asOf: now.addingTimeInterval(Double(index - 10)))
+        }
     }
 
     private static func seedCourseStudy(library: any LibraryRepository) async throws {

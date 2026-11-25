@@ -1290,3 +1290,84 @@ private actor FirstStudyQueueLoadGate {
     #expect(model.isPreparingQueue == false)
     #expect(model.isLoading == false)
 }
+
+@Test @MainActor func extraStudyStopsAtItsBatchAndSupportsRepairsUndoAndEarlyExit() async throws {
+    let (_, store) = try await makeStudyFeatureModel(scheduler: LearningScheduler())
+    let deck = try await store.createDeck(Deck(name: "Paused deck", newCardsPerDay: 0))
+    let scope = DeckScope.deck(deck.id)
+    let now = Date(timeIntervalSince1970: 1_900_000_000)
+    for index in 0..<3 {
+        _ = try await store.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+            .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question \(index)")),
+            .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer \(index)")),
+        ], deckID: deck.id), now: now.addingTimeInterval(Double(index - 10)))
+    }
+    let library = SQLiteLibraryRepository(store: store)
+    let regular = StudyFeatureModel(library: library, scope: scope, title: deck.name, clock: { now })
+    await regular.start()
+    #expect(regular.isComplete)
+    #expect(try await regular.extraStudyAvailability() == 3)
+    let extra = StudyFeatureModel(library: library, scope: scope, title: deck.name, clock: { now })
+    try await extra.startExtraStudy(scope: scope, title: deck.name, limit: 2)
+    #expect(extra.learningTime.sessionID != regular.learningTime.sessionID)
+    let first = try #require(extra.currentCard)
+    await extra.grade(.again)
+    let second = try #require(extra.currentCard)
+    #expect(second.id != first.id)
+    await extra.grade(.easy)
+    #expect(extra.currentCard?.id == first.id)
+    await extra.grade(.easy)
+    #expect(extra.isComplete)
+    #expect(extra.completion.uniqueCards == 2)
+    #expect(extra.completion.reviews == 3)
+    #expect(try await extra.extraStudyAvailability() == 0)
+    await extra.undoLastGrade()
+    #expect(extra.currentCard?.id == first.id)
+    await extra.grade(.easy)
+    #expect(extra.isComplete)
+
+    let later = StudyFeatureModel(library: library, scope: scope, title: deck.name, clock: { now })
+    try await later.startExtraStudy(scope: scope, title: deck.name, limit: 5)
+    #expect(later.remainingCount == 1)
+    let ungraded = try #require(later.currentCard)
+    #expect(try await store.extraStudyCardCount(scope: scope, asOf: now) == 1)
+    #expect(try await store.reviewLogCount(for: ungraded.id) == 0)
+    #expect(try await store.card(id: ungraded.id).memory.phase == .new)
+}
+
+@Test @MainActor func extraStudyRechecksAvailabilityAtStartAndDropsCardsChangedDuringStudy() async throws {
+    let (_, store) = try await makeStudyFeatureModel()
+    let deck = try await store.createDeck(Deck(name: "Paused deck", newCardsPerDay: 0))
+    let scope = DeckScope.deck(deck.id)
+    let other = try await store.createDeck(Deck(name: "Other deck"))
+    let now = Date(timeIntervalSince1970: 1_900_000_000)
+    for index in 0..<3 {
+        _ = try await store.createItem(Item(itemTypeID: BuiltInItemTypes.basicID, fields: [
+            .init(fieldID: BuiltInItemTypes.frontFieldID, value: .text("Question \(index)")),
+            .init(fieldID: BuiltInItemTypes.backFieldID, value: .text("Answer \(index)")),
+        ], deckID: deck.id), now: now.addingTimeInterval(Double(index - 10)))
+    }
+    let library = SQLiteLibraryRepository(store: store)
+    #expect(try await library.availableExtraStudyCardCount(scope: scope, asOf: now) == 3)
+    var edited = deck
+    edited.newCardsPerDay = 1
+    _ = try await store.updateDeck(edited)
+    let extra = StudyFeatureModel(library: library, scope: scope, title: deck.name, clock: { now })
+    await #expect(throws: ExtraStudyStartUnavailable.self) {
+        try await extra.startExtraStudy(scope: scope, title: deck.name, limit: 3)
+    }
+    _ = try await store.updateDeck(deck)
+    try await extra.startExtraStudy(scope: scope, title: deck.name, limit: 3)
+    let first = try #require(extra.currentCard)
+    var moved = extra.queue[1].item
+    moved.deckID = other.id
+    _ = try await store.updateItem(moved, now: now)
+    _ = try await store.submitReview(cardID: first.id, rating: .easy, now: now)
+    await extra.grade(.easy)
+    #expect(try await store.reviewLogCount(for: first.id) == 1)
+    #expect(extra.currentCard?.item.id != moved.id)
+    #expect(extra.remainingCount == 1)
+    await extra.grade(.easy)
+    #expect(extra.isComplete)
+    #expect(extra.completion.uniqueCards == 1)
+}

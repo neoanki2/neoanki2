@@ -473,15 +473,32 @@ public final class LibraryFeatureModel {
         guard !isStartingStudy else { return }
         isStartingStudy = true
         defer { isStartingStudy = false }
-        let study = StudyFeatureModel(
+        let study = makeStudy(scope: scope, title: title)
+        activeStudy = study
+        await study.start()
+    }
+
+    public func extraStudyAvailability(in scope: DeckScope) async throws -> Int {
+        try await (library as? any LibraryExtraStudying)?.availableExtraStudyCardCount(scope: scope) ?? 0
+    }
+
+    public func prepareExtraStudy(scope: DeckScope, title: String, limit: Int) async throws -> StudyFeatureModel {
+        guard !isStartingStudy else { throw ExtraStudyStartUnavailable() }
+        isStartingStudy = true
+        defer { isStartingStudy = false }
+        let study = makeStudy(scope: scope, title: title)
+        try await study.startExtraStudy(scope: scope, title: title, limit: limit)
+        return study
+    }
+
+    private func makeStudy(scope: DeckScope, title: String) -> StudyFeatureModel {
+        StudyFeatureModel(
             library: library,
             scope: scope,
             title: title,
             mediaStore: mediaStore,
             onMutation: { [weak self] in await self?.studyDidMutate() }
         )
-        activeStudy = study
-        await study.start()
     }
 
     public func endStudy() async {

@@ -186,6 +186,7 @@ Private CloudKit sync includes decks, item types and their persisted templates
 state, immutable review and revert history, and shared content-addressed media.
 First reviews also carry their original deck and study day, so introducing new
 cards on one device consumes the same daily allowance on your other devices.
+This includes first grades saved during an extra study session.
 An upgrade restores missing allowance entries from older synced reviews using
 the current deck and study-day settings when the original context is unavailable;
 entries already recorded on the device are preserved.
@@ -329,7 +330,8 @@ to other devices.
 The Mac Dock icon and the iPhone/iPad Home Screen icon show the number of cards
 currently available to study across the whole library. Selecting one deck does
 not narrow this count. Suspended cards and new cards deferred by daily limits
-are excluded. The badge clears when no cards are due.
+are excluded. The badge clears when no cards are due, even when a deck can
+offer an extra study batch.
 Switching the Mac window into or out of [Full Screen](../getting-started/#navigate-the-library)
 does not change the library-wide due count shown by its Dock badge.
 
