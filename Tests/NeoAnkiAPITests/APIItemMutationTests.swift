@@ -346,6 +346,7 @@ import Testing
     let secondTemplateID = UUID().uuidString.lowercased()
     second["id"] = secondTemplateID
     second["name"] = "Second"
+    second["fitStudyArea"] = true
     templates.append(second)
     updateObject["templates"] = templates
     let addTemplateBody = String(
@@ -361,6 +362,7 @@ import Testing
 
     let typeUUID = try #require(UUID(uuidString: typeID))
     let domainType = try await store.itemType(id: typeUUID)
+    #expect(domainType.templates.first { $0.id.uuidString.lowercased() == secondTemplateID }?.fitStudyArea == true)
     let item = Item(
         itemTypeID: typeUUID,
         fields: domainType.fields.map { field in

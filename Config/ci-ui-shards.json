@@ -208,7 +208,14 @@
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testScopedBrowseSelectionAttentionAndSavedRecordingPersistence",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testTransferPreviewImportAndConcealment",
         "NeoAnki2MobileUITests/MobileRedesignParityUITests/testNavigationRetentionBothGradingModesUndoAndSkip",
-        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargeTextGradesReflowWithoutBreakingLabels",
+        "NeoAnki2MobileUITests/MobileRedesignParityUITests/testLargeTextGradesReflowWithoutBreakingLabels"
+      ]
+    },
+    {
+      "id": "phone-fit-study-area",
+      "device": "iPhone 17 Pro Max",
+      "workers": 1,
+      "tests": [
         "NeoAnki2MobileUITests/MobileFitStudyAreaUITests/testPromptFitsPortraitAndLandscapeAndKeepsAnswerReadable"
       ]
     },
